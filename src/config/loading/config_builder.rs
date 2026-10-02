@@ -3,13 +3,11 @@ use std::{collections::HashMap, io::Read};
 use indexmap::IndexMap;
 
 use super::{
-    ComponentHint, Process, deserialize_config_map, loader, prepare_input,
-    representation::ConfigMap, secret,
+    ComponentHint, Process, deserialize_component_map, deserialize_config_map,
+    interpolate_config_map_with_secrets, loader,
+    representation::{ConfigMap, deserialize_config_value},
 };
-use crate::config::{
-    ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter,
-};
+use crate::config::{ConfigBuilder, TestDefinition};
 
 #[derive(Debug)]
 pub struct ConfigBuilderLoader {
@@ -66,48 +64,50 @@ impl Default for ConfigBuilderLoader {
 }
 
 impl Process for ConfigBuilderLoader {
-    /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let prepared_input = prepare_input(input, self.interpolate_env)?;
-        Ok(if self.secrets.is_empty() {
-            prepared_input
+    fn should_interpolate_env(&self) -> bool {
+        self.interpolate_env
+    }
+
+    fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+        if self.secrets.is_empty() {
+            Ok(map)
         } else {
-            secret::interpolate(&prepared_input, &self.secrets)?
-        })
+            interpolate_config_map_with_secrets(&map, &self.secrets)
+        }
     }
 
     /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
     fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {
-            Some(ComponentHint::Source) => {
+            Some(hint @ ComponentHint::Source) => {
                 self.builder
                     .sources
-                    .extend(deserialize_config_map::<IndexMap<ComponentKey, SourceOuter>>(map)?);
+                    .extend(deserialize_component_map(map, hint)?);
             }
-            Some(ComponentHint::Sink) => {
-                self.builder.sinks.extend(deserialize_config_map::<
-                    IndexMap<ComponentKey, SinkOuter<_>>,
-                >(map)?);
+            Some(hint @ ComponentHint::Sink) => {
+                self.builder
+                    .sinks
+                    .extend(deserialize_component_map(map, hint)?);
             }
-            Some(ComponentHint::Transform) => {
-                self.builder.transforms.extend(deserialize_config_map::<
-                    IndexMap<ComponentKey, TransformOuter<_>>,
-                >(map)?);
+            Some(hint @ ComponentHint::Transform) => {
+                self.builder
+                    .transforms
+                    .extend(deserialize_component_map(map, hint)?);
             }
-            Some(ComponentHint::EnrichmentTable) => {
+            Some(hint @ ComponentHint::EnrichmentTable) => {
                 self.builder
                     .enrichment_tables
-                    .extend(deserialize_config_map::<
-                        IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
-                    >(map)?);
+                    .extend(deserialize_component_map(map, hint)?);
             }
             Some(ComponentHint::Test) => {
                 // This serializes to a `Vec<TestDefinition<_>>`, so we need to first expand
                 // it to an ordered map, and then pull out the value, ignoring the keys.
                 self.builder.tests.extend(
-                    deserialize_config_map::<IndexMap<String, TestDefinition<String>>>(map)?
-                        .into_iter()
-                        .map(|(_, test)| test),
+                    deserialize_config_value::<IndexMap<String, TestDefinition<String>>>(
+                        serde_json::Value::Object(map),
+                    )?
+                    .into_iter()
+                    .map(|(_, test)| test),
                 );
             }
             None => {

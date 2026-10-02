@@ -6,8 +6,10 @@ pub mod schema_coercion;
 mod secret;
 mod source;
 
+#[cfg(all(test, feature = "sources-demo_logs"))]
+mod tests;
+
 use std::{
-    collections::HashMap,
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
@@ -308,7 +310,11 @@ fn load_from_inputs(
     let mut errors = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|n| config.append(n)) {
+        if let Err(errs) = ConfigBuilderLoader::default()
+            .interpolate_env(false)
+            .load_from_input(input, format)
+            .and_then(|n| config.append(n))
+        {
             // TODO: add back paths
             errors.extend(errs.iter().map(|e| e.to_string()));
         }
@@ -321,40 +327,12 @@ fn load_from_inputs(
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(
-    mut input: R,
-    interpolate_env: bool,
-) -> Result<String, Vec<String>> {
-    let mut source_string = String::new();
-    input
-        .read_to_string(&mut source_string)
-        .map_err(|e| vec![e.to_string()])?;
-
-    if interpolate_env {
-        let mut vars: HashMap<String, String> = std::env::vars_os()
-            .filter_map(|(k, v)| match (k.into_string(), v.into_string()) {
-                (Ok(k), Ok(v)) => Some((k, v)),
-                _ => None,
-            })
-            .collect();
-
-        if !vars.contains_key("HOSTNAME")
-            && let Ok(hostname) = crate::get_hostname()
-        {
-            vars.insert("HOSTNAME".into(), hostname);
-        }
-        interpolation::interpolate(&source_string, &vars)
-    } else {
-        Ok(source_string)
-    }
-}
-
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
 {
     // Via configurations that load from raw string, skip interpolation of env
-    let with_vars = prepare_input(input, false)?;
+    let with_vars = loader::string_from_input(input)?;
 
     representation::deserialize_config(&with_vars, format)
 }

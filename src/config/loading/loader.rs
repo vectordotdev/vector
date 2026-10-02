@@ -1,12 +1,20 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use serde_json::Value;
 
 use super::{
-    Format, component_name, open_file, read_dir,
+    Format, component_name, interpolate_config_map_with_env_vars,
+    interpolation::ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX,
+    open_file, read_dir,
     representation::{
-        ConfigMap, deserialize_config, deserialize_config_value, merge_into_map, merge_values,
+        ConfigMap, deserialize_config_value, merge_into_map, merge_values, parse_config_value,
     },
+    schema_coercion::ValueCoercer,
+    secret::COLLECTOR,
 };
 
 /// Provides a hint to the loading system of the type of components that should be found
@@ -23,7 +31,7 @@ pub enum ComponentHint {
 impl ComponentHint {
     /// Returns the component string field that should host a component -- e.g. sources,
     /// transforms, etc.
-    const fn as_component_field(&self) -> &str {
+    pub(super) const fn as_component_field(self) -> &'static str {
         match self {
             ComponentHint::Source => "sources",
             ComponentHint::Transform => "transforms",
@@ -47,26 +55,42 @@ impl ComponentHint {
 // because there are numerous internal functions for dealing with (non)recursive loading that
 // rely on `&self` but don't need overriding and would be confusingly named in a public API.
 pub(super) mod process {
-    use std::io::Read;
-
     use super::*;
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why
     /// this is nested in a private mod.
     pub trait Process {
-        /// Prepares input for serialization. This can be a useful step to interpolate
-        /// environment variables or perform some other pre-processing on the input.
-        fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>>;
+        /// Returns whether environment variable interpolation should be applied.
+        fn should_interpolate_env(&self) -> bool;
 
-        /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
-        fn load<R: std::io::Read, T>(&mut self, input: R, format: Format) -> Result<T, Vec<String>>
-        where
-            T: serde::de::DeserializeOwned,
-        {
-            let content = self.prepare(input)?;
+        /// Runs loader-specific processing on the parsed, environment-interpolated map.
+        fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>>;
 
-            deserialize_config(&content, format)
+        /// Parses the document before substituting any environment variables or secrets.
+        fn load<R: Read>(&mut self, input: R, format: Format) -> Result<ConfigMap, Vec<String>> {
+            let source = string_from_input(input)?;
+            let value = parse_config_value(&source, format).map_err(|mut errors| {
+                if matches!(format, Format::Toml | Format::Json)
+                    && (ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX.is_match(&source)
+                        || COLLECTOR.is_match(&source))
+                {
+                    errors.push(
+                        "Configuration is parsed before interpolation. Quote placeholders in \
+                         TOML and JSON values; they will be coerced to the field's declared \
+                         type after substitution."
+                            .to_string(),
+                    );
+                }
+                errors
+            })?;
+            let map = deserialize_config_value(value)?;
+            let map = if self.should_interpolate_env() {
+                resolve_environment_variables(map)?
+            } else {
+                map
+            };
+            self.postprocess(map)
         }
 
         /// Helper method used by other methods to recursively handle file/dir loading, merging
@@ -222,10 +246,8 @@ where
         input: R,
         format: Format,
     ) -> Result<(), Vec<String>> {
-        if let Some(map) = self.load(input, format)? {
-            self.merge(map, None)?;
-        }
-        Ok(())
+        let map = self.load(input, format)?;
+        self.merge(map, None)
     }
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
@@ -298,9 +320,51 @@ fn merge_with_value(res: &mut ConfigMap, name: String, value: Value) -> Result<(
     Ok(())
 }
 
-/// Deserialize a configuration map into a `T`.
+/// Coerces a root configuration before serde performs authoritative deserialization.
 pub(super) fn deserialize_config_map<T: serde::de::DeserializeOwned>(
     map: ConfigMap,
 ) -> Result<T, Vec<String>> {
-    deserialize_config_value(Value::Object(map))
+    let mut value = Value::Object(map);
+    coerce_config(&mut value)?;
+    deserialize_config_value(value)
+}
+
+/// Coerces a namespaced component map using its schema at the root configuration field.
+pub(super) fn deserialize_component_map<T: serde::de::DeserializeOwned>(
+    map: ConfigMap,
+    hint: ComponentHint,
+) -> Result<indexmap::IndexMap<crate::config::ComponentKey, T>, Vec<String>> {
+    let key = hint.as_component_field();
+    let mut value = serde_json::json!({key: map});
+    coerce_config(&mut value)?;
+    deserialize_config_value(value[key].take())
+}
+
+fn coerce_config(value: &mut Value) -> Result<(), Vec<String>> {
+    let schema = vector_config::schema::generate_root_schema::<crate::config::ConfigBuilder>()
+        .map_err(|error| vec![format!("{error:?}")])?;
+    let schema = serde_json::to_value(schema).map_err(|error| vec![error.to_string()])?;
+    ValueCoercer::new(&schema)
+        .coerce(value)
+        .map_err(|error| vec![error.to_string()])
+}
+
+pub(super) fn string_from_input<R: Read>(mut input: R) -> Result<String, Vec<String>> {
+    let mut source = String::new();
+    input
+        .read_to_string(&mut source)
+        .map_err(|error| vec![error.to_string()])?;
+    Ok(source)
+}
+
+fn resolve_environment_variables(map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+    let mut vars = std::env::vars_os()
+        .filter_map(|(key, value)| Some((key.into_string().ok()?, value.into_string().ok()?)))
+        .collect::<HashMap<_, _>>();
+    if !vars.contains_key("HOSTNAME")
+        && let Ok(hostname) = crate::get_hostname()
+    {
+        vars.insert("HOSTNAME".into(), hostname);
+    }
+    interpolate_config_map_with_env_vars(&map, &vars)
 }
