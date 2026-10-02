@@ -130,6 +130,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
                     unit: "1".to_string(),
+                    metadata: vec![],
                     data: Some(Data::Summary(Summary {
                         data_points: vec![SummaryDataPoint {
                             attributes: vec![
@@ -183,6 +184,7 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     trace_id: (1..17).collect::<Vec<u8>>(),
                     span_id: (1..9).collect::<Vec<u8>>(),
                     parent_span_id: (1..9).collect::<Vec<u8>>(),
+                    flags: 0,
                     name: "span".to_string(),
                     kind: 1,
                     start_time_unix_nano: 1713525203000000000,
@@ -654,6 +656,7 @@ async fn receive_sum_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Sum(Sum {
                             data_points: vec![NumberDataPoint {
                                 attributes: vec![
@@ -746,6 +749,7 @@ async fn receive_sum_non_monotonic_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Sum(Sum {
                             data_points: vec![NumberDataPoint {
                                 attributes: vec![
@@ -838,6 +842,7 @@ async fn receive_gauge_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Gauge(Gauge {
                             data_points: vec![NumberDataPoint {
                                 attributes: vec![
@@ -927,6 +932,7 @@ async fn receive_histogram_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Histogram(Histogram {
                             aggregation_temporality: AggregationTemporality::Cumulative as i32,
                             data_points: vec![HistogramDataPoint {
@@ -1054,6 +1060,7 @@ async fn receive_histogram_delta_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Histogram(Histogram {
                             aggregation_temporality: AggregationTemporality::Delta as i32,
                             data_points: vec![HistogramDataPoint {
@@ -1181,6 +1188,7 @@ async fn receive_exponential_histogram_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::ExponentialHistogram(ExponentialHistogram {
                             aggregation_temporality: AggregationTemporality::Cumulative as i32,
                             data_points: vec![ExponentialHistogramDataPoint {
@@ -1321,6 +1329,7 @@ async fn receive_summary_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Summary(Summary {
                             data_points: vec![SummaryDataPoint {
                                 attributes: vec![

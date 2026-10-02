@@ -14,7 +14,7 @@ pub mod agentpayload {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-/// Generated types for `datadoghq.api.metrics.v3` (metrics intake v3).
+/// Generated types for `datadoghq.api.metrics.v3` (metrics intake).
 #[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 pub mod metrics_v3 {
     include!(concat!(env!("OUT_DIR"), "/datadoghq.api.metrics.v3.rs"));
