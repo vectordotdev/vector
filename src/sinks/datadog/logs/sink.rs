@@ -318,11 +318,10 @@ impl LogRequestBuilder {
     ///
     /// Returns the serialized events, the buffer, and the byte size of the events. Events that do
     /// not fit remain in the `events` parameter. Events rejected during encoding are removed.
-    #[doc(hidden)]
     fn serialize_with_capacity(
         &self,
         events: &mut VecDeque<(Event, JsonSize)>,
-    ) -> Result<(Vec<Event>, Vec<u8>, GroupedCountByteSize), io::Error> {
+    ) -> io::Result<(Vec<Event>, Vec<u8>, GroupedCountByteSize)> {
         let total_estimated =
             events.iter().map(|(_, size)| size.get()).sum::<usize>() + events.len() * 2;
         let mut buf = Vec::with_capacity(total_estimated);
@@ -400,7 +399,7 @@ fn encode_log(
     include_comma: bool,
     truncation: Option<DatadogLogsTruncationConfig>,
     conforms_as_agent: bool,
-) -> Result<bool, io::Error> {
+) -> io::Result<bool> {
     let existing_len = buf.len();
     let original_encoded_size = write_log(buf, event, include_comma)?;
     let Some(truncation) =
@@ -478,7 +477,7 @@ fn select_message_body_len(
     }
 }
 
-fn write_log(buf: &mut Vec<u8>, event: &Event, include_comma: bool) -> Result<usize, io::Error> {
+fn write_log(buf: &mut Vec<u8>, event: &Event, include_comma: bool) -> io::Result<usize> {
     if include_comma {
         buf.push(b',');
     }
@@ -504,7 +503,7 @@ fn set_truncated_message(
         Bytes::from(truncated);
 }
 
-fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> Result<usize, io::Error> {
+fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<usize> {
     let tags_path = event_path!(DDTAGS);
     let previous_size = log
         .get(tags_path)
@@ -559,7 +558,7 @@ const fn json_character_encoded_size(character: char) -> usize {
     }
 }
 
-fn json_value_encoded_size(value: &Value) -> Result<usize, io::Error> {
+fn json_value_encoded_size(value: &Value) -> io::Result<usize> {
     let mut sink = io::sink();
     encoding::as_tracked_write(&mut sink, value, |writer, value| {
         serde_json::to_writer(writer, value)
@@ -1070,19 +1069,21 @@ mod tests {
 
     #[test]
     fn truncation_preserves_utf8_boundaries() {
-        let original = "😀".repeat(300_000);
-        let log = LogEvent::from(original.clone());
+        for prefix_len in 0..4 {
+            let original = format!("{}{}", "x".repeat(prefix_len), "😀".repeat(300_000));
+            let log = LogEvent::from(original.clone());
 
-        let logs = encode_logs(vec![Event::Log(log)], true, false);
+            let logs = encode_logs(vec![Event::Log(log)], true, false);
 
-        let message = logs[0]["message"]
-            .as_str()
-            .expect("message should be valid UTF-8");
-        let body = message
-            .strip_suffix(TRUNCATION_MARKER)
-            .expect("message should have truncation marker");
-        assert!(original.starts_with(body));
-        assert!(body.len() < MAX_LOG_BYTES);
+            let message = logs[0]["message"]
+                .as_str()
+                .expect("message should be valid UTF-8");
+            let body = message
+                .strip_suffix(TRUNCATION_MARKER)
+                .expect("message should have truncation marker");
+            assert!(original.starts_with(body));
+            assert!(body.len() < MAX_LOG_BYTES);
+        }
     }
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
