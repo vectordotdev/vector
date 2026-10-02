@@ -345,15 +345,47 @@ impl HousekeepingPrepare {
             "master must still contain release version {}",
             self.version
         );
+        // Restore the VRL main revision master built against before the release.
+        // VRL main may have moved to changes master has not adopted yet.
+        let base_lock = git::run_and_check_output(&[
+            "show",
+            &format!("refs/tags/v{}^:Cargo.lock", self.version),
+        ])?;
+        let vrl_revision = locked_vrl_git_revision(&base_lock)?;
         let manifest = housekeeping_manifest(&fs::read_to_string("Cargo.toml")?, &self.version)?;
         fs::write("Cargo.toml", manifest)?;
         Command::new("cargo")
             .args(["update", "-p", "vector"])
             .check_run()?;
         Command::new("cargo")
-            .args(["update", "-p", "vrl"])
+            .args(["update", "-p", "vrl", "--precise", &vrl_revision])
             .check_run()
     }
+}
+
+/// Returns the VRL git revision locked in a development (pre-release) Cargo.lock.
+fn locked_vrl_git_revision(lock: &str) -> Result<String> {
+    let lock: toml::Value = toml::from_str(lock).context("failed to parse lock file")?;
+    let mut sources = lock
+        .get("package")
+        .and_then(toml::Value::as_array)
+        .context("Cargo.lock is missing packages")?
+        .iter()
+        .filter(|package| package.get("name").and_then(toml::Value::as_str) == Some("vrl"))
+        .map(|package| package.get("source").and_then(toml::Value::as_str));
+    let source = sources
+        .next()
+        .flatten()
+        .context("Cargo.lock is missing a VRL source")?;
+    ensure!(sources.next().is_none(), "Cargo.lock must contain one VRL");
+    let revision = source
+        .strip_prefix("git+https://github.com/vectordotdev/vrl.git?branch=main#")
+        .context("the preparation base must lock VRL to its main branch")?;
+    ensure!(
+        revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "invalid VRL revision {revision}"
+    );
+    Ok(revision.to_owned())
 }
 
 impl HousekeepingValidate {
@@ -907,7 +939,8 @@ fn append_github_step_summary(line: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_cargo_version, parse_preparation_branch, preparation_branch, release_file_allowed,
+        locked_vrl_git_revision, parse_cargo_version, parse_preparation_branch, preparation_branch,
+        release_file_allowed,
     };
     use indoc::indoc;
 
@@ -974,5 +1007,18 @@ mod tests {
         ));
         assert!(!release_file_allowed("src/main.rs", &version));
         assert!(!release_file_allowed("changelog.d/README.txt", &version));
+    }
+
+    #[test]
+    fn housekeeping_restores_the_base_vrl_revision() {
+        let revision = "e7d8d0f59062e44c18da6f861a7fd0ddfe24cf9f";
+        let lock = format!(
+            "[[package]]\nname = \"vector\"\nversion = \"0.59.0-dev\"\n\n[[package]]\nname = \"vrl\"\nversion = \"0.36.0\"\nsource = \"git+https://github.com/vectordotdev/vrl.git?branch=main#{revision}\"\n"
+        );
+        assert_eq!(locked_vrl_git_revision(&lock).unwrap(), revision);
+
+        // A base already pinned to a registry release has no main revision to restore.
+        let registry = "[[package]]\nname = \"vrl\"\nversion = \"0.36.0\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n";
+        assert!(locked_vrl_git_revision(registry).is_err());
     }
 }
