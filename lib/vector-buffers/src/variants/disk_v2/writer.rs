@@ -375,6 +375,7 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
         if buf.len() >= self.buf.capacity() {
             self.inner.write_all(buf).await?;
+            self.inner.flush().await?;
 
             let flush_result = flush_result.get_or_insert(FlushResult::default());
             flush_result.events_flushed += event_count as u64;
@@ -408,7 +409,14 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         let events_flushed = self.unflushed_events as u64;
         let bytes_flushed = self.buf.len() as u64;
 
-        let result = self.inner.write_all(&self.buf[..]).await;
+        // Accepting a write does not necessarily make it visible to another
+        // file handle (notably for tokio::fs::File). Finish the write before
+        // reporting flushed records and waking the buffer reader.
+        let result = async {
+            self.inner.write_all(&self.buf[..]).await?;
+            self.inner.flush().await
+        }
+        .await;
         self.unflushed_events = 0;
         self.buf.clear();
 
@@ -1989,5 +1997,132 @@ where
 {
     fn drop(&mut self) {
         self.close();
+    }
+}
+
+#[cfg(test)]
+mod write_completion_tests {
+    use std::{
+        io,
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use tokio::io::AsyncWrite;
+    use tokio_test::{assert_pending, assert_ready, task::spawn};
+
+    use super::TrackingBufWriter;
+
+    // Like tokio::fs::File, accepting a write need not make its bytes visible
+    // to another handle. Only a completed flush publishes this writer's bytes.
+    #[derive(Default)]
+    struct DeferredWriter {
+        pending: Vec<u8>,
+        visible: Vec<u8>,
+        defer_flush: bool,
+        fail_flush: bool,
+    }
+
+    impl AsyncWrite for DeferredWriter {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            bytes: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            self.pending.extend_from_slice(bytes);
+            Poll::Ready(Ok(bytes.len()))
+        }
+
+        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            if self.defer_flush {
+                self.defer_flush = false;
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
+            }
+            if self.fail_flush {
+                return Poll::Ready(Err(io::Error::other("deferred write failed")));
+            }
+            let pending = std::mem::take(&mut self.pending);
+            self.visible.extend_from_slice(&pending);
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            self.poll_flush(cx)
+        }
+    }
+
+    fn writer() -> TrackingBufWriter<DeferredWriter> {
+        TrackingBufWriter::with_capacity(
+            8,
+            DeferredWriter {
+                defer_flush: true,
+                ..Default::default()
+            },
+        )
+    }
+
+    #[tokio::test]
+    async fn explicit_flush_waits_for_write_completion() {
+        let mut writer = writer();
+        assert!(writer.write(2, b"small").await.unwrap().is_none());
+        let mut flush = spawn(writer.flush());
+        assert_pending!(flush.poll());
+        let result = assert_ready!(flush.poll()).unwrap().unwrap();
+        drop(flush);
+        assert_eq!(writer.get_ref().visible, b"small");
+        assert_eq!(result.events_flushed, 2);
+        assert_eq!(result.bytes_flushed, 5);
+    }
+
+    #[tokio::test]
+    async fn implicit_flush_waits_for_write_completion() {
+        let mut writer = writer();
+        assert!(writer.write(2, b"first").await.unwrap().is_none());
+        let mut write = spawn(writer.write(3, b"next"));
+        assert_pending!(write.poll());
+        let result = assert_ready!(write.poll()).unwrap().unwrap();
+        drop(write);
+        assert_eq!(writer.get_ref().visible, b"first");
+        assert_eq!(result.events_flushed, 2);
+        assert_eq!(result.bytes_flushed, 5);
+        let result = writer.flush().await.unwrap().unwrap();
+        assert_eq!(writer.get_ref().visible, b"firstnext");
+        assert_eq!(result.events_flushed, 3);
+        assert_eq!(result.bytes_flushed, 4);
+    }
+
+    #[tokio::test]
+    async fn direct_write_waits_for_write_completion() {
+        // Exercise both the exact-capacity boundary and an oversized write.
+        for bytes in [b"12345678".as_slice(), b"123456789".as_slice()] {
+            let mut writer = writer();
+            let mut write = spawn(writer.write(2, bytes));
+            assert_pending!(write.poll());
+            let result = assert_ready!(write.poll()).unwrap().unwrap();
+            drop(write);
+            assert_eq!(writer.get_ref().visible, bytes);
+            assert_eq!(result.events_flushed, 2);
+            assert_eq!(result.bytes_flushed, bytes.len() as u64);
+        }
+    }
+
+    #[tokio::test]
+    async fn deferred_write_errors_are_not_reported_as_flushed() {
+        for bytes in [b"small".as_slice(), b"123456789".as_slice()] {
+            let mut writer = TrackingBufWriter::with_capacity(
+                8,
+                DeferredWriter {
+                    fail_flush: true,
+                    ..Default::default()
+                },
+            );
+            let result = match writer.write(1, bytes).await {
+                Ok(None) => writer.flush().await,
+                other => other,
+            };
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Other);
+            assert!(writer.get_ref().visible.is_empty());
+        }
     }
 }
