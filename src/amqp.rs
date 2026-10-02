@@ -64,6 +64,10 @@ impl AmqpConfig {
         let addr = self.connection_string.clone();
         let conn = match &self.tls {
             Some(tls) => {
+                if tls.has_protocol_version_bounds() {
+                    vector_lib::tls::warn_unenforceable_protocol_versions("lapin");
+                }
+
                 let cert_chain = if let Some(ca) = &tls.ca_file {
                     Some(tokio::fs::read_to_string(ca.to_owned()).await?)
                 } else {
