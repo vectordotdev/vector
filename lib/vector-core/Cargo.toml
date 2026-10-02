@@ -41,7 +41,7 @@ pin-project.workspace = true
 proptest = { workspace = true, optional = true }
 prost-types.workspace = true
 prost.workspace = true
-quanta = { version = "0.12.6", default-features = false }
+quanta = { version = "0.13.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 zmij = { version = "1", default-features = false }
 serde.workspace = true
