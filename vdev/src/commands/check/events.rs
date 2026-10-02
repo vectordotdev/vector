@@ -375,12 +375,16 @@ fn validate_event(events: &HashMap<String, Event>, name: &str, handle_name: &str
 
 // ---- Macro arg parsers (operate on small token strings) --------------------
 
-/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw
-/// source slice of an impl block (which preserves comments and original
-/// formatting that `to_token_stream` strips).
+/// `emit!(ComponentEventsDropped...)` detection regex, applied to the raw source slice of an impl
+/// block (which preserves comments and original formatting that `to_token_stream` strips).
 static RE_EMIT_DROPPED: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?:emit|register)!\([ \t\r\n]*ComponentEventsDropped(?:[^A-Za-z0-9_]|$)").unwrap()
 });
+
+fn emits_component_events_dropped(source: &str) -> bool {
+    RE_EMIT_DROPPED.is_match(source)
+        || (source.contains("ComponentEventsDropped") && source.contains(".emit_with_group("))
+}
 
 /// `emit!(EventName)` / `register!(Path::EventName)` use-counting regex,
 /// applied to the raw file text so it sees calls nested inside other macros
@@ -733,7 +737,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
                     "InternalEventHandle" => event.impl_event_handle = true,
                     _ => {}
                 }
-                if RE_EMIT_DROPPED.is_match(&raw_block) {
+                if emits_component_events_dropped(&raw_block) {
                     event.emits_component_events_dropped = true;
                 }
                 self.impl_stack.push(ImplCtx { event_name });
@@ -880,6 +884,7 @@ impl Scanner<'_> {
             // Component-events-dropped emission.
             if expr.contains("emit ! (ComponentEventsDropped")
                 || expr.contains("register ! (ComponentEventsDropped")
+                || (expr.contains("ComponentEventsDropped") && expr.contains(". emit_with_group ("))
             {
                 event.emits_component_events_dropped = true;
             }
@@ -1257,6 +1262,19 @@ mod tests {
         // comma must not be split at the comma inside `<...>`.
         let input = "events_dropped : Registered<ComponentEventsDropped<'static, INTENTIONAL>> = register!(X)";
         assert_eq!(split_comma_args(input), vec![input.to_string()]);
+    }
+
+    #[test]
+    fn recognizes_component_events_dropped_emit_with_group() {
+        let source = r#"
+            ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "discarded",
+            }
+            .emit_with_group(group);
+        "#;
+
+        assert!(emits_component_events_dropped(source));
     }
 
     #[test]

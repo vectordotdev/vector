@@ -424,6 +424,10 @@ components: sources: internal_metrics: {
 					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
 					required:    true
 				}
+				group: {
+					description: "The group that the discarded event belonged to. This tag is included only when enabled in the component configuration."
+					required:    false
+				}
 			}
 		}
 		component_errors_total: {
