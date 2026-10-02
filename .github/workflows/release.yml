@@ -33,7 +33,9 @@ jobs:
 
   prepare-helm-release:
     name: Prepare Helm chart release
-    needs: Release
+    # The Helm release ends by pushing refreshed Kubernetes manifests to master.
+    # Start it after housekeeping has pushed, so the two pushes to master never race.
+    needs: [Release, housekeeping]
     if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
