@@ -332,21 +332,14 @@ impl LogRequestBuilder {
         buf.push(b'[');
         while let Some((mut event, mut estimated_json_size)) = events.pop_front() {
             let existing_len = buf.len();
-            match encode_log(
+            if encode_log(
                 &mut buf,
                 &mut event,
                 !events_serialized.is_empty(),
                 self.truncation,
                 self.conforms_as_agent,
             )? {
-                LogEncoding::Unchanged => {}
-                LogEncoding::Truncated => {
-                    estimated_json_size = event.estimated_json_encoded_size_of();
-                }
-                LogEncoding::Dropped { reason } => {
-                    emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
-                    continue;
-                }
+                estimated_json_size = event.estimated_json_encoded_size_of();
             }
 
             if buf.len() >= self.max_payload_bytes {
@@ -397,34 +390,29 @@ impl LogRequestBuilder {
     }
 }
 
-enum LogEncoding {
-    Unchanged,
-    Truncated,
-    Dropped { reason: &'static str },
-}
-
+/// Encodes a log event and returns whether it was locally truncated.
+///
+/// Returns `true` if the message was shortened and tagged, so the caller must recompute its
+/// estimated encoded size.
 fn encode_log(
     buf: &mut Vec<u8>,
     event: &mut Event,
     include_comma: bool,
     truncation: Option<DatadogLogsTruncationConfig>,
     conforms_as_agent: bool,
-) -> Result<LogEncoding, io::Error> {
+) -> Result<bool, io::Error> {
     let existing_len = buf.len();
     let original_encoded_size = write_log(buf, event, include_comma)?;
     let Some(truncation) =
         truncation.filter(|truncation| original_encoded_size > truncation.max_log_bytes)
     else {
-        return Ok(LogEncoding::Unchanged);
+        return Ok(false);
     };
 
     let Some(message) =
         message_bytes_mut(event.as_mut_log(), conforms_as_agent).map(|message| message.clone())
     else {
-        buf.truncate(existing_len);
-        return Ok(LogEncoding::Dropped {
-            reason: "Oversized event has no string message to truncate.",
-        });
+        return Ok(false);
     };
     let message = simdutf_bytes_utf8_lossy(&message);
     let message_encoded_size = json_string_encoded_size(&message);
@@ -444,7 +432,7 @@ fn encode_log(
             // Remove the temporary tag that `ensure_truncated_tag` inserted for size calculation.
             event.as_mut_log().remove(event_path!(DDTAGS));
         }
-        return Ok(LogEncoding::Unchanged);
+        return Ok(false);
     };
     if body_len < message.len() {
         set_truncated_message(event.as_mut_log(), &message, body_len, conforms_as_agent);
@@ -461,7 +449,7 @@ fn encode_log(
         max_log_bytes: truncation.max_log_bytes,
         original_encoded_size,
     });
-    Ok(LogEncoding::Truncated)
+    Ok(true)
 }
 
 fn select_message_body_len(
@@ -939,20 +927,7 @@ mod tests {
     }
 
     #[test]
-    fn drops_oversized_log_with_non_string_message() {
-        let mut log = LogEvent::default();
-        log.insert(
-            event_path!("message"),
-            value!({ "body": ("f".repeat(MAX_LOG_BYTES + 1)) }),
-        );
-
-        let logs = encode_logs(vec![Event::Log(log)], true, false);
-
-        assert!(logs.is_empty());
-    }
-
-    #[test]
-    fn drops_oversized_structured_message_without_agent_normalization() {
+    fn forwards_oversized_structured_message_without_agent_normalization() {
         let mut log = LogEvent::default();
         log.insert(
             event_path!("message"),
@@ -961,19 +936,52 @@ mod tests {
 
         let logs = encode_logs(vec![Event::Log(log)], true, false);
 
-        assert!(logs.is_empty());
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["message"]["message"], "f".repeat(MAX_LOG_BYTES + 1));
+        assert_eq!(logs[0]["message"]["other"], "preserve-me");
+        assert!(logs[0].get("ddtags").is_none());
     }
 
     #[test]
-    fn drops_oversized_log_without_string_message() {
+    fn forwards_oversized_log_without_string_message() {
         for conforms_as_agent in [false, true] {
             let mut log = LogEvent::default();
             log.insert(event_path!("custom"), "f".repeat(MAX_LOG_BYTES + 1));
 
             let logs = encode_logs(vec![Event::Log(log)], true, conforms_as_agent);
 
-            assert!(logs.is_empty());
+            assert_eq!(logs.len(), 1);
+            let custom = if conforms_as_agent {
+                &logs[0]["message"]["custom"]
+            } else {
+                &logs[0]["custom"]
+            };
+            assert_eq!(custom, &"f".repeat(MAX_LOG_BYTES + 1));
+            assert!(logs[0].get("ddtags").is_none());
         }
+    }
+
+    #[test]
+    fn drops_non_string_message_that_exceeds_payload_limit() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let mut log = LogEvent::default().with_batch_notifier(&batch);
+        log.insert(
+            event_path!("message"),
+            value!({ "body": ("f".repeat(MAX_PAYLOAD_BYTES + 1)) }),
+        );
+        drop(batch);
+
+        let requests = build_requests(
+            vec![Event::Log(log)],
+            Some(DatadogLogsTruncationConfig {
+                max_log_bytes: MAX_LOG_BYTES,
+            }),
+            false,
+            MAX_PAYLOAD_BYTES,
+        );
+
+        assert!(requests.is_empty());
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
     #[test]
@@ -1075,20 +1083,6 @@ mod tests {
             .expect("message should have truncation marker");
         assert!(original.starts_with(body));
         assert!(body.len() < MAX_LOG_BYTES);
-    }
-
-    #[test]
-    fn delivers_following_log_after_forwarding_best_effort_log() {
-        let mut oversized = LogEvent::from("i".repeat(MAX_LOG_BYTES + 1));
-        oversized.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
-        let small = LogEvent::from("ok");
-
-        let logs = encode_logs(vec![Event::Log(oversized), Event::Log(small)], true, false);
-
-        assert_eq!(logs.len(), 2);
-        assert_eq!(logs[0]["message"], "i".repeat(MAX_LOG_BYTES + 1));
-        assert!(logs[0].get("ddtags").is_none());
-        assert_eq!(logs[1]["message"], "ok");
     }
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {

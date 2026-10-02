@@ -103,10 +103,9 @@ pub struct DatadogLogsConfig {
     /// Attempt to truncate logs whose encoded JSON exceeds `max_log_bytes`.
     ///
     /// The message is shortened to the largest size that fits and `...TRUNCATED...` is appended.
-    /// Every reduced log is tagged with `truncated:single_line`. Logs whose non-message fields
-    /// leave no room for a truncated message are sent unchanged if they fit
-    /// `max_payload_bytes`; the Datadog intake can further truncate them. Logs without a string
-    /// message to truncate are dropped.
+    /// Every reduced log is tagged with `truncated:single_line`. Logs with no string message, or
+    /// whose non-message fields leave no room for a truncated message, are sent unchanged if they
+    /// fit `max_payload_bytes`; the Datadog intake can further truncate them.
     pub truncate_oversized_logs: Option<DatadogLogsTruncationConfig>,
 }
 
