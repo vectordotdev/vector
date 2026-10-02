@@ -153,3 +153,21 @@ test("mobile navigation opens, navigates, and closes the docs sidebar", async ({
   await sidebar.getByRole("link", { name: "Vector Remap Language", exact: true }).click();
   await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
 });
+
+test("mobile component sidebar opens, closes, and navigates", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/docs/reference/configuration/sinks/amqp/");
+  const sidebarToggle = page.getByText("Sidebar", { exact: true });
+  const sidebar = page.getByRole("dialog").filter({
+    has: page.getByRole("button", { name: "Close docs slideover panel" })
+  });
+  await sidebarToggle.click();
+  await expect(sidebar).toBeVisible();
+  await expect(sidebarToggle).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(sidebar).toBeHidden();
+  await expect(sidebarToggle).toBeVisible();
+  await sidebarToggle.click();
+  await sidebar.getByRole("link", { name: "Vector Remap Language", exact: true }).click();
+  await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
+});
