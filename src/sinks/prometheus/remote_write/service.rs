@@ -19,7 +19,7 @@ use crate::{
         prelude::*,
         util::{
             HttpEndpoint,
-            auth::Auth,
+            auth::{Auth, apply_api_key},
             http::{HttpResponse, OrderedHeaderName},
         },
     },
@@ -143,6 +143,7 @@ pub(super) async fn build_request(
     if let Some(auth) = auth {
         match auth {
             Auth::Basic(http_auth) => http_auth.apply(&mut request),
+            Auth::ApiKey(api_key) => apply_api_key(&api_key, &mut request)?,
             #[cfg(feature = "aws-core")]
             Auth::Aws {
                 credentials_provider: provider,

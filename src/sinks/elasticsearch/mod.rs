@@ -53,6 +53,16 @@ pub enum ElasticsearchAuthConfig {
         password: SensitiveString,
     },
 
+    /// API key authentication.
+    ///
+    /// The encoded API key is sent in the `Authorization` header as `ApiKey <api_key>`.
+    ApiKey {
+        /// Base64-encoded Elasticsearch API key (the `encoded` value returned when creating the key).
+        #[configurable(metadata(docs::examples = "${ELASTICSEARCH_API_KEY}"))]
+        #[configurable(metadata(docs::examples = "dGVzdDp0ZXN0"))]
+        api_key: SensitiveString,
+    },
+
     #[cfg(feature = "aws-core")]
     /// Amazon OpenSearch Service-specific authentication.
     Aws(crate::aws::AwsAuthentication),

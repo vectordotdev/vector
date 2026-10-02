@@ -14,7 +14,11 @@ use crate::{
             ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
             VersionType, sink::process_log,
         },
-        util::{HttpEndpoint, auth::Auth, encoding::Encoder},
+        util::{
+            HttpEndpoint,
+            auth::{Auth, apply_api_key},
+            encoding::Encoder,
+        },
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
@@ -713,6 +717,7 @@ async fn test_parse_config_with_uri_auth() {
 
     let got_auth_inner = match common.auth.as_ref().unwrap() {
         Auth::Basic(auth) => auth,
+        Auth::ApiKey(_) => panic!("Expected auth to be Basic"),
         #[cfg(feature = "aws-core")]
         Auth::Aws { .. } => panic!("Expected auth to be Basic"),
     };
@@ -748,6 +753,7 @@ async fn test_parse_config_with_config_auth() {
 
     let got_auth_inner = match common.auth.as_ref().unwrap() {
         Auth::Basic(auth) => auth,
+        Auth::ApiKey(_) => panic!("Expected auth to be Basic"),
         #[cfg(feature = "aws-core")]
         Auth::Aws { .. } => panic!("Expected auth to be Basic"),
     };
@@ -776,4 +782,88 @@ async fn test_parse_config_with_conflicting_auth() {
 
     // Should fail due to auth being specified in both places
     assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_parse_config_with_api_key_auth() {
+    let raw_key = "dGVzdDp0ZXN0";
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::ApiKey {
+            api_key: SensitiveString::from(raw_key.to_string()),
+        }),
+        endpoints: vec![HttpEndpoint::parse("http://localhost:9200").unwrap()],
+        ..Default::default()
+    };
+    let proxy = ProxyConfig::default();
+    let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://localhost:9200").unwrap();
+
+    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    assert!(result.is_ok());
+    let common = result.unwrap();
+
+    let got_key = match common.auth.as_ref().unwrap() {
+        Auth::ApiKey(key) => key,
+        _ => panic!("Expected auth to be ApiKey"),
+    };
+    assert_eq!(got_key.inner(), raw_key);
+
+    // Verify debug representation does not leak the secret
+    let debug_str = format!("{common:?}");
+    assert!(!debug_str.contains(raw_key));
+    assert!(debug_str.contains("**REDACTED**"));
+
+    // Verify apply_api_key sets Authorization header and marks it sensitive
+    let mut req = http::Request::builder()
+        .uri("http://localhost:9200")
+        .body(hyper::Body::empty())
+        .unwrap();
+    apply_api_key(got_key, &mut req).expect("Failed to apply api key");
+    let header_val = req
+        .headers()
+        .get(http::header::AUTHORIZATION)
+        .expect("Authorization header missing");
+    assert_eq!(header_val, &format!("ApiKey {raw_key}"));
+    assert!(header_val.is_sensitive());
+}
+
+#[tokio::test]
+async fn test_parse_config_with_conflicting_api_key_and_uri_auth() {
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::ApiKey {
+            api_key: SensitiveString::from("dGVzdDp0ZXN0".to_string()),
+        }),
+        endpoints: vec![HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap()],
+        ..Default::default()
+    };
+    let proxy = ProxyConfig::default();
+    let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap();
+
+    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "Two authorization credentials was provided."
+    );
+}
+
+#[tokio::test]
+async fn test_parse_config_with_invalid_api_key() {
+    let invalid_key = "invalid\nkey";
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::ApiKey {
+            api_key: SensitiveString::from(invalid_key.to_string()),
+        }),
+        endpoints: vec![HttpEndpoint::parse("http://localhost:9200").unwrap()],
+        ..Default::default()
+    };
+    let proxy = ProxyConfig::default();
+    let mut version = None;
+    let endpoint = HttpEndpoint::parse("http://localhost:9200").unwrap();
+
+    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    assert!(result.is_err());
+    let err_str = result.unwrap_err().to_string();
+    assert!(!err_str.contains(invalid_key));
 }
