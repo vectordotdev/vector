@@ -33,6 +33,7 @@ async fn emits_internal_events() {
             group_by: None,
             exclude: None,
             sample_rate_key: default_sample_rate_key(),
+            internal_metrics: Default::default(),
         };
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
