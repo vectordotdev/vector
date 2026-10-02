@@ -171,3 +171,24 @@ test("mobile component sidebar opens, closes, and navigates", async ({ page }) =
   await sidebar.getByRole("link", { name: "Vector Remap Language", exact: true }).click();
   await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
 });
+
+test("mobile Updates modal covers the sidebar control and dismisses from the bottom backdrop", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/docs/");
+  const sidebarToggle = page.getByText("Sidebar", { exact: true });
+  const sidebarControl = (await sidebarToggle.boundingBox())!;
+  const sidebar = page.getByRole("dialog").filter({
+    has: page.getByRole("button", { name: "Close docs slideover panel" })
+  });
+  const modal = page.locator('[id="12461"]');
+  await page.getByRole("button", { name: "Open navbar dropdown menu" }).click();
+  await page.locator("#mobile-menu").getByRole("button", { name: "Updates", exact: true }).click();
+  await expect(modal).toBeVisible();
+
+  // Tap the backdrop at the underlying Sidebar control, not the modal close button.
+  await page.mouse.click(sidebarControl.x + sidebarControl.width / 2, sidebarControl.y + sidebarControl.height / 2);
+  await expect(modal).toBeHidden();
+  await expect(sidebar).toBeHidden();
+  await sidebarToggle.click();
+  await expect(sidebar).toBeVisible();
+});
