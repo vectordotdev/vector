@@ -1,5 +1,8 @@
-use bytes::{BufMut, BytesMut};
-use codecs::{JsonSerializerConfig, NewlineDelimitedEncoder, encoding::Framer};
+use bytes::{BufMut, Bytes, BytesMut};
+use codecs::{
+    JsonSerializerConfig, MetricTagValues, NewlineDelimitedEncoder,
+    encoding::{Framer, JsonBytesFormat, JsonSerializerOptions},
+};
 use criterion::{
     BatchSize, BenchmarkGroup, Criterion, Throughput, criterion_group, measurement::WallTime,
 };
@@ -99,6 +102,36 @@ fn encoder(c: &mut Criterion) {
             BatchSize::SmallInput,
         )
     });
+
+    let binary: Event = Event::Log(LogEvent::from(btreemap! {
+        "message" => Bytes::from((0..4096).map(|i| (i % 256) as u8).collect::<Vec<u8>>()),
+        "source_type" => "websocket",
+    }));
+    for encoding in [JsonBytesFormat::LossyUtf8, JsonBytesFormat::Base64] {
+        let config = JsonSerializerConfig::new(
+            MetricTagValues::default(),
+            JsonSerializerOptions {
+                bytes_format: encoding,
+                ..Default::default()
+            },
+        );
+        group.throughput(Throughput::Bytes(binary.size_of() as u64));
+        group.bench_with_input(
+            format!("codecs::JsonSerializer::encode binary {encoding:?}"),
+            &(),
+            |b, ()| {
+                b.iter_batched(
+                    || config.build(),
+                    |mut encoder| {
+                        let mut bytes = BytesMut::new();
+                        encoder.encode(binary.clone(), &mut bytes).unwrap();
+                        bytes.put_u8(b'\n');
+                    },
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+    }
 }
 
 criterion_group!(benches, encoder);

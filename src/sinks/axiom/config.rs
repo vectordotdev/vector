@@ -238,7 +238,10 @@ impl AxiomConfig {
                 Some(FramingConfig::NewlineDelimited),
                 SerializerConfig::Json(JsonSerializerConfig {
                     metric_tag_values: MetricTagValues::Single,
-                    options: JsonSerializerOptions { pretty: false }, // Minified JSON
+                    options: JsonSerializerOptions {
+                        pretty: false, // Minified JSON
+                        ..Default::default()
+                    },
                 }),
                 Transformer::default(),
             ),
