@@ -1,0 +1,32 @@
+version: "3"
+
+services:
+  victoriametrics:
+    image: docker.io/victoriametrics/victoria-metrics:${CONFIG_VERSION}
+  vmstorage:
+    image: docker.io/victoriametrics/vmstorage:${CONFIG_VERSION}-cluster
+  vminsert:
+    image: docker.io/victoriametrics/vminsert:${CONFIG_VERSION}-cluster
+    command:
+      - -storageNode=vmstorage:8400
+    depends_on:
+      - vmstorage
+  vmselect:
+    image: docker.io/victoriametrics/vmselect:${CONFIG_VERSION}-cluster
+    command:
+      - -storageNode=vmstorage:8401
+    depends_on:
+      - vmstorage
+  vmauth:
+    image: docker.io/victoriametrics/vmauth:${CONFIG_VERSION}
+    command:
+      - -auth.config=/etc/vmauth/auth.yaml
+    volumes:
+      - ../data/vmauth.yaml:/etc/vmauth/auth.yaml:ro
+    depends_on:
+      - vminsert
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
