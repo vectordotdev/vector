@@ -223,6 +223,7 @@ serde_json = { version = "1.0.150", default-features = false, features = ["prese
 serde_path_to_error = "0.1.14"
 serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
+simdutf8 = { version = "0.1.5", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.6.3", default-features = false }
 tempfile = "3.27.0"
