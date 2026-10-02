@@ -135,10 +135,7 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 ### Run browser tests locally
 
 The browser suite uses [Playwright](https://playwright.dev) to test the built website in Chromium,
-Firefox, and WebKit. It covers globe rendering and rotation, theme persistence, documentation
-navigation, VRL signatures and examples, generated Console sink data, scroll-driven TOC highlighting,
-configuration tabs, exact and full-text search, and mobile navigation. Each test also fails on
-JavaScript errors or missing local assets.
+Firefox, and WebKit.
 
 Install dependencies and browser binaries once from this directory:
 

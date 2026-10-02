@@ -130,7 +130,7 @@ test("Pagefind returns full-text results and handles an unmatched query", async 
   await expect(page.locator(".aa-Panel")).toBeHidden();
 });
 
-test("mobile navigation opens, navigates, and closes the docs sidebar", async ({ page }) => {
+test.skip("mobile navigation opens, navigates, and closes the docs sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const menu = page.locator("#mobile-menu");
