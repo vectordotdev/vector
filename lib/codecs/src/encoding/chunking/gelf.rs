@@ -25,6 +25,11 @@ pub struct GelfChunker {
 }
 
 impl Chunking for GelfChunker {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
     fn chunk(&self, bytes: Bytes) -> Result<Vec<Bytes>, vector_common::Error> {
         if bytes.len() <= self.max_chunk_size {
             return Ok(vec![bytes]);
@@ -89,6 +94,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
     fn test_gelf_chunker_chunk() {
         let chunker = Chunker::Gelf(GelfChunker {
             max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 4,
@@ -121,12 +131,17 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
     fn test_gelf_chunker_max() {
         let chunker = Chunker::Gelf(GelfChunker {
             max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 65500,
         });
         // Input for 128 chunks of 65500 bytes of data
-        let input = Bytes::from_static(&[0; 65500 * 128]);
+        let input = Bytes::from(vec![0; 65_500 * 128]);
         let chunks = chunker.chunk(input).unwrap();
         assert_eq!(chunks.len(), 128);
 
@@ -140,7 +155,10 @@ mod tests {
             // Byte 11: Sequence count
             assert_eq!(chunks[i][11], chunks.len() as u8);
             // Payload bytes
-            assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], &[0; 65500]);
+            assert_eq!(
+                &chunks[i][GELF_CHUNK_HEADERS_LENGTH..],
+                vec![0; 65_500].as_slice()
+            );
         }
     }
 }
