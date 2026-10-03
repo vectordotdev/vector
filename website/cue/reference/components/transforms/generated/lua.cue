@@ -7,7 +7,8 @@ generated: components: transforms: lua: configuration: {
 
 			These hooks can be set to perform additional processing during the lifecycle of the transform.
 			"""
-		required: true
+		relevant_when: "version = \"2\""
+		required:      true
 		type: object: options: {
 			init: {
 				description: """
@@ -82,7 +83,8 @@ generated: components: transforms: lua: configuration: {
 			When set to `full`, all metric tags are exposed as arrays of either string or null
 			values.
 			"""
-		required: false
+		relevant_when: "version = \"2\""
+		required:      false
 		type: string: {
 			default: "single"
 			enum: {
@@ -153,8 +155,9 @@ generated: components: transforms: lua: configuration: {
 		}
 	}
 	timers: {
-		description: "A list of timers which should be configured and executed periodically."
-		required:    false
+		description:   "A list of timers which should be configured and executed periodically."
+		relevant_when: "version = \"2\""
+		required:      false
 		type: array: {
 			default: []
 			items: type: object: options: {
@@ -180,19 +183,15 @@ generated: components: transforms: lua: configuration: {
 		}
 	}
 	version: {
-		description: """
-			Transform API version.
-
-			Specifying this version ensures that backward compatibility is not broken.
-			"""
-		required: true
+		description: "Transform API version. Specifying this version ensures that backward compatibility is not broken."
+		required:    true
 		type: string: enum: {
 			"1": """
-				Lua transform API version 1.
+				Configuration for version one.
 
 				This version is deprecated and will be removed in a future version.
 				"""
-			"2": "Lua transform API version 2."
+			"2": "Configuration for version two."
 		}
 	}
 }
