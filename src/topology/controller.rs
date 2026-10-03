@@ -150,8 +150,9 @@ impl TopologyController {
         }
     }
 
-    /// Stops the topology. Returns `true` if every component finished on its own before the
-    /// graceful shutdown deadline, or `false` if any component had to be forcefully killed.
+    /// Stops the topology. Returns `true` if every component task completed successfully before
+    /// the graceful shutdown deadline, or `false` if any task failed or had to be forcefully
+    /// killed.
     #[cfg_attr(not(feature = "api"), allow(unused_mut))]
     pub async fn stop(mut self) -> bool {
         // Phase 1: Mark the gRPC API as unavailable so that external probes
