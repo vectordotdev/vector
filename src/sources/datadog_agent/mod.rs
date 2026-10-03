@@ -13,6 +13,7 @@ use std::{convert::Infallible, fmt::Debug, net::SocketAddr, sync::Arc, time::Dur
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
 pub(crate) use datadog_proto::agentpayload as ddmetric_proto;
+pub(crate) use datadog_proto::metrics_v3 as ddmetric_v3_proto;
 pub(crate) use datadog_proto::trace as ddtrace_proto;
 use futures::FutureExt;
 use http::StatusCode;
