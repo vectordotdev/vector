@@ -394,6 +394,52 @@ async fn test_only_event_ids_generates_xpath_filter() {
     }
 }
 
+/// A long `only_event_ids` list must still produce a query that Windows
+/// accepts. A flat chain of 24 or more `EventID=` comparisons is rejected with
+/// `ERROR_EVT_INVALID_QUERY`, the channel is skipped and the source fails with
+/// "No channels could be subscribed"; `build_xpath_query()` therefore emits long
+/// lists as a balanced tree.
+#[tokio::test]
+async fn test_only_event_ids_long_list_is_accepted() {
+    let data_dir = temp_data_dir();
+
+    emit_event("VT_xpathlong", "INFORMATION", 1000, "xpath-long-include");
+    emit_event("VT_xpathlong", "INFORMATION", 999, "xpath-long-exclude");
+
+    // 30 IDs: 1000 plus 29 IDs that are not expected to occur.
+    let mut ids: Vec<u32> = (61001..61030).collect();
+    ids.push(1000);
+
+    let config = WindowsEventLogConfig {
+        data_dir: Some(data_dir.path().to_path_buf()),
+        channels: vec!["Application".to_string()],
+        read_existing_events: true,
+        only_event_ids: Some(ids.clone()),
+        ..Default::default()
+    };
+
+    let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
+
+    assert!(
+        !events.is_empty(),
+        "Expected events from a subscription with {} only_event_ids; \
+         the generated XPath query was probably rejected by Windows",
+        ids.len()
+    );
+    for event in &events {
+        if let Some(eid) = event.as_log().get(event_path!("event_id")) {
+            let id: i64 = match eid {
+                vrl::value::Value::Integer(i) => *i,
+                other => other.to_string_lossy().parse().unwrap_or(-1),
+            };
+            assert!(
+                ids.iter().any(|&allowed| i64::from(allowed) == id),
+                "got event_id={id}, which is not in only_event_ids"
+            );
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Event level / type variety
 // ---------------------------------------------------------------------------
