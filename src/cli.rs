@@ -492,11 +492,7 @@ impl SubCommand {
         }
     }
 
-    pub async fn execute(
-        &self,
-        mut signals: signal::SignalPair,
-        color: bool,
-    ) -> exitcode::ExitCode {
+    pub async fn execute(&self, mut signals: signal::Signals, color: bool) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
@@ -507,11 +503,11 @@ impl SubCommand {
             #[cfg(windows)]
             Self::Service(s) => service::cmd(s),
             #[cfg(feature = "api-client")]
-            Self::Tap(t) => tap::cmd(t, signals.receiver).await,
+            Self::Tap(t) => tap::cmd(t, &mut signals.shutdown).await,
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, &mut signals.handler, color).await,
+            Self::Validate(v) => validate::validate(v, &mut signals, color).await,
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }
