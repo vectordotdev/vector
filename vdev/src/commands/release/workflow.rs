@@ -32,14 +32,16 @@ pub struct Cli {
 enum WorkflowCommand {
     /// Validate a request before generating a release preparation PR.
     PrepareCheck(PrepareCheck),
-    /// Validate a generated release preparation or housekeeping PR.
+    /// Validate a generated release preparation PR.
     PrCheck(PrCheck),
     /// Validate an approved minor-release squash merge before creating its refs.
     AutotagCheck(AutotagCheck),
-    /// Check whether a published minor release needs a housekeeping PR.
+    /// Check whether a published minor release needs post-release housekeeping.
     HousekeepingCheck(HousekeepingCheck),
     /// Begin the next development version and restore VRL main locally.
     HousekeepingPrepare(HousekeepingPrepare),
+    /// Validate a generated housekeeping commit before it is pushed to master.
+    HousekeepingValidate(HousekeepingValidate),
     /// Check that resetting the website branch to a release won't roll it back.
     WebsiteCheck(WebsiteCheck),
     /// Decide whether a release tag should reset the website branch.
@@ -60,8 +62,16 @@ struct HousekeepingCheck {
 struct HousekeepingPrepare {
     #[arg(long)]
     version: Version,
+}
+
+#[derive(clap::Args, Debug)]
+struct HousekeepingValidate {
+    /// Released stable version whose housekeeping commit is being validated, e.g. 0.59.0.
     #[arg(long)]
-    release_commit: String,
+    version: Version,
+    /// Frozen master commit the housekeeping commit is based on.
+    #[arg(long)]
+    base_sha: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -157,6 +167,7 @@ impl Cli {
             WorkflowCommand::AutotagCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingPrepare(args) => args.exec(),
+            WorkflowCommand::HousekeepingValidate(args) => args.exec(),
             WorkflowCommand::WebsiteCheck(args) => args.exec(),
             WorkflowCommand::WebsitePreflight(args) => args.exec(),
         }
@@ -300,21 +311,24 @@ impl HousekeepingCheck {
             println!("Master has advanced beyond {version}; no housekeeping needed.");
             return set_github_output("skip", "true");
         }
-        ensure_release_checkout(&version, &self.release_commit)?;
+        // Authorized release-time pushes (e.g. the Kubernetes manifests refresh)
+        // may have landed on top of the release commit; housekeeping generates
+        // from the current frozen master, so HEAD need only contain the release
+        // commit (checked above via merge-base) and still carry the released
+        // version.
+        ensure!(
+            current_cargo_version()? == version,
+            "master must still contain release version {version}"
+        );
         validate_associated_preparation_pr(
             &self.repository,
             &self.release_commit,
             &preparation_branch(&version),
         )?;
-        let branch = format!("release/housekeeping-v{version}");
+        // Housekeeping commits directly to master under the freeze, so there is
+        // no branch to resume and no PR to detect; the "master already advanced"
+        // check above makes re-runs idempotent.
         set_github_output("version", &version.to_string())?;
-        set_github_output("branch", &branch)?;
-        if let Some(url) = find_existing_pr(&self.repository, &branch, "vectordotdev-bot")? {
-            append_github_step_summary(&format!("Existing housekeeping PR: {url}"))?;
-            return set_github_output("skip", "true");
-        }
-        let resume = remote_ref_exists(&format!("refs/heads/{branch}"))?;
-        set_github_output("resume", if resume { "true" } else { "false" })?;
         set_github_output("skip", "false")
     }
 }
@@ -322,15 +336,63 @@ impl HousekeepingCheck {
 impl HousekeepingPrepare {
     fn exec(self) -> Result<()> {
         git::ensure_worktree_clean()?;
-        ensure_release_checkout(&self.version, &self.release_commit)?;
+        // Authorized release-time pushes (e.g. the Kubernetes manifests
+        // refresh) may have advanced master past the release commit; generate
+        // from the current frozen master, which the check step verified still
+        // contains the release commit at the released version.
+        ensure!(
+            current_cargo_version()? == self.version,
+            "master must still contain release version {}",
+            self.version
+        );
+        // Restore the VRL main revision master built against before the release.
+        // VRL main may have moved to changes master has not adopted yet.
+        let base_lock = git::run_and_check_output(&[
+            "show",
+            &format!("refs/tags/v{}^:Cargo.lock", self.version),
+        ])?;
+        let vrl_revision = locked_vrl_git_revision(&base_lock)?;
         let manifest = housekeeping_manifest(&fs::read_to_string("Cargo.toml")?, &self.version)?;
         fs::write("Cargo.toml", manifest)?;
         Command::new("cargo")
             .args(["update", "-p", "vector"])
             .check_run()?;
         Command::new("cargo")
-            .args(["update", "-p", "vrl"])
+            .args(["update", "-p", "vrl", "--precise", &vrl_revision])
             .check_run()
+    }
+}
+
+/// Returns the VRL git revision locked in a development (pre-release) Cargo.lock.
+fn locked_vrl_git_revision(lock: &str) -> Result<String> {
+    let lock: toml::Value = toml::from_str(lock).context("failed to parse lock file")?;
+    let mut sources = lock
+        .get("package")
+        .and_then(toml::Value::as_array)
+        .context("Cargo.lock is missing packages")?
+        .iter()
+        .filter(|package| package.get("name").and_then(toml::Value::as_str) == Some("vrl"))
+        .map(|package| package.get("source").and_then(toml::Value::as_str));
+    let source = sources
+        .next()
+        .flatten()
+        .context("Cargo.lock is missing a VRL source")?;
+    ensure!(sources.next().is_none(), "Cargo.lock must contain one VRL");
+    let revision = source
+        .strip_prefix("git+https://github.com/vectordotdev/vrl.git?branch=main#")
+        .context("the preparation base must lock VRL to its main branch")?;
+    ensure!(
+        revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "invalid VRL revision {revision}"
+    );
+    Ok(revision.to_owned())
+}
+
+impl HousekeepingValidate {
+    fn exec(self) -> Result<()> {
+        git::ensure_sha(&self.base_sha, "base SHA")?;
+        git::ensure_worktree_clean()?;
+        validate_housekeeping(&self.base_sha, &self.version)
     }
 }
 
@@ -383,20 +445,6 @@ impl WebsitePreflight {
         }
         set_github_output("skip", if skip { "true" } else { "false" })
     }
-}
-
-fn ensure_release_checkout(version: &Version, sha: &str) -> Result<()> {
-    next_minor_development_version(version)?;
-    git::ensure_sha(sha, "release commit")?;
-    ensure!(
-        current_cargo_version()? == *version,
-        "master must still contain release version {version}"
-    );
-    ensure!(
-        git::run_and_check_output(&["rev-parse", "HEAD"])?.trim() == sha,
-        "master must still match the published release commit"
-    );
-    Ok(())
 }
 
 fn next_minor_development_version(version: &Version) -> Result<Version> {
@@ -471,10 +519,6 @@ impl PrCheck {
     fn exec(self) -> Result<()> {
         git::ensure_sha(&self.base_sha, "base SHA")?;
         git::ensure_worktree_clean()?;
-        if let Some(version) = self.head_ref.strip_prefix("release/housekeeping-v") {
-            let version = parse_stable_version(version, "housekeeping branch version")?;
-            return validate_housekeeping(&self.base_sha, &version);
-        }
         let version = parse_preparation_branch(&self.head_ref)?;
         ensure!(
             version.patch == 0,
@@ -895,7 +939,8 @@ fn append_github_step_summary(line: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_cargo_version, parse_preparation_branch, preparation_branch, release_file_allowed,
+        locked_vrl_git_revision, parse_cargo_version, parse_preparation_branch, preparation_branch,
+        release_file_allowed,
     };
     use indoc::indoc;
 
@@ -962,5 +1007,18 @@ mod tests {
         ));
         assert!(!release_file_allowed("src/main.rs", &version));
         assert!(!release_file_allowed("changelog.d/README.txt", &version));
+    }
+
+    #[test]
+    fn housekeeping_restores_the_base_vrl_revision() {
+        let revision = "e7d8d0f59062e44c18da6f861a7fd0ddfe24cf9f";
+        let lock = format!(
+            "[[package]]\nname = \"vector\"\nversion = \"0.59.0-dev\"\n\n[[package]]\nname = \"vrl\"\nversion = \"0.36.0\"\nsource = \"git+https://github.com/vectordotdev/vrl.git?branch=main#{revision}\"\n"
+        );
+        assert_eq!(locked_vrl_git_revision(&lock).unwrap(), revision);
+
+        // A base already pinned to a registry release has no main revision to restore.
+        let registry = "[[package]]\nname = \"vrl\"\nversion = \"0.36.0\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n";
+        assert!(locked_vrl_git_revision(registry).is_err());
     }
 }

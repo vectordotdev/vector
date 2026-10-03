@@ -98,12 +98,12 @@ generated: components: sinks: datadog_metrics: configuration: {
 		description: """
 			Controls which Datadog series API endpoint is used to submit metrics.
 
-			Defaults to `v2` (`/api/v2/series`). Set to `v1` (`/api/v1/series`) only if you need to
-			fall back to the legacy endpoint.
+			Defaults to `v3` (`/api/intake/metrics/v3/series`). Set to `v2` (`/api/v2/series`) or
+			to `v1` (`/api/v1/series`) only if you need to fall back to the legacy endpoint.
 			"""
 		required: false
 		type: string: {
-			default: "v2"
+			default: "v3"
 			enum: {
 				v1: {
 					deprecated: true
@@ -113,8 +113,13 @@ generated: components: sinks: datadog_metrics: configuration: {
 						This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
 						"""
 				}
-				v2: """
-					Use the v2 series endpoint (`/api/v2/series`).
+				v2: "Use the v2 series endpoint (`/api/v2/series`)."
+				v3: """
+					Use the v3 series endpoint (`/api/intake/metrics/v3/series`).
+
+					Columnar protobuf format with dictionary-based string deduplication and delta
+					encoding. More efficient than v2 for workloads with many metrics that share
+					common tags or names.
 
 					This is the recommended and default endpoint.
 					"""

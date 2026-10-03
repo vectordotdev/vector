@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![deny(warnings)]
 
 //! Kubernetes test framework.

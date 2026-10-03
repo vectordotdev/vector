@@ -1,6 +1,4 @@
-#[cfg(unix)]
-use std::path::PathBuf;
-use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -28,7 +26,8 @@ use crate::{
     SourceSender,
     codecs::Decoder,
     config::{
-        DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, log_schema,
+        DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, UnixOnly,
+        log_schema,
     },
     event::Event,
     internal_events::{
@@ -120,20 +119,24 @@ pub enum Mode {
     /// Listen on UDS (Unix domain socket). This only supports Unix stream sockets.
     ///
     /// For Unix datagram sockets, use the `socket` source instead.
-    #[cfg(unix)]
-    Unix {
-        /// The Unix socket path.
-        ///
-        /// This should be an absolute path.
-        #[configurable(metadata(docs::examples = "/path/to/socket"))]
-        path: PathBuf,
+    Unix(UnixOnly<UnixConfig>),
+}
 
-        /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
-        ///
-        /// The file mode value can be specified in any numeric format supported by your configuration
-        /// language, but it is most intuitive to use an octal number.
-        socket_file_mode: Option<u32>,
-    },
+/// Unix domain socket configuration for the `syslog` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    path: PathBuf,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    socket_file_mode: Option<u32>,
 }
 
 impl SyslogConfig {
@@ -236,27 +239,38 @@ impl SourceConfig for SyslogConfig {
                 log_namespace,
                 cx.out,
             )),
-            #[cfg(unix)]
-            Mode::Unix {
-                path,
-                socket_file_mode,
-            } => {
-                let decoder = Decoder::new(
-                    Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
-                        self.max_length,
-                    )),
-                    Deserializer::Syslog(
-                        SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                    ),
-                );
-
-                build_unix_stream_source(
-                    path,
-                    socket_file_mode,
-                    decoder,
-                    move |events, host| handle_events(events, &host_key, host, log_namespace),
+            Mode::Unix(config) => {
+                let (max_length, host_key, log_namespace, shutdown, out) = (
+                    self.max_length,
+                    host_key,
+                    log_namespace,
                     cx.shutdown,
                     cx.out,
+                );
+                config.on_unix(
+                    (max_length, host_key, log_namespace, shutdown, out),
+                    #[cfg(unix)]
+                    |config, (max_length, host_key, log_namespace, shutdown, out)| {
+                        let decoder = Decoder::new(
+                            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
+                                max_length,
+                            )),
+                            Deserializer::Syslog(
+                                SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
+                            ),
+                        );
+
+                        build_unix_stream_source(
+                            config.path,
+                            config.socket_file_mode,
+                            decoder,
+                            move |events, host| {
+                                handle_events(events, &host_key, host, log_namespace)
+                            },
+                            shutdown,
+                            out,
+                        )
+                    },
                 )
             }
         }
@@ -278,8 +292,7 @@ impl SourceConfig for SyslogConfig {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.as_tcp_resource()],
             Mode::Udp { address, .. } => vec![address.as_udp_resource()],
-            #[cfg(unix)]
-            Mode::Unix { .. } => vec![],
+            Mode::Unix(_) => vec![],
         }
     }
 
@@ -519,6 +532,17 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SyslogConfig>();
+    }
+
+    #[test]
+    fn unix_mode_deserializes_on_all_platforms() {
+        let config: SyslogConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            mode: unix
+            path: /tmp/vector-syslog.sock
+        "#})
+        .unwrap();
+
+        assert!(matches!(config.mode, Mode::Unix(_)));
     }
 
     #[test]
@@ -796,7 +820,7 @@ mod test {
             "#,
         })
         .unwrap();
-        assert!(matches!(config.mode, Mode::Unix { .. }));
+        assert!(matches!(config.mode, Mode::Unix(_)));
     }
 
     #[cfg(unix)]
@@ -811,10 +835,7 @@ mod test {
         })
         .unwrap();
         let socket_file_mode = match config.mode {
-            Mode::Unix {
-                path: _,
-                socket_file_mode,
-            } => socket_file_mode,
+            Mode::Unix(config) => config.platform_independent().socket_file_mode,
             _ => panic!("expected Mode::Unix"),
         };
 
@@ -1290,10 +1311,13 @@ mod test {
             let in_path = tempfile::tempdir().unwrap().keep().join("stream_test");
 
             // Create and spawn the source.
-            let config = SyslogConfig::from_mode(Mode::Unix {
-                path: in_path.clone(),
-                socket_file_mode: None,
-            });
+            let config = SyslogConfig::from_mode(Mode::Unix(
+                UnixConfig {
+                    path: in_path.clone(),
+                    socket_file_mode: None,
+                }
+                .into(),
+            ));
 
             let key = ComponentKey::from("in");
             let (tx, rx) = SourceSender::new_test();
