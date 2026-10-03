@@ -23,6 +23,8 @@ mod raw_message;
 #[cfg(feature = "syslog")]
 mod syslog;
 mod text;
+#[cfg(feature = "arrow")]
+mod wire_to_arrow;
 
 use std::fmt::Debug;
 
@@ -34,6 +36,10 @@ pub use self::parquet::{
 pub use arrow::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
     find_null_non_nullable_fields,
+};
+#[cfg(feature = "arrow")]
+pub use wire_to_arrow::{
+    WireToArrowEncoder, WireToArrowError, WireToArrowSerializer, WireToArrowSerializerConfig,
 };
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
