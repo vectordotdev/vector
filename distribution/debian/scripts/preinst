@@ -1,6 +1,28 @@
 #!/bin/sh
 set -e
 
+VECTOR_CONF=/etc/vector/vector.yaml
+VECTOR_CONF_BACKUP=/etc/vector/.vector.yaml.pre-conffile
+
+# The bundled sample configs moved from /etc/vector/examples/ (where dpkg
+# tracked them as conffiles) to /usr/share/vector/examples/. Remove the old
+# copies on upgrade; dpkg-maintscript-helper deletes unmodified ones and renames
+# locally modified ones to <file>.dpkg-bak. 0.59.0~ sorts before the first
+# release that no longer ships them.
+for f in \
+    docs_example.yaml \
+    environment_variables.yaml \
+    es_s3_hybrid.yaml \
+    file_to_cloudwatch_metrics.yaml \
+    file_to_prometheus.yaml \
+    http_sink_custom_retry.yaml \
+    prometheus_to_console.yaml \
+    stdio.yaml \
+    varint_framing_protobuf.yaml \
+    wrapped_json.yaml; do
+  dpkg-maintscript-helper rm_conffile "/etc/vector/examples/$f" 0.59.0~ vector -- "$@"
+done
+
 # Add vector:vector user & group
 id --user vector >/dev/null 2>&1 || \
   useradd --system --shell /sbin/nologin --home-dir /var/lib/vector --user-group \
@@ -11,5 +33,21 @@ mkdir -p /var/lib/vector
 
 # Make vector:vector the owner of the Vector data directory
 chown -R vector:vector /var/lib/vector
+
+# vector.yaml is a dpkg conffile in this package version. Older versions did
+# not own that path -- administrators created it themselves -- so an existing
+# file is unknown to dpkg. If it is still in place when dpkg unpacks the new
+# conffile, dpkg asks what to do with it and fails when there is no terminal.
+# Move it out of the way here (last, so an earlier failure cannot strand it)
+# and let postinst put it back once unpacking is done. Skip this when the
+# installed version already tracks the file: dpkg's own conffile handling is
+# correct then.
+if [ "$1" = "install" ] || [ "$1" = "upgrade" ]; then
+  if [ -f "$VECTOR_CONF" ] && [ ! -L "$VECTOR_CONF" ] && [ ! -e "$VECTOR_CONF_BACKUP" ]; then
+    if ! dpkg-query -W -f='${Conffiles}\n' vector 2>/dev/null | grep -qF " $VECTOR_CONF "; then
+      mv "$VECTOR_CONF" "$VECTOR_CONF_BACKUP"
+    fi
+  fi
+fi
 
 #DEBHELPER#
