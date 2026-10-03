@@ -8,7 +8,7 @@ use tower::{
     buffer::{Buffer, BufferLayer},
     discover::Change,
     layer::{Layer, util::Stack},
-    limit::RateLimit,
+    limit::{ConcurrencyLimit, RateLimit},
     retry::Retry,
     timeout::Timeout,
 };
@@ -44,9 +44,11 @@ pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 // Distributed service types
 pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
-    Retry<
-        FibonacciRetryPolicy<RL>,
-        Buffer<Req, <Balance<DiscoveryService<S, RL, HL, K>, Req> as Service<Req>>::Future>,
+    ConcurrencyLimit<
+        Retry<
+            FibonacciRetryPolicy<RL>,
+            Buffer<Req, <Balance<DiscoveryService<S, RL, HL, K>, Req> as Service<Req>>::Future>,
+        >,
     >,
 >;
 pub type DiscoveryService<S, RL, HL, K> =
@@ -308,6 +310,18 @@ impl TowerRequestSettings {
     ///
     /// [BufferLayer] suggests that the `buffer_bound` should be at least equal to
     /// the number of the callers of the service. For sinks, this should typically be 1.
+    ///
+    /// A [ConcurrencyLimit] is placed outside the retry layer so that a request holds a
+    /// permit for its whole retry sequence, including the backoff sleeps between attempts.
+    /// The per-endpoint [AdaptiveConcurrencyLimit] sits inside the retry layer and releases
+    /// its permit as soon as one attempt resolves, so on its own it does not bound the number
+    /// of requests that are simultaneously retrying. Without the outer limit the caller sees
+    /// a service that is always ready during a sustained downstream failure, and in-flight
+    /// retrying requests accumulate without bound.
+    ///
+    /// The limit is sized at the per-endpoint concurrency ceiling times the number of
+    /// endpoints, which is the most the inner limiters can ever admit at once, so it cannot
+    /// become the binding constraint on a healthy pipeline.
     pub fn distributed_service<Req, RL, HL, S>(
         self,
         retry_logic: RL,
@@ -326,6 +340,13 @@ impl TowerRequestSettings {
         S::Future: Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
+
+        // The most requests the per-endpoint limiters can admit at the same time. Adaptive
+        // concurrency has no fixed limit, so its configured ceiling is used instead.
+        let per_endpoint_limit = self
+            .concurrency
+            .unwrap_or(self.adaptive_concurrency.max_concurrency_limit);
+        let max_in_flight = per_endpoint_limit.saturating_mul(services.len()).max(1);
 
         // Build services
         let open = OpenGauge::new();
@@ -357,6 +378,8 @@ impl TowerRequestSettings {
         // Build sink service
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
+            // Outside the retry layer, so the permit spans every attempt and every backoff.
+            .concurrency_limit(max_in_flight)
             .retry(policy)
             // [Balance] must be wrapped with a [BufferLayer] so that the overall service implements Clone.
             .layer(BufferLayer::new(buffer_bound))
@@ -588,5 +611,201 @@ mod tests {
             // Treat the default as the request is successful
             RetryAction::Successful
         }
+    }
+}
+
+/// Backpressure coverage for [`TowerRequestSettings::distributed_service`].
+///
+/// The endpoints answer instantly with a retriable status and nothing ever succeeds, so every
+/// request the service accepts stays resident in the caller's in-flight set for the duration of
+/// the outage. The question these tests ask is the one the sink driver asks on every iteration:
+/// how many requests will the service accept before `poll_ready` stops returning `Ready`?
+#[cfg(test)]
+mod distributed_backpressure_tests {
+    use std::task::{Context, Poll};
+
+    use futures::{StreamExt, future, stream::FuturesUnordered};
+    use http::StatusCode;
+    use tower::Service;
+
+    use super::{
+        Concurrency, GlobalTowerRequestConfigDefaults, HealthConfig, HealthLogic,
+        TowerRequestConfig, TowerRequestSettings,
+    };
+    use crate::sinks::util::retries::{JitterMode, RetryAction, RetryLogic};
+
+    const ENDPOINTS: usize = 2;
+    const PER_ENDPOINT: usize = 3;
+
+    /// What the outer concurrency limit is sized at: the most the per-endpoint limiters can
+    /// ever admit at the same time.
+    const EXPECTED_BOUND: usize = ENDPOINTS * PER_ENDPOINT;
+
+    /// Far above the bound, so a service that never applies backpressure runs to the cap
+    /// instead of settling.
+    const ADMISSION_CAP: usize = 500;
+
+    /// Rounds of no progress before the harness accepts that backpressure has engaged.
+    const IDLE_ROUNDS: usize = 64;
+
+    #[derive(Clone, Debug)]
+    struct FaultRequest;
+
+    #[derive(Clone, Debug)]
+    struct FaultResponse(StatusCode);
+
+    #[derive(Debug)]
+    struct FaultError;
+
+    impl std::fmt::Display for FaultError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "fault")
+        }
+    }
+
+    impl std::error::Error for FaultError {}
+
+    /// An endpoint that answers every request immediately with a fixed status.
+    #[derive(Clone)]
+    struct FaultService(StatusCode);
+
+    impl Service<FaultRequest> for FaultService {
+        type Response = FaultResponse;
+        type Error = crate::Error;
+        type Future = future::Ready<Result<FaultResponse, crate::Error>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: FaultRequest) -> Self::Future {
+            future::ready(Ok(FaultResponse(self.0)))
+        }
+    }
+
+    /// Mirrors `ElasticsearchRetryLogic`: 429 and 5xx are retried, and with the default
+    /// `retry_attempts` they are retried forever.
+    #[derive(Clone)]
+    struct FaultRetryLogic;
+
+    impl RetryLogic for FaultRetryLogic {
+        type Error = FaultError;
+        type Request = FaultRequest;
+        type Response = FaultResponse;
+
+        fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+            true
+        }
+
+        fn should_retry_response(&self, response: &FaultResponse) -> RetryAction<FaultRequest> {
+            if response.0 == StatusCode::TOO_MANY_REQUESTS || response.0.is_server_error() {
+                RetryAction::Retry("fault injected".into())
+            } else {
+                RetryAction::Successful
+            }
+        }
+    }
+
+    /// Mirrors `ElasticsearchHealthLogic`: 5xx counts against the endpoint, 4xx is not
+    /// classified at all, so the per-endpoint circuit breaker never sees it.
+    #[derive(Clone)]
+    struct FaultHealthLogic;
+
+    impl HealthLogic for FaultHealthLogic {
+        type Error = crate::Error;
+        type Response = FaultResponse;
+
+        fn is_healthy(&self, response: &Result<FaultResponse, crate::Error>) -> Option<bool> {
+            match response {
+                Ok(response) if response.0.is_success() => Some(true),
+                Ok(response) if response.0.is_server_error() => Some(false),
+                Ok(_) => None,
+                Err(_) => None,
+            }
+        }
+    }
+
+    fn settings() -> TowerRequestSettings {
+        TowerRequestConfig::<GlobalTowerRequestConfigDefaults> {
+            concurrency: Concurrency::Fixed(PER_ENDPOINT),
+            // Deterministic backoff, so the measurement does not depend on jitter.
+            retry_jitter_mode: JitterMode::None,
+            ..TowerRequestConfig::default()
+        }
+        .into_settings()
+    }
+
+    /// Drives the service the way `Driver::run` does and returns how many requests it accepted.
+    ///
+    /// Time is paused and the harness task is always runnable, so no retry backoff and no
+    /// circuit breaker backoff ever elapses. Every accepted request is therefore still parked
+    /// mid retry when the next one is offered.
+    async fn admitted_before_backpressure(status: StatusCode) -> usize {
+        let services = (0..ENDPOINTS)
+            .map(|i| (format!("endpoint-{i}"), FaultService(status)))
+            .collect::<Vec<_>>();
+
+        let mut service = settings().distributed_service(
+            FaultRetryLogic,
+            services,
+            HealthConfig::default(),
+            FaultHealthLogic,
+            // Same buffer bound the Elasticsearch sink uses.
+            1,
+        );
+
+        let mut in_flight = FuturesUnordered::new();
+        let mut admitted = 0usize;
+        let mut idle_rounds = 0usize;
+
+        while admitted < ADMISSION_CAP && idle_rounds < IDLE_ROUNDS {
+            // Let the buffer worker and the endpoint services run.
+            for _ in 0..4 {
+                tokio::task::yield_now().await;
+            }
+
+            // Drain anything that resolved, which is what lets the driver submit more.
+            while let Poll::Ready(Some(_)) = futures::poll!(in_flight.next()) {}
+
+            match futures::poll!(future::poll_fn(|cx| service.poll_ready(cx))) {
+                Poll::Ready(Ok(())) => {
+                    in_flight.push(service.call(FaultRequest));
+                    admitted += 1;
+                    idle_rounds = 0;
+                }
+                Poll::Ready(Err(error)) => panic!("service returned an error: {error}"),
+                Poll::Pending => idle_rounds += 1,
+            }
+        }
+
+        admitted
+    }
+
+    /// A sustained 429 is retried forever by the retry logic and is never classified by the
+    /// health logic, so the per-endpoint circuit breaker cannot trip on it. Before the outer
+    /// concurrency limit existed this ran to `ADMISSION_CAP` with every request still in
+    /// flight, which is the unbounded growth reported in #25212.
+    #[tokio::test(start_paused = true)]
+    async fn too_many_requests_applies_backpressure() {
+        let admitted = admitted_before_backpressure(StatusCode::TOO_MANY_REQUESTS).await;
+
+        assert!(
+            admitted <= EXPECTED_BOUND,
+            "sustained 429 admitted {admitted} concurrent retrying requests, expected at most \
+             {EXPECTED_BOUND}"
+        );
+    }
+
+    /// A sustained 5xx is also retried forever. The circuit breaker does classify it, so this
+    /// case has always settled, but it must settle at or below the same bound.
+    #[tokio::test(start_paused = true)]
+    async fn server_error_applies_backpressure() {
+        let admitted = admitted_before_backpressure(StatusCode::SERVICE_UNAVAILABLE).await;
+
+        assert!(
+            admitted <= EXPECTED_BOUND,
+            "sustained 503 admitted {admitted} concurrent retrying requests, expected at most \
+             {EXPECTED_BOUND}"
+        );
     }
 }
