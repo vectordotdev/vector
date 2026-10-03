@@ -1,13 +1,15 @@
 use std::{
-    io::ErrorKind,
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt, stream::BoxStream, task::noop_waker_ref};
+use futures::{
+    SinkExt, Stream, StreamExt, future::poll_fn, stream::BoxStream, task::noop_waker_ref,
+};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::{AsyncRead, ReadBuf},
@@ -26,20 +28,26 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, SocketSendError, TcpSocketConnectionEstablished,
-        TcpSocketConnectionShutdown, TcpSocketOutgoingConnectionError,
+        ConnectionOpen, OpenGauge, OpenToken, SocketMode, SocketSendError,
+        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown,
+        TcpSocketOutgoingConnectionError,
     },
-    sink_ext::VecSinkExt,
     sinks::{
         Healthcheck, VectorSink,
         util::{
             EncodedEvent, SinkBuildError, StreamSink,
-            socket_bytes_sink::{BytesSink, ShutdownCheck},
+            socket_bytes_sink::{
+                BytesSink, MAX_PENDING_ITEMS, PendingBatch, ShutdownCheck, is_peer_shutdown_error,
+            },
         },
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
+
+fn emit_tcp_connection_open(count: usize) {
+    emit!(ConnectionOpen { count });
+}
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -254,12 +262,28 @@ impl<E> TcpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync + 'static,
 {
+    const SEND_FAILURE_MAX_BACKOFF: Duration = Duration::from_secs(5);
+
     const fn new(connector: TcpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             transformer,
             encoder,
         }
+    }
+
+    fn fresh_send_failure_backoff() -> ExponentialBackoff {
+        ExponentialBackoff::default().max_delay(Self::SEND_FAILURE_MAX_BACKOFF)
+    }
+
+    fn add_full_jitter(d: Duration) -> Duration {
+        let max_millis = u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
+        if max_millis == 0 {
+            return Duration::ZERO;
+        }
+
+        let jitter_millis = (rand::random::<u64>() % max_millis) + 1;
+        Duration::from_millis(jitter_millis)
     }
 
     async fn connect(&self) -> BytesSink<MaybeTlsStream<TcpStream>> {
@@ -329,28 +353,124 @@ where
             })
             .peekable();
 
-        while Pin::new(&mut input).peek().await.is_some() {
-            let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+        // Keep queued events in memory until a flush succeeds. If the connection fails after
+        // partially writing bytes, we resend the unflushed events on reconnect (at-least-once).
+        let mut pending_batch = PendingBatch::new();
+        let mut connection: Option<(BytesSink<MaybeTlsStream<TcpStream>>, OpenToken<fn(usize)>)> =
+            None;
+        let mut send_failure_backoff = Self::fresh_send_failure_backoff();
+        let mut flush_chunk = MAX_PENDING_ITEMS;
 
-            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
-                Ok(()) => sink.close().await,
-                Err(error) => Err(error),
-            };
+        loop {
+            if pending_batch.is_empty() {
+                poll_fn(|cx| {
+                    let mut input = Pin::new(&mut input);
+                    loop {
+                        if pending_batch.is_full() {
+                            return Poll::Ready(());
+                        }
+                        match input.as_mut().poll_peek(cx) {
+                            Poll::Pending => {
+                                return if pending_batch.is_empty() {
+                                    Poll::Pending
+                                } else {
+                                    Poll::Ready(())
+                                };
+                            }
+                            Poll::Ready(None) => return Poll::Ready(()),
+                            Poll::Ready(Some(_)) => match input.as_mut().poll_next(cx) {
+                                Poll::Ready(Some(item)) => pending_batch.push(item),
+                                Poll::Ready(None) => return Poll::Ready(()),
+                                Poll::Pending => {
+                                    return if pending_batch.is_empty() {
+                                        Poll::Pending
+                                    } else {
+                                        Poll::Ready(())
+                                    };
+                                }
+                            },
+                        }
+                    }
+                })
+                .await;
 
-            // TODO we can consider retrying once in the Error case. This sink is a "best effort"
-            // delivery due to the nature of the underlying protocol.
-            // For now, if an error occurs we cannot assume that the events succeeded in delivery
-            // so we will emit `Error` / `EventsDropped` internal events regardless of if the server
-            // responded with Ok(0).
-            if let Err(error) = result {
-                if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+                if pending_batch.is_empty() {
+                    if let Some((mut sink, _open_token)) = connection.take()
+                        && let Err(error) = sink.close().await
+                    {
+                        emit!(SocketSendError {
+                            mode: SocketMode::Tcp,
+                            error
+                        });
+                    }
+                    break;
                 }
-                emit!(SocketSendError {
-                    mode: SocketMode::Tcp,
-                    error
-                });
+            }
+
+            if connection.is_none() {
+                let sink = self.connect().await;
+                let open_token = OpenGauge::new().open(emit_tcp_connection_open as fn(usize));
+                connection = Some((sink, open_token));
+            }
+
+            // Flush in chunks and retire each chunk as soon as it lands. A peer that closes the
+            // connection at a fixed record or byte boundary would otherwise make every reconnect
+            // restart from the first event, resending the same prefix forever without the suffix
+            // ever being attempted.
+            let mut send_error = None;
+            while !pending_batch.is_empty() {
+                let chunk_len = flush_chunk.min(pending_batch.len());
+                let chunk_result: std::io::Result<()> = async {
+                    let (sink, _open_token) = connection
+                        .as_mut()
+                        .expect("connection should be initialized before send");
+                    for enc in pending_batch.head(chunk_len) {
+                        let wire = EncodedEvent {
+                            item: enc.item.clone(),
+                            finalizers: Default::default(),
+                            byte_size: enc.byte_size,
+                            json_byte_size: enc.json_byte_size,
+                        };
+                        sink.feed(wire).await?;
+                    }
+                    sink.flush().await
+                }
+                .await;
+
+                match chunk_result {
+                    Ok(()) => {
+                        pending_batch.ack_delivered(chunk_len);
+                        // Ramp back up so a transient failure does not permanently cap throughput.
+                        flush_chunk = flush_chunk.saturating_mul(2).min(MAX_PENDING_ITEMS);
+                    }
+                    Err(error) => {
+                        // Halve the unit of work so a peer limit smaller than the current chunk
+                        // converges on a size that fits instead of failing indefinitely.
+                        flush_chunk = (chunk_len / 2).max(1);
+                        send_error = Some(error);
+                        break;
+                    }
+                }
+            }
+
+            match send_error {
+                None => send_failure_backoff.reset(),
+                Some(error) => {
+                    if is_peer_shutdown_error(&error) {
+                        emit!(TcpSocketConnectionShutdown {});
+                    }
+                    emit!(SocketSendError {
+                        mode: SocketMode::Tcp,
+                        error
+                    });
+                    if let Some((mut sink, _open_token)) = connection.take() {
+                        _ = sink.close().await;
+                    }
+
+                    if let Some(delay) = send_failure_backoff.next() {
+                        sleep(Self::add_full_jitter(delay)).await;
+                    }
+                }
             }
         }
 
@@ -360,10 +480,219 @@ where
 
 #[cfg(test)]
 mod test {
-    use tokio::net::TcpListener;
+    use std::{future::ready, time::Duration};
+
+    use futures::stream;
+    use socket2::SockRef;
+    use stream_cancel::{StreamExt as _, Tripwire};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+        sync::oneshot,
+        time::timeout,
+    };
+    use vector_lib::{
+        codecs::encoding::Framer,
+        event::{BatchNotifier, BatchStatus, LogEvent, MetricValue},
+        metrics::Controller,
+    };
 
     use super::*;
     use crate::test_util::{addr::next_addr, trace_init};
+
+    const TEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+    fn test_sink(addr: SocketAddr) -> Box<TcpSink<crate::codecs::Encoder<Framer>>> {
+        let mut connector = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
+        // Keep a large event in flight until the reset is observed, rather than allowing the
+        // entire event to fit in the kernel's send buffer before the server accepts it.
+        connector.send_buffer_bytes = Some(1_024);
+        Box::new(TcpSink::new(
+            connector,
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::default(),
+        ))
+    }
+
+    fn reset_connection(socket: TcpStream) {
+        SockRef::from(&socket)
+            .set_linger(Some(Duration::ZERO))
+            .unwrap();
+        drop(socket);
+    }
+
+    fn counter_value(name: &str) -> f64 {
+        Controller::get()
+            .unwrap()
+            .capture_metrics()
+            .iter()
+            .filter(|metric| metric.name() == name)
+            .filter_map(|metric| match metric.value() {
+                MetricValue::Counter { value } => Some(*value),
+                _ => None,
+            })
+            .sum()
+    }
+
+    #[tokio::test]
+    async fn half_closed_peer_receives_pending_event() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let connector = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
+        let (client, accepted) = tokio::join!(connector.connect(), listener.accept());
+        let mut client = client.unwrap();
+        let (mut peer, _) = accepted.unwrap();
+
+        // A collector can close its write half while continuing to receive events. Wait until
+        // the client's read side actually observes EOF before handing it to BytesSink.
+        peer.shutdown().await.unwrap();
+        assert_eq!(
+            timeout(TEST_TIMEOUT, client.read(&mut [0; 1]))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+        // Verify the other direction is still usable on this exact connection.
+        client.write_all(b"probe\n").await.unwrap();
+        let mut probe = [0; 6];
+        timeout(TEST_TIMEOUT, peer.read_exact(&mut probe))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(&probe, b"probe\n");
+
+        let mut sink = BytesSink::new(
+            client,
+            TcpSink::<crate::codecs::Encoder<Framer>>::shutdown_check,
+            SocketMode::Tcp,
+        );
+        let result = sink
+            .send(EncodedEvent::new(
+                Bytes::from_static(b"event\n"),
+                0,
+                JsonSize::zero(),
+            ))
+            .await;
+        drop(sink);
+
+        let mut received = Vec::new();
+        timeout(TEST_TIMEOUT, peer.read_to_end(&mut received))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(received, b"event\n", "send result: {result:?}");
+    }
+
+    #[tokio::test]
+    async fn retrying_sink_observes_input_detachment() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let (retry_tx, retry_rx) = oneshot::channel();
+        let peer = tokio::spawn(async move {
+            reset_connection(listener.accept().await.unwrap().0);
+            // The second connection proves the first send failed and the batch is being retried.
+            reset_connection(listener.accept().await.unwrap().0);
+            retry_tx.send(()).unwrap();
+            loop {
+                reset_connection(listener.accept().await.unwrap().0);
+            }
+        });
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::Log(LogEvent::from_str_legacy("x".repeat(4 * 1_024 * 1_024)))
+            .with_batch_notifier(&batch);
+        drop(batch);
+        let (trigger, tripwire) = Tripwire::new();
+        // This is the same detachment adapter used by topology::builder when reusing a buffer.
+        let input = stream::once(ready(event))
+            .chain(stream::pending())
+            .take_until_if(tripwire)
+            .boxed();
+        let mut task = tokio::spawn(test_sink(addr).run(input));
+        timeout(TEST_TIMEOUT, retry_rx).await.unwrap().unwrap();
+
+        trigger.cancel();
+        let detached = timeout(TEST_TIMEOUT, &mut task).await;
+        if detached.is_err() {
+            task.abort();
+            assert!(task.await.unwrap_err().is_cancelled());
+        }
+        peer.abort();
+        assert!(peer.await.unwrap_err().is_cancelled());
+
+        assert!(
+            detached.is_ok(),
+            "sink kept retrying the old destination after its input was detached"
+        );
+        detached.unwrap().unwrap().unwrap();
+        assert_eq!(receiver.await, BatchStatus::Errored);
+    }
+
+    #[tokio::test]
+    async fn successful_retry_does_not_report_discarded_events() {
+        trace_init();
+        Controller::get().unwrap().reset();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let payload = "x".repeat(4 * 1_024 * 1_024);
+        let event = Event::Log(LogEvent::from_str_legacy(&payload)).with_batch_notifier(&batch);
+        drop(batch);
+
+        let receive = async {
+            reset_connection(listener.accept().await.unwrap().0);
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut received = Vec::new();
+            socket.read_to_end(&mut received).await.unwrap();
+            received
+        };
+        let (result, received) = timeout(TEST_TIMEOUT, async {
+            tokio::join!(test_sink(addr).run(stream::iter([event]).boxed()), receive)
+        })
+        .await
+        .unwrap();
+
+        result.unwrap();
+        assert_eq!(received.len(), payload.len() + 1);
+        assert_eq!(&received[..payload.len()], payload.as_bytes());
+        assert_eq!(received.last(), Some(&b'\n'));
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+        assert!(counter_value("component_errors_total") >= 1.0);
+        assert_eq!(counter_value("component_discarded_events_total"), 0.0);
+    }
+
+    #[tokio::test]
+    async fn flush_does_not_wait_for_peer_to_read() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::Log(LogEvent::from_str_legacy("event")).with_batch_notifier(&batch);
+        drop(batch);
+
+        let (result, accepted) = timeout(TEST_TIMEOUT, async {
+            tokio::join!(
+                test_sink(addr).run(stream::iter([event]).boxed()),
+                listener.accept()
+            )
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        let (peer, _) = accepted.unwrap();
+
+        // Nothing has read from the peer, yet the source already sees Delivered. Resetting
+        // this connection discards the unread data after the sink's retry queue has emptied.
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        reset_connection(peer);
+    }
 
     #[tokio::test]
     async fn healthcheck() {
@@ -377,5 +706,20 @@ mod test {
         let (_guard, addr) = next_addr();
         let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
+    }
+
+    #[test]
+    fn send_failure_jitter_stays_bounded() {
+        let max = Duration::from_millis(500);
+        let mut backoff = ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(max);
+
+        for _ in 0..32 {
+            let delay =
+                TcpSink::<crate::codecs::Encoder<()>>::add_full_jitter(backoff.next().unwrap());
+            assert!(delay > Duration::ZERO);
+            assert!(delay <= max);
+        }
     }
 }

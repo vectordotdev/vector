@@ -291,6 +291,7 @@ impl ValidatedSink for SocketSinkConfig {
 #[cfg(test)]
 mod test {
     use std::{
+        collections::HashSet,
         future::ready,
         net::{SocketAddr, UdpSocket},
     };
@@ -300,6 +301,8 @@ mod test {
     use futures::stream::StreamExt;
     use futures_util::stream;
     use serde_json::Value;
+    #[cfg(unix)]
+    use tokio::net::UnixListener;
     use tokio::{
         net::TcpListener,
         time::{Duration, sleep, timeout},
@@ -324,7 +327,7 @@ mod test {
             CountReceiver,
             addr::{next_addr, next_addr_v6},
             components::{SINK_TAGS, assert_sink_compliance, run_and_assert_sink_compliance},
-            random_lines_with_stream, trace_init,
+            generate_lines_with_stream, random_lines_with_stream, trace_init,
         },
     };
 
@@ -702,14 +705,18 @@ mod test {
                                 close_rx = None;
                             }
 
-                            let mut buf = [0u8; 11];
+                            // Count newlines per read so coalesced TLS/TCP reads still match one
+                            // increment per text line.
+                            let mut buf = [0u8; 256];
                             let mut buf = ReadBuf::new(&mut buf);
                             return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
                                 Poll::Ready(Ok(())) => {
                                     if buf.filled().is_empty() {
                                         Poll::Ready(())
                                     } else {
-                                        msg_counter1.fetch_add(1, Ordering::SeqCst);
+                                        let lines =
+                                            buf.filled().iter().filter(|&&b| b == b'\n').count();
+                                        msg_counter1.fetch_add(lines, Ordering::SeqCst);
                                         continue;
                                     }
                                 }
@@ -776,26 +783,20 @@ mod test {
         let context = SinkContext::default();
         let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
-        let (_, events) = random_lines_with_stream(1000, 10000, None);
+        // Exceed stream sink pending batch cap to exercise split-batch retry path.
+        let (lines, events) =
+            generate_lines_with_stream(|i| format!("{i:05} {}", "x".repeat(1_994)), 10_000, None);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
 
         // First listener
-        let mut count = 20usize;
-        TcpListenerStream::new(TcpListener::bind(addr).await.unwrap())
+        let first_batch = TcpListenerStream::new(TcpListener::bind(addr).await.unwrap())
             .next()
             .await
             .unwrap()
             .map(|socket| FramedRead::new(socket, LinesCodec::new()))
             .unwrap()
             .map(|x| x.unwrap())
-            .take_while(|_| {
-                ready(if count > 0 {
-                    count -= 1;
-                    true
-                } else {
-                    false
-                })
-            })
+            .take(20)
             .collect::<Vec<_>>()
             .await;
 
@@ -807,16 +808,85 @@ mod test {
 
         // Second listener
         // If this doesn't succeed then the sink hanged.
-        assert!(
-            timeout(
-                Duration::from_secs(5),
-                CountReceiver::receive_lines(addr).connected()
-            )
+        let mut receiver = CountReceiver::receive_lines(addr);
+        timeout(Duration::from_secs(5), receiver.connected())
             .await
-            .is_ok()
+            .unwrap();
+
+        sink_handle.await.unwrap();
+        assert_no_missing_lines(&lines, first_batch.into_iter().chain(receiver.await));
+    }
+
+    /// Tests whether Unix stream socket recovers from a hard disconnect.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn reconnect_unix_stream() {
+        trace_init();
+
+        let out_path = temp_uds_path("unix_stream_reconnect");
+        let config = SocketSinkConfig {
+            mode: Mode::UnixStream(UnixMode {
+                config: UnixSinkConfig::new(out_path.clone()),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        let context = SinkContext::default();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        // Exceed stream sink pending batch cap to exercise split-batch retry path.
+        let (lines, events) =
+            generate_lines_with_stream(|i| format!("{i:05} {}", "x".repeat(1_994)), 10_000, None);
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
+
+        // First listener.
+        let listener = UnixListener::bind(&out_path).unwrap();
+        let socket = listener.accept().await.unwrap().0;
+        let first_batch = FramedRead::new(socket, LinesCodec::new())
+            .map(|x| x.unwrap())
+            .take(20)
+            .collect::<Vec<_>>()
+            .await;
+        drop(listener);
+        std::fs::remove_file(&out_path).unwrap();
+
+        // Second listener. If this doesn't succeed then the sink hanged.
+        let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
+        assert!(
+            timeout(Duration::from_secs(5), receiver.connected())
+                .await
+                .is_ok()
         );
 
         sink_handle.await.unwrap();
+        assert_no_missing_lines(&lines, first_batch.into_iter().chain(receiver.await));
+    }
+
+    fn assert_no_missing_lines(expected: &[String], received: impl IntoIterator<Item = String>) {
+        // Replayed records must not compensate for a different record missing after reconnect.
+        let received = received.into_iter().collect::<HashSet<_>>();
+        let missing = expected
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| !received.contains(*line))
+            .map(|(index, _)| index)
+            .take(10)
+            .collect::<Vec<_>>();
+        assert!(
+            missing.is_empty(),
+            "missing expected records at indices (up to 10 shown): {missing:?}"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "missing expected records")]
+    fn reconnect_assertion_rejects_duplicates_masking_loss() {
+        let expected = vec!["record-1".to_owned(), "record-2".to_owned()];
+        let received = vec!["record-1".to_owned(), "record-1".to_owned()];
+        // This is accepted by the old count-only assertion despite losing record-2.
+        assert!(received.len() >= expected.len());
+        assert_no_missing_lines(&expected, received);
     }
 
     #[cfg(unix)]
