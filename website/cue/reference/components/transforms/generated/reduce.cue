@@ -63,6 +63,20 @@ generated: components: transforms: reduce: configuration: {
 		required:    false
 		type: uint: {}
 	}
+	max_groups: {
+		description: """
+			The maximum number of groups to keep in memory at any one time.
+
+			When a new group would exceed this limit, the group that has gone the longest without
+			receiving an event is flushed early to make room, and the
+			`reduce_max_groups_exceeded_total` internal metric is incremented.
+
+			This is a safeguard against unbounded memory growth when `group_by` contains
+			high-cardinality fields. When not specified, the number of groups is unbounded.
+			"""
+		required: false
+		type: uint: {}
+	}
 	merge_strategies: {
 		description: """
 			A map of field names to custom merge strategies.

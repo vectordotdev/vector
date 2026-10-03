@@ -14,6 +14,18 @@ impl InternalEvent for ReduceStaleEventFlushed {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct ReduceMaxGroupsExceeded;
+
+impl InternalEvent for ReduceMaxGroupsExceeded {
+    fn emit(self) {
+        warn!(
+            message = "Reached the configured `max_groups` limit; flushing the least recently updated group early.",
+        );
+        counter!(CounterName::ReduceMaxGroupsExceededTotal).increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct ReduceAddEventError {
     pub error: PathParseError,
     pub path: KeyString,
