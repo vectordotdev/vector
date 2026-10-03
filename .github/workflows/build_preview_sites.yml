@@ -16,7 +16,7 @@ jobs:
   # the artifact by preview_site_trigger.yml) so each deploy job below can be gated individually.
   read_requested_apps:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       contents: read # Required for repository context
@@ -93,7 +93,7 @@ jobs:
       - read_requested_apps
       - deploy_vector_preview_site
       - deploy_vrl_playground_preview_site
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     # Since this is now the only job that writes the comment (no sibling fan-out), a concurrency
     # group per branch safely de-races overlapping workflow runs for rapid successive pushes.

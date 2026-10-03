@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   approval_check:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       contents: read # Required for repository context

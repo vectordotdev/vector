@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
     outputs:
@@ -128,7 +128,7 @@ jobs:
 
   check-generated-vrl-docs:
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: run-check-generated-vrl-docs
     steps:
       - run: |

@@ -561,7 +561,7 @@ jobs:
 
   regression-detection-suite:
     name: Set final result
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     if: always()
     needs:
