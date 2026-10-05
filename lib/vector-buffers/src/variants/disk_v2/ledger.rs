@@ -564,6 +564,11 @@ where
             .increment_dropped_event_count_and_byte_size(0, total_record_size, false);
     }
 
+    /// Removes an unread data file tail that could not be interpreted as a record.
+    pub fn track_abandoned_tail_bytes(&self, total_size: u64) {
+        self.decrement_total_buffer_size(total_size);
+    }
+
     /// Marks the writer as finished.
     ///
     /// If the writer was not yet marked done, `false` is returned.  Otherwise, `true` is returned,
