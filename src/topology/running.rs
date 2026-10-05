@@ -1503,45 +1503,67 @@ fn enrichment_table_sink_buffer(
 mod tests {
     use std::collections::HashSet;
 
-    use tokio::sync::mpsc;
     use vector_lib::config::ComponentKey;
 
-    use super::RunningTopology;
     use crate::{
         config::Config,
-        test_util::mock::{basic_sink, basic_source},
+        test_util::{
+            mock::{basic_sink, basic_source, basic_transform},
+            start_topology, trace_init,
+        },
     };
 
     #[tokio::test]
     async fn pending_component_reloads_are_consumed_after_reload() {
+        trace_init();
         let config = || {
             let mut config = Config::builder();
             config.add_source("in", basic_source().1);
-            config.add_sink("out", &["in"], basic_sink(1).1);
+            config.add_transform("normalize_logs", &["in"], basic_transform("", 0.0));
+            config.add_sink("output", &["normalize_logs"], basic_sink(1).1);
             config.build().unwrap()
         };
-        let (abort_tx, _) = mpsc::unbounded_channel();
-        let mut topology = RunningTopology::new(config(), abort_tx);
-        let component = ComponentKey::from("component");
+        let transform = ComponentKey::from("normalize_logs");
+        let sink = ComponentKey::from("output");
+        let (mut topology, _) = start_topology(config(), false).await;
+        let initial_transform_task = topology.tasks[&transform].id();
+        let initial_sink_task = topology.tasks[&sink].id();
 
-        topology.extend_reload_set(HashSet::from([component.clone()]));
+        topology.extend_reload_set(HashSet::from([transform.clone()]));
         topology
             .reload_config_and_respawn(config(), Default::default())
             .await
             .unwrap();
-        assert!(topology.pending_reload.is_none());
+        let transform_task_after_transform_reload = topology.tasks[&transform].id();
+        let sink_task_after_transform_reload = topology.tasks[&sink].id();
+        assert_ne!(
+            transform_task_after_transform_reload,
+            initial_transform_task
+        );
+        assert_eq!(sink_task_after_transform_reload, initial_sink_task);
 
+        topology.extend_reload_set(HashSet::from([sink.clone()]));
         topology
             .reload_config_and_respawn(config(), Default::default())
             .await
             .unwrap();
-        assert!(topology.pending_reload.is_none());
+        assert_eq!(
+            topology.tasks[&transform].id(),
+            transform_task_after_transform_reload,
+            "the transform was rebuilt by the later sink reload"
+        );
+        assert_ne!(topology.tasks[&sink].id(), sink_task_after_transform_reload);
 
-        topology.extend_reload_set(HashSet::from([component]));
+        topology.extend_reload_set(HashSet::from([transform.clone()]));
         topology
             .reload_config_and_respawn(config(), Default::default())
             .await
             .unwrap();
-        assert!(topology.pending_reload.is_none());
+        assert_ne!(
+            topology.tasks[&transform].id(),
+            transform_task_after_transform_reload
+        );
+
+        topology.stop().await;
     }
 }
