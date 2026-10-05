@@ -1,0 +1,47 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  file:
+    path: /output/opentelemetry-demo/${env:CONFIG_INGRESS_EXPORTER}/input.jsonl
+    flush_interval: 100ms
+  otlphttp:
+    endpoint: http://vector:4318
+    sending_queue:
+      enabled: false
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 30s
+  otlp:
+    endpoint: vector:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: false
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 30s
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [file, "${env:CONFIG_INGRESS_EXPORTER}"]
+    metrics:
+      receivers: [otlp]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      exporters: [debug]

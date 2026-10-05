@@ -1,0 +1,17 @@
+features:
+  - e2e-tests-opentelemetry
+
+test: e2e
+test_filter: "opentelemetry::demo::"
+
+runner:
+  needs_docker_socket: true
+  volumes:
+    opentelemetry_demo_evidence: /output/opentelemetry-demo
+
+matrix:
+  collector_version: ["0.159.0"]
+  ingress_exporter: ["otlphttp", "otlp"] # HTTP and gRPC into Vector, respectively.
+
+
+# Intentionally absent from the automatic CI matrices and changed-file filters.

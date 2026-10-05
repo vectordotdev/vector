@@ -20,3 +20,9 @@ slow-timeout = { period = "30s", terminate-after = 4 }
 # output test results at target/nextest/default/junit.xml
 path = "junit.xml"
 store-failure-output = true
+
+[[profile.default.overrides]]
+filter = 'test(opentelemetry::demo::demo_trace_round_trip)'
+# This test stops its producers and collectors, so a retry needs a fresh Compose run.
+retries = 0
+slow-timeout = { period = "30s", terminate-after = 10 }

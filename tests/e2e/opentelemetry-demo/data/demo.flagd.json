@@ -1,0 +1,201 @@
+{
+  "$schema": "https://flagd.dev/schema/v0/flags.json",
+  "flags": {
+    "adFailure": {
+      "defaultVariant": "off",
+      "description": "Fail ad service",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "adHighCpu": {
+      "defaultVariant": "off",
+      "description": "Triggers high cpu load in the ad service",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "adManualGc": {
+      "defaultVariant": "off",
+      "description": "Triggers full manual garbage collections in the ad service",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "aiRunawayAgent": {
+      "defaultVariant": "off",
+      "description": "forces the agent to keep looping tool calls until it hits its recursion limit",
+      "state": "ENABLED",
+      "variants": {
+        "off": 0,
+        "on": 20
+      }
+    },
+    "aiSlowResponse": {
+      "defaultVariant": "off",
+      "description": "slow LLM responses in the agent service",
+      "state": "ENABLED",
+      "variants": {
+        "10sec": 10000,
+        "5sec": 5000,
+        "off": 0
+      }
+    },
+    "cartFailure": {
+      "defaultVariant": "off",
+      "description": "Fail cart service n% of the time",
+      "state": "ENABLED",
+      "variants": {
+        "10%": 0.1,
+        "100%": 1,
+        "25%": 0.25,
+        "50%": 0.5,
+        "75%": 0.75,
+        "90%": 0.9,
+        "off": 0
+      }
+    },
+    "emailMemoryLeak": {
+      "defaultVariant": "off",
+      "description": "Memory leak in the email service.",
+      "state": "ENABLED",
+      "variants": {
+        "10000x": 10000,
+        "1000x": 1000,
+        "100x": 100,
+        "10x": 10,
+        "1x": 1,
+        "off": 0
+      }
+    },
+    "emitRawPii": {
+      "defaultVariant": "off",
+      "description": "Emit raw PII attributes (user.email, demo.payment.card_number, demo.payment.card_cvv) from checkout and payment for the collector redaction example. Not a failure scenario -- controls PII emission, independent of collector-side redaction which always runs.",
+      "metadata": {
+        "schedulable": false
+      },
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "failedReadinessProbe": {
+      "defaultVariant": "off",
+      "description": "readiness probe failure for cart service",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "imageSlowLoad": {
+      "defaultVariant": "off",
+      "description": "slow loading images in the frontend",
+      "state": "ENABLED",
+      "variants": {
+        "10sec": 10000,
+        "5sec": 5000,
+        "off": 0
+      }
+    },
+    "intlShippingSlowdown": {
+      "defaultVariant": "off",
+      "description": "Delays international shipping responses to simulate overseas shipping delay",
+      "state": "ENABLED",
+      "variants": {
+        "10sec": 10,
+        "5sec": 5,
+        "off": 0
+      }
+    },
+    "kafkaQueueProblems": {
+      "defaultVariant": "off",
+      "description": "Overloads Kafka queue while simultaneously introducing a consumer side delay leading to a lag spike",
+      "state": "ENABLED",
+      "variants": {
+        "off": 0,
+        "on": 100
+      }
+    },
+    "loadGeneratorFloodHomepage": {
+      "defaultVariant": "off",
+      "description": "Flood the frontend with a large amount of requests.",
+      "state": "ENABLED",
+      "variants": {
+        "off": 0,
+        "on": 100
+      }
+    },
+    "paymentFailure": {
+      "defaultVariant": "off",
+      "description": "Fail payment service charge requests n%",
+      "state": "ENABLED",
+      "variants": {
+        "10%": 0.1,
+        "100%": 1,
+        "25%": 0.25,
+        "50%": 0.5,
+        "75%": 0.75,
+        "90%": 0.95,
+        "off": 0
+      }
+    },
+    "paymentUnreachable": {
+      "defaultVariant": "off",
+      "description": "Payment service is unavailable",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "productCatalogFailure": {
+      "defaultVariant": "off",
+      "description": "Fail product catalog service on a specific product",
+      "state": "ENABLED",
+      "targeting": {
+        "if": [
+          {
+            "==": [
+              {
+                "var": "product_id"
+              },
+              "OLJCESPC7Z"
+            ]
+          },
+          "off",
+          "off"
+        ]
+      },
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "productCatalogLockContention": {
+      "defaultVariant": "off",
+      "description": "Trigger lock contention on the product catalog database",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    },
+    "recommendationCacheFailure": {
+      "defaultVariant": "off",
+      "description": "Fail recommendation service cache",
+      "state": "ENABLED",
+      "variants": {
+        "off": false,
+        "on": true
+      }
+    }
+  }
+}

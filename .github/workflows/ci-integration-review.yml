@@ -251,6 +251,70 @@ jobs:
           max_attempts: 3
           command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
+  otel-demo:
+    name: OTel Demo trace validation
+    if: startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-demo')
+    needs:
+      - prep-pr
+      - build-test-runner
+    runs-on: ubuntu-24.04-8core
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read # Required to pull test runner image from GHCR
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: "recursive"
+          ref: ${{ github.event.review.commit_id }}
+
+      - uses: ./.github/actions/dd-token
+
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          datadog-ci: true
+
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
+
+      - name: OTel Demo trace validation
+        run: |
+          mkdir -p target/otel-demo-evidence
+          set -o pipefail
+          vdev e2e run opentelemetry-demo --retries 0 --always-show-logs 2>&1 | tee target/otel-demo-evidence/runner.log
+
+      - name: Collect OTel Demo evidence
+        if: always()
+        run: |
+          mkdir -p target/otel-demo-evidence
+          git rev-parse HEAD > target/otel-demo-evidence/revision.txt
+          cp -R tests/e2e/opentelemetry-demo/config tests/e2e/opentelemetry-demo/data target/otel-demo-evidence/
+          if docker volume inspect opentelemetry_demo_evidence >/dev/null 2>&1; then
+            docker run --rm \
+              -v opentelemetry_demo_evidence:/output/opentelemetry-demo:ro \
+              -v "$PWD/target/otel-demo-evidence:/evidence" \
+              alpine:3.20 sh -c 'if [ -d /output/opentelemetry-demo ]; then cp -R /output/opentelemetry-demo/. /evidence/; fi'
+          fi
+          summaries=(target/otel-demo-evidence/*/summary.md)
+          if [ -f "${summaries[0]}" ]; then
+            cat "${summaries[@]}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'OTel Demo did not produce a validation summary. See runner.log and the failed job steps.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload OTel Demo evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: otel-demo-${{ github.event.review.commit_id }}
+          path: target/otel-demo-evidence/
+          retention-days: 14
+
   update-pr-status:
     name: Signal result to PR
     runs-on: ubuntu-24.04
@@ -258,6 +322,7 @@ jobs:
     needs:
       - integration-tests
       - e2e-tests
+      - otel-demo
     if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
     permissions:
       statuses: write # Required to set final commit status
