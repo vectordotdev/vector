@@ -72,7 +72,18 @@ with this [issue filter][vrl-wasm-unsupported-filter].
 
 ### macOS Troubleshooting
 
-If you are getting compilation errors on macOS here are some things to check:
+On macOS the `zstd-sys` dependency (pulled in by VRL's stdlib) must compile C
+code for WebAssembly, but the system Apple `clang` has no WebAssembly backend.
+Point the build at a clang that has one, for example LLVM from Homebrew
+(`brew install llvm`):
+
+```shell
+CC_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/clang" \
+AR_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/llvm-ar" \
+wasm-pack build --target web --out-dir public/pkg
+```
+
+If you are getting other compilation errors on macOS here are some things to check:
 
 ```shell
 xcode-select -p
