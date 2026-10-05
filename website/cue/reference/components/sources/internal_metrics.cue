@@ -64,6 +64,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_request_active: {
+			description:       "The number of requests currently being processed by this component."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_request_concurrency_limit: {
+			description:       "The maximum number of requests that can be processed concurrently by this component. The OpenTelemetry source emits this metric only when `max_concurrent_requests` is configured."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		aggregate_events_recorded_total: {
 			description:       "The number of events recorded by the aggregate transform."
 			type:              "counter"
@@ -95,10 +107,16 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		component_timed_out_requests_total: {
-			description:       "The total number of requests for which this source responded with a timeout error."
+			description:       "The total number of requests for which this source responded with a timeout error. The OpenTelemetry source emits this metric only when `request_timeout_secs` is configured."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _request_tags
+		}
+		component_load_shed_requests_total: {
+			description:       "The total number of requests rejected because the component's request concurrency limit was reached. The OpenTelemetry source emits this metric only when `max_concurrent_requests` is configured."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _request_tags
 		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
@@ -1181,6 +1199,16 @@ components: sources: internal_metrics: {
 			component_kind: _component_kind
 			component_id:   _component_id
 			component_type: _component_type
+		}
+		_request_tags: _component_tags & {
+			protocol: {
+				description: "The protocol used to receive the request."
+				required:    false
+				enum: {
+					"grpc": "gRPC"
+					"http": "HTTP"
+				}
+			}
 		}
 
 		// All available tags

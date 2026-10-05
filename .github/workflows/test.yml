@@ -40,6 +40,20 @@ jobs:
           prettier: true
       - run: make check-fmt
 
+  check-actionlint:
+    name: Check GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.actionlint == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          vdev: false
+          actionlint: true
+      - run: make check-actionlint
+
   check-clippy:
     name: Check clippy
     runs-on: ubuntu-24.04-8core
@@ -190,6 +204,7 @@ jobs:
     needs:
       - changes
       - check-fmt
+      - check-actionlint
       - check-clippy
       - test
       - check-scripts
