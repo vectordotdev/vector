@@ -222,6 +222,7 @@ impl TransformConfig for SampleConfig {
                 self.group_by.clone(),
                 exclude,
                 self.sample_rate_key.clone(),
+                self.internal_metrics.include_group_tag,
             )
         } else {
             Sample::new(
@@ -231,12 +232,11 @@ impl TransformConfig for SampleConfig {
                 self.group_by.clone(),
                 exclude,
                 self.sample_rate_key.clone(),
+                self.internal_metrics.include_group_tag,
             )
         };
 
-        Ok(Transform::function(sample.with_include_group_tag(
-            self.internal_metrics.include_group_tag,
-        )))
+        Ok(Transform::function(sample))
     }
 
     fn input(&self) -> Input {

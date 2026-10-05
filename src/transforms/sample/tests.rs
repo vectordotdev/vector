@@ -65,6 +65,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
     let total_passed = events
         .into_iter()
@@ -88,6 +89,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
     let total_passed = events
         .into_iter()
@@ -114,6 +116,7 @@ fn hash_consistently_samples_the_same_events() {
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
 
     let first_run = events
@@ -151,6 +154,7 @@ fn always_passes_events_matching_pass_list() {
                 "important",
             )),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -181,6 +185,7 @@ fn handles_group_by() {
                 "na",
             )),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -205,6 +210,7 @@ fn handles_key_field() {
             None,
             Some(condition_contains("other_field", "foo")),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -228,6 +234,7 @@ fn sampler_adds_sampling_rate_to_event() {
             None,
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
+            false,
         );
         let passing = events
             .into_iter()
@@ -244,6 +251,7 @@ fn sampler_adds_sampling_rate_to_event() {
             None,
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("custom_sample_rate")),
+            false,
         );
         let passing = events
             .into_iter()
@@ -261,6 +269,7 @@ fn sampler_adds_sampling_rate_to_event() {
             None,
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("")),
+            false,
         );
         let passing = events
             .into_iter()
@@ -277,6 +286,7 @@ fn sampler_adds_sampling_rate_to_event() {
             None,
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
+            false,
         );
         let event = Event::Log(LogEvent::from("nananana"));
         let passing = transform_one(&mut sampler, event).unwrap();
@@ -296,6 +306,7 @@ fn handles_trace_event() {
         None,
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let iterations = 0..2;
@@ -314,6 +325,7 @@ fn group_by_uses_independent_ratio_samplers() {
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let sampled = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
@@ -338,6 +350,7 @@ fn sample_at_rates_higher_then_half() {
             None,
             None,
             default_sample_rate_key(),
+            false,
         );
         let total_observed = events
             .iter()
@@ -363,6 +376,7 @@ fn dynamic_ratio_field_overrides_static_ratio() {
         None,
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -385,6 +399,7 @@ fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
         None,
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let event = Event::Log(LogEvent::from("hello"));
@@ -404,6 +419,7 @@ fn dynamic_rate_field_overrides_static_ratio() {
         None,
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -426,6 +442,7 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
         None,
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let event = Event::Log(LogEvent::from("hello"));
@@ -445,6 +462,7 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
         None,
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -469,6 +487,7 @@ fn dynamic_ratio_honors_group_by_key() {
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_service_a = 0;
@@ -514,6 +533,7 @@ fn dynamic_rate_honors_group_by_key() {
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_service_a = 0;
@@ -558,6 +578,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_low_ratio = 0;
@@ -606,6 +627,7 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_rate_2 = 0;

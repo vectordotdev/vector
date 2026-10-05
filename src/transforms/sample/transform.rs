@@ -158,6 +158,7 @@ impl Sample {
         group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
@@ -168,6 +169,7 @@ impl Sample {
             },
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
@@ -178,6 +180,7 @@ impl Sample {
         group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
@@ -185,6 +188,7 @@ impl Sample {
             SampleKeySource::Dynamic { fields, group_by },
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
@@ -194,6 +198,7 @@ impl Sample {
         key_source: SampleKeySource,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self {
             name,
@@ -202,13 +207,8 @@ impl Sample {
             dynamic_event_counters: HashMap::default(),
             exclude,
             sample_rate_key,
-            include_group_tag: false,
+            include_group_tag,
         }
-    }
-
-    pub const fn with_include_group_tag(mut self, include_group_tag: bool) -> Self {
-        self.include_group_tag = include_group_tag;
-        self
     }
 
     #[cfg(test)]
