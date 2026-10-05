@@ -74,7 +74,6 @@ components: sinks: prometheus_remote_write: {
 				as a way to protect against this.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.prometheus_remote_write.configuration

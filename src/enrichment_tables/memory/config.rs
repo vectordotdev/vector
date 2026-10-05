@@ -17,8 +17,8 @@ use vrl::{path::OwnedTargetPath, value::Kind};
 use super::{Memory, internal_events::InternalMetricsConfig, source::EXPIRED_ROUTE};
 use crate::{
     config::{
-        DynValidatedSink, EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig,
-        SourceContext, SourceOutput, ValidatedSink,
+        EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+        ValidatedSink,
     },
     enrichment_tables::memory::{
         bloom_table::{BloomMemoryConfig, BloomMemoryTable},
@@ -66,25 +66,20 @@ pub struct MemoryConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
     /// Configuration of internal metrics
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
     /// Configuration for source functionality.
-    #[configurable(derived)]
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub source_config: Option<MemorySourceConfig>,
     /// Field in the incoming value used as the TTL override.
-    #[configurable(derived)]
     #[serde(default)]
     pub ttl_field: OptionalValuePath,
     /// Behavior for memory table state on configuration reload.
-    #[configurable(derived)]
     #[serde(default)]
     pub reload_behavior: ReloadBehavior,
 
     /// Set to make the table act as a probabilistic filter instead of storing original values. This
     /// will prevent reading values from the table - found keys will have empty value.
-    #[configurable(derived)]
     #[serde(default)]
     pub filter: Option<TableFilter>,
 
@@ -187,7 +182,7 @@ const fn default_ttl() -> u64 {
 }
 
 const fn default_scan_interval() -> NonZeroU64 {
-    unsafe { NonZeroU64::new_unchecked(30) }
+    NonZeroU64::new(30).expect("the default scan interval is nonzero")
 }
 
 impl MemoryConfig {
@@ -278,7 +273,7 @@ impl MemoryConfig {
                 if let Some(max_byte_size) = self.max_byte_size
                     && filter_size > max_byte_size
                 {
-                    return Err(format!("Configured bloom filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of bloom filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+                    return Err(format!("Configured bloom filter is larger ({filter_size}) than defined `max_byte_size` ({max_byte_size}). Reduce the size of bloom filter or increase or remove `max_byte_size`.").into());
                 }
             }
             _ => {}
@@ -341,10 +336,6 @@ impl SinkConfig for MemoryConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

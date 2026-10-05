@@ -134,7 +134,16 @@ pub fn healthcheck_response(
     response: http::Response<hyper::Body>,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
-    match response.status() {
+    healthcheck_status(response.status(), not_found_error)
+}
+
+/// Classifies a GCP healthcheck response by status alone, shared by the legacy and native
+/// HTTP clients.
+pub fn healthcheck_status(
+    status: http::StatusCode,
+    not_found_error: crate::Error,
+) -> crate::Result<()> {
+    match status {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),

@@ -56,7 +56,6 @@ components: sinks: appsignal: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.appsignal.configuration

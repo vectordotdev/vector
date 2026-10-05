@@ -397,7 +397,7 @@ mod test {
             1,
         );
 
-        transform.transform(event.clone(), &mut outputs);
+        transform.transform(event, &mut outputs);
         for output_name in output_names {
             let events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 0);

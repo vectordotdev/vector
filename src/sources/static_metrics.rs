@@ -42,7 +42,6 @@ pub struct StaticMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub metrics: Vec<StaticMetricConfig>,
 }
@@ -165,7 +164,7 @@ impl StaticMetrics {
                                 interval_ms: NonZeroU32::new(self.interval.as_millis() as u32),
                             },
                             kind,
-                            value: value.clone(),
+                            value,
                         },
                         EventMetadata::default(),
                     )

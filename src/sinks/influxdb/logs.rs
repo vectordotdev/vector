@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::collections::{HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
-use derivative::Derivative;
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
@@ -26,8 +20,7 @@ use super::{
 use crate::{
     codecs::Transformer,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
     http::HttpClient,
@@ -151,22 +144,17 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::minimal = true))]
     pub token: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -240,20 +228,15 @@ impl SinkConfig for InfluxDbLogsConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedInfluxDbLogs {
     measurement: String,
     tags: HashSet<KeyString>,
     batch: BatchSettings<Buffer>,
     // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     uri: Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,

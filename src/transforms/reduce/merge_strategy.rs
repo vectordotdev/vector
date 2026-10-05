@@ -87,8 +87,7 @@ struct RetainMerger {
 }
 
 impl RetainMerger {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    fn new(v: Value) -> Self {
+    const fn new(v: Value) -> Self {
         Self { v }
     }
 }

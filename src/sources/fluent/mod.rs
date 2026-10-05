@@ -22,7 +22,7 @@ use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput, log_schema,
+        SourceContext, SourceOutput, UnixOnly, log_schema,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -58,8 +58,7 @@ pub enum FluentMode {
     Tcp(FluentTcpConfig),
 
     /// Listen on unix stream socket
-    #[cfg(unix)]
-    Unix(FluentUnixConfig),
+    Unix(UnixOnly<FluentUnixConfig>),
 }
 
 /// Serde doesn't provide a way to specify a default tagged variant when deserializing
@@ -77,9 +76,8 @@ mod deser {
         #[serde(rename = "tcp")]
         Tcp(FluentTcpConfig),
 
-        #[cfg(unix)]
         #[serde(rename = "unix")]
-        Unix(FluentUnixConfig),
+        Unix(UnixOnly<FluentUnixConfig>),
     }
 
     #[derive(Deserialize)]
@@ -98,7 +96,6 @@ mod deser {
         {
             Ok(match FluentModeDe::deserialize(deserializer)? {
                 FluentModeDe::Tagged(FluentModeTagged::Tcp(config)) => FluentMode::Tcp(config),
-                #[cfg(unix)]
                 FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => FluentMode::Unix(config),
                 FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
             })
@@ -133,18 +130,6 @@ mod deser {
         }
 
         #[test]
-        fn test_invalid_unix_mode() {
-            let json_data = serde_json::json!({
-                "mode": "unix",
-                "address": "0.0.0.0:2020",
-                "connection_limit": 2
-            });
-
-            assert!(serde_json::from_value::<FluentConfig>(json_data).is_err());
-        }
-
-        #[cfg(unix)]
-        #[test]
         fn test_valid_unix_mode() {
             let json_data = serde_json::json!({
                 "mode": "unix",
@@ -153,7 +138,7 @@ mod deser {
 
             let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
             assert!(
-                matches!(parsed.mode, FluentMode::Unix(c) if c.path.to_string_lossy() == "/foo")
+                matches!(parsed.mode, FluentMode::Unix(c) if c.platform_independent().path.to_string_lossy() == "/foo")
             );
         }
     }
@@ -164,17 +149,14 @@ mod deser {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FluentTcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
     /// The size of the receive buffer used for each connection.
@@ -192,10 +174,8 @@ pub struct FluentTcpConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     tls_handshake_timeout_secs: Option<NonZeroU64>,
 
-    #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 }
@@ -239,7 +219,6 @@ impl FluentTcpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-#[cfg(unix)]
 pub struct FluentUnixConfig {
     /// The Unix socket path.
     ///
@@ -257,8 +236,8 @@ pub struct FluentUnixConfig {
     pub socket_file_mode: Option<u32>,
 }
 
-#[cfg(unix)]
 impl FluentUnixConfig {
+    #[cfg(unix)]
     fn build(
         &self,
         cx: SourceContext,
@@ -303,8 +282,11 @@ impl SourceConfig for FluentConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
         match &self.mode {
             FluentMode::Tcp(t) => t.build(cx, log_namespace),
-            #[cfg(unix)]
-            FluentMode::Unix(u) => u.build(cx, log_namespace),
+            FluentMode::Unix(u) => u.as_ref().on_unix(
+                (cx, log_namespace),
+                #[cfg(unix)]
+                |config, (cx, log_namespace)| config.build(cx, log_namespace),
+            ),
         }
     }
 
@@ -321,7 +303,6 @@ impl SourceConfig for FluentConfig {
     fn resources(&self) -> Vec<Resource> {
         match &self.mode {
             FluentMode::Tcp(tcp) => vec![tcp.address.as_tcp_resource()],
-            #[cfg(unix)]
             FluentMode::Unix(_) => vec![],
         }
     }
@@ -349,7 +330,6 @@ impl FluentConfig {
                 .and_then(|tls| tls.client_metadata_key.as_ref())
                 .and_then(|k| k.path.clone())
                 .map(LegacyKey::Overwrite),
-            #[cfg(unix)]
             FluentMode::Unix(_) => None,
         };
 
@@ -1433,7 +1413,7 @@ mod integration_tests {
                         .unwrap();
                     sleep(Duration::from_secs(2)).await;
 
-                    collect_ready(out).await
+                    collect_ready(out)
                 })
                 .await;
 
@@ -1513,7 +1493,7 @@ mod integration_tests {
                         .await
                         .unwrap();
                     sleep(Duration::from_secs(2)).await;
-                    collect_ready(out).await
+                    collect_ready(out)
                 })
                 .await;
 

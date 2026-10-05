@@ -255,11 +255,9 @@ pub struct WebSocketCommonConfig {
     pub ping_timeout: Option<NonZeroU64>,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
     /// HTTP Authentication.
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 }
 

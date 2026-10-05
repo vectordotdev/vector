@@ -290,24 +290,23 @@ impl TryFrom<String> for SocketListenAddr {
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
         // first attempt to parse the string into a SocketAddr directly
-        match input.parse::<SocketAddr>() {
-            Ok(socket_addr) => Ok(socket_addr.into()),
-
+        if let Ok(socket_addr) = input.parse::<SocketAddr>() {
+            Ok(socket_addr.into())
+        } else {
             // then attempt to parse a systemd file descriptor
-            Err(_) => {
-                let fd: usize = match input.as_str() {
-                    "systemd" => Ok(0),
-                    s => s
-                        .strip_prefix("systemd#")
-                        .ok_or_else(|| "unable to parse".to_string())?
-                        .parse::<usize>()
-                        .map_err(|_| "failed to parse usize".to_string())?
-                        .checked_sub(1)
-                        .ok_or_else(|| "systemd indices start at 1".to_string()),
-                }?;
 
-                Ok(fd.into())
-            }
+            let fd: usize = match input.as_str() {
+                "systemd" => Ok(0),
+                s => s
+                    .strip_prefix("systemd#")
+                    .ok_or_else(|| "unable to parse".to_string())?
+                    .parse::<usize>()
+                    .map_err(|_| "failed to parse usize".to_string())?
+                    .checked_sub(1)
+                    .ok_or_else(|| "systemd indices start at 1".to_string()),
+            }?;
+
+            Ok(fd.into())
         }
     }
 }
@@ -370,11 +369,9 @@ pub struct SimpleSinkConfig {
     #[serde(default = "default_simple_sink_endpoint")]
     endpoint: String,
 
-    #[configurable(derived)]
     #[serde(default = "default_simple_sink_batch")]
     batch: BatchConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_simple_sink_encoding")]
     encoding: Encoding,
 
@@ -425,7 +422,6 @@ fn default_simple_sink_endpoint() -> String {
 #[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AwsBleepBloopSinkConfig {
-    #[configurable(derived)]
     #[serde(default)]
     auth: AwsAuthentication,
 
@@ -433,16 +429,14 @@ pub struct AwsBleepBloopSinkConfig {
     #[configurable(validation(pattern = "foo\\d+"))]
     folder_id: String,
 
-    #[configurable(derived)]
     #[serde(default = "default_aws_bleep_bloop_sink_batch")]
     batch: BatchConfig,
 
-    #[configurable(deprecated, derived)]
+    #[configurable(deprecated)]
     #[serde(default = "default_aws_bleep_bloop_sink_encoding")]
     encoding: Encoding,
 
     /// Overridden TLS description.
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     /// The partition key to use for each event.
@@ -624,7 +618,6 @@ pub struct GlobalOptions {
 #[derive(Clone)]
 #[configurable_component]
 pub struct VectorConfig {
-    #[configurable(derived)]
     global: GlobalOptions,
 
     /// Any configured sources.

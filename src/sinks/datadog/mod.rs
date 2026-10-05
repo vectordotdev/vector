@@ -75,11 +75,9 @@ pub struct LocalDatadogCommonConfig {
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

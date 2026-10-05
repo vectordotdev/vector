@@ -41,16 +41,12 @@ use crate::{
 #[configurable_component(source("logstash", "Collect logs from a Logstash agent."))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
@@ -70,7 +66,6 @@ pub struct LogstashConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     tls_handshake_timeout_secs: Option<NonZeroU64>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 

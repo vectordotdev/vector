@@ -26,7 +26,6 @@ components: sinks: blackhole: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.blackhole.configuration

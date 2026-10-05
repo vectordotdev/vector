@@ -1,10 +1,6 @@
-// Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
-use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
 use vector_common::internal_event::{InternalEventHandle, Registered, register};
@@ -225,16 +221,19 @@ impl UsageAccounting {
 /// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
 /// `SenderAdapter` instances instead... which would let us get rid of the boxing and
 /// `#[async_recursion]` stuff.
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
+    // `overflow` is self-referential, so formatting it via a plain placeholder would make
+    // derive_more infer `Option<Box<BufferSender<T>>>: Debug`, overflowing (E0275). A method-call
+    // expression skips bound inference while formatting the same value.
+    #[debug("{:?}", overflow.as_ref())]
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     usage_instrumentation: Option<BufferUsageHandle>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     send_duration: Option<Registered<BufferSendDuration>>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     custom_instrumentation: Option<Arc<dyn BufferInstrumentation<T>>>,
 }
 
@@ -409,7 +408,7 @@ impl<T: Bufferable> BufferSender<T> {
 mod usage_snapshot_tests {
     use std::num::{NonZeroU64, NonZeroUsize};
 
-    use temp_dir::TempDir;
+    use tempfile::tempdir;
     use tracing::Span;
 
     use super::SenderAdapter;
@@ -427,7 +426,7 @@ mod usage_snapshot_tests {
                 when_full: WhenFull::Block,
             },
         ]);
-        let data_dir = TempDir::new().unwrap();
+        let data_dir = tempdir().unwrap();
         let (sender, _receiver) = config
             .build::<SizedRecord>(
                 Some(data_dir.path().to_path_buf()),

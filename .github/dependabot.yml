@@ -20,6 +20,12 @@ updates:
           - "bytecheck"
           - "rkyv"
 
+      kube:
+        applies-to: version-updates
+        patterns:
+          - "kube"
+          - "k8s-openapi"
+
       patches:
         applies-to: version-updates
         patterns:
@@ -102,6 +108,12 @@ updates:
       netlink:
         patterns:
           - "netlink-*"
+        update-types:
+          - "patch"
+          - "minor"
+      opendal:
+        patterns:
+          - "opendal*"
         update-types:
           - "patch"
           - "minor"
@@ -234,10 +246,9 @@ updates:
     commit-message:
       prefix: "chore(ci)"
     groups:
-      artifact:
+      actions:
         patterns:
-          - "actions/download-artifact"
-          - "actions/upload-artifact"
+          - "*"
   - package-ecosystem: "npm"
     directory: "website/"
     schedule:

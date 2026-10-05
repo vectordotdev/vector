@@ -39,7 +39,6 @@ components: sources: opentelemetry: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -292,6 +291,10 @@ components: sources: opentelemetry: {
 	}
 
 	telemetry: metrics: {
+		component_request_active:             components.sources.internal_metrics.output.metrics.component_request_active
+		component_request_concurrency_limit:  components.sources.internal_metrics.output.metrics.component_request_concurrency_limit
+		component_timed_out_requests_total:   components.sources.internal_metrics.output.metrics.component_timed_out_requests_total
+		component_load_shed_requests_total:   components.sources.internal_metrics.output.metrics.component_load_shed_requests_total
 		grpc_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.grpc_server_handler_duration_seconds
 		grpc_server_messages_received_total:  components.sources.internal_metrics.output.metrics.grpc_server_messages_received_total
 		grpc_server_messages_sent_total:      components.sources.internal_metrics.output.metrics.grpc_server_messages_sent_total

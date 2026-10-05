@@ -1,6 +1,6 @@
 //! Cargo.toml parsing and version utilities
 
-use std::{collections::BTreeMap, fs};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -20,7 +20,12 @@ pub struct CargoToml {
 
 impl CargoToml {
     pub fn load() -> Result<CargoToml> {
-        let text = fs::read_to_string("Cargo.toml").context("Could not read `Cargo.toml`")?;
+        Self::load_from(Path::new("Cargo.toml"))
+    }
+
+    pub fn load_from(path: &Path) -> Result<CargoToml> {
+        let text = fs::read_to_string(path)
+            .with_context(|| format!("Could not read `{}`", path.display()))?;
         toml::from_str::<CargoToml>(&text).context("Invalid contents in `Cargo.toml`")
     }
 }

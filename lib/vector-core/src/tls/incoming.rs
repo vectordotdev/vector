@@ -79,6 +79,7 @@ impl MaybeTlsSettings {
             listener,
             acceptor,
             origin_filter: None,
+            keepalive: None,
         })
     }
 }
@@ -87,22 +88,34 @@ pub struct MaybeTlsListener {
     listener: TcpListener,
     acceptor: Option<Arc<ArcSwap<SslAcceptor>>>,
     origin_filter: Option<Vec<IpNet>>,
+    keepalive: Option<TcpKeepaliveConfig>,
 }
 
 impl MaybeTlsListener {
     pub async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
-        let listener = self
+        let (stream, peer_addr) = self
             .listener
             .accept()
             .await
-            .map(|(stream, peer_addr)| {
-                let acceptor = self
-                    .acceptor
-                    .as_ref()
-                    .map(|accptr| accptr.load().as_ref().clone());
-                MaybeTlsIncomingStream::new(stream, peer_addr, acceptor)
-            })
             .context(IncomingListenerSnafu)?;
+
+        if let Some(keepalive) = self.keepalive
+            && let Some(time_secs) = keepalive.time_secs
+        {
+            let config =
+                socket2::TcpKeepalive::new().with_time(std::time::Duration::from_secs(time_secs));
+            if let Err(error) = tcp::set_keepalive(&stream, &config) {
+                warn!(message = "Failed to set TCP keepalive on accepted connection.", %error);
+            }
+        }
+
+        let listener = MaybeTlsIncomingStream::new(
+            stream,
+            peer_addr,
+            self.acceptor
+                .as_ref()
+                .map(|accptr| accptr.load().as_ref().clone()),
+        );
 
         if let Some(origin_filter) = &self.origin_filter {
             if origin_filter
@@ -185,6 +198,12 @@ impl MaybeTlsListener {
         self.origin_filter = allowlist;
         self
     }
+
+    #[must_use]
+    pub fn with_keepalive(mut self, keepalive: Option<TcpKeepaliveConfig>) -> Self {
+        self.keepalive = keepalive;
+        self
+    }
 }
 
 impl From<TcpListener> for MaybeTlsListener {
@@ -193,6 +212,7 @@ impl From<TcpListener> for MaybeTlsListener {
             listener,
             acceptor: None,
             origin_filter: None,
+            keepalive: None,
         }
     }
 }

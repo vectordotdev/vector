@@ -6,8 +6,7 @@ use crate::{
     codecs::{EncodingConfig, Transformer},
     common::websocket::{ConnectSnafu, WebSocketCommonConfig, WebSocketConnector, WebSocketError},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     sinks::{Healthcheck, VectorSink, websocket::sink::WebSocketSink},
     tls::MaybeTlsSettings,
@@ -23,10 +22,8 @@ pub struct WebSocketSinkConfig {
     #[serde(flatten)]
     pub common: WebSocketCommonConfig,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -58,10 +55,6 @@ impl SinkConfig for WebSocketSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -77,6 +70,7 @@ impl ValidatedSink for WebSocketSinkConfig {
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
         let transformer = self.encoding.transformer();
+        self.encoding.validate()?;
         Ok(ValidatedWebSocketSink { uri, transformer })
     }
 
