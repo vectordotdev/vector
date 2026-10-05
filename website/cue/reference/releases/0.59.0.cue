@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.59.0": {
-	date: "2026-10-05"
-
+	date: "2026-10-06"
 	changelog: [
 		{
 			type: "enhancement"
