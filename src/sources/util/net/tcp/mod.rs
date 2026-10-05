@@ -147,7 +147,8 @@ where
                     emit!(SocketBindError {
                         mode: SocketMode::Tcp,
                         error: &error,
-                    })
+                    });
+                    cx.error_reporter.report(error);
                 })?;
 
             info!(

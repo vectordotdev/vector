@@ -167,6 +167,7 @@ impl SourceConfig for SocketConfig {
                     cx.shutdown,
                     cx.out,
                     log_namespace,
+                    cx.error_reporter,
                 ))
             }
             Mode::UnixDatagram(config) => config.on_unix(
@@ -1119,6 +1120,7 @@ mod test {
                 schema_definitions: HashMap::default(),
                 extra_context: Default::default(),
                 metrics_storage: Default::default(),
+                error_reporter: Default::default(),
             })
             .await
             .unwrap();

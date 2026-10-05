@@ -51,8 +51,9 @@ use crate::{
     SourceSender,
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
-        ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
-        TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
+        ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceErrorReporter, SourceOuter,
+        TransformContext, TransformOuter, TransformOutput, enrichment_table_sinks,
+        enrichment_table_sources,
     },
     cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
@@ -412,6 +413,7 @@ impl<'a> Builder<'a> {
             .shutdown_coordinator
             .register_source(key, INTERNAL_SOURCES.contains(&typetag));
 
+        let error_reporter = SourceErrorReporter::default();
         let context = SourceContext {
             key: key.clone(),
             globals: self.config.global.clone(),
@@ -424,6 +426,7 @@ impl<'a> Builder<'a> {
             schema_definitions,
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
+            error_reporter: error_reporter.clone(),
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -457,7 +460,9 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|_| TaskError::Opaque),
+                result = server => result.map_err(|_| {
+                    error_reporter.take().map_or(TaskError::Opaque, TaskError::wrapped)
+                }),
             };
 
             // Even though we already tried to receive any pump task error above, we may have exited
