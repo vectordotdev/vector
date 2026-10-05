@@ -154,6 +154,44 @@ fn namespaced_files_are_coerced_under_their_component_field() {
 }
 
 #[test]
+fn namespaced_tests_coerce_interpolated_event_counts() {
+    for (name, count) in [
+        (
+            "environment variable",
+            "${VECTOR_TEST_PARSE_FIRST_COUNT:-42}",
+        ),
+        ("secret", "SECRET[backend.count]"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("tests")).unwrap();
+        std::fs::write(
+            dir.path().join("tests/events.yaml"),
+            indoc::formatdoc! {"
+                name: event count
+                outputs:
+                  - extract_from: transform
+                    expected_event_count: '{count}'
+            "},
+        )
+        .unwrap();
+
+        let builder = ConfigBuilderLoader::default()
+            .interpolate_env(true)
+            .secrets(HashMap::from([("backend.count".into(), "42".into())]))
+            .load_from_paths(&[ConfigPath::Dir(dir.path().to_owned())])
+            .unwrap_or_else(|errors| panic!("{name}: {errors:?}"));
+
+        assert_eq!(builder.tests.len(), 1, "{name}");
+        assert_eq!(builder.tests[0].name, "event count", "{name}");
+        assert_eq!(
+            builder.tests[0].outputs[0].expected_event_count,
+            Some(42),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn coercion_errors_include_the_component_field_path() {
     let input = indoc! {r#"
         sources:
