@@ -59,6 +59,11 @@ pub enum DataType {
     ///
     /// Redis channels function in a pub/sub fashion, allowing many-to-many broadcasting and receiving.
     Channel,
+
+    /// The Redis `string` type.
+    ///
+    /// This resembles a sequence of bytes..
+    String,
 }
 
 /// Wrapper for an `Event` that also stored the rendered key.
