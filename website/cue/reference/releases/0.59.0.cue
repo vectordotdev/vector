@@ -386,8 +386,8 @@ releases: "0.59.0": {
 		{
 			type:     "chore"
 			breaking: true
-			title:    "Remove `http` source and `greptimedb` sink deprecated component aliases"
-			anchor:   "remove-deprecated-component-aliases"
+			title:    "Removed `http` source and `greptimedb` sink deprecated component aliases"
+			anchor:   "removed-deprecated-component-aliases"
 			description: #"""
 				The deprecated `http` source and `greptimedb` sink aliases have been removed. They were deprecated in Vector 0.26.0 and 0.41.0, respectively.
 				"""#
