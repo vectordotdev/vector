@@ -399,12 +399,15 @@ releases: "0.59.0": {
 			description: #"""
 				Sink `endpoint` options now require an absolute URL that includes a host.
 				
-				**Before:** partial or empty endpoints (for example `endpoint: ""` or `endpoint: "localhost:8080"` without a scheme) were accepted at configuration load and only failed when the sink attempted to send data, or were silently completed with a default scheme and host.
+				**Before:**
+				
+				- Endpoints without a scheme (for example `endpoint: "localhost:8080"`) were accepted at configuration load and failed only when the sink attempted to send data.
+				- Empty, host-less, or non-`http(s)` endpoints (for example `endpoint: ""`, `endpoint: "http:///"`, or `endpoint: "ftp://example.com"`) were accepted at configuration load and either failed only when the sink attempted to send data or were silently completed with a default scheme and host.
 				
 				**After:**
 				
-				- Endpoints without a scheme default to `https://` (for example `endpoint: "localhost:8080"` becomes `https://localhost:8080`).
-				- Empty, host-less, or non-`http(s)` endpoints (for example `endpoint: ""`, `endpoint: "/path"`, or `endpoint: "ftp://example.com"`) are rejected at configuration load with a clear error, including with `vector validate --no-environment`.
+				- Endpoints without a scheme are defaulted to `https://` (for example `endpoint: "localhost:8080"` becomes `https://localhost:8080`) and work as expected.
+				- Empty, host-less, or non-`http(s)` endpoints (for example `endpoint: ""`, `endpoint: "http:///"`, or `endpoint: "ftp://example.com"`) are rejected at configuration load with a clear error, including with `vector validate --no-environment`.
 				"""#
 			pr_numbers: [26224, 26218, 26213]
 			contributors: ["thomasqueirozb"]
