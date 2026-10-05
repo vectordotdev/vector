@@ -397,7 +397,7 @@ releases: "0.59.0": {
 		{
 			type: "enhancement"
 			description: #"""
-				Sink `endpoint` options now require an absolute URL that includes a host. This affects the `keep` and `new_relic` sinks.
+				Sink `endpoint` options now require an absolute URL that includes a host.
 				
 				**Before:** partial or empty endpoints (for example `endpoint: ""` or `endpoint: "localhost:8080"` without a scheme) were accepted at configuration load and only failed when the sink attempted to send data, or were silently completed with a default scheme and host.
 				
