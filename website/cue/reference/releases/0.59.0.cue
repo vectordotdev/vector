@@ -11,16 +11,16 @@ releases: "0.59.0": {
 				Unlike the default block blob mode that creates a new uniquely-named blob per batch, append mode
 				reuses a stable blob name and extends it on each flush — ideal for continuous log streaming
 				where you want a single growing file per time window.
-				
+
 				When `blob_type` is set to `append`, `blob_append_uuid` defaults to `false` and `blob_time_format`
 				defaults to `%Y-%m-%dT%H` (hourly rotation), which keeps the Azure limit of 50,000 blocks per
 				append blob out of reach at realistic throughput. Both can still be overridden explicitly.
 				The Azure hard limit of 4 MiB per `append_block` call is enforced at startup via `batch.max_bytes`.
-				
+
 				Compression is supported in append mode with `gzip`, `zstd`, or `none`. Because each batch is
 				compressed independently, `snappy` and `zlib` are rejected at startup: neither format can be
 				decoded as a concatenated sequence of streams.
-				
+
 				Because a batch is appended to whatever the blob already holds, append mode takes the same
 				stream-oriented encoding defaults as the `file` sink: with `codec: json` and no explicit `framing`
 				it writes newline-delimited JSON, rather than the one-array-per-batch framing used for block blobs.
@@ -49,7 +49,7 @@ releases: "0.59.0": {
 			type: "fix"
 			description: #"""
 				Fix collection from systemd sockets.
-				
+
 				Systemd sockets are passed in blocking mode, but tokio expects them to be in non-blocking mode.
 				Therefore, always set sockets from systemd to non-blocking.
 				"""#
@@ -71,7 +71,7 @@ releases: "0.59.0": {
 			type: "feat"
 			description: #"""
 				Added the `files_unwatched_bytes_unread_total` internal metric to the `file` and `kubernetes_logs` sources. It tracks known unread bytes when a file is unwatched, for example after deletion or rotation. A known count of zero means no bytes remained unread at measurement time.
-				
+
 				When the unread-byte count is unavailable, Vector increments `files_unwatched_with_unknown_bytes_total` instead. This counter counts unwatch events with unknown unread size, including gzipped files, skipped gzip readers, and metadata failures; it does not measure lost bytes. Gzip files are not decompressed solely to calculate telemetry. Both metrics use the existing `reached_eof` label and optional `file` label, and `files_unwatched_total` continues to count all unwatch events.
 				"""#
 			pr_numbers: [24676]
@@ -102,11 +102,11 @@ releases: "0.59.0": {
 			type: "fix"
 			description: #"""
 				Renamed the memory enrichment table failure and TTL-expiration internal metrics to end in `_total`, matching Vector's counter naming convention:
-				
+
 				- `memory_enrichment_table_failed_insertions_total`
 				- `memory_enrichment_table_failed_reads_total`
 				- `memory_enrichment_table_ttl_expirations_total`
-				
+
 				This replaces the previous non-`_total` metric names. The previous metric names without the `_total` suffix are still emitted but are deprecated and will be removed in a future release.
 				"""#
 			pr_numbers: [26405, 25459]
@@ -154,7 +154,7 @@ releases: "0.59.0": {
 				The `apache-avro` library has been upgraded from 0.21 to 0.22, which enforces stricter schema
 				parsing per the Avro specification. Field-level attributes must now be nested inside a `"type"`
 				object rather than specified as siblings of the `"type"` string:
-				
+
 				- **Complex types** (`array`, `map`, `enum`, `record`, `fixed`): schemas using the shorthand
 				  form will **fail to parse at startup**.
 				- **Logical types** (`timestamp-millis`, `date`, `uuid`, etc.): schemas using the shorthand
@@ -189,7 +189,7 @@ releases: "0.59.0": {
 			type: "security"
 			description: #"""
 				The `chunked_gelf` framing decoder now limits the payload buffered across incomplete messages to 128 MiB. An unauthenticated sender could previously exhaust memory by sending chunks for messages it never completed, most easily on the `socket` source in UDP mode.
-				
+
 				`max_length` can lower the per-message ceiling. Setting it above 128 MiB raises both the per-message ceiling and the aggregate limit to that value.
 				"""#
 			pr_numbers: [26302]
@@ -199,7 +199,7 @@ releases: "0.59.0": {
 			type: "security"
 			description: #"""
 				The `chunked_gelf` framing decoder now applies a configurable limit to the number of incomplete messages held in memory. An unauthenticated sender could previously exhaust memory by sending unique message IDs it never completed, most easily on the `socket` source in UDP mode.
-				
+
 				`pending_messages_limit` now defaults to 4096. It was previously unset and therefore unbounded.
 				"""#
 			pr_numbers: [26301]
@@ -285,7 +285,7 @@ releases: "0.59.0": {
 				default, using Datadog's columnar protobuf format. This format uses dictionary-based string
 				deduplication and delta encoding, making it more efficient than `v2` for workloads with many
 				metrics that share common names or tags.
-				
+
 				Sketch metrics (distributions and histograms) are unaffected and continue to be submitted to
 				`/api/beta/sketches`.
 				"""#
@@ -398,14 +398,14 @@ releases: "0.59.0": {
 			type: "enhancement"
 			description: #"""
 				Sink `endpoint` options now require an absolute URL that includes a host.
-				
+
 				**Before:**
-				
+
 				- Endpoints without a scheme (for example `endpoint: "localhost:8080"`) were accepted at configuration load and failed only when the sink attempted to send data.
 				- Empty, host-less, or non-`http(s)` endpoints (for example `endpoint: ""`, `endpoint: "http:///"`, or `endpoint: "ftp://example.com"`) were accepted at configuration load and either failed only when the sink attempted to send data or were silently completed with a default scheme and host.
-				
+
 				**After:**
-				
+
 				- Endpoints without a scheme are defaulted to `https://` (for example `endpoint: "localhost:8080"` becomes `https://localhost:8080`) and work as expected.
 				- Empty, host-less, or non-`http(s)` endpoints (for example `endpoint: ""`, `endpoint: "http:///"`, or `endpoint: "ftp://example.com"`) are rejected at configuration load with a clear error, including with `vector validate --no-environment`.
 				"""#
@@ -456,56 +456,56 @@ releases: "0.59.0": {
 
 	vrl_changelog: #"""
 		### [0.36.0 (2026-10-01)](https://github.com/vectordotdev/vrl/releases/tag/v0.36.0)
-		
+
 		#### Breaking Changes & Upgrade Guide
-		
+
 		- Several stdlib functions now declare element-kind constraints on array parameters, enabling the compiler to detect element-type mismatches at compile time and automatically infer call-site infallibility.
-		
+
 		**Before:** passing a string-literal array required `!` because the compiler assumed it could fail:
 		```coffee
 		join!(["sources", "transforms", "sinks"], separator: ", ")
 		```
-		
+
 		**After:** when the compiler can prove the elements are strings, `!` is unnecessary (and `!` now triggers a warning):
 		```coffee
 		join(["sources", "transforms", "sinks"], separator: ", ")
 		```
-		
+
 		Passing the wrong element type (e.g. `join([1, 2, 3])`) is now a hard compile error instead of a runtime failure.
-		
+
 		Affected functions: `join`, `contains_all`, `tally`, `encode_key_value`, `encode_logfmt`, `ip_cidr_contains`, `parse_groks`.
-		
+
 		*Thanks to [pront](https://github.com/pront) for contributing PR [#1861](https://github.com/vectordotdev/vrl/pull/1861)!*
-		
+
 		#### New Features
-		
+
 		- Add `break` statement support for early loop exit within `for_each` closures.
-		
+
 		*Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1931](https://github.com/vectordotdev/vrl/pull/1931)!*
-		
+
 		#### Enhancements
-		
+
 		- Optimize `md5` runtime performance with stack-buffered hex encoding and compile-time constant evaluation for literals.
-		
+
 		*Thanks to [[jimmystewpot]](https://github.com/[jimmystewpot]) for contributing PR [#1930](https://github.com/vectordotdev/vrl/pull/1930)!*
 		- Improve `for_each` performance and reduce memory allocations by iterating over collections directly, binding only the closure parameters that are used, and reusing compiler variable slots across iterations. Benchmarks show a 23–41% throughput improvement for arrays and objects.
-		
+
 		*Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1932](https://github.com/vectordotdev/vrl/pull/1932)!*
 		- Optimise `merge` runtime performance and memory usage with zero-clone ownership transfer, single-pass entry traversal, size-adaptive shallow merging, and compile-time constant evaluation for literals, while hardening against deep recursion stack overflows and resolving type definition unsoundness for deep merges. Benchmarks show up to a 120% throughput increase for asymmetric merges and 26% for large flat objects.
-		
+
 		*Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1953](https://github.com/vectordotdev/vrl/pull/1953)!*
 		- Bump `convert_case` from 0.7.1 to 0.12.0, improving string casing function performance (`camelcase`, `snakecase`, `pascalcase`, `kebabcase`, `screamingsnakecase`) by approximately 70%.
-		
+
 		*Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1961](https://github.com/vectordotdev/vrl/pull/1961)!*
 		- Optimize `sha1`, `sha2`, and `sha3` runtime performance with stack-buffered hex encoding and compile-time constant evaluation for literals.
-		
+
 		*Thanks to [bruceg](https://github.com/bruceg) for contributing PR [#1951](https://github.com/vectordotdev/vrl/pull/1951)!*
-		
+
 		#### Fixes
-		
+
 		- Fixed `uuid_v7` to preserve the supplied timestamp at millisecond precision.
-		
+
 		*Thanks to [abbit](https://github.com/abbit) for contributing PR [#1956](https://github.com/vectordotdev/vrl/pull/1956)!*
-		
+
 		"""#
 }
