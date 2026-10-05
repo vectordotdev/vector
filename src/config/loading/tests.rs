@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use indoc::indoc;
 use serde_json::{Value, json};
 
-use super::{ConfigBuilderLoader, SecretBackendLoader, SourceLoader, loader_from_input};
+use super::{
+    ConfigBuilderLoader, SecretBackendLoader, SourceLoader, loader_from_input, loader_from_paths,
+};
 use crate::config::{ConfigPath, Format};
 
 struct ScalarCase {
@@ -189,6 +191,193 @@ fn namespaced_tests_coerce_interpolated_event_counts() {
             "{name}"
         );
     }
+}
+
+#[test]
+fn directory_fragments_merge_interpolated_scalars() {
+    struct Case {
+        name: &'static str,
+        path: &'static [&'static str],
+        first: Value,
+        second: Value,
+        expected: Result<Value, &'static str>,
+    }
+
+    for case in [
+        Case {
+            name: "an interpolated boolean overrides a literal",
+            path: &["proxy", "enabled"],
+            first: json!(false),
+            second: json!("${VECTOR_TEST_DIRECTORY_BOOL:-false}"),
+            expected: Ok(json!(false)),
+        },
+        Case {
+            name: "a literal overrides an interpolated boolean",
+            path: &["proxy", "enabled"],
+            first: json!("${VECTOR_TEST_DIRECTORY_BOOL:-true}"),
+            second: json!(true),
+            expected: Ok(json!(true)),
+        },
+        Case {
+            name: "an interpolated integer in a partial component",
+            path: &["sources", "demo", "count"],
+            first: json!(43),
+            second: json!("${VECTOR_TEST_DIRECTORY_COUNT:-43}"),
+            expected: Ok(json!(43)),
+        },
+        Case {
+            name: "a literal overrides an interpolated integer",
+            path: &["sources", "demo", "count"],
+            first: json!("${VECTOR_TEST_DIRECTORY_COUNT:-43}"),
+            second: json!(43),
+            expected: Ok(json!(43)),
+        },
+        Case {
+            name: "an interpolated float in a partial component",
+            path: &["sources", "demo", "interval"],
+            first: json!(2.5),
+            second: json!("${VECTOR_TEST_DIRECTORY_INTERVAL:-2.5}"),
+            expected: Ok(json!(2.5)),
+        },
+        Case {
+            name: "a secret overrides a literal integer",
+            path: &["sources", "demo", "count"],
+            first: json!(43),
+            second: json!("SECRET[backend.count]"),
+            expected: Ok(json!(43)),
+        },
+        Case {
+            name: "a literal overrides a secret",
+            path: &["sources", "demo", "count"],
+            first: json!("SECRET[backend.count]"),
+            second: json!(43),
+            expected: Ok(json!(43)),
+        },
+        Case {
+            name: "an invalid interpolated value cannot be hidden by an override",
+            path: &["proxy", "enabled"],
+            first: json!("${VECTOR_TEST_DIRECTORY_INVALID:-invalid}"),
+            second: json!(true),
+            expected: Err("proxy.enabled"),
+        },
+        Case {
+            name: "a boolean cannot override an integer",
+            path: &["proxy", "enabled"],
+            first: json!(1),
+            second: json!(true),
+            expected: Err("Incompatible types"),
+        },
+        Case {
+            name: "an integer cannot override a float",
+            path: &["sources", "demo", "interval"],
+            first: json!(1.5),
+            second: json!(2),
+            expected: Err("Incompatible types"),
+        },
+        Case {
+            name: "an array cannot be replaced with a string",
+            path: &["sources", "demo", "lines"],
+            first: json!(["first"]),
+            second: json!("second"),
+            expected: Err("Incompatible types"),
+        },
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        // Component type and required fields are deliberately in separate files.
+        // Directory traversal order is unspecified, so successful cases use equal values.
+        let fragments = [
+            json!({"sources": {"demo": {"type": "demo_logs"}}}),
+            json!({"sources": {"demo": {"format": "json"}}}),
+            directory_fragment(case.path, case.first),
+            directory_fragment(case.path, case.second),
+        ];
+        for (index, fragment) in fragments.iter().enumerate() {
+            std::fs::write(
+                dir.path().join(format!("{index}.yaml")),
+                serde_yaml::to_string(fragment).unwrap(),
+            )
+            .unwrap();
+        }
+
+        let result = ConfigBuilderLoader::default()
+            .interpolate_env(true)
+            .secrets(HashMap::from([("backend.count".into(), "43".into())]))
+            .load_from_paths(&[ConfigPath::Dir(dir.path().to_owned())]);
+        match case.expected {
+            Ok(expected) => {
+                let builder = result.unwrap_or_else(|errors| panic!("{}: {errors:?}", case.name));
+                let actual = if case.path == ["proxy", "enabled"] {
+                    // The default value is deliberately omitted by serialization.
+                    json!(builder.global.proxy.enabled)
+                } else {
+                    let value = serde_json::to_value(builder).unwrap();
+                    let pointer = format!("/{}", case.path.join("/"));
+                    value.pointer(&pointer).unwrap().clone()
+                };
+                assert_eq!(actual, expected, "{}", case.name);
+            }
+            Err(expected_error) => {
+                let errors = result.unwrap_err();
+                assert!(
+                    errors.iter().any(|error| error.contains(expected_error)),
+                    "{}: {errors:?}",
+                    case.name
+                );
+            }
+        }
+    }
+}
+
+fn directory_fragment(path: &[&str], value: Value) -> Value {
+    path.iter()
+        .rev()
+        .fold(value, |value, key| json!({*key: value}))
+}
+
+#[tokio::test]
+async fn directory_secret_discovery_defers_unresolved_component_values() {
+    let dir = tempfile::tempdir().unwrap();
+    let secrets_dir = tempfile::tempdir().unwrap();
+    let secrets_path = secrets_dir.path().join("secrets.json");
+    std::fs::write(&secrets_path, r#"{"count":"43"}"#).unwrap();
+    let fragments = [
+        json!({
+            "secret": {"backend": {"type": "file"}},
+            "sources": {"demo": {"type": "demo_logs", "format": "json", "count": 43}},
+            "proxy": {"enabled": true}
+        }),
+        json!({
+            "secret": {"backend": {"path": secrets_path}},
+            "sources": {"demo": {"count": "SECRET[backend.count]"}},
+            "proxy": {"enabled": "${VECTOR_TEST_DIRECTORY_BOOL:-true}"}
+        }),
+    ];
+    for (index, fragment) in fragments.iter().enumerate() {
+        std::fs::write(
+            dir.path().join(format!("{index}.yaml")),
+            serde_yaml::to_string(fragment).unwrap(),
+        )
+        .unwrap();
+    }
+
+    let paths = [ConfigPath::Dir(dir.path().to_owned())];
+    let loader =
+        loader_from_paths(SecretBackendLoader::default().interpolate_env(true), &paths).unwrap();
+    let (mut signal_handler, _receiver) = crate::signal::SignalHandler::new();
+    let secrets = loader.retrieve_secrets(&mut signal_handler).await.unwrap();
+    assert_eq!(
+        secrets,
+        HashMap::from([("backend.count".into(), "43".into())])
+    );
+
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .secrets(secrets)
+        .load_from_paths(&paths)
+        .unwrap();
+    assert!(builder.global.proxy.enabled);
+    let value = serde_json::to_value(builder).unwrap();
+    assert_eq!(value["sources"]["demo"]["count"], 43);
 }
 
 #[test]
