@@ -13,7 +13,7 @@ use crate::{
     config::{
         SecretBackend,
         loading::{
-            ComponentHint, Loader, deserialize_config_map, process::Process,
+            ComponentHint, Loader, deserialize_config_map, merge_root_config, process::Process,
             representation::ConfigMap,
         },
     },
@@ -32,6 +32,8 @@ use crate::{
 // - "SECRET[.secret.name]" will not match
 pub static COLLECTOR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]").unwrap());
+
+const SECRET_KEY: &str = "secret";
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -118,10 +120,20 @@ impl Process for SecretBackendLoader {
         Ok(map)
     }
 
+    fn merge_root(&mut self, mut files: ConfigMap) -> Result<(), Vec<String>> {
+        // Secret references have already been collected from every file. Only the
+        // backends can be coerced now; other components still contain unresolved secrets.
+        for value in files.values_mut() {
+            if let serde_json::Value::Object(map) = value {
+                map.retain(|key, _| key == SECRET_KEY);
+            }
+        }
+        self.merge(merge_root_config(files)?, None)
+    }
+
     fn merge(&mut self, mut map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
         // Other components can still contain unresolved secrets, including their type tags.
         // Only coerce the backend configurations needed to retrieve those secrets.
-        const SECRET_KEY: &str = "secret";
         if let Some(backends) = map.remove(SECRET_KEY) {
             let additional =
                 deserialize_config_map::<SecretBackendOuter>(ConfigMap::from_iter([(

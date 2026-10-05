@@ -73,6 +73,10 @@ impl Process for ConfigBuilderLoader {
         }
     }
 
+    fn merge_root(&mut self, files: ConfigMap) -> Result<(), Vec<String>> {
+        self.merge(loader::merge_root_config(files)?, None)
+    }
+
     /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
     fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {

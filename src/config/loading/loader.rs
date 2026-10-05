@@ -11,7 +11,8 @@ use super::{
     interpolation::ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX,
     open_file, read_dir,
     representation::{
-        ConfigMap, deserialize_config_value, merge_into_map, merge_values, parse_config_value,
+        ConfigMap, deserialize_config_value, merge_into_map, merge_maps_with_coercion,
+        merge_values, parse_config_value,
     },
     schema_coercion::ValueCoercer,
     secret::COLLECTOR,
@@ -229,6 +230,17 @@ pub(super) mod process {
         /// with the intention of merging an inner value that can be `take`n by a `Loader`.
         fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>)
         -> Result<(), Vec<String>>;
+
+        /// Combines root files before deserializing their potentially partial components.
+        fn merge_root(&mut self, files: ConfigMap) -> Result<(), Vec<String>> {
+            let mut root = ConfigMap::new();
+            for value in files.into_values() {
+                if let Value::Object(map) = value {
+                    merge_into_map(&mut root, map)?;
+                }
+            }
+            self.merge(root, None)
+        }
     }
 }
 
@@ -279,19 +291,8 @@ where
 
         // Get files from the root of the folder. These represent top-level config settings,
         // and need to merged down first to represent a more 'complete' config.
-        let mut root = ConfigMap::new();
         let map = self.load_dir(path, false)?;
-
-        // Discard the named part of the path, since these don't form any component names.
-        for (_, value) in map {
-            // All files should contain key/value pairs.
-            if let Value::Object(map) = value {
-                merge_into_map(&mut root, map)?;
-            }
-        }
-
-        // Merge the 'root' config value first.
-        self.merge(root, None)?;
+        self.merge_root(map)?;
 
         // Loop over each component path. If it exists, load files and merge.
         for (path, hint) in paths {
@@ -329,6 +330,24 @@ pub(super) fn deserialize_config_map<T: serde::de::DeserializeOwned>(
     deserialize_config_value(value)
 }
 
+pub(super) fn merge_root_config(files: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+    let maps = files.into_values().filter_map(|value| match value {
+        Value::Object(map) => Some(map),
+        _ => None,
+    });
+    // Generate at most one schema, and only when a conflict needs to be checked.
+    let mut schema = None;
+    merge_maps_with_coercion(maps, |value| {
+        let schema = schema
+            .get_or_insert_with(config_schema)
+            .as_ref()
+            .map_err(Clone::clone)?;
+        ValueCoercer::new(schema)
+            .coerce(value)
+            .map_err(|error| vec![error.to_string()])
+    })
+}
+
 /// Coerces a namespaced component map using its schema at the root configuration field.
 pub(super) fn deserialize_component_map<T: serde::de::DeserializeOwned>(
     map: ConfigMap,
@@ -341,12 +360,16 @@ pub(super) fn deserialize_component_map<T: serde::de::DeserializeOwned>(
 }
 
 fn coerce_config(value: &mut Value) -> Result<(), Vec<String>> {
-    let schema = vector_config::schema::generate_root_schema::<crate::config::ConfigBuilder>()
-        .map_err(|error| vec![format!("{error:?}")])?;
-    let schema = serde_json::to_value(schema).map_err(|error| vec![error.to_string()])?;
+    let schema = config_schema()?;
     ValueCoercer::new(&schema)
         .coerce(value)
         .map_err(|error| vec![error.to_string()])
+}
+
+fn config_schema() -> Result<Value, Vec<String>> {
+    let schema = vector_config::schema::generate_root_schema::<crate::config::ConfigBuilder>()
+        .map_err(|error| vec![format!("{error:?}")])?;
+    serde_json::to_value(schema).map_err(|error| vec![error.to_string()])
 }
 
 pub(super) fn string_from_input<R: Read>(mut input: R) -> Result<String, Vec<String>> {
