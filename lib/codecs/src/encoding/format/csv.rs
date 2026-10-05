@@ -352,7 +352,7 @@ mod tests {
             "foo" => Value::from("bar"),
             "int" => Value::from(123),
             "comma" => Value::from("abc,bcd"),
-            "float" => Value::Float(NotNan::new(3.141_592_5).unwrap()),
+            "float" => Value::Float(NotNan::new(std::f64::consts::PI).unwrap()),
             "space" => Value::from("sp ace"),
             "time" => Value::Timestamp(DateTime::parse_from_rfc3339("2023-02-27T15:04:49.363+08:00").unwrap().into()),
             "quote" => Value::from("the \"quote\" should be escaped"),
@@ -383,7 +383,7 @@ mod tests {
 
         assert_eq!(
             bytes.freeze(),
-            b"bar,123,\"abc,bcd\",3.1415925,,sp ace,2023-02-27T07:04:49.363Z,\"the \"\"quote\"\" should be escaped\",true".as_slice()
+            b"bar,123,\"abc,bcd\",3.141592653589793,,sp ace,2023-02-27T07:04:49.363Z,\"the \"\"quote\"\" should be escaped\",true".as_slice()
         );
     }
 

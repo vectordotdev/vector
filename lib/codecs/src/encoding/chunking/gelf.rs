@@ -137,11 +137,13 @@ mod tests {
         reason = "Preserve the existing numeric conversion and wire-format behavior."
     )]
     fn test_gelf_chunker_max() {
+        static INPUT: [u8; 65_500 * 128] = [0; 65_500 * 128];
+
         let chunker = Chunker::Gelf(GelfChunker {
             max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 65500,
         });
         // Input for 128 chunks of 65500 bytes of data
-        let input = Bytes::from(vec![0; 65_500 * 128]);
+        let input = Bytes::from_static(&INPUT);
         let chunks = chunker.chunk(input).unwrap();
         assert_eq!(chunks.len(), 128);
 
@@ -155,10 +157,7 @@ mod tests {
             // Byte 11: Sequence count
             assert_eq!(chunks[i][11], chunks.len() as u8);
             // Payload bytes
-            assert_eq!(
-                &chunks[i][GELF_CHUNK_HEADERS_LENGTH..],
-                vec![0; 65_500].as_slice()
-            );
+            assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], &INPUT[..65_500]);
         }
     }
 }

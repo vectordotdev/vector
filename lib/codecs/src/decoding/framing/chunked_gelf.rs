@@ -36,8 +36,7 @@ const fn default_pending_messages_limit() -> usize {
     MAX_PENDING_MESSAGES
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
+#[expect(
     clippy::unnecessary_wraps,
     reason = "Serde requires a default function returning the optional field type."
 )]
