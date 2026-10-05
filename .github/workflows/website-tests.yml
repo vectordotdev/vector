@@ -75,12 +75,8 @@ jobs:
       - name: Upload test results to Datadog
         if: ${{ !cancelled() && hashFiles('website/test-results/junit.xml') != '' }}
         continue-on-error: true
-        run: |
-          if [[ -z "${DD_API_KEY:-}" ]]; then
-            echo "::notice::Skipping Datadog upload: credentials are unavailable"
-            exit 0
-          fi
-          datadog-ci junit upload --service vector-website test-results/junit.xml
+        working-directory: .
+        run: scripts/upload-test-results.sh website/test-results/junit.xml vector-website
 
       - name: Upload browser test report
         if: ${{ !cancelled() }}
