@@ -1,13 +1,10 @@
 use std::{collections::HashMap, io::Read};
 
-use indexmap::IndexMap;
-
 use super::{
     ComponentHint, Process, deserialize_component_map, deserialize_config_map,
-    interpolate_config_map_with_secrets, loader,
-    representation::{ConfigMap, deserialize_config_value},
+    interpolate_config_map_with_secrets, loader, representation::ConfigMap,
 };
-use crate::config::{ConfigBuilder, TestDefinition};
+use crate::config::ConfigBuilder;
 
 #[derive(Debug)]
 pub struct ConfigBuilderLoader {
@@ -99,16 +96,16 @@ impl Process for ConfigBuilderLoader {
                     .enrichment_tables
                     .extend(deserialize_component_map(map, hint)?);
             }
-            Some(ComponentHint::Test) => {
-                // This serializes to a `Vec<TestDefinition<_>>`, so we need to first expand
-                // it to an ordered map, and then pull out the value, ignoring the keys.
-                self.builder.tests.extend(
-                    deserialize_config_value::<IndexMap<String, TestDefinition<String>>>(
-                        serde_json::Value::Object(map),
-                    )?
-                    .into_iter()
-                    .map(|(_, test)| test),
-                );
+            Some(hint @ ComponentHint::Test) => {
+                // Tests use a root array, not a component map. Discard filenames while
+                // preserving their order, then use the same coercion as top-level tests.
+                let map = ConfigMap::from_iter([(
+                    hint.as_component_field().to_owned(),
+                    serde_json::Value::Array(map.into_values().collect()),
+                )]);
+                self.builder
+                    .tests
+                    .extend(deserialize_config_map::<ConfigBuilder>(map)?.tests);
             }
             None => {
                 self.builder.append(deserialize_config_map(map)?)?;
