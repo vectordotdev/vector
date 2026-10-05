@@ -112,7 +112,7 @@ impl SourceConfig for InternalMetricsConfig {
             .as_deref()
             .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
 
-        Ok(Box::pin(
+        Ok(crate::sources::opaque_source(
             InternalMetrics {
                 namespace,
                 host_key,

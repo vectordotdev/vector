@@ -103,7 +103,7 @@ impl SourceConfig for StaticMetricsConfig {
 
         let metrics = self.metrics.clone();
 
-        Ok(Box::pin(
+        Ok(crate::sources::opaque_source(
             StaticMetrics {
                 namespace,
                 metrics,

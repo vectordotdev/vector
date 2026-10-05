@@ -127,7 +127,7 @@ impl SourceConfig for BasicSourceConfig {
 
                         if let Err(e) = out.send_event(array).await {
                             error!(message = "Error sending in sink..", %e);
-                            return Err(())
+                            return Err(e.into())
                         }
                     },
 

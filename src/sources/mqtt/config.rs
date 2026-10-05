@@ -81,7 +81,7 @@ impl SourceConfig for MqttSourceConfig {
                 .build()?;
 
         let sink = MqttSource::new(connector, decoder, log_namespace, self.clone())?;
-        Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
+        Ok(crate::sources::opaque_source(sink.run(cx.out, cx.shutdown)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

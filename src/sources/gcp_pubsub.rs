@@ -327,7 +327,10 @@ impl SourceConfig for PubsubConfig {
             events_received: register!(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
-        .map_err(|error| error!(message = "Source failed.", %error));
+        .map_err(|error| {
+            error!(message = "Source failed.", %error);
+            crate::sources::SourceError::Detailed(error)
+        });
         Ok(Box::pin(source))
     }
 

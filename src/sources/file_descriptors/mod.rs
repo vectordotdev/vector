@@ -74,7 +74,7 @@ pub trait FileDescriptorConfig: NamedComponent {
             read_from_fd(reader, sender);
         });
 
-        Ok(Box::pin(process_stream(
+        Ok(crate::sources::opaque_source(process_stream(
             receiver,
             decoder,
             out,

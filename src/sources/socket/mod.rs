@@ -167,7 +167,6 @@ impl SourceConfig for SocketConfig {
                     cx.shutdown,
                     cx.out,
                     log_namespace,
-                    cx.error_reporter,
                 ))
             }
             Mode::UnixDatagram(config) => config.on_unix(
@@ -925,7 +924,7 @@ mod test {
         assert_eq!(shutdown_result, Ok(true));
 
         let source_result = source_handle.await.expect("source task should not panic");
-        assert_eq!(source_result, Ok(()));
+        assert!(source_result.is_ok());
     }
 
     #[tokio::test]
@@ -1049,7 +1048,10 @@ mod test {
         sender: SourceSender,
         source_id: &ComponentKey,
         shutdown: &mut SourceShutdownCoordinator,
-    ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
+    ) -> (
+        SocketAddr,
+        JoinHandle<Result<(), crate::sources::SourceError>>,
+    ) {
         let (shutdown_signal, _) = shutdown.register_source(source_id, false);
         init_udp_inner(sender, source_id, shutdown_signal, None, false).await
     }
@@ -1084,7 +1086,10 @@ mod test {
         shutdown_signal: ShutdownSignal,
         config: Option<UdpConfig>,
         use_vector_namespace: bool,
-    ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
+    ) -> (
+        SocketAddr,
+        JoinHandle<Result<(), crate::sources::SourceError>>,
+    ) {
         let (guard, address, mut config) = match config {
             Some(config) => match config.address() {
                 SocketListenAddr::SocketAddr(addr) => (None, addr, config),
@@ -1120,7 +1125,6 @@ mod test {
                 schema_definitions: HashMap::default(),
                 extra_context: Default::default(),
                 metrics_storage: Default::default(),
-                error_reporter: Default::default(),
             })
             .await
             .unwrap();

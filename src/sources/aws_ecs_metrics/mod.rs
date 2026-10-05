@@ -157,7 +157,7 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let http_client = HttpClient::new(None, &cx.proxy)?;
 
-        Ok(Box::pin(aws_ecs_metrics(
+        Ok(crate::sources::opaque_source(aws_ecs_metrics(
             http_client,
             self.stats_endpoint(),
             self.scrape_interval_secs,

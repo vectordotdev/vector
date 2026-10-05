@@ -293,7 +293,7 @@ impl SourceConfig for DemoLogsConfig {
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
-        Ok(Box::pin(demo_logs_source(
+        Ok(crate::sources::opaque_source(demo_logs_source(
             self.interval,
             self.count,
             self.format.clone(),

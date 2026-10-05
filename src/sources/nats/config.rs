@@ -202,7 +202,7 @@ impl SourceConfig for NatsSourceConfig {
                 let connection = self.connect().await?;
                 let messages = create_consumer_stream(&connection, js_config).await?;
 
-                Ok(Box::pin(run_nats_jetstream(
+                Ok(crate::sources::opaque_source(run_nats_jetstream(
                     self.clone(),
                     connection,
                     messages,
@@ -215,7 +215,7 @@ impl SourceConfig for NatsSourceConfig {
             NatsMode::Core => {
                 let (connection, subscription) = create_subscription(self).await?;
 
-                Ok(Box::pin(run_nats_core(
+                Ok(crate::sources::opaque_source(run_nats_core(
                     self.clone(),
                     connection,
                     subscription,

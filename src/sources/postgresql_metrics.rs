@@ -218,7 +218,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
 
         let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
-        Ok(Box::pin(async move {
+        Ok(crate::sources::opaque_source(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();

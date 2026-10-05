@@ -354,7 +354,8 @@ pub fn udp(
             emit!(SocketBindError {
                 mode: SocketMode::Udp,
                 error: &error,
-            })
+            });
+            super::SourceError::from(error)
         })?;
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes
@@ -418,7 +419,7 @@ pub fn udp(
             Err(_) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Err(())
+                Err(super::SourceError::Opaque)
             }
         }
     })
