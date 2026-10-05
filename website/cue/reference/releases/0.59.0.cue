@@ -458,12 +458,12 @@ releases: "0.59.0": {
 		- Several stdlib functions now declare element-kind constraints on array parameters, enabling the compiler to detect element-type mismatches at compile time and automatically infer call-site infallibility.
 		
 		**Before:** passing a string-literal array required `!` because the compiler assumed it could fail:
-		```
+		```coffee
 		join!(["sources", "transforms", "sinks"], separator: ", ")
 		```
 		
 		**After:** when the compiler can prove the elements are strings, `!` is unnecessary (and `!` now triggers a warning):
-		```
+		```coffee
 		join(["sources", "transforms", "sinks"], separator: ", ")
 		```
 		
