@@ -255,7 +255,7 @@ impl SourceConfig for ExecConfig {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
 
-                Ok(Box::pin(run_scheduled(
+                Ok(crate::sources::opaque_source(run_scheduled(
                     self.clone(),
                     hostname,
                     exec_interval_secs,
@@ -269,7 +269,7 @@ impl SourceConfig for ExecConfig {
                 let respawn_on_exit = self.respawn_on_exit_or_default();
                 let respawn_interval_secs = self.respawn_interval_secs_or_default();
 
-                Ok(Box::pin(run_streaming(
+                Ok(crate::sources::opaque_source(run_streaming(
                     self.clone(),
                     hostname,
                     respawn_on_exit,

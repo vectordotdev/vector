@@ -295,6 +295,7 @@ impl SplunkConfig {
                 .await
                 .map_err(|err| {
                     error!("An error occurred: {err:?}.");
+                    err
                 })?;
 
             Ok(())

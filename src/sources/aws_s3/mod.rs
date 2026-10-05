@@ -193,7 +193,7 @@ impl SourceConfig for AwsS3Config {
             .transpose()?;
 
         match self.strategy {
-            Strategy::Sqs => Ok(Box::pin(
+            Strategy::Sqs => Ok(crate::sources::opaque_source(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy, log_namespace)
                     .await?
                     .run(cx, self.acknowledgements, log_namespace),

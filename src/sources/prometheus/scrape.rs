@@ -1,7 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
-use futures_util::FutureExt;
 use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
@@ -172,7 +171,12 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
+        Ok(crate::sources::opaque_source(call(
+            inputs,
+            builder,
+            cx.out,
+            HttpMethod::Get,
+        )))
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

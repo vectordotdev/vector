@@ -153,7 +153,7 @@ impl SourceConfig for OktaConfig {
 
         warn_if_interval_too_low(self.timeout, self.interval);
 
-        Ok(run(
+        Ok(crate::sources::opaque_source(run(
             url,
             tls,
             cx.proxy,
@@ -163,8 +163,7 @@ impl SourceConfig for OktaConfig {
             log_namespace,
             cx.shutdown,
             cx.out,
-        )
-        .boxed())
+        )))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

@@ -55,7 +55,7 @@ pub fn build_unix_datagram_source(
             });
         }
 
-        result
+        result.map_err(|_| crate::sources::SourceError::Opaque)
     }))
 }
 

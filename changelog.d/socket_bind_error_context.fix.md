@@ -1,3 +1,3 @@
-Report the underlying socket bind error when a TCP or UDP source fails to start, instead of a generic task error.
+Preserve source errors in topology task failures, including socket bind errors that previously appeared as generic task failures.
 
 authors: gwenaskell

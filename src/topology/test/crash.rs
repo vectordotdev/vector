@@ -17,6 +17,9 @@ use crate::{
     },
 };
 
+#[cfg(feature = "sources-syslog")]
+use crate::sources::syslog::{Mode as SyslogMode, SyslogConfig};
+
 #[tokio::test]
 async fn test_tcp_socket_bind_error_is_reported() {
     trace_init();
@@ -54,6 +57,37 @@ async fn test_udp_socket_bind_error_is_reported() {
     config.add_source(
         "in",
         SocketConfig::from(UdpConfig::from_address(address.into())),
+    );
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("source error timed out")
+        .expect("source error missing");
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. } if error == expected_error
+    ));
+    topology.stop().await;
+}
+
+#[cfg(feature = "sources-syslog")]
+#[tokio::test]
+async fn test_udp_syslog_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _socket = UdpSocket::bind(address).unwrap();
+    let expected_error = UdpSocket::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source(
+        "in",
+        SyslogConfig::from_mode(SyslogMode::Udp {
+            address: address.into(),
+            receive_buffer_bytes: None,
+        }),
     );
     config.add_sink("out", &["in"], basic_sink(1).1);
 

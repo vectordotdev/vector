@@ -149,7 +149,7 @@ fn apache_metrics(
     mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
-    Box::pin(async move {
+    crate::sources::opaque_source(async move {
         let mut stream = IntervalStream::new(tokio::time::interval(interval))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))

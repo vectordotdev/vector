@@ -226,7 +226,7 @@ pub(crate) async fn amqp_source(
         .await
         .map_err(|source| BuildError::AmqpCreateError { source })?;
 
-    Ok(Box::pin(run_amqp_source(
+    Ok(crate::sources::opaque_source(run_amqp_source(
         config,
         shutdown,
         out,

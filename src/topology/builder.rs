@@ -35,6 +35,7 @@ use vector_lib::{
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
+    source::SourceError,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
@@ -51,9 +52,8 @@ use crate::{
     SourceSender,
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
-        ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceErrorReporter, SourceOuter,
-        TransformContext, TransformOuter, TransformOutput, enrichment_table_sinks,
-        enrichment_table_sources,
+        ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
+        TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
     cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
@@ -413,7 +413,6 @@ impl<'a> Builder<'a> {
             .shutdown_coordinator
             .register_source(key, INTERNAL_SOURCES.contains(&typetag));
 
-        let error_reporter = SourceErrorReporter::default();
         let context = SourceContext {
             key: key.clone(),
             globals: self.config.global.clone(),
@@ -426,7 +425,6 @@ impl<'a> Builder<'a> {
             schema_definitions,
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
-            error_reporter: error_reporter.clone(),
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -460,8 +458,9 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|_| {
-                    error_reporter.take().map_or(TaskError::Opaque, TaskError::wrapped)
+                result = server => result.map_err(|error| match error {
+                    SourceError::Opaque => TaskError::Opaque,
+                    SourceError::Detailed(error) => TaskError::wrapped(error),
                 }),
             };
 
