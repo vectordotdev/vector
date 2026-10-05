@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, time::Duration};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
@@ -128,6 +133,21 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
 
 dyn_clone::clone_trait_object!(SourceConfig);
 
+/// Carries a source's runtime error to the topology task that reports its failure.
+#[derive(Clone, Default)]
+pub struct SourceErrorReporter(Arc<Mutex<Option<crate::Error>>>);
+
+impl SourceErrorReporter {
+    /// Records an error before the source returns an opaque failure.
+    pub fn report(&self, error: impl Into<crate::Error>) {
+        *self.0.lock().expect("source error lock poisoned") = Some(error.into());
+    }
+
+    pub(crate) fn take(&self) -> Option<crate::Error> {
+        self.0.lock().expect("source error lock poisoned").take()
+    }
+}
+
 pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
@@ -148,6 +168,9 @@ pub struct SourceContext {
     /// Extra context data provided by the running app and shared across all components. This can be
     /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
+
+    /// Reports source errors that would otherwise be lost when the source task exits.
+    pub error_reporter: SourceErrorReporter,
 }
 
 impl SourceContext {
@@ -171,6 +194,7 @@ impl SourceContext {
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
                 extra_context: Default::default(),
+                error_reporter: Default::default(),
             },
             shutdown,
         )
@@ -193,6 +217,7 @@ impl SourceContext {
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
             extra_context: Default::default(),
+            error_reporter: Default::default(),
         }
     }
 

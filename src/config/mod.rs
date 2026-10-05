@@ -65,7 +65,7 @@ pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use sink_validated::{DynValidatedSink, ValidatedSink};
-pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
+pub use source::{BoxedSource, SourceConfig, SourceContext, SourceErrorReporter, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };

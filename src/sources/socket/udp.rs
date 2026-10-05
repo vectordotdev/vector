@@ -20,6 +20,7 @@ use super::default_host_key;
 use crate::{
     SourceSender,
     codecs::Decoder,
+    config::SourceErrorReporter,
     event::Event,
     internal_events::{
         SocketBindError, SocketEventsReceived, SocketMode, SocketMulticastGroupJoinError,
@@ -172,6 +173,7 @@ pub(super) fn udp(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     log_namespace: LogNamespace,
+    error_reporter: SourceErrorReporter,
 ) -> Source {
     Box::pin(async move {
         let listenfd = ListenFd::from_env();
@@ -180,8 +182,9 @@ pub(super) fn udp(
             .map_err(|error| {
                 emit!(SocketBindError {
                     mode: SocketMode::Udp,
-                    error,
-                })
+                    error: &error,
+                });
+                error_reporter.report(error);
             })?;
 
         if !config.multicast_groups.is_empty() {
