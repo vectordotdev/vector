@@ -22,7 +22,7 @@ use crate::{
         Client as VectorClient, HealthCheckRequest, HealthCheckResponse, PushEventsRequest,
         PushEventsResponse, Server as VectorServer, Service as VectorService, ServingStatus,
     },
-    sources::util::grpc::run_grpc_server,
+    sources::util::grpc::{GrpcKeepaliveConfig, run_grpc_server},
 };
 
 #[derive(Clone)]
@@ -46,7 +46,9 @@ impl VectorService for EventForwardService {
             .into_inner()
             .events
             .into_iter()
-            .map(Event::from)
+            .map(|wrapper| {
+                Event::try_from(wrapper).expect("validation events are encoded by Vector")
+            })
             .collect();
 
         self.tx
@@ -165,7 +167,9 @@ pub fn spawn_grpc_server<S>(
         let server = run_grpc_server(
             listen_addr.as_socket_addr(),
             tls_settings,
+            None,
             service,
+            GrpcKeepaliveConfig::default(),
             shutdown_signal,
         );
         pin!(server);

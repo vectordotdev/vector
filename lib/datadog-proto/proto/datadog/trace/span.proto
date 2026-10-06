@@ -1,0 +1,147 @@
+syntax = "proto3";
+
+package datadog.trace;
+
+option go_package="pkg/proto/pbgo/trace";
+
+message SpanLink {
+   // @gotags: json:"trace_id" msg:"trace_id"
+   uint64 traceID = 1;                         // Required.
+   // @gotags: json:"trace_id_high" msg:"trace_id_high,omitempty"
+   uint64 traceID_high = 2;                    // Optional. The high 64 bits of a referenced trace id.
+   // @gotags: json:"span_id" msg:"span_id"
+   uint64 spanID = 3;                          // Required.
+   // @gotags: msg:"attributes,omitempty"
+   map<string, string> attributes = 4;         // Optional. Simple mapping of keys to string values.
+   // @gotags: msg:"tracestate,omitempty"
+   string tracestate = 5;                      // Optional. W3C tracestate.
+   // @gotags: msg:"flags,omitempty"
+   uint32 flags = 6;                           // Optional. W3C trace flags. If set, the high bit (bit 31) must be set.
+}
+
+message SpanEvent {
+  // @gotags: json:"time_unix_nano" msg:"time_unix_nano"
+  fixed64 time_unix_nano = 1; // time is the number of nanoseconds between the Unix epoch and this event.
+  // @gotags: json:"name" msg:"name"
+  string name = 2; // name is this event's name.
+  // attributes is a mapping from attribute key string to any value.
+  // The order of attributes should be preserved in the key/value map.
+  // The supported values match the OpenTelemetry attributes specification:
+  // https://github.com/open-telemetry/opentelemetry-proto/blob/a8f08fc49d60538f97ffabcc7feac92f832976dd/opentelemetry/proto/common/v1/common.proto
+  // @gotags: json:"attributes" msg:"attributes"
+  map <string,AttributeAnyValue> attributes = 3;
+}
+
+// AttributeAnyValue is used to represent any type of attribute value. AttributeAnyValue may contain a
+// primitive value such as a string or integer or it may contain an arbitrary nested
+// object containing arrays, key-value lists and primitives.
+message AttributeAnyValue {
+  // We implement a union manually here because Go's MessagePack generator does not support
+  // Protobuf `oneof` unions: https://github.com/tinylib/msgp/issues/184
+  // Despite this, the format represented here is binary compatible with `oneof`, if we choose
+  // to migrate to that in the future.
+  // @gotags: json:"type" msg:"type"
+  AttributeAnyValueType type = 1;
+
+  enum AttributeAnyValueType {
+    STRING_VALUE = 0;
+    BOOL_VALUE = 1;
+    INT_VALUE = 2;
+    DOUBLE_VALUE = 3;
+    ARRAY_VALUE = 4;
+  }
+  // @gotags: json:"string_value" msg:"string_value"
+  string string_value = 2;
+  // @gotags: json:"bool_value" msg:"bool_value"
+  bool bool_value = 3;
+  // @gotags: json:"int_value" msg:"int_value"
+  int64 int_value = 4;
+  // @gotags: json:"double_value" msg:"double_value"
+  double double_value = 5;
+  // @gotags: json:"array_value" msg:"array_value"
+  AttributeArray array_value = 6;
+}
+
+
+// AttributeArray is a list of AttributeArrayValue messages. We need this as a message since `oneof` in AttributeAnyValue does not allow repeated fields.
+message AttributeArray {
+  // Array of values. The array may be empty (contain 0 elements).
+  // @gotags: json:"values" msg:"values"
+  repeated AttributeArrayValue values = 1;
+}
+
+// An element in the homogeneous AttributeArray.
+// Compared to AttributeAnyValue, it only supports scalar values.
+message AttributeArrayValue {
+  // We implement a union manually here because Go's MessagePack generator does not support
+  // Protobuf `oneof` unions: https://github.com/tinylib/msgp/issues/184
+  // Despite this, the format represented here is binary compatible with `oneof`, if we choose
+  // to migrate to that in the future.
+  // @gotags: json:"type" msg:"type"
+  AttributeArrayValueType type = 1;
+
+  enum AttributeArrayValueType {
+    STRING_VALUE = 0;
+    BOOL_VALUE = 1;
+    INT_VALUE = 2;
+    DOUBLE_VALUE = 3;
+  }
+
+  // @gotags: json:"string_value" msg:"string_value"
+  string string_value = 2;
+  // @gotags: json:"bool_value" msg:"bool_value"
+  bool bool_value = 3;
+  // @gotags: json:"int_value" msg:"int_value"
+  int64 int_value = 4;
+  // @gotags: json:"double_value" msg:"double_value"
+  double double_value = 5;
+}
+
+
+message Span {
+    // service is the name of the service with which this span is associated.
+    // @gotags: json:"service" msg:"service"
+    string service = 1;
+    // name is the operation name of this span.
+    // @gotags: json:"name" msg:"name"
+    string name = 2;
+    // resource is the resource name of this span, also sometimes called the endpoint (for web spans).
+    // @gotags: json:"resource" msg:"resource"
+    string resource = 3;
+    // traceID is the ID of the trace to which this span belongs.
+    // @gotags: json:"trace_id" msg:"trace_id"
+    uint64 traceID = 4;
+    // spanID is the ID of this span.
+    // @gotags: json:"span_id" msg:"span_id"
+    uint64 spanID = 5;
+    // parentID is the ID of this span's parent, or zero if this span has no parent.
+    // @gotags: json:"parent_id" msg:"parent_id"
+    uint64 parentID = 6;
+    // start is the number of nanoseconds between the Unix epoch and the beginning of this span.
+    // @gotags: json:"start" msg:"start"
+    int64 start = 7;
+    // duration is the time length of this span in nanoseconds.
+    // @gotags: json:"duration" msg:"duration"
+    int64 duration = 8;
+    // error is 1 if there is an error associated with this span, or 0 if there is not.
+    // @gotags: json:"error" msg:"error"
+    int32 error = 9;
+    // meta is a mapping from tag name to tag value for string-valued tags.
+    // @gotags: json:"meta,omitempty" msg:"meta,omitempty"
+    map<string, string> meta = 10;
+    // metrics is a mapping from tag name to tag value for numeric-valued tags.
+    // @gotags: json:"metrics,omitempty" msg:"metrics,omitempty"
+    map<string, double> metrics = 11;
+    // type is the type of the service with which this span is associated.  Example values: web, db, lambda.
+    // @gotags: json:"type" msg:"type"
+    string type = 12;
+    // meta_struct is a registry of structured "other" data used by, e.g., AppSec.
+    // @gotags: json:"meta_struct,omitempty" msg:"meta_struct,omitempty"
+    map<string, bytes> meta_struct = 13;
+    // span_links represents a collection of links, where each link defines a causal relationship between two spans.
+    // @gotags: json:"span_links,omitempty" msg:"span_links,omitempty"
+    repeated SpanLink spanLinks = 14;
+    // spanEvents represent an event at an instant in time related to this span, but not necessarily during the span.
+    // @gotags: json:"span_events,omitempty" msg:"span_events,omitempty"
+    repeated SpanEvent spanEvents = 15;
+}

@@ -51,6 +51,7 @@ impl Decoder {
     }
 
     /// Sets the log namespace that will be used when decoding.
+    #[must_use]
     pub const fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
         self.log_namespace = log_namespace;
         self
@@ -58,6 +59,7 @@ impl Decoder {
 
     /// Attaches a per-decode-call metadata template to the inner deserializer,
     /// allowing deserializers to read from and write to event metadata.
+    #[must_use]
     pub fn with_metadata_template(mut self, metadata: EventMetadata) -> Self {
         self.deserializer = self.deserializer.with_metadata_template(metadata);
         self
@@ -82,6 +84,11 @@ impl Decoder {
     }
 
     /// Parses a frame using the included deserializer, and handles any errors by logging.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn deserializer_parse(&self, frame: Bytes) -> Result<DecodedFrame, Error> {
         let byte_size = frame.len();
 
@@ -116,6 +123,7 @@ mod tests {
     use bytes::Bytes;
     use futures::{StreamExt, stream};
     use tokio_util::io::StreamReader;
+    use vrl::event_path;
     use vrl::value::Value;
 
     use super::Decoder;
@@ -141,7 +149,7 @@ mod tests {
 
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
-        assert_eq!(event.get("foo").unwrap(), &Value::from(1));
+        assert_eq!(event.get(event_path!("foo")).unwrap(), &Value::from(1));
 
         let next = stream.next().await.unwrap();
         let error = next.unwrap_err();
@@ -149,6 +157,6 @@ mod tests {
 
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
-        assert_eq!(event.get("bar").unwrap(), &Value::from(2));
+        assert_eq!(event.get(event_path!("bar")).unwrap(), &Value::from(2));
     }
 }

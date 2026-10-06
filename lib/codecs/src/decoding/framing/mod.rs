@@ -16,6 +16,7 @@ use std::{any::Any, fmt::Debug};
 use ::bytes::Bytes;
 pub use character_delimited::{
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions,
+    OversizedAction,
 };
 pub use chunked_gelf::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions};
 use dyn_clone::DynClone;

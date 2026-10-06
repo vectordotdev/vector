@@ -213,23 +213,23 @@ impl ParsedConnectionString {
                 .unwrap_or_else(|| "127.0.0.1:10000".to_string());
 
             let base = if host.starts_with("http://") || host.starts_with("https://") {
-                format!("{}/{}", trim_trailing_slash(&host), account_name)
+                format!("{}/{account_name}", trim_trailing_slash(&host))
             } else {
-                format!("{proto}://{host}/{}", account_name)
+                format!("{proto}://{host}/{account_name}")
             };
             return Ok(base);
         }
 
         // Public cloud-style base
         let suffix = self.endpoint_suffix();
-        Ok(format!("{proto}://{}.blob.{}", account_name, suffix))
+        Ok(format!("{proto}://{account_name}.blob.{suffix}"))
     }
 
     /// Build a container URL, optionally appending SAS if present.
     pub fn container_url(&self, container: &str) -> Result<String, ConnectionStringError> {
         let base = self.blob_account_endpoint()?;
         Ok(append_query_segment(
-            &format!("{}/{}", trim_trailing_slash(&base), container),
+            &format!("{}/{container}", trim_trailing_slash(&base)),
             self.shared_access_signature.as_deref(),
         ))
     }
@@ -239,7 +239,7 @@ impl ParsedConnectionString {
         // Build the base container URL without SAS, then append the blob path,
         // and finally append the SAS so it appears after the full path.
         let base = self.blob_account_endpoint()?;
-        let container_no_sas = format!("{}/{}", trim_trailing_slash(&base), container);
+        let container_no_sas = format!("{}/{container}", trim_trailing_slash(&base));
         let blob_full = format!(
             "{}/{}",
             trim_trailing_slash(&container_no_sas),

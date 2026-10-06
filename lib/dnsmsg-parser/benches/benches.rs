@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use data_encoding::BASE64;
 use dnsmsg_parser::dns_message_parser::DnsMessageParser;
@@ -20,7 +22,7 @@ fn benchmark_parse_as_query_message(c: &mut Criterion) {
                     .expect("failed to parse as query")
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.finish();
@@ -43,7 +45,7 @@ fn benchmark_parse_as_update_message(c: &mut Criterion) {
                     .expect("failed to parse as update")
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.finish();
@@ -91,7 +93,7 @@ fn benchmark_parse_rdata(c: &mut Criterion, data: &str, code: u16, id: &str) {
                     .expect("failed to parse rdata")
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.finish();

@@ -1,0 +1,109 @@
+transforms:
+  dedupe_simple:
+    inputs: []
+    type: "dedupe"
+    fields:
+      match:
+        - "a"
+
+  dedupe_field_order:
+    inputs: []
+    type: "dedupe"
+    fields:
+      match:
+        - "a"
+        - "b"
+
+  dedupe_nested_fields:
+    inputs: []
+    type: "dedupe"
+    fields:
+      match:
+        - "a.b.c"
+
+tests:
+  - name: "dedupe_simple"
+    inputs:
+      - insert_at: "dedupe_simple"
+        type: "log"
+        log_fields:
+          a: 1
+          b: 2
+      - insert_at: "dedupe_simple"
+        type: "log"
+        log_fields:
+          a: 1
+          b: 3
+      - insert_at: "dedupe_simple"
+        type: "log"
+        log_fields:
+          a: 2
+          b: 4
+    outputs:
+      - extract_from: "dedupe_simple"
+        conditions:
+          - type: "vrl"
+            source: ".a == 1 && .b == 2"
+      - extract_from: "dedupe_simple"
+        conditions:
+          - type: "vrl"
+            source: ".a == 2 && .b == 4"
+
+  - name: "dedupe_field_order"
+    inputs:
+      - insert_at: "dedupe_field_order"
+        type: "log"
+        log_fields:
+          a: 1
+          b: 2
+          c: 3
+      - insert_at: "dedupe_field_order"
+        type: "log"
+        log_fields:
+          b: 2
+          a: 1
+          c: 3
+      - insert_at: "dedupe_field_order"
+        type: "log"
+        log_fields:
+          a: 1
+          b: 3
+          c: 3
+    outputs:
+      - extract_from: "dedupe_field_order"
+        conditions:
+          - type: "vrl"
+            source: |
+              .a == 1 && .b == 2 && .c == 3
+      - extract_from: "dedupe_field_order"
+        conditions:
+          - type: "vrl"
+            source: |
+              .a == 1 && .b == 3 && .c == 3
+
+  - name: "dedupe_nested_fields"
+    inputs:
+      - insert_at: "dedupe_nested_fields"
+        type: "log"
+        log_fields:
+          "a.b.c": "d"
+          b: 2
+      - insert_at: "dedupe_nested_fields"
+        type: "log"
+        log_fields:
+          "a.b.c": "d"
+          b: 3
+      - insert_at: "dedupe_nested_fields"
+        type: "log"
+        log_fields:
+          "a.b": "c.d"
+          b: 4
+    outputs:
+      - extract_from: "dedupe_nested_fields"
+        conditions:
+          - type: "vrl"
+            source: '.a.b.c == "d" && .b == 2'
+      - extract_from: "dedupe_nested_fields"
+        conditions:
+          - type: "vrl"
+            source: '.a.b == "c.d" && .b == 4'

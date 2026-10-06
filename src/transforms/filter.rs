@@ -21,7 +21,6 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
-    #[configurable(derived)]
     /// The condition that every input event is matched against.
     ///
     /// If an event is matched by the condition, it is forwarded. Otherwise, the event is dropped.
@@ -35,8 +34,8 @@ impl From<AnyCondition> for FilterConfig {
 }
 
 impl GenerateConfig for FilterConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(r#"condition = ".message == \"value\"""#).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(r#"condition: '.message == "value"'"#).unwrap()
     }
 }
 
@@ -48,6 +47,12 @@ impl TransformConfig for FilterConfig {
             &context.enrichment_tables,
             &context.metrics_storage,
         )?)))
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        self.condition
+            .validate(&context.enrichment_tables, &context.metrics_storage)
+            .map_err(|e| vec![e.to_string()])
     }
 
     fn input(&self) -> Input {

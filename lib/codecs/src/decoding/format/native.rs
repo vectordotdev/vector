@@ -17,16 +17,19 @@ pub struct NativeDeserializerConfig;
 
 impl NativeDeserializerConfig {
     /// Build the `NativeDeserializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> NativeDeserializer {
         NativeDeserializer
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::all_bits()
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => schema::Definition::empty_legacy_namespace(),
@@ -52,7 +55,7 @@ impl Deserializer for NativeDeserializer {
         if bytes.is_empty() {
             Ok(smallvec![])
         } else {
-            let event_array = EventArray::from(proto::EventArray::decode(bytes)?);
+            let event_array = EventArray::try_from(proto::EventArray::decode(bytes)?)?;
             Ok(event_array.into_events().collect())
         }
     }

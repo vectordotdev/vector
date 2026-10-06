@@ -131,7 +131,7 @@ impl Fanout {
     ///
     /// This method should not be used if there is an active `SendGroup` being processed.
     fn apply_control_message(&mut self, message: ControlMessage) {
-        trace!("Processing control message outside of send: {:?}", message);
+        trace!("Processing control message outside of send: {message:?}");
 
         match message {
             ControlMessage::Add(id, sink) => self.add(id, sink),
@@ -272,13 +272,13 @@ impl Fanout {
                 biased;
 
                 maybe_msg = self.control_channel.recv(), if control_channel_open => {
-                    trace!("Processing control message inside of send: {:?}", maybe_msg);
+                    trace!("Processing control message inside of send: {maybe_msg:?}");
 
                     // During a send operation, control messages must be applied via the
                     // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
                         Some(ControlMessage::Add(id, sink)) => {
-                            send_group.add(id, sink);
+                            send_group.add(&id, sink);
                         },
                         Some(ControlMessage::Remove(id)) => {
                             send_group.remove(&id);
@@ -358,6 +358,10 @@ impl<'a> SendGroup<'a> {
 
     fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
         if let Some(send) = self.sends.remove(id) {
+            // Deliberately not instrumented with the current span: this drains a send to a sink
+            // that has just been detached from the topology, so it is unrelated to the upstream
+            // component that owns this fanout. Attaching the current span would mis-tag this
+            // task's logs with the upstream component's identity rather than the detached sink's.
             tokio::spawn(async move {
                 if let Err(e) = send.await {
                     warn!(
@@ -372,8 +376,7 @@ impl<'a> SendGroup<'a> {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
+    fn add(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
         // When we're in the middle of a send, we can only keep track of the new sink, but can't
         // actually send to it, as we don't have the item to send... so only add it to `senders`.
         assert!(
@@ -513,7 +516,7 @@ mod tests {
             channel::{BufferReceiver, BufferSender},
         },
     };
-    use vrl::value::Value;
+    use vrl::{event_path, value::Value};
 
     use super::{ControlMessage, Fanout};
     use crate::{
@@ -649,7 +652,7 @@ mod tests {
             .expect("must have at least one event");
         let event = event.into_log();
         event
-            .get("message")
+            .get(event_path!("message"))
             .and_then(Value::as_bytes)
             .and_then(|b| String::from_utf8(b.to_vec()).ok())
             .expect("must be valid log event with `message` field")
@@ -866,13 +869,14 @@ mod tests {
             .expect("should not fail");
     }
 
+    #[cfg(debug_assertions)]
     #[tokio::test]
     #[should_panic(expected = "Fanout received empty event batch from upstream component")]
     async fn fanout_panics_on_empty_event_array_in_debug_builds() {
         let (mut fanout, _, _receivers) = fanout_from_senders(&[2, 2]);
         let empty: EventArray = Vec::<LogEvent>::new().into();
 
-        let _ = fanout.send(empty, None).await;
+        _ = fanout.send(empty, None).await;
     }
 
     #[tokio::test]
