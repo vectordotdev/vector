@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Tests for the behaviour of Protobuf serializer and deserializer (together).
 
 #![allow(clippy::unwrap_used)]
