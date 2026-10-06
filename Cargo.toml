@@ -458,7 +458,7 @@ kube = { version = "4.2.0", default-features = false, features = ["client", "ope
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 libc.workspace = true
 lru = { version = "0.18.2", default-features = false }
-maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
+maxminddb = { version = "0.28.1", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.7.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
 async-nats = { version = "0.49.0", default-features = false, optional = true, features = ["ring", "websockets", "jetstream", "nkeys"] }
