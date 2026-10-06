@@ -302,14 +302,14 @@ impl File {
                     let current_row_value = &row[idx];
 
                     // Helper closure for comparing current_row_value with another value,
-                    // respecting the specified case for Value::Bytes.
+                    // respecting the specified case for string values.
                     let compare_values = |val_to_compare: &Value| -> bool {
-                        match (case, current_row_value, val_to_compare) {
-                            (
-                                Case::Insensitive,
-                                Value::Bytes(bytes_row),
-                                Value::Bytes(bytes_cmp),
-                            ) => {
+                        match (
+                            case,
+                            current_row_value.as_bytes(),
+                            val_to_compare.as_bytes(),
+                        ) {
+                            (Case::Insensitive, Some(bytes_row), Some(bytes_cmp)) => {
                                 // Perform case-insensitive comparison for byte strings.
                                 // If both are valid UTF-8, compare their lowercase versions.
                                 // If both are non-UTF-8 bytes, compare them directly.
@@ -325,7 +325,7 @@ impl File {
                                     _ => false,
                                 }
                             }
-                            // For Case::Sensitive, or for Case::Insensitive with non-Bytes types,
+                            // For Case::Sensitive, or for Case::Insensitive with non-string types,
                             // perform a direct equality check.
                             _ => current_row_value == val_to_compare,
                         }
@@ -523,8 +523,8 @@ impl File {
 /// Adds the bytes from the given value to the hash.
 /// Each field is terminated by a `0` value to separate the fields
 fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Result<(), Error> {
-    match value {
-        Value::Bytes(bytes) => match case {
+    if let Some(bytes) = value.as_bytes() {
+        match case {
             Case::Sensitive => hasher.write(bytes),
             Case::Insensitive => hasher.write(
                 std::str::from_utf8(bytes)
@@ -532,13 +532,12 @@ fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Res
                     .to_lowercase()
                     .as_bytes(),
             ),
-        },
-        value => {
-            let bytes: bytes::Bytes = value
-                .encode_as_bytes()
-                .map_err(|details| Error::FailedToEncodeValue { details })?;
-            hasher.write(&bytes);
         }
+    } else {
+        let bytes: bytes::Bytes = value
+            .encode_as_bytes()
+            .map_err(|details| Error::FailedToEncodeValue { details })?;
+        hasher.write(&bytes);
     }
 
     hasher.write_u8(0);
@@ -1124,6 +1123,41 @@ mod tests {
                 Some(handle)
             )
         );
+    }
+
+    #[test]
+    fn case_insensitive_lookup_accepts_strings_and_bytes() {
+        for value in [Value::from("ZiP"), Value::Bytes("ZiP".into())] {
+            let mut file = File::new(
+                Default::default(),
+                FileData {
+                    modified: SystemTime::now(),
+                    data: vec![vec![value]],
+                    headers: vec!["field".to_string()],
+                },
+            );
+            let handle = file.add_index(Case::Insensitive, &["field"]).unwrap();
+            for value in [Value::from("zIp"), Value::Bytes("zIp".into())] {
+                for index in [None, Some(handle)] {
+                    let rows = file
+                        .find_table_rows(
+                            Case::Insensitive,
+                            &[Condition::Equals {
+                                field: "field",
+                                value: value.clone(),
+                            }],
+                            None,
+                            None,
+                            index,
+                        )
+                        .unwrap();
+                    assert_eq!(
+                        rows,
+                        vec![ObjectMap::from([("field".into(), Value::from("ZiP"))])]
+                    );
+                }
+            }
+        }
     }
 
     #[test]
