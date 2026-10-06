@@ -29,7 +29,7 @@ use vector_lib::{
 use crate::{
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
-    template::{Template, TemplateParseError},
+    template::{ConfinedTemplate, TemplateParseError, UnconfinedTemplate},
 };
 
 /// Elasticsearch Authentication strategies.
@@ -93,9 +93,8 @@ pub enum BulkAction {
     Update,
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 impl BulkAction {
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
@@ -103,7 +102,7 @@ impl BulkAction {
         }
     }
 
-    pub const fn as_json_pointer(&self) -> &'static str {
+    pub const fn as_json_pointer(self) -> &'static str {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
@@ -140,9 +139,8 @@ pub enum VersionType {
     ExternalGte,
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 impl VersionType {
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Internal => "internal",
             Self::External => "external",
@@ -169,13 +167,13 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
     Bulk {
-        index: Template,
+        index: ConfinedTemplate,
         template_fallback_index: Option<String>,
-        action: Template,
-        version: Option<Template>,
+        action: UnconfinedTemplate,
+        version: Option<UnconfinedTemplate>,
         version_type: VersionType,
     },
-    DataStream(DataStreamConfig),
+    DataStream(DataStreamMode),
 }
 
 #[derive(NamedInternalEvent)]
@@ -205,6 +203,19 @@ impl ElasticsearchCommonMode {
             } => index
                 .render_string(log)
                 .or_else(|error| {
+                    // Confined errors are intentional security drops — never fall back
+                    // to the default index, as that would silently accept an attack event.
+                    if matches!(
+                        error,
+                        crate::template::TemplateRenderingError::Confined { .. }
+                    ) {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("index"),
+                            drop_event: true,
+                        });
+                        return Err(());
+                    }
                     if let Some(fallback) = template_fallback_index {
                         emit!(TemplateRenderingError {
                             error,
@@ -280,7 +291,7 @@ impl ElasticsearchCommonMode {
         }
     }
 
-    const fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
+    const fn as_data_stream_config(&self) -> Option<&DataStreamMode> {
         match self {
             Self::DataStream(value) => Some(value),
             _ => None,
@@ -308,7 +319,7 @@ pub enum ElasticsearchApiVersion {
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
-    /// Use the Elasticsearch 7.x API.
+    /// Use the Elasticsearch 7.x-compatible API, including OpenSearch.
     V7,
     /// Use the Elasticsearch 8.x API.
     V8,

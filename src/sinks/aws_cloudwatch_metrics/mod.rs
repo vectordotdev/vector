@@ -3,7 +3,10 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
-use std::task::{Context, Poll};
+use std::{
+    fmt,
+    task::{Context, Poll},
+};
 
 use aws_config::Region;
 use aws_sdk_cloudwatch::{
@@ -26,7 +29,7 @@ use crate::{
     aws::{
         ClientBuilder, RegionOrEndpoint, auth::AwsAuthentication, create_client, is_retriable_error,
     },
-    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, ValidatedSink},
     event::{
         Event,
         metric::{Metric, MetricTags, MetricValue},
@@ -34,7 +37,7 @@ use crate::{
     sinks::util::{
         Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
         TowerRequestConfig,
-        batch::BatchConfig,
+        batch::{BatchConfig, BatchSettings},
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
     },
@@ -81,19 +84,15 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig<CloudWatchMetricsTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
@@ -103,11 +102,9 @@ pub struct CloudWatchMetricsSinkConfig {
     #[configurable(metadata(docs::hidden))]
     assume_role: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -140,22 +137,53 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = CloudWatchMetricsSvc::new(self.clone(), client)?;
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+pub struct ValidatedCloudWatchMetrics {
+    batch: BatchSettings<MetricsBuffer>,
+    storage_resolution: IndexMap<String, i32>,
+}
+
+impl fmt::Debug for ValidatedCloudWatchMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ValidatedCloudWatchMetrics")
+            .field("batch_size_bytes", &self.batch.size.bytes)
+            .field("batch_size_events", &self.batch.size.events)
+            .field("batch_timeout", &self.batch.timeout)
+            .field("storage_resolution", &self.storage_resolution)
+            .finish()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for CloudWatchMetricsSinkConfig {
+    type Validated = ValidatedCloudWatchMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedCloudWatchMetrics> {
+        let batch = self.batch.into_batch_settings()?;
+        let storage_resolution = validate_storage_resolutions(self.storage_resolution.clone())?;
+        Ok(ValidatedCloudWatchMetrics {
+            batch,
+            storage_resolution,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedCloudWatchMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let client = self.create_client(&cx.proxy).await?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let sink = CloudWatchMetricsSvc::new(self.clone(), client, validated)?;
+        Ok((sink, healthcheck))
     }
 }
 
@@ -240,14 +268,15 @@ impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         client: CloudwatchClient,
+        validated: &ValidatedCloudWatchMetrics,
     ) -> crate::Result<VectorSink> {
         let default_namespace = config.default_namespace.clone();
-        let batch = config.batch.into_batch_settings()?;
+        let batch = &validated.batch;
         let request_settings = config.request.into_settings();
 
         let service = CloudWatchMetricsSvc {
             client,
-            storage_resolution: validate_storage_resolutions(config.storage_resolution)?,
+            storage_resolution: validated.storage_resolution.clone(),
         };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();

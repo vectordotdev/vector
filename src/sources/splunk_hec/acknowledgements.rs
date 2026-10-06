@@ -106,7 +106,7 @@ impl IndexerAcknowledgement {
         let idle_task_channels = Arc::clone(&channels);
 
         if config.ack_idle_cleanup {
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 let mut interval = interval(Duration::from_secs(max_idle_time));
                 loop {
                     interval.tick().await;
@@ -206,7 +206,7 @@ impl Channel {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
         let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(Some(shutdown));
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             while let Some((status, ack_id)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
                     let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();

@@ -2,13 +2,14 @@ use std::num::NonZeroU32;
 
 use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
-use flate2::read::ZlibDecoder;
+use datadog_proto::agentpayload as ddmetric_proto;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
@@ -17,7 +18,7 @@ use vector_lib::{
 
 use super::{
     DatadogMetricsConfig,
-    config::{SERIES_V1_PATH, SERIES_V2_PATH},
+    config::{SERIES_V2_PATH, SERIES_V3_PATH},
     encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
 };
 use crate::{
@@ -33,11 +34,6 @@ use crate::{
         map_event_batch_stream,
     },
 };
-
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
 
 fn generate_counters() -> Vec<Event> {
     let timestamp = Utc::now().trunc_subsecs(3);
@@ -114,11 +110,29 @@ fn generate_counter_gauge_set() -> Vec<Event> {
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
 async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
-    let config = indoc! {r#"
+    // Pinned to v2: the tests built on this helper decode `MetricPayload`, which is the v2
+    // wire shape. The default (v3) is a different, columnar format and is covered separately by
+    // `default_series_version_uses_the_v3_intake` below.
+    start_test_with_series_version(events, Some("v2")).await
+}
+
+/// Same as [`start_test`], but selects the series API version explicitly. Passing `None` omits
+/// the option entirely so the sink's default applies.
+async fn start_test_with_series_version(
+    events: Vec<Event>,
+    series_api_version: Option<&str>,
+) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
+    let mut config = indoc! {r#"
         default_api_key = "atoken"
         default_namespace = "foo"
-    "#};
-    let (mut config, cx) = load_sink::<DatadogMetricsConfig>(config).unwrap();
+    "#}
+    .to_string();
+
+    if let Some(series_api_version) = series_api_version {
+        config.push_str(&format!("series_api_version = \"{series_api_version}\"\n"));
+    }
+
+    let (mut config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
 
     let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
@@ -143,14 +157,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 }
 
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
-    if is_zstd(&payload) {
-        zstd::decode_all(&payload[..])
-    } else {
-        let mut decompressor = ZlibDecoder::new(&payload[..]);
-        let mut decompressed = Vec::new();
-        std::io::copy(&mut decompressor, &mut decompressed)?;
-        Ok(decompressed)
-    }
+    CappedDecoder::zstd(&payload[..])?.decompress()
 }
 
 #[tokio::test]
@@ -165,11 +172,8 @@ async fn all_series_metric_types() {
 
     let request = output.first().unwrap();
 
-    match request.0.uri.path() {
-        SERIES_V1_PATH => warn!("Deprecated endpoint used."),
-        SERIES_V2_PATH => validate_protobuf_set_gauge_rate(request),
-        _ => panic!("Unexpected request type received!"),
-    }
+    assert_eq!(request.0.uri.path(), SERIES_V2_PATH);
+    validate_protobuf_set_gauge_rate(request);
 }
 
 #[tokio::test]
@@ -192,11 +196,47 @@ async fn smoke() {
 
     let request = output.first().unwrap();
 
-    match request.0.uri.path() {
-        SERIES_V1_PATH => validate_json_counters(request),
-        SERIES_V2_PATH => validate_protobuf_counters(request),
-        _ => panic!("Unexpected request type received!"),
-    }
+    assert_eq!(request.0.uri.path(), SERIES_V2_PATH);
+    validate_protobuf_counters(request);
+}
+
+#[tokio::test]
+/// The sink defaults to the v3 series protocol, so a config that doesn't set
+/// `series_api_version` must submit to the v3 intake route.
+///
+/// V3's columnar payload has no decoder in this crate — the e2e suite validates its contents by
+/// having fakeintake decode it — so this asserts the parts that are checkable here: the route,
+/// the framing, and that the body is a non-empty zstd stream.
+async fn default_series_version_uses_the_v3_intake() {
+    let counters = generate_counters();
+    let (expected, rx) = start_test_with_series_version(counters, None).await;
+
+    let output = rx.take(expected.len()).collect::<Vec<_>>().await;
+
+    assert!(output.len() == 1, "Should have received a response");
+
+    let request = output.first().unwrap();
+
+    assert_eq!(
+        request.0.uri.path(),
+        SERIES_V3_PATH,
+        "the default series version must submit to the v3 intake route"
+    );
+
+    validate_common(request);
+
+    assert_eq!(
+        request.0.headers.get("Content-Type").unwrap(),
+        "application/x-protobuf"
+    );
+    assert_eq!(request.0.headers.get("Content-Encoding").unwrap(), "zstd");
+    assert!(
+        is_zstd(&request.1),
+        "v3 only supports zstd, so the body must be a zstd stream"
+    );
+
+    let payload = decompress_payload(request.1.to_vec()).expect("Could not decompress v3 payload");
+    assert!(!payload.is_empty(), "v3 payload should not be empty");
 }
 
 fn validate_common(request: &(Parts, Bytes)) {
@@ -343,93 +383,6 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
         assert_eq!(count.points.len(), 1);
         assert_eq!(count.points[0].value, 1234.0 / count.interval as f64);
     }
-}
-
-fn validate_json_counters(request: &(Parts, Bytes)) {
-    assert_eq!(
-        request.0.headers.get("Content-Type").unwrap(),
-        "application/json"
-    );
-
-    validate_common(request);
-
-    let compressed_payload = request.1.to_vec();
-    let payload = decompress_payload(compressed_payload).unwrap();
-    let payload = std::str::from_utf8(&payload).unwrap();
-    let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
-
-    let series = payload
-        .as_object()
-        .unwrap()
-        .get("series")
-        .unwrap()
-        .as_array()
-        .unwrap();
-    assert!(!series.is_empty());
-
-    // check metrics are sorted by name, which helps HTTP compression
-    let metric_names: Vec<String> = series
-        .iter()
-        .map(|value| {
-            value
-                .as_object()
-                .unwrap()
-                .get("metric")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string()
-        })
-        .collect();
-    let mut sorted_names = metric_names.clone();
-    sorted_names.sort();
-    assert_eq!(metric_names, sorted_names);
-
-    let entry = series.first().unwrap().as_object().unwrap();
-    assert!(
-        entry
-            .get("metric")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .starts_with("foo.counter_"),
-    );
-    assert_eq!(entry.get("type").unwrap().as_str().unwrap(), "count");
-    let points = entry
-        .get("points")
-        .unwrap()
-        .as_array()
-        .unwrap()
-        .first()
-        .unwrap()
-        .as_array()
-        .unwrap();
-    assert_eq!(points.len(), 2);
-
-    // validate that all values were received
-    let all_values: f64 = series
-        .iter()
-        .map(|entry| {
-            entry
-                .as_object()
-                .unwrap()
-                .get("points")
-                .unwrap()
-                .as_array()
-                .unwrap()
-                .first()
-                .unwrap()
-                .as_array()
-                .unwrap()
-                .get(1)
-                .unwrap()
-                .as_f64()
-                .unwrap()
-        })
-        .sum();
-
-    // the input values are [0..10)
-    assert_eq!(all_values, 45.0);
 }
 
 async fn run_sink() {

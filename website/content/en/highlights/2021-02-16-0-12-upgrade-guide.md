@@ -70,7 +70,7 @@ While `check_fields` is deprecated and still supported, you will need to explici
  lanes.errors."level.eq" = "error"
 ```
 
-Alteratively, we recommend migrating to the new VRL syntax:
+Alternatively, we recommend migrating to the new VRL syntax:
 
 ```diff
  [transforms.route]
@@ -117,12 +117,12 @@ The following transforms have been deprecated in favor of the new [`remap` trans
 Deprecation notices have been placed on each of these transforms with example VRL programs that demonstrate how to
 migrate to the new `remap` transform. For example, migrating from the `json_parser` transform is as simple as:
 
-```toml
-[transforms.remap]
-type = "remap"
-source = '''
-. = merge(., parse_json!(.message))
-'''
+```yaml
+transforms:
+  remap:
+    type: "remap"
+    source: |
+      . = merge(., parse_json!(.message))
 ```
 
 **You do not need to upgrade immediately. These transforms will not be removed until Vector hits 1.0, a milestone that

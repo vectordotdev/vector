@@ -14,14 +14,14 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
 
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to checkout'
+        description: "Git ref to checkout"
         required: false
         type: string
 
@@ -30,7 +30,7 @@ on:
     types: [checks_requested]
   schedule:
     # Same schedule as nightly.yml
-    - cron: "0 5 * * 2-6"  # Runs at 5:00 AM UTC, Tuesday through Saturday
+    - cron: "0 5 * * 2-6" # Runs at 5:00 AM UTC, Tuesday through Saturday
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
@@ -52,7 +52,7 @@ jobs:
     needs: [changes]
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
@@ -71,7 +71,7 @@ jobs:
     needs: [changes]
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 

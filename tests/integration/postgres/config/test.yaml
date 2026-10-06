@@ -1,6 +1,6 @@
 features:
-- postgresql_metrics-integration-tests
-- postgres_sink-integration-tests
+  - postgresql_metrics-integration-tests
+  - postgres_sink-integration-tests
 
 test_filter: ::postgres
 
@@ -13,13 +13,13 @@ runner:
     postgres_socket: /pg_socket
 
 matrix:
-  version: ['13.1']
+  version: ["13.1"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
-- "src/internal_events/postgresql_metrics.rs"
-- "src/sinks/postgres/**"
-- "src/sources/postgresql_metrics.rs"
-- "src/sources/util/**"
-- "tests/integration/postgres/**"
+  - "src/internal_events/postgresql_metrics.rs"
+  - "src/sinks/postgres/**"
+  - "src/sources/postgresql_metrics.rs"
+  - "src/sources/util/**"
+  - "tests/integration/postgres/**"

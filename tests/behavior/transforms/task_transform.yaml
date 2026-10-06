@@ -1,0 +1,82 @@
+transforms:
+  field1:
+    type: "remap"
+    inputs: []
+    source: '.field1 = "value1"'
+
+  field2:
+    type: "remap"
+    inputs: []
+    source: '.field2 = "value2"'
+
+  field3:
+    type: "remap"
+    inputs: []
+    source: '.field3 = "value3"'
+
+  # Task transform
+  multi_input_dedupe:
+    type: "dedupe"
+    inputs:
+      - "field1"
+      - "field2"
+    fields:
+      match:
+        - "id"
+
+  # Task transform
+  multi_input_reduce:
+    type: "reduce"
+    inputs:
+      - "field3"
+      - "multi_input_dedupe"
+
+tests:
+  - name: "reduce_with_multiple_inputs"
+    inputs:
+      - insert_at: "field3"
+        type: "log"
+        log_fields:
+          message: "some message"
+          a_field: "value1"
+      - insert_at: "multi_input_dedupe"
+        type: "log"
+        log_fields:
+          message: "some message"
+          another_field: 1234
+    outputs:
+      - extract_from: "multi_input_reduce"
+        conditions:
+          - type: "vrl"
+            source: |
+              assert_eq!(.message, "some message", "incorrect message")
+              assert_eq!(.a_field, "value1", "incorrect field")
+              assert_eq!(.another_field, 1234, "incorrect field")
+
+  - name: "dedupe_into_reduce_with_multiple_inputs"
+    inputs:
+      - insert_at: "field1"
+        type: "log"
+        log_fields:
+          message: "some message"
+          counter: 1
+          id: 1
+      - insert_at: "field2"
+        type: "log"
+        log_fields:
+          message: "some message"
+          counter: 1
+          id: 1
+      - insert_at: "field3"
+        type: "log"
+        log_fields:
+          message: "some message"
+          counter: 1
+    outputs:
+      - extract_from: "multi_input_reduce"
+        conditions:
+          - type: "vrl"
+            source: |
+              assert_eq!(.message, "some message", "incorrect message")
+              assert_eq!(.field3, "value3", "incorrect field")
+              assert_eq!(.counter, 2, "incorrect counter")

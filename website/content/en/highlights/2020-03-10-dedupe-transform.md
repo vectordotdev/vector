@@ -22,14 +22,16 @@ mistakes that accidentally duplicate logs. This mistake can easily double
 
 Simply add the transform to your pipeline:
 
-```toml
-[transforms.my_transform_id]
-  # General
-  type = "dedupe" # required
-  inputs = ["my-source-id"] # required
+```yaml
+transforms:
+  my_transform_id:
+    # General
+    type: "dedupe" # required
+    inputs: ["my-source-id"] # required
 
-  # Fields
-  fields.match = ["timestamp", "host", "message"] # optional, default
+    # Fields
+    fields:
+      match: ["timestamp", "host", "message"] # optional, default
 ```
 
 {{< success >}}

@@ -4,8 +4,7 @@ components: sources: mongodb_metrics: {
 	title: "MongoDB Metrics"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -44,7 +43,6 @@ components: sources: mongodb_metrics: {
 		]
 
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -149,7 +147,7 @@ components: sources: mongodb_metrics: {
 			tags:              _mongodb_metrics_tags
 		}
 		memory: {
-			description:       "Current memory unsage."
+			description:       "Current memory usage."
 			type:              "gauge"
 			default_namespace: "mongodb"
 			tags: _mongodb_metrics_tags & {

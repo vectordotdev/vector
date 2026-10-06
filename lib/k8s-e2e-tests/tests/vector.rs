@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::await_holding_lock)]
 
 use indoc::{formatdoc, indoc};
@@ -77,7 +78,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "aggregator",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 ..Default::default()
             },
@@ -97,7 +98,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "agent",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![&helm_values_stdout_sink(&agent_override_name)],
                 ..Default::default()
@@ -153,11 +154,8 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
@@ -177,9 +175,14 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// This test validates that vector picks up logs with an agent and
-/// delivers them to the aggregator through an HAProxy load balancer.
+/// delivers them to the aggregator through an `HAProxy` load balancer.
 #[tokio::test]
 async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
+    const CONFIG: &str = indoc! {r"
+        haproxy:
+          enabled: true
+    "};
+
     let _guard = lock();
     init();
 
@@ -188,17 +191,12 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
     let agent_override_name = get_override_name(&namespace, "vector-agent");
 
-    const CONFIG: &str = indoc! {r#"
-        haproxy:
-          enabled: true
-    "#};
-
     let vector_aggregator = framework
         .helm_chart(
             &namespace,
             "vector",
             "aggregator",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![CONFIG],
                 ..Default::default()
@@ -227,7 +225,7 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "agent",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![&helm_values_haproxy(&agent_override_name)],
                 ..Default::default()
@@ -283,11 +281,8 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
