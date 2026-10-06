@@ -5,7 +5,8 @@ import "google/protobuf/timestamp.proto";
 
 // Deprecated fields remain declared for wire compatibility, which prevents
 // their field numbers from being reused. If a deprecated field is removed, its
-// number must be added to a reserved statement in the containing message.
+// number and name must be added to reserved statements in the containing message:
+// binary Protobuf identifies fields by number, while ProtoJSON identifies them by name.
 
 message EventArray {
   oneof events {
@@ -33,6 +34,13 @@ message EventWrapper {
     Metric metric = 2;
     Trace trace = 3;
   }
+}
+
+// The stable envelope for the native JSON codec. The extra message layer is an
+// unambiguous discriminator from the legacy native JSON representation, whose
+// top-level object is Vector's in-memory Event enum serialized by serde.
+message NativeJsonEnvelope {
+  EventWrapper event = 1;
 }
 
 message Log {
@@ -134,6 +142,9 @@ message Metric {
     AggregatedSummary3 aggregated_summary3 = 17;
   }
   string namespace = 11;
+  // Presence-aware namespace used by native JSON. Binary native retains the
+  // original namespace field so its wire representation remains unchanged.
+  optional string namespace_v2 = 22;
   uint32 interval_ms = 18;
   Value metadata = 19 [deprecated = true];
   Metadata metadata_full = 21;
