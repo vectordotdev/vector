@@ -72,12 +72,12 @@ pub enum CefSerializerError {
         actual_length: usize,
     },
     #[snafu(display(
-        r#"LogEvent CEF severity must be a number from 0 to {}: actual {}"#,
+        r"LogEvent CEF severity must be a number from 0 to {}: actual {}",
         max_value,
         actual_value
     ))]
     SeverityMaxValue { max_value: u8, actual_value: u8 },
-    #[snafu(display(r#"LogEvent CEF severity must be a number: {}"#, error))]
+    #[snafu(display(r"LogEvent CEF severity must be a number: {}", error))]
     SeverityNumberType { error: ParseIntError },
     #[snafu(display(r#"LogEvent extension keys can only contain ascii alphabetical characters: invalid key "{}""#, key))]
     ExtensionNonASCIIKey { key: String },
@@ -93,11 +93,17 @@ pub struct CefSerializerConfig {
 
 impl CefSerializerConfig {
     /// Creates a new `CefSerializerConfig`.
+    #[must_use]
     pub const fn new(cef: CefSerializerOptions) -> Self {
         Self { cef }
     }
 
     /// Build the `CefSerializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> Result<CefSerializer, BuildError> {
         let device_vendor = validate_length(
             &self.cef.device_vendor,
@@ -153,11 +159,13 @@ impl CefSerializerConfig {
     }
 
     /// The data type of events that are accepted by `CefSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // CEF, we don't want to enforce that limitation to users yet.
@@ -222,6 +230,11 @@ pub struct CefSerializerOptions {
     /// It must point to a number from 0 to 10.
     /// 0 = lowest_importance, 10 = highest_importance.
     /// Set to "cef.severity" by default.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::doc_markdown,
+        reason = "Preserve generated configuration documentation during the lint rollout."
+    )]
     pub severity: ConfigTargetPath,
 
     /// This is a path that points to the human-readable description of a log event.
@@ -258,7 +271,7 @@ impl Default for CefSerializerOptions {
 }
 
 /// Serializer that converts an `Event` to the bytes using the CEF format.
-/// CEF:{version}|{device_vendor}|{device_product}|{device_version>|{device_event_class}|{name}|{severity}|{encoded_fields}
+/// `CEF:{version}|{device_vendor}|{device_product}|{device_version>|{device_event_class}|{name}|{severity}|{encoded_fields}`
 #[derive(Debug, Clone)]
 pub struct CefSerializer {
     version: Version,
@@ -270,6 +283,7 @@ pub struct CefSerializer {
 
 impl CefSerializer {
     /// Creates a new `CefSerializer`.
+    #[must_use]
     pub const fn new(
         version: Version,
         device: DeviceSettings,
@@ -307,7 +321,7 @@ impl Encoder<Event> for CefSerializer {
                     }
                     .fail()
                     .map_err(|e| e.to_string().into());
-                };
+                }
                 severity
             }
         };
@@ -351,10 +365,8 @@ fn get_log_event_value(log: &LogEvent, field: &ConfigTargetPath) -> String {
         Some(Value::Float(float)) => float.to_string(),
         Some(Value::Boolean(bool)) => bool.to_string(),
         Some(Value::Timestamp(timestamp)) => timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true),
-        Some(Value::Null) => String::from(""),
-        // Other value types: Array, Regex, Object are not supported by the CEF format.
-        Some(_) => String::from(""),
-        None => String::from(""),
+        // Null, missing, and unsupported values (Array, Regex, Object) render as empty.
+        _ => String::new(),
     }
 }
 
@@ -366,8 +378,8 @@ fn escape_extension(s: &str) -> String {
 }
 
 fn escape_special_chars(s: &str, extra_char: char) -> String {
-    s.replace('\\', r#"\\"#)
-        .replace(extra_char, &format!(r#"\{extra_char}"#))
+    s.replace('\\', r"\\")
+        .replace(extra_char, &format!(r"\{extra_char}"))
 }
 
 fn validate_length(field: &str, field_name: &str, max_length: usize) -> Result<String, BuildError> {
@@ -433,38 +445,38 @@ mod tests {
 
     #[test]
     fn try_escape_header() {
-        let s1 = String::from(r#"Test | test"#);
-        let s2 = String::from(r#"Test \ test"#);
-        let s3 = String::from(r#"Test test"#);
-        let s4 = String::from(r#"Test \| \| test"#);
+        let s1 = String::from(r"Test | test");
+        let s2 = String::from(r"Test \ test");
+        let s3 = String::from(r"Test test");
+        let s4 = String::from(r"Test \| \| test");
 
         let s1 = escape_header(&s1);
         let s2 = escape_header(&s2);
         let s3: String = escape_header(&s3);
         let s4: String = escape_header(&s4);
 
-        assert_eq!(s1, r#"Test \| test"#);
-        assert_eq!(s2, r#"Test \\ test"#);
-        assert_eq!(s3, r#"Test test"#);
-        assert_eq!(s4, r#"Test \\\| \\\| test"#);
+        assert_eq!(s1, r"Test \| test");
+        assert_eq!(s2, r"Test \\ test");
+        assert_eq!(s3, r"Test test");
+        assert_eq!(s4, r"Test \\\| \\\| test");
     }
 
     #[test]
     fn try_escape_extension() {
-        let s1 = String::from(r#"Test=test"#);
-        let s2 = String::from(r#"Test = test"#);
-        let s3 = String::from(r#"Test test"#);
-        let s4 = String::from(r#"Test \| \| test"#);
+        let s1 = String::from(r"Test=test");
+        let s2 = String::from(r"Test = test");
+        let s3 = String::from(r"Test test");
+        let s4 = String::from(r"Test \| \| test");
 
         let s1 = escape_extension(&s1);
         let s2 = escape_extension(&s2);
         let s3: String = escape_extension(&s3);
         let s4: String = escape_extension(&s4);
 
-        assert_eq!(s1, r#"Test\=test"#);
-        assert_eq!(s2, r#"Test \= test"#);
-        assert_eq!(s3, r#"Test test"#);
-        assert_eq!(s4, r#"Test \\| \\| test"#);
+        assert_eq!(s1, r"Test\=test");
+        assert_eq!(s2, r"Test \= test");
+        assert_eq!(s3, r"Test test");
+        assert_eq!(s4, r"Test \\| \\| test");
     }
 
     #[test]
@@ -477,7 +489,7 @@ mod tests {
             "foo" => Value::from("bar"),
             "int" => Value::from(123),
             "comma" => Value::from("abc,bcd"),
-            "float" => Value::Float(NotNan::new(3.1415925).unwrap()),
+            "float" => Value::Float(NotNan::new(std::f64::consts::PI).unwrap()),
             "space" => Value::from("sp ace"),
             "time" => Value::Timestamp(DateTime::parse_from_rfc3339("2023-02-27T15:04:49.363+08:00").unwrap().into()),
             "quote" => Value::from("the \"quote\" should be escaped"),
@@ -534,7 +546,7 @@ mod tests {
         let mut bytes = BytesMut::new();
 
         serializer.encode(event, &mut bytes).unwrap();
-        let expected = b"CEF:0|Datadog|Vector|0|Telemetry Event|Event name|1|bool=true comma=abc,bcd float=3.1415925 foo=bar int=123 quote=the \"quote\" should be escaped space=sp ace time=2023-02-27T07:04:49.363Z";
+        let expected = b"CEF:0|Datadog|Vector|0|Telemetry Event|Event name|1|bool=true comma=abc,bcd float=3.141592653589793 foo=bar int=123 quote=the \"quote\" should be escaped space=sp ace time=2023-02-27T07:04:49.363Z";
 
         assert_eq!(bytes.as_ref(), expected);
     }
