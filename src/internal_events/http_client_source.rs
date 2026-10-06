@@ -1,9 +1,8 @@
 #![allow(dead_code)] // TODO requires optional feature compilation
 
-use metrics::counter;
 use vector_lib::{
-    NamedInternalEvent,
-    internal_event::{InternalEvent, error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -25,12 +24,12 @@ impl InternalEvent for HttpClientEventsReceived {
             url = %self.url,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "uri" => self.url.clone(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "uri" => self.url.clone(),
         )
         .increment(self.byte_size.get() as u64);
@@ -53,7 +52,7 @@ impl InternalEvent for HttpClientHttpResponseError {
             error_code = %http_error_code(self.code.as_u16()),
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "url" => self.url,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
@@ -79,7 +78,7 @@ impl InternalEvent for HttpClientHttpError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "url" => self.url,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,

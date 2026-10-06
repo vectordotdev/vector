@@ -81,8 +81,8 @@ fn routes_example() -> Vec<Route> {
 }
 
 impl GenerateConfig for ExclusiveRouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             routes: routes_example(),
         })
         .unwrap()
@@ -101,7 +101,7 @@ impl TransformConfig for ExclusiveRouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         let mut counts = std::collections::HashMap::new();
@@ -126,6 +126,26 @@ impl TransformConfig for ExclusiveRouteConfig {
         {
             errors.push(format!("Using reserved '{UNMATCHED_ROUTE}' name."));
         }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let errors: Vec<String> = self
+            .routes
+            .iter()
+            .filter_map(|route| {
+                route
+                    .condition
+                    .validate(&context.enrichment_tables, &context.metrics_storage)
+                    .err()
+                    .map(|e| format!("route \"{}\": {e}", route.name))
+            })
+            .collect();
 
         if errors.is_empty() {
             Ok(())

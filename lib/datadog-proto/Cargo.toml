@@ -1,0 +1,16 @@
+[package]
+name = "datadog-proto"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+license = "MPL-2.0"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+prost = { workspace = true, features = ["derive"] }
+
+[build-dependencies]
+prost-build.workspace = true

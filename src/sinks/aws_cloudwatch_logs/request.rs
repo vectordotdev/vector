@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     future::Future,
     pin::Pin,
     task::{Context, Poll, ready},
@@ -18,11 +18,13 @@ use aws_sdk_cloudwatchlogs::{
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::{FutureExt, future::BoxFuture};
-use http::{HeaderValue, header::HeaderName};
-use indexmap::IndexMap;
+use http::HeaderValue;
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
+use crate::sinks::{
+    aws_cloudwatch_logs::{config::Retention, service::CloudwatchError},
+    util::http::OrderedHeaderName,
+};
 
 pub struct CloudwatchFuture {
     client: Client,
@@ -38,7 +40,7 @@ struct Client {
     client: CloudwatchLogsClient,
     stream_name: String,
     group_name: String,
-    headers: IndexMap<HeaderName, HeaderValue>,
+    headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     retention_days: u32,
     kms_key: Option<String>,
     tags: Option<HashMap<String, String>>,
@@ -59,7 +61,7 @@ impl CloudwatchFuture {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         client: CloudwatchLogsClient,
-        headers: IndexMap<HeaderName, HeaderValue>,
+        headers: BTreeMap<OrderedHeaderName, HeaderValue>,
         stream_name: String,
         group_name: String,
         create_missing_group: bool,
@@ -267,7 +269,8 @@ impl Client {
                 .customize()
                 .mutate_request(move |req| {
                     for (header, value) in headers.iter() {
-                        req.headers_mut().insert(header.clone(), value.clone());
+                        req.headers_mut()
+                            .insert(header.inner().clone(), value.clone());
                     }
                 })
                 .send()

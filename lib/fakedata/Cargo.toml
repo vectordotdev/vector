@@ -6,7 +6,9 @@ edition = "2024"
 publish = false
 license = "MPL-2.0"
 
+[lints]
+workspace = true
+
 [dependencies]
 chrono.workspace = true
-fakedata_generator = "0.7.1"
 rand.workspace = true

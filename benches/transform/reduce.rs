@@ -36,7 +36,7 @@ fn reduce(c: &mut Criterion) {
     {
         let param = &Param {
             slug: "proof_of_concept",
-            input: fixed_stream.clone(),
+            input: fixed_stream,
             reduce_config: ReduceConfig {
                 expire_after_ms: Duration::from_secs(30),
                 end_every_period_ms: None,
