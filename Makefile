@@ -480,10 +480,6 @@ release-docker: ## Release to Docker Hub
 release-github: ## Release to GitHub
 	@$(VDEV) release github
 
-.PHONY: release-homebrew
-release-homebrew: ## Release to vectordotdev Homebrew tap
-	@$(VDEV) release homebrew --vector-version $(VECTOR_VERSION)
-
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
 	@$(VDEV) release prepare
