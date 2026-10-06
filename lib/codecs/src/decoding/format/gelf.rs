@@ -16,7 +16,14 @@ use vector_core::{
 use vrl::value::{Kind, Value, kind::Collection};
 
 use super::{Deserializer, default_lossy};
-use crate::{VALID_FIELD_REGEX, gelf::GELF_TARGET_PATHS, gelf_fields::*};
+use crate::{
+    VALID_FIELD_REGEX,
+    gelf::GELF_TARGET_PATHS,
+    gelf_fields::{
+        FACILITY, FILE, FULL_MESSAGE, GELF_VERSION, HOST, LEVEL, LINE, SHORT_MESSAGE, TIMESTAMP,
+        VERSION,
+    },
+};
 
 // On GELF decoding behavior:
 //   Graylog has a relaxed decoding. They are much more lenient than the spec would
@@ -54,11 +61,13 @@ pub enum ValidationMode {
 
 impl GelfDeserializerConfig {
     /// Creates a new `GelfDeserializerConfig`.
+    #[must_use]
     pub fn new(options: GelfDeserializerOptions) -> Self {
         Self { gelf: options }
     }
 
     /// Build the `GelfDeserializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> GelfDeserializer {
         GelfDeserializer {
             lossy: self.gelf.lossy,
@@ -67,11 +76,13 @@ impl GelfDeserializerConfig {
     }
 
     /// Return the type of event built by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         schema::Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -127,14 +138,15 @@ pub struct GelfDeserializer {
 
 impl GelfDeserializer {
     /// Create a new `GelfDeserializer`.
+    #[must_use]
     pub fn new(lossy: bool, validation: ValidationMode) -> GelfDeserializer {
         GelfDeserializer { lossy, validation }
     }
 
-    /// Builds a LogEvent from the parsed GelfMessage.
+    /// Builds a `LogEvent` from the parsed `GelfMessage`.
     /// The logic follows strictly the documented GELF standard.
     fn message_to_event(&self, parsed: &GelfMessage) -> vector_common::Result<Event> {
-        let mut log = LogEvent::from_str_legacy(parsed.short_message.to_string());
+        let mut log = LogEvent::from_str_legacy(parsed.short_message.clone());
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
         if self.validation == ValidationMode::Strict && parsed.version != GELF_VERSION {
@@ -143,11 +155,11 @@ impl GelfDeserializer {
             );
         }
 
-        log.insert(&GELF_TARGET_PATHS.version, parsed.version.to_string());
-        log.insert(&GELF_TARGET_PATHS.host, parsed.host.to_string());
+        log.insert(&GELF_TARGET_PATHS.version, parsed.version.clone());
+        log.insert(&GELF_TARGET_PATHS.host, parsed.host.clone());
 
         if let Some(full_message) = &parsed.full_message {
-            log.insert(&GELF_TARGET_PATHS.full_message, full_message.to_string());
+            log.insert(&GELF_TARGET_PATHS.full_message, full_message.clone());
         }
 
         if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
@@ -163,7 +175,7 @@ impl GelfDeserializer {
             log.insert(&GELF_TARGET_PATHS.level, level);
         }
         if let Some(facility) = &parsed.facility {
-            log.insert(&GELF_TARGET_PATHS.facility, facility.to_string());
+            log.insert(&GELF_TARGET_PATHS.facility, facility.clone());
         }
         if let Some(line) = parsed.line {
             log.insert(
@@ -172,11 +184,11 @@ impl GelfDeserializer {
             );
         }
         if let Some(file) = &parsed.file {
-            log.insert(&GELF_TARGET_PATHS.file, file.to_string());
+            log.insert(&GELF_TARGET_PATHS.file, file.clone());
         }
 
         if let Some(add) = &parsed.additional_fields {
-            for (key, val) in add.iter() {
+            for (key, val) in add {
                 // per GELF spec, filter out _id
                 if key == "_id" {
                     continue;
@@ -243,9 +255,10 @@ impl Deserializer for GelfDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let parsed: GelfMessage = match self.lossy {
-            true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
-            false => serde_json::from_slice(&bytes),
+        let parsed: GelfMessage = if self.lossy {
+            serde_json::from_str(&String::from_utf8_lossy(&bytes))
+        } else {
+            serde_json::from_slice(&bytes)
         }?;
         let event = self.message_to_event(&parsed)?;
 
@@ -286,7 +299,7 @@ mod tests {
             HOST: "example.org",
             SHORT_MESSAGE: "A short message that helps you identify what is going on",
             FULL_MESSAGE: "Backtrace here\n\nmore stuff",
-            TIMESTAMP: 1385053862.3072,
+            TIMESTAMP: 1_385_053_862.307_2,
             LEVEL: 1,
             FACILITY: "foo",
             LINE: 42,
@@ -321,7 +334,7 @@ mod tests {
                 b"Backtrace here\n\nmore stuff"
             )))
         );
-        let dt = DateTime::from_timestamp(1385053862, 307_200_000).expect("invalid timestamp");
+        let dt = DateTime::from_timestamp(1_385_053_862, 307_200_000).expect("invalid timestamp");
         assert_eq!(log.get(event_path!(TIMESTAMP)), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(event_path!(LEVEL)), Some(&Value::Integer(1)));
         assert_eq!(
@@ -440,7 +453,7 @@ mod tests {
             HOST: "example.org",
             SHORT_MESSAGE: "A short message that helps you identify what is going on",
             FULL_MESSAGE: "Backtrace here\n\nmore stuff",
-            TIMESTAMP: 1385053862.3072,
+            TIMESTAMP: 1_385_053_862.307_2,
             LEVEL: 1,
             FACILITY: "foo",
             LINE: 42,
