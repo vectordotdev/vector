@@ -1,7 +1,6 @@
 mod channel;
 mod generate_cue;
 mod github;
-mod homebrew;
 mod prepare;
 mod workflow;
 
@@ -30,7 +29,6 @@ crate::cli_subcommands! {
     docker,
     generate_cue,
     github,
-    homebrew,
     prepare,
     workflow,
     s3,

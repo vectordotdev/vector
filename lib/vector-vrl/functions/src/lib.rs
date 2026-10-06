@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Central location for all VRL functions used in Vector.
 //!
 //! This crate provides a single source of truth for the complete set of VRL functions
@@ -26,6 +28,7 @@ pub enum MetadataKey {
 pub const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
 
 /// Returns Vector-specific secret functions.
+#[must_use]
 pub fn secret_functions() -> Vec<Box<dyn Function>> {
     vec![
         Box::new(set_semantic_meaning::SetSemanticMeaning) as _,
@@ -37,12 +40,14 @@ pub fn secret_functions() -> Vec<Box<dyn Function>> {
 
 /// Returns all VRL functions available in Vector.
 #[allow(clippy::disallowed_methods)]
+#[must_use]
 pub fn all() -> Vec<Box<dyn Function>> {
     let functions = iter_all_without_vrl_stdlib().chain(vrl::stdlib::all());
     functions.collect()
 }
 
 /// Returns all VRL functions available only in Vector.
+#[must_use]
 pub fn all_without_vrl_stdlib() -> Vec<Box<dyn Function>> {
     let functions = iter_all_without_vrl_stdlib();
     functions.collect()
