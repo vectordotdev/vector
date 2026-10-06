@@ -1,0 +1,8 @@
+sources:
+  my_source_id:
+    type: fluent
+    address: 0.0.0.0:9000
+    mode: tcp
+    permit_origin:
+      - 192.168.0.0/16
+    receive_buffer_bytes: 65536

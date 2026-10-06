@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: sematext_logs
+    inputs:
+      - my-source-or-transform-id
+    endpoint: http://127.0.0.1
+    region: us
+    token: ${SEMATEXT_TOKEN}

@@ -1,0 +1,15 @@
+sources:
+  my_source_id:
+    type: docker_logs
+    auto_partial_merge: true
+    docker_host: http://localhost:2375
+    exclude_containers:
+      - exclude_
+    include_containers:
+      - include_
+    include_images:
+      - httpd
+    include_labels:
+      - org.opencontainers.image.vendor=Vector
+    partial_event_marker_field: _partial
+    retry_backoff_secs: 2

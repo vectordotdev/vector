@@ -70,15 +70,11 @@ jobs:
     needs: changes
     # Run this job even if `changes` job is skipped
     if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
-    # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
-      CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
-      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
-      CARGO_INCREMENTAL: 0
       DISABLE_MOLD: true
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
       - run: sudo -E bash scripts/ci-free-disk-space.sh
@@ -89,13 +85,11 @@ jobs:
           cross: true
           mold: false
           cargo-deb: true
-
-      - name: Install packaging dependencies
-        run: sudo apt-get install -y cmark-gfm
+          cmark-gfm: true
 
       - run: VECTOR_VERSION="$(vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
@@ -116,7 +110,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         id: set-matrix
         with:
           script: |
@@ -130,11 +124,12 @@ jobs:
             // https://cloud.google.com/kubernetes-engine/docs/release-notes
             // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
+              { version: "v1.37.1",  is_essential: true  }, // Latest stable (Sep 23, 2026)
+              { version: "v1.36.5",  is_essential: true  }, // Latest stable (Apr 22, 2026)
               { version: "v1.35.1",  is_essential: true  }, // Latest stable (Feb 10, 2026)
               { version: "v1.34.4",  is_essential: true  }, // Current patch (Feb 10, 2026)
               { version: "v1.33.0",  is_essential: false }, // Widely supported
               { version: "v1.32.0",  is_essential: false }, // EOL Feb 28 2026
-              { version: "v1.31.0",  is_essential: false }, // Extended support on cloud providers
             ]
             const container_runtime = [
               "docker",
@@ -175,7 +170,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
@@ -183,7 +178,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -198,7 +192,7 @@ jobs:
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
       - name: Checkout helm-charts
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: vectordotdev/helm-charts
           ref: develop
@@ -210,7 +204,6 @@ jobs:
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
-          CARGO_INCREMENTAL: 0
           HELM_CHART_REPO: ${{ github.workspace }}/helm-charts/charts/vector
         with:
           timeout_minutes: 45

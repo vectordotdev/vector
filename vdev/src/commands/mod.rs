@@ -15,6 +15,9 @@ macro_rules! cli_commands {
     ( :: $( $mod:ident, )* :: ) => {
         pastey::paste! {
             #[derive(clap::Subcommand, Debug)]
+            // Command groups such as `update` share a suffix (`opentelemetry-proto`,
+            // `datadog-trace-proto`, `datadog-metrics-proto`) that causes clippy to warn.
+            #[allow(clippy::enum_variant_names)]
             enum Commands {
                 $( [<$mod:camel>]($mod::Cli), )*
             }
@@ -68,62 +71,118 @@ pub struct Cli {
 }
 
 mod build;
+pub(crate) mod changelog;
 mod check;
 mod complete;
 mod crate_versions;
+mod deprecation;
 mod e2e;
 mod features;
 mod fmt;
 mod info;
 mod integration;
-mod meta;
 mod package;
 mod release;
 mod run;
 mod status;
+mod style;
 mod test;
 mod test_vrl;
+mod update;
 mod version;
 
 cli_commands! {
     build,
+    changelog,
     check,
     complete,
     crate_versions,
+    deprecation,
     e2e,
     features,
     fmt,
     info,
     integration,
-    meta,
     package,
     release,
     run,
     status,
     test,
     test_vrl,
+    update,
     version,
 }
 
-/// This macro creates a wrapper for an existing script.
-#[macro_export]
-macro_rules! script_wrapper {
-    ( $mod:ident = $doc:literal => $script:literal ) => {
-        pastey::paste! {
-            mod $mod {
-                #[doc = $doc]
-                #[derive(clap::Args, Debug)]
-                #[command()]
-                pub(super) struct Cli {
-                    args: Vec<String>,
-                }
+#[cfg(test)]
+mod tests {
+    use clap::{CommandFactory as _, error::ErrorKind};
 
-                impl Cli {
-                    pub(super) fn exec(self) -> anyhow::Result<()> {
-                        $crate::app::exec(concat!("scripts/", $script), self.args, true)
-                    }
-                }
+    use super::Cli;
+
+    const SCRIPT_COMMANDS: &[(&str, &str)] = &[
+        ("check", "docs"),
+        ("package", "archive"),
+        ("package", "deb"),
+        ("package", "msi"),
+        ("package", "rpm"),
+        ("release", "docker"),
+        ("release", "s3"),
+    ];
+
+    #[test]
+    fn script_commands_forward_arguments() {
+        let cases: &[(&[&str], &[&str])] = &[
+            (&[], &[]),
+            (&["0.58.0"], &["0.58.0"]),
+            (
+                &["--chart-version", "0.46.0"],
+                &["--chart-version", "0.46.0"],
+            ),
+            (&["--chart-version=0.46.0"], &["--chart-version=0.46.0"]),
+            (
+                &["-x", "path with spaces", "-1"],
+                &["-x", "path with spaces", "-1"],
+            ),
+            (&["value", "--help", "-v"], &["value", "--help", "-v"]),
+            (&["--", "--help"], &["--help"]),
+            (
+                &["--", "--chart-version", "0.46.0"],
+                &["--chart-version", "0.46.0"],
+            ),
+        ];
+
+        for &(group, command) in SCRIPT_COMMANDS {
+            for &(args, expected) in cases {
+                let matches = Cli::command()
+                    .try_get_matches_from(
+                        ["vdev", group, command]
+                            .into_iter()
+                            .chain(args.iter().copied()),
+                    )
+                    .unwrap_or_else(|error| panic!("{group} {command} {args:?}: {error}"));
+                let script = matches
+                    .subcommand_matches(group)
+                    .unwrap()
+                    .subcommand_matches(command)
+                    .unwrap();
+                let forwarded: Vec<_> = script
+                    .get_many::<String>("args")
+                    .into_iter()
+                    .flatten()
+                    .map(String::as_str)
+                    .collect();
+                assert_eq!(forwarded, expected, "{group} {command} {args:?}");
             }
         }
-    };
+    }
+
+    #[test]
+    fn script_commands_keep_vdev_help() {
+        for &(group, command) in SCRIPT_COMMANDS {
+            let error = Cli::command()
+                .try_get_matches_from(["vdev", group, command, "--help"])
+                .unwrap_err();
+            assert_eq!(error.kind(), ErrorKind::DisplayHelp, "{group} {command}");
+        }
+    }
 }

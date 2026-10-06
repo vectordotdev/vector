@@ -1,12 +1,19 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeSet, HashMap},
-    env, mem,
+    mem,
 };
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
-use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
+use vector_config_common::{
+    attributes::CustomAttribute,
+    constants,
+    schema::{
+        ArrayValidation, InstanceType, NumberValidation, ObjectValidation, RootSchema, Schema,
+        SchemaGenerator, SchemaObject, SchemaSettings, SingleOrVec, SubschemaValidation,
+    },
+};
 
 use super::visitors::{
     DisallowUnevaluatedPropertiesVisitor, GenerateHumanFriendlyNameVisitor,
@@ -16,15 +23,24 @@ use crate::{
     Configurable, ConfigurableRef, GenerateError, Metadata, ToValue, num::ConfigurableNumber,
 };
 
-/// Applies metadata to the given schema.
-///
-/// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
-/// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_base_metadata(schema: &mut SchemaObject, metadata: Metadata) {
-    apply_metadata(&<()>::as_configurable_ref(), schema, metadata)
+/// Applies metadata that is not associated with a configurable type to the given schema.
+pub fn apply_metadata(schema: &mut SchemaObject, metadata: Metadata) {
+    apply_configurable_metadata(&<()>::as_configurable_ref(), schema, metadata);
 }
 
-fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata: Metadata) {
+/// Applies resolved metadata to the given schema.
+///
+/// All metadata, whether it comes from a type, field, or enum variant, flows through this function.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "retain ownership of metadata passed through the schema generation pipeline"
+)]
+fn apply_configurable_metadata(
+    config: &ConfigurableRef,
+    schema: &mut SchemaObject,
+    metadata: Metadata,
+) {
     let type_name = config.type_name();
     let base_metadata = config.make_metadata();
 
@@ -54,32 +70,40 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
     let has_referenceable_description =
         config.referenceable_name().is_some() && base_metadata.description().is_some();
     let is_transparent = base_metadata.transparent() || metadata.transparent();
-    if schema_description.is_none() && !is_transparent && !has_referenceable_description {
-        panic!(
-            "No description provided for `{type_name}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used."
-        );
-    }
+    assert!(
+        schema_description.is_some() || is_transparent || has_referenceable_description,
+        "No description provided for `{type_name}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used."
+    );
 
-    // If a default value was given, serialize it.
-    let schema_default = metadata.default_value().map(ToValue::to_value);
+    apply_custom_attributes(schema, &metadata, type_name);
+    apply_validations(schema, &metadata);
+    apply_schema_metadata(schema, schema_title, schema_description, &metadata);
+}
 
-    // Take the existing schema metadata, if any, or create a default version of it, and then apply
-    // all of our newly-calculated values to it.
-    //
-    // Similar to the above title/description logic, we update both title/description if either of
-    // them have been set, to avoid mixing/matching between base and override metadata.
+fn apply_schema_metadata(
+    schema: &mut SchemaObject,
+    title: Option<&'static str>,
+    description: Option<&'static str>,
+    metadata: &Metadata,
+) {
     let mut schema_metadata = schema.metadata.take().unwrap_or_default();
-    if schema_title.is_some() || schema_description.is_some() {
-        schema_metadata.title = schema_title.map(|s| s.to_string());
-        schema_metadata.description = schema_description.map(|s| s.to_string());
+    if title.is_some() || description.is_some() {
+        schema_metadata.title = title.map(str::to_owned);
+        schema_metadata.description = description.map(str::to_owned);
     }
-    schema_metadata.default = schema_default.or(schema_metadata.default);
+    schema_metadata.default = metadata
+        .default_value()
+        .map(ToValue::to_value)
+        .or(schema_metadata.default);
     schema_metadata.deprecated = metadata.deprecated();
+    schema.metadata = Some(schema_metadata);
+}
 
-    // Set any custom attributes as extensions on the schema. If an attribute is declared multiple
-    // times, we turn the value into an array and merge them together. We _do_ not that, however, if
-    // the original value is a flag, or the value being added to an existing key is a flag, as
-    // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
+fn apply_custom_attributes(
+    schema: &mut SchemaObject,
+    metadata: &Metadata,
+    type_name: &'static str,
+) {
     let map_entries_len = {
         let custom_map = schema
             .extensions
@@ -98,7 +122,7 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
         for attribute in metadata.custom_attributes() {
             match attribute {
                 CustomAttribute::Flag(key) => {
-                    match custom_map.insert(key.to_string(), Value::Bool(true)) {
+                    match custom_map.insert(key.clone(), Value::Bool(true)) {
                         // Overriding a flag is fine, because flags are only ever "enabled", so there's
                         // no harm to enabling it... again. Likewise, if there was no existing value,
                         // it's fine.
@@ -111,7 +135,7 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
                     }
                 }
                 CustomAttribute::KeyValue { key, value } => {
-                    custom_map.entry(key.to_string())
+                    custom_map.entry(key.clone())
                         .and_modify(|existing_value| match existing_value {
                             // We already have a flag entry for this key, which we cannot turn into an
                             // array, so we panic in this particular case to signify the weirdness.
@@ -141,13 +165,12 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
     if map_entries_len == 0 {
         schema.extensions.remove("_metadata");
     }
+}
 
-    // Now apply any relevant validations.
+fn apply_validations(schema: &mut SchemaObject, metadata: &Metadata) {
     for validation in metadata.validations() {
         validation.apply(schema);
     }
-
-    schema.metadata = Some(schema_metadata);
 }
 
 pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: Vec<SchemaObject>) {
@@ -166,6 +189,7 @@ pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: V
     }));
 }
 
+#[must_use]
 pub fn generate_null_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Null.into()),
@@ -173,6 +197,7 @@ pub fn generate_null_schema() -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_bool_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Boolean.into()),
@@ -180,6 +205,7 @@ pub fn generate_bool_schema() -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_string_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::String.into()),
@@ -187,6 +213,7 @@ pub fn generate_string_schema() -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_number_schema<N>() -> SchemaObject
 where
     N: ConfigurableNumber,
@@ -277,6 +304,7 @@ pub(crate) fn generate_map_schema(
     })
 }
 
+#[must_use]
 pub fn generate_struct_schema(
     properties: IndexMap<String, SchemaObject>,
     required: BTreeSet<String>,
@@ -393,10 +421,10 @@ pub(crate) fn generate_optional_schema(
         },
         Some(sov) => match sov {
             SingleOrVec::Single(ty) if **ty != InstanceType::Null => {
-                *sov = vec![**ty, InstanceType::Null].into()
+                *sov = vec![**ty, InstanceType::Null].into();
             }
             SingleOrVec::Vec(ty) if !ty.contains(&InstanceType::Null) => {
-                ty.push(InstanceType::Null)
+                ty.push(InstanceType::Null);
             }
             _ => {}
         },
@@ -409,6 +437,108 @@ pub(crate) fn generate_optional_schema(
     Ok(schema)
 }
 
+/// Generates the schema for a `#[serde(flatten)] Option<T>` field.
+///
+/// `generate_optional_schema` encodes optionality as `oneOf: [null, T]`, which is correct for a
+/// nullable *property*. Flattened fields are merged into the parent object via `allOf`, where the
+/// value being validated is never JSON `null`.
+///
+/// When `T` is an internally (or adjacently) tagged enum, this wraps `T` as
+/// `anyOf: [ { not: { required: [<tag>] } }, T ]` so omission matches serde. The wrapper is `anyOf`
+/// rather than `oneOf` because a trailing `#[serde(untagged)]` object or map variant also has no
+/// tag field; both alternatives then match a serialized `Some(fallback)` value.
+///
+/// A sibling property that serializes under the same name as the tag is rejected: the absence
+/// encoding would treat that sibling as a present variant. That includes an enclosing
+/// internally-tagged enum's tag field, which is not a variant field of its own. That layout is
+/// unused and is not modeled.
+///
+/// When `T` is not tagged that way, this falls back to `Option<T>`'s normal (nullable property)
+/// schema so flatten-of-struct and similar shapes stay unchanged.
+///
+/// The wrapper is built from `T` rather than from a shared `Option<T>` definition, so a normal
+/// `Option<T>` property keeps its null branch and field-specific metadata stays on this site.
+///
+/// # Errors
+///
+/// Returns an error if a sibling field collides with the enum tag or generating the inner schema fails.
+pub fn generate_flattened_optional_schema(
+    inner: &ConfigurableRef,
+    optional: &ConfigurableRef,
+    generator: &RefCell<SchemaGenerator>,
+    overrides: Option<Metadata>,
+    sibling_field_names: &[&str],
+) -> Result<SchemaObject, GenerateError> {
+    let Some(tag_field) = enum_tag_field_from_metadata(&inner.make_metadata()) else {
+        return get_or_generate_schema(optional, generator, overrides);
+    };
+
+    if let Some(sibling_field) = sibling_field_names
+        .iter()
+        .copied()
+        .find(|name| *name == tag_field)
+    {
+        return Err(GenerateError::FlattenedOptionalEnumTagCollision {
+            enum_type: inner.type_name(),
+            tag_field,
+            sibling_field: sibling_field.to_owned(),
+        });
+    }
+
+    let inner_schema = get_or_generate_schema(inner, generator, None)?;
+    let mut schema = SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            any_of: Some(vec![
+                Schema::Object(absent_tag_schema(tag_field)),
+                Schema::Object(inner_schema),
+            ]),
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+
+    // Match `generate_optional_schema`: mark the wrapper optional for docs, and apply field
+    // metadata to this site. `optional` is transparent, so a flatten field without its own
+    // description does not inherit the inner enum's docs.
+    let mut metadata = overrides.unwrap_or_default();
+    metadata.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
+    optional.validate_metadata(&metadata)?;
+    apply_configurable_metadata(optional, &mut schema, metadata);
+
+    Ok(schema)
+}
+
+fn enum_tag_field_from_metadata(metadata: &Metadata) -> Option<String> {
+    metadata
+        .custom_attributes()
+        .iter()
+        .find_map(|attribute| match attribute {
+            CustomAttribute::KeyValue { key, value }
+                if key == constants::DOCS_META_ENUM_TAG_FIELD =>
+            {
+                value.as_str().map(str::to_owned)
+            }
+            _ => None,
+        })
+}
+
+fn absent_tag_schema(tag_field: String) -> SchemaObject {
+    SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            not: Some(Box::new(Schema::Object(SchemaObject {
+                object: Some(Box::new(ObjectValidation {
+                    required: [tag_field].into_iter().collect(),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
+#[must_use]
 pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -424,6 +554,7 @@ pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_any_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -439,6 +570,7 @@ pub fn generate_any_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -458,6 +590,7 @@ pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_enum_schema(values: Vec<Value>) -> SchemaObject {
     SchemaObject {
         enum_values: Some(values),
@@ -465,6 +598,7 @@ pub fn generate_enum_schema(values: Vec<Value>) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_const_string_schema(value: String) -> SchemaObject {
     SchemaObject {
         const_value: Some(Value::String(value)),
@@ -472,6 +606,7 @@ pub fn generate_const_string_schema(value: String) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_internal_tagged_variant_schema(
     tag: String,
     value_schema: SchemaObject,
@@ -492,6 +627,11 @@ pub fn default_schema_settings() -> SchemaSettings {
         .with_visitor(GenerateHumanFriendlyNameVisitor::from_settings)
 }
 
+/// Generate a root schema using the default settings.
+///
+/// # Errors
+///
+/// Returns an error if metadata validation or schema generation fails.
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
@@ -499,25 +639,58 @@ where
     generate_root_schema_with_settings::<T>(default_schema_settings())
 }
 
+thread_local! {
+    static GENERATING_ROOT_SCHEMA: Cell<bool> = const { Cell::new(false) };
+}
+
+struct SchemaGeneration {
+    previous: bool,
+}
+
+impl SchemaGeneration {
+    fn enable() -> Self {
+        let previous = GENERATING_ROOT_SCHEMA.replace(true);
+        Self { previous }
+    }
+}
+
+impl Drop for SchemaGeneration {
+    fn drop(&mut self) {
+        GENERATING_ROOT_SCHEMA.set(self.previous);
+    }
+}
+
+/// Returns whether the current thread is generating a root configuration schema.
+#[must_use]
+pub fn is_generating_root_schema() -> bool {
+    GENERATING_ROOT_SCHEMA.get()
+}
+
+/// Generate a root schema using the supplied settings.
+///
+/// # Errors
+///
+/// Returns an error if metadata validation or schema generation fails.
 pub fn generate_root_schema_with_settings<T>(
     schema_settings: SchemaSettings,
 ) -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
 {
+    let _generation = SchemaGeneration::enable();
     let schema_gen = RefCell::new(schema_settings.into_generator());
-
-    // Set env variable to enable generating all schemas, including platform-specific ones.
-    unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
 
-    unsafe { env::remove_var("VECTOR_GENERATE_SCHEMA") };
-
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
 
+/// Resolve or generate a configurable type schema and apply its metadata.
+///
+/// # Errors
+///
+/// Returns an error if metadata validation or generating the configurable type schema fails.
 pub fn get_or_generate_schema(
     config: &ConfigurableRef,
     generator: &RefCell<SchemaGenerator>,
@@ -551,7 +724,7 @@ pub fn get_or_generate_schema(
                 // be unwittingly applying a default for all usages of the type that didn't override
                 // the default themselves.
                 let mut schema = config.generate_schema(generator)?;
-                apply_metadata(config, &mut schema, metadata);
+                apply_configurable_metadata(config, &mut schema, metadata);
 
                 generator
                     .borrow_mut()
@@ -585,7 +758,7 @@ pub fn get_or_generate_schema(
         // it was given.
         None => {
             if let Some(metadata) = overrides {
-                apply_metadata(config, &mut schema, metadata);
+                apply_configurable_metadata(config, &mut schema, metadata);
             }
         }
 
@@ -593,10 +766,12 @@ pub fn get_or_generate_schema(
         // metadata here, which we need to merge the override metadata into if it was given. If
         // there was no override metadata, then we just use the base by itself.
         Some(base) => match overrides {
-            None => apply_metadata(config, &mut schema, base),
-            Some(overrides) => apply_metadata(config, &mut schema, base.merge(overrides)),
+            None => apply_configurable_metadata(config, &mut schema, base),
+            Some(overrides) => {
+                apply_configurable_metadata(config, &mut schema, base.merge(overrides));
+            }
         },
-    };
+    }
 
     Ok(schema)
 }
@@ -653,11 +828,7 @@ pub(crate) fn assert_string_schema_for_map(
                 // As long as there's only one instance type, and it's string, we're fine
                 // with that, too.
                 SingleOrVec::Vec(its) => {
-                    its.len() == 1
-                        && its
-                            .first()
-                            .filter(|it| *it == &InstanceType::String)
-                            .is_some()
+                    its.len() == 1 && its.first().is_some_and(|it| it == &InstanceType::String)
                 }
             },
             // We match explicitly, so a lack of declared instance types is not considered
@@ -668,39 +839,264 @@ pub(crate) fn assert_string_schema_for_map(
         _ => false,
     };
 
-    if !is_string_like {
-        Err(GenerateError::MapKeyNotStringLike { key_type, map_type })
-    } else {
+    if is_string_like {
         Ok(())
+    } else {
+        Err(GenerateError::MapKeyNotStringLike { key_type, map_type })
+    }
+}
+
+/// A value that distinguishes a generated enum variant from its siblings.
+pub enum EnumDiscriminant {
+    /// A named struct variant.
+    Object,
+    /// The schema of a scalar or newtype variant.
+    Schema(Box<SchemaObject>),
+}
+
+impl EnumDiscriminant {
+    /// Creates a discriminant from a variant schema.
+    #[must_use]
+    pub fn schema(schema: SchemaObject) -> Self {
+        Self::Schema(Box::new(schema))
+    }
+
+    /// Creates a discriminant for a named struct variant.
+    #[must_use]
+    pub const fn object() -> Self {
+        Self::Object
     }
 }
 
 /// Determines whether an enum schema is ambiguous based on discriminants of its variants.
-///
-/// A discriminant is the set of the named fields which are required, which may be an empty set.
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "preserve the existing default-hasher API; broader hasher support is deferred"
+)]
 pub fn has_ambiguous_discriminants(
-    discriminants: &HashMap<&'static str, BTreeSet<String>>,
+    discriminants: &HashMap<&'static str, EnumDiscriminant>,
 ) -> bool {
     // Firstly, if there's less than two discriminants, then there can't be any ambiguity.
     if discriminants.len() < 2 {
         return false;
     }
 
-    // Any empty discriminant is considered ambiguous.
-    if discriminants
+    discriminants
         .values()
-        .any(|discriminant| discriminant.is_empty())
-    {
-        return true;
+        .enumerate()
+        .any(|(index, discriminant)| {
+            discriminants
+                .values()
+                .skip(index + 1)
+                .any(|other| discriminants_overlap(discriminant, other))
+        })
+}
+
+fn discriminants_overlap(left: &EnumDiscriminant, right: &EnumDiscriminant) -> bool {
+    match (left, right) {
+        (EnumDiscriminant::Object, EnumDiscriminant::Object) => true,
+        (EnumDiscriminant::Object, EnumDiscriminant::Schema(schema))
+        | (EnumDiscriminant::Schema(schema), EnumDiscriminant::Object) => {
+            schema_instance_types(schema).is_none_or(|types| types.contains(&InstanceType::Object))
+        }
+        (EnumDiscriminant::Schema(left), EnumDiscriminant::Schema(right)) => {
+            schemas_overlap(left, right)
+        }
+    }
+}
+
+fn schemas_overlap(left: &SchemaObject, right: &SchemaObject) -> bool {
+    match (&left.const_value, &right.const_value) {
+        (Some(left), Some(right)) => left == right,
+        (Some(value), None) => schema_accepts_instance_type(right, instance_type_for_value(value)),
+        (None, Some(value)) => schema_accepts_instance_type(left, instance_type_for_value(value)),
+        (None, None) => match (schema_instance_types(left), schema_instance_types(right)) {
+            (Some(left), Some(right)) => left.iter().any(|left| {
+                right.iter().any(|right| {
+                    left == right
+                        || matches!(
+                            (left, right),
+                            (InstanceType::Integer, InstanceType::Number)
+                                | (InstanceType::Number, InstanceType::Integer)
+                        )
+                })
+            }),
+            // Deliberately conservative: without direct instance types (for example, a nested
+            // const-string schema), we cannot prove the variants disjoint, so use `anyOf`.
+            _ => true,
+        },
+    }
+}
+
+fn schema_accepts_instance_type(schema: &SchemaObject, instance_type: InstanceType) -> bool {
+    schema_instance_types(schema).is_none_or(|types| {
+        types.contains(&instance_type)
+            || matches!(
+                (instance_type, types.as_slice()),
+                (InstanceType::Integer, types) if types.contains(&InstanceType::Number)
+            )
+    })
+}
+
+fn schema_instance_types(schema: &SchemaObject) -> Option<Vec<InstanceType>> {
+    if let Some(const_value) = schema.const_value.as_ref() {
+        return Some(vec![instance_type_for_value(const_value)]);
     }
 
-    // Now collapse the list of discriminants into another set, which will eliminate any duplicate
-    // sets. If there are any duplicate sets, this would also imply ambiguity, since there's not
-    // enough discrimination via required fields.
-    let deduplicated = discriminants.values().cloned().collect::<BTreeSet<_>>();
-    if deduplicated.len() != discriminants.len() {
-        return true;
+    schema.instance_type.as_ref().map(|types| match types {
+        SingleOrVec::Single(instance_type) => vec![**instance_type],
+        SingleOrVec::Vec(instance_types) => instance_types.clone(),
+    })
+}
+
+fn instance_type_for_value(value: &Value) -> InstanceType {
+    match value {
+        Value::Null => InstanceType::Null,
+        Value::Bool(_) => InstanceType::Boolean,
+        Value::Number(number) if number.is_i64() || number.is_u64() => InstanceType::Integer,
+        Value::Number(_) => InstanceType::Number,
+        Value::String(_) => InstanceType::String,
+        Value::Array(_) => InstanceType::Array,
+        Value::Object(_) => InstanceType::Object,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn root_schema_generation_state_is_scoped_to_the_current_thread() {
+        assert!(!is_generating_root_schema());
+
+        let outer = SchemaGeneration::enable();
+        assert!(is_generating_root_schema());
+        std::thread::spawn(|| assert!(!is_generating_root_schema()))
+            .join()
+            .unwrap();
+
+        {
+            let _inner = SchemaGeneration::enable();
+            assert!(is_generating_root_schema());
+        }
+        assert!(is_generating_root_schema());
+
+        drop(outer);
+        assert!(!is_generating_root_schema());
     }
 
-    false
+    #[test]
+    fn single_discriminant_is_not_ambiguous() {
+        let discriminants =
+            HashMap::from([("only", EnumDiscriminant::schema(generate_string_schema()))]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn const_string_and_string_schema_are_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "fixed",
+                EnumDiscriminant::schema(generate_const_string_schema("kind".to_string())),
+            ),
+            ("free", EnumDiscriminant::schema(generate_string_schema())),
+        ]);
+
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn integer_and_number_schemas_are_ambiguous() {
+        // Every integer also validates as a number, so these variants overlap.
+        let discriminants = HashMap::from([
+            (
+                "int",
+                EnumDiscriminant::schema(generate_number_schema::<i64>()),
+            ),
+            (
+                "float",
+                EnumDiscriminant::schema(generate_number_schema::<f64>()),
+            ),
+        ]);
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn identical_const_strings_are_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "a",
+                EnumDiscriminant::schema(generate_const_string_schema("dup".to_string())),
+            ),
+            (
+                "b",
+                EnumDiscriminant::schema(generate_const_string_schema("dup".to_string())),
+            ),
+        ]);
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn disjoint_scalar_schemas_are_not_ambiguous() {
+        // A string and an integer accept disjoint documents, so `oneOf` is preserved.
+        let discriminants = HashMap::from([
+            ("text", EnumDiscriminant::schema(generate_string_schema())),
+            (
+                "number",
+                EnumDiscriminant::schema(generate_number_schema::<i64>()),
+            ),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn const_string_and_integer_schema_are_not_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "fixed",
+                EnumDiscriminant::schema(generate_const_string_schema("kind".to_string())),
+            ),
+            (
+                "number",
+                EnumDiscriminant::schema(generate_number_schema::<i64>()),
+            ),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn distinct_const_strings_are_not_ambiguous() {
+        let discriminants = HashMap::from([
+            (
+                "a",
+                EnumDiscriminant::schema(generate_const_string_schema("a".to_string())),
+            ),
+            (
+                "b",
+                EnumDiscriminant::schema(generate_const_string_schema("b".to_string())),
+            ),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn object_discriminants_are_ambiguous() {
+        let discriminants = HashMap::from([
+            ("a", EnumDiscriminant::object()),
+            ("b", EnumDiscriminant::object()),
+        ]);
+        assert!(has_ambiguous_discriminants(&discriminants));
+    }
+
+    #[test]
+    fn object_and_scalar_schema_are_not_ambiguous() {
+        // An object variant and a scalar variant accept disjoint documents.
+        let discriminants = HashMap::from([
+            ("obj", EnumDiscriminant::object()),
+            ("scalar", EnumDiscriminant::schema(generate_string_schema())),
+        ]);
+        assert!(!has_ambiguous_discriminants(&discriminants));
+    }
 }

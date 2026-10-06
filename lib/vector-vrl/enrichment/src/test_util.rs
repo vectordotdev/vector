@@ -28,7 +28,7 @@ impl DummyEnrichmentTable {
     pub(crate) fn new_with_data(data: ObjectMap) -> Self {
         Self {
             data,
-            indexes: Default::default(),
+            indexes: Arc::default(),
         }
     }
 }
@@ -92,7 +92,7 @@ pub(crate) fn get_table_registry_with_tables(
 
     let mut tablesmap: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
-    for (name, table) in tables.into_iter() {
+    for (name, table) in tables {
         tablesmap.insert(name, Box::new(table) as Box<dyn Table + Send + Sync>);
     }
 
