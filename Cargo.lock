@@ -3154,15 +3154,6 @@ checksum = "18f12cc9948ed9604230cdddc7c86e270f9401ccbe3c2e98a4378c5e7632212f"
 
 [[package]]
 name = "convert_case"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb402b8d4c85569410425650ce3eddc7d698ed96d39a73f941b08fb63082f1e7"
-dependencies = [
- "unicode-segmentation",
-]
-
-[[package]]
-name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "633458d4ef8c78b72454de2d54fd6ab2e60f9e02be22f3c6104cdc8a4e0fceb9"
@@ -13427,7 +13418,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.59.0-dev"
+version = "0.59.0"
 dependencies = [
  "antithesis-instrumentation",
  "approx",
@@ -14073,8 +14064,9 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.35.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#e7d8d0f59062e44c18da6f861a7fd0ddfe24cf9f"
+version = "0.36.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "248c630ed4bcef3966791db4ab6590a3dca644bb51a4b104d8729beb7c333a18"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",
@@ -14095,7 +14087,7 @@ dependencies = [
  "clap",
  "codespan-reporting",
  "community-id",
- "convert_case 0.7.1",
+ "convert_case 0.12.0",
  "crc",
  "crypto_secretbox",
  "csv",
