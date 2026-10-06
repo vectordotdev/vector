@@ -20,13 +20,14 @@ protect against this we built a new
 
 Getting started is easy. Simply add this component to your pipeline:
 
-```toml title="vector.toml"
-[transforms.tag_protection]
-  type = "tag_cardinality_limit"
-  inputs = ["my-source-id"]
-  limit_exceeded_action = "drop_tag"
-  mode = "exact"
-  value_limit = 500
+```yaml title="vector.yaml"
+transforms:
+  tag_protection:
+    type: "tag_cardinality_limit"
+    inputs: ["my-source-id"]
+    limit_exceeded_action: "drop_tag"
+    mode: "exact"
+    value_limit: 500
 ```
 
 {{< success >}}

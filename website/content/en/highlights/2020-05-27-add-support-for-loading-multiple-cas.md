@@ -15,15 +15,17 @@ Working with `openssl` isn't very fun, and we don't want to inflict that on you.
 
 This is particularly useful if you have a socket source:
 
-```toml title="vector.toml"
-[sources.tls]
-  type = "socket"
-  address = "0.0.0.0:6514"
-  mode = "tcp"
-  tls.enabled = true
-  tls.crt_path = "cert.pfx"
-  tls.ca_path = "ca.pem" # Now supported: More complicated PEMS!
-  tls.verify_certificate = true
+```yaml title="vector.yaml"
+sources:
+  tls:
+    type: "socket"
+    address: "0.0.0.0:6514"
+    mode: "tcp"
+    tls:
+      enabled: true
+      crt_path: "cert.pfx"
+      ca_path: "ca.pem" # Now supported: More complicated PEMS!
+      verify_certificate: true
 ```
 
 If it doesn't, that's a bug. [**Report it.**][urls.new_bug_report] We squash bugs.

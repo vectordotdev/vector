@@ -1,8 +1,8 @@
-#[cfg(feature = "sources-prometheus-remote-write")]
+#[cfg(feature = "sources-prometheus_remote_write")]
 use super::remote_write::MetadataConflictStrategy;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_lib::prometheus::parser::{GroupKind, MetricGroup, ParserError};
-#[cfg(feature = "sources-prometheus-remote-write")]
+#[cfg(feature = "sources-prometheus_remote_write")]
 use vector_lib::prometheus::parser::{
     MetadataConflictStrategy as ParserMetadataConflictStrategy, proto,
 };
@@ -21,13 +21,13 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
         .unwrap_or(default)
 }
 
-#[cfg(any(test, feature = "sources-prometheus-scrape"))]
+#[cfg(any(test, feature = "sources-prometheus_scrape"))]
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_text(packet)
         .map(|group| reparse_groups(group, vec![], false, false))
 }
 
-#[cfg(any(test, feature = "sources-prometheus-pushgateway"))]
+#[cfg(any(test, feature = "sources-prometheus_pushgateway"))]
 pub(super) fn parse_text_with_overrides(
     packet: &str,
     tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
@@ -43,7 +43,7 @@ fn parse_text_with_nan_filtering(packet: &str) -> Result<Vec<Event>, ParserError
         .map(|group| reparse_groups(group, vec![], false, true))
 }
 
-#[cfg(feature = "sources-prometheus-remote-write")]
+#[cfg(feature = "sources-prometheus_remote_write")]
 pub(super) fn parse_request(
     request: proto::WriteRequest,
     metadata_conflict_strategy: MetadataConflictStrategy,
@@ -203,7 +203,7 @@ fn reparse_groups(
     result
 }
 
-#[cfg(feature = "sources-prometheus-remote-write")]
+#[cfg(feature = "sources-prometheus_remote_write")]
 impl From<MetadataConflictStrategy> for ParserMetadataConflictStrategy {
     fn from(strategy: MetadataConflictStrategy) -> Self {
         match strategy {

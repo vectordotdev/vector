@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Vector gRPC API client library
 //!
 //! This library provides a Rust client for the Vector gRPC observability API.
@@ -11,9 +13,9 @@
 //! let mut client = Client::new("http://localhost:9999".parse().unwrap());
 //! client.connect().await?;
 //!
-//! // Check health
-//! let health = client.health().await?;
-//! println!("Healthy: {}", health.healthy);
+//! // Check health (standard gRPC health check)
+//! client.health().await?;
+//! println!("Server is healthy");
 //!
 //! // Get components
 //! let components = client.get_components(0).await?;
@@ -34,6 +36,14 @@ pub use error::{Error, Result};
 pub const RECONNECT_DELAY_MS: u64 = 5000;
 
 /// Re-export generated protobuf types
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    clippy::missing_errors_doc,
+    clippy::must_use_candidate,
+    clippy::wildcard_imports,
+    reason = "Prost and Tonic generate these types, documentation, and imports"
+)]
 pub mod proto {
     pub mod event {
         tonic::include_proto!("event");

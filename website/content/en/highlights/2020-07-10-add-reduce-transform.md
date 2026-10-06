@@ -54,42 +54,49 @@ Then output this (but not formatted so nicely!):
 
 We'll run this config:
 
-```toml title=vector.toml
-data_dir = "tmp"
+```yaml title=vector.yaml
+data_dir: "tmp"
 
-[sources.source0]
-  include = ["input.log"]
-  start_at_beginning = true
-  type = "file"
-  fingerprinting.strategy = "device_and_inode"
+sources:
+  source0:
+    include: ["input.log"]
+    start_at_beginning: true
+    type: "file"
+    fingerprinting:
+      strategy: "device_and_inode"
 
-[transforms.transform0]
-  inputs = ["source0"]
-  type = "json_parser"
-  field = "message"
+transforms:
+  transform0:
+    inputs: ["source0"]
+    type: "json_parser"
+    field: "message"
 
-[transforms.transform1]
-  inputs = ["transform0"]
-  type = "reduce"
-  identifier_fields = ["request_id"]
-  ends_when.type = "check_fields"
-  ends_when."response_status.exists" = true
-  merge_strategies.message = "discard"
-  merge_strategies.query = "discard"
-  merge_strategies.template = "discard"
-  merge_strategies.query_duration_ms = "sum"
-  merge_strategies.render_duration_ms = "sum"
-  merge_strategies.response_duration_ms = "sum"
+  transform1:
+    inputs: ["transform0"]
+    type: "reduce"
+    identifier_fields: ["request_id"]
+    ends_when:
+      type: "check_fields"
+      "response_status.exists": true
+    merge_strategies:
+      message: "discard"
+      query: "discard"
+      template: "discard"
+      query_duration_ms: "sum"
+      render_duration_ms: "sum"
+      response_duration_ms: "sum"
 
-[sinks.sink0]
-  healthcheck = true
-  inputs = ["transform1"]
-  type = "file"
-  path = "output.log"
-  encoding = "ndjson"
-  buffer.type = "memory"
-  buffer.max_events = 500
-  buffer.when_full = "block"s
+sinks:
+  sink0:
+    healthcheck: true
+    inputs: ["transform1"]
+    type: "file"
+    path: "output.log"
+    encoding: "ndjson"
+    buffer:
+      type: "memory"
+      max_events: 500
+      when_full: "block"
 ```
 
 We hope you find this useful!

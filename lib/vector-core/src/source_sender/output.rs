@@ -11,7 +11,9 @@ use metrics::Histogram;
 use tracing::Span;
 use vector_buffers::{
     config::MemoryBufferSize,
-    topology::channel::{self, ChannelMetricMetadata, LimitedReceiver, LimitedSender},
+    topology::channel::{
+        self, BufferChannelKind, ChannelMetricMetadata, LimitedReceiver, LimitedSender,
+    },
 };
 use vector_common::{
     byte_size_of::ByteSizeOf,
@@ -22,15 +24,13 @@ use vector_common::{
 };
 use vrl::value::Value;
 
-use super::{CHUNK_SIZE, SendError, SourceSenderItem};
+use super::{PostProcessor, SendError, SourceSenderItem, chunk_size_events};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
     event::{Event, EventArray, EventContainer as _, EventRef, array},
     schema::Definition,
 };
-
-const UTILIZATION_METRIC_PREFIX: &str = "source_buffer";
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,
@@ -76,7 +76,7 @@ impl Drop for UnsentEventCount {
             let _enter = self.span.enter();
             internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,
-                reason: "Source send cancelled.",
+                reason: "Source send interrupted mid-flight; pipeline may be overloaded or shutting down.",
             });
         }
     }
@@ -85,7 +85,7 @@ impl Drop for UnsentEventCount {
 #[derive(Clone)]
 pub(super) struct Output {
     sender: LimitedSender<SourceSenderItem>,
-    lag_time: Option<Histogram>,
+    metrics: OutputMetrics,
     events_sent: Registered<EventsSent>,
     /// The schema definition that will be attached to Log events sent through here
     log_definition: Option<Arc<Definition>>,
@@ -93,6 +93,29 @@ pub(super) struct Output {
     /// `EventMetadata` for all event sent through here.
     id: Arc<OutputId>,
     timeout: Option<Duration>,
+    /// Optional post-processing step applied to every event before it is placed on the channel.
+    post_processor: Option<Arc<dyn PostProcessor>>,
+}
+
+#[derive(Clone, Default)]
+pub(super) struct OutputMetrics {
+    lag_time: Option<Histogram>,
+    send_latency: Option<Histogram>,
+    send_batch_latency: Option<Histogram>,
+}
+
+impl OutputMetrics {
+    pub(super) fn new(
+        lag_time: Option<Histogram>,
+        send_latency: Option<Histogram>,
+        send_batch_latency: Option<Histogram>,
+    ) -> Self {
+        Self {
+            lag_time,
+            send_latency,
+            send_batch_latency,
+        }
+    }
 }
 
 #[expect(clippy::missing_fields_in_debug)]
@@ -111,37 +134,81 @@ impl Output {
     pub(super) fn new_with_buffer(
         n: usize,
         output: String,
-        lag_time: Option<Histogram>,
+        metrics: OutputMetrics,
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
         timeout: Option<Duration>,
         ewma_half_life_seconds: Option<f64>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
-        let metrics = ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
-        let (tx, rx) = channel::limited(limit, Some(metrics), ewma_half_life_seconds);
+        let channel_metrics =
+            ChannelMetricMetadata::new(BufferChannelKind::Source, Some(output.clone()));
+        let (tx, rx) = channel::limited(limit, Some(channel_metrics), ewma_half_life_seconds);
         (
             Self {
                 sender: tx,
-                lag_time,
+                metrics,
                 events_sent: internal_event::register(EventsSent::from(internal_event::Output(
                     Some(output.into()),
                 ))),
                 log_definition,
                 id: Arc::new(output_id),
                 timeout,
+                post_processor: None,
             },
             rx,
         )
     }
 
+    /// Attach a post-processing step to this output, replacing any previously set one.
+    pub(super) fn with_post_processor(mut self, pp: Arc<dyn PostProcessor>) -> Self {
+        self.post_processor = Some(pp);
+        self
+    }
+
     pub(super) async fn send(
+        &mut self,
+        events: EventArray,
+        unsent_event_count: &mut UnsentEventCount,
+    ) -> Result<(), SendError> {
+        let reference = Utc::now().timestamp_millis();
+        self.send_inner(events, unsent_event_count, reference).await
+    }
+
+    async fn send_inner(
         &mut self,
         mut events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
+        reference: i64,
     ) -> Result<(), SendError> {
+        // Apply post-processor with typed dispatch. Each method receives a reference to the
+        // concrete event type, making it impossible at the type level to change the variant.
+        // Original finalizers are stripped before calling the processor so they cannot be
+        // accidentally dropped if the processor replaces the entire inner value
+        // (e.g. `*log = LogEvent::default()`). Any finalizers added by the processor are
+        // collected after and merged back alongside the originals.
+        //
+        // Note: post-processing runs before the send_with_timeout call. Because PostProcessor
+        // methods are synchronous, they cannot be cancelled by tokio::time::timeout (which
+        // only fires at .await points). Implementations are expected to be fast; heavy
+        // processing should be done in a transform, not here.
+        if let Some(ref pp) = self.post_processor {
+            events.iter_events_mut().for_each(|mut event| {
+                let original_finalizers = event.metadata_mut().take_finalizers();
+                pp.process(&mut event);
+                let new_finalizers = event.metadata_mut().take_finalizers();
+                event.metadata_mut().merge_finalizers(original_finalizers);
+                event.metadata_mut().merge_finalizers(new_finalizers);
+            });
+        }
+
+        // Capture send_reference after post-processing so that buffer_send_duration_seconds
+        // excludes processor CPU time and reflects only lag-time emission, schema attachment,
+        // and buffer enqueue latency.
         let send_reference = Instant::now();
-        let reference = Utc::now().timestamp_millis();
+
+        // Emit lag time after the post-processor so that any timestamp mutations made by the
+        // processor are reflected in the metric.
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
@@ -156,7 +223,16 @@ impl Output {
 
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
-        self.send_with_timeout(events, send_reference).await?;
+
+        let send_start = Instant::now();
+        let send_result = self.send_with_timeout(events, send_reference).await;
+
+        if let Some(send_latency) = &self.metrics.send_latency {
+            send_latency.record(send_start.elapsed().as_secs_f64());
+        }
+
+        send_result?;
+
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
@@ -205,9 +281,9 @@ impl Output {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        let mut stream = events.ready_chunks(CHUNK_SIZE);
+        let mut stream = events.ready_chunks(chunk_size_events());
         while let Some(events) = stream.next().await {
-            self.send_batch(events.into_iter()).await?;
+            self.send_batch(events).await?;
         }
         Ok(())
     }
@@ -218,33 +294,52 @@ impl Output {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
+        // Capture a single reference timestamp for the entire batch so that lag time
+        // measurements are not inflated by channel-send latency for later chunks.
+        let reference = Utc::now().timestamp_millis();
+
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let events = events.into_iter().map(Into::into);
         let mut unsent_event_count = UnsentEventCount::new(events.len());
-        for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
-            self.send(events, &mut unsent_event_count)
+        let send_batch_start = Instant::now();
+
+        for events in array::events_into_arrays(events, Some(chunk_size_events())) {
+            self.send_inner(events, &mut unsent_event_count, reference)
                 .await
-                .inspect_err(|error| match error {
-                    SendError::Timeout => {
-                        unsent_event_count.timed_out();
+                .inspect_err(|error| {
+                    match error {
+                        SendError::Timeout => {
+                            unsent_event_count.timed_out();
+                        }
+                        SendError::Closed => {
+                            // The unsent event count is discarded here because the callee emits the
+                            // `StreamClosedError`.
+                            unsent_event_count.discard();
+                        }
                     }
-                    SendError::Closed => {
-                        // The unsent event count is discarded here because the callee emits the
-                        // `StreamClosedError`.
-                        unsent_event_count.discard();
+                    if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
+                        send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
                     }
                 })?;
         }
+        if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
+            send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
+        }
         Ok(())
+    }
+
+    /// Attach a post-processing step to this output, replacing any previously set one.
+    pub(super) fn set_post_processor(&mut self, pp: Arc<dyn PostProcessor>) {
+        self.post_processor = Some(pp);
     }
 
     /// Calculate the difference between the reference time and the
     /// timestamp stored in the given event reference, and emit the
     /// different, as expressed in milliseconds, as a histogram.
     pub(super) fn emit_lag_time(&self, event: EventRef<'_>, reference: i64) {
-        if let Some(lag_time_metric) = &self.lag_time {
+        if let Some(lag_time_metric) = &self.metrics.lag_time {
             let timestamp = match event {
                 EventRef::Log(log) => {
                     log_schema()

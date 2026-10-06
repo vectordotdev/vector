@@ -374,7 +374,7 @@ impl Runner {
             telemetry_task_coordinator.shutdown().await;
             topology_task_coordinator.shutdown().await;
 
-            info!("Collected runner metrics: {:?}", runner_metrics);
+            info!("Collected runner metrics: {runner_metrics:?}");
             let final_runner_metrics = runner_metrics.lock().await;
 
             // Run the relevant data -- inputs, outputs, telemetry, etc -- through each validator to

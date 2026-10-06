@@ -1,0 +1,11 @@
+sinks:
+  my_sink_id:
+    type: nats
+    inputs:
+      - my-source-or-transform-id
+    connection_name: vector
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    subject: events-{{ host }}
+    url: nats://demo.nats.io

@@ -4,14 +4,11 @@ use std::pin::Pin;
 // (only used in synchronous map updates inside IntervalStream closures), so the
 // cheaper std mutex is correct here. tokio::sync::Mutex is only needed when the
 // critical section itself contains .await.
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures::{StreamExt as FuturesStreamExt, stream};
-use rand::{Rng, SeedableRng as _, rngs::SmallRng};
+use rand::{RngExt, SeedableRng as _, rngs::SmallRng};
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::time::{self, interval};
@@ -399,12 +396,11 @@ fn ports_to_proto_outputs(
 /// gRPC observability service implementation.
 pub struct ObservabilityService {
     watch_rx: WatchRx,
-    running: Arc<AtomicBool>,
 }
 
 impl ObservabilityService {
-    pub const fn new(watch_rx: WatchRx, running: Arc<AtomicBool>) -> Self {
-        Self { watch_rx, running }
+    pub const fn new(watch_rx: WatchRx) -> Self {
+        Self { watch_rx }
     }
 }
 
@@ -412,28 +408,30 @@ impl ObservabilityService {
 impl observability::Service for ObservabilityService {
     // ========== Simple Queries ==========
 
-    async fn health(
-        &self,
-        _request: Request<HealthRequest>,
-    ) -> Result<Response<HealthResponse>, Status> {
-        if self.running.load(Ordering::Relaxed) {
-            Ok(Response::new(HealthResponse { healthy: true }))
-        } else {
-            Err(Status::unavailable("Vector is shutting down"))
-        }
-    }
-
     async fn get_meta(
         &self,
         _request: Request<GetMetaRequest>,
     ) -> Result<Response<GetMetaResponse>, Status> {
-        let version = crate::get_version().to_string();
+        let version = crate::get_version();
         let hostname = hostname::get()
             .ok()
             .and_then(|h| h.into_string().ok())
             .unwrap_or_else(|| "unknown".to_string());
 
         Ok(Response::new(GetMetaResponse { version, hostname }))
+    }
+
+    async fn get_allocation_tracing_status(
+        &self,
+        _request: Request<GetAllocationTracingStatusRequest>,
+    ) -> Result<Response<GetAllocationTracingStatusResponse>, Status> {
+        #[cfg(unix)]
+        let enabled = crate::internal_telemetry::allocations::is_allocation_tracing_enabled();
+        #[cfg(not(unix))]
+        let enabled = false;
+        Ok(Response::new(GetAllocationTracingStatusResponse {
+            enabled,
+        }))
     }
 
     async fn get_components(
@@ -678,7 +676,7 @@ impl observability::Service for ObservabilityService {
 
         let watch_rx = self.watch_rx.clone();
 
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             let _tap_controller = TapController::new(watch_rx, tap_tx, patterns);
             let mut tap_rx = ReceiverStream::new(tap_rx);
             let mut interval = time::interval(time::Duration::from_millis(interval_ms));

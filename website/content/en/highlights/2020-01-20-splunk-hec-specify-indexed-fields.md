@@ -21,9 +21,10 @@ will _not_ index any fields by default.
 In order to mark desired fields as indexed you can use the optional
 configuration option `indexed_fields`:
 
-```toml title="vector.toml"
- [sinks.my_sink_id]
-   type = "splunk_hec"
-   inputs = ["my-source-id"]
-+  indexed_fields = ["foo", "bar"]
+```yaml title="vector.yaml"
+ sinks:
+   my_sink_id:
+     type: "splunk_hec"
+     inputs: ["my-source-id"]
++    indexed_fields: ["foo", "bar"]
 ```

@@ -150,8 +150,7 @@ impl WebSocketSource {
                     | WebSocketSourceError::InitialMessageTimeout
                     | WebSocketSourceError::ConnectionClosedPrematurely => {
                         unreachable!(
-                            "Encountered a connection-time error during runtime: {:?}",
-                            error
+                            "Encountered a connection-time error during runtime: {error:?}"
                         );
                     }
                 }
@@ -649,7 +648,7 @@ mod tests {
                     code: CloseCode::Error,
                     reason: Cow::from("Simulated Internal Server Error"),
                 };
-                let _ = websocket.close(Some(close_frame)).await;
+                websocket.close(Some(close_frame)).await.ok(); // connection may already be gone
             }
         });
 
@@ -657,7 +656,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn websocket_source_exits_on_rejected_intial_messsage() {
+    async fn websocket_source_exits_on_rejected_initial_message() {
         let server_addr = start_reject_initial_message_server().await;
 
         let mut config = make_config(&server_addr);

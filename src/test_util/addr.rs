@@ -8,6 +8,8 @@
 //!
 //! This ensures no race window between port allocation and registration.
 
+#[cfg(windows)]
+use std::net::UdpSocket;
 use std::{
     collections::HashSet,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener as StdTcpListener},
@@ -76,6 +78,14 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
         if reserved.contains(&port) {
             // OS recycled a port that's still reserved by another test.
             // Lock and listener will be dropped implicitly after continuing
+            continue;
+        }
+
+        // On Windows, certain ports are in OS-excluded ranges (e.g. set by Hyper-V/WSL).
+        // TCP bind(0) may return such a port, but UDP bind to the same port will fail with
+        // WSAEACCES (10013). Probe with a UDP socket and retry if it is excluded.
+        #[cfg(windows)]
+        if UdpSocket::bind(addr).is_err() {
             continue;
         }
 
