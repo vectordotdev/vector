@@ -32,16 +32,23 @@ pub struct ProtobufDeserializerConfig {
 
 impl ProtobufDeserializerConfig {
     /// Build the `ProtobufDeserializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> vector_common::Result<ProtobufDeserializer> {
         ProtobufDeserializer::try_from(self)
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
@@ -90,6 +97,11 @@ pub struct ProtobufDeserializerOptions {
     /// This is useful when working with data that needs to be converted to JSON or
     /// when interfacing with systems that use JSON naming conventions.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::doc_markdown,
+        reason = "Preserve generated configuration documentation during the lint rollout."
+    )]
     pub use_json_names: bool,
 }
 
@@ -102,14 +114,20 @@ pub struct ProtobufDeserializer {
 
 impl ProtobufDeserializer {
     /// Creates a new `ProtobufDeserializer`.
+    #[must_use]
     pub fn new(message_descriptor: MessageDescriptor) -> Self {
         Self {
             message_descriptor,
-            options: Default::default(),
+            options: Options::default(),
         }
     }
 
     /// Creates a new deserializer instance using the descriptor bytes directly.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn new_from_bytes(
         desc_bytes: &[u8],
         message_type: &str,
@@ -186,6 +204,7 @@ mod tests {
     use std::{env, fs, path::PathBuf};
 
     use vector_core::config::log_schema;
+    use vrl::event_path;
 
     use super::*;
 
@@ -193,6 +212,11 @@ mod tests {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/protobuf")
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     fn parse_and_validate(
         protobuf_bin_message: String,
         protobuf_desc_path: PathBuf,
@@ -274,15 +298,15 @@ mod tests {
 
     #[test]
     fn deserialize_empty_buffer() {
-        let protobuf_bin_message = "".to_string();
+        let protobuf_bin_message = String::new();
         let protobuf_desc_path = test_data_dir().join("protos/test_protobuf.desc");
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
             // No field will be set.
-            assert!(!log.contains("name"));
-            assert!(!log.contains("id"));
-            assert!(!log.contains("email"));
-            assert!(!log.contains("phones"));
+            assert!(!log.contains(event_path!("name")));
+            assert!(!log.contains(event_path!("id")));
+            assert!(!log.contains(event_path!("email")));
+            assert!(!log.contains(event_path!("phones")));
         };
 
         parse_and_validate(

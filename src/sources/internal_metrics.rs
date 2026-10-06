@@ -35,7 +35,6 @@ pub struct InternalMetricsConfig {
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
 
-    #[configurable(derived)]
     pub tags: TagsConfig,
 
     /// Overrides the default namespace for the metrics emitted by the source.

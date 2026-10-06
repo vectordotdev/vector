@@ -4,7 +4,6 @@ components: sinks: gcp_cloud_storage: {
 	title: "GCP Cloud Storage (GCS)"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: gcp_cloud_storage: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 300.0
 			}
@@ -71,7 +69,6 @@ components: sinks: gcp_cloud_storage: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_cloud_storage.configuration

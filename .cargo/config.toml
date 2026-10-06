@@ -7,6 +7,13 @@ vdev = "run --quiet --package vdev --"
 # coarsens jemalloc's allocation granularity; no regression was measured in
 # https://github.com/vectordotdev/vector/pull/18481.
 JEMALLOC_SYS_WITH_LG_PAGE = "16"
+# Zero out timestamps in macOS static archives so vendored C libraries (openssl,
+# curl, librdkafka) produce deterministic artifacts. Ignored on Linux.
+ZERO_AR_DATE = "1"
+# OpenSSL embeds the exact compile time ("built on: ...") in libcrypto.a.
+# Setting SOURCE_DATE_EPOCH to a fixed epoch makes OpenSSL 3.x use a
+# reproducible timestamp instead, producing identical artifacts across builds.
+SOURCE_DATE_EPOCH = "0"
 
 [target.'cfg(all())']
 rustflags = [

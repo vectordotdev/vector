@@ -7,6 +7,8 @@ use tower::Service;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::telemetry,
+    event::event_exceeds_max_nesting_cost,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     request_metadata::GroupedCountByteSize,
     stream::{BatcherSettings, DriverResponse, batcher::data::BatchReduce},
 };
@@ -60,6 +62,34 @@ where
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
+            .filter_map(|event| {
+                std::future::ready(
+                    if let Some((cost, budget)) = event_exceeds_max_nesting_cost(&event) {
+                        let reason = format!(
+                            "Event nesting cost {cost} exceeds protobuf budget of {budget}."
+                        );
+                        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                            count: 1,
+                            reason: &reason,
+                        });
+                        match event {
+                            Event::Log(log) => log
+                                .metadata()
+                                .update_status(vector_lib::event::EventStatus::Rejected),
+                            Event::Metric(metric) => metric
+                                .metadata()
+                                .update_status(vector_lib::event::EventStatus::Rejected),
+                            Event::Trace(trace) => trace
+                                .metadata()
+                                .update_status(vector_lib::event::EventStatus::Rejected),
+                        }
+
+                        None
+                    } else {
+                        Some(event)
+                    },
+                )
+            })
             .map(|mut event| {
                 let mut byte_size = telemetry().create_request_count_byte_size();
                 byte_size.add_event(&event, event.estimated_json_encoded_size_of());
@@ -117,5 +147,106 @@ where
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::BytesMut;
+    use prost::Message;
+    use vector_lib::event::{
+        Event, LogEvent, MAX_VALUE_NESTING_FRAMES, ObjectMap, Value, event_exceeds_max_nesting_cost,
+    };
+    use vrl::event_path;
+
+    use super::EventWrapper;
+    use crate::proto::vector as proto_vector;
+
+    fn build_nested_value(wrapping_levels: usize) -> Value {
+        let mut v = Value::from("leaf");
+        for _ in 0..wrapping_levels {
+            let mut m = ObjectMap::new();
+            m.insert("nested".into(), v);
+            v = Value::Object(m);
+        }
+        v
+    }
+
+    /// Empirical check: an event sitting *exactly* at the value budget accepted by
+    /// `event_exceeds_max_nesting_cost` must roundtrip through the vector sink's
+    /// actual wire shape — `PushEventsRequest { events: [EventWrapper] }` — and
+    /// not fail decode at the receiver. If this test fails, the value budget is
+    /// too high for the gRPC path and needs to be reduced for the outer request
+    /// wrapper.
+    #[test]
+    fn push_events_request_decode_at_value_budget() {
+        // 31 nested objects under "data" key → 32 effective object levels in
+        // `log.value()` (one outer Object from the inserted key), cost = 96.
+        let mut log = LogEvent::default();
+        log.insert(event_path!("data"), build_nested_value(31));
+        let event = Event::Log(log);
+        assert!(
+            event_exceeds_max_nesting_cost(&event).is_none(),
+            "test setup invariant: event must sit exactly at the value budget \
+             (cost {MAX_VALUE_NESTING_FRAMES})",
+        );
+
+        let request = proto_vector::PushEventsRequest {
+            events: vec![EventWrapper::from(event)],
+        };
+
+        let mut buf = BytesMut::with_capacity(65536);
+        request.encode(&mut buf).expect("encode should succeed");
+
+        proto_vector::PushEventsRequest::decode(buf.freeze())
+            .expect("PushEventsRequest decode should succeed at the accepted value budget");
+    }
+
+    /// An object-root log one step past the common budget still fits the wider
+    /// `Log.fields` wire path, but the sink gate applies the same limit to every Value.
+    #[test]
+    fn push_events_request_rejects_one_past_common_value_budget() {
+        // 32 nested objects under "data" → 33 effective object levels, cost 99.
+        let mut log = LogEvent::default();
+        log.insert(event_path!("data"), build_nested_value(32));
+        let event = Event::Log(log);
+        assert_eq!(
+            event_exceeds_max_nesting_cost(&event),
+            Some((MAX_VALUE_NESTING_FRAMES + 3, MAX_VALUE_NESTING_FRAMES)),
+        );
+
+        let request = proto_vector::PushEventsRequest {
+            events: vec![EventWrapper::from(event)],
+        };
+
+        let mut buf = BytesMut::with_capacity(65536);
+        request.encode(&mut buf).expect("encode should succeed");
+
+        proto_vector::PushEventsRequest::decode(buf.freeze()).expect(
+            "the object-root wire path can decode 99 frames even though the common \
+             Value gate rejects it",
+        );
+    }
+
+    #[test]
+    fn push_events_request_decode_with_metadata_at_value_budget() {
+        let mut log = LogEvent::from("flat");
+        *log.metadata_mut().value_mut() = build_nested_value(32);
+        let event = Event::Log(log);
+        assert!(
+            event_exceeds_max_nesting_cost(&event).is_none(),
+            "test setup invariant: metadata must sit exactly at the Value budget \
+             (cost {MAX_VALUE_NESTING_FRAMES})",
+        );
+
+        let request = proto_vector::PushEventsRequest {
+            events: vec![EventWrapper::from(event)],
+        };
+
+        let mut buf = BytesMut::with_capacity(65536);
+        request.encode(&mut buf).expect("encode should succeed");
+
+        proto_vector::PushEventsRequest::decode(buf.freeze())
+            .expect("PushEventsRequest decode should succeed at the accepted metadata budget");
     }
 }

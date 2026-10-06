@@ -68,7 +68,7 @@ async fn handle_errors(
         .map_err(|_| TaskError::Panicked)
         .and_then(|res| res)
         .map_err(|e| {
-            error!("An error occurred that Vector couldn't handle: {}.", e);
+            error!("An error occurred that Vector couldn't handle: {e}.");
             _ = abort_tx.send(error(e.to_string()));
             e
         })

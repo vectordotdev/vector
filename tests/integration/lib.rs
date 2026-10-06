@@ -19,6 +19,14 @@ pub fn create_file(config: &str) -> PathBuf {
     path
 }
 
+/// Creates a YAML config file (`.yaml` extension so Vector parses it as YAML)
+pub fn create_yaml_file(config: &str) -> PathBuf {
+    let mut path = temp_file();
+    path.set_extension("yaml");
+    overwrite_file(path.clone(), config);
+    path
+}
+
 /// Overwrites file with given content
 pub fn overwrite_file(path: PathBuf, config: &str) {
     let mut file = OpenOptions::new()
