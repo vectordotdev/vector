@@ -478,7 +478,9 @@ rdkafka = { workspace = true, features = ["curl-static", "tokio", "libz", "ssl",
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
-rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
+rumqttc = { version = "0.25.1", default-features = false, features = ["use-rustls-no-provider"], optional = true }
+# Keep MQTT on Ring alongside Vector's other Rustls users, including in minimal builds.
+rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -788,7 +790,7 @@ sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
-sources-mqtt = ["dep:rumqttc"]
+sources-mqtt = ["dep:rumqttc", "dep:rustls"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-okta = ["sources-utils-http-client"]
@@ -996,7 +998,7 @@ sinks-kafka = ["dep:rdkafka"]
 sinks-keep = []
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
-sinks-mqtt = ["dep:rumqttc"]
+sinks-mqtt = ["dep:rumqttc", "dep:rustls"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
