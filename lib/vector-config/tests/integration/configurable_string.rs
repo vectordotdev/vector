@@ -21,7 +21,7 @@ impl fmt::Display for FakeString {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "MapKeyNotStringLike")]
 fn non_string_key_schema_stdlib_hashmap() {
     /// A HashMap-specific struct for testing fake string keys.
     #[derive(Clone)]
@@ -35,7 +35,7 @@ fn non_string_key_schema_stdlib_hashmap() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "MapKeyNotStringLike")]
 fn non_string_key_schema_stdlib_btreemap() {
     /// A BTreeMap-specific struct for testing fake string keys.
     #[derive(Clone)]
@@ -49,7 +49,7 @@ fn non_string_key_schema_stdlib_btreemap() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "MapKeyNotStringLike")]
 fn non_string_key_schema_stdlib_indexmap() {
     /// A IndexMap-specific struct for testing fake string keys.
     #[derive(Clone)]

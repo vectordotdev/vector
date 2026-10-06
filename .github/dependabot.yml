@@ -20,6 +20,12 @@ updates:
           - "bytecheck"
           - "rkyv"
 
+      kube:
+        applies-to: version-updates
+        patterns:
+          - "kube"
+          - "k8s-openapi"
+
       patches:
         applies-to: version-updates
         patterns:

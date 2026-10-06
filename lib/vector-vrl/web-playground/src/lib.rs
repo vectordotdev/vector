@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::collections::BTreeMap;
 
 use gloo_utils::format::JsValueSerdeExt;
@@ -88,7 +90,7 @@ impl VrlDiagnosticResult {
 
 fn compile(
     mut input: Input,
-    tz_str: Option<String>,
+    tz_str: Option<&str>,
 ) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let functions = vector_vrl_functions::all();
 
@@ -97,12 +99,13 @@ fn compile(
     let mut runtime = Runtime::default();
     let config = CompileConfig::default();
 
-    let timezone = match tz_str.as_deref() {
+    let timezone = match tz_str {
         // Empty or "Default" tz string will default to tz default
-        None | Some("") | Some("Default") => TimeZone::default(),
-        Some(other) => match other.parse() {
-            Ok(tz) => TimeZone::Named(tz),
-            Err(_) => {
+        None | Some("" | "Default") => TimeZone::default(),
+        Some(other) => {
+            if let Ok(tz) = other.parse() {
+                TimeZone::Named(tz)
+            } else {
                 // Returns error message if tz parsing has failed.
                 // This avoids head scratching, instead of it silently using the default timezone.
                 let error_message = format!("Invalid timezone identifier: '{other}'");
@@ -112,7 +115,7 @@ fn compile(
                     msg_colorized: error_message,
                 });
             }
-        },
+        }
     };
 
     let mut target_value = TargetValue {
@@ -160,33 +163,41 @@ fn compile(
     }
 }
 
-// The user-facing function
+/// Executes a VRL program against the supplied event.
+///
+/// # Panics
+/// Panics if the input cannot be deserialized or the result cannot be serialized.
 #[wasm_bindgen]
+#[must_use]
 pub fn run_vrl(incoming: &JsValue, tz_str: &str) -> JsValue {
     let input: Input = incoming.into_serde().unwrap();
 
-    match compile(input, Some(tz_str.to_string())) {
+    match compile(input, Some(tz_str)) {
         Ok(res) => JsValue::from_serde(&res).unwrap(),
         Err(err) => JsValue::from_serde(&err).unwrap(),
     }
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn vector_version() -> String {
     built_info::VECTOR_VERSION.to_string()
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn vector_link() -> String {
     built_info::VECTOR_LINK.to_string()
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn vrl_version() -> String {
     built_info::VRL_VERSION.to_string()
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn vrl_link() -> String {
     built_info::VRL_LINK.to_string()
 }
