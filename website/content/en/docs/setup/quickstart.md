@@ -3,7 +3,7 @@ title: Vector quickstart
 description: Get up and running
 short: Quickstart
 weight: 1
-aliases: ["/docs/setup/getting-started", "/docs/setup/guides/getting-started"]
+aliases: ["/docs/setup/getting-started", "/docs/setup/guides/getting-started", "/guides/getting-started/getting-started"]
 ---
 
 Welcome to Vector! Vector is a high-performance observability data pipeline that enables you to collect, transform, and route all of your logs and metrics.
@@ -20,6 +20,8 @@ We can install Vector using an installation script or Docker:
 ```shell
 curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash
 ```
+
+After installation, open a new terminal so that your shell can find the `vector` command.
 
 {{< /tab >}}
 {{< tab title="Docker" >}}
@@ -55,9 +57,17 @@ Vector topologies are defined using a [configuration file][config] that tells it
 * [Transforms] manipulate or change that observability data as it passes through your topology
 * [Sinks] send data onwards from Vector to external services or destinations
 
-Let's create a configuration file called `vector.yaml`:
+Create a directory for this tutorial and change into it:
 
-```yaml filename="vector.yaml"
+```shell
+mkdir vector-quickstart
+cd vector-quickstart
+```
+
+Run all remaining commands from this directory. Copy and run the entire command below, including the final `YAML` line, to create `vector.yaml`:
+
+```shell
+cat > vector.yaml <<'YAML'
 sources:
   in:
     type: "stdin"
@@ -69,6 +79,7 @@ sinks:
     type: "console"
     encoding:
       codec: "text"
+YAML
 ```
 
 Each component has a unique id and is prefixed with the type of the component, for example `sources` for a source. Our first component, `sources.in`, uses the [`stdin` source][stdin], which tells Vector to receive data over stdin and is given the ID `in`.
@@ -79,11 +90,28 @@ The `inputs` option of the `sinks.out` component tells Vector where this sink's 
 
 ## Hello world!
 
-That's it for our first config. Now let's pipe an event through it:
+That's it for our first config. Now let's pipe an event through it. Choose the tab for your installation method:
+
+{{< tabs default="Local installation" >}}
+{{< tab title="Local installation" >}}
+
+For Vector installed using the script or a package manager, explicitly select the configuration in the current directory:
+
+```shell
+echo 'Hello world!' | vector --config ./vector.yaml
+```
+
+{{< /tab >}}
+{{< tab title="Docker" >}}
+
+Use the Docker alias defined above. It mounts the current directory at `/etc/vector` inside the container, where Vector reads `vector.yaml` by default:
 
 ```shell
 echo 'Hello world!' | vector
 ```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 The `echo` statement sends a single log to Vector via stdin. The `vector...` command starts Vector with our previously created config file.
 
@@ -91,16 +119,16 @@ The event we've just sent is received by our `sources.in` component, then sent o
 
 ```shell
 ... some logs ...
-Hello World!
+Hello world!
 ```
 
 {{< info title="JSON encoding" >}}
-If you want to see something cool, try setting `encoding.codec = "json"` in the sink config.
+To see the event as JSON, change `codec: "text"` to `codec: "json"` under `encoding` in the sink configuration and run the command again.
 {{< /info >}}
 
 ## Hello Syslog!
 
-Echoing events into the console isn't terribly exciting. Let's see what we can do with some real observability data by collecting and processing Syslog events. To do that, we'll add two new components to our configuration file. Here's our updated `vector.yaml` configuration file:
+Next, let's collect and process generated Syslog events. Open the same `vector.yaml` file in your text editor, replace its entire contents with the following configuration, and save the file:
 
 ```yaml filename="vector.yaml"
 sources:
@@ -129,14 +157,14 @@ sinks:
 
 The first component uses the [`demo_logs` source][demo_logs], which creates sample log data that enables you to simulate different types of events in various formats.
 
-{{< warning >}}
-Wait, I thought you said "real" observability data? We choose generated data here because it's hard for us to know which platform you're trying Vector on. That means it's also hard to document a single way for everyone to get data into Vector.
-{{< /warning >}}
+{{< info >}}
+Generated logs let you try this pipeline without connecting to an external log source.
+{{< /info >}}
 
 The second component is a transform called [`remap`][remap]. The `remap` transform is at the heart of what makes Vector so powerful for processing observability data. The transform exposes a simple language called [Vector Remap Language][vrl] that allows you to parse, manipulate, and decorate your event data as it passes through Vector. Using `remap`, you can turn static events into informational
 data that can help you ask and answer questions about your environment's state.
 
-You can see we've added the `sources.generated_syslog` component. The `format` option tells the `demo_logs` source which type of logs to emit, here `syslog`, and the `count` option tells the `demo_logs` source how many lines to emit, here 100.
+You can see we've added the `sources.generate_syslog` component. The `format` option tells the `demo_logs` source which type of logs to emit, here `syslog`, and the `count` option tells the `demo_logs` source how many lines to emit, here 100.
 
 In our second component, `transforms.remap_syslog`, we've specified an `inputs` option of `generate_syslog`, which means it will receive events from our `generate_syslog` source. We've also specified the type of transform: `remap`.
 
@@ -148,12 +176,25 @@ We support parsing a variety of logging formats. Of course, if you have an event
 
 Lastly, we've updated the ID of our sink component to `emit_syslog`, updated the `inputs` option to process events generated by the `remap_syslog` transform, and specified that we want to emit events in JSON-format.
 
-Let's re-run Vector. This time we don't need to echo any data to it; just run in on the command line. It'll process
+Let's re-run Vector from the same directory, choosing the tab for your installation method. This time we don't need to echo any data to it. It'll process
 100 lines of generated Syslog data, emit the processed data as JSON, and exit:
+
+{{< tabs default="Local installation" >}}
+{{< tab title="Local installation" >}}
+
+```shell
+vector --config ./vector.yaml
+```
+
+{{< /tab >}}
+{{< tab title="Docker" >}}
 
 ```shell
 vector
 ```
+
+{{< /tab >}}
+{{< /tabs >}}
 
 Now you should have a series of JSON-formatted events, something like this:
 
