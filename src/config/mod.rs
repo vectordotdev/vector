@@ -36,6 +36,7 @@ pub mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
+mod graph_builder;
 pub mod loading;
 pub mod provider;
 pub mod schema;
