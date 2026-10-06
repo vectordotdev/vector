@@ -3,11 +3,11 @@ use std::{
     fmt,
 };
 
-use indexmap::{IndexMap, set::IndexSet};
+use indexmap::set::IndexSet;
 
 use super::{
-    Component, ComponentKey, ComponentKind, DataType, OutputId, SinkOuter, SourceOuter,
-    SourceOutput, TransformContext, TransformOuter, TransformOutput, WildcardMatching, schema,
+    Component, ComponentKey, ComponentKind, DataType, OutputId, SourceOutput, TransformContext,
+    TransformOutput, WildcardMatching, schema,
 };
 
 /// Port metadata derived from a component for graph validation.
@@ -136,69 +136,47 @@ struct Edge {
 pub struct Graph {
     nodes: HashMap<ComponentKey, Node>,
     edges: Vec<Edge>,
+    input_errors: Vec<String>,
 }
 
 impl Graph {
-    pub fn new(
-        sources: &IndexMap<ComponentKey, SourceOuter>,
-        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
-        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+    /// Builds a graph from components in insertion order.
+    ///
+    /// Enrichment tables must already be expanded into their sources and sinks.
+    /// Unresolved inputs are retained as diagnostics for `check_inputs`; ambiguous
+    /// output names prevent construction entirely.
+    pub fn new<'a>(
+        components: impl Iterator<Item = (&'a ComponentKey, Component<'a, String>)> + Clone,
         schema: schema::Options,
         wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false, schema, wildcard_matching)
-    }
-
-    pub fn new_unchecked(
-        sources: &IndexMap<ComponentKey, SourceOuter>,
-        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
-        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
-        schema: schema::Options,
-        wildcard_matching: WildcardMatching,
-    ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true, schema, wildcard_matching)
-            .expect("errors ignored")
-    }
-
-    fn new_inner(
-        sources: &IndexMap<ComponentKey, SourceOuter>,
-        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
-        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
-        ignore_errors: bool,
-        schema: schema::Options,
-        wildcard_matching: WildcardMatching,
-    ) -> Result<Self, Vec<String>> {
-        let mut graph = Graph::default();
-        let mut errors = Vec::new();
-
-        let components = || {
-            let sources = sources.iter().map(|(id, c)| (id, Component::from(c)));
-            let transforms = transforms.iter().map(|(id, c)| (id, Component::from(c)));
-            let sinks = sinks.iter().map(|(id, c)| (id, Component::from(c)));
-
-            sources.chain(transforms).chain(sinks)
-        };
-
         // Derive each node from its component before resolving any connections.
-        for (id, component) in components() {
+        let mut graph = Self::default();
+        for (id, component) in components.clone() {
             graph
                 .nodes
                 .insert(id.clone(), Node::new(&component, id, schema));
         }
 
-        let available_inputs = graph.input_map()?;
-        for (id, component) in components() {
+        let available_outputs = graph.output_map()?;
+        for (id, component) in components {
             for input in component.inputs().into_iter().flatten() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
-                    errors.push(e);
+                if let Err(e) = graph.add_input(input, id, &available_outputs, wildcard_matching) {
+                    graph.input_errors.push(e);
                 }
             }
         }
 
-        if ignore_errors || errors.is_empty() {
-            Ok(graph)
+        Ok(graph)
+    }
+
+    /// Reports unresolved inputs after construction. Partial graphs used while
+    /// preparing config unit tests can be inspected before this check.
+    pub fn check_inputs(&self) -> Result<(), Vec<String>> {
+        if self.input_errors.is_empty() {
+            Ok(())
         } else {
-            Err(errors)
+            Err(self.input_errors.clone())
         }
     }
 
@@ -206,10 +184,10 @@ impl Graph {
         &mut self,
         from: &str,
         to: &ComponentKey,
-        available_inputs: &HashMap<String, OutputId>,
+        available_outputs: &HashMap<String, OutputId>,
         wildcard_matching: WildcardMatching,
     ) -> Result<(), String> {
-        if let Some(output_id) = available_inputs.get(from) {
+        if let Some(output_id) = available_outputs.get(from) {
             self.edges.push(Edge {
                 from: output_id.clone(),
                 to: to.clone(),
@@ -351,8 +329,14 @@ impl Graph {
         Ok(())
     }
 
-    pub fn valid_inputs(&self) -> HashSet<OutputId> {
-        self.nodes
+    /// Maps output names used in `inputs` to output IDs, rejecting ambiguous names.
+    ///
+    /// A dotted name such as `route.branch` can identify either an expanded
+    /// component or a named output. Distinct output IDs must therefore have
+    /// distinct string representations.
+    pub fn output_map(&self) -> Result<HashMap<String, OutputId>, Vec<String>> {
+        let outputs = self
+            .nodes
             .iter()
             .flat_map(|(key, node)| {
                 node.outputs.iter().map(|output| OutputId {
@@ -360,28 +344,11 @@ impl Graph {
                     port: output.port.clone(),
                 })
             })
-            .collect()
-    }
-
-    /// Produce a map of output IDs for the current set of nodes in the graph, keyed by their string
-    /// representation. Returns errors for any nodes that have the same string representation,
-    /// making input specifications ambiguous.
-    ///
-    /// When we get a dotted path in the `inputs` section of a user's config, we need to determine
-    /// which of a few things that represents:
-    ///
-    ///   1. A component that's part of an expanded macro (e.g. `route.branch`)
-    ///   2. A named output of a branching transform (e.g. `name.errors`)
-    ///
-    /// A naive way to do that is to compare the string representation of all valid inputs to the
-    /// provided string and pick the one that matches. This works better if you can assume that there
-    /// are no conflicting string representations, so this function reports any ambiguity as an
-    /// error when creating the lookup map.
-    pub fn input_map(&self) -> Result<HashMap<String, OutputId>, Vec<String>> {
-        let mut mapped: HashMap<String, OutputId> = HashMap::new();
+            .collect::<HashSet<_>>();
+        let mut mapped = HashMap::new();
         let mut errors = HashSet::new();
 
-        for id in self.valid_inputs() {
+        for id in outputs {
             if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
                 errors.insert(format!("Input specifier {id} is ambiguous"));
             }
@@ -453,6 +420,48 @@ mod test {
     use vector_lib::schema::Definition;
 
     use super::*;
+    use crate::{config::ConfigBuilder, test_util::mock::transforms::BasicTransformConfig};
+
+    #[test]
+    fn partial_graph_retains_connections_and_reports_unresolved_inputs() {
+        let mut config = ConfigBuilder::default();
+        config.add_transform(
+            "first",
+            &["missing_source"],
+            BasicTransformConfig::default(),
+        );
+        config.add_transform(
+            "second",
+            &["first", "missing_transform"],
+            BasicTransformConfig::default(),
+        );
+        let components = config
+            .transforms
+            .iter()
+            .map(|(key, transform)| (key, Component::from(transform)));
+
+        let graph = Graph::new(components, config.schema, WildcardMatching::Strict).unwrap();
+        let outputs = graph.output_map().unwrap();
+        assert_eq!(
+            outputs,
+            HashMap::from([
+                ("first".into(), OutputId::from("first")),
+                ("second".into(), OutputId::from("second")),
+            ])
+        );
+
+        assert_eq!(
+            graph.inputs_for(&"second".into()),
+            vec![OutputId::from("first")]
+        );
+        assert_eq!(
+            graph.check_inputs().unwrap_err(),
+            vec![
+                "Input \"missing_source\" for transform \"first\" doesn't match any components.",
+                "Input \"missing_transform\" for transform \"second\" doesn't match any components.",
+            ]
+        );
+    }
 
     #[test]
     fn preserves_node_diagnostics() {
@@ -576,8 +585,8 @@ mod test {
             input: &str,
             wildcard_matching: WildcardMatching,
         ) -> Result<(), String> {
-            let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs, wildcard_matching)
+            let available_outputs = self.output_map().unwrap();
+            self.add_input(input, &node.into(), &available_outputs, wildcard_matching)
         }
     }
 
@@ -839,7 +848,7 @@ mod test {
             ),
         );
 
-        let mut errors = graph.input_map().unwrap_err();
+        let mut errors = graph.output_map().unwrap_err();
         errors.sort();
         assert_eq!(
             errors,

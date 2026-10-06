@@ -7,6 +7,10 @@ use super::Result;
 
 /// Exec a `kubectl` command to pull down the kubernetes version
 /// metadata for a running cluster for use in the test framework
+///
+/// # Errors
+///
+/// Returns an error if the version command cannot be run or its output is invalid JSON.
 pub async fn get(kubectl_command: &str) -> Result<K8sVersion> {
     let mut command = Command::new(kubectl_command);
     command
@@ -50,22 +54,26 @@ pub struct K8sVersion {
 
 impl K8sVersion {
     /// Accessor method for returning major version
+    #[must_use]
     pub fn major(&self) -> String {
-        self.major.to_string()
+        self.major.clone()
     }
 
     /// Accessor method for returning minor version
+    #[must_use]
     pub fn minor(&self) -> String {
-        self.minor.to_string()
+        self.minor.clone()
     }
 
     /// Accessor method for returning platform target
+    #[must_use]
     pub fn platform(&self) -> String {
-        self.platform.to_string()
+        self.platform.clone()
     }
 
     /// Accessor method for returning fully qualified version
+    #[must_use]
     pub fn version(&self) -> String {
-        self.git_version.to_string()
+        self.git_version.clone()
     }
 }

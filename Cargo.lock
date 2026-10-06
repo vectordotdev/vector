@@ -13330,7 +13330,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.24"
+version = "0.3.26"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -13353,7 +13353,6 @@ dependencies = [
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "regex",
- "reqwest 0.11.26",
  "semver",
  "serde",
  "serde_json",
@@ -15129,9 +15128,9 @@ checksum = "66fee0b777b0f5ac1c69bb06d361268faafa61cd4682ae064a171c16c433e9e4"
 
 [[package]]
 name = "xxhash-rust"
-version = "0.8.15"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
+checksum = "550a2b930b62486a393c52d5c3b84bff264b28aa437ed64694d31e93b1757af7"
 
 [[package]]
 name = "yansi"

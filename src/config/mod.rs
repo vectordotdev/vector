@@ -45,6 +45,7 @@ mod sink_validated;
 mod source;
 mod transform;
 pub mod unit_test;
+mod unix;
 mod validation;
 pub mod watcher;
 
@@ -52,6 +53,7 @@ pub use builder::ConfigBuilder;
 pub use component::{Component, ComponentKind};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
+pub(crate) use enrichment_table::{enrichment_table_sinks, enrichment_table_sources};
 pub use format::{Format, FormatHint};
 pub use loading::interpolation::{ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX, interpolate};
 pub use loading::{
@@ -68,6 +70,7 @@ pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };
 pub use unit_test::{UnitTestResult, build_unit_tests, build_unit_tests_main};
+pub use unix::UnixOnly;
 pub use validation::warnings;
 pub use vector_lib::{
     config::{
@@ -436,7 +439,7 @@ pub struct TestDefinition<T: 'static = OutputId> {
 impl TestDefinition<String> {
     fn resolve_outputs(
         self,
-        graph: &graph::Graph,
+        output_map: &HashMap<String, OutputId>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -446,8 +449,6 @@ impl TestDefinition<String> {
             no_outputs_from,
         } = self;
         let mut errors = Vec::new();
-
-        let output_map = graph.input_map().expect("ambiguous outputs");
 
         let outputs = outputs
             .into_iter()

@@ -18,11 +18,19 @@ pub struct Config {
 
 impl Config {
     /// Create a [`Config`] using a structured [`Namespace`] object.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resource cannot be serialized or its temporary file cannot be written.
     pub fn from_namespace(namespace: &Namespace) -> Result<Self> {
         Self::from_resource_string(serde_json::to_string(namespace)?.as_str())
     }
 
     /// Create a [`Config`] using an unstructured resource string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the temporary resource file cannot be created or written.
     pub fn from_resource_string(resource: &str) -> Result<Self> {
         let test_namespace_resource_file = ResourceFile::new(resource)?;
         Ok(Self {
@@ -63,6 +71,7 @@ impl up_down::CommandBuilder for CommandBuilder {
 
 /// Create a new [`up_down::Manager`] for the specified `namespace` and using
 /// the specified `kubectl_command`.
+#[must_use]
 pub fn manager(kubectl_command: &str, config: Config) -> up_down::Manager<CommandBuilder> {
     up_down::Manager::new(CommandBuilder {
         kubectl_command: kubectl_command.to_owned(),
@@ -71,6 +80,7 @@ pub fn manager(kubectl_command: &str, config: Config) -> up_down::Manager<Comman
 }
 
 /// Helper to create a Namespace resource during tests
+#[must_use]
 pub fn make_namespace(name: String, labels: Option<BTreeMap<String, String>>) -> Namespace {
     Namespace {
         metadata: ObjectMeta {
