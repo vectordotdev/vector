@@ -1,1 +1,0 @@
-{"metric":{"name":"s","tags":{"a":"s","h":"u","k":"_"},"kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[2124],"n":[1]},"count":1,"min":196608.0,"max":196608.0,"sum":-858368.0,"avg":-411200.0}}}}}

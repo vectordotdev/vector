@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: apache_metrics
+    endpoints:
+      - http://localhost:8080/server-status/?auto
+    namespace: apache
+    scrape_interval_secs: 15

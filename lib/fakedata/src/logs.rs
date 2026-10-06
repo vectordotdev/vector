@@ -3,8 +3,43 @@ use chrono::{
     format::{DelayedFormat, StrftimeItems},
     prelude::Local,
 };
-use fakedata_generator::{gen_domain, gen_ipv4, gen_username};
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
+
+static FAKE_USERNAMES: [&str; 20] = [
+    "log_whisperer",
+    "commit_conductor",
+    "cache_cowboy",
+    "compile_captain",
+    "latency_llama",
+    "yaml_yoda",
+    "regex_rider",
+    "semver_sage",
+    "kernel_keith",
+    "pixel_pilgrim",
+    "kubectl_kev",
+    "pipeline_pat",
+    "telemetry_tina",
+    "merge_maria",
+    "parser_pete",
+    "debug_duchess",
+    "nullable_nate",
+    "grep_greg",
+    "stderr_stan",
+    "segfault_sue",
+];
+
+static FAKE_DOMAIN_NAMES: [&str; 8] = [
+    "acme",
+    "contoso",
+    "widgets",
+    "example",
+    "placeholder",
+    "sample",
+    "foobar",
+    "testbench",
+];
+
+static FAKE_DOMAIN_TLDS: [&str; 8] = ["com", "net", "org", "io", "dev", "co", "app", "biz"];
 
 static APPLICATION_NAMES: [&str; 10] = [
     "auth", "data", "deploy", "etl", "scraper", "cron", "ingress", "egress", "alerter", "fwd",
@@ -50,6 +85,7 @@ const APACHE_ERROR_TIME_FORMAT: &str = "%a %b %d %T %Y";
 const SYSLOG_3164_FORMAT: &str = "%b %d %T";
 const JSON_TIME_FORMAT: &str = "%d/%b/%Y:%T";
 
+#[must_use]
 pub fn apache_common_log_line() -> String {
     // Example log line:
     // 173.159.239.159 - schoen1464 [31/Oct/2020:19:06:10 -0700] "POST /wireless HTTP/2.0" 100 20815
@@ -66,6 +102,7 @@ pub fn apache_common_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn apache_error_log_line() -> String {
     // Example log line:
     // [Sat Oct 31 19:27:55 2020] [deleniti:crit] [pid 879:tid 9607] [client 169.198.228.174:1364] Something bad happened
@@ -81,6 +118,7 @@ pub fn apache_error_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn syslog_3164_log_line() -> String {
     format!(
         "<{}>{} {} {}[{}]: {}",
@@ -93,6 +131,7 @@ pub fn syslog_3164_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn syslog_5424_log_line() -> String {
     // Example log line:
     // <65>2 2020-11-05T18:11:43.975Z chiefubiquitous.io totam 6899 ID44 - Something bad happened
@@ -109,6 +148,7 @@ pub fn syslog_5424_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn json_log_line() -> String {
     // Borrowed from Flog: https://github.com/mingrammer/flog/blob/master/log.go#L24
     // Example log line:
@@ -156,7 +196,11 @@ fn application() -> &'static str {
 }
 
 fn domain() -> String {
-    gen_domain()
+    format!(
+        "{}.{}",
+        random_from_array(&FAKE_DOMAIN_NAMES),
+        random_from_array(&FAKE_DOMAIN_TLDS),
+    )
 }
 
 fn error_level() -> &'static str {
@@ -188,7 +232,14 @@ fn http_version() -> &'static str {
 }
 
 fn ipv4_address() -> String {
-    gen_ipv4()
+    let mut r = rng();
+    format!(
+        "{}.{}.{}.{}",
+        r.random_range(1..255),
+        r.random_range(1..255),
+        r.random_range(1..255),
+        r.random_range(1..255),
+    )
 }
 
 fn pid() -> usize {
@@ -208,7 +259,7 @@ fn referer() -> String {
 }
 
 fn username() -> String {
-    gen_username()
+    (*random_from_array(&FAKE_USERNAMES)).to_string()
 }
 
 fn syslog_version() -> usize {

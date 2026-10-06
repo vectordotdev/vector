@@ -154,6 +154,10 @@ impl Encoder {
         let mut total_had_errors = false;
 
         loop {
+            #[expect(
+                clippy::string_slice,
+                reason = "total_read_from_input is a byte offset returned by the encoder, always a char boundary"
+            )]
             let (result, read, written, had_errors) = self.inner.encode_from_utf8(
                 &input[total_read_from_input..],
                 &mut self.buffer,

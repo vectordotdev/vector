@@ -8,10 +8,10 @@ use smallvec::{SmallVec, smallvec};
 use vector_config::{configurable_component, indexmap::IndexSet};
 use vector_core::{
     config::{DataType, LogNamespace},
-    event::Event,
+    event::{Event, TraceEvent, TraceLayout},
     schema,
 };
-use vrl::{protobuf::parse::Options, value::Kind};
+use vrl::{event_path, protobuf::parse::Options, value::Kind};
 
 use super::{Deserializer, ProtobufDeserializer};
 
@@ -19,6 +19,11 @@ use super::{Deserializer, ProtobufDeserializer};
 #[configurable_component]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    reason = "Preserve generated configuration documentation during the lint rollout."
+)]
 pub enum OtlpSignalType {
     /// OTLP logs signal (ExportLogsServiceRequest)
     Logs,
@@ -34,11 +39,11 @@ pub enum OtlpSignalType {
 pub struct OtlpDeserializerConfig {
     /// Signal types to attempt parsing, in priority order.
     ///
-    /// The deserializer will try parsing in the order specified. This allows you to optimize
+    /// The deserializer tries to parse signals in the specified order. This allows you to optimize
     /// performance when you know the expected signal types. For example, if you only receive
     /// traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
     ///
-    /// If not specified, defaults to trying all types in order: logs, metrics, traces.
+    /// If not specified, defaults to trying all types in this order: logs, metrics, traces.
     /// Duplicate signal types are automatically removed while preserving order.
     #[serde(default = "default_signal_types")]
     pub signal_types: IndexSet<OtlpSignalType>,
@@ -62,16 +67,19 @@ impl Default for OtlpDeserializerConfig {
 
 impl OtlpDeserializerConfig {
     /// Build the `OtlpDeserializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> OtlpDeserializer {
         OtlpDeserializer::new_with_signals(self.signal_types.clone())
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log | DataType::Trace
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
@@ -118,6 +126,12 @@ impl Default for OtlpDeserializer {
 impl OtlpDeserializer {
     /// Creates a new OTLP deserializer with custom signal support.
     /// During parsing, each signal type is tried in order until one succeeds.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "The codec API panic documentation needs a separate audit."
+    )]
     pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> Self {
         let options = Options {
             use_json_names: true,
@@ -165,7 +179,7 @@ impl Deserializer for OtlpDeserializer {
                 OtlpSignalType::Logs => {
                     if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
                         && let Some(Event::Log(log)) = events.first()
-                        && log.get(RESOURCE_LOGS_JSON_FIELD).is_some()
+                        && log.get(event_path!(RESOURCE_LOGS_JSON_FIELD)).is_some()
                     {
                         return Ok(events);
                     }
@@ -175,22 +189,28 @@ impl Deserializer for OtlpDeserializer {
                         .metrics_deserializer
                         .parse(bytes.clone(), log_namespace)
                         && let Some(Event::Log(log)) = events.first()
-                        && log.get(RESOURCE_METRICS_JSON_FIELD).is_some()
+                        && log.get(event_path!(RESOURCE_METRICS_JSON_FIELD)).is_some()
                     {
                         return Ok(events);
                     }
                 }
                 OtlpSignalType::Traces => {
-                    // TODO: <https://github.com/vectordotdev/vector/issues/25045>
-                    if let Ok(mut events) =
-                        self.traces_deserializer.parse(bytes.clone(), log_namespace)
+                    // Always use LogNamespace::Vector for traces to avoid spurious timestamp injection.
+                    // The log_namespace concept is logs-specific and doesn't apply to trace events.
+                    // See: https://github.com/vectordotdev/vector/issues/25045
+                    if let Ok(mut events) = self
+                        .traces_deserializer
+                        .parse(bytes.clone(), LogNamespace::Vector)
                         && let Some(Event::Log(log)) = events.first()
-                        && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
+                        && log.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some()
                     {
                         // Convert the log event to a trace event by taking ownership
                         if let Some(Event::Log(log)) = events.pop() {
-                            let trace_event = Event::Trace(log.into());
-                            return Ok(smallvec![trace_event]);
+                            let mut trace = TraceEvent::from(log);
+                            trace
+                                .metadata_mut()
+                                .set_trace_layout(TraceLayout::OtlpResourceSpans);
+                            return Ok(smallvec![Event::Trace(trace)]);
                         }
                     }
                 }
@@ -214,6 +234,7 @@ mod tests {
         trace::v1::{ResourceSpans, ScopeSpans, Span},
     };
     use prost::Message;
+    use vrl::path;
 
     use super::*;
 
@@ -235,7 +256,7 @@ mod tests {
                 scope_logs: vec![ScopeLogs {
                     scope: None,
                     log_records: vec![LogRecord {
-                        time_unix_nano: 1234567890,
+                        time_unix_nano: 1_234_567_890,
                         severity_number: 9,
                         severity_text: "INFO".to_string(),
                         body: None,
@@ -268,6 +289,7 @@ mod tests {
                         name: "test_metric".to_string(),
                         description: String::new(),
                         unit: String::new(),
+                        metadata: vec![],
                         data: None,
                     }],
                     schema_url: String::new(),
@@ -293,10 +315,11 @@ mod tests {
                         span_id: TEST_SPAN_ID.to_vec(),
                         trace_state: String::new(),
                         parent_span_id: vec![],
+                        flags: 0,
                         name: "test_span".to_string(),
                         kind: 0,
-                        start_time_unix_nano: 1234567890,
-                        end_time_unix_nano: 1234567900,
+                        start_time_unix_nano: 1_234_567_890,
+                        end_time_unix_nano: 1_234_567_900,
                         attributes: vec![],
                         dropped_attributes_count: 0,
                         events: vec![],
@@ -314,10 +337,15 @@ mod tests {
         Bytes::from(request.encode_to_vec())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Related fixture values retain names that describe their types or encodings."
+    )]
     fn validate_trace_ids(trace: &vrl::value::Value) {
         // Navigate to the span and check traceId and spanId
         let resource_spans = trace
-            .get("resourceSpans")
+            .get(path!("resourceSpans"))
             .and_then(|v| v.as_array())
             .expect("resourceSpans should be an array");
 
@@ -326,7 +354,7 @@ mod tests {
             .expect("should have at least one resource span");
 
         let scope_spans = first_rs
-            .get("scopeSpans")
+            .get(path!("scopeSpans"))
             .and_then(|v| v.as_array())
             .expect("scopeSpans should be an array");
 
@@ -335,7 +363,7 @@ mod tests {
             .expect("should have at least one scope span");
 
         let spans = first_ss
-            .get("spans")
+            .get(path!("spans"))
             .and_then(|v| v.as_array())
             .expect("spans should be an array");
 
@@ -343,7 +371,7 @@ mod tests {
 
         // Verify traceId - should be raw bytes (16 bytes for trace_id)
         let trace_id = span
-            .get("traceId")
+            .get(path!("traceId"))
             .and_then(|v| v.as_bytes())
             .expect("traceId should exist and be bytes");
 
@@ -355,7 +383,7 @@ mod tests {
 
         // Verify spanId - should be raw bytes (8 bytes for span_id)
         let span_id = span
-            .get("spanId")
+            .get(path!("spanId"))
             .and_then(|v| v.as_bytes())
             .expect("spanId should exist and be bytes");
 
@@ -374,10 +402,14 @@ mod tests {
         if is_trace {
             assert!(matches!(events[0], Event::Trace(_)));
             let trace = events[0].as_trace();
-            assert!(trace.get(field).is_some());
+            assert!(trace.get(event_path!(field)).is_some());
             validate_trace_ids(trace.value());
+            assert_eq!(
+                events[0].metadata().trace_layout(),
+                Some(TraceLayout::OtlpResourceSpans)
+            );
         } else {
-            assert!(events[0].as_log().get(field).is_some());
+            assert!(events[0].as_log().get(event_path!(field)).is_some());
         }
     }
 
@@ -435,5 +467,39 @@ mod tests {
         let log_bytes = create_logs_request_bytes();
         let result = deserializer.parse(log_bytes, LogNamespace::Legacy);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn deserialize_traces_with_legacy_namespace_should_not_inject_timestamp() {
+        use vector_core::config::log_schema;
+
+        // This test verifies the fix for issue #25045
+        // When log_namespace is Legacy, the ProtobufDeserializer injects a timestamp
+        // into log events, but this behavior should NOT apply to trace events.
+        let deserializer = OtlpDeserializer::default();
+        let trace_bytes = create_traces_request_bytes();
+
+        // Parse with Legacy namespace
+        let events = deserializer
+            .parse(trace_bytes, LogNamespace::Legacy)
+            .unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0], Event::Trace(_)));
+
+        let trace = events[0].as_trace();
+
+        // Verify that no spurious timestamp was injected
+        // The timestamp field should not exist at the root level
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+            assert!(
+                trace.get(timestamp_key).is_none(),
+                "Trace event should not have spurious timestamp field '{timestamp_key}' injected when using LogNamespace::Legacy"
+            );
+        }
+
+        // The trace should still have the OTLP trace data
+        assert!(trace.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some());
+        validate_trace_ids(trace.value());
     }
 }

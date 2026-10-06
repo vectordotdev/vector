@@ -1,0 +1,16 @@
+sinks:
+  my_sink_id:
+    type: greptimedb_logs
+    inputs:
+      - my-source-or-transform-id
+    compression: gzip
+    dangerously_allow_unconfined_template_resolution: false
+    dbname: public
+    endpoint: http://localhost:4000
+    extra_params:
+      source: vector
+    password: password
+    pipeline_name: greptime_identity
+    pipeline_version: 2024-06-07 06:46:23.858293
+    table: mytable
+    username: username

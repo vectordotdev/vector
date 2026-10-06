@@ -9,20 +9,20 @@ use super::{
     },
     util::{table_to_timestamp, timestamp_to_table},
 };
+use crate::event::MetricTagMode;
 use crate::metrics::AgentDDSketch;
 
 pub struct LuaMetric {
     pub metric: Metric,
-    pub multi_value_tags: bool,
+    pub tag_mode: MetricTagMode,
 }
 
 pub struct LuaMetricTags {
     pub tags: MetricTags,
-    pub multi_value_tags: bool,
+    pub tag_mode: MetricTagMode,
 }
 
 impl IntoLua for MetricKind {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
@@ -83,12 +83,18 @@ impl FromLua for TagValueSet {
                 for value in table.sequence_values() {
                     match value {
                         Ok(value) => string_values.push(value),
-                        Err(_) => unimplemented!(),
+                        Err(err) => {
+                            return Err(LuaError::FromLuaConversionError {
+                                from: "metric tag value",
+                                to: String::from("string"),
+                                message: Some(err.to_string()),
+                            });
+                        }
                     }
                 }
                 Ok(Self::from(string_values))
             }
-            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy().clone()])),
+            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy()])),
             _ => Err(mlua::Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: String::from("metric tag value"),
@@ -106,8 +112,8 @@ impl FromLua for MetricTags {
 
 impl IntoLua for LuaMetricTags {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        if self.multi_value_tags {
-            Ok(LuaValue::Table(lua.create_table_from(
+        match self.tag_mode {
+            MetricTagMode::Full => Ok(LuaValue::Table(lua.create_table_from(
                 self.tags.0.into_iter().map(|(key, value)| {
                     let value: Vec<_> = value
                         .into_iter()
@@ -115,17 +121,16 @@ impl IntoLua for LuaMetricTags {
                         .collect();
                     (key, value)
                 }),
-            )?))
-        } else {
-            Ok(LuaValue::Table(
+            )?)),
+            MetricTagMode::Single => Ok(LuaValue::Table(
                 lua.create_table_from(self.tags.iter_single())?,
-            ))
+            )),
+            MetricTagMode::Auto => unreachable!("Auto is not used by the lua transform"),
         }
     }
 }
 
 impl IntoLua for LuaMetric {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tbl = lua.create_table()?;
 
@@ -144,7 +149,7 @@ impl IntoLua for LuaMetric {
                 "tags",
                 LuaMetricTags {
                     tags,
-                    multi_value_tags: self.multi_value_tags,
+                    tag_mode: self.tag_mode,
                 },
             )?;
         }
@@ -163,7 +168,7 @@ impl IntoLua for LuaMetric {
             }
             MetricValue::Set { values } => {
                 let set = lua.create_table()?;
-                set.raw_set("values", lua.create_sequence_from(values.into_iter())?)?;
+                set.raw_set("values", lua.create_sequence_from(values)?)?;
                 tbl.raw_set("set", set)?;
             }
             MetricValue::Distribution { samples, statistic } => {
@@ -350,23 +355,16 @@ mod test {
 
     use super::*;
 
-    fn assert_metric(metric: Metric, multi_value_tags: bool, assertions: Vec<&'static str>) {
+    fn assert_metric(metric: Metric, tag_mode: MetricTagMode, assertions: Vec<&'static str>) {
         let lua = Lua::new();
         lua.globals()
-            .set(
-                "metric",
-                LuaMetric {
-                    metric,
-                    multi_value_tags,
-                },
-            )
+            .set("metric", LuaMetric { metric, tag_mode })
             .unwrap();
 
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
-                "{}",
-                assertion
+                "{assertion}"
             );
         }
     }
@@ -389,7 +387,7 @@ mod test {
 
         assert_metric(
             metric.clone(),
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric) == 'table'",
                 "metric.name == 'example counter'",
@@ -410,7 +408,7 @@ mod test {
         );
         assert_metric(
             metric,
-            true,
+            MetricTagMode::Full,
             vec![
                 "type(metric) == 'table'",
                 "metric.name == 'example counter'",
@@ -448,13 +446,29 @@ mod test {
 
         assert_metric(
             metric,
-            true,
+            MetricTagMode::Full,
             vec![
                 "type(metric.tags) == 'table'",
                 "metric.tags['example tag'][1] == 'a'",
                 "metric.tags['example tag'][2] == 'b'",
             ],
         );
+    }
+
+    #[test]
+    fn from_lua_tag_value_set_rejects_non_string_element() {
+        let lua = Lua::new();
+
+        let table = lua.create_table().unwrap();
+        table.push("example value").unwrap();
+        table.push(true).unwrap();
+
+        let result = TagValueSet::from_lua(LuaValue::Table(table), &lua);
+
+        assert!(matches!(
+            result,
+            Err(LuaError::FromLuaConversionError { .. })
+        ));
     }
 
     #[test]
@@ -467,10 +481,10 @@ mod test {
             },
         );
 
-        for multi_value_tags in [false, true] {
+        for tag_mode in [MetricTagMode::Single, MetricTagMode::Full] {
             assert_metric(
                 metric.clone(),
-                multi_value_tags,
+                tag_mode,
                 vec![
                     "metric.timestamp == nil",
                     "metric.tags == nil",
@@ -490,7 +504,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec!["metric.gauge.value == 1.6180339", "metric.counter == nil"],
         );
     }
@@ -508,7 +522,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.set) == 'table'",
                 "type(metric.set.values) == 'table'",
@@ -531,7 +545,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.distribution) == 'table'",
                 "#metric.distribution.values == 2",
@@ -557,7 +571,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.aggregated_histogram) == 'table'",
                 "#metric.aggregated_histogram.buckets == 4",
@@ -588,7 +602,7 @@ mod test {
 
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.aggregated_summary) == 'table'",
                 "#metric.aggregated_summary.quantiles == 7",

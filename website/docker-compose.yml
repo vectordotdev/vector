@@ -1,0 +1,16 @@
+services:
+  website:
+    build: .
+    ports:
+      - "1313:1313"
+    volumes:
+      - ..:/app
+      - website_node_modules:/app/website/node_modules
+      - website_cargo_target:/target
+    environment:
+      - CI=false
+      - CARGO_TARGET_DIR=/target
+
+volumes:
+  website_node_modules:
+  website_cargo_target:

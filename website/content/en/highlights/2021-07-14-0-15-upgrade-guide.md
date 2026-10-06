@@ -42,38 +42,42 @@ This means, if you are presently using the deprecated `check_fields` syntax, you
 
 For example, if you previously had:
 
-```toml
-[transforms.sample]
-type = "sample"
-inputs = ["in"]
-rate = 10
-key_field = "message"
-exclude."message.contains" = "error"
+```yaml
+transforms:
+  sample:
+    type: "sample"
+    inputs: ["in"]
+    rate: 10
+    key_field: "message"
+    exclude:
+      "message.contains": "error"
 ```
 
 You will need to add `exclude.type = "check_fields"` like:
 
-```toml
-[transforms.sample]
-type = "sample"
-inputs = ["in"]
-rate = 10
-key_field = "message"
-exclude."type" = "check_fields"
-exclude."message.contains" = "error"
+```yaml
+transforms:
+  sample:
+    type: "sample"
+    inputs: ["in"]
+    rate: 10
+    key_field: "message"
+    exclude:
+      "type": "check_fields"
+      "message.contains": "error"
 ```
 
 To convert this to the new [VRL][VRL] conditions, you would write:
 
-```toml
-[transforms.sample]
-type = "sample"
-inputs = ["in"]
-rate = 10
-key_field = "message"
-exclude = """
-  contains!(.message, "error")
-"""
+```yaml
+transforms:
+  sample:
+    type: "sample"
+    inputs: ["in"]
+    rate: 10
+    key_field: "message"
+    exclude: |
+      contains!(.message, "error")
 ```
 
 We recommend upgrading to the [VRL][VRL] conditions as these are much more powerful than the legacy `check_fields`-style
@@ -85,40 +89,42 @@ The `remap` condition type has been renamed `vrl` in this release to better high
 a [VRL][VRL] program. Most examples of using this condition type have the short-hand condition config of just specifying
 the [VRL][VRL] program without specifying a `type`. For example:
 
-```toml
-[transforms.filter_a]
-  inputs = ["stdin"]
-  type = "filter"
-  condition = '''
+```yaml
+transforms:
+  filter_a:
+    inputs: ["stdin"]
+    type: "filter"
+    condition: |
       message = if exists(.tags) { .tags.message } else { .message }
       message == "test filter 1"
-    '''
 ```
 
 Which is automatically a [VRL][VRL] condition. However, if you were specifying the `type` like:
 
-```toml
-[transforms.filter_a]
-inputs = ["stdin"]
-type = "filter"
-condition.type = "remap"
-condition.source = '''
-    message = if exists(.tags) { .tags.message } else { .message }
-    message == "test filter 1"
-'''
+```yaml
+transforms:
+  filter_a:
+    inputs: ["stdin"]
+    type: "filter"
+    condition:
+      type: "remap"
+      source: |
+        message = if exists(.tags) { .tags.message } else { .message }
+        message == "test filter 1"
 ```
 
 Then you will need to update `type = "remap"` to `type = "vrl"` like:
 
-```toml
-[transforms.filter_a]
-inputs = ["stdin"]
-type = "filter"
-condition.type = "vrl"
-condition.source = '''
-    message = if exists(.tags) { .tags.message } else { .message }
-    message == "test filter 1"
-'''
+```yaml
+transforms:
+  filter_a:
+    inputs: ["stdin"]
+    type: "filter"
+    condition:
+      type: "vrl"
+      source: |
+        message = if exists(.tags) { .tags.message } else { .message }
+        message == "test filter 1"
 ```
 
 [vrl]: /docs/reference/vrl/

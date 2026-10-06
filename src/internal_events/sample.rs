@@ -1,5 +1,7 @@
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent};
+use vector_lib::{
+    NamedInternalEvent,
+    internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct SampleEventDiscarded;

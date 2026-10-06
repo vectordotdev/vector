@@ -8,6 +8,8 @@ use vector_core::{config::DataType, event::Event, schema};
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+use super::format::{ParquetSerializer, ParquetSerializerConfig};
 #[cfg(feature = "syslog")]
 use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
@@ -144,6 +146,10 @@ impl Default for SerializerConfig {
 }
 
 /// Batch serializer configuration.
+///
+/// Only available when the `arrow` feature is enabled (the `parquet` feature
+/// implies `arrow`); all batch serializers produce columnar Arrow/Parquet output.
+#[cfg(feature = "arrow")]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
@@ -157,35 +163,57 @@ pub enum BatchSerializerConfig {
     /// a continuous stream of record batches.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
-    #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
+    /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
+    ///
+    /// [apache_parquet]: https://parquet.apache.org/
+    #[cfg(feature = "parquet")]
+    #[serde(rename = "parquet")]
+    Parquet(ParquetSerializerConfig),
 }
 
 #[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
-    /// Build the `ArrowStreamSerializer` from this configuration.
-    pub fn build(
+    /// Build the batch serializer from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
+    pub fn build_batch_serializer(
         &self,
-    ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<super::BatchSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => {
-                Ok(ArrowStreamSerializer::new(arrow_config.clone())?)
+                let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
+                Ok(super::BatchSerializer::Arrow(serializer))
+            }
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet(parquet_config) => {
+                let serializer = ParquetSerializer::new(parquet_config.clone())?;
+                Ok(super::BatchSerializer::Parquet(Box::new(serializer)))
             }
         }
     }
 
     /// The data type of events that are accepted by this batch serializer.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
         }
     }
 
     /// The schema required by the batch serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
         }
     }
 }
@@ -265,6 +293,11 @@ impl From<TextSerializerConfig> for SerializerConfig {
 
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
@@ -294,6 +327,7 @@ impl SerializerConfig {
     }
 
     /// Return an appropriate default framer for the given serializer.
+    #[must_use]
     pub fn default_stream_framing(&self) -> FramingConfig {
         match self {
             // TODO: Technically, Avro messages are supposed to be framed[1] as a vector of
@@ -331,6 +365,7 @@ impl SerializerConfig {
     }
 
     /// The data type of events that are accepted by this `Serializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         match self {
             SerializerConfig::Avro { avro } => {
@@ -354,6 +389,7 @@ impl SerializerConfig {
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             SerializerConfig::Avro { avro } => {
@@ -412,6 +448,7 @@ pub enum Serializer {
 
 impl Serializer {
     /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
+    #[must_use]
     pub fn supports_json(&self) -> bool {
         match self {
             Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
@@ -436,6 +473,11 @@ impl Serializer {
     ///
     /// Panics if the serializer does not support encoding to JSON. Call `Serializer::supports_json`
     /// if you need to determine the capability to encode to JSON at runtime.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         match self {
             Serializer::Gelf(serializer) => serializer.to_json_value(event),
@@ -463,6 +505,7 @@ impl Serializer {
     }
 
     /// Returns the chunking implementation for the serializer, if any is supported.
+    #[must_use]
     pub fn chunker(&self) -> Option<Chunker> {
         match self {
             Serializer::Gelf(gelf) => Some(Chunker::Gelf(gelf.chunker())),
@@ -474,6 +517,7 @@ impl Serializer {
     ///
     /// Binary serializers produce raw bytes that should not be interpreted as text,
     /// while text serializers produce UTF-8 encoded strings.
+    #[must_use]
     pub const fn is_binary(&self) -> bool {
         match self {
             Serializer::RawMessage(_)

@@ -33,8 +33,9 @@ use super::{
     state::{self, ConnectionStatus},
 };
 
+#[must_use]
 pub const fn is_allocation_tracing_enabled() -> bool {
-    cfg!(feature = "allocation-tracing")
+    cfg!(unix)
 }
 
 macro_rules! row_comparator {
@@ -84,6 +85,11 @@ trait HumanFormatter {
 impl HumanFormatter for i64 {
     /// Format an i64 as a string, returning `--` if zero, the value as a string if < 1000, or
     /// the value and the recognised abbreviation
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Keep the existing approximate display of large metric values."
+    )]
     fn human_format(&self) -> String {
         match self {
             0 => "--".into(),
@@ -96,6 +102,11 @@ impl HumanFormatter for i64 {
 
     /// Format an i64 as a string in the same way as `human_format`, but using a 1024 base
     /// for binary, and appended with a "B" to represent byte values
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Keep the existing approximate display of large metric values."
+    )]
     fn human_format_bytes(&self) -> String {
         match self {
             0 => "--".into(),
@@ -157,7 +168,7 @@ pub mod columns {
     pub const BYTES_OUT: &str = "Bytes Out";
     pub const BYTES_OUT_TOTAL: &str = "Bytes Out Total";
     pub const ERRORS: &str = "Errors";
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     pub const MEMORY_USED: &str = "Memory Used";
 }
 
@@ -170,9 +181,9 @@ static HEADER: [&str; NUM_COLUMNS] = [
     columns::BYTES_IN,
     columns::EVENTS_OUT,
     columns::BYTES_OUT,
-    columns::ERRORS,
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     columns::MEMORY_USED,
+    columns::ERRORS,
 ];
 
 struct Widgets<'a> {
@@ -238,6 +249,11 @@ impl<'a> Widgets<'a> {
 
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing dashboard layout and event handling together during the lint rollout."
+    )]
     fn components_table(&self, f: &mut Frame, state: &state::State, area: Rect) {
         // Header columns
         let header = HEADER
@@ -246,25 +262,24 @@ impl<'a> Widgets<'a> {
                 let mut content_line = Line::from(*s);
                 let c = Cell::default().style(Style::default().add_modifier(Modifier::BOLD));
                 if state.filter_state.column.matches_header(s)
-                    && let Some(pattern) = state.filter_state.pattern.as_ref().map(|p| p.as_str())
+                    && let Some(pattern) = state
+                        .filter_state
+                        .pattern
+                        .as_ref()
+                        .map(regex::Regex::as_str)
                 {
                     content_line.push_span(" ");
                     let filter_span =
                         Span::styled(format!("/{pattern}/"), Style::default().fg(Color::Yellow));
                     content_line.push_span(filter_span);
-                };
-                if state
-                    .sort_state
-                    .column
-                    .map(|c| c.matches_header(s))
-                    .unwrap_or_default()
-                {
+                }
+                if state.sort_state.column.is_some_and(|c| c.matches_header(s)) {
                     content_line.push_span(if state.sort_state.reverse {
                         " ▼"
                     } else {
                         " ▲"
                     });
-                };
+                }
                 c.content(content_line)
             })
             .collect::<Vec<_>>();
@@ -286,11 +301,11 @@ impl<'a> Widgets<'a> {
                 SortColumn::BytesOut => row_comparator!(sent_bytes_throughput_sec),
                 SortColumn::BytesOutTotal => row_comparator!(sent_bytes_total),
                 SortColumn::Errors => row_comparator!(errors),
-                #[cfg(feature = "allocation-tracing")]
+                #[cfg(unix)]
                 SortColumn::MemoryUsed => row_comparator!(allocated_bytes),
             };
             if state.sort_state.reverse {
-                sorted.sort_by(|a, b| sort_fn(a.1, b.1).reverse())
+                sorted.sort_by(|a, b| sort_fn(a.1, b.1).reverse());
             } else {
                 sorted.sort_by(|a, b| sort_fn(a.1, b.1));
             }
@@ -317,10 +332,10 @@ impl<'a> Widgets<'a> {
         }) {
             let mut data = vec![
                 r.key.id().to_string(),
-                if !r.has_displayable_outputs() {
-                    "--"
-                } else {
+                if r.has_displayable_outputs() {
                     Default::default()
+                } else {
+                    "--"
                 }
                 .to_string(),
                 r.kind.clone(),
@@ -348,13 +363,17 @@ impl<'a> Widgets<'a> {
                     r.sent_bytes_throughput_sec,
                     self.human_metrics,
                 ),
+                #[cfg(unix)]
+                if state.allocation_tracing_active {
+                    r.allocated_bytes.human_format_bytes()
+                } else {
+                    "disabled".to_string()
+                },
                 if self.human_metrics {
                     r.errors.human_format()
                 } else {
                     r.errors.thousands_format()
                 },
-                #[cfg(feature = "allocation-tracing")]
-                r.allocated_bytes.human_format_bytes(),
             ];
 
             data.extend_from_slice(&formatted_metrics);
@@ -362,7 +381,7 @@ impl<'a> Widgets<'a> {
 
             // Add output rows
             if r.has_displayable_outputs() {
-                for (id, output) in r.outputs.iter() {
+                for (id, output) in &r.outputs {
                     let sent_events_metric = format_metric(
                         output.sent_events_total,
                         output.sent_events_throughput_sec,
@@ -383,26 +402,26 @@ impl<'a> Widgets<'a> {
             &[
                 Constraint::Percentage(13), // ID
                 Constraint::Percentage(8),  // Output
-                Constraint::Percentage(4),  // Kind
+                Constraint::Percentage(5),  // Kind
                 Constraint::Percentage(9),  // Type
                 Constraint::Percentage(10), // Events In
                 Constraint::Percentage(12), // Bytes In
                 Constraint::Percentage(10), // Events Out
                 Constraint::Percentage(12), // Bytes Out
-                Constraint::Percentage(8),  // Errors
-                Constraint::Percentage(14), // Allocated Bytes
+                Constraint::Percentage(14), // Memory Used
+                Constraint::Percentage(7),  // Errors
             ]
         } else {
             &[
                 Constraint::Percentage(13), // ID
                 Constraint::Percentage(12), // Output
-                Constraint::Percentage(9),  // Kind
+                Constraint::Percentage(10), // Kind
                 Constraint::Percentage(6),  // Type
                 Constraint::Percentage(12), // Events In
                 Constraint::Percentage(14), // Bytes In
                 Constraint::Percentage(12), // Events Out
                 Constraint::Percentage(14), // Bytes Out
-                Constraint::Percentage(8),  // Errors
+                Constraint::Percentage(7),  // Errors
             ]
         };
         let w = Table::new(items, widths)
@@ -440,7 +459,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Alerts the user to resize the window to view columns
-    fn components_resize_window(&self, f: &mut Frame, area: Rect) {
+    fn components_resize_window(f: &mut Frame, area: Rect) {
         let block = Block::default().borders(Borders::ALL).title("Components");
         let w = Paragraph::new("Expand the window to > 80 chars to view metrics")
             .block(block)
@@ -450,7 +469,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a box showing instructions on how to use `vector top`.
-    fn help_box(&self, f: &mut Frame, area: Rect) {
+    fn help_box(f: &mut Frame, area: Rect) {
         let text = vec![
             Line::from("General").bold(),
             Line::from("ESC, q => quit (or close window)"),
@@ -494,7 +513,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a box with sorting options.
-    fn sort_box(&self, f: &mut Frame, area: Rect, mut list_state: ListState) {
+    fn sort_box(f: &mut Frame, area: Rect, mut list_state: ListState) {
         f.render_widget(Clear, area);
         let w = List::new(
             SortColumn::items()
@@ -512,7 +531,12 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a box with filtering options.
-    fn filter_box(&self, f: &mut Frame, area: Rect, filter_menu_state: &FilterMenuState) {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve existing cursor positioning for long filter input."
+    )]
+    fn filter_box(f: &mut Frame, area: Rect, filter_menu_state: &FilterMenuState) {
         f.render_widget(Clear, area);
         let w = List::new(
             FilterColumn::items()
@@ -548,7 +572,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a box showing instructions on how to exit from `vector top`.
-    fn quit_box(&self, f: &mut Frame, area: Rect) {
+    fn quit_box(f: &mut Frame, area: Rect) {
         let text = vec![Line::from(
             "To quit, press ESC or 'q'; Press F1 or '?' for help",
         )];
@@ -565,7 +589,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
-    fn draw(&self, f: &mut Frame, state: state::State) {
+    fn draw(&self, f: &mut Frame, state: &state::State) {
         let size = f.area();
         let rects = Layout::default()
             .constraints(self.constraints.clone())
@@ -575,12 +599,12 @@ impl<'a> Widgets<'a> {
 
         // Require a minimum of 80 chars of line width to display the table
         if size.width >= 80 {
-            self.components_table(f, &state, rects[1]);
+            self.components_table(f, state, rects[1]);
         } else {
-            self.components_resize_window(f, rects[1]);
+            Self::components_resize_window(f, rects[1]);
         }
 
-        self.quit_box(f, rects[2]);
+        Self::quit_box(f, rects[2]);
 
         // Render help, sort and filter over other items
         if state.ui.help_visible {
@@ -590,7 +614,7 @@ impl<'a> Widgets<'a> {
             let [area] = Layout::vertical([Constraint::Length(32)])
                 .flex(Flex::Center)
                 .areas(area);
-            self.help_box(f, area);
+            Self::help_box(f, area);
         }
 
         if state.ui.sort_visible {
@@ -600,7 +624,7 @@ impl<'a> Widgets<'a> {
             let [area] = Layout::vertical([Constraint::Length(32)])
                 .flex(Flex::Center)
                 .areas(area);
-            self.sort_box(f, area, state.ui.sort_menu_state);
+            Self::sort_box(f, area, state.ui.sort_menu_state);
         }
 
         if state.ui.filter_visible {
@@ -610,12 +634,13 @@ impl<'a> Widgets<'a> {
             let [area] = Layout::vertical([Constraint::Length(12)])
                 .flex(Flex::Center)
                 .areas(area);
-            self.filter_box(f, area, &state.ui.filter_menu_state);
+            Self::filter_box(f, area, &state.ui.filter_menu_state);
         }
     }
 }
 
 /// Determine if the terminal is a TTY
+#[must_use]
 pub fn is_tty() -> bool {
     stdout().is_tty()
 }
@@ -624,12 +649,18 @@ pub fn is_tty() -> bool {
 /// stdout. We're using 'direct' drawing mode to control the full output of the dashboard,
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
+///
+/// # Errors
+/// Returns an error if terminal setup, drawing, or cleanup fails.
+///
+/// # Panics
+/// Panics if the keyboard input channel closes before the dashboard shuts down.
 pub async fn init_dashboard<'a>(
     title: &'a str,
     url: &'a str,
     interval: u32,
     human_metrics: bool,
-    event_tx: state::EventTx,
+    ui_event_tx: state::UiEventTx,
     mut state_rx: state::StateRx,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -657,7 +688,8 @@ pub async fn init_dashboard<'a>(
 
     loop {
         tokio::select! {
-            Some(state) = state_rx.recv() => {
+            Ok(()) = state_rx.changed() => {
+                let state = state_rx.borrow_and_update().clone();
                 if state.ui.filter_visible {
                     input_mode = InputMode::FilterInput;
                 } else if state.ui.sort_visible {
@@ -667,11 +699,11 @@ pub async fn init_dashboard<'a>(
                 } else {
                     input_mode = InputMode::Top;
                 }
-                terminal.draw(|f| widgets.draw(f, state))?;
+                terminal.draw(|f| widgets.draw(f, &state))?;
             },
             k = key_press_rx.recv() => {
                 let k = k.unwrap();
-                if handle_input(input_mode, k, &event_tx, &terminal).await {
+                if handle_input(input_mode, k, &ui_event_tx, &terminal).await {
                     _ = key_press_kill_tx.send(());
                     break;
                 }
