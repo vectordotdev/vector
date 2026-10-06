@@ -198,7 +198,7 @@ impl_configurable_numeric!(i16 => Into::into);
 impl_configurable_numeric!(i32 => Into::into);
 impl_configurable_numeric!(i64 => Into::into);
 impl_configurable_numeric!(isize => Into::into);
-impl_configurable_numeric!(f32 => |v| Number::from_f64(v as f64).expect("Could not convert number to JSON"));
+impl_configurable_numeric!(f32 => |v| Number::from_f64(f64::from(v)).expect("Could not convert number to JSON"));
 impl_configurable_numeric!(f64 => |v| Number::from_f64(v).expect("Could not convert number to JSON"));
 impl_configurable_numeric!(NonZeroU8 => |v: NonZeroU8| v.get().into());
 impl_configurable_numeric!(NonZeroU16 => |v: NonZeroU16| v.get().into());
@@ -311,6 +311,11 @@ impl<V: ToValue> ToValue for BTreeSet<V> {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "preserve the existing default-hasher API; broader hasher support is deferred"
+)]
 impl<K, V> Configurable for HashMap<K, V>
 where
     K: ConfigurableString + ToValue + Hash + Eq + 'static,
@@ -345,6 +350,11 @@ where
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "preserve the existing default-hasher API; broader hasher support is deferred"
+)]
 impl<K, V> ToValue for HashMap<K, V>
 where
     K: ToString,
@@ -359,6 +369,11 @@ where
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "preserve the existing default-hasher API; broader hasher support is deferred"
+)]
 impl<V> Configurable for HashSet<V>
 where
     V: Configurable + ToValue + Eq + Hash + 'static,
@@ -379,6 +394,11 @@ where
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "preserve the existing default-hasher API; broader hasher support is deferred"
+)]
 impl<V> ToValue for HashSet<V>
 where
     V: ToValue,
@@ -445,14 +465,15 @@ impl Configurable for PathBuf {
     }
 
     fn metadata() -> Metadata {
-        let mut metadata = Metadata::default();
-        metadata.set_description("A file path.");
-
         // Taken from
         // https://stackoverflow.com/questions/44289075/regular-expression-to-validate-windows-and-linux-path-with-extension
         // and manually checked against common Linux and Windows paths. It's probably not 100% correct, but it
         // definitely covers the most basic cases.
         const PATH_REGEX: &str = r#"(\/.*|[a-zA-Z]:\\(?:([^<>:"\/\\|?*]*[^<>:"\/\\|?*.]\\|..\\)*([^<>:"\/\\|?*]*[^<>:"\/\\|?*.]\\?|..\\))?)"#;
+
+        let mut metadata = Metadata::default();
+        metadata.set_description("A file path.");
+
         metadata.add_validation(Validation::Pattern(PATH_REGEX.to_string()));
 
         metadata

@@ -49,17 +49,19 @@ The tag starts the release workflow; do not create the tag or release branch man
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.
-- [ ] Review and squash-merge the Helm release PR, then wait for the chart release.
-  - The Vector release workflow starts [Helm release preparation](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml)
-    automatically for the latest stable Vector release.
-  - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) for the review steps.
-- [ ] Release Homebrew. Refer to the internal releasing doc.
+- [ ] Wait for the [Homebrew release](https://github.com/vectordotdev/homebrew-brew/actions/workflows/release.yml) to complete.
+  - The Vector release workflow starts it automatically after publishing a stable release.
+    It updates the ARM64 formula and commits directly to the tap's default branch, without a PR.
 - [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/releases) description with the release announcement.
 
 # Post-release housekeeping
 
 - [ ] Wait for the release workflow to push its post-release housekeeping directly to `master`.
       It begins the next minor `-dev` version, restores VRL `main`, and refreshes licenses and documentation.
+  - If it fails, use **Re-run failed jobs**; this also starts the Helm release.
+- [ ] Wait for the [Helm chart release](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml).
+  - It starts after housekeeping and pushes directly, without a PR.
+    See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) if it fails.
 - [ ] Wait for the Helm chart release to push the Kubernetes manifests directly to `master`.
   - The chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml),
     which runs `cargo vdev build manifests` and, when the generated manifests differ,

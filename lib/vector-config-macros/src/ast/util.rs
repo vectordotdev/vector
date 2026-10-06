@@ -122,7 +122,7 @@ fn group_doc_lines(ungrouped: &[String]) -> Vec<String> {
                 buffer.push_str(s.strip_prefix(' ').unwrap_or(s));
                 buffer.push('\n');
             }
-        };
+        }
 
         grouped
     });
@@ -187,7 +187,7 @@ where
 /// If a valid ident can be constructed from the path, and the ident's value matches `other`,
 /// `true` is returned. Otherwise, `false` is returned.
 fn path_matches<S: AsRef<str>>(path: &syn::Path, other: S) -> bool {
-    path.get_ident().filter(|i| *i == &other).is_some()
+    path.get_ident().is_some_and(|ident| ident == &other)
 }
 
 /// Tries to find a specific attribute with a specific name/value pair.
@@ -212,10 +212,11 @@ fn find_name_value_attribute(
         .flat_map(|attr| match &attr.meta {
             Meta::List(ml) => ml
                 .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
-                .map(|nested| nested.into_iter())
-                // If parsing fails, return an empty iterator. By this point, `serde` has already
-                // emitted its own error, so we don't want to duplicate any error emission here.
-                .unwrap_or_else(|_| Punctuated::<NestedMeta, Comma>::new().into_iter()),
+                // Serde already reports parse errors, so avoid duplicate diagnostics.
+                .map_or_else(
+                    |_| Punctuated::<NestedMeta, Comma>::new().into_iter(),
+                    std::iter::IntoIterator::into_iter,
+                ),
             // Non-list attributes cannot contain nested meta items; return empty iterator.
             _ => Punctuated::<NestedMeta, Comma>::new().into_iter(),
         })
@@ -248,7 +249,7 @@ pub(crate) fn has_flag_attribute(
         .filter_map(|attr| match &attr.meta {
             Meta::List(ml) => ml
                 .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
-                .map(|nested| nested.into_iter())
+                .map(std::iter::IntoIterator::into_iter)
                 .ok(),
             _ => None,
         })
