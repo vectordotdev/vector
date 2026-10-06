@@ -49,9 +49,8 @@ The tag starts the release workflow; do not create the tag or release branch man
 - [ ] Confirm that [Homebrew](https://github.com/vectordotdev/homebrew-brew) was released ([workflow](https://github.com/vectordotdev/homebrew-brew/actions/workflows/release.yml))
 - [ ] Release Linux packages. Refer to the internal releasing doc.
 
-- [ ] Wait for the [Helm chart release](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml).
-  - It starts after housekeeping and pushes directly, without a PR.
-    See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) if it fails.
+- [ ] Wait for the Helm chart [Post Release](https://github.com/vectordotdev/helm-charts/actions/workflows/release-post.yml) to complete.
+  - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
 
 - [ ] Wait for the Helm chart release to push the Kubernetes manifests directly to `master` ([workflow](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml)).
 - [ ] Wait for the [Unfreeze master](https://github.com/vectordotdev/vector/actions/workflows/release_unfreeze.yml) workflow to finalize the release.
