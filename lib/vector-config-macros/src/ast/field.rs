@@ -216,7 +216,7 @@ impl<'a> Field<'a> {
     /// Whether or not this field is visible during either serialization or deserialization.
     ///
     /// This is derived from whether any of the `serde` visibility attributes are applied: `skip`,
-    /// `skip_serializing, and `skip_deserializing`. Unless the field is skipped entirely, it will
+    /// `skip_serializing`, and `skip_deserializing`. Unless the field is skipped entirely, it will
     /// be considered visible and part of the schema.
     pub fn visible(&self) -> bool {
         self.attrs.visible
@@ -262,7 +262,7 @@ impl<'a> Field<'a> {
 
 impl ToTokens for Field<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.original.to_tokens(tokens)
+        self.original.to_tokens(tokens);
     }
 }
 
