@@ -425,7 +425,7 @@ components: sources: internal_metrics: {
 					required:    true
 				}
 				group: {
-					description: "The group that the discarded event belonged to. This tag is included only when enabled in the component configuration."
+					description: "The group that the discarded event belonged to. This tag is included only when enabled in the component configuration, such as `internal_metrics.include_group_tag` on the `throttle` transform."
 					required:    false
 				}
 			}

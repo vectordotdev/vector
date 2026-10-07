@@ -34,7 +34,7 @@ pub struct ThrottleInternalMetricsConfig {
     /// internal metric.
     ///
     /// When enabled, adds a `group` tag containing the rendered `key_field` value.
-    /// Missing or unrenderable values use `None`.
+    /// If the `key_field` value is missing or can't be rendered, the tag value is `None`.
     ///
     /// Note that this defaults to false because the `group` tag has potentially unbounded
     /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
