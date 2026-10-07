@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rand::{
     distr::{Distribution, Uniform},

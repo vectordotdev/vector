@@ -12,6 +12,11 @@ use vector::{
 };
 use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn build_file_benchmark_environment(
     idle_files: usize,
 ) -> (
@@ -52,7 +57,7 @@ fn build_file_benchmark_environment(
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: sinks::file::Compression::None,
             acknowledgements: Default::default(),
-            timezone: Default::default(),
+            timezone: Option::default(),
             internal_metrics: Default::default(),
             truncate: Default::default(),
             base_dir: None,
@@ -78,6 +83,11 @@ fn build_file_benchmark_environment(
     (rt, topology, input, temp)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn benchmark_files_no_partitions(c: &mut Criterion) {
     let num_lines: usize = 10_000;
     let line_size: usize = 100;
@@ -124,7 +134,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
                         compression: sinks::file::Compression::None,
                         acknowledgements: Default::default(),
-                        timezone: Default::default(),
+                        timezone: Option::default(),
                         internal_metrics: Default::default(),
                         truncate: Default::default(),
                         base_dir: None,
@@ -161,7 +171,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                 });
             },
             BatchSize::LargeInput,
-        )
+        );
     });
 
     group.finish();
@@ -202,7 +212,7 @@ fn benchmark_files_with_idle_watchers(c: &mut Criterion) {
                         });
                     },
                     BatchSize::LargeInput,
-                )
+                );
             },
         );
     }
