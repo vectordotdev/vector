@@ -100,8 +100,10 @@ fn coerce_logical_types(
                 .map(|value| AvroValue::Union(index, Box::new(value)))
         }
         (value, Schema::Union(union_schema)) => {
-            if let Ok(resolved) = value.clone().resolve(schema) {
-                return Ok(resolved);
+            if value.clone().resolve(schema).is_ok() {
+                // Resolving an already-converted value again can select a different
+                // union branch and discard fields, so preserve the original input.
+                return Ok(value);
             }
 
             let mut last_err = None;
