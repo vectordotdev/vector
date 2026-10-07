@@ -104,7 +104,7 @@
             {{ $numBreaking := len $breakingTitled }}
             {{ $breakingWord := cond (eq $numBreaking 1) "breaking change" "breaking changes" }}
             {{ $breakingHeading := printf "%d %s" $numBreaking $breakingWord }}
-            {{ partial "heading.html" (dict "text" $breakingHeading "level" 3 "icon" false) }}
+            {{ partial "heading.html" (dict "text" $breakingHeading "id" "breaking changes" "level" 3 "icon" false) }}
           </div>
 
           <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
@@ -135,7 +135,7 @@
           {{ $heading := printf "%d %s" $numChanges $value }}
           <div>
             <div class="prose dark:prose-invert max-w-none">
-              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+              {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false) }}
             </div>
 
             <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
@@ -170,7 +170,7 @@
           {{ $heading := printf "%d %s" $numCommits $value }}
           <div class="ml-6">
             <div class="prose dark:prose-invert max-w-none">
-              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+              {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false) }}
             </div>
 
             <div class="mt-4 flex flex-col space-y-2">
