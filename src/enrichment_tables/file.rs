@@ -304,30 +304,16 @@ impl File {
                     // Helper closure for comparing current_row_value with another value,
                     // respecting the specified case for string values.
                     let compare_values = |val_to_compare: &Value| -> bool {
-                        match (
-                            case,
-                            current_row_value.as_bytes(),
-                            val_to_compare.as_bytes(),
-                        ) {
-                            (Case::Insensitive, Some(bytes_row), Some(bytes_cmp)) => {
-                                // Perform case-insensitive comparison for byte strings.
-                                // If both are valid UTF-8, compare their lowercase versions.
-                                // If both are non-UTF-8 bytes, compare them directly.
-                                // If one is UTF-8 and the other is not, they are considered not equal.
-                                match (
-                                    std::str::from_utf8(bytes_row),
-                                    std::str::from_utf8(bytes_cmp),
-                                ) {
-                                    (Ok(s_row), Ok(s_cmp)) => {
-                                        s_row.to_lowercase() == s_cmp.to_lowercase()
-                                    }
-                                    (Err(_), Err(_)) => bytes_row == bytes_cmp,
-                                    _ => false,
-                                }
-                            }
-                            // For Case::Sensitive, or for Case::Insensitive with non-string types,
-                            // perform a direct equality check.
-                            _ => current_row_value == val_to_compare,
+                        if case == Case::Insensitive
+                            && let (Some(row), Some(value)) = (
+                                lowercase_string_value(current_row_value),
+                                lowercase_string_value(val_to_compare),
+                            )
+                        {
+                            row == value
+                        } else {
+                            // Invalid UTF-8 bytes and non-string values use ordinary equality.
+                            current_row_value == val_to_compare
                         }
                     };
 
@@ -517,6 +503,14 @@ impl File {
         let wildcard_key = wildcard_hash.finish();
         let IndexHandle(handle) = handle;
         Ok(self.indexes[handle].2.get(&wildcard_key))
+    }
+}
+
+fn lowercase_string_value(value: &Value) -> Option<String> {
+    match value {
+        Value::Bytes(bytes) => std::str::from_utf8(bytes).map(str::to_lowercase).ok(),
+        Value::String(string) => Some(string.to_lowercase()),
+        _ => None,
     }
 }
 
@@ -1157,6 +1151,41 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn case_insensitive_lookup_preserves_invalid_bytes_and_non_strings() {
+        let values = [
+            Value::Bytes(Bytes::from_static(&[0xff])),
+            Value::Bytes(Bytes::from_static(&[0xfe])),
+            Value::from("\u{fffd}"),
+            Value::Integer(42),
+            Value::Null,
+        ];
+        let file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: values.iter().cloned().map(|value| vec![value]).collect(),
+                headers: vec!["field".to_string()],
+            },
+        );
+
+        for value in values {
+            let rows = file
+                .find_table_rows(
+                    Case::Insensitive,
+                    &[Condition::Equals {
+                        field: "field",
+                        value: value.clone(),
+                    }],
+                    None,
+                    None,
+                    None,
+                )
+                .unwrap();
+            assert_eq!(rows, vec![ObjectMap::from([("field".into(), value)])]);
         }
     }
 
