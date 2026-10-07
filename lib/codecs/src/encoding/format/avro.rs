@@ -271,6 +271,58 @@ mod tests {
     }
 
     #[test]
+    fn serialize_avro_preserves_resolvable_union_branch() {
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "x" => Value::Array(vec![Value::from(65), Value::from(66)]),
+            "y" => Value::from(123)
+        }));
+        let schema = indoc! {r#"
+            [
+                {
+                    "type": "record",
+                    "name": "A",
+                    "fields": [
+                        {"name": "x", "type": "string"}
+                    ]
+                },
+                {
+                    "type": "record",
+                    "name": "B",
+                    "fields": [
+                        {"name": "x", "type": "bytes"},
+                        {"name": "y", "type": "long"}
+                    ]
+                }
+            ]
+        "#}
+        .to_owned();
+        let config = AvroSerializerConfig::new(schema);
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event, &mut bytes).unwrap();
+
+        let value = apache_avro::reader::datum::GenericDatumReader::builder(&serializer.schema)
+            .build()
+            .unwrap()
+            .read_value(&mut bytes.as_ref())
+            .unwrap();
+
+        // The array resolves to bytes in B. Resolving again can turn those bytes into
+        // a string, select A, and silently discard y.
+        assert_eq!(
+            value,
+            AvroValue::Union(
+                1,
+                Box::new(AvroValue::Record(vec![
+                    ("x".to_owned(), AvroValue::Bytes(vec![65, 66])),
+                    ("y".to_owned(), AvroValue::Long(123)),
+                ]))
+            )
+        );
+    }
+
+    #[test]
     fn coerce_date_fields_recursively() {
         let schema = apache_avro::Schema::parse_str(indoc! {r#"
             {
