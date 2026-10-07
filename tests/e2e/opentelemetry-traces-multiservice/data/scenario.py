@@ -1,4 +1,8 @@
-"""Bounded transactions using the pinned demo's instrumented Locust user."""
+"""Run a fixed workload using the demo's instrumented Locust user.
+
+Unlike the default random, continuous workload, this stops after three shopping
+rounds and writes a completion marker so trace validation can start.
+"""
 
 import os
 from pathlib import Path
@@ -16,17 +20,6 @@ class DemoUser(WebsiteUser):
             self.get_recommendations()
             self.view_cart()
             self.checkout_multi()
-
-        # The catalog's not-found RPC exercises real error spans without a fault flag.
-        with self.tracer.start_as_current_span("user_missing_product"):
-            with self.client.get(
-                "/api/products/vector-e2e-missing", catch_response=True
-            ) as response:
-                if response.status_code < 400:
-                    response.failure("missing product unexpectedly succeeded")
-                    self.environment.process_exit_code = 1
-                else:
-                    response.success()
 
         trace.get_tracer_provider().shutdown()
         directory = Path("/output/opentelemetry-traces-multiservice") / os.environ["CONFIG_INGRESS_EXPORTER"]

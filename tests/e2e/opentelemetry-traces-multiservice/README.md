@@ -18,9 +18,12 @@ fixture-based trace tests.
 Trace and span counts in the diagram are examples from local runs, not assertions.
 
 [scenario.py](data/scenario.py) runs one simulated shopper through three rounds of ad,
-recommendation, cart, and multi-item checkout requests, then a missing-product
-request to generate errors. Checkout also exercises the Kafka accounting and
-fraud-detection consumers.
+recommendation, cart, and multi-item checkout requests. Checkout also exercises
+the Kafka accounting and fraud-detection consumers.
+
+[demo.flagd.json](data/demo.flagd.json) uses the Demo's default flags except
+`cartFailure: 100%`. This generates cart-emptying error spans while checkout
+continues to email and Kafka.
 
 The [ingress Collector](data/collector-source.yaml) writes `input.jsonl` and
 forwards traces to Vector. The [matrix](config/test.yaml) runs each transport
