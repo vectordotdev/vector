@@ -1,73 +1,70 @@
-# OpenTelemetry Demo trace validation
+# Multiservice OpenTelemetry trace validation
 
-This manual E2E test runs the multilingual
+This manual E2E test checks that Vector preserves multilingual, multiservice
+traces from the
 [OpenTelemetry Demo 3.1.0](https://github.com/open-telemetry/opentelemetry-demo/tree/3.1.0)
-through Vector using the existing `vdev` Compose harness and Collector 0.159.0.
+using the existing `vdev` Compose harness and
+[OTel Collector](https://opentelemetry.io/docs/collector/) 0.159.0.
+
+It provides realistic trace-preservation evidence for changes such as the
+[trace model RFC](../../../rfcs/2026-04-29-25329-trace-data-model.md).
+It runs manually because the full application setup is heavier than the
+fixture-based trace tests.
 
 ## Input and destination
 
-```text
-Demo applications → ingress Collector → Vector → destination Collector
-                        input.jsonl                  output.jsonl
-```
+![Trace test architecture: application traces pass through Vector between two Collectors; input and output captures are compared after each run.](architecture.png)
 
-[scenario.py](data/scenario.py) runs one instrumented Locust user through three
-sets of ad, recommendation, cart, and multi-item checkout requests, followed by a
-missing-product request to generate errors. Checkout also exercises the Kafka
-accounting and fraud-detection consumers. Browser traffic is disabled.
+Trace and span counts in the diagram are examples from local runs, not assertions.
 
-The ingress Collector accepts the applications' OTLP/gRPC and OTLP/HTTP telemetry.
-Its [configuration](data/collector-source.yaml) captures traces in `input.jsonl`.
-The [test matrix](config/test.yaml) runs two separate environments: `otlphttp`
-forwards over HTTP to `http://vector:4318/v1/traces`, and `otlp` forwards over
-gRPC to `vector:4317`. Each run forwards the input once and applies the same
-validations; captures are kept separately.
-Application logs and metrics are accepted by the Collector but not sent to Vector.
+[scenario.py](data/scenario.py) runs one simulated shopper through three rounds of ad,
+recommendation, cart, and multi-item checkout requests, then a missing-product
+request to generate errors. Checkout also exercises the Kafka accounting and
+fraud-detection consumers.
+
+The [ingress Collector](data/collector-source.yaml) writes `input.jsonl` and
+forwards traces to Vector. The [matrix](config/test.yaml) runs each transport
+separately with the same checks:
+
+- HTTP (`otlphttp`): `http://vector:4318/v1/traces`.
+- gRPC (`otlp`): `vector:4317`.
+
+Application logs and metrics are not forwarded to Vector.
 
 Vector runs [data/vector.yaml](data/vector.yaml), mounted as
-`/etc/vector/vector.yaml`. Its `opentelemetry` source uses
-`use_otlp_decoding: true`; its `opentelemetry` sink reads `otel.traces`, encodes
-OTLP, and sends HTTP requests to `http://otel-collector-sink:4318/v1/traces`,
-with a one-second batch timeout. There are no transforms.
+`/etc/vector/vector.yaml`: an `opentelemetry` source with
+`use_otlp_decoding: true` feeds `otel.traces` directly to an `opentelemetry`
+sink, which sends OTLP/HTTP to `http://otel-collector-sink:4318/v1/traces`.
 
-The destination is a second local OpenTelemetry Collector, configured by
-[collector-sink.yaml](data/collector-sink.yaml) to write `output.jsonl`.
-No external telemetry backend is involved.
+The destination is a [second local Collector](data/collector-sink.yaml) that
+writes `output.jsonl`.
 
 ## Validations
 
 The [Rust test](../opentelemetry/demo/mod.rs) verifies:
 
-- Workload completion and drain: requires the completion marker, lets Kafka
-  consumers finish, stops producers and the ingress Collector, and waits up to
-  120 seconds for Vector's output before closing the destination capture.
-- Service coverage: requires spans from ad, cart, checkout, currency, email,
-  frontend, payment, product-catalog, quote, recommendation, shipping,
-  load-generator, accounting, and fraud-detection.
-- Trace coverage: requires roots, multi-span traces, children with captured
+- Completion: requires the workload marker, allows Kafka consumers to finish,
+  stops the input, and waits up to 120 seconds for Vector to drain.
+- Service coverage: requires spans from 14 services exercised by the workload.
+- Trace shapes: requires roots, multi-span traces, children with captured
   parents, cross-service parent relationships, and error spans.
-- Round-trip preservation: compares every span with its resource, scope, and
-  schema URLs, including identities, parents, attributes, timestamps, status,
-  events, links, flags, and dropped counts. Missing, extra, or changed spans,
-  including changes to duplicate counts, fail. Only batching, span traversal
-  order, and attribute-map order may differ.
-- Capture support: rejects malformed IDs and unknown protobuf fields rather than
-  silently discarding them before comparison.
+- Preservation: compares every span and its resource, scope, and schema URLs.
+  Missing, extra, or changed spans and duplicate counts fail. Only batching,
+  span order, and attribute-map order may differ.
+- Capture format: fails on malformed IDs or unknown capture fields.
 
-Events, links, and scope groups containing multiple trace IDs are reported as
-observed; they are not required coverage gates. This currently validates the
-existing OTLP relay, not the proposed typed trace conversion. The flattened
-`use_otlp_decoding: false` layout needs separate converter assertions because it
-already loses scope information and cannot feed the current OTLP sink directly.
+## Coverage and limitations
 
-Once OTLP-to-Datadog conversion is implemented, the same input can also feed a
-`datadog_traces` sink targeting a local intake receiver. That branch should check
-the [RFC's cross-format mapping](../../../rfcs/2026-04-29-25329-trace-data-model/datadog-mapping.md#cross-format-conformance-otlp---vector---datadog_traces),
-while the OTLP branch continues checking round-trip preservation.
+- Decoding: only `use_otlp_decoding: true` is tested.
+- Optional coverage: events, links, and scope groups with multiple trace IDs
+  are reported in `coverage.json` and compared when present. They are not required,
+  so a run without them can pass.
+- Edge cases: the workload does not guarantee all field values, such as byte
+  attributes, missing scopes, or nonzero dropped counts.
 
 ## Running and results
 
-Locally, with Docker available, run both ingress transports:
+With Docker available, run both transports:
 
 ```shell
 cargo vdev e2e run opentelemetry-demo --retries 0 --always-show-logs
@@ -75,17 +72,11 @@ cargo vdev e2e run opentelemetry-demo --retries 0 --always-show-logs
 
 To run one transport, add `-e 0.159.0-otlphttp` (HTTP) or `-e 0.159.0-otlp` (gRPC).
 
-In CI, a Vector-team member submits a PR review starting with
-`/ci-run-e2e-opentelemetry-demo`. The dedicated job tests the reviewed commit.
-Ordinary comments, both “run all” commands, automatic PR CI, and schedules do not
-run the demo. The candidate branch must include this test.
+In CI, a Vector-team member can submit a PR review starting with
+`/ci-run-e2e-opentelemetry-demo` to test the reviewed commit.
+Comments, “run all” commands, automatic PR CI, and schedules do not trigger it.
 
-Captures, `coverage.json`, `differences.txt`, and `summary.md` are stored in the
-`opentelemetry_demo_evidence` Docker volume, mounted under
-`/output/opentelemetry-demo/`, in separate `otlphttp/` and `otlp/` directories.
-The dedicated volume retains both runs across the harness's per-environment
-cleanup. Each selected run replaces its own captures; unselected or unstarted
-transports may retain older local results. CI publishes
-these with the configuration, commit SHA, and runner logs in an
-`otel-demo-<commit>` artifact and adds the summary to the job. Startup or drain
-failures may leave partial evidence.
+Read the results on the CI job's summary page. Download the
+`otel-demo-<commit>` artifact for input/output captures, `coverage.json`,
+`differences.txt`, configs, and runner logs. Results are separated by transport;
+failed runs may leave partial results.
