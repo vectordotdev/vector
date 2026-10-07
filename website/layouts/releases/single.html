@@ -194,7 +194,9 @@
         </div>
 
         <div class="vrl-changelog mt-6 prose dark:prose-invert max-w-none [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
-          {{ . | markdownify }}
+          {{/* Prefix VRL heading IDs (and links to them) so VRL's "New Features",
+               "Enhancements", etc. do not collide with the Vector changelog anchors. */}}
+          {{ . | markdownify | replaceRE `(id="|href="#)` "${1}vrl-" | safeHTML }}
         </div>
       </div>
       {{ end }}
