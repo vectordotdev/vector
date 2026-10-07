@@ -52,6 +52,15 @@ const failedIcon = svgIcon(
 const addCopyButtons = () => {
   if (!navigator.clipboard?.writeText) return;
 
+  // Raw HTML code blocks (e.g. in generated component descriptions) lack Hugo's .highlight wrapper
+  document.querySelectorAll("#page-content pre.chroma").forEach((pre) => {
+    if (pre.closest(".highlight")) return;
+    const wrapper = document.createElement("div");
+    wrapper.className = "highlight";
+    pre.replaceWith(wrapper);
+    wrapper.append(pre);
+  });
+
   document.querySelectorAll("#page-content .highlight").forEach((block) => {
     if (codeBlockText(block) === null) return;
 
@@ -67,9 +76,12 @@ const addCopyButtons = () => {
     status.setAttribute("aria-live", "polite");
 
     let resetTimer;
+    let copying = false;
     button.addEventListener("click", async () => {
+      // Guard with a flag rather than `disabled`, which can drop keyboard focus
+      if (copying) return;
+      copying = true;
       clearTimeout(resetTimer);
-      button.disabled = true;
       try {
         await navigator.clipboard.writeText(codeBlockText(block));
         button.innerHTML = copiedIcon;
@@ -78,7 +90,7 @@ const addCopyButtons = () => {
         button.innerHTML = failedIcon;
         button.title = status.textContent = "Copy failed. Select the code to copy it manually.";
       } finally {
-        button.disabled = false;
+        copying = false;
       }
       resetTimer = setTimeout(() => {
         button.innerHTML = copyIcon;
