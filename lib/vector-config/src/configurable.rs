@@ -22,6 +22,7 @@ pub trait Configurable {
     ///
     /// When specified, this implies the value is both complex and standardized, and should be
     /// reused within any generated schema it is present in.
+    #[must_use]
     fn referenceable_name() -> Option<&'static str>
     where
         Self: Sized,
@@ -38,6 +39,7 @@ pub trait Configurable {
     /// Maps, by definition, are inherently free-form, and thus inherently optional. Thus, this
     /// method should likely not be overridden except for implementing `Configurable` for map
     /// types. If you're using it for something else, you are expected to know what you're doing.
+    #[must_use]
     fn is_optional() -> bool
     where
         Self: Sized,
@@ -46,6 +48,7 @@ pub trait Configurable {
     }
 
     /// Gets the metadata for this value.
+    #[must_use]
     fn metadata() -> Metadata
     where
         Self: Sized,
@@ -60,6 +63,10 @@ pub trait Configurable {
     /// numeric types, there is a limited amount of validation that can occur within the
     /// `Configurable` derive macro, and additional validation must happen at runtime when the
     /// `Configurable` trait is being used, which this method allows for.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metadata violates constraints imposed by this type.
     fn validate_metadata(_metadata: &Metadata) -> Result<(), GenerateError>
     where
         Self: Sized,
@@ -78,6 +85,7 @@ pub trait Configurable {
         Self: Sized;
 
     /// Create a new configurable reference table.
+    #[must_use]
     fn as_configurable_ref() -> ConfigurableRef
     where
         Self: Sized + 'static,
@@ -109,6 +117,7 @@ pub struct ConfigurableRef {
 
 impl ConfigurableRef {
     /// Create a new configurable reference table.
+    #[must_use]
     pub const fn new<T: Configurable + 'static>() -> Self {
         Self {
             type_name: std::any::type_name::<T>,

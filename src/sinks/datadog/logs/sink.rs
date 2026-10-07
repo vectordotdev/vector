@@ -1,5 +1,6 @@
 use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
+use bytes::Bytes;
 use itertools::Itertools;
 use snafu::Snafu;
 use tracing::Instrument;
@@ -8,12 +9,15 @@ use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
-use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
+use vrl::{
+    path::{OwnedSegment, OwnedTargetPath, PathPrefix},
+    value::value::simdutf_bytes_utf8_lossy,
+};
 
-use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
+use super::{config::DatadogLogsTruncationConfig, service::LogApiRequest};
 use crate::{
     common::datadog::{DD_RESERVED_SEMANTIC_ATTRS, DDTAGS, MESSAGE, is_reserved_attribute},
-    internal_events::DatadogLogsReservedAttributeConflict,
+    internal_events::{DatadogLogsEventTruncated, DatadogLogsReservedAttributeConflict},
     sinks::{
         prelude::*,
         util::{Compressor, http::HttpJsonBatchSizer},
@@ -40,6 +44,8 @@ pub struct LogSinkBuilder<S> {
     default_api_key: Arc<str>,
     protocol: String,
     conforms_as_agent: bool,
+    max_payload_bytes: usize,
+    truncation: Option<DatadogLogsTruncationConfig>,
 }
 
 impl<S> LogSinkBuilder<S> {
@@ -50,6 +56,7 @@ impl<S> LogSinkBuilder<S> {
         batch_settings: BatcherSettings,
         protocol: String,
         conforms_as_agent: bool,
+        max_payload_bytes: usize,
     ) -> Self {
         Self {
             transformer,
@@ -59,11 +66,18 @@ impl<S> LogSinkBuilder<S> {
             compression: None,
             protocol,
             conforms_as_agent,
+            max_payload_bytes,
+            truncation: None,
         }
     }
 
     pub const fn compression(mut self, compression: Compression) -> Self {
         self.compression = Some(compression);
+        self
+    }
+
+    pub const fn truncation(mut self, truncation: Option<DatadogLogsTruncationConfig>) -> Self {
+        self.truncation = truncation;
         self
     }
 
@@ -76,6 +90,8 @@ impl<S> LogSinkBuilder<S> {
             compression: self.compression.unwrap_or_default(),
             protocol: self.protocol,
             conforms_as_agent: self.conforms_as_agent,
+            max_payload_bytes: self.max_payload_bytes,
+            truncation: self.truncation,
         }
     }
 }
@@ -100,6 +116,10 @@ pub struct LogSink<S> {
     protocol: String,
     /// Normalize events to agent standard and attach associated HTTP header to request
     conforms_as_agent: bool,
+    /// Maximum uncompressed payload size in bytes
+    max_payload_bytes: usize,
+    /// Limits used when oversized log truncation is enabled.
+    truncation: Option<DatadogLogsTruncationConfig>,
 }
 
 // The Datadog logs intake does not require the fields that are set in this
@@ -247,6 +267,8 @@ struct LogRequestBuilder {
     pub transformer: Transformer,
     pub compression: Compression,
     pub conforms_as_agent: bool,
+    pub max_payload_bytes: usize,
+    pub truncation: Option<DatadogLogsTruncationConfig>,
 }
 
 impl LogRequestBuilder {
@@ -273,22 +295,63 @@ impl LogRequestBuilder {
         let mut requests: Vec<LogApiRequest> = Vec::new();
         while !events_with_estimated_size.is_empty() {
             let (events_serialized, body, byte_size) =
-                serialize_with_capacity(&mut events_with_estimated_size)?;
+                self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
-                // first event was too large for whole request
-                let _too_big = events_with_estimated_size.pop_front();
-                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                    count: 1,
-                    reason: "Event too large to encode."
-                });
-            } else {
-                let request =
-                    self.finish_request(body, events_serialized, byte_size, Arc::clone(&api_key))?;
-                requests.push(request);
+                if events_with_estimated_size.pop_front().is_some() {
+                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                        count: 1,
+                        reason: "Event too large to encode."
+                    });
+                }
+                continue;
             }
+            let request =
+                self.finish_request(body, events_serialized, byte_size, Arc::clone(&api_key))?;
+            requests.push(request);
         }
 
         Ok(requests)
+    }
+
+    /// Serialize events into a buffer as a JSON array that has a maximum size of
+    /// `max_payload_bytes`.
+    ///
+    /// Returns the serialized events, the buffer, and the byte size of the events. Events that do
+    /// not fit remain in the `events` parameter. Events rejected during encoding are removed.
+    fn serialize_with_capacity(
+        &self,
+        events: &mut VecDeque<(Event, JsonSize)>,
+    ) -> io::Result<(Vec<Event>, Vec<u8>, GroupedCountByteSize)> {
+        let total_estimated =
+            events.iter().map(|(_, size)| size.get()).sum::<usize>() + events.len() * 2;
+        let mut buf = Vec::with_capacity(total_estimated);
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        let mut events_serialized = Vec::with_capacity(events.len());
+
+        buf.push(b'[');
+        while let Some((mut event, mut estimated_json_size)) = events.pop_front() {
+            let existing_len = buf.len();
+            if encode_log(
+                &mut buf,
+                &mut event,
+                !events_serialized.is_empty(),
+                self.truncation,
+                self.conforms_as_agent,
+            )? {
+                estimated_json_size = event.estimated_json_encoded_size_of();
+            }
+
+            if buf.len() >= self.max_payload_bytes {
+                events.push_front((event, estimated_json_size));
+                buf.truncate(existing_len);
+                break;
+            }
+            byte_size.add_event(&event, estimated_json_size);
+            events_serialized.push(event);
+        }
+        buf.push(b']');
+
+        Ok((events_serialized, buf, byte_size))
     }
 
     fn finish_request(
@@ -326,48 +389,180 @@ impl LogRequestBuilder {
     }
 }
 
-/// Serialize events into a buffer as a JSON array that has a maximum size of
-/// `MAX_PAYLOAD_BYTES`.
+/// Encodes a log event and returns whether it was locally truncated.
 ///
-/// Returns the serialized events, the buffer, and the byte size of the events.
-/// Events that are not serialized remain in the `events` parameter.
-pub fn serialize_with_capacity(
-    events: &mut VecDeque<(Event, JsonSize)>,
-) -> Result<(Vec<Event>, Vec<u8>, GroupedCountByteSize), io::Error> {
-    // Compute estimated size, accounting for the size of the brackets and commas.
-    let total_estimated =
-        events.iter().map(|(_, size)| size.get()).sum::<usize>() + events.len() * 2;
+/// Returns `true` if the message was shortened and tagged, so the caller must recompute its
+/// estimated encoded size.
+fn encode_log(
+    buf: &mut Vec<u8>,
+    event: &mut Event,
+    include_comma: bool,
+    truncation: Option<DatadogLogsTruncationConfig>,
+    conforms_as_agent: bool,
+) -> io::Result<bool> {
+    let existing_len = buf.len();
+    let original_encoded_size = write_log(buf, event, include_comma)?;
+    let Some(truncation) =
+        truncation.filter(|truncation| original_encoded_size > truncation.max_log_bytes)
+    else {
+        return Ok(false);
+    };
 
-    // Initialize state.
-    let mut buf = Vec::with_capacity(total_estimated);
-    let mut byte_size = telemetry().create_request_count_byte_size();
-    let mut events_serialized = Vec::with_capacity(events.len());
-
-    // Write entries until the buffer is full.
-    buf.push(b'[');
-    let mut first = true;
-    while let Some((event, estimated_json_size)) = events.pop_front() {
-        // Track the existing length of the buffer so we can truncate it if we need to.
-        let existing_len = buf.len();
-        if first {
-            first = false;
+    let Some(message) =
+        message_bytes_mut(event.as_mut_log(), conforms_as_agent).map(|message| message.clone())
+    else {
+        return Ok(false);
+    };
+    let message = simdutf_bytes_utf8_lossy(&message);
+    let message_encoded_size = json_string_encoded_size(&message);
+    let previous_tags = event.as_log().get(event_path!(DDTAGS)).cloned();
+    let tagged_encoded_size = ensure_truncated_tag(event.as_mut_log(), original_encoded_size)?;
+    // The encoded event consists of a fixed non-message portion and the message value. Size them
+    // separately so the final message can be selected without repeatedly encoding the whole event.
+    let non_message_encoded_size = tagged_encoded_size - message_encoded_size;
+    let Some(body_len) = truncation
+        .max_log_bytes
+        .checked_sub(non_message_encoded_size)
+        .and_then(|budget| select_message_body_len(&message, message_encoded_size, budget))
+    else {
+        if let Some(tags) = previous_tags {
+            event.as_mut_log().insert(event_path!(DDTAGS), tags);
         } else {
-            buf.push(b',');
+            // Remove the temporary tag that `ensure_truncated_tag` inserted for size calculation.
+            event.as_mut_log().remove(event_path!(DDTAGS));
         }
-        serde_json::to_writer(&mut buf, event.as_log())?;
-        // If the buffer is too big, truncate it and break out of the loop.
-        if buf.len() >= MAX_PAYLOAD_BYTES {
-            events.push_front((event, estimated_json_size));
-            buf.truncate(existing_len);
-            break;
-        }
-        // Otherwise, track the size of the event and continue.
-        byte_size.add_event(&event, estimated_json_size);
-        events_serialized.push(event);
+        return Ok(false);
+    };
+    if body_len < message.len() {
+        set_truncated_message(event.as_mut_log(), &message, body_len, conforms_as_agent);
     }
-    buf.push(b']');
 
-    Ok((events_serialized, buf, byte_size))
+    buf.truncate(existing_len);
+    let encoded_size = write_log(buf, event, include_comma)?;
+
+    // The message budget uses the same UTF-8 bytes and JSON sizing as serialization, so a
+    // mismatch here indicates that the size calculation has diverged. Request serialization
+    // separately enforces `max_payload_bytes` in release builds.
+    debug_assert!(encoded_size <= truncation.max_log_bytes);
+    emit!(DatadogLogsEventTruncated {
+        max_log_bytes: truncation.max_log_bytes,
+        original_encoded_size,
+    });
+    Ok(true)
+}
+
+fn select_message_body_len(
+    message: &str,
+    message_encoded_size: usize,
+    encoded_budget: usize,
+) -> Option<usize> {
+    if message_encoded_size <= encoded_budget {
+        Some(message.len())
+    } else {
+        let content_budget =
+            encoded_budget.checked_sub(2 + json_string_content_size(TRUNCATION_MARKER))?;
+        let mut body_len = 0;
+        let mut encoded_size = 0;
+        for (index, character) in message.char_indices() {
+            let next_body_len = index + character.len_utf8();
+            let next_encoded_size = encoded_size + json_character_encoded_size(character);
+            if next_encoded_size > content_budget {
+                break;
+            }
+            body_len = next_body_len;
+            encoded_size = next_encoded_size;
+        }
+
+        (body_len < message.len()).then_some(body_len)
+    }
+}
+
+fn write_log(buf: &mut Vec<u8>, event: &Event, include_comma: bool) -> io::Result<usize> {
+    if include_comma {
+        buf.push(b',');
+    }
+    let object_start = buf.len();
+    serde_json::to_writer(&mut *buf, event.as_log())?;
+    Ok(buf.len() - object_start)
+}
+
+const TRUNCATION_MARKER: &str = "...TRUNCATED...";
+const TRUNCATED_TAG: &str = "truncated:single_line";
+
+fn set_truncated_message(
+    log: &mut LogEvent,
+    message: &str,
+    body_len: usize,
+    conforms_as_agent: bool,
+) {
+    let marker = TRUNCATION_MARKER.as_bytes();
+    let mut truncated = Vec::with_capacity(body_len + marker.len());
+    truncated.extend_from_slice(&message.as_bytes()[..body_len]);
+    truncated.extend_from_slice(marker);
+    *message_bytes_mut(log, conforms_as_agent).expect("the message was previously found") =
+        Bytes::from(truncated);
+}
+
+fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<usize> {
+    let tags_path = event_path!(DDTAGS);
+    let previous_size = log
+        .get(tags_path)
+        .map(json_value_encoded_size)
+        .transpose()?;
+    if let Some(tags) = log.get(tags_path).and_then(Value::as_bytes)
+        && !tags.is_empty()
+    {
+        let tags = String::from_utf8_lossy(tags);
+        if tags.split(',').any(|tag| tag.trim() == TRUNCATED_TAG) {
+            return Ok(encoded_size);
+        }
+        log.insert(tags_path, format!("{tags},{TRUNCATED_TAG}"));
+    } else {
+        log.insert(tags_path, TRUNCATED_TAG);
+    }
+    let new_size =
+        json_value_encoded_size(log.get(tags_path).expect("the truncation tag was inserted"))?;
+
+    Ok(if let Some(previous_size) = previous_size {
+        encoded_size - previous_size + new_size
+    } else {
+        // The log already contains the message field, so adding ddtags also adds one comma.
+        encoded_size + json_string_encoded_size(DDTAGS) + 1 + new_size + 1
+    })
+}
+
+fn message_bytes_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Bytes> {
+    match log.as_map_mut()?.get_mut(MESSAGE)? {
+        Value::Bytes(message) => Some(message),
+        Value::Object(fields) if conforms_as_agent => match fields.get_mut(MESSAGE)? {
+            Value::Bytes(message) => Some(message),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn json_string_encoded_size(value: &str) -> usize {
+    2 + json_string_content_size(value)
+}
+
+fn json_string_content_size(value: &str) -> usize {
+    value.chars().map(json_character_encoded_size).sum()
+}
+
+const fn json_character_encoded_size(character: char) -> usize {
+    match character {
+        '"' | '\\' | '\u{0008}' | '\t' | '\n' | '\u{000c}' | '\r' => 2,
+        '\u{0000}'..='\u{001f}' => 6,
+        _ => character.len_utf8(),
+    }
+}
+
+fn json_value_encoded_size(value: &Value) -> io::Result<usize> {
+    let mut sink = io::sink();
+    encoding::as_tracked_write(&mut sink, value, |writer, value| {
+        serde_json::to_writer(writer, value)
+    })
 }
 
 impl<S> LogSink<S>
@@ -387,6 +582,8 @@ where
             transformer: self.transformer,
             compression: self.compression,
             conforms_as_agent: self.conforms_as_agent,
+            max_payload_bytes: self.max_payload_bytes,
+            truncation: self.truncation,
         });
 
         let input = input.batched_partitioned(partitioner, batch_settings.timeout, |_| {
@@ -449,6 +646,7 @@ mod tests {
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
         event::{Event, EventMetadata, LogEvent},
+        finalization::{BatchNotifier, BatchStatus},
         schema::{Definition, meaning},
     };
     use vrl::{
@@ -457,8 +655,436 @@ mod tests {
         value::{Kind, kind::Collection},
     };
 
-    use super::{normalize_as_agent_event, normalize_event};
-    use crate::common::datadog::DD_RESERVED_SEMANTIC_ATTRS;
+    use super::{
+        LogRequestBuilder, json_string_encoded_size, normalize_as_agent_event, normalize_event,
+        simdutf_bytes_utf8_lossy,
+    };
+    use crate::{
+        common::datadog::DD_RESERVED_SEMANTIC_ATTRS,
+        sinks::{
+            datadog::logs::config::{
+                DEFAULT_MAX_LOG_BYTES as MAX_LOG_BYTES, DatadogLogsTruncationConfig,
+                MAX_PAYLOAD_BYTES,
+            },
+            util::Compression,
+        },
+    };
+
+    const TRUNCATION_MARKER: &str = "...TRUNCATED...";
+    const TRUNCATED_TAG: &str = "truncated:single_line";
+
+    #[test]
+    fn calculates_exact_json_string_size() {
+        for value in [
+            "plain text",
+            "\"quoted\\text\"",
+            "\0\u{0001}\u{0008}\t\n\u{000c}\r",
+            "multibyte 😀 text",
+        ] {
+            assert_eq!(
+                json_string_encoded_size(value),
+                serde_json::to_vec(value).unwrap().len()
+            );
+        }
+
+        let invalid = bytes::Bytes::from_static(&[b'a', 0xff, b'b']);
+        assert_eq!(
+            json_string_encoded_size(&simdutf_bytes_utf8_lossy(&invalid)),
+            serde_json::to_vec(&Value::Bytes(invalid)).unwrap().len()
+        );
+    }
+
+    fn encode_logs(
+        events: Vec<Event>,
+        truncate_oversized_logs: bool,
+        conforms_as_agent: bool,
+    ) -> Vec<serde_json::Value> {
+        encode_logs_with_limits(
+            events,
+            truncate_oversized_logs.then_some(DatadogLogsTruncationConfig {
+                max_log_bytes: MAX_LOG_BYTES,
+            }),
+            conforms_as_agent,
+        )
+    }
+
+    fn encode_logs_with_limits(
+        events: Vec<Event>,
+        truncation: Option<DatadogLogsTruncationConfig>,
+        conforms_as_agent: bool,
+    ) -> Vec<serde_json::Value> {
+        let requests = build_requests(events, truncation, conforms_as_agent, 5_000_000);
+
+        requests
+            .into_iter()
+            .flat_map(|request| {
+                serde_json::from_slice::<Vec<serde_json::Value>>(&request.body)
+                    .expect("payload should be a JSON array")
+            })
+            .collect()
+    }
+
+    fn build_requests(
+        events: Vec<Event>,
+        truncation: Option<DatadogLogsTruncationConfig>,
+        conforms_as_agent: bool,
+        max_payload_bytes: usize,
+    ) -> Vec<super::LogApiRequest> {
+        LogRequestBuilder {
+            default_api_key: Arc::from("unused"),
+            transformer: Default::default(),
+            compression: Compression::None,
+            conforms_as_agent,
+            max_payload_bytes,
+            truncation,
+        }
+        .build_request(events, Arc::from("api-key"))
+        .expect("request should build")
+    }
+
+    #[test]
+    fn truncates_at_configured_log_limit() {
+        let log = LogEvent::from("a".repeat(600));
+
+        let logs = encode_logs_with_limits(
+            vec![Event::Log(log)],
+            Some(DatadogLogsTruncationConfig { max_log_bytes: 500 }),
+            false,
+        );
+
+        let message = logs[0]["message"]
+            .as_str()
+            .expect("message should be a string");
+        assert!(message.ends_with(TRUNCATION_MARKER));
+        assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= 500);
+    }
+
+    #[test]
+    fn truncates_oversized_message_and_preserves_other_fields() {
+        let original = "a".repeat(MAX_LOG_BYTES + 1);
+        let mut log = LogEvent::from(original);
+        log.insert(event_path!("service"), "payments");
+        log.insert(event_path!("custom"), "keep-me");
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs.len(), 1);
+        assert!(
+            logs[0]["message"]
+                .as_str()
+                .expect("message should be a string")
+                .ends_with(TRUNCATION_MARKER)
+        );
+        assert_eq!(logs[0]["service"], "payments");
+        assert_eq!(logs[0]["custom"], "keep-me");
+        assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
+        assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
+    }
+
+    #[test]
+    fn truncates_agent_normalized_message_and_preserves_nested_fields() {
+        let original = "b".repeat(MAX_LOG_BYTES + 1);
+        let mut log = LogEvent::from(original);
+        log.insert(event_path!("service"), "payments");
+        log.insert(event_path!("custom"), "keep-me");
+
+        let logs = encode_logs(vec![Event::Log(log)], true, true);
+
+        let nested = logs[0]["message"]
+            .as_object()
+            .expect("agent message should be an object");
+        let message = nested["message"]
+            .as_str()
+            .expect("nested message should be a string");
+        assert!(message.ends_with(TRUNCATION_MARKER));
+        assert_eq!(nested["custom"], "keep-me");
+        assert_eq!(logs[0]["service"], "payments");
+        assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
+        assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
+    }
+
+    #[test]
+    fn preserves_non_standard_fields_if_message_can_be_shortened_further() {
+        let mut log = LogEvent::from("c".repeat(MAX_LOG_BYTES + 1));
+        log.insert(event_path!("service"), "payments");
+        log.insert(event_path!("custom"), "x".repeat(200_000));
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["custom"], "x".repeat(200_000));
+        assert_eq!(logs[0]["service"], "payments");
+        assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
+        let message = logs[0]["message"]
+            .as_str()
+            .expect("message should be a string");
+        assert!(message.ends_with(TRUNCATION_MARKER));
+        assert!(message.len() < 900_000 + TRUNCATION_MARKER.len());
+        assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
+    }
+
+    #[test]
+    fn forwards_log_when_custom_fields_leave_no_room_for_message() {
+        let mut log = LogEvent::from("hello");
+        log.insert(event_path!("service"), "payments");
+        log.insert(event_path!("custom"), "\u{0001}".repeat(200_000));
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["message"], "hello");
+        assert_eq!(logs[0]["service"], "payments");
+        assert_eq!(logs[0]["custom"], "\u{0001}".repeat(200_000));
+        assert!(logs[0].get("ddtags").is_none());
+    }
+
+    #[test]
+    fn preserves_nested_non_standard_fields_if_message_can_be_shortened_further() {
+        let mut log = LogEvent::from("d".repeat(MAX_LOG_BYTES + 1));
+        log.insert(event_path!("service"), "payments");
+        log.insert(event_path!("custom"), "x".repeat(200_000));
+
+        let logs = encode_logs(vec![Event::Log(log)], true, true);
+
+        assert_eq!(logs.len(), 1);
+        let nested = logs[0]["message"]
+            .as_object()
+            .expect("agent message should be an object");
+        assert_eq!(nested["custom"], "x".repeat(200_000));
+        assert!(
+            nested["message"]
+                .as_str()
+                .expect("message should be a string")
+                .ends_with(TRUNCATION_MARKER)
+        );
+        assert!(
+            nested["message"]
+                .as_str()
+                .expect("message should be a string")
+                .len()
+                < 900_000 + TRUNCATION_MARKER.len()
+        );
+        assert_eq!(logs[0]["service"], "payments");
+        assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
+        assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
+    }
+
+    #[test]
+    fn drops_log_that_exceeds_payload_limit_after_best_effort_truncation() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1)).with_batch_notifier(&batch);
+        log.insert(event_path!("service"), "x".repeat(MAX_PAYLOAD_BYTES + 1));
+        drop(batch);
+
+        let requests = build_requests(
+            vec![Event::Log(log)],
+            Some(DatadogLogsTruncationConfig {
+                max_log_bytes: MAX_LOG_BYTES,
+            }),
+            false,
+            5_000_000,
+        );
+
+        assert!(requests.is_empty());
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn drops_log_that_exceeds_payload_limit() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let log = LogEvent::from("oversized").with_batch_notifier(&batch);
+        drop(batch);
+
+        let requests = build_requests(vec![Event::Log(log)], None, false, 2);
+
+        assert!(requests.is_empty());
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn does_not_count_best_effort_log_as_dropped() {
+        vector_lib::metrics::init_test();
+        let controller = vector_lib::metrics::Controller::get().unwrap();
+        controller.reset();
+
+        let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1));
+        log.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs.len(), 1);
+        let discarded_events = controller
+            .capture_metrics()
+            .iter()
+            .filter(|metric| metric.name() == "component_discarded_events_total")
+            .map(|metric| match metric.value() {
+                vector_lib::event::MetricValue::Counter { value } => *value,
+                _ => panic!("discarded events metric must be a counter"),
+            })
+            .sum::<f64>();
+        assert_eq!(discarded_events, 0.0);
+    }
+
+    #[test]
+    fn forwards_oversized_structured_message_without_agent_normalization() {
+        let mut log = LogEvent::default();
+        log.insert(
+            event_path!("message"),
+            value!({ "message": ("f".repeat(MAX_LOG_BYTES + 1)), "other": "preserve-me" }),
+        );
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["message"]["message"], "f".repeat(MAX_LOG_BYTES + 1));
+        assert_eq!(logs[0]["message"]["other"], "preserve-me");
+        assert!(logs[0].get("ddtags").is_none());
+    }
+
+    #[test]
+    fn forwards_oversized_log_without_string_message() {
+        for conforms_as_agent in [false, true] {
+            let mut log = LogEvent::default();
+            log.insert(event_path!("custom"), "f".repeat(MAX_LOG_BYTES + 1));
+
+            let logs = encode_logs(vec![Event::Log(log)], true, conforms_as_agent);
+
+            assert_eq!(logs.len(), 1);
+            let custom = if conforms_as_agent {
+                &logs[0]["message"]["custom"]
+            } else {
+                &logs[0]["custom"]
+            };
+            assert_eq!(custom, &"f".repeat(MAX_LOG_BYTES + 1));
+            assert!(logs[0].get("ddtags").is_none());
+        }
+    }
+
+    #[test]
+    fn drops_non_string_message_that_exceeds_payload_limit() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let mut log = LogEvent::default().with_batch_notifier(&batch);
+        log.insert(
+            event_path!("message"),
+            value!({ "body": ("f".repeat(MAX_PAYLOAD_BYTES + 1)) }),
+        );
+        drop(batch);
+
+        let requests = build_requests(
+            vec![Event::Log(log)],
+            Some(DatadogLogsTruncationConfig {
+                max_log_bytes: MAX_LOG_BYTES,
+            }),
+            false,
+            MAX_PAYLOAD_BYTES,
+        );
+
+        assert!(requests.is_empty());
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn shrinks_escaped_message_again_to_fit_default_limits() {
+        for conforms_as_agent in [false, true] {
+            let log = LogEvent::from("\"".repeat(600_000));
+
+            let logs = encode_logs(vec![Event::Log(log)], true, conforms_as_agent);
+
+            assert_eq!(logs.len(), 1);
+            let message = if conforms_as_agent {
+                &logs[0]["message"]["message"]
+            } else {
+                &logs[0]["message"]
+            }
+            .as_str()
+            .expect("message should be a string");
+            assert!(message.len() < 600_000 + TRUNCATION_MARKER.len());
+            assert!(message.ends_with(TRUNCATION_MARKER));
+            assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
+        }
+    }
+
+    #[test]
+    fn truncates_escaped_message_with_plain_suffix_to_fit() {
+        let message = format!("{}{}", "\"".repeat(450_000), "a".repeat(110_000));
+        let log = LogEvent::from(message);
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs.len(), 1);
+        assert!(
+            logs[0]["message"]
+                .as_str()
+                .expect("message should be a string")
+                .ends_with(TRUNCATION_MARKER)
+        );
+        assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
+    }
+
+    #[test]
+    fn does_not_duplicate_truncation_tag() {
+        let mut log = LogEvent::from("g".repeat(MAX_LOG_BYTES + 1));
+        log.insert(event_path!("ddtags"), format!("env:test,{TRUNCATED_TAG}"));
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs[0]["ddtags"], format!("env:test,{TRUNCATED_TAG}"));
+    }
+
+    #[test]
+    fn appends_truncation_tag_to_existing_tags() {
+        let mut log = LogEvent::from("g".repeat(MAX_LOG_BYTES + 1));
+        log.insert(event_path!("ddtags"), "env:test");
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(logs[0]["ddtags"], format!("env:test,{TRUNCATED_TAG}"));
+    }
+
+    #[test]
+    fn leaves_oversized_message_unchanged_when_truncation_is_disabled() {
+        let original = "h".repeat(MAX_LOG_BYTES + 1);
+        let log = LogEvent::from(original.clone());
+
+        let logs = encode_logs(vec![Event::Log(log)], false, false);
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["message"].as_str(), Some(original.as_str()));
+        assert!(logs[0].get("ddtags").is_none());
+    }
+
+    #[test]
+    fn leaves_log_at_exact_encoded_limit_unchanged() {
+        // `{"message":""}` contributes 14 bytes around the message body.
+        let original = "h".repeat(MAX_LOG_BYTES - 14);
+        let mut log = LogEvent::default();
+        log.insert(event_path!("message"), original.clone());
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert_eq!(serde_json::to_vec(&logs[0]).unwrap().len(), MAX_LOG_BYTES);
+        assert_eq!(logs[0]["message"].as_str(), Some(original.as_str()));
+        assert!(logs[0].get("ddtags").is_none());
+    }
+
+    #[test]
+    fn truncation_preserves_utf8_boundaries() {
+        for prefix_len in 0..4 {
+            let original = format!("{}{}", "x".repeat(prefix_len), "😀".repeat(300_000));
+            let log = LogEvent::from(original.clone());
+
+            let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+            let message = logs[0]["message"]
+                .as_str()
+                .expect("message should be valid UTF-8");
+            let body = message
+                .strip_suffix(TRUNCATION_MARKER)
+                .expect("message should have truncation marker");
+            assert!(original.starts_with(body));
+            assert!(body.len() < MAX_LOG_BYTES);
+        }
+    }
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
         assert!(

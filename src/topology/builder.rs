@@ -52,7 +52,7 @@ use crate::{
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
-        TransformOuter, TransformOutput,
+        TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
     cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
@@ -292,12 +292,8 @@ impl<'a> Builder<'a> {
     ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
-        let table_sources = self
-            .config
-            .enrichment_tables
-            .iter()
-            .filter_map(|(key, table)| table.as_source(key))
-            .collect::<Vec<_>>();
+        let table_sources =
+            enrichment_table_sources(&self.config.enrichment_tables).collect::<Vec<_>>();
         for (key, source) in self
             .config
             .sources()
@@ -628,12 +624,8 @@ impl<'a> Builder<'a> {
     }
 
     async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
-        let table_sinks = self
-            .config
-            .enrichment_tables
-            .iter()
-            .filter_map(|(key, table)| table.as_sink(key))
-            .collect::<Vec<_>>();
+        let table_sinks =
+            enrichment_table_sinks(&self.config.enrichment_tables).collect::<Vec<_>>();
         for (key, sink) in self
             .config
             .sinks()

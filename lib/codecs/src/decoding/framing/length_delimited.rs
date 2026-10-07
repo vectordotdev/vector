@@ -16,6 +16,7 @@ pub struct LengthDelimitedDecoderConfig {
 
 impl LengthDelimitedDecoderConfig {
     /// Build the `LengthDelimitedDecoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> LengthDelimitedDecoder {
         LengthDelimitedDecoder::new(&self.length_delimited)
     }
@@ -27,6 +28,7 @@ pub struct LengthDelimitedDecoder(tokio_util::codec::LengthDelimitedCodec);
 
 impl LengthDelimitedDecoder {
     /// Creates a new `LengthDelimitedDecoder`.
+    #[must_use]
     pub fn new(config: &LengthDelimitedCoderOptions) -> Self {
         Self(config.build_codec())
     }
