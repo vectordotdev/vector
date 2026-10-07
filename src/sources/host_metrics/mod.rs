@@ -272,6 +272,11 @@ fn example_cgroups() -> FilterList {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing return type and caller contracts during the lint rollout."
+)]
 fn default_cgroups_config() -> Option<CGroupsConfig> {
     // Include the Linux-only default when generating docs on other platforms.
     if is_generating_root_schema() {
@@ -382,6 +387,7 @@ impl HostMetrics {
     }
 
     #[cfg(target_os = "linux")]
+    #[must_use]
     pub fn new(config: HostMetricsConfig) -> Self {
         let cgroups = config.cgroups.clone().unwrap_or_default();
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
@@ -595,6 +601,11 @@ where
         reason = "#[cfg(linux)] calls non-const methods"
     )
 )]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::single_match_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn init_roots() {
     #[cfg(target_os = "linux")]
     {
@@ -612,7 +623,7 @@ fn init_roots() {
                     heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
                 }
                 None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
-            };
+            }
 
             match std::env::var_os("SYSFS_ROOT") {
                 Some(sysfs_root) => {

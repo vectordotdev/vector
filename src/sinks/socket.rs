@@ -462,7 +462,7 @@ mod test {
                 }),
                 #[cfg(all(unix, not(target_os = "macos")))]
                 DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
-                    config: UnixSinkConfig::new(path.to_path_buf()),
+                    config: UnixSinkConfig::new(path.clone()),
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
                 }),
             },

@@ -16,6 +16,11 @@ use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
 
 #[cfg(target_os = "linux")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn record_vmstat_metrics(stats: &HashMap<String, i64>, output: &mut super::MetricsBuffer) {
     output.name = "memory";
 

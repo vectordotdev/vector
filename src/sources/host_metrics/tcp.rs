@@ -61,6 +61,11 @@ struct TcpStats {
     tx_queued_bytes: f64,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 const fn tcp_state_to_string(state: TcpState) -> &'static str {
     match state {
         TcpState::Established => "established",

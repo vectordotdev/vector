@@ -272,7 +272,7 @@ mod tests {
         trace_init();
 
         let delay = Duration::from_secs(3);
-        let dir = temp_dir().to_path_buf();
+        let dir = temp_dir().clone();
         let watcher_conf = WatcherConfig::RecommendedWatcher;
         let component_file_path = vec![dir.join("tls.cert"), dir.join("tls.key")];
         let http_component = ComponentKey::from("http");
@@ -333,7 +333,7 @@ mod tests {
         trace_init();
 
         let delay = Duration::from_secs(3);
-        let dir = temp_dir().to_path_buf();
+        let dir = temp_dir().clone();
         let file_path = dir.join("vector.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;
 
@@ -412,7 +412,7 @@ mod tests {
         trace_init();
 
         let delay = Duration::from_secs(3);
-        let dir = temp_dir().to_path_buf();
+        let dir = temp_dir().clone();
         let sub_dir = dir.join("sources");
         let file_path = sub_dir.join("input.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;
