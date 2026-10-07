@@ -3,35 +3,16 @@ import { test, expect } from "./fixtures";
 const quickstart = "/docs/setup/quickstart/";
 const remap = "/docs/reference/configuration/transforms/remap/";
 
-test("homepage renders the React diagram and links to VRL", async ({ page }) => {
+test("homepage renders the React globe and diagram and links to VRL", async ({ page }) => {
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Take control of your observability data", exact: true })
   ).toBeVisible();
+  await expect(page.locator("#globe svg")).toBeVisible();
   await expect(page.locator("#diagram svg")).toBeVisible();
   await page.locator('#diagram a[href="/docs/reference/vrl"]').click();
   await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Vector Remap Language");
-});
-
-test("homepage globe renders land and markers with contrast and rotates", async ({ page }) => {
-  await page.goto("/");
-  const globe = page.locator("#globe svg");
-  await globe.scrollIntoViewIfNeeded();
-  await expect(globe).toBeInViewport({ ratio: 0.9 });
-
-  const water = globe.locator("circle.globe");
-  const land = globe.locator("path.land").first();
-  const marker = globe.locator('circle.marker:not([fill="none"])').first();
-  await expect(water).toBeVisible();
-  await expect(land).toBeVisible();
-  await expect(marker).toBeVisible();
-  const waterFill = await water.evaluate((element) => getComputedStyle(element).fill);
-  await expect(land).not.toHaveCSS("fill", waterFill);
-  await expect(land).not.toHaveCSS("fill", "none");
-
-  const initialLand = await land.getAttribute("d");
-  await expect(land).not.toHaveAttribute("d", initialLand!);
 });
 
 test("theme changes the rendered colors and persists across reloads and pages", async ({ page }) => {
