@@ -69,6 +69,7 @@ async-trait,https://github.com/dtolnay/async-trait,MIT OR Apache-2.0,David Tolna
 asyncband,https://github.com/fast/asyncband,Apache-2.0,The asyncband Authors
 atoi,https://github.com/pacman82/atoi-rs,MIT,Markus Klein
 atomic-waker,https://github.com/smol-rs/atomic-waker,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, Contributors to futures-rs"
+attohttpc,https://github.com/sbstp/attohttpc,MPL-2.0,Simon Bernier St-Pierre <git.sbstp.ca@gmail.com>
 aws-config,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-credential-types,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rust SDK Team <aws-sdk-rust@amazon.com>
 aws-runtime,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rust SDK Team <aws-sdk-rust@amazon.com>
