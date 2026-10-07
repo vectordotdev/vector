@@ -283,14 +283,20 @@
   @apply bg-gray-800 text-white;
 }
 
-.code-copy-button:focus-visible {
-  @apply outline-2 outline-offset-2 outline-secondary text-white;
-}
-
 .code-copy-button svg {
   @apply block h-4 w-4;
 }
 
+}
+
+/* Focus outlines for copy buttons and code blocks (Hugo makes each pre focusable for keyboard
+   scrolling). Unlayered and more specific than toc.sass's `.prose *:focus { outline: none }`. */
+.prose .code-copy-button:focus-visible {
+  @apply outline-2 outline-offset-2 outline-secondary text-white;
+}
+
+.prose .has-copy-button pre:focus-visible {
+  @apply outline-2 -outline-offset-2 outline-secondary;
 }
 
 .hover\:underline {
