@@ -12,7 +12,7 @@ use crate::{
 };
 
 const WEBSITE_URL: &str = "https://vector.dev";
-const DISCORD_URL: &str = "https://chat.vector.dev";
+const RELEASE_CALENDAR_URL: &str = "https://calendar.vector.dev";
 
 /// Anchor of the release page's breaking-changes section.
 const BREAKING_ANCHOR: &str = "breaking-changes";
@@ -215,7 +215,7 @@ fn render_notes(
 
     write!(
         out,
-        "[View the full release notes]({release_url}) · Questions or feedback? Join us on [Discord]({DISCORD_URL})."
+        "[View the full release notes]({release_url}) · [Release calendar]({RELEASE_CALENDAR_URL})"
     )
     .unwrap();
     out
@@ -260,7 +260,7 @@ mod tests {
 
                 Before upgrading, read the [0.59 upgrade guide](https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/).
 
-                [View the full release notes](https://vector.dev/releases/0.59.0/) · Questions or feedback? Join us on [Discord](https://chat.vector.dev)."}
+                [View the full release notes](https://vector.dev/releases/0.59.0/) · [Release calendar](https://calendar.vector.dev)"}
         );
     }
 
@@ -279,7 +279,7 @@ mod tests {
                 - [1 breaking change](https://vector.dev/releases/0.59.1/)
                 - [1 bug fix](https://vector.dev/releases/0.59.1/#bug-fixes)
 
-                [View the full release notes](https://vector.dev/releases/0.59.1/) · Questions or feedback? Join us on [Discord](https://chat.vector.dev)."}
+                [View the full release notes](https://vector.dev/releases/0.59.1/) · [Release calendar](https://calendar.vector.dev)"}
         );
     }
 }
