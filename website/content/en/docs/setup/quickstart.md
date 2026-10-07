@@ -106,7 +106,7 @@ echo 'Hello, World!' | vector --config ./vector.yaml
 {{< /tab >}}
 {{< tab title="Docker" >}}
 
-No `--config` flag is needed here — the `vector` alias from the [installation step](#install-vector) mounts the current directory at `/etc/vector`, where Vector looks for `vector.yaml` by default:
+The `vector` alias from the [Install Vector](#install-vector) section mounts the current directory at `/etc/vector`, where Vector looks for `vector.yaml` by default, so you don't need the `--config` flag:
 
 ```shell
 echo 'Hello, World!' | vector
