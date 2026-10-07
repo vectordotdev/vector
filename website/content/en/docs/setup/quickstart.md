@@ -97,7 +97,7 @@ That's it for our first config. Now let's pipe an event through it:
 {{< tabs default="Script" >}}
 {{< tab title="Script" >}}
 
-If you installed Vector using the script or a package manager, point it at the configuration in the current directory with `--config`:
+If you installed Vector with the install script, use `--config` to point Vector at the configuration file in the current directory:
 
 ```shell
 echo 'Hello, World!' | vector --config ./vector.yaml
