@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Modules that are common between sources, transforms, and sinks.
 #[cfg(any(
     feature = "sources-datadog_agent",
