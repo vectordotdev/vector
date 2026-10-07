@@ -108,6 +108,11 @@ fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
 /// When IPv6 is detected via `/proc/net/if_inet6`, a failure to read `/proc/net/tcp6` is
 /// treated as a hard error rather than a degraded fallback, because emitting IPv4-only
 /// totals on an IPv6-enabled host would silently undercount connections.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep the paired network-statistic names during the lint rollout."
+)]
 fn build_tcp_stats() -> Result<TcpStats, procfs::ProcError> {
     let mut tcp_stats = TcpStats::default();
 
@@ -171,6 +176,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep the paired network-statistic names during the lint rollout."
+    )]
     async fn generates_tcp_metrics() {
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(HostMetricsConfig::default())

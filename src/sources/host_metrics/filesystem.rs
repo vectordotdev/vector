@@ -149,8 +149,18 @@ impl HostMetrics {
                     // may pay a small extra cost.
                     #[cfg(unix)]
                     if let Ok(stat) = statvfs(partition.mount_point()) {
-                        let inodes_total = f64::from(stat.files());
-                        let inodes_free = f64::from(stat.files_free());
+                        // https://github.com/vectordotdev/vector/issues/23659
+                        #[allow(
+                            clippy::cast_lossless,
+                            reason = "statvfs inode counters are 32 bits on macOS and 64 bits on Linux."
+                        )]
+                        let inodes_total = stat.files() as f64;
+                        // https://github.com/vectordotdev/vector/issues/23659
+                        #[allow(
+                            clippy::cast_lossless,
+                            reason = "statvfs inode counters are 32 bits on macOS and 64 bits on Linux."
+                        )]
+                        let inodes_free = stat.files_free() as f64;
                         let inodes_used = (inodes_total - inodes_free).max(0.0);
                         let inodes_used_ratio = if inodes_total > 0.0 {
                             inodes_used / inodes_total

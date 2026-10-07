@@ -499,10 +499,10 @@ mod tests {
 
     #[tokio::test]
     async fn generates_cgroups_metrics() {
-        let config: HostMetricsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: HostMetricsConfig = serde_yaml::from_str(indoc::indoc! {r"
             collectors:
               - cgroups
-        "#})
+        "})
         .unwrap();
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
@@ -616,12 +616,12 @@ mod tests {
 
         async fn test(&self) {
             let path = self.0.path();
-            let config: HostMetricsConfig = serde_yaml::from_str(&indoc::formatdoc! {r#"
+            let config: HostMetricsConfig = serde_yaml::from_str(&indoc::formatdoc! {r"
                 collectors:
                   - cgroups
                 cgroups:
                   base_dir: {path:?}
-            "#})
+            "})
             .unwrap();
             let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
@@ -684,9 +684,9 @@ mod tests {
         }
 
         fn cpu_stat(&mut self, subdir: &str) {
-            let a = self.1.random_range(1000000..1000000000);
-            let b = self.1.random_range(1000000..1000000000);
-            let c = self.1.random_range(1000000..1000000000);
+            let a = self.1.random_range(1_000_000..1_000_000_000);
+            let b = self.1.random_range(1_000_000..1_000_000_000);
+            let c = self.1.random_range(1_000_000..1_000_000_000);
             self.f(
                 subdir,
                 "cpu.stat",
@@ -695,8 +695,8 @@ mod tests {
         }
 
         fn memory_stat(&mut self, subdir: &str) {
-            let anon = self.1.random_range(1000000..1000000000);
-            let file = self.1.random_range(1000000..1000000000);
+            let anon = self.1.random_range(1_000_000..1_000_000_000);
+            let file = self.1.random_range(1_000_000..1_000_000_000);
             self.f(
                 subdir,
                 "memory.stat",
