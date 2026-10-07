@@ -38,7 +38,7 @@ pub trait PathsProvider {
 pub struct Glob<E: FileSourceInternalEvents> {
     include_patterns: Vec<String>,
     exclude_patterns: Vec<Pattern>,
-    glob_match_options: MatchOptions,
+    match_options: MatchOptions,
     emitter: E,
 }
 
@@ -49,7 +49,7 @@ impl<E: FileSourceInternalEvents> Glob<E> {
     pub fn new(
         include_patterns: &[PathBuf],
         exclude_patterns: &[PathBuf],
-        glob_match_options: MatchOptions,
+        match_options: MatchOptions,
         emitter: E,
     ) -> Option<Self> {
         let include_patterns = include_patterns
@@ -65,7 +65,7 @@ impl<E: FileSourceInternalEvents> Glob<E> {
         Some(Self {
             include_patterns,
             exclude_patterns,
-            glob_match_options,
+            match_options,
             emitter,
         })
     }
@@ -78,12 +78,12 @@ impl<E: FileSourceInternalEvents> PathsProvider for Glob<E> {
         self.include_patterns
             .iter()
             .flat_map(|include_pattern| {
-                glob::glob_with(include_pattern.as_str(), self.glob_match_options)
+                glob::glob_with(include_pattern.as_str(), self.match_options)
                     .expect("failed to read glob pattern")
                     .filter_map(|val| {
                         val.map_err(|error| {
                             self.emitter
-                                .emit_path_globbing_failed(error.path(), error.error())
+                                .emit_path_globbing_failed(error.path(), error.error());
                         })
                         .ok()
                     })
