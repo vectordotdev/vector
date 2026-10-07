@@ -1,3 +1,3 @@
-Fixed an incorrect file-ID calculation in the disk buffer (`disk_v2`) ledger. `get_offset_reader_file_id` performed the offset addition in `u16`, which could wrap before the modulo was applied (when `MAX_FILE_ID` is `u16::MAX`), causing distinct offsets to resolve to the same data file ID. The calculation now uses wider arithmetic so it wraps correctly.
+Fixed a disk buffer bug that could cause Vector to read from the wrong data file after many file rotations. This occurred when a file ID calculation exceeded 65,535 and wrapped incorrectly, even if only a few buffer files existed on disk.
 
 authors: xfocus3
