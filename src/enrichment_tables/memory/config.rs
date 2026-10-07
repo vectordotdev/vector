@@ -118,7 +118,7 @@ pub struct MemorySourceConfig {
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub export_batch_size: Option<u64>,
     /// If set to true, all data will be removed from cache after exporting.
-    /// Only valid if used as a source and `export_interval` > 0
+    /// Only valid if used as a source and `export_interval` is greater than 0.
     ///
     /// By default, export will not remove data from cache
     #[serde(default = "crate::serde::default_false")]
