@@ -220,7 +220,7 @@ install_from_archive() {
     fi
 
     printf "%s Install succeeded! 🚀\n" "$_prompt"
-    printf "%s To start Vector:\n" "$_prompt"
+    printf "%s To try a demo pipeline (prints sample logs, press Ctrl+C to stop):\n" "$_prompt"
     printf "\n"
     printf "%s vector --config $prefix/config/vector.yaml\n" "$_indent"
     printf "\n"
