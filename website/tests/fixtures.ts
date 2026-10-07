@@ -12,7 +12,11 @@ export const test = base.extend<{ websiteChecks: void }>({
       await context.addInitScript(() => {
         Object.assign(window, {
           Munchkin: { init() {} },
-          MktoForms2: { loadForm() {} }
+          MktoForms2: { loadForm() {} },
+          // Makes `datadogRum.init` a no-op (the SDK defers to Synthetics). Otherwise RUM
+          // flushes its batch on page exit, and WebKit reports the fetch it starts from
+          // the unloading page as an "access control checks" page error.
+          _DATADOG_SYNTHETICS_INJECTS_RUM: true
         });
       });
 
