@@ -21,7 +21,7 @@ We can install Vector using an installation script or Docker:
 curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash
 ```
 
-After installation, make the `vector` command available in your current terminal:
+After installation, add Vector to your PATH for the current terminal session:
 
 ```shell
 export PATH="$HOME/.vector/bin:$PATH"
