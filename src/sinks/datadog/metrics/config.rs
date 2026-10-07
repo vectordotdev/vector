@@ -27,14 +27,14 @@ pub struct DatadogMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
-    // No default byte cap here; the appropriate limit (v1: 60 MiB, v2: 5 MiB) is applied at
-    // sink build time based on the active series API version.
+    // No default byte cap here; the appropriate limit (series: 5 MiB, sketches: 60 MiB) is
+    // applied during validation based on the endpoint.
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
 }
 
-pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
+pub(super) const SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 
 /// The API version to use when submitting series metrics to Datadog.
@@ -42,25 +42,31 @@ pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum SeriesApiVersion {
-    /// Use the v1 series endpoint (`/api/v1/series`).
-    ///
-    /// This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
-    #[configurable(deprecated)]
-    V1,
-
     /// Use the v2 series endpoint (`/api/v2/series`).
+    V2,
+
+    /// Use the v3 series endpoint (`/api/intake/metrics/v3/series`).
+    ///
+    /// Columnar protobuf format with dictionary-based string deduplication and delta
+    /// encoding. More efficient than v2 for workloads with many metrics that share
+    /// common tags or names.
     ///
     /// This is the recommended and default endpoint.
     #[default]
-    V2,
+    V3,
 }
 
 impl SeriesApiVersion {
     pub const fn get_path(self) -> &'static str {
         match self {
-            Self::V1 => SERIES_V1_PATH,
             Self::V2 => SERIES_V2_PATH,
+            Self::V3 => SERIES_V3_PATH,
         }
+    }
+
+    /// Returns true if this version uses the V3 columnar encoding format.
+    pub const fn is_v3_format(self) -> bool {
+        matches!(self, Self::V3)
     }
 }
 
@@ -80,24 +86,14 @@ pub(super) struct DatadogMetricsPayloadLimits {
 }
 
 impl DatadogMetricsEndpoint {
-    /// Gets the content type associated with the specific encoder for a given metric endpoint.
-    pub const fn content_type(self) -> &'static str {
-        match self {
-            Self::Series(SeriesApiVersion::V1) => "application/json",
-            Self::Sketches | Self::Series(SeriesApiVersion::V2) => "application/x-protobuf",
-        }
-    }
-
     pub(super) const fn payload_limits(self) -> DatadogMetricsPayloadLimits {
         // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
         let (uncompressed, compressed) = match self {
-            // Sketches use the same payload size limits as v1 series
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
-            | DatadogMetricsEndpoint::Sketches => (
+            DatadogMetricsEndpoint::Sketches => (
                 62_914_560, // 60 MiB
                 3_200_000,  // 3.2 MB
             ),
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => (
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2 | SeriesApiVersion::V3) => (
                 5_242_880, // 5 MiB
                 512_000,   // 512 KB
             ),
@@ -106,32 +102,6 @@ impl DatadogMetricsEndpoint {
         DatadogMetricsPayloadLimits {
             uncompressed,
             compressed,
-        }
-    }
-
-    /// Returns the compression scheme used for this endpoint.
-    pub(super) const fn compression(self) -> DatadogMetricsCompression {
-        match self {
-            Self::Series(SeriesApiVersion::V1) => DatadogMetricsCompression::Zlib,
-            _ => DatadogMetricsCompression::Zstd,
-        }
-    }
-}
-
-/// Selects the compressor for a given Datadog metrics endpoint.
-#[derive(Clone, Copy, Debug)]
-pub(super) enum DatadogMetricsCompression {
-    /// zlib (deflate) — used by Series v1.
-    Zlib,
-    /// zstd — used by Series v2 and Sketches.
-    Zstd,
-}
-
-impl DatadogMetricsCompression {
-    pub(super) const fn content_encoding(self) -> &'static str {
-        match self {
-            Self::Zstd => "zstd",
-            Self::Zlib => "deflate",
         }
     }
 }
@@ -178,8 +148,8 @@ pub struct DatadogMetricsConfig {
 
     /// Controls which Datadog series API endpoint is used to submit metrics.
     ///
-    /// Defaults to `v2` (`/api/v2/series`). Set to `v1` (`/api/v1/series`) only if you need to
-    /// fall back to the legacy endpoint.
+    /// Defaults to `v3` (`/api/intake/metrics/v3/series`). Set to `v2` (`/api/v2/series`)
+    /// if you need to use the v2 endpoint.
     #[serde(default)]
     pub series_api_version: SeriesApiVersion,
 
@@ -350,7 +320,7 @@ impl DatadogMetricsConfig {
 /// Returns `(series_settings, sketches_settings)`.
 ///
 /// When the user has not set an explicit `max_bytes`, each endpoint is capped to its own
-/// uncompressed payload limit (5 MiB for Series v2, 60 MiB for Sketches). When an explicit
+/// uncompressed payload limit (5 MiB for series, 60 MiB for sketches). When an explicit
 /// limit is configured, both endpoints share it.
 fn resolve_endpoint_batch_settings(
     batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
@@ -387,7 +357,7 @@ mod tests {
     fn validate_produces_endpoint_specific_batch_settings() {
         let config = DatadogMetricsConfig::default();
         let validated = config.validate().expect("validation should succeed");
-        assert_eq!(validated.batcher_settings.size_limit, 5_242_880); // 5 MiB — Series v2 limit
+        assert_eq!(validated.batcher_settings.size_limit, 5_242_880); // 5 MiB — Series v3 limit
         assert_eq!(validated.sketches_batcher_settings.size_limit, 62_914_560); // 60 MiB — Sketches limit
     }
 
@@ -427,15 +397,6 @@ mod tests {
         assert_eq!(sketches.size_limit, 62_914_560); // 60 MiB — Sketches limit
     }
 
-    #[test]
-    fn v1_batch_config_uses_v1_size_limit() {
-        let (series, sketches) =
-            resolve_endpoint_batch_settings(BatchConfig::default(), SeriesApiVersion::V1).unwrap();
-
-        assert_eq!(series.size_limit, 62_914_560); // 60 MiB — Series v1 limit
-        assert_eq!(sketches.size_limit, 62_914_560); // 60 MiB — Sketches limit
-    }
-
     // When the user sets max_bytes, both endpoints share that limit unchanged.
     #[test]
     fn explicit_max_bytes_applies_to_both_endpoints() {
@@ -447,5 +408,46 @@ mod tests {
 
         assert_eq!(series.size_limit, 1_000_000);
         assert_eq!(sketches.size_limit, 1_000_000);
+    }
+
+    #[test]
+    fn series_api_version_v2_v3_and_default_are_configurable() {
+        for (yaml, expected) in [
+            ("default_api_key: unused", SeriesApiVersion::V3),
+            (
+                "default_api_key: unused\nseries_api_version: v2",
+                SeriesApiVersion::V2,
+            ),
+            (
+                "default_api_key: unused\nseries_api_version: v3",
+                SeriesApiVersion::V3,
+            ),
+        ] {
+            let config = serde_yaml::from_str::<DatadogMetricsConfig>(yaml)
+                .expect("v2, v3, and the unset default must all parse");
+            assert_eq!(config.series_api_version, expected);
+        }
+    }
+
+    #[test]
+    fn series_api_version_v1_is_rejected() {
+        let error = serde_yaml::from_str::<DatadogMetricsConfig>(
+            "default_api_key: unused\nseries_api_version: v1",
+        )
+        .expect_err("the removed v1 option must fail configuration parsing");
+
+        assert!(error.to_string().contains("unknown variant `v1`"));
+        assert!(error.to_string().contains("expected `v2` or `v3`"));
+    }
+
+    // Each configurable series version must resolve to its own intake path, and only `v3` uses
+    // the columnar wire format.
+    #[test]
+    fn series_api_version_paths_and_formats() {
+        assert_eq!(SeriesApiVersion::V2.get_path(), SERIES_V2_PATH);
+        assert_eq!(SeriesApiVersion::V3.get_path(), SERIES_V3_PATH);
+
+        assert!(!SeriesApiVersion::V2.is_v3_format());
+        assert!(SeriesApiVersion::V3.is_v3_format());
     }
 }

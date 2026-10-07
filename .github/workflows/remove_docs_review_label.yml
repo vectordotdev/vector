@@ -42,8 +42,8 @@ jobs:
         id: read
         if: steps.download.outcome == 'success'
         run: |
-          pr_number=$(cat pr-number | tr -d '[:space:]')
-          echo "pr_number=${pr_number}" >> $GITHUB_OUTPUT
+          pr_number=$(tr -d '[:space:]' < pr-number)
+          echo "pr_number=${pr_number}" >> "$GITHUB_OUTPUT"
 
   remove_label:
     needs: download

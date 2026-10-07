@@ -11,6 +11,7 @@ use vector_lib::{config::OutputId, id::ComponentKey};
 use crate::config::{
     self,
     dot_graph::{EdgeAttributes, GraphConfig},
+    enrichment_table_sinks, enrichment_table_sources,
 };
 
 #[derive(Parser, Debug)]
@@ -143,11 +144,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
 
     let mut written_tables = HashSet::<ComponentKey>::new();
 
-    for (id, table) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_source(key))
-    {
+    for (id, table) in enrichment_table_sources(&config.enrichment_tables) {
         writeln!(
             dot,
             "  \"{id}\" [{}]",
@@ -157,11 +154,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         written_tables.insert(id);
     }
 
-    for (id, table) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_sink(key))
-    {
+    for (id, table) in enrichment_table_sinks(&config.enrichment_tables) {
         if !written_tables.contains(&id) {
             writeln!(
                 dot,
@@ -255,20 +248,12 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     writeln!(mermaid, "\n  %% Enrichment tables").unwrap();
     let mut written_tables = HashSet::<ComponentKey>::new();
 
-    for (id, _) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_source(key))
-    {
+    for (id, _) in enrichment_table_sources(&config.enrichment_tables) {
         writeln!(mermaid, "  {id}[({id})]").unwrap();
         written_tables.insert(id);
     }
 
-    for (id, table) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_sink(key))
-    {
+    for (id, table) in enrichment_table_sinks(&config.enrichment_tables) {
         if !written_tables.contains(&id) {
             writeln!(mermaid, "  {id}[({id})]").unwrap();
         }

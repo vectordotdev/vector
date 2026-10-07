@@ -112,7 +112,6 @@ pub struct MetricConfig {
     ///
     /// Both keys and values can be templated, allowing you to attach dynamic tags to events.
     ///
-    #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
     pub tags: Option<IndexMap<UnconfinedTemplate, TagConfig>>,
 
     #[serde(flatten)]
@@ -488,6 +487,7 @@ fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric,
 fn bytes_to_str(value: &Value) -> Option<String> {
     match value {
         Value::Bytes(bytes) => std::str::from_utf8(bytes).ok().map(|s| s.to_string()),
+        Value::String(string) => Some(string.to_string()),
         _ => None,
     }
 }

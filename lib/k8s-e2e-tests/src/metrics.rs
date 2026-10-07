@@ -6,6 +6,10 @@ use std::collections::HashSet;
 /// This helper function issues an HTTP request to the Prometheus-exposition
 /// format metrics endpoint, validates that it completes successfully and
 /// returns the response body.
+///
+/// # Errors
+///
+/// Returns an error if the request fails, the HTTP status is unsuccessful, or reading the body fails.
 pub async fn load(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let response = reqwest::get(url).await?.error_for_status()?;
     let body = response.text().await?;
@@ -23,6 +27,10 @@ fn metrics_regex() -> regex::Regex {
 
 /// This helper function extracts the sum of `component_sent_events_total`-ish metrics
 /// across all labels.
+///
+/// # Errors
+///
+/// Returns an error if a matching value is not a `u64` or the sum overflows.
 pub fn extract_component_sent_events_total_sum(
     metrics: &str,
 ) -> Result<u64, Box<dyn std::error::Error>> {
@@ -44,6 +52,7 @@ pub fn extract_component_sent_events_total_sum(
 }
 
 /// This helper function validates the presence of `vector_started`-ish metric.
+#[must_use]
 pub fn extract_vector_started(metrics: &str) -> bool {
     metrics_regex().captures_iter(metrics).any(|captures| {
         let metric_name = &captures["name"];
@@ -54,6 +63,10 @@ pub fn extract_vector_started(metrics: &str) -> bool {
 
 /// This helper function performs an HTTP request to the specified URL and
 /// extracts the sum of `component_sent_events_total`-ish metrics across all labels.
+///
+/// # Errors
+///
+/// Returns an error if loading the metrics or parsing their sum fails.
 pub async fn get_component_sent_events_total(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
     extract_component_sent_events_total_sum(&metrics)
@@ -61,6 +74,10 @@ pub async fn get_component_sent_events_total(url: &str) -> Result<u64, Box<dyn s
 
 /// This helper function performs an HTTP request to the specified URL and
 /// validates the presence of `vector_started`-ish metric.
+///
+/// # Errors
+///
+/// Returns an error if loading the metrics fails or the started metric is absent.
 pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
     if !extract_vector_started(&metrics) {
@@ -72,6 +89,10 @@ pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::
 /// This helper function performs HTTP requests to the specified URL and
 /// waits for the presence of `vector_started`-ish metric until the deadline
 /// with even delays between attempts.
+///
+/// # Errors
+///
+/// Returns the last polling error if the started metric is not observed by the deadline.
 pub async fn wait_for_vector_started(
     url: &str,
     next_attempt_delay: std::time::Duration,
@@ -114,12 +135,16 @@ pub const SOURCE_COMPLIANCE_METRICS: &[&str] = &[
 
 /// This helper function performs an HTTP request to the specified URL and
 /// validates the presence of the specified metrics.
+///
+/// # Errors
+///
+/// Returns an error if loading the metrics fails or any requested metric is absent.
 pub async fn assert_metrics_present(
     url: &str,
     metrics_list: &[&str],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
-    let mut required_metrics: HashSet<_> = HashSet::from_iter(metrics_list.iter().cloned());
+    let mut required_metrics: HashSet<_> = metrics_list.iter().copied().collect();
     for captures in metrics_regex().captures_iter(&metrics) {
         let metric_name = &captures["name"];
         required_metrics.remove(metric_name);
@@ -137,9 +162,9 @@ mod tests {
     #[test]
     fn test_extract_component_sent_events_total_sum() {
         let cases = vec![
-            (vec![r#""#], 0),
-            (vec![r#"component_sent_events_total 123"#], 123),
-            (vec![r#"component_sent_events_total{} 123"#], 123),
+            (vec![r""], 0),
+            (vec![r"component_sent_events_total 123"], 123),
+            (vec![r"component_sent_events_total{} 123"], 123),
             (
                 vec![r#"component_sent_events_total{method="POST"} 456"#],
                 456,
@@ -147,33 +172,33 @@ mod tests {
             (vec![r#"component_sent_events_total{a="b",c="d"} 456"#], 456),
             (
                 vec![
-                    r#"component_sent_events_total 123"#,
+                    r"component_sent_events_total 123",
                     r#"component_sent_events_total{method="POST"} 456"#,
                 ],
                 123 + 456,
             ),
-            (vec![r#"other{} 789"#], 0),
+            (vec![r"other{} 789"], 0),
             (
                 vec![
-                    r#"component_sent_events_total{} 123"#,
+                    r"component_sent_events_total{} 123",
                     r#"component_sent_events_total{method="POST"} 456"#,
-                    r#"other{} 789"#,
+                    r"other{} 789",
                 ],
                 123 + 456,
             ),
             // Prefixes and suffixes
             (
                 vec![
-                    r#"component_sent_events_total 1"#,
-                    r#"vector_component_sent_events_total 3"#,
+                    r"component_sent_events_total 1",
+                    r"vector_component_sent_events_total 3",
                 ],
                 1 + 3,
             ),
             // Prefixes and suffixes with timestamps
             (
                 vec![
-                    r#"component_sent_events_total 1 1607985729161"#,
-                    r#"vector_component_sent_events_total 3 1607985729161"#,
+                    r"component_sent_events_total 1 1607985729161",
+                    r"vector_component_sent_events_total 3 1607985729161",
                 ],
                 1 + 3,
             ),
@@ -189,26 +214,26 @@ mod tests {
     #[test]
     fn test_extract_vector_started() {
         let cases = vec![
-            (vec![r#"vector_started 1"#], true),
-            (vec![r#"vector_started_total 1"#], true),
-            (vec![r#"vector_vector_started_total 1"#], true),
-            (vec![r#""#], false),
-            (vec![r#"other{} 1"#], false),
+            (vec![r"vector_started 1"], true),
+            (vec![r"vector_started_total 1"], true),
+            (vec![r"vector_vector_started_total 1"], true),
+            (vec![r""], false),
+            (vec![r"other{} 1"], false),
             // Real-world example.
             (
                 vec![
-                    r#"# HELP vector_started_total vector_started_total"#,
-                    r#"# TYPE vector_started_total counter"#,
-                    r#"vector_started_total 1"#,
+                    r"# HELP vector_started_total vector_started_total",
+                    r"# TYPE vector_started_total counter",
+                    r"vector_started_total 1",
                 ],
                 true,
             ),
             // Another real-world example.
             (
                 vec![
-                    r#"# HELP vector_started_total started_total"#,
-                    r#"# TYPE vector_started_total counter"#,
-                    r#"vector_started_total 1 1607985729161"#,
+                    r"# HELP vector_started_total started_total",
+                    r"# TYPE vector_started_total counter",
+                    r"vector_started_total 1 1607985729161",
                 ],
                 true,
             ),

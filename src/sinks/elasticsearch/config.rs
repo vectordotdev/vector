@@ -166,7 +166,6 @@ pub struct ElasticsearchConfig {
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: Option<QueryParameters>,
 

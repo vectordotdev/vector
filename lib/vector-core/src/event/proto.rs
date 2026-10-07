@@ -429,12 +429,10 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
-        // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
-        // (as per chrono leap-second specs), which is below i32::MAX
-        #[allow(clippy::cast_possible_wrap)]
         let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
-            nanos: ts.timestamp_subsec_nanos() as i32,
+            nanos: i32::try_from(ts.timestamp_subsec_nanos())
+                .expect("chrono subsecond nanoseconds fit in i32"),
         });
 
         let interval_ms = data.time.interval_ms.map_or(0, std::num::NonZeroU32::get);
@@ -639,6 +637,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id,
             datadog_origin_metadata,
             source_event_id,
+            trace_layout,
             ..
         } = value.into_owned();
 
@@ -652,6 +651,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
+            trace_layout: encode_trace_layout(trace_layout),
         }
     }
 }
@@ -668,6 +668,7 @@ impl TryFrom<Metadata> for EventMetadata {
             secrets,
             datadog_origin_metadata,
             source_event_id,
+            trace_layout,
         } = value;
 
         let metadata_value = match metadata_value {
@@ -706,11 +707,31 @@ impl TryFrom<Metadata> for EventMetadata {
                 schema_definition: default_schema_definition(),
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
+                trace_layout: decode_trace_layout(trace_layout),
                 source_event_id,
             }),
             last_transform_timestamp: None,
         })
     }
+}
+
+fn encode_trace_layout(layout: Option<super::TraceLayout>) -> Option<i32> {
+    Some(match layout? {
+        super::TraceLayout::Datadog => TraceLayout::Datadog as i32,
+        super::TraceLayout::OtelFlattened => TraceLayout::OtelFlattened as i32,
+        super::TraceLayout::OtlpResourceSpans => TraceLayout::OtlpResourceSpans as i32,
+        super::TraceLayout::Unrecognized(value) => value,
+    })
+}
+
+fn decode_trace_layout(value: Option<i32>) -> Option<super::TraceLayout> {
+    let value = value?;
+    Some(match TraceLayout::try_from(value) {
+        Ok(TraceLayout::Datadog) => super::TraceLayout::Datadog,
+        Ok(TraceLayout::OtelFlattened) => super::TraceLayout::OtelFlattened,
+        Ok(TraceLayout::OtlpResourceSpans) => super::TraceLayout::OtlpResourceSpans,
+        Ok(TraceLayout::Unspecified) | Err(_) => super::TraceLayout::Unrecognized(value),
+    })
 }
 
 fn decode_event_metadata(
@@ -731,10 +752,9 @@ fn decode_event_metadata(
 fn decode_timestamp(
     ts: &prost_types::Timestamp,
 ) -> Result<chrono::DateTime<chrono::Utc>, DecodeError> {
-    // Sign is never lost as ts.nanos is always non negative (per proto spec)
-    #[allow(clippy::cast_sign_loss)]
+    let nanos = u32::try_from(ts.nanos).map_err(|_| DecodeError::InvalidTimestamp)?;
     chrono::Utc
-        .timestamp_opt(ts.seconds, ts.nanos as u32)
+        .timestamp_opt(ts.seconds, nanos)
         .single()
         .ok_or(DecodeError::InvalidTimestamp)
 }
@@ -787,13 +807,12 @@ fn encode_value(value: super::Value) -> Value {
     Value {
         kind: match value {
             super::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
+            super::Value::String(s) => Some(value::Kind::RawBytes(s.into_bytes())),
             super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
-            // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
-            // (as per chrono leap-second specs), which is below i32::MAX
-            #[allow(clippy::cast_possible_wrap)]
             super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
-                nanos: ts.timestamp_subsec_nanos() as i32,
+                nanos: i32::try_from(ts.timestamp_subsec_nanos())
+                    .expect("chrono subsecond nanoseconds fit in i32"),
             })),
             super::Value::Integer(value) => Some(value::Kind::Integer(value)),
             super::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
@@ -994,6 +1013,7 @@ mod tests {
 
         assert_eq!(decoded.source_event_id(), None);
         assert_eq!(decoded.source_type(), Some("legacy"));
+        assert_eq!(decoded.trace_layout(), None);
     }
 
     #[test]
@@ -1061,6 +1081,17 @@ mod tests {
             crate::event::Metric::try_from(proto),
             Err(DecodeError::MismatchedSketchBins)
         );
+    }
+
+    #[test]
+    fn strings_preserve_bytes_wire_encoding() {
+        let string = VrlValue::from("café\n");
+        let bytes = VrlValue::Bytes("café\n".into());
+        let encoded = encode_value(string.clone());
+        assert_eq!(encoded.encode_to_vec(), encode_value(bytes).encode_to_vec());
+        let decoded = decode_value(encoded).unwrap().unwrap();
+        assert!(matches!(decoded, VrlValue::Bytes(_)));
+        assert_eq!(decoded, string);
     }
 
     #[test]

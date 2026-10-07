@@ -163,8 +163,8 @@ impl StackdriverLogsEncoder {
 pub(super) fn remap_severity(severity: Value) -> Value {
     let n = match severity {
         Value::Integer(n) => n - n % 100,
-        Value::Bytes(s) => {
-            let s = String::from_utf8_lossy(&s);
+        value @ (Value::Bytes(_) | Value::String(_)) => {
+            let s = value.to_string_lossy();
             match s.parse::<usize>() {
                 Ok(n) => (n - n % 100) as i64,
                 Err(_) => match s.to_uppercase() {
