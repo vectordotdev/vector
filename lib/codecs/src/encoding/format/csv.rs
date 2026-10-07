@@ -257,6 +257,7 @@ impl Encoder<Event> for CsvSerializer {
             // get string value of current field
             let field_value = match field_value {
                 Some(Value::Bytes(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
+                Some(Value::String(string)) => string.to_string(),
                 Some(Value::Integer(int)) => int.to_string(),
                 Some(Value::Float(float)) => float.to_string(),
                 Some(Value::Boolean(bool)) => bool.to_string(),
