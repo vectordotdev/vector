@@ -1189,10 +1189,10 @@ mod tests {
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
         assert_eq!(log.get(event_path!("field")).unwrap(), &msg.into());
-        assert!(matches!(
+        assert_eq!(
             log.get(event_path!("host")).unwrap(),
-            Value::Bytes(_)
-        ));
+            &address.ip().to_string().into()
+        );
         assert!(matches!(
             log.get(event_path!("timestamp")).unwrap(),
             Value::Timestamp(_)

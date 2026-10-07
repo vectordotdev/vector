@@ -244,6 +244,7 @@ impl Sample {
             Value::Integer(value) => *value as f64,
             Value::Float(value) => value.into_inner(),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<f64>().ok()?,
+            Value::String(string) => string.parse::<f64>().ok()?,
             _ => return None,
         };
 
@@ -261,6 +262,7 @@ impl Sample {
         match value {
             Value::Integer(value) => u64::try_from(*value).ok().and_then(NonZeroU64::new),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<NonZeroU64>().ok(),
+            Value::String(string) => string.parse::<NonZeroU64>().ok(),
             _ => None,
         }
     }

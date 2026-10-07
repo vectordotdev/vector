@@ -350,6 +350,7 @@ fn map_timestamp_value(value: Value) -> Option<Timestamp> {
         Value::Bytes(b) => Some(Timestamp::String(
             String::from_utf8_lossy(b.as_ref()).into(),
         )),
+        Value::String(s) => Some(Timestamp::String(s.to_string())),
         _ => None,
     }
 }
@@ -357,6 +358,7 @@ fn map_timestamp_value(value: Value) -> Option<Timestamp> {
 fn get_message_string(value: Option<Value>) -> String {
     match value {
         Some(Value::Bytes(bytes)) => String::from_utf8_lossy(bytes.as_ref()).into(),
+        Some(Value::String(string)) => string.to_string(),
         Some(value) => value.to_string(),
         None => "log from vector".to_string(),
     }

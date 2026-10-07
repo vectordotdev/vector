@@ -2255,7 +2255,7 @@ dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "regex",
@@ -2601,6 +2601,15 @@ name = "bytesize"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bd91ee7b2422bcb158d90ef4d14f75ef67f340943fc4149891dcce8f8b972a3"
+
+[[package]]
+name = "bytestring"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86566c496f2f47d9b8147a4c8b02ffdb69c919fe0c2b2e7195d22cbba0e635c9"
+dependencies = [
+ "bytes",
+]
 
 [[package]]
 name = "cargo-lock"
@@ -3151,15 +3160,6 @@ name = "const-str"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18f12cc9948ed9604230cdddc7c86e270f9401ccbe3c2e98a4378c5e7632212f"
-
-[[package]]
-name = "convert_case"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb402b8d4c85569410425650ce3eddc7d698ed96d39a73f941b08fb63082f1e7"
-dependencies = [
- "unicode-segmentation",
-]
 
 [[package]]
 name = "convert_case"
@@ -9218,7 +9218,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.4.1",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -9238,7 +9238,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck 0.4.1",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -9272,7 +9272,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -9285,7 +9285,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -14073,8 +14073,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.35.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#e7d8d0f59062e44c18da6f861a7fd0ddfe24cf9f"
+version = "0.36.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#09f1cd85b5b09d5dce9c479930e334b0b52dd574"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",
@@ -14083,6 +14083,7 @@ dependencies = [
  "base62",
  "base64-simd",
  "bytes",
+ "bytestring",
  "cbc",
  "cfb-mode",
  "cfg-if",
@@ -14095,7 +14096,7 @@ dependencies = [
  "clap",
  "codespan-reporting",
  "community-id",
- "convert_case 0.7.1",
+ "convert_case 0.12.0",
  "crc",
  "crypto_secretbox",
  "csv",
