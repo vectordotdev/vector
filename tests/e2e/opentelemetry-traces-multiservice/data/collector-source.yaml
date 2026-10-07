@@ -12,7 +12,7 @@ receivers:
 
 exporters:
   file:
-    path: /output/opentelemetry-demo/${env:CONFIG_INGRESS_EXPORTER}/input.jsonl
+    path: /output/opentelemetry-traces-multiservice/${env:CONFIG_INGRESS_EXPORTER}/input.jsonl
     flush_interval: 100ms
   otlphttp:
     endpoint: http://vector:4318

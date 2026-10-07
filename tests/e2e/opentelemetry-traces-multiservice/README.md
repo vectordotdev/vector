@@ -41,7 +41,7 @@ writes `output.jsonl`.
 
 ## Validations
 
-The [Rust test](../opentelemetry/demo/mod.rs) verifies:
+The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 
 - Completion: requires the workload marker, allows Kafka consumers to finish,
   stops the input, and waits up to 120 seconds for Vector to drain.
@@ -67,16 +67,16 @@ The [Rust test](../opentelemetry/demo/mod.rs) verifies:
 With Docker available, run both transports:
 
 ```shell
-cargo vdev e2e run opentelemetry-demo --retries 0 --always-show-logs
+cargo vdev e2e run opentelemetry-traces-multiservice --retries 0 --always-show-logs
 ```
 
 To run one transport, add `-e 0.159.0-otlphttp` (HTTP) or `-e 0.159.0-otlp` (gRPC).
 
 In CI, a Vector-team member can submit a PR review starting with
-`/ci-run-e2e-opentelemetry-demo` to test the reviewed commit.
+`/ci-run-e2e-opentelemetry-traces-multiservice` to test the reviewed commit.
 Comments, “run all” commands, automatic PR CI, and schedules do not trigger it.
 
 Read the results on the CI job's summary page. Download the
-`otel-demo-<commit>` artifact for input/output captures, `coverage.json`,
+`otel-traces-multiservice-<commit>` artifact for input/output captures, `coverage.json`,
 `differences.txt`, configs, and runner logs. Results are separated by transport;
 failed runs may leave partial results.

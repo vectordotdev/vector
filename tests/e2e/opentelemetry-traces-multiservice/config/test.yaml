@@ -2,12 +2,12 @@ features:
   - e2e-tests-opentelemetry
 
 test: e2e
-test_filter: "opentelemetry::demo::"
+test_filter: "opentelemetry::multiservice_traces::"
 
 runner:
   needs_docker_socket: true
   volumes:
-    opentelemetry_demo_evidence: /output/opentelemetry-demo
+    opentelemetry_traces_multiservice_evidence: /output/opentelemetry-traces-multiservice
 
 matrix:
   collector_version: ["0.159.0"]

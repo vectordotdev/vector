@@ -1,7 +1,7 @@
-pub mod demo;
 pub mod logs;
 pub mod metrics;
 pub mod metrics_native;
+pub mod multiservice_traces;
 pub mod traces;
 
 use std::{io, path::Path, process::Command};

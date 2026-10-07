@@ -39,7 +39,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   cart:
     image: ghcr.io/open-telemetry/demo:3.1.0-cart
     depends_on:
@@ -72,7 +72,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   checkout:
     image: ghcr.io/open-telemetry/demo:3.1.0-checkout
     healthcheck:
@@ -144,7 +144,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   currency:
     image: ghcr.io/open-telemetry/demo:3.1.0-currency
     healthcheck:
@@ -177,7 +177,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   email:
     image: ghcr.io/open-telemetry/demo:3.1.0-email
     healthcheck:
@@ -213,7 +213,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   frontend:
     image: ghcr.io/open-telemetry/demo:3.1.0-frontend
     healthcheck:
@@ -287,7 +287,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   payment:
     image: ghcr.io/open-telemetry/demo:3.1.0-payment
     healthcheck:
@@ -328,7 +328,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   product-catalog:
     image: ghcr.io/open-telemetry/demo:3.1.0-product-catalog
     healthcheck:
@@ -376,7 +376,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
     volumes:
       - "../data/otel-config.yml:/otel-config.yml:ro"
   quote:
@@ -414,7 +414,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   recommendation:
     image: ghcr.io/open-telemetry/demo:3.1.0-recommendation
     healthcheck:
@@ -456,7 +456,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   shipping:
     image: ghcr.io/open-telemetry/demo:3.1.0-shipping
     healthcheck:
@@ -498,7 +498,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   accounting:
     image: ghcr.io/open-telemetry/demo:3.1.0-accounting
     depends_on:
@@ -527,7 +527,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   fraud-detection:
     image: ghcr.io/open-telemetry/demo:3.1.0-fraud-detection
     depends_on:
@@ -558,7 +558,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   kafka:
     image: ghcr.io/open-telemetry/demo:3.1.0-kafka
     healthcheck:
@@ -588,7 +588,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   flagd:
     image: ghcr.io/open-feature/flagd:v0.16.0
     command:
@@ -610,7 +610,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
     volumes:
       - "../data/demo.flagd.json:/etc/flagd/demo.flagd.json:ro"
   astronomy-db:
@@ -638,7 +638,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
     volumes:
       - "../data/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"
   valkey-cart:
@@ -661,7 +661,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
   load-generator:
     image: ghcr.io/open-telemetry/demo:3.1.0-load-generator
     depends_on:
@@ -704,7 +704,7 @@ services:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
     labels:
-      vector.otel-demo.producer: "true"
+      vector.otel-traces-multiservice.producer: "true"
     command:
       - "-f"
       - "/usr/src/app/scenario.py"
@@ -716,15 +716,15 @@ services:
       - DemoUser
     volumes:
       - "../data/scenario.py:/usr/src/app/scenario.py:ro"
-      - opentelemetry_demo_evidence:/output/opentelemetry-demo
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
   prepare-output:
     image: alpine:3.20
     command:
       - sh
       - "-c"
-      - rm -rf /output/opentelemetry-demo/${CONFIG_INGRESS_EXPORTER} && mkdir -p /output/opentelemetry-demo/${CONFIG_INGRESS_EXPORTER}
+      - rm -rf /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER} && mkdir -p /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}
     volumes:
-      - opentelemetry_demo_evidence:/output/opentelemetry-demo
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
   otel-collector:
     build:
       context: "../../../.."
@@ -742,7 +742,7 @@ services:
         condition: service_started
     volumes:
       - "../data/collector-source.yaml:/etc/otelcol-contrib/config.yaml:ro"
-      - opentelemetry_demo_evidence:/output/opentelemetry-demo
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
     healthcheck:
       test:
         - CMD-SHELL
@@ -765,7 +765,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - "../data/collector-sink.yaml:/etc/otelcol-contrib/config.yaml:ro"
-      - opentelemetry_demo_evidence:/output/opentelemetry-demo
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
     healthcheck:
       test:
         - CMD-SHELL
@@ -793,14 +793,14 @@ services:
     command:
       - sh
       - "-c"
-      - test -f /output/opentelemetry-demo/${CONFIG_INGRESS_EXPORTER}/workload-complete
+      - test -f /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}/workload-complete
     depends_on:
       load-generator:
         condition: service_completed_successfully
     volumes:
-      - opentelemetry_demo_evidence:/output/opentelemetry-demo
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
 volumes:
-  opentelemetry_demo_evidence:
+  opentelemetry_traces_multiservice_evidence:
     external: true
 networks:
   default:

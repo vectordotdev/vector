@@ -10,7 +10,7 @@ receivers:
 
 exporters:
   file:
-    path: /output/opentelemetry-demo/${env:CONFIG_INGRESS_EXPORTER}/output.jsonl
+    path: /output/opentelemetry-traces-multiservice/${env:CONFIG_INGRESS_EXPORTER}/output.jsonl
     flush_interval: 100ms
 
 service:

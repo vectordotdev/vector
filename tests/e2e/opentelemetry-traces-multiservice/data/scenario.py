@@ -29,7 +29,7 @@ class DemoUser(WebsiteUser):
                     response.success()
 
         trace.get_tracer_provider().shutdown()
-        directory = Path("/output/opentelemetry-demo") / os.environ["CONFIG_INGRESS_EXPORTER"]
+        directory = Path("/output/opentelemetry-traces-multiservice") / os.environ["CONFIG_INGRESS_EXPORTER"]
         (directory / "workload-complete").touch()
         self.environment.runner.quit()
 

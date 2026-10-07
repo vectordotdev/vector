@@ -19,8 +19,8 @@ use vector_lib::opentelemetry::proto::{
 
 use crate::opentelemetry::parse_export_traces_request;
 
-const OUTPUT: &str = "/output/opentelemetry-demo";
-const NETWORK: &str = "vector-integration-tests-opentelemetry-demo";
+const OUTPUT: &str = "/output/opentelemetry-traces-multiservice";
+const NETWORK: &str = "vector-integration-tests-opentelemetry-traces-multiservice";
 const REQUIRED_SERVICES: &[&str] = &[
     "ad",
     "cart",
@@ -245,7 +245,7 @@ fn read_capture(directory: &Path, name: &str) -> Result<ExportTraceServiceReques
     )
 }
 
-async fn validate_demo() -> Result<(), String> {
+async fn validate_multiservice_traces() -> Result<(), String> {
     let exporter = std::env::var("CONFIG_INGRESS_EXPORTER").map_err(|error| error.to_string())?;
     let transport = match exporter.as_str() {
         "otlphttp" => "HTTP",
@@ -255,13 +255,13 @@ async fn validate_demo() -> Result<(), String> {
     let directory = Path::new(OUTPUT).join(&exporter);
     if !directory.join("workload-complete").exists() {
         return Err(
-            "Demo workload did not complete; run cargo vdev e2e run opentelemetry-demo".into(),
+            "Demo workload did not complete; run cargo vdev e2e run opentelemetry-traces-multiservice".into(),
         );
     }
     let docker = Docker::connect_with_socket_defaults().map_err(|error| error.to_string())?;
     // Give asynchronous Kafka consumers time to process the final checkout.
     thread::sleep(Duration::from_secs(5));
-    stop_containers(&docker, "vector.otel-demo.producer=true").await?;
+    stop_containers(&docker, "vector.otel-traces-multiservice.producer=true").await?;
     stop_containers(&docker, "com.docker.compose.service=otel-collector").await?;
     let input = read_capture(&directory, "input.jsonl")?;
     let input_coverage = coverage(&input);
@@ -313,7 +313,7 @@ async fn validate_demo() -> Result<(), String> {
         ));
     }
     let summary = format!(
-        "# OTel Demo trace validation\n\nDemo: 3.1.0; Vector ingress: {transport}\n\n```json\n{}\n```\n\n{}\n",
+        "# Multiservice OpenTelemetry trace validation\n\nDemo: 3.1.0; Vector ingress: {transport}\n\n```json\n{}\n```\n\n{}\n",
         serde_json::to_string_pretty(&input_coverage).unwrap(),
         if failures.is_empty() {
             "PASS: captured trace semantics and multiplicities match.".into()
@@ -330,8 +330,8 @@ async fn validate_demo() -> Result<(), String> {
 }
 
 #[tokio::test]
-async fn demo_trace_round_trip() {
-    validate_demo()
+async fn trace_round_trip() {
+    validate_multiservice_traces()
         .await
         .unwrap_or_else(|error| panic!("{error}"));
 }
