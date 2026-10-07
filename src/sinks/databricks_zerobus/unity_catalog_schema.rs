@@ -97,7 +97,7 @@ pub async fn fetch_table_schema(
             .into_body()
             .collect()
             .await
-            .map(|c| c.to_bytes())
+            .map(http_body::Collected::to_bytes)
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
         return Err(ZerobusSinkError::SchemaError {
@@ -110,7 +110,7 @@ pub async fn fetch_table_schema(
         .into_body()
         .collect()
         .await
-        .map(|c| c.to_bytes())
+        .map(http_body::Collected::to_bytes)
         .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to read response body: {e}"),
             retryable: true,
@@ -172,7 +172,7 @@ async fn get_oauth_token(
             .into_body()
             .collect()
             .await
-            .map(|c| c.to_bytes())
+            .map(http_body::Collected::to_bytes)
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
         return Err(ZerobusSinkError::SchemaError {
@@ -185,7 +185,7 @@ async fn get_oauth_token(
         .into_body()
         .collect()
         .await
-        .map(|c| c.to_bytes())
+        .map(http_body::Collected::to_bytes)
         .map_err(|e| ZerobusSinkError::SchemaError {
             message: format!("Failed to read OAuth response body: {e}"),
             retryable: true,

@@ -60,6 +60,11 @@ impl ReduceState {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<OwnedTargetPath, MergeStrategy>) {
         self.metadata.merge(e.metadata().clone());
 
@@ -140,6 +145,11 @@ impl ReduceState {
 }
 
 #[derive(Clone, Debug)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
@@ -152,6 +162,11 @@ pub struct Reduce {
     max_events: Option<usize>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
     for (path, _) in &strategies {
         let contains_index = parse_target_path(path)
@@ -159,7 +174,7 @@ fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> 
             .path
             .segments
             .iter()
-            .any(|segment| segment.is_index());
+            .any(vrl::path::OwnedSegment::is_index);
         if contains_index {
             return Err(format!(
                 "Merge strategies with indexes are currently not supported. Path: `{path}`"
@@ -172,6 +187,11 @@ fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> 
 }
 
 impl Reduce {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -192,7 +212,7 @@ impl Reduce {
             .map(|c| c.build(enrichment_tables, metrics_storage))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
-        let max_events = config.max_events.map(|max| max.into());
+        let max_events = config.max_events.map(std::convert::Into::into);
 
         validate_merge_strategies(config.merge_strategies.clone())?;
 
@@ -260,7 +280,7 @@ impl Reduce {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
             }
-        };
+        }
     }
 
     pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
@@ -293,21 +313,20 @@ impl Reduce {
                 emitter.emit(state.flush().into());
             }
 
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state(event, discriminant);
         } else if ends_here {
-            emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
-                Some(mut state) => {
+            emitter.emit(
+                if let Some(mut state) = self.reduce_merge_states.remove(&discriminant) {
                     state.add_event(event, &self.merge_strategies);
                     state.flush().into()
-                }
-                None => {
+                } else {
                     let mut state = ReduceState::new();
                     state.add_event(event, &self.merge_strategies);
                     state.flush().into()
-                }
-            });
+                },
+            );
         } else {
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state(event, discriminant);
         }
     }
 }
@@ -374,6 +393,19 @@ mod test {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
+    #[allow(
+        clippy::needless_for_each,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn reduce_from_condition() {
         let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             group_by:
@@ -476,6 +508,15 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn reduce_merge_strategies() {
         let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             group_by:
@@ -548,6 +589,15 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn missing_group_by() {
         let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             group_by:
@@ -643,6 +693,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn max_events_1() {
         let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             group_by:
@@ -686,6 +741,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn max_events() {
         let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             group_by:
@@ -746,10 +806,19 @@ mod test {
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
-        .await
+        .await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn arrays() {
         let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             group_by:
@@ -841,6 +910,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn strategy_path_with_nested_fields() {
         let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             group_by:
@@ -939,6 +1013,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn merge_objects_in_array() {
         let config = serde_yaml::from_str::<ReduceConfig>(indoc! {r#"
             group_by:
@@ -998,10 +1077,15 @@ mod test {
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
-        .await
+        .await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn merged_quoted_path() {
         let config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
             ends_when:
@@ -1032,6 +1116,6 @@ mod test {
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
-        .await
+        .await;
     }
 }

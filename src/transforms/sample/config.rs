@@ -263,6 +263,7 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+#[must_use]
 pub fn default_sample_rate_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("sample_rate"))
 }

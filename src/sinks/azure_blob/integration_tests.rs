@@ -102,6 +102,11 @@ async fn azure_blob_healthcheck_unknown_container() {
     );
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 async fn assert_insert_lines_into_blob(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("lines/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig {
@@ -131,6 +136,11 @@ async fn azure_blob_insert_lines_into_blob_with_oauth() {
     assert_insert_lines_into_blob(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 async fn assert_insert_json_into_blob(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("json/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig {
@@ -174,6 +184,11 @@ async fn azure_blob_insert_json_into_blob_with_oauth() {
 // This test fails to get the posted blob with "header not found content-length".
 // However, we inspected that the sink writes the expected contents to Azure thus this is a retrieval/test issue.
 // Additional context: https://github.com/Azure/Azurite/issues/629
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ignore_without_reason,
+    reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+)]
 async fn azure_blob_insert_lines_into_blob_gzip() {
     let blob_prefix = format!("lines-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
@@ -199,6 +214,11 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
 #[tokio::test]
 // This test will fail with Azurite blob emulator because of this issue:
 // https://github.com/Azure/Azurite/issues/629
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ignore_without_reason,
+    reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+)]
 async fn azure_blob_insert_json_into_blob_gzip() {
     let blob_prefix = format!("json-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
@@ -449,7 +469,7 @@ async fn azure_blob_append_blob_json_encoding_with_oauth() {
     assert_append_blob_json_encoding(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
 }
 
-/// Default hourly rotation: without explicit blob_time_format or blob_append_uuid overrides,
+/// Default hourly rotation: without explicit `blob_time_format` or `blob_append_uuid` overrides,
 /// append blobs use `%Y-%m-%dT%H` and no UUID — two batches both write to the current hour's blob.
 async fn assert_append_blob_default_hourly_rotation(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("append/hourly/{}/", random_string(10));
@@ -519,7 +539,7 @@ async fn azure_blob_append_blob_default_hourly_rotation_with_oauth() {
     .await;
 }
 
-/// Forced multi-flush: a low batch.max_bytes causes Vector to flush many small blocks within a
+/// Forced multi-flush: a low `batch.max_bytes` causes Vector to flush many small blocks within a
 /// single run. All blocks must land in one append blob and every line must be present.
 async fn assert_append_blob_multiple_forced_flushes(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("append/multiflush/{}", random_string(10));
@@ -619,6 +639,11 @@ async fn azure_blob_append_blob_with_tags_and_metadata_with_oauth() {
 }
 
 impl AzureBlobSinkConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
@@ -647,6 +672,11 @@ impl AzureBlobSinkConfig {
         config
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     pub async fn new_emulator_with_oauth() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_OAUTH_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
@@ -716,6 +746,11 @@ impl AzureBlobSinkConfig {
             .expect("Running sink failed");
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = self.build_test_client();
 
@@ -736,6 +771,11 @@ impl AzureBlobSinkConfig {
         names
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn get_blob(&self, blob: String) -> (Option<String>, Option<String>, Vec<String>) {
         let client = self.build_test_client();
 
@@ -779,6 +819,15 @@ impl AzureBlobSinkConfig {
         (content_type, content_encoding, self.get_blob_content(data))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn get_blob_metadata(&self, blob: String) -> HashMap<String, String> {
         let client = self.build_test_client();
         let blob_client = client.blob_client(&blob);
@@ -804,6 +853,11 @@ impl AzureBlobSinkConfig {
             .collect()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn get_blob_tags(&self, blob: String) -> HashMap<String, String> {
         let client = self.build_test_client();
         let blob_client = client.blob_client(&blob);
@@ -815,6 +869,11 @@ impl AzureBlobSinkConfig {
         HashMap::from(body)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
         let body = BytesMut::from(data.as_slice()).freeze().reader();
 
@@ -840,10 +899,19 @@ impl AzureBlobSinkConfig {
             },
         };
 
-        response.expect("Failed to create container")
+        response.expect("Failed to create container");
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn random_lines_with_stream_with_group_key(
     len: usize,
     count: usize,

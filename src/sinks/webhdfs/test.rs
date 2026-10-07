@@ -18,6 +18,11 @@ use crate::{
     },
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn default_config(encoding: EncodingConfigWithFraming) -> WebHdfsConfig {
     WebHdfsConfig {
         root: "/tmp/".to_string(),
@@ -78,6 +83,11 @@ fn build_request(compression: Compression) -> OpenDalRequest {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 fn webhdfs_build_request() {
     let req = build_request(Compression::None);
     assert!(req.metadata.partition_key.ends_with(".log"));

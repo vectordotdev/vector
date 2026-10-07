@@ -196,6 +196,11 @@ fn no_tls() -> MaybeTlsSettings {
     MaybeTlsSettings::from_config(None, false).unwrap()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn client_tls(config: TlsConfig) -> MaybeTlsSettings {
     TlsSettings::from_options(Some(&config)).unwrap().into()
 }
@@ -427,6 +432,11 @@ fn proxy_config(proxy: &TestServer, tls: bool, auth: bool) -> ProxyConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn assert_success(response: TestResponse) {
     assert_eq!(response.status, StatusCode::OK.as_u16());
     assert_eq!(response.body, b"origin response");

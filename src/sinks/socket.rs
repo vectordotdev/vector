@@ -111,6 +111,7 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
+    #[must_use]
     pub const fn new(mode: Mode, acknowledgements: AcknowledgementsConfig) -> Self {
         SocketSinkConfig {
             mode,
@@ -118,6 +119,7 @@ impl SocketSinkConfig {
         }
     }
 
+    #[must_use]
     pub fn make_basic_tcp_config(
         address: String,
         acknowledgements: AcknowledgementsConfig,
@@ -135,6 +137,11 @@ impl SocketSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn input(&self) -> Input {
         let encoder_input_type = match &self.mode {
             Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
@@ -340,7 +347,7 @@ mod test {
                 config: TcpSinkConfig::from_address("127.0.0.1:5000".to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("validation should succeed");
@@ -354,7 +361,7 @@ mod test {
                 config: TcpSinkConfig::from_address("not a valid address".to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -370,7 +377,7 @@ mod test {
                 config: TcpSinkConfig::from_address("127.0.0.1".to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -386,7 +393,7 @@ mod test {
                 config: UdpSinkConfig::from_address("not a valid address".to_string()),
                 encoding: JsonSerializerConfig::default().into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -402,7 +409,7 @@ mod test {
                 config: UdpSinkConfig::from_address("127.0.0.1".to_string()),
                 encoding: JsonSerializerConfig::default().into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -418,7 +425,7 @@ mod test {
                 config: UdpSinkConfig::from_address("127.0.0.1:5000".to_string()),
                 encoding: JsonSerializerConfig::default().into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         config
@@ -459,7 +466,7 @@ mod test {
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
                 }),
             },
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let context = SinkContext::default();
@@ -517,6 +524,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn tcp_stream() {
         trace_init();
 
@@ -526,7 +538,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let mut receiver = CountReceiver::receive_lines(addr);
@@ -556,6 +568,11 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn metrics_socket() {
         trace_init();
 
@@ -567,7 +584,7 @@ mod test {
                 config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let (expected, events) = random_metrics_with_stream(10, None, None);
@@ -604,6 +621,11 @@ mod test {
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn tcp_stream_detects_disconnect() {
         use std::{
             pin::Pin,
@@ -649,7 +671,7 @@ mod test {
                 ),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let context = SinkContext::default();
         let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
@@ -659,7 +681,7 @@ mod test {
                 .take_while(|event| ready(event.is_some()))
                 .map(|event| event.unwrap())
                 .boxed();
-            run_and_assert_sink_compliance(sink, stream, &SINK_TAGS).await
+            run_and_assert_sink_compliance(sink, stream, &SINK_TAGS).await;
         });
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
@@ -770,7 +792,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             }),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let context = SinkContext::default();

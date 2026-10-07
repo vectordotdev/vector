@@ -45,7 +45,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-/// Retention policy configuration for AWS CloudWatch Log Group
+/// Retention policy configuration for AWS `CloudWatch` Log Group
 pub struct Retention {
     /// Whether or not to set a retention policy when creating a new Log Group.
     #[serde(default)]
@@ -60,6 +60,11 @@ pub struct Retention {
     pub days: u32,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 fn retention_days<'de, D>(deserializer: D) -> Result<u32, D::Error>
 where
     D: Deserializer<'de>,
@@ -89,14 +94,14 @@ where
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
-    /// The [group name][group_name] of the target CloudWatch Logs stream.
+    /// The [group name][group_name] of the target `CloudWatch` Logs stream.
     ///
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     #[configurable(metadata(docs::examples = "group-name"))]
     #[configurable(metadata(docs::examples = "group-{{ file }}"))]
     pub group_name: Template,
 
-    /// The [stream name][stream_name] of the target CloudWatch Logs stream.
+    /// The [stream name][stream_name] of the target `CloudWatch` Logs stream.
     ///
     /// There can only be one writer to a log stream at a time. If multiple instances are writing to
     /// the same log group, the stream name must include an identifier that is guaranteed to be
@@ -183,6 +188,11 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSinkConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
         create_client::<CloudwatchLogsClientBuilder>(
             &CloudwatchLogsClientBuilder {},
@@ -291,22 +301,22 @@ impl GenerateConfig for CloudwatchLogsSinkConfig {
 fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
         encoding,
-        group_name: Default::default(),
-        stream_name: Default::default(),
-        region: Default::default(),
+        group_name: Template::default(),
+        stream_name: UnconfinedTemplate::default(),
+        region: RegionOrEndpoint::default(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
-        assume_role: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        kms_key: Default::default(),
-        tags: Default::default(),
-        confinement: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: Option::default(),
+        assume_role: Option::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        kms_key: Option::default(),
+        tags: Option::default(),
+        confinement: ConfinementConfig::default(),
     }
 }
 

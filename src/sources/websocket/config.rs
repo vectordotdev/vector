@@ -25,15 +25,16 @@ use crate::{
 #[serde(untagged)]
 pub enum PongMessage {
     /// For exact string matching.
-    /// e.g., pong_message: "pong"
+    /// e.g., `pong_message`: "pong"
     Simple(String),
 
     /// For advanced matching strategies.
-    /// e.g., pong_message: { type: contains, value: "pong" }
+    /// e.g., `pong_message`: { type: contains, value: "pong" }
     Advanced(PongValidation),
 }
 
 impl PongMessage {
+    #[must_use]
     pub fn matches(&self, msg: &str) -> bool {
         match self {
             PongMessage::Simple(expected) => msg == expected,
@@ -65,6 +66,7 @@ pub enum PongValidation {
 }
 
 impl PongValidation {
+    #[must_use]
     pub fn matches(&self, msg: &str) -> bool {
         match self {
             PongValidation::Exact { value: expected } => msg == expected,

@@ -68,6 +68,7 @@ pub struct MetricToLogConfig {
 }
 
 impl MetricToLogConfig {
+    #[must_use]
     pub fn build_transform(&self, context: &TransformContext) -> MetricToLog {
         MetricToLog::new(
             self.host_tag.as_deref(),
@@ -123,6 +124,11 @@ impl TransformConfig for MetricToLogConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn schema_definition(log_namespace: LogNamespace) -> Definition {
     let mut schema_definition = Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
         .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
@@ -263,6 +269,7 @@ pub struct MetricToLog {
 }
 
 impl MetricToLog {
+    #[must_use]
     pub fn new(
         host_tag: Option<&str>,
         timezone: TimeZone,
@@ -283,6 +290,7 @@ impl MetricToLog {
         }
     }
 
+    #[must_use]
     pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
         if self.tag_values == MetricTagValues::Single {
             metric.reduce_tags_to_single();
@@ -340,8 +348,8 @@ impl FunctionTransform for MetricToLog {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
-            .map(|log| log.into());
-        output.extend(retval.into_iter())
+            .map(std::convert::Into::into);
+        output.extend(retval.into_iter());
     }
 }
 
@@ -371,6 +379,11 @@ mod tests {
         crate::test_util::test_generate_config::<MetricToLogConfig>();
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn do_transform(metric: Metric) -> Option<LogEvent> {
         assert_transform_compliance(async move {
             let config = MetricToLogConfig {
@@ -393,7 +406,7 @@ mod tests {
             result
         })
         .await
-        .map(|e| e.into_log())
+        .map(vector_lib::event::Event::into_log)
     }
 
     fn ts() -> DateTime<Utc> {
@@ -415,6 +428,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_counter() {
         let counter = Metric::new_with_metadata(
             "counter",
@@ -447,6 +465,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_gauge() {
         let gauge = Metric::new_with_metadata(
             "gauge",
@@ -476,6 +499,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_set() {
         let set = Metric::new_with_metadata(
             "set",
@@ -508,6 +536,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_distribution() {
         let distro = Metric::new_with_metadata(
             "distro",
@@ -559,6 +592,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_histogram() {
         let histo = Metric::new_with_metadata(
             "histo",
@@ -615,6 +653,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_summary() {
         let summary = Metric::new_with_metadata(
             "summary",

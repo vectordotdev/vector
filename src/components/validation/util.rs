@@ -17,6 +17,7 @@ impl GrpcAddress {
     ///
     /// This is typically used when actually binding a socket to use for listening for connections
     /// as a gRPC server.
+    #[must_use]
     pub const fn as_socket_addr(&self) -> SocketAddr {
         self.addr
     }
@@ -24,6 +25,12 @@ impl GrpcAddress {
     /// Gets the fully-qualified endpoint address.
     ///
     /// This is a URI in the form of `http://<socket address>/`. The scheme and path are hard-coded.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn as_uri(&self) -> Uri {
         let addr_str = self.addr.to_string();
         Uri::builder()

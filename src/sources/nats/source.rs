@@ -38,7 +38,7 @@ pub enum ProcessingStatus {
 
 /// Processes a single NATS message, sending decoded events downstream.
 ///
-/// This function contains the common logic for both Core and JetStream NATS.
+/// This function contains the common logic for both Core and `JetStream` NATS.
 pub async fn process_message(
     msg: &async_nats::Message,
     config: &NatsSourceConfig,
@@ -206,7 +206,7 @@ pub async fn run_nats_jetstream(
             let delay = backoff.next().expect("backoff never ends");
             tokio::select! {
                 _ = &mut shutdown => return Ok(()),
-                _ = tokio::time::sleep(delay) => {},
+                () = tokio::time::sleep(delay) => {},
             }
 
             match create_consumer_stream(&connection, js_config).await {

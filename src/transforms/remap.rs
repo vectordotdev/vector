@@ -175,12 +175,17 @@ impl Clone for RemapConfig {
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
             runtime: self.runtime,
-            cache: Mutex::new(Default::default()),
+            cache: Mutex::new(Vec::default()),
         }
     }
 }
 
 impl RemapConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn compile_vrl_program(
         &self,
         enrichment_tables: TableRegistry,
@@ -321,9 +326,15 @@ impl TransformConfig for RemapConfig {
         let mut default_definitions = HashMap::new();
 
         for (output_id, input_definition) in input_definitions {
-            let default_definition = compiled
-                .clone()
-                .map(|(state, meaning)| {
+            let default_definition = compiled.clone().map_or_else(
+                |()| {
+                    Definition::new_with_default_metadata(
+                        // The program failed to compile, so it can "never" return a value
+                        Kind::never(),
+                        input_definition.log_namespaces().clone(),
+                    )
+                },
+                |(state, meaning)| {
                     let mut new_type_def = Definition::new(
                         state.external.target_kind().clone(),
                         state.external.metadata_kind().clone(),
@@ -343,14 +354,8 @@ impl TransformConfig for RemapConfig {
                         new_type_def = new_type_def.with_meaning(path, &id);
                     }
                     new_type_def
-                })
-                .unwrap_or_else(|_| {
-                    Definition::new_with_default_metadata(
-                        // The program failed to compile, so it can "never" return a value
-                        Kind::never(),
-                        input_definition.log_namespaces().clone(),
-                    )
-                });
+                },
+            );
 
             // When a message is dropped and re-routed, we keep the original event, but also annotate
             // it with additional metadata.
@@ -429,6 +434,11 @@ pub trait VrlRunner {
     /// Creates a runner. Pass the transform build context for runner implementations that require it.
     fn new(context: &TransformContext) -> Self;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -470,6 +480,11 @@ impl VrlRunner for AstRunner {
 }
 
 impl Remap<AstRunner> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new_ast(
         config: RemapConfig,
         context: &TransformContext,
@@ -482,6 +497,15 @@ impl<Runner> Remap<Runner>
 where
     Runner: VrlRunner,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<(Self, String)> {
         let (program, warnings, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
@@ -513,13 +537,17 @@ where
         &self.runner
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn dropped_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
         let message = error
             .notes()
             .iter()
             .rfind(|note| matches!(note, Note::UserErrorMessage(_)))
-            .map(|note| note.to_string())
-            .unwrap_or_else(|| error.to_string());
+            .map_or_else(|| error.to_string(), std::string::ToString::to_string);
         serde_json::json!({
                 "reason": reason,
                 "message": message,
@@ -607,8 +635,7 @@ where
 
         let log_namespace = event
             .maybe_as_log()
-            .map(|log| log.namespace())
-            .unwrap_or(LogNamespace::Legacy);
+            .map_or(LogNamespace::Legacy, vector_lib::event::LogEvent::namespace);
 
         let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
         let result = self.run_vrl(&mut target);
@@ -618,7 +645,7 @@ where
                 TargetEvents::One(event) => push_default(event, output),
                 TargetEvents::Logs(events) => events.for_each(|event| push_default(event, output)),
                 TargetEvents::Traces(events) => {
-                    events.for_each(|event| push_default(event, output))
+                    events.for_each(|event| push_default(event, output));
                 }
             },
             Err(Terminate::Interrupted) => {
@@ -666,7 +693,7 @@ where
 
 #[inline]
 fn push_default(event: Event, output: &mut TransformOutputsBuf) {
-    output.push(None, event)
+    output.push(None, event);
 }
 
 #[inline]
@@ -810,13 +837,13 @@ mod tests {
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` or `files` configuration"
-        )
+        );
     }
 
     #[test]
     fn config_both_source_and_file() {
         let config = RemapConfig {
-            source: Some("".to_owned()),
+            source: Some(String::new()),
             file: Some("".into()),
             ..Default::default()
         };
@@ -825,7 +852,7 @@ mod tests {
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` or `files` configuration"
-        )
+        );
     }
 
     #[test]
@@ -919,7 +946,7 @@ mod tests {
         assert_eq!(get_field_string(&result, "."), "root string");
 
         let mut outputs = conf.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(OutputId::dummy(), initial_definition)],
         );
 
@@ -1049,7 +1076,7 @@ mod tests {
         };
         let mut tform = remap(conf).unwrap();
 
-        assert!(transform_one(&mut tform, event).is_none())
+        assert!(transform_one(&mut tform, event).is_none());
     }
 
     #[test]
@@ -1140,7 +1167,7 @@ mod tests {
         };
         let mut tform = remap(conf).unwrap();
 
-        assert!(transform_one(&mut tform, event).is_none())
+        assert!(transform_one(&mut tform, event).is_none());
     }
 
     #[test]
@@ -1263,6 +1290,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn check_remap_branching() {
         let happy =
             Event::from_json_value(serde_json::json!({"hello": "world"}), LogNamespace::Legacy)
@@ -1605,7 +1637,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                &Default::default(),
+                &TransformContext::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
@@ -1696,7 +1728,13 @@ mod tests {
 
     fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
         let out = collect_outputs(ft, event);
-        assert_eq!(0, out.named.values().map(|v| v.len()).sum::<usize>());
+        assert_eq!(
+            0,
+            out.named
+                .values()
+                .map(vector_lib::transform::OutputBuffer::len)
+                .sum::<usize>()
+        );
         assert!(out.primary.len() <= 1);
         out.primary.into_events().next()
     }
@@ -1728,6 +1766,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn emits_internal_events() {
         assert_transform_compliance(async move {
             let config = RemapConfig {
@@ -1746,7 +1789,7 @@ mod tests {
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
-        .await
+        .await;
     }
 
     #[test]
@@ -1766,7 +1809,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[("in".into(), schema::Definition::default_legacy_namespace())],
         );
 
@@ -1788,7 +1831,7 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1835,7 +1878,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1869,7 +1912,7 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1912,7 +1955,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1952,7 +1995,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1980,7 +2023,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2020,7 +2063,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2081,7 +2124,7 @@ mod tests {
         assert_eq!(result.as_log().get(event_path!()), Some(&Value::Null));
 
         let outputs1 = conf.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(

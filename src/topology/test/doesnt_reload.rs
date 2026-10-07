@@ -10,6 +10,11 @@ use crate::{
 };
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_doesnt_reload_new_data_dir() {
     trace_init();
 

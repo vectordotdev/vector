@@ -65,6 +65,23 @@ async fn create_sqs_test_client() -> SqsClient {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 async fn sns_send_message_batch() {
     let topic_name = gen_topic_name();
     let topic_arn = ensure_topic(topic_name.clone()).await;
@@ -80,9 +97,9 @@ async fn sns_send_message_batch() {
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
     };
 

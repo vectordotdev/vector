@@ -197,14 +197,21 @@ struct TimerConfig {
 }
 
 impl LuaConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(&self, key: ComponentKey) -> crate::Result<Transform> {
         Lua::new(self, key).map(Transform::event_task)
     }
 
+    #[must_use]
     pub fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
     }
 
+    #[must_use]
     pub fn outputs(
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
@@ -240,6 +247,11 @@ impl LuaConfig {
 // after each transform would have significant footprint on the performance.
 const GC_INTERVAL: usize = 16;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct Lua {
     lua: mlua::Lua,
     invocations_after_gc: usize,
@@ -259,6 +271,15 @@ fn make_registry_value(lua: &mlua::Lua, source: &str) -> mlua::Result<mlua::Regi
 }
 
 impl Lua {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: &LuaConfig, key: ComponentKey) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
@@ -555,6 +576,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_runs_init_hook() {
         let line1 = random_string(9);
         run_transform(
@@ -591,6 +617,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_add_field() {
         run_transform(
             indoc! {r#"
@@ -616,6 +647,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_read_field() {
         run_transform(
             indoc! {r#"
@@ -639,6 +675,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_remove_field() {
         run_transform(
             indoc! {r#"
@@ -669,6 +710,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_drop_event() {
         run_transform(
             indoc! {r#"
@@ -690,6 +736,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_duplicate_event() {
         run_transform(
             indoc! {r#"
@@ -714,6 +765,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_read_empty_field() {
         run_transform(
             indoc! {r#"
@@ -743,6 +799,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_integer_value() {
         run_transform(
             indoc! {r#"
@@ -768,6 +829,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_numeric_value() {
         run_transform(
             indoc! {r#"
@@ -793,6 +859,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_boolean_value() {
         run_transform(
             indoc! {r#"
@@ -818,6 +889,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_non_coercible_value() {
         run_transform(
             indoc! {r#"
@@ -869,6 +945,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_non_string_key_read() {
         run_transform(
             indoc! {r#"
@@ -917,13 +998,13 @@ mod tests {
 
     #[tokio::test]
     async fn lua_syntax_error() -> crate::Result<()> {
-        let err = from_config(indoc! {r#"
+        let err = from_config(indoc! {r"
             hooks:
               process: |
                 function (event, emit)
                   1234 = sadf <>&*!#@
                 end
-            "#})
+            "})
         .map(|_| ())
         .unwrap_err()
         .to_string();
@@ -933,6 +1014,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_load_file() {
         use std::{fs::File, io::Write};
 
@@ -982,6 +1068,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_pairs() {
         run_transform(
             indoc! {r#"
@@ -1011,6 +1102,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_metric() {
         run_transform(
             indoc! {r#"
@@ -1045,6 +1141,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn lua_multiple_events() {
         run_transform(
             indoc! {r#"

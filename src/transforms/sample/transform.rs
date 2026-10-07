@@ -20,7 +20,7 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-/// Exists only for backwards compatibility purposes so that the value of sample_rate_key is
+/// Exists only for backwards compatibility purposes so that the value of `sample_rate_key` is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
 /// of percentages
 #[derive(Clone, Debug)]
@@ -37,6 +37,7 @@ pub enum SampleMode {
 }
 
 impl SampleMode {
+    #[must_use]
     pub fn new_rate(rate: u64) -> Self {
         Self::Rate {
             rate,
@@ -44,6 +45,20 @@ impl SampleMode {
         }
     }
 
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     pub fn new_ratio(ratio: f64) -> Self {
         Self::Ratio {
             ratio,
@@ -55,7 +70,7 @@ impl SampleMode {
             // To do one option would be to convert the hash to a number between 0 and 1 and compare
             // to the ratio. However to address issues with precision, here the ratio is scaled to
             // meet the width of the type of the hash.
-            hash_ratio_threshold: (ratio * (u64::MAX as u128) as f64) as u64,
+            hash_ratio_threshold: (ratio * u128::from(u64::MAX) as f64) as u64,
         }
     }
 
@@ -137,6 +152,11 @@ pub enum SampleKeySource {
 }
 
 #[derive(Clone)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct Sample {
     name: String,
     static_mode: SampleMode,
@@ -150,6 +170,7 @@ impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
+    #[must_use]
     pub fn new(
         name: String,
         static_mode: SampleMode,
@@ -170,6 +191,7 @@ impl Sample {
         )
     }
 
+    #[must_use]
     pub fn new_with_dynamic(
         name: String,
         static_mode: SampleMode,
@@ -205,6 +227,11 @@ impl Sample {
     }
 
     #[cfg(test)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub fn ratio(&self) -> f64 {
         match &self.static_mode {
             SampleMode::Rate { rate, .. } => 1.0f64 / *rate as f64,
@@ -219,6 +246,23 @@ impl Sample {
         hasher.finish()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
         let counter_value = self
             .dynamic_event_counters
@@ -228,10 +272,15 @@ impl Sample {
         *counter_value += 1;
 
         let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
-        let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
+        let hash_ratio_threshold = (ratio * u128::from(u64::MAX) as f64) as u64;
         hash <= hash_ratio_threshold
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn event_ratio(&self, event: &Event) -> Option<f64> {
         let ratio_field = match &self.key_source {
             SampleKeySource::Dynamic { fields, .. } => fields.ratio_field.as_ref()?,
@@ -265,6 +314,11 @@ impl Sample {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn get_event_value<'a>(&self, event: &'a Event, path: &str) -> Option<&'a Value> {
         match event {
             Event::Log(event) => event.parse_path_and_get_value(path).ok().flatten(),
@@ -279,6 +333,11 @@ impl Sample {
             .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn sample_with_dynamic_rate(&mut self, rate: NonZeroU64, group_by_key: Option<String>) -> bool {
         let counter_value = self
             .dynamic_event_counters
@@ -291,6 +350,11 @@ impl Sample {
         hash.is_multiple_of(rate.get())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn group_by_key(&self, event: &Event) -> Option<String> {
         let group_by = match &self.key_source {
             SampleKeySource::Static { group_by, .. } => group_by.as_ref()?,
@@ -307,7 +371,7 @@ impl Sample {
                 error,
                 field: Some("group_by"),
                 drop_event: false,
-            })
+            });
         })
         .ok()
     }
@@ -330,9 +394,8 @@ impl FunctionTransform for Sample {
                 if result {
                     output.push(event);
                     return;
-                } else {
-                    event
                 }
+                event
             } else {
                 event
             }
@@ -342,10 +405,10 @@ impl FunctionTransform for Sample {
         let value = self.static_key_value(&event);
 
         let event_sample_mode = self.event_sample_mode(&event);
-        let sample_rate = event_sample_mode
-            .as_ref()
-            .map(EventSampleMode::sample_rate_label)
-            .unwrap_or_else(|| self.static_mode.to_string());
+        let sample_rate = event_sample_mode.as_ref().map_or_else(
+            || self.static_mode.to_string(),
+            EventSampleMode::sample_rate_label,
+        );
 
         let should_sample = match event_sample_mode {
             Some(EventSampleMode::Ratio(ratio)) => {
@@ -371,7 +434,7 @@ impl FunctionTransform for Sample {
                         event.insert(&OwnedTargetPath::event(path.clone()), sample_rate);
                     }
                     Event::Metric(_) => panic!("component can never receive metric events"),
-                };
+                }
             }
             output.push(event);
         } else {

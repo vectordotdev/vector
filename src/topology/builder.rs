@@ -121,9 +121,7 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads()
-        .map(std::num::NonZeroUsize::get)
-        .unwrap_or_else(crate::num_threads)
+    crate::app::worker_threads().map_or_else(crate::num_threads, std::num::NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
@@ -229,7 +227,7 @@ impl<'a> Builder<'a> {
         let mut enrichment_tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
         // Build enrichment tables
-        'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
+        'tables: for (name, table_outer) in &self.config.enrichment_tables {
             let table_name = name.to_string();
             if ENRICHMENT_TABLES.needs_reload(&table_name)
                 || self.diff.enrichment_tables.tables.is_changed(name)
@@ -261,9 +259,13 @@ impl<'a> Builder<'a> {
                 };
 
                 for (case, index) in indexes {
-                    match table
-                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
-                    {
+                    match table.add_index(
+                        case,
+                        &index
+                            .iter()
+                            .map(std::convert::AsRef::as_ref)
+                            .collect::<Vec<_>>(),
+                    ) {
                         Ok(_) => (),
                         Err(error) => {
                             // If there is an error adding an index we do not want to use the reloaded
@@ -326,6 +328,11 @@ impl<'a> Builder<'a> {
         source_tasks
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn build_instrumented_source(
         &mut self,
         key: &ComponentKey,
@@ -351,7 +358,7 @@ impl<'a> Builder<'a> {
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
-        for output in source_outputs.into_iter() {
+        for output in source_outputs {
             let rx = builder.add_source_output(output.clone(), key.clone());
 
             let (fanout, control) = Fanout::new(key.clone());
@@ -447,7 +454,7 @@ impl<'a> Builder<'a> {
                 biased;
 
                 // We've been told that we must forcefully shut down.
-                _ = force_shutdown_tripwire => Ok(()),
+                () = force_shutdown_tripwire => Ok(()),
 
                 // The source pump encountered an error, which we're now bubbling up here to stop
                 // the source as well, since the source running makes no sense without the pump.
@@ -457,7 +464,7 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|_| TaskError::Opaque),
+                result = server => result.map_err(|()| TaskError::Opaque),
             };
 
             // Even though we already tried to receive any pump task error above, we may have exited
@@ -491,6 +498,11 @@ impl<'a> Builder<'a> {
         Ok(server)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn build_transforms(
         &mut self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -652,6 +664,11 @@ impl<'a> Builder<'a> {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn build_instrumented_sink(
         &mut self,
         key: &ComponentKey,
@@ -673,31 +690,30 @@ impl<'a> Builder<'a> {
             schema::validate_sink_expectations(key, sink, self.config, enrichment_tables.clone())
         {
             self.errors.append(&mut err);
-        };
+        }
 
-        let (tx, rx) = match self.buffers.remove(key) {
-            Some(buffer) => buffer,
-            _ => {
-                let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                    BufferType::Memory { .. } => "memory",
-                    BufferType::DiskV2 { .. } => "disk",
-                };
-                let buffer_span = error_span!("sink", buffer_type);
-                let buffer = sink
-                    .buffer
-                    .build(
-                        self.config.global.data_dir.clone(),
-                        key.to_string(),
-                        buffer_span,
-                    )
-                    .await;
-                match buffer {
-                    Err(error) => {
-                        self.errors.push(format!("Sink \"{key}\": {error}"));
-                        return;
-                    }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
+        let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
+            buffer
+        } else {
+            let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
+                BufferType::Memory { .. } => "memory",
+                BufferType::DiskV2 { .. } => "disk",
+            };
+            let buffer_span = error_span!("sink", buffer_type);
+            let buffer = sink
+                .buffer
+                .build(
+                    self.config.global.data_dir.clone(),
+                    key.to_string(),
+                    buffer_span,
+                )
+                .await;
+            match buffer {
+                Err(error) => {
+                    self.errors.push(format!("Sink \"{key}\": {error}"));
+                    return;
                 }
+                Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
             }
         };
 
@@ -752,16 +768,16 @@ impl<'a> Builder<'a> {
                         events_received.emit(CountByteSize(
                             events.len(),
                             events.estimated_json_encoded_size_of(),
-                        ))
+                        ));
                     })
                     .take_until_if(tripwire),
             )
             .await
-            .map(|_| {
+            .map(|()| {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .map_err(|_| {
+            .map_err(|()| {
                 debug!("Sink finished with an error.");
                 TaskError::Opaque
             })
@@ -774,7 +790,7 @@ impl<'a> Builder<'a> {
             if enable_healthcheck {
                 timeout(healthcheck_timeout, healthcheck)
                     .map(|result| match result {
-                        Ok(Ok(_)) => {
+                        Ok(Ok(())) => {
                             info!("Healthcheck passed.");
                             Ok(TaskOutput::Healthcheck)
                         }
@@ -889,9 +905,10 @@ impl<'a> Builder<'a> {
 
         let mut output_controls = HashMap::new();
         for (name, control) in controls {
-            let id = name
-                .map(|name| OutputId::from((&node.key, name)))
-                .unwrap_or_else(|| OutputId::from(&node.key));
+            let id = name.map_or_else(
+                || OutputId::from(&node.key),
+                |name| OutputId::from((&node.key, name)),
+            );
             output_controls.insert(id, control);
         }
 
@@ -931,7 +948,7 @@ impl<'a> Builder<'a> {
                 events_received.emit(CountByteSize(
                     events.len(),
                     events.estimated_json_encoded_size_of(),
-                ))
+                ));
             });
         let events_sent = register!(EventsSent::from(internal_event::Output(None)));
         let output_id = Arc::new(OutputId {
@@ -1055,7 +1072,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
     let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
     let mut enrichment_tables = HashMap::new();
     // Build enrichment tables
-    'tables: for (name, table_outer) in config.enrichment_tables.iter() {
+    'tables: for (name, table_outer) in &config.enrichment_tables {
         let table_name = name.to_string();
         if ENRICHMENT_TABLES.needs_reload(&table_name)
             // Tables that can act as sinks are reloaded through topology
@@ -1073,9 +1090,13 @@ pub async fn reload_enrichment_tables(config: &Config) {
 
             if let Some(indexes) = indexes {
                 for (case, index) in indexes {
-                    match table
-                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
-                    {
+                    match table.add_index(
+                        case,
+                        &index
+                            .iter()
+                            .map(std::convert::AsRef::as_ref)
+                            .collect::<Vec<_>>(),
+                    ) {
                         Ok(_) => (),
                         Err(error) => {
                             // If there is an error adding an index we do not want to use the reloaded
@@ -1112,7 +1133,7 @@ pub struct TopologyPieces {
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
 }
 
-/// Builder for constructing TopologyPieces with a fluent API.
+/// Builder for constructing `TopologyPieces` with a fluent API.
 ///
 /// # Examples
 ///
@@ -1133,6 +1154,7 @@ pub struct TopologyPiecesBuilder<'a> {
 
 impl<'a> TopologyPiecesBuilder<'a> {
     /// Creates a new builder with required parameters.
+    #[must_use]
     pub fn new(config: &'a Config, diff: &'a ConfigDiff) -> Self {
         Self {
             config,
@@ -1144,18 +1166,21 @@ impl<'a> TopologyPiecesBuilder<'a> {
     }
 
     /// Sets the buffers for the topology.
+    #[must_use]
     pub fn with_buffers(mut self, buffers: HashMap<ComponentKey, BuiltBuffer>) -> Self {
         self.buffers = buffers;
         self
     }
 
     /// Sets the extra context for the topology.
+    #[must_use]
     pub fn with_extra_context(mut self, extra_context: ExtraContext) -> Self {
         self.extra_context = extra_context;
         self
     }
 
     /// Sets the utilization registry for the topology.
+    #[must_use]
     pub fn with_utilization_registry(mut self, registry: Option<UtilizationRegistry>) -> Self {
         self.utilization_registry = registry;
         self
@@ -1165,6 +1190,11 @@ impl<'a> TopologyPiecesBuilder<'a> {
     ///
     /// Use this method when you need to handle errors explicitly,
     /// such as in tests or validation code.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn build(self) -> Result<TopologyPieces, Vec<String>> {
         Builder::new(
             self.config,
@@ -1211,6 +1241,11 @@ impl TopologyPieces {
     }
 
     /// Builds only the new pieces, and doesn't check their topology.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn build(
         config: &super::Config,
         diff: &ConfigDiff,
@@ -1339,6 +1374,11 @@ impl Runner {
         Ok(TaskOutput::Transform)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_continue,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn run_concurrently(mut self) -> TaskResult {
         let input_rx = self
             .input_rx
@@ -1369,34 +1409,31 @@ impl Runner {
                 }
 
                 input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
-                    match input_arrays {
-                        Some(input_arrays) => {
-                            let mut len = 0;
-                            for events in &input_arrays {
-                                self.on_events_received(events);
-                                len += events.len();
-                            }
+                    if let Some(input_arrays) = input_arrays {
+                        let mut len = 0;
+                        for events in &input_arrays {
+                            self.on_events_received(events);
+                            len += events.len();
+                        }
 
-                            let mut t = self.transform.clone();
-                            let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            // Hook CPU-time accounting onto the spawned task at
-                            // the `Future::poll` boundary.
-                            // This is a separate task from the current one, so there is no double-counting.
-                            let task = spawn_timed(
-                                async move {
-                                    for events in input_arrays {
-                                        t.transform_all(events, &mut outputs_buf);
-                                    }
-                                    outputs_buf
-                                },
-                                self.cpu_ns.clone(),
-                            );
-                            in_flight.push_back(task);
-                        }
-                        None => {
-                            shutting_down = true;
-                            continue
-                        }
+                        let mut t = self.transform.clone();
+                        let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
+                        // Hook CPU-time accounting onto the spawned task at
+                        // the `Future::poll` boundary.
+                        // This is a separate task from the current one, so there is no double-counting.
+                        let task = spawn_timed(
+                            async move {
+                                for events in input_arrays {
+                                    t.transform_all(events, &mut outputs_buf);
+                                }
+                                outputs_buf
+                            },
+                            self.cpu_ns.clone(),
+                        );
+                        in_flight.push_back(task);
+                    } else {
+                        shutting_down = true;
+                        continue
                     }
                 }
 

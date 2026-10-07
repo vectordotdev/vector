@@ -65,6 +65,11 @@ pub(super) struct BaseSSSinkConfig {
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub(super) fn message_group_id(
     message_group_id: Option<String>,
     fifo: bool,

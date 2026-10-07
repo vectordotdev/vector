@@ -1,4 +1,4 @@
-//! The `vector` source. See [VectorConfig].
+//! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
 
 use chrono::Utc;
@@ -97,7 +97,7 @@ impl proto::Service for Service {
                 emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
-            .and_then(|_| handle_batch_status(receiver))
+            .and_then(|()| handle_batch_status(receiver))
             .await?;
 
         Ok(Response::new(proto::PushEventsResponse {}))
@@ -159,6 +159,7 @@ pub struct VectorConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
+    #[must_use]
     pub fn from_address(addr: SocketAddr) -> Self {
         Self {
             address: addr,
@@ -173,8 +174,8 @@ impl Default for VectorConfig {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
-            acknowledgements: Default::default(),
-            keepalive: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
             log_namespace: None,
         }
     }
@@ -361,7 +362,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -380,7 +381,7 @@ mod test {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -565,6 +566,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     async fn standard_grpc_health_check_works() {
         use tonic::transport::Channel;
         use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};

@@ -1,5 +1,9 @@
 use super::parsing::{parse_template, render_metric_field, render_timestamp};
-use super::*;
+use super::{
+    ConfigurableNumber, ConfigurableString, Cow, EventRef, FixedOffset, Hash, NumberClass, Part,
+    TemplateParseError, TemplateRenderingError, TryFrom, UnsignedIntTemplate, Value,
+    configurable_component, fmt,
+};
 
 /// The source of a `uint` template. May be a constant numeric value or a template string.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -127,6 +131,11 @@ impl ConfigurableNumber for UnsignedIntTemplate {
 
 impl UnsignedIntTemplate {
     /// Renders the given template with data from the event.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -138,6 +147,7 @@ impl UnsignedIntTemplate {
     }
 
     /// set tz offset
+    #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.tz_offset = tz_offset;
         self
@@ -171,7 +181,7 @@ impl UnsignedIntTemplate {
                     );
                 }
                 Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.tz_offset))
+                    out.push_str(&render_timestamp(items, event, self.tz_offset));
                 }
             }
         }
@@ -184,6 +194,7 @@ impl UnsignedIntTemplate {
     }
 
     /// Returns the names of the fields that are rendered in this template.
+    #[must_use]
     pub fn get_fields(&self) -> Option<Vec<String>> {
         let parts: Vec<_> = self
             .parts

@@ -128,6 +128,7 @@ pub struct Compressor {
 
 impl Compressor {
     /// Gets a mutable reference to the underlying buffer.
+    #[must_use]
     pub fn get_ref(&self) -> &BytesMut {
         self.inner.get_ref()
     }
@@ -140,6 +141,7 @@ impl Compressor {
     ///
     /// Some callers can benefit from knowing whether or not compression is actually taking place,
     /// as different size limitations may come into play.
+    #[must_use]
     pub const fn is_compressed(&self) -> bool {
         self.compression.is_compressed()
     }
@@ -163,6 +165,7 @@ impl Compressor {
     /// footer/checksum data.
     ///
     /// Consider using `finish` if catching these scenarios is important.
+    #[must_use]
     pub fn into_inner(self) -> BytesMut {
         self.inner.into_inner()
     }

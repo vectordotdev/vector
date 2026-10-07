@@ -29,6 +29,15 @@ use crate::{
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
 /// syslog source).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn build_unix_datagram_source(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
@@ -78,23 +87,23 @@ async fn listen(
                     emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
-                    })
+                    });
                 })?;
 
                 let span = info_span!("datagram");
-                let received_from = if !address.is_unnamed() {
-                    let path = address.as_pathname().map(|e| e.to_owned()).inspect(|path| {
-                        span.record("peer_path", field::debug(path));
-                    });
-
-                    path.map(|p| p.to_string_lossy().into_owned().into())
-                } else {
+                let received_from = if address.is_unnamed() {
                     // In most cases, we'll be connecting to this
                     // socket from an unnamed socket (a socket not
                     // bound to a file). Instead of a filename, we'll
                     // surface a specific host value.
                     span.record("peer_path", field::debug(UNNAMED_SOCKET_HOST));
                     Some(UNNAMED_SOCKET_HOST.into())
+                } else {
+                    let path = address.as_pathname().map(std::borrow::ToOwned::to_owned).inspect(|path| {
+                        span.record("peer_path", field::debug(path));
+                    });
+
+                    path.map(|p| p.to_string_lossy().into_owned().into())
                 };
 
                 bytes_received.emit(ByteSize(byte_size));

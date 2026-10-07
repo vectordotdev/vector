@@ -129,10 +129,16 @@ impl UdpConfig {
         self.host_key.clone().unwrap_or(default_host_key())
     }
 
+    #[must_use]
     pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     pub(super) const fn framing(&self) -> &Option<FramingConfig> {
         &self.framing
     }
@@ -145,6 +151,7 @@ impl UdpConfig {
         self.address
     }
 
+    #[must_use]
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -166,6 +173,11 @@ impl UdpConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 pub(super) fn udp(
     config: UdpConfig,
     decoder: Decoder,
@@ -181,7 +193,7 @@ pub(super) fn udp(
                 emit!(SocketBindError {
                     mode: SocketMode::Udp,
                     error,
-                })
+                });
             })?;
 
         if !config.multicast_groups.is_empty() {
@@ -207,7 +219,7 @@ pub(super) fn udp(
                             error,
                             group_addr,
                             interface,
-                        })
+                        });
                     })?;
                 info!(message = "Joined multicast group.", group = %group_addr);
             }

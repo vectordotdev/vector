@@ -72,9 +72,9 @@ pub struct DatadogTracesConfig {
 
 impl GenerateConfig for DatadogTracesConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_api_key: ${DATADOG_API_KEY_ENV_VAR}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -107,10 +107,15 @@ impl DatadogTracesConfig {
     fn traces_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
         endpoint.map_or_else(
             || format!("https://trace.agent.{site}"),
-            |endpoint| endpoint.to_string(),
+            std::string::ToString::to_string,
         )
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn generate_traces_endpoint_configuration(
         &self,
         dd_common: &DatadogCommonConfig,
@@ -125,6 +130,11 @@ impl DatadogTracesConfig {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_sink(
         &self,
         dd_common: &DatadogCommonConfig,
@@ -179,16 +189,20 @@ impl DatadogTracesConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let default_tls_config;
 
         let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
+            Some(if let Some(config) = self.local_dd_common.tls.as_ref() {
+                config
+            } else {
+                default_tls_config = TlsEnableableConfig::enabled();
+                &default_tls_config
             }),
             false,
         )?;

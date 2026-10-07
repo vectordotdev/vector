@@ -44,10 +44,15 @@ type TimeSeriesData = BTreeMap<TimeBucket, Vec<f64>>;
 /// guaranteed to line up.
 ///
 /// For instance, the services that are running, may start at different times, thus the
-/// timestamps (TimeBucket) for data points received are not guaranteed to match up.
+/// timestamps (`TimeBucket`) for data points received are not guaranteed to match up.
 type SeriesIntake = BTreeMap<SeriesContext, TimeSeriesData>;
 
 // massages the raw payloads into our intake structure
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn generate_series_intake(payloads: &[MetricPayload]) -> SeriesIntake {
     let mut intake = BTreeMap::new();
 
@@ -84,6 +89,11 @@ fn generate_series_intake(payloads: &[MetricPayload]) -> SeriesIntake {
 
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn common_series_assertions(series: &SeriesIntake) {
     // we should have received some metrics from the emitter
     assert!(!series.is_empty());
@@ -275,6 +285,11 @@ async fn get_v3_series_from_pipeline(address: String) -> SeriesIntake {
     intake
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::float_cmp,
+    reason = "Preserve the existing exact floating-point assertion until tolerance requirements are audited."
+)]
 fn compare_intakes(agent_intake: &SeriesIntake, vector_intake: &SeriesIntake) {
     // The assertions we make below can be summarized as follows:
     //   - For each metric type, we have a different set of assertions which are relevant to

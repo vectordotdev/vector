@@ -111,8 +111,8 @@ impl GenerateConfig for StatsdSinkConfig {
                 address.ip().to_string(),
                 address.port(),
             )),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -181,17 +181,22 @@ mod test {
 
     #[test]
     fn unix_mode_deserializes_on_all_platforms() {
-        let config: StatsdSinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: StatsdSinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             mode: unix
             path: /tmp/vector-statsd.sock
             unix_mode: Datagram
-        "#})
+        "})
         .unwrap();
 
         assert!(matches!(config.mode, Mode::Unix(_)));
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn validate_produces_usable_state() {
         let config = StatsdSinkConfig {
             default_namespace: Some("service".to_string()),

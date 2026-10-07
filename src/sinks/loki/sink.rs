@@ -25,7 +25,7 @@ use crate::{
 use crate::config::ValidatedSink;
 
 /// Attach the sink's confinement config to every key template in a
-/// `label`-style HashMap. Values are metadata and remain unconfined.
+/// `label`-style `HashMap`. Values are metadata and remain unconfined.
 pub(super) fn confine_template_keys(
     map: HashMap<Template, UnconfinedTemplate>,
     config: &ConfinementConfig,
@@ -95,7 +95,7 @@ impl Partitioner for RecordPartitioner {
     type Key = Option<PartitionKey>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.as_ref().map(|inner| inner.partition())
+        item.as_ref().map(FilteredRecord::partition)
     }
 }
 
@@ -199,7 +199,7 @@ fn build_template_pair_map(
     let mut static_map: HashMap<String, String> = HashMap::new();
     let mut dynamic_map: HashMap<String, String> = HashMap::new();
 
-    for (key_template, value_template) in pairs.iter() {
+    for (key_template, value_template) in pairs {
         match (
             key_template.render_string(event),
             value_template.render_string(event),
@@ -280,7 +280,7 @@ fn build_template_pair_map(
                 discarded_value = %discarded_v,
                 "Static {pair_kind} overrides dynamic {pair_kind}."
             );
-        };
+        }
     }
 
     Ok(Vec::from_iter(dynamic_map))
@@ -297,7 +297,7 @@ fn remove_event_fields(event: &mut Event, enabled: bool, paths: &[OwnedTargetPat
 impl EventEncoder {
     /// Renders each label pair. Returns `Err(())` if a key template rendered a
     /// confined value — the caller must drop the event as an intentional
-    /// security discard (matches the tenant_id contract).
+    /// security discard (matches the `tenant_id` contract).
     fn build_labels(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
         build_template_pair_map(&self.labels, "label_key", "label_value", "label", event)
     }
@@ -307,7 +307,7 @@ impl EventEncoder {
             let paths: Vec<OwnedTargetPath> = self
                 .labels
                 .values()
-                .filter_map(|t| t.get_fields())
+                .filter_map(crate::template::UnconfinedTemplate::get_fields)
                 .flatten()
                 .filter_map(|f| parse_target_path(f.as_str()).ok())
                 .collect();
@@ -330,7 +330,7 @@ impl EventEncoder {
             let paths: Vec<OwnedTargetPath> = self
                 .structured_metadata
                 .values()
-                .filter_map(|t| t.get_fields())
+                .filter_map(crate::template::UnconfinedTemplate::get_fields)
                 .flatten()
                 .filter_map(|f| parse_target_path(f.as_str()).ok())
                 .collect();
@@ -338,6 +338,11 @@ impl EventEncoder {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = match self.key_partitioner.render_tenant_id(&event) {
             Ok(t) => t,
@@ -358,14 +363,15 @@ impl EventEncoder {
         self.remove_structured_metadata_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
-            Some(Value::Timestamp(ts)) => match ts.timestamp_nanos_opt() {
-                Some(timestamp) => timestamp,
-                None => {
+            Some(Value::Timestamp(ts)) => {
+                if let Some(timestamp) = ts.timestamp_nanos_opt() {
+                    timestamp
+                } else {
                     finalizers.update_status(EventStatus::Errored);
                     emit!(LokiTimestampNonParsableEventsDropped);
                     return None;
                 }
-            },
+            }
             _ => chrono::Utc::now()
                 .timestamp_nanos_opt()
                 .expect("Timestamp out of range"),
@@ -386,7 +392,7 @@ impl EventEncoder {
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
             emit!(LokiEventUnlabeledError);
-            labels = vec![("agent".to_string(), "vector".to_string())]
+            labels = vec![("agent".to_string(), "vector".to_string())];
         }
 
         let partition = PartitionKey { tenant_id };
@@ -490,6 +496,11 @@ pub struct LokiSink {
 
 impl LokiSink {
     #[cfg(test)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let validated = config.validate()?;
         Self::from_validated(&config, validated, client)
@@ -682,6 +693,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_no_labels() {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -712,6 +728,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_with_labels() {
         let mut labels = HashMap::default();
         labels.insert(confined_label("static"), unconfined_value("value"));
@@ -763,6 +784,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_with_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(
@@ -816,6 +842,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_with_colliding_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(confined_label("l1_*"), unconfined_value("{{ map1 }}"));
@@ -854,6 +885,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_with_failing_dynamic_label_expansion() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(confined_label("missing_*"), unconfined_value("{{ map }}"));
@@ -880,6 +916,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_no_ts() {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -905,6 +946,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_no_record_labels() {
         let mut labels = HashMap::default();
         labels.insert(confined_label("static"), unconfined_value("value"));
@@ -935,6 +981,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn encoder_with_structured_metadata() -> Result<(), serde_json::Error> {
         let mut structured_metadata = HashMap::default();
         structured_metadata.insert(
@@ -1001,6 +1052,15 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn filter_encoder_drop() {
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),

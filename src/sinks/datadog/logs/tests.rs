@@ -111,7 +111,7 @@ async fn start_test_detail(
         TestType::Happy => run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await,
         TestType::Error => run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await,
         TestType::Telemetry => {
-            run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await
+            run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await;
         }
     }
 
@@ -143,7 +143,7 @@ async fn start_test_error(
 
 /// Assert the basic functionality of the sink in good conditions
 ///
-/// This test rigs the sink to return OKv1 to responses, checks that all batches
+/// This test rigs the sink to return `OKv1` to responses, checks that all batches
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
 #[tokio::test]
@@ -223,7 +223,7 @@ async fn telemetry() {
 #[tokio::test]
 /// Assert delivery error behavior for v1 API
 ///
-/// In the event that delivery fails -- in this case because it is BAD_REQUEST --
+/// In the event that delivery fails -- in this case because it is `BAD_REQUEST` --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v1() {
@@ -237,7 +237,7 @@ async fn handles_failure_v1() {
 #[tokio::test]
 /// Assert delivery error behavior for v2 API
 ///
-/// In the event that delivery fails -- in this case because it is BAD_REQUEST --
+/// In the event that delivery fails -- in this case because it is `BAD_REQUEST` --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v2() {
@@ -256,7 +256,7 @@ async fn handles_failure_v2() {
 /// that, for successful transmission, the API key set in metadata is
 /// propagated.
 async fn api_key_in_metadata_v2() {
-    api_key_in_metadata_inner(ApiStatus::OKv2).await
+    api_key_in_metadata_inner(ApiStatus::OKv2).await;
 }
 
 #[tokio::test]
@@ -267,7 +267,7 @@ async fn api_key_in_metadata_v2() {
 /// that, for successful transmission, the API key set in metadata is
 /// propagated.
 async fn api_key_in_metadata_v1() {
-    api_key_in_metadata_inner(ApiStatus::OKv1).await
+    api_key_in_metadata_inner(ApiStatus::OKv1).await;
 }
 
 async fn api_key_in_metadata_inner(api_status: ApiStatus) {
@@ -335,7 +335,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 /// that, for successful transmission, per-event API keys are propagated
 /// correctly.
 async fn multiple_api_keys_v1() {
-    multiple_api_keys_inner(ApiStatus::OKv1).await
+    multiple_api_keys_inner(ApiStatus::OKv1).await;
 }
 
 #[tokio::test]
@@ -346,7 +346,7 @@ async fn multiple_api_keys_v1() {
 /// that, for successful transmission, per-event API keys are propagated
 /// correctly.
 async fn multiple_api_keys_v2() {
-    multiple_api_keys_inner(ApiStatus::OKv2).await
+    multiple_api_keys_inner(ApiStatus::OKv2).await;
 }
 
 async fn multiple_api_keys_inner(api_status: ApiStatus) {
@@ -382,7 +382,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
         .await;
 
     keys.sort();
-    assert_eq!(keys, vec!["atoken", "pkc", "vvo"])
+    assert_eq!(keys, vec!["atoken", "pkc", "vvo"]);
 }
 
 #[tokio::test]
@@ -391,7 +391,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
 /// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
 async fn headers_v2() {
-    headers_inner(ApiStatus::OKv2).await
+    headers_inner(ApiStatus::OKv2).await;
 }
 
 #[tokio::test]
@@ -400,7 +400,7 @@ async fn headers_v2() {
 /// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
 async fn headers_v1() {
-    headers_inner(ApiStatus::OKv1).await
+    headers_inner(ApiStatus::OKv1).await;
 }
 
 async fn headers_inner(api_status: ApiStatus) {
@@ -440,7 +440,7 @@ async fn headers_inner(api_status: ApiStatus) {
 }
 
 #[tokio::test]
-/// Assert the RetryLogic implementation of LogApiRetry
+/// Assert the `RetryLogic` implementation of `LogApiRetry`
 async fn error_is_retriable() {
     let retry = LogApiRetry;
 
@@ -507,7 +507,7 @@ async fn does_not_send_too_big_payloads() {
             Some((_parts, body)) = rx.next() => {
                 sizes.push(body.len());
             }
-            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+            () = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
                 break;
             }
         }

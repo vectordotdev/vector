@@ -1,4 +1,4 @@
-//! Schema fetching and Arrow schema construction for ClickHouse tables.
+//! Schema fetching and Arrow schema construction for `ClickHouse` tables.
 
 use std::str::FromStr;
 
@@ -17,7 +17,7 @@ use crate::http::{
 
 use super::parser::ClickHouseType;
 
-/// String constants for ClickHouse column `default_kind` values.
+/// String constants for `ClickHouse` column `default_kind` values.
 const COLUMN_KIND_REGULAR: &str = "";
 const COLUMN_KIND_DEFAULT: &str = "DEFAULT";
 
@@ -43,7 +43,7 @@ impl TryFrom<ColumnInfo> for Field {
     }
 }
 
-/// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.
+/// Fetches the schema for a `ClickHouse` table and converts it to an Arrow schema.
 pub async fn fetch_table_schema(
     client: &HttpClient,
     endpoint: &str,
@@ -91,7 +91,7 @@ pub async fn fetch_table_schema(
     parse_schema_from_response(&body_bytes)
 }
 
-/// Parses the JSONEachRow response from ClickHouse and builds an Arrow schema.
+/// Parses the `JSONEachRow` response from `ClickHouse` and builds an Arrow schema.
 fn parse_schema_from_response(response: &[u8]) -> crate::Result<Schema> {
     let fields = serde_json::Deserializer::from_slice(response)
         .into_iter::<ColumnInfo>()
@@ -105,7 +105,7 @@ fn parse_schema_from_response(response: &[u8]) -> crate::Result<Schema> {
     Ok(Schema::new(fields))
 }
 
-/// Schema provider implementation for ClickHouse tables.
+/// Schema provider implementation for `ClickHouse` tables.
 #[derive(Clone, Debug)]
 pub struct ClickHouseSchemaProvider {
     client: HttpClient,
@@ -116,7 +116,7 @@ pub struct ClickHouseSchemaProvider {
 }
 
 impl ClickHouseSchemaProvider {
-    /// Create a new ClickHouse schema provider.
+    /// Create a new `ClickHouse` schema provider.
     pub const fn new(
         client: HttpClient,
         endpoint: String,
@@ -236,7 +236,7 @@ mod tests {
     }
 
     /// Tests that DEFAULT columns are marked nullable in the parsed schema,
-    /// since ClickHouse fills them with server-side defaults when omitted.
+    /// since `ClickHouse` fills them with server-side defaults when omitted.
     #[test]
     fn test_default_columns_marked_nullable() {
         // The SQL query filters out MATERIALIZED/ALIAS/EPHEMERAL, so

@@ -6,6 +6,11 @@ use super::buffer::compression::CompressionLevel;
 pub struct ZstdCompressionLevel(i32);
 
 impl From<CompressionLevel> for ZstdCompressionLevel {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
     fn from(value: CompressionLevel) -> Self {
         let val: i32 = match value {
             CompressionLevel::None => 0,
@@ -29,11 +34,25 @@ pub struct ZstdEncoder<W: io::Write> {
 }
 
 impl<W: io::Write> ZstdEncoder<W> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn new(writer: W, level: ZstdCompressionLevel) -> io::Result<Self> {
         let encoder = zstd::Encoder::new(writer, level.0)?;
         Ok(Self { inner: encoder })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn finish(self) -> io::Result<W> {
         self.inner.finish()
     }

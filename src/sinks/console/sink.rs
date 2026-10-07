@@ -42,21 +42,17 @@ where
                 finalizers.update_status(EventStatus::Errored);
             })?;
 
-            match self.output.write_all(&bytes).await {
-                Err(error) => {
-                    // Error when writing to stdout/stderr is likely irrecoverable,
-                    // so stop the sink.
-                    error!(message = "Error writing to output. Stopping sink.", %error, internal_log_rate_limit = false);
-                    finalizers.update_status(EventStatus::Errored);
-                    return Err(());
-                }
-                Ok(()) => {
-                    finalizers.update_status(EventStatus::Delivered);
-
-                    events_sent.emit(CountByteSize(1, event_byte_size));
-                    bytes_sent.emit(ByteSize(bytes.len()));
-                }
+            if let Err(error) = self.output.write_all(&bytes).await {
+                // Error when writing to stdout/stderr is likely irrecoverable,
+                // so stop the sink.
+                error!(message = "Error writing to output. Stopping sink.", %error, internal_log_rate_limit = false);
+                finalizers.update_status(EventStatus::Errored);
+                return Err(());
             }
+            finalizers.update_status(EventStatus::Delivered);
+
+            events_sent.emit(CountByteSize(1, event_byte_size));
+            bytes_sent.emit(ByteSize(bytes.len()));
         }
 
         Ok(())
@@ -89,7 +85,7 @@ mod test {
 
         let sink = WriterSink {
             output: Vec::new(),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             encoder,
         };
 

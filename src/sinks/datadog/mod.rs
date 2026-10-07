@@ -87,6 +87,7 @@ pub struct LocalDatadogCommonConfig {
 }
 
 impl LocalDatadogCommonConfig {
+    #[must_use]
     pub fn new(
         endpoint: Option<String>,
         site: Option<String>,
@@ -100,6 +101,11 @@ impl LocalDatadogCommonConfig {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn with_globals(
         &self,
         config: datadog::Options,
@@ -134,6 +140,11 @@ pub struct DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_healthcheck<C>(&self, client: HttpClient<Body, C>) -> crate::Result<Healthcheck>
     where
         C: Connect + Clone + Send + Sync + 'static,
@@ -202,8 +213,13 @@ pub enum DatadogApiError {
 }
 
 impl DatadogApiError {
-    /// Common DatadogApiError handling for HTTP Responses.
+    /// Common `DatadogApiError` handling for HTTP Responses.
     /// Returns Ok(response) if the response was Ok/Accepted.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn from_result(
         result: Result<http::Response<Body>, HttpError>,
     ) -> Result<http::Response<Body>, DatadogApiError> {
@@ -242,6 +258,7 @@ impl DatadogApiError {
         }
     }
 
+    #[must_use]
     pub const fn is_retriable(&self) -> bool {
         match self {
             // This retry logic will be expanded further, but specifically retrying unauthorized
@@ -324,7 +341,7 @@ mod tests {
             endpoint: Some("localhost:8080".to_string()),
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             config
@@ -338,7 +355,7 @@ mod tests {
             endpoint: None,
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             default

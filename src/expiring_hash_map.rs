@@ -93,8 +93,8 @@ where
         Some((value, expired))
     }
 
-    /// Return an iterator over keys and values of ExpiringHashMap. Useful for
-    /// processing all values in ExpiringHashMap irrespective of expiration. This
+    /// Return an iterator over keys and values of `ExpiringHashMap`. Useful for
+    /// processing all values in `ExpiringHashMap` irrespective of expiration. This
     /// may be required for processing shutdown or other operations.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
         self.map.iter_mut().map(|(k, (v, _delayed_key))| (k, v))
@@ -105,11 +105,13 @@ where
     /// [`None`]. Be aware that this may cause a spinlock behaviour if the
     /// `next_expired` is polled in a loop while [`ExpiringHashMap`] is empty.
     /// See [`ExpiringHashMap::next_expired`] for more info.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.expiration_queue.is_empty()
     }
 
     /// Returns the number of elements in the map.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.map.len()
     }
@@ -194,6 +196,11 @@ where
     /// }
     /// # });
     /// ```
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn next_expired(&mut self) -> Option<ExpiredItem<K, V>> {
         self.expiration_queue.next().await.map(|key| {
             let (value, _) = self.map.remove(key.get_ref()).unwrap();
@@ -231,6 +238,11 @@ mod tests {
 
     use super::*;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn unwrap_ready<T>(poll: Poll<T>) -> T {
         assert_ready!(&poll);
         match poll {
@@ -258,7 +270,7 @@ mod tests {
     async fn next_expired_does_not_wake_when_the_value_is_available_upfront() {
         let mut map = ExpiringHashMap::<String, String>::default();
 
-        let a_minute_ago = Instant::now() - Duration::from_secs(60);
+        let a_minute_ago = Instant::now().checked_sub(Duration::from_mins(1)).unwrap();
         map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
 
         let mut fut = task::spawn(map.next_expired());

@@ -304,6 +304,12 @@ pub struct AzureBlobSinkConfig {
     pub confinement: ConfinementConfig,
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn default_blob_prefix() -> Template {
     Template::try_from(DEFAULT_KEY_PREFIX).unwrap()
 }
@@ -326,7 +332,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             metadata: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             tls: None,
             confinement: ConfinementConfig::default(),
         })
@@ -551,6 +557,11 @@ const fn supports_append(compression: Compression) -> bool {
 }
 
 impl AzureBlobSinkConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_processor(
         &self,
         client: Arc<BlobContainerClient>,
@@ -657,6 +668,11 @@ impl AzureBlobSinkConfig {
         )
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         let tpl = self.confined_blob_prefix()?;
         Ok(KeyPartitioner::new(tpl, None))
@@ -700,7 +716,7 @@ mod tests {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             tls: None,
             confinement: ConfinementConfig::default(),
         }
@@ -771,7 +787,7 @@ mod tests {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             tls: None,
             confinement: ConfinementConfig::default(),
         };
@@ -838,7 +854,7 @@ mod tests {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             tls: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1019,6 +1035,11 @@ pub enum HealthcheckError {
     Unknown { status: StatusCode },
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn build_healthcheck(
     container_name: String,
     client: Arc<BlobContainerClient>,
@@ -1049,6 +1070,11 @@ pub fn build_healthcheck(
 ///
 /// Pure structural check: no credential construction, no I/O, no async. Shared
 /// by `validate` and `build_client`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn validate_auth_conflict(
     parsed_auth: &Auth,
     auth: &Option<AzureAuthentication>,
@@ -1066,6 +1092,19 @@ fn validate_auth_conflict(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn build_client(
     auth: Option<AzureAuthentication>,
     parsed: ParsedConnectionString,
@@ -1147,9 +1186,7 @@ pub fn build_client(
         let host = url.host_str().unwrap_or("");
         let port = url.port();
         proxy.no_proxy.matches(host)
-            || port
-                .map(|p| proxy.no_proxy.matches(&format!("{host}:{p}")))
-                .unwrap_or(false)
+            || port.is_some_and(|p| proxy.no_proxy.matches(&format!("{host}:{p}")))
     };
     if bypass_proxy || !proxy.enabled {
         // Ensure no proxy (and disable any potential system proxy auto-detection)

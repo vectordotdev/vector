@@ -108,6 +108,15 @@ impl<C> LogApiService<C>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn new(
         client: HttpClient<Body, C>,
         uri: Uri,

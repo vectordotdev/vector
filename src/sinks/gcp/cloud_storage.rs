@@ -219,40 +219,40 @@ fn default_time_format() -> String {
 #[cfg(test)]
 fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
     GcsSinkConfig {
-        bucket: Default::default(),
-        acl: Default::default(),
-        storage_class: Default::default(),
-        metadata: Default::default(),
-        key_prefix: Default::default(),
+        bucket: String::default(),
+        acl: Option::default(),
+        storage_class: Option::default(),
+        metadata: Option::default(),
+        key_prefix: Option::default(),
         filename_time_format: default_time_format(),
         filename_append_uuid: true,
-        filename_extension: Default::default(),
-        content_type: Default::default(),
-        content_encoding: Default::default(),
-        cache_control: Default::default(),
+        filename_extension: Option::default(),
+        content_type: Option::default(),
+        content_encoding: Option::default(),
+        cache_control: Option::default(),
         encoding,
         compression: Compression::gzip_default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         endpoint: default_endpoint(),
-        request: Default::default(),
-        auth: Default::default(),
-        tls: Default::default(),
-        acknowledgements: Default::default(),
-        timezone: Default::default(),
+        request: TowerRequestConfig::default(),
+        auth: GcpAuthConfig::default(),
+        tls: Option::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        timezone: Option::default(),
         confinement: ConfinementConfig::default(),
     }
 }
 
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             bucket: my-bucket
             credentials_path: /path/to/credentials.json
             framing:
               method: newline_delimited
             encoding:
               codec: json
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -455,6 +455,11 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 }
 
 impl RequestSettings {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn new(config: &GcsSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
@@ -481,16 +486,15 @@ impl RequestSettings {
             .as_ref()
             .map(|cc| HeaderValue::from_str(cc))
             .transpose()?;
-        let metadata = config
-            .metadata
-            .as_ref()
-            .map(|metadata| {
+        let metadata = config.metadata.as_ref().map_or_else(
+            || Ok(vec![]),
+            |metadata| {
                 metadata
                     .iter()
                     .map(make_header)
                     .collect::<Result<Vec<_>, _>>()
-            })
-            .unwrap_or_else(|| Ok(vec![]))?;
+            },
+        )?;
         let extension = config
             .filename_extension
             .clone()
@@ -792,7 +796,7 @@ mod tests {
         let context = SinkContext::default();
         let sink_config = GcsSinkConfig {
             // Empty string to disable content encoding header even with compression
-            content_encoding: Some("".to_string()),
+            content_encoding: Some(String::new()),
             compression: Compression::gzip_default(),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };

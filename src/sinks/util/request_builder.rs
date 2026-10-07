@@ -5,6 +5,12 @@ use vector_lib::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
 use super::{Compression, Compressor, encoding::Encoder, metadata::RequestMetadataBuilder};
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
     if let Some(limit) = std::env::var("VECTOR_EXPERIMENTAL_REQUEST_BUILDER_CONCURRENCY")
         .map(|value| value.parse::<NonZeroUsize>().ok())
@@ -80,6 +86,11 @@ pub trait RequestBuilder<Input> {
     /// as-is, such as event finalizers, while the events are the actual events to process.
     fn split_input(&self, input: Input) -> (Self::Metadata, RequestMetadataBuilder, Self::Events);
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn encode_events(
         &self,
         events: Self::Events,

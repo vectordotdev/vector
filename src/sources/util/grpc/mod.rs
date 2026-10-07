@@ -353,6 +353,15 @@ where
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_grpc_server<S>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -403,6 +412,15 @@ where
 
 // This is a bit of a ugly hack to allow us to run two services on the same port.
 // I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_grpc_server_with_routes<L>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -443,9 +461,10 @@ where
     Ok(())
 }
 
-/// Builds a [TraceLayer] configured for a gRPC server.
+/// Builds a [`TraceLayer`] configured for a gRPC server.
 ///
 /// This layer emits gPRC specific telemetry for messages received/sent and handler duration.
+#[must_use]
 pub fn build_grpc_trace_layer(
     span: Span,
 ) -> TraceLayer<

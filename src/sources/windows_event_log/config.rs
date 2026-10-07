@@ -32,7 +32,7 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = "System"))]
     pub channels: Vec<String>,
 
-    /// The XPath query for filtering events.
+    /// The `XPath` query for filtering events.
     ///
     /// Allows filtering events using XML Path Language queries.
     /// If not specified, all events from the specified channels will be collected.
@@ -101,7 +101,7 @@ pub struct WindowsEventLogConfig {
     /// Events older than this value will be ignored. If not specified,
     /// all events will be processed regardless of age.
     #[configurable(metadata(docs::examples = 86400))]
-    #[configurable(metadata(docs::examples = 604800))]
+    #[configurable(metadata(docs::examples = 604_800))]
     pub max_event_age_secs: Option<u64>,
 
     /// Timeout in milliseconds for waiting for new events.
@@ -170,7 +170,7 @@ pub struct WindowsEventLogConfig {
 
     /// Whether to render human-readable event messages.
     ///
-    /// When enabled (default), Vector will use the Windows EvtFormatMessage API
+    /// When enabled (default), Vector will use the Windows `EvtFormatMessage` API
     /// to render localized, human-readable event messages with parameter
     /// substitution. This matches the behavior of Windows Event Viewer.
     ///
@@ -232,7 +232,7 @@ pub struct FieldFilter {
 
     /// Whether to include system fields.
     ///
-    /// System fields include metadata like Computer, TimeCreated, etc.
+    /// System fields include metadata like Computer, `TimeCreated`, etc.
     #[serde(default = "default_include_system_fields")]
     pub include_system_fields: bool,
 
@@ -282,7 +282,7 @@ impl Default for WindowsEventLogConfig {
             max_event_data_length: default_max_event_data_length(),
             checkpoint_interval_secs: default_checkpoint_interval_secs(),
             render_message: default_render_message(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
         }
     }
 }
@@ -295,6 +295,15 @@ impl GenerateConfig for WindowsEventLogConfig {
 
 impl WindowsEventLogConfig {
     /// Validate the configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub fn validate(&self) -> Result<(), crate::Error> {
         if self.channels.is_empty() {
             return Err("At least one channel must be specified".into());
@@ -364,7 +373,7 @@ impl WindowsEventLogConfig {
             // Reject control characters and null bytes. Actual channel name
             // validation is handled by EvtOpenChannelConfig at subscription time,
             // so we only block characters that could cause issues before that check.
-            if channel.chars().any(|c| c.is_control()) {
+            if channel.chars().any(char::is_control) {
                 return Err(format!("Channel name '{channel}' contains control characters").into());
             }
         }
@@ -520,6 +529,7 @@ impl WindowsEventLogConfig {
 }
 
 /// Check if a channel name contains glob pattern characters
+#[must_use]
 pub fn is_channel_pattern(name: &str) -> bool {
     name.contains('*') || name.contains('?') || name.contains('[')
 }
@@ -621,12 +631,12 @@ mod tests {
         assert!(config.validate().is_ok());
 
         // Empty channel name should fail
-        config.channels = vec!["".to_string()];
+        config.channels = vec![String::new()];
         assert!(config.validate().is_err());
 
         // Empty query should fail
         config.channels = vec!["System".to_string()];
-        config.event_query = Some("".to_string());
+        config.event_query = Some(String::new());
         assert!(config.validate().is_err());
     }
 

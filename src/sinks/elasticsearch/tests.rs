@@ -403,7 +403,7 @@ async fn decode_bulk_action_error() {
     assert!(action.is_none());
 }
 
-/// validates that the configuration parsing for ElasticsearchCommon succeeds when BulkConfig is
+/// validates that the configuration parsing for `ElasticsearchCommon` succeeds when `BulkConfig` is
 /// not explicitly set in the configuration (using defaults).
 #[tokio::test]
 async fn default_bulk_settings() {
@@ -569,6 +569,11 @@ async fn allows_using_only_fields() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn datastream_index_name() {
     #[derive(Clone, Debug)]
     struct TestCase {
@@ -599,7 +604,7 @@ async fn datastream_index_name() {
         },
         TestCase {
             dtype: Some("type".to_string()),
-            dataset: Some("".to_string()),
+            dataset: Some(String::new()),
             namespace: Some("namespace".to_string()),
             want: "type-namespace".to_string(),
         },
@@ -611,8 +616,8 @@ async fn datastream_index_name() {
         },
         TestCase {
             dtype: Some("type".to_string()),
-            dataset: Some("".to_string()),
-            namespace: Some("".to_string()),
+            dataset: Some(String::new()),
+            namespace: Some(String::new()),
             want: "type".to_string(),
         },
         TestCase {
@@ -622,10 +627,10 @@ async fn datastream_index_name() {
             want: "type-generic-default".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
-            dataset: Some("".to_string()),
-            namespace: Some("".to_string()),
-            want: "".to_string(),
+            dtype: Some(String::new()),
+            dataset: Some(String::new()),
+            namespace: Some(String::new()),
+            want: String::new(),
         },
         TestCase {
             dtype: None,
@@ -634,7 +639,7 @@ async fn datastream_index_name() {
             want: "logs-generic-default".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
+            dtype: Some(String::new()),
             dataset: Some("dataset".to_string()),
             namespace: Some("namespace".to_string()),
             want: "dataset-namespace".to_string(),
@@ -646,8 +651,8 @@ async fn datastream_index_name() {
             want: "logs-dataset-namespace".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
-            dataset: Some("".to_string()),
+            dtype: Some(String::new()),
+            dataset: Some(String::new()),
             namespace: Some("namespace".to_string()),
             want: "namespace".to_string(),
         },
@@ -658,9 +663,9 @@ async fn datastream_index_name() {
             want: "logs-generic-namespace".to_string(),
         },
         TestCase {
-            dtype: Some("".to_string()),
+            dtype: Some(String::new()),
             dataset: Some("dataset".to_string()),
-            namespace: Some("".to_string()),
+            namespace: Some(String::new()),
             want: "dataset".to_string(),
         },
         TestCase {

@@ -228,13 +228,13 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
                 })
             );
             InstanceInfo {
-                tag: tag.to_string(),
+                tag: tag.clone(),
                 instance,
                 honor_label: self.honor_labels,
             }
         });
         let endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
-            tag: tag.to_string(),
+            tag: tag.clone(),
             endpoint: url.to_string(),
             honor_label: self.honor_labels,
         });
@@ -435,7 +435,7 @@ mod test {
 
         let metrics: Vec<_> = events
             .into_iter()
-            .map(|event| event.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .collect();
 
         for metric in metrics {
@@ -488,7 +488,7 @@ mod test {
 
         let metrics: Vec<_> = events
             .into_iter()
-            .map(|event| event.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .collect();
 
         for metric in metrics {
@@ -555,7 +555,7 @@ mod test {
 
         let metrics: Vec<vector_lib::event::Metric> = events
             .into_iter()
-            .map(|event| event.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .collect();
         let metric = &metrics[0];
 
@@ -625,7 +625,7 @@ mod test {
 
         let metrics: Vec<_> = events
             .into_iter()
-            .map(|event| event.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .collect();
 
         let expected = HashMap::from([
@@ -655,6 +655,15 @@ mod test {
     // Intentionally not using assert_source_compliance here because this is a round-trip test which
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn test_prometheus_routing() {
         trace_init();
         let (_in_guard, in_addr) = next_addr();
@@ -821,7 +830,7 @@ mod integration_tests {
 
         let metrics: Vec<_> = events
             .into_iter()
-            .map(|event| event.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .collect();
 
         let find_metric = |name: &str| {

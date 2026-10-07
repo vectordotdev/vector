@@ -51,14 +51,21 @@ pub enum Mode {
 }
 
 impl SocketConfig {
+    #[must_use]
     pub fn new_tcp(tcp_config: tcp::TcpConfig) -> Self {
         tcp_config.into()
     }
 
+    #[must_use]
     pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn decoding(&self) -> DeserializerConfig {
         match &self.mode {
             Mode::Tcp(config) => config.decoding().clone(),
@@ -68,6 +75,11 @@ impl SocketConfig {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn log_namespace(&self, global_log_namespace: LogNamespace) -> LogNamespace {
         match &self.mode {
             Mode::Tcp(config) => global_log_namespace.merge(config.log_namespace),
@@ -207,6 +219,11 @@ impl SourceConfig for SocketConfig {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = self.log_namespace(global_log_namespace);
 
@@ -313,6 +330,11 @@ impl SourceConfig for SocketConfig {
         )]
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
             Mode::Tcp(tcp) => vec![tcp.address().as_tcp_resource()],
@@ -404,7 +426,7 @@ mod test {
 
     async fn wait_for_tcp_and_release(guard: PortGuard, addr: SocketAddr) {
         wait_for_tcp(addr).await;
-        drop(guard) // Now we're sure the socket was bound by the server and we can release the guard
+        drop(guard); // Now we're sure the socket was bound by the server and we can release the guard
     }
 
     pub fn bind_unused_udp() -> UdpSocket {
@@ -430,7 +452,7 @@ mod test {
             "version": "1.1",
             "host": "example.org",
             "short_message": message,
-            "timestamp": 1234567890.123,
+            "timestamp": 1_234_567_890.123,
             "level": 6,
             "_foo": "bar",
         }))
@@ -453,6 +475,11 @@ mod test {
         chunk.freeze()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn get_gelf_chunks(short_message: &str, max_size: usize, rng: &mut SmallRng) -> Vec<Bytes> {
         let message_id = rand::random();
         let payload = get_gelf_payload(short_message);
@@ -480,14 +507,14 @@ mod test {
     #[test]
     fn unix_modes_deserialize_on_all_platforms() {
         for input in [
-            indoc::indoc! {r#"
+            indoc::indoc! {r"
                 mode: unix_datagram
                 path: /tmp/vector-socket.sock
-            "#},
-            indoc::indoc! {r#"
+            "},
+            indoc::indoc! {r"
                 mode: unix_stream
                 path: /tmp/vector-socket.sock
-            "#},
+            "},
         ] {
             let config: SocketConfig = serde_yaml::from_str(input).unwrap();
 
@@ -847,6 +874,19 @@ mod test {
     // Intentionally not using assert_source_compliance here because this is a round-trip test which
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn tcp_shutdown_infinite_stream() {
         // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
         // the source doesn't block on sending the events downstream, otherwise if it was blocked on
@@ -952,7 +992,7 @@ mod test {
         let mut buffer = [0u8; 10];
 
         tokio::select! {
-             _ = timeout => {
+             () = timeout => {
                  panic!("timed out waiting for stream to close")
              },
              read_result = stream.read(&mut buffer) => {
@@ -1013,7 +1053,7 @@ mod test {
         to: SocketAddr,
         lines: impl IntoIterator<Item = String>,
     ) -> UdpSocket {
-        send_packets_udp_from(from, to, lines.into_iter().map(|line| line.into()))
+        send_packets_udp_from(from, to, lines.into_iter().map(std::convert::Into::into))
     }
 
     fn send_packets_udp(to: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> UdpSocket {
@@ -1077,6 +1117,15 @@ mod test {
         .0
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn init_udp_inner(
         sender: SourceSender,
         source_key: &ComponentKey,
@@ -1084,19 +1133,18 @@ mod test {
         config: Option<UdpConfig>,
         use_vector_namespace: bool,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let (guard, address, mut config) = match config {
-            Some(config) => match config.address() {
+        let (guard, address, mut config) = if let Some(config) = config {
+            match config.address() {
                 SocketListenAddr::SocketAddr(addr) => (None, addr, config),
                 _ => panic!("listen address should not be systemd FD offset in tests"),
-            },
-            None => {
-                let (guard, address) = next_addr();
-                (
-                    Some(guard),
-                    address,
-                    UdpConfig::from_address(address.into()),
-                )
             }
+        } else {
+            let (guard, address) = next_addr();
+            (
+                Some(guard),
+                address,
+                UdpConfig::from_address(address.into()),
+            )
         };
 
         let config = if use_vector_namespace {
@@ -1128,7 +1176,7 @@ mod test {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         if let Some(guard) = guard {
-            drop(guard)
+            drop(guard);
         }
 
         (address, source_handle)
@@ -1223,8 +1271,8 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     /// This test only works on Unix.
-    /// Unix truncates at max_length giving us the bytes to get the first n delimited messages.
-    /// Windows will drop the entire packet if we exceed the max_length so we are unable to
+    /// Unix truncates at `max_length` giving us the bytes to get the first n delimited messages.
+    /// Windows will drop the entire packet if we exceed the `max_length` so we are unable to
     /// extract anything.
     async fn udp_max_length_delimited() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
@@ -1619,9 +1667,10 @@ mod test {
 
     #[cfg(unix)]
     async fn unix_send_lines(stream: bool, path: PathBuf, lines: &[&str]) {
-        match stream {
-            false => send_lines_unix_datagram(path, lines).await,
-            true => send_lines_unix_stream(path, lines).await,
+        if stream {
+            send_lines_unix_stream(path, lines).await;
+        } else {
+            send_lines_unix_datagram(path, lines).await;
         }
     }
 
@@ -1717,6 +1766,11 @@ mod test {
     #[ignore]
     #[cfg(unix)]
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ignore_without_reason,
+        reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+    )]
     async fn unix_datagram_socket_test() {
         // This test is useful for testing the behavior of datagram
         // sockets.
@@ -1844,7 +1898,7 @@ mod test {
     #[tokio::test]
     async fn unix_datagram_multiple_packets() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            unix_multiple_packets(false).await
+            unix_multiple_packets(false).await;
         })
         .await;
     }
@@ -1883,7 +1937,7 @@ mod test {
                 Ok(meta) => {
                     match meta.permissions().mode() {
                         // S_IFSOCK   0140000   socket
-                        0o140555 => ready(true),
+                        0o140_555 => ready(true),
                         _ => ready(false),
                     }
                 }
@@ -1982,7 +2036,7 @@ mod test {
     #[tokio::test]
     async fn unix_stream_multiple_packets() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            unix_multiple_packets(true).await
+            unix_multiple_packets(true).await;
         })
         .await;
     }
@@ -2028,7 +2082,7 @@ mod test {
                 Ok(meta) => {
                     match meta.permissions().mode() {
                         // S_IFSOCK   0140000   socket
-                        0o140421 => ready(true),
+                        0o140_421 => ready(true),
                         _ => ready(false),
                     }
                 }

@@ -99,6 +99,11 @@ pub struct IndexerAcknowledgement {
 }
 
 impl IndexerAcknowledgement {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn new(config: HecAcknowledgementsConfig, shutdown: ShutdownSignal) -> Self {
         let channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>> =
             Arc::new(tokio::sync::Mutex::new(HashMap::new()));
@@ -131,6 +136,11 @@ impl IndexerAcknowledgement {
     }
 
     /// Creates a channel with the specified id if it does not exist.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn create_or_get_channel(&self, id: String) -> Result<Arc<Channel>, Rejection> {
         let mut channels = self.channels.lock().await;
         if let Some(channel) = channels.get(&id) {
@@ -456,6 +466,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     async fn test_indexer_ack_create_channels() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {

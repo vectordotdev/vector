@@ -35,10 +35,19 @@ fn elasticsearch_address() -> String {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn firehose_put_records_without_partition_key() {
     let stream = gen_stream();
 
-    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().clone()).await;
 
     ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
 
@@ -58,13 +67,13 @@ async fn firehose_put_records_without_partition_key() {
             ..Default::default()
         },
         tls: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: None,
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -132,10 +141,23 @@ async fn firehose_put_records_without_partition_key() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn firehose_put_records_with_partition_key() {
     let stream = gen_stream();
 
-    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().to_string()).await;
+    let elasticsearch_arn = ensure_elasticsearch_domain(stream.clone().clone()).await;
 
     ensure_elasticsearch_delivery_stream(stream.clone(), elasticsearch_arn.clone()).await;
 
@@ -158,13 +180,13 @@ async fn firehose_put_records_with_partition_key() {
             ..Default::default()
         },
         tls: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: Some(partition_key.clone()),
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -312,15 +334,13 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
             reqwest::get(format!("{}/_cluster/health", elasticsearch_address()))
                 .and_then(reqwest::Response::json::<Value>)
                 .await
-                .map(|v| {
+                .is_ok_and(|v| {
                     v.get("status")
                         .and_then(|status| status.as_str())
-                        .map(|status| status != "red")
-                        .unwrap_or(false)
+                        .is_some_and(|status| status != "red")
                 })
-                .unwrap_or(false)
         },
-        Duration::from_secs(120),
+        Duration::from_mins(2),
     )
     .await;
 
@@ -328,6 +348,11 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
 }
 
 /// creates Firehose delivery stream to ship to Elasticsearch
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn ensure_elasticsearch_delivery_stream(
     delivery_stream_name: String,
     elasticsearch_arn: String,
@@ -351,7 +376,7 @@ async fn ensure_elasticsearch_delivery_stream(
     {
         Ok(_) => (),
         Err(error) => panic!("Unable to create the delivery stream {error:?}"),
-    };
+    }
 }
 
 fn gen_stream() -> String {

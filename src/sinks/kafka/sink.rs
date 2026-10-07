@@ -36,6 +36,11 @@ pub struct KafkaSink {
     headers_key: Option<OwnedTargetPath>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub(crate) fn create_producer(
     client_config: ClientConfig,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {

@@ -27,6 +27,11 @@ const MEMORY_USAGE: GaugeName = GaugeName::ProcessMemoryUsage;
 const MEMORY_VIRTUAL_USAGE: GaugeName = GaugeName::ProcessMemoryVirtualUsage;
 
 impl HostMetrics {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,

@@ -45,8 +45,8 @@ fn generate_source_config(url: &str, subject: &str) -> NatsSourceConfig {
     }
 }
 
-/// Test runner for JetStream sources.
-/// This function sets up the required JetStream stream and consumer,
+/// Test runner for `JetStream` sources.
+/// This function sets up the required `JetStream` stream and consumer,
 /// publishes a message, and then runs the source to ensure it receives the message.
 async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> {
     let js_config = conf.jetstream.clone().unwrap();
@@ -602,9 +602,9 @@ async fn nats_shutdown_drain_messages() {
     shutdown_done.await;
 }
 
-/// Test harness for JetStream recovery tests.
+/// Test harness for `JetStream` recovery tests.
 ///
-/// Encapsulates NATS JetStream setup (stream, consumer, source) and provides
+/// Encapsulates NATS `JetStream` setup (stream, consumer, source) and provides
 /// ergonomic helpers for publish, disruption, and drain-until-found patterns.
 struct JetStreamTestHarness {
     js: async_nats::jetstream::Context,
@@ -721,7 +721,7 @@ impl JetStreamTestHarness {
             .expect("Failed to recreate consumer");
     }
 
-    /// Deletes the entire JetStream stream (implicitly deletes all consumers).
+    /// Deletes the entire `JetStream` stream (implicitly deletes all consumers).
     /// Waits 3 seconds for the pull loop to observe the error.
     async fn delete_stream(&self) {
         self.js
@@ -750,6 +750,11 @@ impl JetStreamTestHarness {
     ///
     /// Skips unrelated or re-delivered messages, which is important because
     /// newly created consumers may re-deliver previously seen messages.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     async fn drain_until(&mut self, target: &str, timeout_secs: u64) -> bool {
         use futures::StreamExt;
         use tokio::time::{Duration, timeout};
@@ -772,7 +777,7 @@ impl JetStreamTestHarness {
     }
 }
 
-/// Regression test for JetStream pull consumer becoming permanently stale after disruption.
+/// Regression test for `JetStream` pull consumer becoming permanently stale after disruption.
 ///
 /// Without the fix, the source silently exits on the first stream error.
 /// With the fix, it retries with backoff and resumes delivery.
@@ -1066,7 +1071,7 @@ async fn nats_jetstream_shutdown_during_consumption() {
 /// Verifies that messages published while the consumer is deleted (but the
 /// stream still exists) are delivered after the consumer is recreated.
 ///
-/// JetStream retains messages in the stream even when no consumer exists.
+/// `JetStream` retains messages in the stream even when no consumer exists.
 /// After recovery, the new consumer should pick up these queued messages.
 #[tokio::test]
 async fn nats_jetstream_messages_during_downtime() {

@@ -36,6 +36,11 @@ pub struct ResponseFuture<F, L> {
 }
 
 impl<F, L> ResponseFuture<F, L> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     pub(super) fn new(
         inner: F,
         _permit: OwnedSemaphorePermit,

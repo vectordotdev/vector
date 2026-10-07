@@ -16,6 +16,16 @@ pub struct Stats {
 }
 
 impl Stats {
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub fn metrics(&self, namespace: Option<String>) -> Vec<Metric> {
         let mut result = Vec::new();
         let mut tags = MetricTags::default();

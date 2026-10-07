@@ -151,23 +151,43 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_basic() {
         let transform_config = make_match_transform_config(5, vec!["matched".into()]);
         basic(transform_config, "matched", "unmatched").await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_basic() {
         let transform_config = make_ignore_transform_config(5, vec!["unmatched".into()]);
         basic(transform_config, "matched", "unmatched").await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_with_metadata_field() {
         let transform_config = make_ignore_transform_config(5, vec!["%ignored".into()]);
         basic(transform_config, "matched", "%ignored").await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn basic(transform_config: DedupeConfig, first_path: &str, second_path: &str) {
         let first_path = vrl::path::parse_target_path(first_path).unwrap();
         let second_path = vrl::path::parse_target_path(second_path).unwrap();
@@ -216,6 +236,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_field_name_matters() {
         let transform_config =
             make_match_transform_config(5, vec!["matched1".into(), "matched2".into()]);
@@ -223,11 +248,21 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_field_name_matters() {
         let transform_config = make_ignore_transform_config(5, vec![]);
         field_name_matters(transform_config).await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn field_name_matters(transform_config: DedupeConfig) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
@@ -267,6 +302,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_field_order_irrelevant() {
         let transform_config =
             make_match_transform_config(5, vec!["matched1".into(), "matched2".into()]);
@@ -274,6 +314,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_field_order_irrelevant() {
         let transform_config = make_ignore_transform_config(5, vec!["randomData".into()]);
         field_order_irrelevant(transform_config).await;
@@ -282,6 +327,11 @@ mod tests {
     /// Test that two Events that are considered duplicates get handled that
     /// way, even if the order of the matched fields is different between the
     /// two.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn field_order_irrelevant(transform_config: DedupeConfig) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
@@ -324,6 +374,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_age_out() {
         // Construct transform with a cache size of only 1 entry.
         let transform_config = make_match_transform_config(1, vec!["matched".into()]);
@@ -331,13 +386,23 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_age_out() {
         // Construct transform with a cache size of only 1 entry.
         let transform_config = make_ignore_transform_config(1, vec![]);
         age_out(transform_config).await;
     }
 
-    /// Test the eviction behavior of the underlying LruCache
+    /// Test the eviction behavior of the underlying `LruCache`
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn age_out(transform_config: DedupeConfig) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
@@ -386,6 +451,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_timed_age_out() {
         // Construct transform with timed cache
         let transform_config = DedupeConfig {
@@ -399,6 +469,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_timed_age_out() {
         // Construct transform with timed cache
         let transform_config = DedupeConfig {
@@ -411,7 +486,12 @@ mod tests {
         timed_age_out(transform_config).await;
     }
 
-    /// Test the eviction behavior of the underlying LruCache
+    /// Test the eviction behavior of the underlying `LruCache`
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn timed_age_out(transform_config: DedupeConfig) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
@@ -450,12 +530,22 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_type_matching() {
         let transform_config = make_match_transform_config(5, vec!["matched".into()]);
         type_matching(transform_config).await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_type_matching() {
         let transform_config = make_ignore_transform_config(5, vec![]);
         type_matching(transform_config).await;
@@ -464,6 +554,11 @@ mod tests {
     /// Test that two events with values for the matched fields that have
     /// different types but the same string representation aren't considered
     /// duplicates.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn type_matching(transform_config: DedupeConfig) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
@@ -501,12 +596,22 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_type_matching_nested_objects() {
         let transform_config = make_match_transform_config(5, vec!["matched".into()]);
         type_matching_nested_objects(transform_config).await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_type_matching_nested_objects() {
         let transform_config = make_ignore_transform_config(5, vec![]);
         type_matching_nested_objects(transform_config).await;
@@ -515,6 +620,11 @@ mod tests {
     /// Test that two events where the matched field is a sub object and that
     /// object contains values that have different types but the same string
     /// representation aren't considered duplicates.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn type_matching_nested_objects(transform_config: DedupeConfig) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
@@ -558,18 +668,33 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_match_null_vs_missing() {
         let transform_config = make_match_transform_config(5, vec!["matched".into()]);
         ignore_vs_missing(transform_config).await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn dedupe_ignore_null_vs_missing() {
         let transform_config = make_ignore_transform_config(5, vec![]);
         ignore_vs_missing(transform_config).await;
     }
 
     /// Test an explicit null vs a field being missing are treated as different.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn ignore_vs_missing(transform_config: DedupeConfig) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);

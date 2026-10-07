@@ -23,7 +23,10 @@ impl TestHarness {
         const DEFAULT_INTERVAL_MS: i32 = 100;
 
         let request = StreamOutputEventsRequest {
-            outputs_patterns: outputs_patterns.iter().map(|s| s.to_string()).collect(),
+            outputs_patterns: outputs_patterns
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
             inputs_patterns: vec![],
             limit: DEFAULT_LIMIT,
             interval_ms: DEFAULT_INTERVAL_MS,
@@ -46,7 +49,12 @@ impl TestHarness {
                 ));
             }
 
-            match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+            match tokio::time::timeout(
+                TAP_TIMEOUT.checked_sub(start.elapsed()).unwrap(),
+                stream.next(),
+            )
+            .await
+            {
                 Ok(Some(Ok(event))) => {
                     events.push(event);
                 }
@@ -74,6 +82,11 @@ impl TestHarness {
 // ============================================================================
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 async fn tap_receives_events() {
     let config = single_source_config("demo", 0.01, Some(100));
     let mut harness = TestHarness::new(&config)
@@ -111,6 +124,11 @@ async fn tap_receives_events() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 async fn tap_specific_component() {
     let config = dual_source_config("demo1", "demo2", 0.01, Some(100));
     let mut harness = TestHarness::new(&config)
@@ -145,6 +163,11 @@ async fn tap_specific_component() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_wild_err_arm,
+    reason = "Keep the current error handling and diagnostic behavior pending a separate audit."
+)]
 async fn tap_survives_config_reload() {
     use vector_lib::api_client::proto::stream_output_events_response::Event;
 
@@ -176,7 +199,12 @@ async fn tap_survives_config_reload() {
             start.elapsed() < TAP_TIMEOUT,
             "Timeout waiting for pre-reload events"
         );
-        match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+        match tokio::time::timeout(
+            TAP_TIMEOUT.checked_sub(start.elapsed()).unwrap(),
+            stream.next(),
+        )
+        .await
+        {
             Ok(Some(Ok(_))) => pre_reload_count += 1,
             Ok(Some(Err(e))) => panic!("Stream error before reload: {e}"),
             Ok(None) => panic!("Stream ended unexpectedly before reload"),
@@ -218,7 +246,12 @@ async fn tap_survives_config_reload() {
             start.elapsed() < TAP_TIMEOUT,
             "Stream did not survive reload: only received {post_reload_count} tapped events after reload"
         );
-        match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+        match tokio::time::timeout(
+            TAP_TIMEOUT.checked_sub(start.elapsed()).unwrap(),
+            stream.next(),
+        )
+        .await
+        {
             Ok(Some(Ok(event))) => {
                 if matches!(&event.event, Some(Event::TappedEvent(_))) {
                     post_reload_count += 1;
@@ -233,6 +266,15 @@ async fn tap_survives_config_reload() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn multiple_concurrent_subscriptions() {
     let config = dual_source_config("demo1", "demo2", 0.01, Some(100));
     let mut harness = TestHarness::new(&config)

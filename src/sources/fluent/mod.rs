@@ -67,7 +67,7 @@ pub enum FluentMode {
 ///
 /// See [serde-rs/serde#2231](https://github.com/serde-rs/serde/issues/2231)
 mod deser {
-    use super::*;
+    use super::{Deserialize, FluentMode, FluentTcpConfig, FluentUnixConfig, UnixOnly};
 
     #[allow(clippy::large_enum_variant)]
     #[derive(Deserialize)]
@@ -90,6 +90,11 @@ mod deser {
     }
 
     impl<'de> Deserialize<'de> for FluentMode {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::match_same_arms,
+            reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+        )]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
@@ -105,6 +110,7 @@ mod deser {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::sources::fluent::FluentConfig;
 
         #[test]
         fn test_tcp_default_mode() {
@@ -266,7 +272,7 @@ impl GenerateConfig for FluentConfig {
                 tls: None,
                 receive_buffer_bytes: None,
                 tls_handshake_timeout_secs: None,
-                acknowledgements: Default::default(),
+                acknowledgements: SourceAcknowledgementsConfig::default(),
                 connection_limit: Some(2),
             }),
             log_namespace: None,
@@ -398,6 +404,11 @@ impl FluentSource {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn handle_events_impl(&self, events: &mut [Event], host: Value) {
         for event in events {
             let log = event.as_mut_log();
@@ -429,7 +440,7 @@ impl TcpSource for FluentSource {
     }
 
     fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
-        self.handle_events_impl(events, host.ip().to_string().into())
+        self.handle_events_impl(events, host.ip().to_string().into());
     }
 
     fn build_acker(&self, frame: &[Self::Item]) -> Self::Acker {
@@ -475,6 +486,11 @@ impl std::fmt::Display for DecodeError {
 }
 
 impl StreamDecodingError for DecodeError {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn can_continue(&self) -> bool {
         match self {
             DecodeError::IO(_) => false,
@@ -517,6 +533,11 @@ impl FluentDecoder {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn handle_message(
         &mut self,
         message: Result<FluentMessage, DecodeError>,
@@ -647,6 +668,11 @@ impl Decoder for FluentDecoder {
     type Item = (FluentFrame, usize);
     type Error = DecodeError;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         loop {
             if src.is_empty() {
@@ -698,7 +724,7 @@ impl Decoder for FluentDecoder {
     }
 }
 
-/// Decoder for decoding MessagePackEventStream which are just a stream of Entries
+/// Decoder for decoding `MessagePackEventStream` which are just a stream of Entries
 #[derive(Clone, Debug)]
 struct FluentEntryStreamDecoder;
 
@@ -706,6 +732,11 @@ impl Decoder for FluentEntryStreamDecoder {
     type Item = FluentEntry;
     type Error = DecodeError;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if src.is_empty() {
             return Ok(None);
@@ -761,7 +792,7 @@ impl TcpSourceAcker for FluentAcker {
             ack_map.clear();
             if let TcpSourceAck::Ack = ack {
                 ack_map.insert("ack", chunk);
-            };
+            }
             ack_map.serialize(&mut ser).unwrap();
         }
         Some(buf.into())
@@ -830,7 +861,7 @@ impl From<FluentEvent<'_>> for LogEvent {
             tag,
         );
 
-        for (key, value) in record.into_iter() {
+        for (key, value) in record {
             let value: Value = value.into();
             log_namespace.insert_source_metadata(
                 FluentConfig::NAME,
@@ -1061,6 +1092,11 @@ mod tests {
         assert_event_data_eq!(got.0[2], expected[2]);
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn decode_all(message: Vec<u8>) -> Result<(SmallVec<[Event; 1]>, usize), DecodeError> {
         let mut buf = BytesMut::from(&message[..]);
 
@@ -1084,6 +1120,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn decode_oversized_frame_is_rejected() {
         // Same shape as above (a 2-element array whose string is declared far
         // larger than what has arrived), but with a decoder whose frame cap is
@@ -1278,7 +1319,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1317,7 +1358,7 @@ mod tests {
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -1373,7 +1414,7 @@ mod integration_tests {
             let dir = make_file(
                 "fluent-bit.conf",
                 &format!(
-                    r#"
+                    r"
 [SERVICE]
     Grace      0
     Flush      1
@@ -1390,7 +1431,7 @@ mod integration_tests {
     Host          host.docker.internal
     Port          {send_port}
     Require_ack_response true
-    "#,
+    ",
                     listen_host = test_address.ip(),
                     listen_port = test_address.port(),
                     send_port = source_address.port(),
@@ -1428,27 +1469,47 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn fluentd() {
         test_fluentd(EventStatus::Delivered, "").await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn fluentd_gzip() {
         test_fluentd(EventStatus::Delivered, "compress gzip").await;
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn fluentd_rejection() {
         test_fluentd(EventStatus::Rejected, "").await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_fluentd(status: EventStatus, options: &str) {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let (_guard, test_address) = next_addr();
             let (out, source_address, _guard) = source(status).await;
 
             let config = format!(
-                r#"
+                r"
 <source>
   @type http
   bind {http_host}
@@ -1469,7 +1530,7 @@ mod integration_tests {
   ack_response_timeout 1
   {options}
 </match>
-"#,
+",
                 http_host = test_address.ip(),
                 http_port = test_address.port(),
                 port = source_address.port(),
@@ -1506,6 +1567,11 @@ mod integration_tests {
         .await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     async fn source(
         status: EventStatus,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
@@ -1530,7 +1596,7 @@ mod integration_tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
         (recv, address, _guard)

@@ -102,12 +102,12 @@ fn default_endpoint() -> HttpEndpoint {
 
 impl GenerateConfig for PubsubConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             project: my-project
             topic: my-topic
             encoding:
               codec: json
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -285,12 +285,12 @@ mod tests {
     fn validate_produces_usable_values() {
         use crate::config::ValidatedSink;
 
-        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
+        let config: PubsubConfig = serde_yaml::from_str(indoc! {r"
                 project: project
                 topic: topic
                 encoding:
                   codec: json
-            "#})
+            "})
         .unwrap();
 
         let validated = config.validate().expect("validation should succeed");
@@ -302,12 +302,12 @@ mod tests {
 
     #[tokio::test]
     async fn fails_missing_creds() {
-        let config: PubsubConfig = serde_yaml::from_str(indoc! {r#"
+        let config: PubsubConfig = serde_yaml::from_str(indoc! {r"
                 project: project
                 topic: topic
                 encoding:
                   codec: json
-            "#})
+            "})
         .unwrap();
         if SinkConfig::build(&config, SinkContext::default())
             .await
@@ -351,11 +351,11 @@ mod integration_tests {
                 skip_authentication: true,
                 ..Default::default()
             },
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             encoding: JsonSerializerConfig::default().into(),
-            tls: Default::default(),
-            acknowledgements: Default::default(),
+            tls: Option::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 

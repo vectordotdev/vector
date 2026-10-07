@@ -1,7 +1,10 @@
 use std::task::Poll;
 
 use chrono::Utc;
-use fakedata::logs::*;
+use fakedata::logs::{
+    apache_common_log_line, apache_error_log_line, json_log_line, syslog_3164_log_line,
+    syslog_5424_log_line,
+};
 use futures::StreamExt;
 use rand::prelude::IndexedRandom;
 use serde_with::serde_as;
@@ -183,6 +186,7 @@ impl OutputFormat {
 
 impl DemoLogsConfig {
     #[cfg(test)]
+    #[must_use]
     pub fn repeat(
         lines: Vec<String>,
         count: usize,
@@ -400,9 +404,14 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn shuffle_demo_logs_copies_lines() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
@@ -410,7 +419,7 @@ mod tests {
               - three
               - four
             count: 5
-        "#})
+        "})
         .await;
 
         let lines = &["one", "two", "three", "four"];
@@ -430,13 +439,13 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_limits_count() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
               - two
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -446,16 +455,21 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn shuffle_demo_logs_adds_sequence() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
               - two
             sequence: true
             count: 5
-        "#})
+        "})
         .await;
 
         for n in 0..5 {
@@ -474,14 +488,14 @@ mod tests {
     #[tokio::test]
     async fn shuffle_demo_logs_obeys_interval() {
         let start = Instant::now();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: shuffle
             lines:
               - one
               - two
             count: 3
             interval: 1.0
-        "#})
+        "})
         .await;
 
         for _ in 0..3 {
@@ -494,12 +508,17 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn host_is_set() {
         let host_key = log_schema().host_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: syslog
             count: 5
-        "#})
+        "})
         .await;
 
         let event = match poll!(rx.next()) {
@@ -513,10 +532,10 @@ mod tests {
 
     #[tokio::test]
     async fn apache_common_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: apache_common
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -527,10 +546,10 @@ mod tests {
 
     #[tokio::test]
     async fn apache_error_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: apache_error
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -541,10 +560,10 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_5424_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: syslog
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -555,10 +574,10 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_3164_format_generates_output() {
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: bsd_syslog
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {
@@ -568,12 +587,17 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn json_format_generates_output() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(indoc! {r#"
+        let mut rx = runit(indoc! {r"
             format: json
             count: 5
-        "#})
+        "})
         .await;
 
         for _ in 0..5 {

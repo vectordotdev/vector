@@ -53,6 +53,11 @@ pub struct HecMetricsEncoder {
 }
 
 impl HecMetricsEncoder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub fn encode_event(&self, processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
         let metadata = processed_event.metadata;
         let metric = processed_event.event;
@@ -60,7 +65,7 @@ impl HecMetricsEncoder {
         let fields = metric
             .tags()
             .into_iter()
-            .flat_map(|tags| tags.iter_single())
+            .flat_map(vector_lib::event::MetricTags::iter_single)
             // skip the metric tags used for templating
             .filter(|(k, _)| !self.templated_field_keys.iter().any(|f| f == k))
             .map(|(k, v)| (k, HecFieldValue::Str(v)))

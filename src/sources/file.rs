@@ -239,6 +239,11 @@ pub struct FileConfig {
     pub rotate_wait: Duration,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
@@ -252,7 +257,7 @@ const fn default_read_from() -> ReadFromConfig {
 }
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
-    Duration::from_millis(1000)
+    Duration::from_secs(1)
 }
 
 const fn default_multi_line_timeout() -> u64 {
@@ -373,9 +378,9 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: default_line_delimiter(),
             encoding: None,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
             rotate_wait: default_rotate_wait(),
         }
     }
@@ -470,6 +475,15 @@ impl SourceConfig for FileConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
@@ -657,18 +671,15 @@ pub fn file_source(
             event
         });
         tokio::spawn(async move {
-            match out
+            if let Ok(()) = out
                 .send_event_stream(&mut messages)
                 .instrument(span.or_current())
                 .await
             {
-                Ok(()) => {
-                    debug!("Finished sending.");
-                }
-                Err(_) => {
-                    let (count, _) = messages.size_hint();
-                    emit!(StreamClosedError { count });
-                }
+                debug!("Finished sending.");
+            } else {
+                let (count, _) = messages.size_hint();
+                emit!(StreamClosedError { count });
             }
         });
 
@@ -699,13 +710,13 @@ fn reconcile_position_options(
     if start_at_beginning.is_some() {
         warn!(
             message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead."
-        )
+        );
     }
 
     match start_at_beginning {
         Some(true) => (
             ignore_checkpoints.unwrap_or(true),
-            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
+            read_from.map_or(ReadFrom::Beginning, Into::into),
         ),
         _ => (
             ignore_checkpoints.unwrap_or(false),
@@ -900,25 +911,25 @@ mod tests {
         );
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             fingerprint:
               strategy: device_and_inode
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             fingerprint:
               strategy: checksum
               bytes: 128
               ignored_header_bytes: 512
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(
@@ -930,32 +941,32 @@ mod tests {
         );
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             encoding:
               charset: utf-16le
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             read_from: beginning
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             read_from: end
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::End);
@@ -1016,7 +1027,7 @@ mod tests {
                     )
                     .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[test]
@@ -1048,7 +1059,7 @@ mod tests {
                 .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
                 .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[test]
@@ -1360,6 +1371,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn file_multiple_paths() {
         let n = 5;
 
@@ -1413,6 +1429,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn file_exclude_paths() {
         let n = 5;
 
@@ -1460,12 +1481,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_key_acknowledged() {
-        file_key(Acks).await
+        file_key(Acks).await;
     }
 
     #[tokio::test]
     async fn file_key_no_acknowledge() {
-        file_key(NoAcks).await
+        file_key(NoAcks).await;
     }
 
     async fn file_key(acks: AckingMode) {
@@ -1566,12 +1587,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
-        file_start_position_server_restart(Acks).await
+        file_start_position_server_restart(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_no_acknowledge() {
-        file_start_position_server_restart(NoAcks).await
+        file_start_position_server_restart(NoAcks).await;
     }
 
     async fn file_start_position_server_restart(acking: AckingMode) {
@@ -1743,12 +1764,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
-        file_start_position_server_restart_with_file_rotation(Acks).await
+        file_start_position_server_restart_with_file_rotation(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_no_acknowledge() {
-        file_start_position_server_restart_with_file_rotation(NoAcks).await
+        file_start_position_server_restart_with_file_rotation(NoAcks).await;
     }
 
     async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
@@ -1795,6 +1816,11 @@ mod tests {
 
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
     async fn file_start_position_ignore_old_files() {
         use std::{
             os::unix::io::AsRawFd,

@@ -107,6 +107,11 @@ pub struct GcpAuthConfig {
 }
 
 impl GcpAuthConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn build(&self, scope: Scope) -> crate::Result<GcpAuthenticator> {
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
@@ -156,6 +161,7 @@ impl GcpAuthenticator {
         Ok(Self::ApiKey(api_key.into()))
     }
 
+    #[must_use]
     pub fn make_token(&self) -> Option<String> {
         match self {
             Self::Credentials(inner) => Some(inner.make_token()),
@@ -163,6 +169,11 @@ impl GcpAuthenticator {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn apply<T>(&self, request: &mut http::Request<T>) {
         if let Some(token) = self.make_token() {
             request
@@ -173,6 +184,11 @@ impl GcpAuthenticator {
     }
 
     /// Applies authentication to a native `http 1` request, mirroring [`Self::apply`].
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn apply_v1<T>(&self, request: &mut http_1::Request<T>) {
         if let Some(token) = self.make_token() {
             request
@@ -182,6 +198,11 @@ impl GcpAuthenticator {
         self.apply_uri_v1(request.uri_mut());
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn apply_uri(&self, uri: &mut Uri) {
         match self {
             Self::Credentials(_) | Self::None => (),
@@ -224,6 +245,10 @@ impl GcpAuthenticator {
         }
     }
 
+    #[expect(
+        clippy::must_use_candidate,
+        reason = "Starting token regeneration is the operation; listening for refreshes is optional."
+    )]
     pub fn spawn_regenerate_token(&self) -> watch::Receiver<()> {
         let (sender, receiver) = watch::channel(());
         crate::spawn_in_current_span(self.clone().token_regenerator(sender));
@@ -233,7 +258,7 @@ impl GcpAuthenticator {
     async fn token_regenerator(self, sender: watch::Sender<()>) {
         match self {
             Self::Credentials(inner) => {
-                let mut expires_in = inner.token.read().unwrap().expires_in() as u64;
+                let mut expires_in = u64::from(inner.token.read().unwrap().expires_in());
                 loop {
                     let deadline = Duration::from_secs(
                         expires_in
@@ -253,7 +278,7 @@ impl GcpAuthenticator {
                             // the same (cached) token during the last 300 seconds of its lifetime.
                             // This scenario is handled by retrying the token refresh after the
                             // METADATA_TOKEN_ERROR_RETRY_SECS period when a fresh token is expected
-                            expires_in = inner.token.read().unwrap().expires_in() as u64;
+                            expires_in = u64::from(inner.token.read().unwrap().expires_in());
                         }
                         Err(error) => {
                             error!(
@@ -269,7 +294,7 @@ impl GcpAuthenticator {
                 // This keeps the sender end of the watch open without
                 // actually sending anything, effectively creating an
                 // empty watch stream.
-                sender.closed().await
+                sender.closed().await;
             }
         }
     }

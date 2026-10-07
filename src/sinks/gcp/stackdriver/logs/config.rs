@@ -177,7 +177,7 @@ pub(super) enum StackdriverLogName {
 #[derive(Clone, Debug, Default)]
 pub(super) struct StackdriverLabelConfig {
     /// The value of this field is used to retrieve the associated labels from the `jsonPayload`
-    /// and extract their values to set as LogEntry labels.
+    /// and extract their values to set as `LogEntry` labels.
     #[configurable(metadata(docs::examples = "logging.googleapis.com/labels"))]
     #[serde(default = "default_labels_key")]
     pub(super) labels_key: Option<String>,
@@ -201,6 +201,11 @@ fn labels_examples() -> HashMap<String, String> {
     example
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing return type and caller contracts during the lint rollout."
+)]
 pub(super) fn default_labels_key() -> Option<String> {
     Some("logging.googleapis.com/labels".to_string())
 }

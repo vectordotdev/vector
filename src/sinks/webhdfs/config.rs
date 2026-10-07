@@ -13,7 +13,7 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
-        opendal_common::*,
+        opendal_common::{OpenDalRequestBuilder, OpenDalService, OpenDalSink},
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint,
             partitioner::KeyPartitioner,
@@ -22,7 +22,7 @@ use crate::{
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
 
-/// The default WebHDFS endpoint, used when `endpoint` is not configured.
+/// The default `WebHDFS` endpoint, used when `endpoint` is not configured.
 fn default_endpoint() -> HttpEndpoint {
     HttpEndpoint::parse("http://127.0.0.1:9870")
         .expect("static default endpoint should be a valid http(s) URL")
@@ -33,7 +33,7 @@ fn default_endpoint() -> HttpEndpoint {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct WebHdfsConfig {
-    /// The root path for WebHDFS.
+    /// The root path for `WebHDFS`.
     ///
     /// Must be a valid directory.
     ///
@@ -52,7 +52,7 @@ pub struct WebHdfsConfig {
     #[configurable(metadata(docs::templateable))]
     pub prefix: String,
 
-    /// An HDFS cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+    /// An HDFS cluster consists of a single `NameNode`, a master server that manages the file system namespace and regulates access to files by clients.
     ///
     /// The endpoint is the HDFS's web restful HTTP API endpoint.
     ///
@@ -98,7 +98,7 @@ impl GenerateConfig for WebHdfsConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
 
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         })
         .unwrap()
@@ -158,6 +158,11 @@ impl ValidatedSink for WebHdfsConfig {
 }
 
 impl WebHdfsConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_operator(&self) -> crate::Result<Operator> {
         install_opendal_defaults();
 
@@ -171,6 +176,11 @@ impl WebHdfsConfig {
         Ok(op)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_processor(
         &self,
         op: Operator,
@@ -207,13 +217,18 @@ impl WebHdfsConfig {
         prefix.confine(&self.confinement, Self::NAME, "prefix")
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         let prefix = self.confined_prefix()?;
         Ok(KeyPartitioner::new(prefix, None))
     }
 }
 
-/// Register OpenDAL services and install the native-tls HTTP transport.
+/// Register `OpenDAL` services and install the native-tls HTTP transport.
 ///
 /// `opendal::install_default` registers enabled services, but HTTP-transport
 /// auto-install is gated on the `http-transport-reqwest` alias (rustls/aws-lc).
@@ -244,8 +259,8 @@ mod tests {
             )
                 .into(),
             compression: crate::sinks::util::Compression::None,
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }
     }
@@ -308,7 +323,7 @@ mod tests {
         // Bulk size-based defaults: 10 MB batches, 300s timeout.
         assert_eq!(
             validated.batcher_settings.timeout,
-            std::time::Duration::from_secs(300)
+            std::time::Duration::from_mins(5)
         );
         assert_eq!(validated.batcher_settings.size_limit, 10_000_000);
         // The confined prefix retains the validated value.

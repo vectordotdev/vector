@@ -39,28 +39,31 @@ impl Parser {
 }
 
 impl FunctionTransform for Parser {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             ParserState::Uninitialized => {
                 let message_field = get_message_path(self.log_namespace);
-                let message = match event.as_log().get(&message_field) {
-                    Some(message) => message,
-                    None => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event without a message"
-                        });
-                        return;
-                    }
+                let message = if let Some(message) = event.as_log().get(&message_field) {
+                    message
+                } else {
+                    emit!(KubernetesLogsFormatPickerEdgeCase {
+                        what: "got an event without a message"
+                    });
+                    return;
                 };
 
-                let bytes = match message {
-                    Value::Bytes(bytes) => bytes,
-                    _ => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event with non-bytes message"
-                        });
-                        return;
-                    }
+                let bytes = if let Value::Bytes(bytes) = message {
+                    bytes
+                } else {
+                    emit!(KubernetesLogsFormatPickerEdgeCase {
+                        what: "got an event with non-bytes message"
+                    });
+                    return;
                 };
 
                 self.state = if bytes.len() > 1 && bytes[0] == b'{' {
@@ -68,7 +71,7 @@ impl FunctionTransform for Parser {
                 } else {
                     ParserState::Cri(cri::Cri::new(self.log_namespace))
                 };
-                self.transform(output, event)
+                self.transform(output, event);
             }
             ParserState::Docker(t) => t.transform(output, event),
             ParserState::Cri(t) => t.transform(output, event),

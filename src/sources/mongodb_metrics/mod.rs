@@ -46,19 +46,31 @@ macro_rules! tags {
 }
 
 macro_rules! counter {
-    ($value:expr_2021) => {
-        MetricValue::Counter {
-            value: $value as f64,
-        }
-    };
+    ($value:expr_2021) => {{
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+        )]
+        let value = $value as f64;
+        MetricValue::Counter { value }
+    }};
 }
 
 macro_rules! gauge {
-    ($value:expr_2021) => {
-        MetricValue::Gauge {
-            value: $value as f64,
-        }
-    };
+    ($value:expr_2021) => {{
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_lossless,
+            reason = "Defer the remaining conversion syntax cleanup without changing numeric behavior."
+        )]
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+        )]
+        let value = $value as f64;
+        MetricValue::Gauge { value }
+    }};
 }
 
 #[derive(Debug, Snafu)]
@@ -81,7 +93,7 @@ enum CollectError {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MongoDbMetricsConfig {
-    /// A list of MongoDB instances to scrape.
+    /// A list of `MongoDB` instances to scrape.
     ///
     /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
     #[configurable(metadata(docs::examples = "mongodb://localhost:27017"))]
@@ -110,10 +122,12 @@ struct MongoDbMetrics {
     tags: MetricTags,
 }
 
+#[must_use]
 pub const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> String {
     "mongodb".to_string()
 }
@@ -139,7 +153,7 @@ impl SourceConfig for MongoDbMetricsConfig {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
-                let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
+                let metrics = join_all(sources.iter().map(MongoDbMetrics::collect)).await;
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
@@ -202,7 +216,7 @@ impl MongoDbMetrics {
 
         Ok(if msg.set_name.is_some() || msg.hosts.is_some() {
             NodeType::Replset
-        } else if msg.msg.map(|msg| msg == "isdbgrid").unwrap_or(false) {
+        } else if msg.msg.is_some_and(|msg| msg == "isdbgrid") {
             // Contains the value isdbgrid when isMaster returns from a mongos instance.
             // <https://docs.mongodb.com/manual/reference/command/isMaster/#isMaster.msg>
             // <https://docs.mongodb.com/manual/core/sharded-cluster-query-router/#confirm-connection-to-mongos-instances>
@@ -274,6 +288,11 @@ impl MongoDbMetrics {
 
     /// Collect metrics from `serverStatus` command.
     /// <https://docs.mongodb.com/manual/reference/command/serverStatus/>
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn collect_server_status(&self) -> Result<Vec<Metric>, CollectError> {
         self.print_version().await?;
 
@@ -381,14 +400,14 @@ impl MongoDbMetrics {
                 "memory",
                 gauge!(value),
                 tags!(self.tags, "type" => "mapped"),
-            ))
+            ));
         }
         if let Some(value) = status.memory.mapped_with_journal {
             metrics.push(self.create_metric(
                 "memory",
                 gauge!(value),
                 tags!(self.tags, "type" => "mapped_with_journal"),
-            ))
+            ));
         }
 
         // mongod_global_lock_*
@@ -970,6 +989,11 @@ impl MongoDbMetrics {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
 fn bson_size(value: &Bson) -> usize {
     match value {
         Bson::Double(value) => value.size_of(),
@@ -1008,7 +1032,7 @@ fn document_size(doc: &Document) -> usize {
 /// Would be nice to serialize [ClientOptions](https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html) to String, but it's not supported.
 /// `endpoint` argument would not be required, but field `original_uri` in `ClientOptions` is private.
 /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
-/// Based on ClientOptions::parse_uri -- <https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708>
+/// Based on `ClientOptions::parse_uri` -- <https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708>
 #[expect(
     clippy::string_slice,
     reason = "all indices come from find() on ASCII chars ('/', '?', '=', '@', ':'), guaranteed char boundaries"
@@ -1047,7 +1071,7 @@ fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
                             // Update options in endpoint
                             endpoint = format!(
                                 "{}{}",
-                                &endpoint[..lstart + segments.0.len() + 1],
+                                &endpoint[..=(lstart + segments.0.len())],
                                 &options
                             );
                         }
@@ -1118,6 +1142,11 @@ mod integration_tests {
         url.to_string()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     async fn test_instance(endpoint: String) {
         assert_source_compliance(&PULL_SOURCE_TAGS, async {
             let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
@@ -1136,7 +1165,7 @@ mod integration_tests {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
             });
 
             // TODO: We should have a simpler/cleaner method for this sort of collection, where we're essentially waiting

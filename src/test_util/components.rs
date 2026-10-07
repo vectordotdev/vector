@@ -194,6 +194,11 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: LazyLock<ComponentTests> =
 impl ComponentTests<'_, '_, '_> {
     /// Run the test specification, and assert that all tests passed.
     #[track_caller]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn assert(&self, tags: &[&str]) {
         let mut test = ComponentTester::new();
         test.emitted_all_events(self.events);
@@ -202,12 +207,11 @@ impl ComponentTests<'_, '_, '_> {
         if let Some(requirement) = self.buffer_metrics {
             test.emitted_buffer_metrics(requirement);
         }
-        if !test.errors.is_empty() {
-            panic!(
-                "Failed to assert compliance, errors:\n{}\n",
-                test.errors.join("\n")
-            );
-        }
+        assert!(
+            test.errors.is_empty(),
+            "Failed to assert compliance, errors:\n{}\n",
+            test.errors.join("\n")
+        );
     }
 }
 
@@ -219,10 +223,10 @@ pub fn init_test() {
 
 /// Tests if the given metric contains all the given tag names
 fn has_tags(metric: &Metric, names: &[&str]) -> bool {
-    metric
-        .tags()
-        .map(|tags| names.iter().all(|name| tags.contains_key(name)))
-        .unwrap_or_else(|| names.is_empty())
+    metric.tags().map_or_else(
+        || names.is_empty(),
+        |tags| names.iter().all(|name| tags.contains_key(name)),
+    )
 }
 
 /// Standard metrics test environment data
@@ -248,10 +252,10 @@ impl ComponentTester {
     }
 
     fn emitted_all_counters(&mut self, names: &[&str], tags: &[&str]) {
-        let tag_suffix = if !tags.is_empty() {
-            format!("{{{}}}", tags.join(","))
-        } else {
+        let tag_suffix = if tags.is_empty() {
             String::new()
+        } else {
+            format!("{{{}}}", tags.join(","))
         };
 
         for name in names {
@@ -460,6 +464,11 @@ where
 }
 
 /// Runs and asserts source test specifications with configurations.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_and_assert_source_advanced<SC>(
     source: SC,
     setup: impl FnOnce(&mut SourceContext),
@@ -500,7 +509,7 @@ where
             }
 
             select! {
-                _ = &mut source_timeout => break,
+                () = &mut source_timeout => break,
                 Some(event) = rx.next() => events.push(event),
                 _ = &mut source => break,
             }
@@ -551,6 +560,11 @@ pub async fn assert_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>
 }
 
 /// Runs and asserts sink compliance.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_and_assert_sink_compliance<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = I> + Send,
@@ -558,7 +572,7 @@ where
 {
     assert_sink_compliance(tags, async move {
         let events = events.map(Into::into);
-        sink.run(events).await.expect("Running sink failed")
+        sink.run(events).await.expect("Running sink failed");
     })
     .await;
 }
@@ -575,6 +589,11 @@ pub async fn assert_data_volume_sink_compliance<T>(tags: &[&str], f: impl Future
 }
 
 /// Runs and asserts compliance for data volume sink tests.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_and_assert_data_volume_sink_compliance<S, I>(
     sink: VectorSink,
     events: S,
@@ -585,7 +604,7 @@ pub async fn run_and_assert_data_volume_sink_compliance<S, I>(
 {
     assert_data_volume_sink_compliance(tags, async move {
         let events = events.map(Into::into);
-        sink.run(events).await.expect("Running sink failed")
+        sink.run(events).await.expect("Running sink failed");
     })
     .await;
 }
@@ -602,6 +621,11 @@ pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<
 }
 
 /// Runs and asserts compliance for nonsending sink tests.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
     sink: VectorSink,
     events: S,
@@ -612,7 +636,7 @@ pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
 {
     assert_nonsending_sink_compliance(tags, async move {
         let events = events.map(Into::into);
-        sink.run(events).await.expect("Running sink failed")
+        sink.run(events).await.expect("Running sink failed");
     })
     .await;
 }
@@ -653,6 +677,11 @@ pub async fn assert_sink_error_with_events<T>(
 }
 
 /// Runs and asserts sink error compliance.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_and_assert_sink_error<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = I> + Send,
@@ -660,12 +689,17 @@ where
 {
     assert_sink_error(tags, async move {
         let events = events.map(Into::into);
-        sink.run(events).await.expect("Running sink failed")
+        sink.run(events).await.expect("Running sink failed");
     })
     .await;
 }
 
 /// Runs and asserts sink error compliance with a specific set of error events.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn run_and_assert_sink_error_with_events<S, I>(
     sink: VectorSink,
     events: S,
@@ -677,7 +711,7 @@ pub async fn run_and_assert_sink_error_with_events<S, I>(
 {
     assert_sink_error_with_events(error_events, tags, async move {
         let events = events.map(Into::into);
-        sink.run(events).await.expect("Running sink failed")
+        sink.run(events).await.expect("Running sink failed");
     })
     .await;
 }
@@ -688,16 +722,21 @@ where
     I: IntoIterator<Item = Event>,
     I::IntoIter: Send,
 {
-    sink_send_stream(sink, stream::iter(events.into_iter().map(Ok)), tags).await
+    sink_send_stream(sink, stream::iter(events.into_iter().map(Ok)), tags).await;
 }
 
 /// Convenience wrapper for running sinks with a stream of events
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn sink_send_stream<S>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
-    let mut events = events.map(|result| result.map(|event| event.into()));
+    let mut events = events.map(|result| result.map(std::convert::Into::into));
     match sink {
         VectorSink::Sink(mut sink) => {
             sink.send_all(&mut events)

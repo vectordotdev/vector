@@ -420,8 +420,7 @@ mod tests {
             .filter(|e| {
                 e.as_log()
                     .get(event_path!("message"))
-                    .map(|m| m.to_string_lossy() == "Repeated test message.")
-                    .unwrap_or(false)
+                    .is_some_and(|m| m.to_string_lossy() == "Repeated test message.")
             })
             .collect();
 
@@ -466,7 +465,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -500,6 +499,6 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }

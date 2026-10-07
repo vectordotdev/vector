@@ -303,14 +303,13 @@ where
                         .in_flight
                         .as_mut()
                         .and_then(|map| map.get_mut(partition))
-                        .map(|req| matches!(req.poll_unpin(cx), Poll::Ready(())))
-                        .unwrap_or(true)
+                        .is_none_or(|req| matches!(req.poll_unpin(cx), Poll::Ready(())))
                 {
                     partitions_ready.push(partition.clone());
                 }
             }
             let mut batch_consumed = false;
-            for partition in partitions_ready.iter() {
+            for partition in &partitions_ready {
                 let service_ready = match this.service.poll_ready(cx) {
                     Poll::Ready(Ok(())) => true,
                     Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
@@ -378,6 +377,11 @@ where
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "Preserve the existing selection of diagnostic fields pending a separate audit."
+)]
 impl<S, B, K> fmt::Debug for PartitionBatchSink<S, B, K>
 where
     S: Service<B::Output> + fmt::Debug,
@@ -488,6 +492,11 @@ where
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "Preserve the existing selection of diagnostic fields pending a separate audit."
+)]
 impl<S, Request> fmt::Debug for ServiceSink<S, Request>
 where
     S: fmt::Debug,
@@ -661,6 +670,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     async fn batch_sink_acking_unordered() {
         let ack_counter = Counter::default();
 
@@ -1084,7 +1098,7 @@ mod tests {
                 // Delay and then error
                 delay = false;
                 sleep(Duration::from_secs(1))
-                    .map(move |_| {
+                    .map(move |()| {
                         sent_requests.lock().unwrap().push(req);
                         Result::<_, std::io::Error>::Ok(())
                     })

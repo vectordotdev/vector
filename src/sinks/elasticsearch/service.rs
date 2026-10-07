@@ -114,6 +114,15 @@ impl HttpRequestBuilder {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn build_request(
         &self,
         es_req: ElasticsearchRequest,
@@ -200,8 +209,8 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
 
             let event_status = get_event_status(&http_response);
             Ok(ElasticsearchResponse {
-                event_status,
                 http_response,
+                event_status,
                 events_byte_size,
             })
         })

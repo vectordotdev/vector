@@ -53,8 +53,17 @@ pub enum RequestError {
 impl warp::reject::Reject for RequestError {}
 
 impl RequestError {
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     pub const fn status(&self) -> StatusCode {
-        use RequestError::*;
+        use RequestError::{
+            AccessKeyInvalid, AccessKeyMissing, Decode, DeliveryErrored, DeliveryFailed, Parse,
+            ParseRecords, ShuttingDown, UnsupportedEncoding, UnsupportedProtocolVersion,
+        };
         match *self {
             AccessKeyMissing { .. } => StatusCode::UNAUTHORIZED,
             AccessKeyInvalid { .. } => StatusCode::UNAUTHORIZED,
@@ -69,8 +78,12 @@ impl RequestError {
         }
     }
 
+    #[must_use]
     pub const fn request_id(&self) -> Option<&str> {
-        use RequestError::*;
+        use RequestError::{
+            AccessKeyInvalid, AccessKeyMissing, Decode, DeliveryErrored, DeliveryFailed, Parse,
+            ParseRecords, ShuttingDown, UnsupportedEncoding, UnsupportedProtocolVersion,
+        };
         match self {
             AccessKeyMissing { request_id, .. }
             | AccessKeyInvalid { request_id, .. }

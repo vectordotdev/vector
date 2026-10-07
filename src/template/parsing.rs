@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    EventRef, FixedOffset, Hash, Item, Metric, RE, StrftimeItems, TemplateParseError, Utc, Value,
+    log_schema, parse_target_path,
+};
 
 /// One part of the template string after parsing.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -40,6 +43,11 @@ impl ParsedStrftime {
         ))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn is_dynamic(&self) -> bool {
         self.0.iter().any(|item| match item {
             Item::Fixed(_) => true,
@@ -56,6 +64,11 @@ impl ParsedStrftime {
         self.0.iter()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     pub(super) fn reserve_size(&self) -> usize {
         self.0
             .iter()

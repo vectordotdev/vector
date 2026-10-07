@@ -112,7 +112,7 @@ impl ElasticsearchCommon {
                         provider,
                         Some(region),
                     )
-                    .await?
+                    .await?;
                 }
             }
         }
@@ -200,7 +200,7 @@ async fn ensure_pipeline_in_params() {
 #[tokio::test]
 async fn ensure_empty_pipeline_not_in_params() {
     let index = gen_index();
-    let pipeline = String::from("");
+    let pipeline = String::new();
 
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -375,6 +375,11 @@ async fn auto_version_aws() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_over_http() {
     trace_init();
 
@@ -394,6 +399,11 @@ async fn insert_events_over_http() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_with_data_volume() {
     trace_init();
 
@@ -413,6 +423,11 @@ async fn insert_events_with_data_volume() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_over_http_with_gzip_compression() {
     trace_init();
 
@@ -432,6 +447,11 @@ async fn insert_events_over_http_with_gzip_compression() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_over_https() {
     trace_init();
 
@@ -460,6 +480,11 @@ async fn insert_events_over_https() {
 
 #[cfg(feature = "aws-core")]
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_on_aws() {
     trace_init();
 
@@ -486,6 +511,11 @@ async fn insert_events_on_aws() {
 
 #[cfg(feature = "aws-core")]
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_on_aws_with_compression() {
     trace_init();
 
@@ -512,6 +542,11 @@ async fn insert_events_on_aws_with_compression() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_with_failure() {
     trace_init();
 
@@ -531,6 +566,11 @@ async fn insert_events_with_failure() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_with_failure_and_gzip_compression() {
     trace_init();
 
@@ -550,6 +590,11 @@ async fn insert_events_with_failure_and_gzip_compression() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn insert_events_in_data_stream() {
     trace_init();
     let index = gen_index();
@@ -651,6 +696,11 @@ async fn distributed_insert_events_failover() {
     run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn run_insert_tests(
     mut config: ElasticsearchConfig,
     test_type: TestType,

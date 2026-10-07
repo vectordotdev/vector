@@ -102,6 +102,11 @@ type Matches = HashMap<String, HashSet<String>>;
 #[configurable_component(source("journald", "Collect logs from JournalD."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Keep the existing state representation pending a separate type-design review."
+)]
 pub struct JournaldConfig {
     /// Only include entries that appended to the journal after the entries have been read.
     #[serde(default)]
@@ -262,6 +267,11 @@ impl JournaldConfig {
     }
 
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         let schema_definition = match log_namespace {
             LogNamespace::Vector => Definition::new_with_default_metadata(
@@ -315,15 +325,15 @@ impl Default for JournaldConfig {
             current_boot_only: true,
             include_units: vec![],
             exclude_units: vec![],
-            include_matches: Default::default(),
-            exclude_matches: Default::default(),
+            include_matches: HashMap::default(),
+            exclude_matches: HashMap::default(),
             data_dir: None,
             batch_size: default_batch_size(),
             journalctl_path: None,
             journal_directory: None,
             journal_namespace: None,
             extra_args: vec![],
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             remap_priority: false,
             log_namespace: None,
             emit_cursor: false,
@@ -500,7 +510,7 @@ impl JournaldSource {
             // so it is an error if we reach here.
             tokio::select! {
                 _ = &mut shutdown => break,
-                _ = sleep(BACKOFF_DURATION) => (),
+                () = sleep(BACKOFF_DURATION) => (),
             }
         }
     }
@@ -545,7 +555,7 @@ impl JournaldSource {
 
             for _ in 1..batch_size {
                 tokio::select! {
-                    _ = &mut timeout => break,
+                    () = &mut timeout => break,
                     result = stdout_stream.next() => if !batch.handle_next(result) {
                         break;
                     }
@@ -583,6 +593,11 @@ impl JournaldSource {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 struct Batch<'a> {
     events: Vec<LogEvent>,
     record_size: usize,
@@ -676,17 +691,14 @@ impl<'a> Batch<'a> {
             let byte_size = self.events.estimated_json_encoded_size_of();
             events_received.emit(CountByteSize(count, byte_size));
 
-            match self.source.out.send_batch(self.events).await {
-                Ok(_) => {
-                    if let Some(cursor) = self.cursor {
-                        finalizer.finalize(cursor, self.receiver).await;
-                    }
+            if let Ok(()) = self.source.out.send_batch(self.events).await {
+                if let Some(cursor) = self.cursor {
+                    finalizer.finalize(cursor, self.receiver).await;
                 }
-                Err(_) => {
-                    emit!(StreamClosedError { count });
-                    // `out` channel is closed, don't restart journalctl.
-                    self.exiting = Some(false);
-                }
+            } else {
+                emit!(StreamClosedError { count });
+                // `out` channel is closed, don't restart journalctl.
+                self.exiting = Some(false);
             }
         }
         self.exiting
@@ -829,13 +841,18 @@ async fn get_systemd_version_from_journalctl(journalctl_path: &PathBuf) -> crate
                     if length > cutoff {
                         format!(" ..{} more char(s)", length - cutoff)
                     } else {
-                        "".to_string()
+                        String::new()
                     }
                 )
             },
         })?)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     match log_namespace {
         LogNamespace::Vector => {
@@ -907,6 +924,15 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     );
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn create_log_event_from_record(
     mut record: Record,
     batch: &Option<BatchNotifier>,
@@ -916,8 +942,7 @@ fn create_log_event_from_record(
         LogNamespace::Vector => {
             let message_value = record
                 .remove(MESSAGE)
-                .map(|msg| Value::Bytes(Bytes::from(msg)))
-                .unwrap_or(Value::Null);
+                .map_or(Value::Null, |msg| Value::Bytes(Bytes::from(msg)));
 
             let mut log = LogEvent::from(message_value).with_batch_notifier_option(batch);
 
@@ -1012,12 +1037,7 @@ fn filter_matches(record: &Record, includes: &Matches, excludes: &Matches) -> bo
 }
 
 fn contains_match(record: &Record, matches: &Matches) -> bool {
-    let f = move |(field, value)| {
-        matches
-            .get(field)
-            .map(|x| x.contains(value))
-            .unwrap_or(false)
-    };
+    let f = move |(field, value)| matches.get(field).is_some_and(|x| x.contains(value));
     record.iter().any(f)
 }
 
@@ -1100,12 +1120,11 @@ impl Checkpointer {
         let mut buf = Vec::<u8>::new();
         self.file.seek(SeekFrom::Start(0)).await?;
         self.file.read_to_end(&mut buf).await?;
-        match buf.len() {
-            0 => Ok(None),
-            _ => {
-                let text = String::from_utf8_lossy(&buf);
-                Ok(text.split_once('\n').map(|(line, _)| line.to_string()))
-            }
+        if buf.is_empty() {
+            Ok(None)
+        } else {
+            let text = String::from_utf8_lossy(&buf);
+            Ok(text.split_once('\n').map(|(line, _)| line.to_string()))
         }
     }
 }
@@ -1310,10 +1329,16 @@ mod tests {
             received[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
             "journald".into()
         );
-        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
+        assert_eq!(
+            timestamp(&received[0]),
+            value_ts(1_578_529_839, 140_001_000)
+        );
         assert_eq!(priority(&received[0]), Value::Bytes("INFO".into()));
         assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
-        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140002000));
+        assert_eq!(
+            timestamp(&received[1]),
+            value_ts(1_578_529_839, 140_002_000)
+        );
         assert_eq!(priority(&received[1]), Value::Bytes("DEBUG".into()));
     }
 
@@ -1359,12 +1384,18 @@ mod tests {
             message(&received[0]),
             Value::Bytes("Different timestamps".into())
         );
-        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140005000));
+        assert_eq!(
+            timestamp(&received[0]),
+            value_ts(1_578_529_839, 140_005_000)
+        );
         assert_eq!(
             message(&received[1]),
             Value::Bytes("Non-ASCII in other field".into())
         );
-        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+        assert_eq!(
+            timestamp(&received[1]),
+            value_ts(1_578_529_839, 140_005_000)
+        );
     }
 
     #[tokio::test]
@@ -1372,7 +1403,10 @@ mod tests {
         let matches = create_matches(vec![("_TRANSPORT", "kernel")]);
         let received = run_journal(matches, HashMap::new(), None, false).await;
         assert_eq!(received.len(), 1);
-        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140006000));
+        assert_eq!(
+            timestamp(&received[0]),
+            value_ts(1_578_529_839, 140_006_000)
+        );
         assert_eq!(message(&received[0]), Value::Bytes("audit log".into()));
     }
 
@@ -1381,11 +1415,26 @@ mod tests {
         let matches = create_matches(vec![("PRIORITY", "INFO"), ("PRIORITY", "DEBUG")]);
         let received = run_journal(HashMap::new(), matches, None, false).await;
         assert_eq!(received.len(), 5);
-        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140003000));
-        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140004000));
-        assert_eq!(timestamp(&received[2]), value_ts(1578529839, 140005000));
-        assert_eq!(timestamp(&received[3]), value_ts(1578529839, 140005000));
-        assert_eq!(timestamp(&received[4]), value_ts(1578529839, 140006000));
+        assert_eq!(
+            timestamp(&received[0]),
+            value_ts(1_578_529_839, 140_003_000)
+        );
+        assert_eq!(
+            timestamp(&received[1]),
+            value_ts(1_578_529_839, 140_004_000)
+        );
+        assert_eq!(
+            timestamp(&received[2]),
+            value_ts(1_578_529_839, 140_005_000)
+        );
+        assert_eq!(
+            timestamp(&received[3]),
+            value_ts(1_578_529_839, 140_005_000)
+        );
+        assert_eq!(
+            timestamp(&received[4]),
+            value_ts(1_578_529_839, 140_006_000)
+        );
     }
 
     #[tokio::test]
@@ -1393,7 +1442,10 @@ mod tests {
         let received = run_with_units(&[], &[], Some("1")).await;
         assert_eq!(received.len(), 7);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
-        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
+        assert_eq!(
+            timestamp(&received[0]),
+            value_ts(1_578_529_839, 140_002_000)
+        );
     }
 
     #[tokio::test]
@@ -1427,8 +1479,14 @@ mod tests {
     async fn handles_missing_timestamp() {
         let received = run_with_units(&["stdout"], &[], None).await;
         assert_eq!(received.len(), 2);
-        assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
-        assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+        assert_eq!(
+            timestamp(&received[0]),
+            value_ts(1_578_529_839, 140_004_000)
+        );
+        assert_eq!(
+            timestamp(&received[1]),
+            value_ts(1_578_529_839, 140_005_000)
+        );
     }
 
     #[tokio::test]
@@ -1518,8 +1576,8 @@ mod tests {
 
         let journald_config = JournaldConfig {
             include_units,
-            include_matches,
             exclude_units,
+            include_matches,
             exclude_matches,
             ..Default::default()
         };
@@ -1742,7 +1800,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1767,7 +1825,7 @@ mod tests {
         )
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     fn matches_schema(config: &JournaldConfig, namespace: LogNamespace) {
@@ -1813,6 +1871,6 @@ mod tests {
     fn matches_schema_legacy() {
         let config = JournaldConfig::default();
 
-        matches_schema(&config, LogNamespace::Legacy)
+        matches_schema(&config, LogNamespace::Legacy);
     }
 }

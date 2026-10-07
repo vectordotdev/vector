@@ -37,8 +37,9 @@ impl NormalizerSettings for IncrementalToAbsoluteDefaultNormalizerSettings {
     const TIME_TO_LIVE: Option<u64> = Some(300);
 }
 
+#[must_use]
 pub const fn default_expire_metrics_secs() -> Duration {
-    Duration::from_secs(120)
+    Duration::from_mins(2)
 }
 
 impl_generate_config_from_default!(IncrementalToAbsoluteConfig);
@@ -68,12 +69,22 @@ pub struct IncrementalToAbsolute {
 }
 
 impl IncrementalToAbsolute {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: &IncrementalToAbsoluteConfig) -> crate::Result<Self> {
         // Create a new MetricSet with the proper cache settings
         Ok(Self {
             data: MetricSet::new(config.cache.validate()?.into_settings()),
         })
     }
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {
         self.data
             .make_absolute(event.as_metric().clone())

@@ -146,12 +146,12 @@ pub struct OAuth2Config {
     #[configurable(metadata(docs::examples = "data:application/json;base64,cHVsc2FyCg=="))]
     credentials_url: String,
 
-    /// The OAuth2 audience.
+    /// The `OAuth2` audience.
     #[configurable(metadata(docs::examples = "${OAUTH2_AUDIENCE}"))]
     #[configurable(metadata(docs::examples = "pulsar"))]
     audience: Option<String>,
 
-    /// The OAuth2 scope.
+    /// The `OAuth2` scope.
     #[configurable(metadata(docs::examples = "${OAUTH2_SCOPE}"))]
     #[configurable(metadata(docs::examples = "admin"))]
     scope: Option<String>,
@@ -222,7 +222,7 @@ pub struct PulsarTlsOptions {
     /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
 
-    /// Whether hostname verification is enabled when verify_certificate is false.
+    /// Whether hostname verification is enabled when `verify_certificate` is false.
     ///
     /// Set to true if not specified.
     pub verify_hostname: Option<bool>,
@@ -237,11 +237,11 @@ impl Default for PulsarSinkConfig {
             producer_name: None,
             properties_key: None,
             partition_key_field: None,
-            batch: Default::default(),
-            compression: Default::default(),
+            batch: PulsarBatchConfig::default(),
+            compression: PulsarCompression::default(),
             encoding: TextSerializerConfig::default().into(),
             auth: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             connection_retry_options: None,
             tls: None,
             confinement: ConfinementConfig::default(),
@@ -305,7 +305,7 @@ impl PulsarSinkConfig {
                             .map_or(default_retry_options.keep_alive, |secs| {
                                 Duration::from_secs(secs)
                             }),
-                        connection_max_idle: Default::default(),
+                        connection_max_idle: Duration::default(),
                     }
                 });
 
@@ -322,9 +322,14 @@ impl PulsarSinkConfig {
             builder = builder
                 .with_tls_hostname_verification_enabled(options.verify_hostname.unwrap_or(true));
         }
-        builder.build().map_err(|e| e.into()).await
+        builder.build().map_err(std::convert::Into::into).await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     pub(crate) fn build_producer_options(&self) -> ProducerOptions {
         let mut opts = ProducerOptions {
             encrypted: None,
@@ -334,9 +339,9 @@ impl PulsarSinkConfig {
             batch_size: self.batch.max_events,
             batch_byte_size: self.batch.max_bytes,
             compression: None,
-            batch_timeout: Default::default(),
+            batch_timeout: Option::default(),
             block_queue_if_full: Default::default(),
-            routing_policy: Default::default(),
+            routing_policy: Option::default(),
         };
 
         match &self.compression {
@@ -344,22 +349,22 @@ impl PulsarSinkConfig {
             PulsarCompression::Lz4 => {
                 opts.compression = Some(compression::Compression::Lz4(
                     compression::CompressionLz4::default(),
-                ))
+                ));
             }
             PulsarCompression::Zlib => {
                 opts.compression = Some(compression::Compression::Zlib(
                     compression::CompressionZlib::default(),
-                ))
+                ));
             }
             PulsarCompression::Zstd => {
                 opts.compression = Some(compression::Compression::Zstd(
                     compression::CompressionZstd::default(),
-                ))
+                ));
             }
             PulsarCompression::Snappy => {
                 opts.compression = Some(compression::Compression::Snappy(
                     compression::CompressionSnappy::default(),
-                ))
+                ));
             }
         }
 

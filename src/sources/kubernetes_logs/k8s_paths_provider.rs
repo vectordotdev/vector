@@ -128,7 +128,7 @@ fn extract_excluded_containers_for_pod(pod: &Pod) -> impl Iterator<Item = &str> 
                 Some(value)
             })
             .flat_map(|containers| containers.split(','))
-            .map(|container| container.trim())
+            .map(str::trim)
     })
 }
 
@@ -188,7 +188,7 @@ fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> + use<> {
         },
     )
     .expect("the pattern is supposed to always be correct")
-    .flat_map(|paths| paths.into_iter())
+    .flat_map(std::iter::IntoIterator::into_iter)
 }
 
 fn filter_paths<'a>(
@@ -459,7 +459,7 @@ mod tests {
 
             let actual_paths: Vec<_> = list_pod_log_paths(mock_glob, &pod).collect();
             let expected_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
-            assert_eq!(actual_paths, expected_paths)
+            assert_eq!(actual_paths, expected_paths);
         }
     }
 
@@ -532,7 +532,7 @@ mod tests {
                 actual_paths, expected_paths,
                 "failed for patterns {:?}",
                 &str_patterns
-            )
+            );
         }
     }
 
@@ -584,7 +584,7 @@ mod tests {
                 actual_paths, expected_paths,
                 "failed for patterns {:?}",
                 &str_patterns
-            )
+            );
         }
     }
 
@@ -626,7 +626,7 @@ mod tests {
                 actual_patterns, expected_patterns,
                 "failed for dir {:?} and containers {:?}",
                 &pod_logs_dir, &containers,
-            )
+            );
         }
     }
 }

@@ -32,13 +32,13 @@ pub enum Protocol {
 
 impl GenerateConfig for OpenTelemetryConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             protocol:
               type: http
               uri: http://localhost:5318/v1/logs
               encoding:
                 codec: json
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -75,6 +75,11 @@ impl ValidatedSink for OpenTelemetryConfig {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn build(
         &self,
         validated: &ValidatedHttp,

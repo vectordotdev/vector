@@ -28,6 +28,16 @@ pub struct EncodedList {
     enrichment_tables: Vec<&'static str>,
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let sources = SourceDescription::types();
     let transforms = TransformDescription::types();

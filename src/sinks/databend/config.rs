@@ -137,7 +137,7 @@ impl ValidatedSink for DatabendConfig {
             .uri
             .authority()
             .ok_or("Endpoint missing authority")?;
-        let endpoint = match self.endpoint.uri.scheme().map(|s| s.as_str()) {
+        let endpoint = match self.endpoint.uri.scheme().map(http::uri::Scheme::as_str) {
             Some("databend") => self.endpoint.to_string(),
             // for backward compatibility, build DSN from endpoint
             Some("http") => format!("databend://{authority}/?sslmode=disable"),

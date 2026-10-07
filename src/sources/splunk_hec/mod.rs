@@ -206,10 +206,10 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecAcknowledgementsConfig::default(),
             store_hec_token: false,
             log_namespace: None,
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             event: CodecConfig::default(),
             raw: CodecConfig::default(),
         }
@@ -223,11 +223,17 @@ fn default_socket_address() -> SocketAddr {
 impl SplunkConfig {
     /// The source's TLS configuration, if any. Exposed so a wrapping source can build a
     /// [`TlsAcceptorReloader`] and watch the certificate files for rotation.
+    #[must_use]
     pub const fn tls_config(&self) -> Option<&TlsEnableableConfig> {
         self.tls.as_ref()
     }
 
     /// Build the source serving a runtime-swappable TLS acceptor when `tls_reloader` is set.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn build_with_tls_reloader(
         &self,
         cx: SourceContext,
@@ -309,6 +315,11 @@ impl SourceConfig for SplunkConfig {
         self.build_with_tls_reloader(cx, None).await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
@@ -505,9 +516,16 @@ impl SplunkSource {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
-        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
-            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_query_param =
+            warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
+                qs.get("channel").map(std::borrow::ToOwned::to_owned)
+            });
         let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         let splunk_channel = splunk_channel_header
@@ -723,7 +741,7 @@ impl SplunkSource {
                             }
                             let res = out.send_event(event).await;
                             return res
-                                .map(|_| maybe_ack_id)
+                                .map(|()| maybe_ack_id)
                                 .map_err(|_| Rejection::from(ApiError::ServerShutdown));
                         };
 
@@ -758,7 +776,7 @@ impl SplunkSource {
                             // existing partial-delivery semantics still apply.
                             let res = out.send_batch(events).await;
                             return res
-                                .map(|_| None)
+                                .map(|()| None)
                                 .map_err(|_| Rejection::from(ApiError::ServerShutdown));
                         }
 
@@ -766,7 +784,7 @@ impl SplunkSource {
                             register_ack(idx_ack, receiver, Some(channel_id)).await?;
 
                         let res = out.send_batch(events).await;
-                        res.map(|_| maybe_ack_id)
+                        res.map(|()| maybe_ack_id)
                             .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
                 },
@@ -775,6 +793,11 @@ impl SplunkSource {
             .boxed()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn health_service(&self) -> BoxedFilter<(Response,)> {
         // The Splunk docs document this endpoint as returning a 400 if given an invalid Splunk
         // token, but, in practice, it seems to ignore the token altogether
@@ -804,8 +827,7 @@ impl SplunkSource {
                     let ok = ctype
                         .as_ref()
                         .and_then(|v| v.to_str().ok())
-                        .map(|h| h.to_ascii_lowercase().contains("application/json"))
-                        .unwrap_or(true);
+                        .is_none_or(|h| h.to_ascii_lowercase().contains("application/json"));
 
                     if !ok {
                         return Err(warp::reject::custom(ApiError::UnsupportedContentType));
@@ -889,6 +911,11 @@ impl SplunkSource {
     }
 
     /// Is body encoded with gzip
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn gzip(&self) -> BoxedFilter<(bool,)> {
         warp::header::optional::<String>("Content-Encoding")
             .and_then(|encoding: Option<String>| async move {
@@ -902,8 +929,10 @@ impl SplunkSource {
     }
 
     fn required_channel() -> BoxedFilter<(String,)> {
-        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
-            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_query_param =
+            warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
+                qs.get("channel").map(std::borrow::ToOwned::to_owned)
+            });
         let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         splunk_channel_header
@@ -938,7 +967,7 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     token: Option<Arc<str>>,
     /// Lognamespace to put the events in
     log_namespace: LogNamespace,
-    /// handle to EventsReceived registry
+    /// handle to `EventsReceived` registry
     events_received: Registered<EventsReceived>,
     /// Optional second-stage decoder applied to the envelope payload after HEC
     /// envelope parsing.
@@ -1012,6 +1041,19 @@ impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterat
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
     /// Process the envelope's `time` field, updating `self.time` (sticky across envelopes
     /// when not explicitly provided).
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     fn process_time(&mut self, json: &mut JsonValue) -> Result<(), Rejection> {
         let parsed_time = match json.get_mut("time").map(JsonValue::take) {
             Some(JsonValue::Number(time)) => Some(Some(time)),
@@ -1052,6 +1094,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn build_event(&mut self, mut json: JsonValue) -> Result<Event, Rejection> {
         self.envelopes_processed += 1;
         // Construct Event from parsed json event
@@ -1118,7 +1165,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         );
 
         // Extract default extracted fields
-        for de in self.extractors.iter_mut() {
+        for de in &mut self.extractors {
             de.extract(&mut log, &mut json);
         }
 
@@ -1199,6 +1246,15 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
     /// decoder-produced fields win on conflict. Returns the events along with a flag
     /// indicating whether the codec hit any errors (so the caller can refuse to ack
     /// a request that lost data).
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn build_events_decoded(
         &mut self,
         mut json: JsonValue,
@@ -1303,7 +1359,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 // are present — matching the non-decoder runtime precedence. Both
                 // still use InsertIfEmpty so the decoder's output wins over all
                 // envelope metadata. Order: decoder > top-level > fields.
-                for de in self.extractors.iter_mut() {
+                for de in &mut self.extractors {
                     de.extract(log, &mut json);
                 }
 
@@ -1494,6 +1550,15 @@ struct DecodePayloadContext<'a> {
 /// i.e. for the `/event` endpoint which carries an HEC envelope `time` field), and
 /// the optional Splunk HEC token. Pass `set_source_timestamp = false` for `/raw`,
 /// which has no envelope timestamp and should only receive `%vector.ingest_timestamp`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn decode_payload(
     mut decoder: Decoder,
     payload: &[u8],
@@ -1582,9 +1647,9 @@ fn decode_payload(
 /// Returns `None` if `t` is negative.
 fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     // Utc.ymd(2400, 1, 1).and_hms(0,0,0).timestamp();
-    const SEC_CUTOFF: i64 = 13569465600;
+    const SEC_CUTOFF: i64 = 13_569_465_600;
     // Utc.ymd(10_000, 1, 1).and_hms(0,0,0).timestamp_millis();
-    const MILLISEC_CUTOFF: i64 = 253402300800000;
+    const MILLISEC_CUTOFF: i64 = 253_402_300_800_000;
 
     // Timestamps can't be negative!
     if t < 0 {
@@ -1716,6 +1781,15 @@ enum Time {
 /// element is `true` when the decoder hit any (recoverable or non-recoverable)
 /// errors during the request, so the caller can refuse to acknowledge the request.
 #[allow(clippy::too_many_arguments)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn raw_event(
     bytes: Bytes,
     gzip: bool,
@@ -2122,6 +2196,11 @@ mod tests {
         source_with(Some(TOKEN.to_owned().into()), None, acknowledgements, false).await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     async fn source_with(
         token: Option<SensitiveString>,
         valid_tokens: Option<&[&str]>,
@@ -2146,7 +2225,7 @@ mod tests {
                 acknowledgements: acknowledgements.unwrap_or_default(),
                 store_hec_token,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event: CodecConfig::default(),
                 raw: CodecConfig::default(),
             }
@@ -2154,12 +2233,17 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
         (recv, address, _guard)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn sink(
         address: SocketAddr,
         encoding: EncodingConfig,
@@ -3020,9 +3104,9 @@ mod tests {
     /// This test will fail once `warp` crate fixes support for
     /// custom connection listener, at that point this test can be
     /// modified to pass.
-    /// https://github.com/vectordotdev/vector/issues/7097
-    /// https://github.com/seanmonstar/warp/issues/830
-    /// https://github.com/seanmonstar/warp/pull/713
+    /// <https://github.com/vectordotdev/vector/issues/7097>
+    /// <https://github.com/seanmonstar/warp/issues/830>
+    /// <https://github.com/seanmonstar/warp/pull/713>
     #[tokio::test]
     async fn host_test() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -3395,6 +3479,11 @@ mod tests {
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     async fn source_with_codec(
         event: CodecConfig,
         raw: CodecConfig,
@@ -3412,10 +3501,10 @@ mod tests {
                 token: Some(TOKEN.to_owned().into()),
                 valid_tokens: None,
                 tls: None,
-                acknowledgements: Default::default(),
+                acknowledgements: HecAcknowledgementsConfig::default(),
                 store_hec_token: false,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event,
                 raw,
             }
@@ -3423,7 +3512,7 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
         (recv, address, _guard)
@@ -3579,6 +3668,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn decoder_raw_endpoint_newline_delimited() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (source, address, _guard) = source_with_codec(
@@ -3640,6 +3734,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn decoder_independent_per_endpoint_codecs() {
         // /event and /raw can be configured with completely different codecs and
         // each endpoint applies only its own. Here /event uses JSON decoding (so a
@@ -3707,14 +3806,14 @@ mod tests {
     #[tokio::test]
     async fn decoder_vrl_reads_envelope_metadata() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let vrl_source = r#"
+            let vrl_source = r"
                 # Read envelope metadata injected before this VRL program runs.
                 .envelope_host = string!(%splunk_hec.host)
                 .envelope_sourcetype = string!(%splunk_hec.sourcetype)
 
                 # Decode the inner JSON payload (the bytes of the `event` string).
                 . = merge!(parse_json!(string!(.message)), .)
-            "#;
+            ";
 
             let event_codec = codec_decoding(
                 DeserializerConfig::Vrl(VrlDeserializerConfig {
@@ -3801,7 +3900,7 @@ mod tests {
                 acknowledgements: ack_config,
                 store_hec_token: false,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event: CodecConfig::default(),
                 raw: codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
             }
@@ -3809,7 +3908,7 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
 
@@ -3833,6 +3932,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn decoder_raw_endpoint_partial_decode_does_not_ack() {
         // Regression: a request whose body decodes into some valid frames AND some
         // dropped frames (e.g., `valid \n invalid \n valid` under newline framing
@@ -3854,7 +3958,7 @@ mod tests {
                 acknowledgements: ack_config,
                 store_hec_token: false,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event: CodecConfig::default(),
                 raw: codec_full(
                     Some(FramingConfig::NewlineDelimited(Default::default())),
@@ -3865,7 +3969,7 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
 
@@ -3889,6 +3993,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn decoder_event_endpoint_error_index_matches_envelope_not_fanout() {
         // Regression: with the decoder fanning out one envelope into many events,
         // `InvalidEventNumber` in error responses must still report the failing
@@ -4079,6 +4188,11 @@ mod tests {
     }
 
     impl ValidatableComponent for SplunkConfig {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::default_trait_access,
+            reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+        )]
         fn validation_configuration() -> ValidationConfiguration {
             let config = Self {
                 address: default_socket_address(),

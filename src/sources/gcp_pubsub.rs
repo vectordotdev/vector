@@ -222,7 +222,7 @@ fn default_endpoint() -> String {
 }
 
 const fn default_ack_deadline() -> Duration {
-    Duration::from_secs(600)
+    Duration::from_mins(10)
 }
 
 const fn default_retry_delay() -> Duration {
@@ -230,7 +230,7 @@ const fn default_retry_delay() -> Duration {
 }
 
 const fn default_keepalive() -> Duration {
-    Duration::from_secs(60)
+    Duration::from_mins(1)
 }
 
 const fn default_max_concurrency() -> usize {
@@ -256,7 +256,7 @@ impl SourceConfig for PubsubConfig {
                 warn!(
                     "The `ack_deadline_seconds` setting is deprecated, use `ack_deadline_secs` instead."
                 );
-                Duration::from_secs(ads as u64)
+                Duration::from_secs(u64::from(ads))
             }
         };
         if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs.as_secs()) {
@@ -297,8 +297,7 @@ impl SourceConfig for PubsubConfig {
 
         let protocol = uri
             .scheme()
-            .map(|scheme| Protocol(scheme.to_string().into()))
-            .unwrap_or(Protocol::HTTP);
+            .map_or(Protocol::HTTP, |scheme| Protocol(scheme.to_string().into()));
 
         let source = PubsubSource {
             endpoint,
@@ -320,7 +319,7 @@ impl SourceConfig for PubsubConfig {
             ack_deadline_secs,
             retry_delay: retry_delay_secs,
             keepalive: self.keepalive_secs,
-            concurrency: Default::default(),
+            concurrency: Arc::default(),
             full_response_size: self.full_response_size,
             log_namespace,
             bytes_received: register!(BytesReceived::from(protocol)),
@@ -418,7 +417,7 @@ impl PubsubSource {
                     }
 
                 },
-                _ = tokio::time::sleep(poll_time) => {
+                () = tokio::time::sleep(poll_time) => {
                     // If all of the tasks are marked as busy, start
                     // up a new one.
                     if tasks.len() < max_concurrency
@@ -544,7 +543,7 @@ impl PubsubSource {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                _ = tokio::time::sleep(self.keepalive) => {
+                () = tokio::time::sleep(self.keepalive) => {
                     if pending_acks == 0 {
                         // No pending acks, and no new data, so drop
                         // this stream if we aren't the only active
@@ -572,6 +571,11 @@ impl PubsubSource {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn request_stream(
         &self,
         ack_ids: mpsc::Receiver<Vec<String>>,
@@ -604,6 +608,11 @@ impl PubsubSource {
         }))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
@@ -639,6 +648,11 @@ impl PubsubSource {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
@@ -647,7 +661,7 @@ impl PubsubSource {
         let mut ack_ids = Vec::with_capacity(response.len());
         let events = response
             .into_iter()
-            .flat_map(|received| {
+            .filter_map(|received| {
                 ack_ids.push(received.ack_id);
                 received
                     .message
@@ -658,6 +672,15 @@ impl PubsubSource {
         (events, ack_ids)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     fn parse_message<'a>(
         &'a self,
         message: proto::PubsubMessage,
@@ -697,7 +720,7 @@ impl PubsubSource {
                     Some(LegacyKey::Overwrite(path!("attributes"))),
                     path!("attributes"),
                     attributes.clone(),
-                )
+                );
             }
             event
         })
@@ -977,6 +1000,11 @@ mod integration_tests {
     // acknowledgements when events are rejected, but have been unable
     // to verify the events are not acknowledged through the emulator.
     #[ignore]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ignore_without_reason,
+        reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+    )]
     async fn does_not_ack_rejected() {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
@@ -1115,8 +1143,7 @@ mod integration_tests {
                 .await;
             response
                 .get("receivedMessages")
-                .map(|rm| rm.as_array().unwrap().len())
-                .unwrap_or(0)
+                .map_or(0, |rm| rm.as_array().unwrap().len())
         }
 
         async fn request(&self, method: Method, base: &str, body: Value) -> Value {

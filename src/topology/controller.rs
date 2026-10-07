@@ -17,6 +17,7 @@ use crate::{
 pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
 
 impl SharedTopologyController {
+    #[must_use]
     pub fn new(inner: TopologyController) -> Self {
         Self(Arc::new(Mutex::new(inner)))
     }
@@ -29,6 +30,11 @@ impl SharedTopologyController {
         self.0.lock().await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn try_into_inner(self) -> Result<Mutex<TopologyController>, Self> {
         Arc::try_unwrap(self.0).map_err(Self)
     }
@@ -43,6 +49,11 @@ pub struct TopologyController {
     pub extra_context: ExtraContext,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "Preserve the existing selection of diagnostic fields pending a separate audit."
+)]
 impl std::fmt::Debug for TopologyController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TopologyController")
@@ -180,6 +191,11 @@ impl TopologyController {
     // check, preventing anyone else from adding new sources. If it does not resolve, that indicates
     // that new sources have been added since our original call and we should start the process over to
     // continue waiting.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_continue,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     pub async fn sources_finished(mutex: SharedTopologyController) {
         loop {
             // Do an initial async wait while the topology is running, making sure not the hold the
@@ -195,9 +211,8 @@ impl TopologyController {
             let top = mutex.lock().await;
             if top.topology.sources_finished().now_or_never().is_some() {
                 return;
-            } else {
-                continue;
             }
+            continue;
         }
     }
 }

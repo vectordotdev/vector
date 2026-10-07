@@ -222,6 +222,11 @@ impl ClientAssertion for ManagedIdentityClientAssertion {
 
 impl AzureAuthentication {
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
         match self {
             Self::Specific(specific) => specific.credential(),
@@ -234,6 +239,15 @@ impl AzureAuthentication {
 
 impl SpecificAzureCredential {
     /// Returns the provider for the credentials based on the specific credential type.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
         let credential: Arc<dyn TokenCredential> = match self {
             #[cfg(not(target_arch = "wasm32"))]
@@ -308,7 +322,7 @@ impl SpecificAzureCredential {
                 if let Some(id) = user_assigned_managed_identity_id {
                     options.user_assigned_id = match user_assigned_managed_identity_id_type
                         .as_ref()
-                        .unwrap_or(&Default::default())
+                        .unwrap_or(&UserAssignedManagedIdentityIdType::default())
                     {
                         UserAssignedManagedIdentityIdType::ClientId => {
                             Some(UserAssignedId::ClientId(id.clone()))
@@ -334,7 +348,7 @@ impl SpecificAzureCredential {
                 if let Some(id) = user_assigned_managed_identity_id {
                     options.user_assigned_id = match user_assigned_managed_identity_id_type
                         .as_ref()
-                        .unwrap_or(&Default::default())
+                        .unwrap_or(&UserAssignedManagedIdentityIdType::default())
                     {
                         UserAssignedManagedIdentityIdType::ClientId => {
                             Some(UserAssignedId::ClientId(id.clone()))
@@ -404,7 +418,7 @@ impl TokenCredential for MockTokenCredential {
         // the claims in alphabetical order to ensure a consistent base64 encoding for testing
         let jwt = serde_json::json!({
             "aud": scope.strip_suffix("/.default").unwrap_or(*scope),
-            "exp": 2147483647,
+            "exp": 2_147_483_647,
             "iat": 0,
             "iss": "https://sts.windows.net/",
             "nbf": 0,
@@ -416,7 +430,7 @@ impl TokenCredential for MockTokenCredential {
             "e30.{}.",
             BASE64_STANDARD
                 .encode(serde_json::to_string(&jwt).unwrap())
-                .trim_end_matches("=")
+                .trim_end_matches('=')
         );
 
         warn!(
@@ -426,7 +440,7 @@ impl TokenCredential for MockTokenCredential {
 
         Ok(azure_core::credentials::AccessToken::new(
             jwt_base64,
-            azure_core::time::OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600),
+            azure_core::time::OffsetDateTime::now_utc() + std::time::Duration::from_hours(1),
         ))
     }
 }

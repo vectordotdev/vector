@@ -75,6 +75,11 @@ impl WebSocketListenerSink {
     /// Constructs the sink from the validated state, performing only the
     /// context-dependent work: building the auth matcher from the enrichment
     /// tables / metrics storage.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub(crate) fn from_validated(
         config: WebSocketListenerSinkConfig,
         validated: &ValidatedWebSocketListenerSink,
@@ -159,6 +164,11 @@ impl WebSocketListenerSink {
     }
 
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn handle_connection(
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
@@ -202,7 +212,7 @@ impl WebSocketListenerSink {
                         .lock()
                         .expect("mutex poisoned")
                         .get(&key)
-                        .cloned()
+                        .copied()
                 }),
             );
             let Some(auth) = auth else {
@@ -268,7 +278,7 @@ impl WebSocketListenerSink {
                 emit!(WebSocketListenerConnectionFailedError {
                     error: Box::new(err),
                     extra_tags: extra_tags.clone()
-                })
+                });
             })?;
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
@@ -337,7 +347,7 @@ impl WebSocketListenerSink {
         {
             emit!(WebSocketListenerSendError {
                 error: Box::new(error)
-            })
+            });
         }
 
         {
@@ -432,7 +442,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     // Error is handled by `Encoder`.
                     finalizers.update_status(EventStatus::Errored);
                 }
-            };
+            }
         }
 
         Ok(())
@@ -868,6 +878,11 @@ mod tests {
         attach_websocket_client(localhost_with_port(port), expected_events, true).await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_for_each,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn attach_websocket_client<R: IntoClientRequest + Unpin>(
         client_request: R,
         expected_events: Vec<Event>,
@@ -927,9 +942,10 @@ mod tests {
                 found_metrics = true;
             }
         }
-        if !found_metrics {
-            panic!("Websocket server didn't emit any of the metrics that use extra tags!");
-        }
+        assert!(
+            found_metrics,
+            "Websocket server didn't emit any of the metrics that use extra tags!"
+        );
     }
 
     fn build_test_event_channel() -> (UnboundedSender<Event>, UnboundedReceiver<Event>) {

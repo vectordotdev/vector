@@ -126,7 +126,7 @@ pub(crate) enum ConfineError {
     },
 
     /// Rejected because a `..` segment could escape the namespace root on
-    /// filesystem-like protocols (e.g. WebHDFS) even when the string prefix
+    /// filesystem-like protocols (e.g. `WebHDFS`) even when the string prefix
     /// check passes (e.g. `safe/../../escape` starts with `safe/`).
     #[snafu(display(
         "rendered value {:?} contains a `..` path segment",
@@ -179,6 +179,11 @@ impl ConfinementChecker {
     /// Returns the literal prefix if the template is dynamic and requires
     /// confinement. Returns `Ok(None)` if the template is static and needs no
     /// confinement.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn validate_common(tpl: &UnconfinedTemplate) -> Result<Option<String>, BuildError> {
         let fields = match tpl.get_fields() {
             Some(f) => f,
@@ -264,10 +269,10 @@ impl ConfinementChecker {
                 // are invalid percent escapes), so their literal prefix —
                 // scheme and authority before the first `%` — is validated
                 // instead.
-                if !tpl.inner.is_dynamic() {
-                    Self::validate_static_uri(tpl).map(|()| None)
-                } else {
+                if tpl.inner.is_dynamic() {
                     Self::validate_static_uri_prefix(tpl.inner.literal_prefix()).map(|()| None)
+                } else {
+                    Self::validate_static_uri(tpl).map(|()| None)
                 }
             }
         }
@@ -563,6 +568,7 @@ impl ConfinementConfig {
     /// Returns a `ConfinementConfig` that opts out of confinement.
     ///
     /// Use only in tests where templates intentionally have no literal prefix.
+    #[must_use]
     pub const fn unconfined() -> Self {
         Self {
             dangerously_allow_unconfined_template_resolution: true,
@@ -588,4 +594,7 @@ impl ConfinementConfig {
         );
     }
 }
-use super::*;
+use super::{
+    ConfinementConfig, Hash, MAX_RENDERED_PATH_LEN, Snafu, Template, UnconfinedTemplate, Uri,
+    confined_preview, warn,
+};

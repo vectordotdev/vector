@@ -44,7 +44,7 @@ fn default_endpoint() -> HttpEndpoint {
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBLogsConfig {
-    /// The endpoint of the GreptimeDB server.
+    /// The endpoint of the `GreptimeDB` server.
     #[serde(alias = "host")]
     #[derivative(Default(value = "default_endpoint()"))]
     #[configurable(metadata(docs::examples = "http://localhost:4000"))]
@@ -56,10 +56,10 @@ pub struct GreptimeDBLogsConfig {
 
     /// The [GreptimeDB database][database] name to connect.
     ///
-    /// Default to `public`, the default database of GreptimeDB.
+    /// Default to `public`, the default database of `GreptimeDB`.
     ///
     /// Database can be created via `create database` statement on
-    /// GreptimeDB. If you are using GreptimeCloud, use `dbname` from the
+    /// `GreptimeDB`. If you are using `GreptimeCloud`, use `dbname` from the
     /// connection information of your instance.
     ///
     /// [database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
@@ -80,13 +80,13 @@ pub struct GreptimeDBLogsConfig {
     #[configurable(metadata(docs::examples = "2024-06-07 06:46:23.858293"))]
     pub pipeline_version: Option<Template>,
 
-    /// The username for your GreptimeDB instance.
+    /// The username for your `GreptimeDB` instance.
     ///
     /// This is required if your instance has authentication enabled.
     #[configurable(metadata(docs::examples = "username"))]
     #[serde(default)]
     pub username: Option<String>,
-    /// The password for your GreptimeDB instance.
+    /// The password for your `GreptimeDB` instance.
     ///
     /// This is required if your instance has authentication enabled.
     #[configurable(metadata(docs::examples = "password"))]
@@ -100,13 +100,13 @@ pub struct GreptimeDBLogsConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    /// Custom parameters to add to the query string for each HTTP request sent to GreptimeDB.
+    /// Custom parameters to add to the query string for each HTTP request sent to `GreptimeDB`.
     #[serde(default)]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "extra_params_examples()"))]
     pub extra_params: Option<HashMap<String, String>>,
 
-    /// Custom headers to add to the HTTP request sent to GreptimeDB.
+    /// Custom headers to add to the HTTP request sent to `GreptimeDB`.
     /// Note that these headers will override the existing headers.
     #[serde(default)]
     #[configurable(metadata(

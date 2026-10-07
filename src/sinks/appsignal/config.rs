@@ -34,14 +34,14 @@ use crate::{
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub(super) struct AppsignalConfig {
-    /// The URI for the AppSignal API to send data to.
+    /// The URI for the `AppSignal` API to send data to.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
     #[derivative(Default(value = "default_endpoint()"))]
     #[serde(default = "default_endpoint")]
     pub(super) endpoint: HttpEndpoint,
 
-    /// A valid app-level AppSignal Push API key.
+    /// A valid app-level `AppSignal` Push API key.
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
     #[configurable(metadata(docs::examples = "${APPSIGNAL_PUSH_API_KEY}"))]
     push_api_key: SensitiveString,
@@ -85,6 +85,11 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 }
 
 impl AppsignalConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     pub(super) fn build_client(
         &self,
         proxy: &ProxyConfig,
@@ -94,6 +99,11 @@ impl AppsignalConfig {
         Ok(client)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     pub(super) fn build_sink(
         &self,
         http_client: HttpClient,

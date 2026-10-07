@@ -24,6 +24,11 @@ impl Service<RedisRequest> for RedisService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn call(&mut self, kvs: RedisRequest) -> Self::Future {
         let count = kvs.request.len();
 

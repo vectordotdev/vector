@@ -157,7 +157,7 @@ const fn default_refresh_timeout_secs() -> Duration {
 fn default_fields() -> Vec<String> {
     DEFAULT_FIELD_ALLOWLIST
         .iter()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect()
 }
 
@@ -181,6 +181,11 @@ struct MetadataKey {
 }
 
 #[derive(Debug)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 struct Keys {
     account_id_key: MetadataKey,
     ami_id_key: MetadataKey,
@@ -232,9 +237,8 @@ impl TransformConfig for Ec2Metadata {
         if let Err(error) = client.refresh_metadata().await {
             if required {
                 return Err(error);
-            } else {
-                emit!(AwsEc2MetadataRefreshError { error });
             }
+            emit!(AwsEc2MetadataRefreshError { error });
         }
 
         // The metadata-refresh loop runs as its own tokio task, so the main
@@ -395,7 +399,7 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             match self.refresh_metadata().await {
-                Ok(_) => {
+                Ok(()) => {
                     emit!(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
@@ -438,7 +442,7 @@ impl MetadataClient {
 
         let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
-        let next_refresh = Instant::now() + Duration::from_secs(21600);
+        let next_refresh = Instant::now() + Duration::from_hours(6);
         self.token = Some((token.clone(), next_refresh));
 
         Ok(token)
@@ -455,6 +459,15 @@ impl MetadataClient {
             .transpose()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let mut new_state = vec![];
 
@@ -652,6 +665,11 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
     output
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
@@ -726,6 +744,11 @@ mod test {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn schema_def_with_string_input() {
         let transform_config = Ec2Metadata {
             namespace: Some(OwnedTargetPath::event(owned_value_path!("ec2", "metadata")).into()),
@@ -862,6 +885,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn enrich_log() {
         assert_transform_compliance(async {
             let mut fields = default_fields();
@@ -906,6 +934,11 @@ mod integration_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     async fn timeout() {
         let (_guard, addr) = next_addr();
 
@@ -937,6 +970,11 @@ mod integration_tests {
 
     // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     async fn not_required() {
         let (_guard, addr) = next_addr();
 
@@ -963,6 +1001,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn enrich_metric() {
         assert_transform_compliance(async {
             let mut fields = default_fields();
@@ -990,7 +1033,7 @@ mod integration_tests {
 
             let metric = make_metric();
             let mut expected_metric = metric.clone();
-            for (k, v) in expected_metric_fields().iter() {
+            for (k, v) in &expected_metric_fields() {
                 expected_metric.replace_tag(k.to_string(), v.to_string());
             }
 
@@ -1007,6 +1050,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn fields_log() {
         assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
@@ -1058,6 +1106,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn fields_metric() {
         assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
@@ -1101,6 +1154,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn namespace_log() {
         {
             assert_transform_compliance(async {
@@ -1174,6 +1232,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn namespace_metric() {
         {
             assert_transform_compliance(async {

@@ -37,7 +37,7 @@ impl BuildError {
 /// reconnect backoff, even if it hasn't delivered any messages. This keeps a flapping
 /// connection backing off while ensuring a stable-but-quiet low-volume channel doesn't retain
 /// a backoff that a previous flapping period drove up to the cap.
-const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_secs(60);
+const HEALTHY_SESSION_THRESHOLD: Duration = Duration::from_mins(1);
 
 /// Defines how a pub/sub "session" ended.
 ///
@@ -61,13 +61,22 @@ impl InputHandler {
     /// erroring at runtime. Once running, a dropped connection is handled by a reconnect loop
     /// with exponential backoff, so a Redis restart or transient network blip no longer
     /// requires a manual Vector restart.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub(super) async fn subscribe(
         mut self,
         connection_info: ConnectionInfo,
     ) -> crate::Result<Source> {
         let client = self.client.clone();
         let channel = self.key.clone();
-        let endpoint = connection_info.endpoint.to_string();
+        let endpoint = connection_info.endpoint.clone();
 
         /// Open a pubsub connection and SUBSCRIBE to `channel`.
         /// Returns a ready `PubSub` on success.
@@ -132,7 +141,7 @@ impl InputHandler {
                             None => RecvEvent::Disconnected,
                         }
                     }
-                    _ = &mut healthy, if !backoff_reset => RecvEvent::Healthy,
+                    () = &mut healthy, if !backoff_reset => RecvEvent::Healthy,
                     _ = &mut *shutdown => {
                         RecvEvent::Shutdown
                     }
@@ -216,7 +225,7 @@ impl InputHandler {
                     None => 'reconnect: loop {
                         let delay = backoff.next().expect("backoff never ends");
                         tokio::select! {
-                            _ = tokio::time::sleep(delay) => {}
+                            () = tokio::time::sleep(delay) => {}
                             _ = &mut shutdown => return Ok(()),
                         }
 

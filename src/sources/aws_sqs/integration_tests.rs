@@ -50,6 +50,11 @@ async fn send_test_events(count: u32, queue_url: &str, client: &aws_sdk_sqs::Cli
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn get_sqs_client() -> aws_sdk_sqs::Client {
     create_client::<SqsClientBuilder>(
         &SqsClientBuilder {},
@@ -65,6 +70,11 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 pub(crate) async fn test() {
     assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
         let sqs_client = get_sqs_client().await;
@@ -91,7 +101,7 @@ pub(crate) async fn test() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         let mut expected_messages = HashSet::new();
@@ -112,9 +122,10 @@ pub(crate) async fn test() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
     })

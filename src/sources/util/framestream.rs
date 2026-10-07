@@ -140,12 +140,11 @@ enum ControlField {
 
 impl ControlField {
     fn from_u32(val: u32) -> Result<Self, ()> {
-        match val {
-            0x01 => Ok(ControlField::ContentType),
-            _ => {
-                error!("Don't know field type {val} (expected 0x01).");
-                Err(())
-            }
+        if val == 0x01 {
+            Ok(ControlField::ContentType)
+        } else {
+            error!("Don't know field type {val} (expected 0x01).");
+            Err(())
         }
     }
     const fn to_u32(&self) -> u32 {
@@ -165,6 +164,7 @@ fn advance_u32(b: &mut Bytes) -> Result<u32, ()> {
 }
 
 impl FrameStreamReader {
+    #[must_use]
     pub fn new(response_sink: FrameStreamSink, expected_content_type: String) -> Self {
         FrameStreamReader {
             response_sink: Mutex::new(response_sink),
@@ -228,32 +228,30 @@ impl FrameStreamReader {
                 }
             }
             ControlState::GotReady => {
-                match header {
-                    ControlHeader::Start => {
-                        //check for content type
-                        _ = self.process_fields(header, &mut frame)?;
-                        //if didn't error, then we are ok to change state
-                        self.state.control_state = ControlState::ReadingData;
-                    }
-                    _ => error!("Got wrong control frame, expected START."),
+                if let ControlHeader::Start = header {
+                    //check for content type
+                    _ = self.process_fields(header, &mut frame)?;
+                    //if didn't error, then we are ok to change state
+                    self.state.control_state = ControlState::ReadingData;
+                } else {
+                    error!("Got wrong control frame, expected START.");
                 }
             }
             ControlState::ReadingData => {
-                match header {
-                    ControlHeader::Stop => {
-                        //check there aren't any fields
-                        _ = self.process_fields(header, &mut frame)?;
-                        if self.state.is_bidirectional {
-                            //send FINISH frame -- but only if we are bidirectional
-                            self.send_control_frame(Self::make_frame(ControlHeader::Finish, None));
-                        }
-                        self.state.control_state = ControlState::Stopped; //stream is now done
+                if let ControlHeader::Stop = header {
+                    //check there aren't any fields
+                    _ = self.process_fields(header, &mut frame)?;
+                    if self.state.is_bidirectional {
+                        //send FINISH frame -- but only if we are bidirectional
+                        self.send_control_frame(Self::make_frame(ControlHeader::Finish, None));
                     }
-                    _ => error!("Got wrong control frame, expected STOP."),
+                    self.state.control_state = ControlState::Stopped; //stream is now done
+                } else {
+                    error!("Got wrong control frame, expected STOP.");
                 }
             }
             ControlState::Stopped => error!("Unexpected control frame, current state is STOPPED."),
-        };
+        }
         Ok(())
     }
 
@@ -283,11 +281,11 @@ impl FrameStreamReader {
             }
             ControlHeader::Stop => {
                 //check that there are no fields
-                if !frame.is_empty() {
+                if frame.is_empty() {
+                    Ok(None)
+                } else {
                     error!("Unexpected fields in STOP header.");
                     Err(())
-                } else {
-                    Ok(None)
                 }
             }
             _ => {
@@ -347,6 +345,11 @@ impl FrameStreamReader {
         Err(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn make_frame(header: ControlHeader, content_type: Option<String>) -> Bytes {
         let mut frame = BytesMut::new();
         frame.extend(header.to_u32().to_be_bytes());
@@ -400,9 +403,14 @@ pub trait TcpFrameHandler: FrameHandler {
 }
 
 /**
- * Based off of the build_framestream_unix_source function.
+ * Based off of the `build_framestream_unix_source` function.
  * Functions similarly, just uses TCP socket instead of unix socket
  **/
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn build_framestream_tcp_source(
     frame_handler: impl TcpFrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
@@ -420,22 +428,21 @@ pub fn build_framestream_tcp_source(
             None, // tls_reloader: not wired for this source
             frame_handler
                 .allowed_origins()
-                .map(|origins| origins.to_vec()),
+                .map(<[ipnet::IpNet]>::to_vec),
         )
         .await
         .map_err(|error| {
             emit!(SocketBindError {
                 mode: SocketMode::Tcp,
                 error: &error,
-            })
+            });
         })?;
 
         info!(
             message = "Listening.",
             addr = %listener
                 .local_addr()
-                .map(SocketListenAddr::SocketAddr)
-                .unwrap_or(addr)
+                .map_or(addr, SocketListenAddr::SocketAddr)
         );
 
         let tripwire = shutdown.clone();
@@ -481,7 +488,7 @@ pub fn build_framestream_tcp_source(
                     let span = info_span!("connection", %peer_addr);
 
                     let tripwire = tripwire
-                        .map(move |_| {
+                        .map(move |()| {
                             info!(
                                 message = "Resetting connection (still open after seconds).",
                                 seconds = ?shutdown_timeout_secs
@@ -521,6 +528,11 @@ pub fn build_framestream_tcp_source(
 }
 
 #[allow(clippy::too_many_arguments)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn handle_stream(
     mut frame_handler: impl TcpFrameHandler + Send + Sync + Clone + 'static,
     mut shutdown_signal: ShutdownSignal,
@@ -600,15 +612,15 @@ async fn handle_stream(
         .filter_map(move |frame| {
             future::ready(match frame {
                 Ok(f) => reader.handle_frame(Bytes::from(f)),
-                Err(_) => None,
+                Err(()) => None,
             })
         });
 
     let active_parsing_task_nums = Arc::new(AtomicUsize::new(0));
     loop {
         let mut permit = tokio::select! {
-            _ = &mut tripwire => break,
-            Some(_) = &mut connection_close_timeout  => {
+            () = &mut tripwire => break,
+            Some(()) = &mut connection_close_timeout  => {
                 break;
             },
             _ = &mut shutdown_signal => {
@@ -624,28 +636,25 @@ async fn handle_stream(
         tokio::pin!(timeout);
 
         tokio::select! {
-            _ = &mut tripwire => break,
+            () = &mut tripwire => break,
             _ = &mut shutdown_signal => break,
-            _ = &mut timeout => {
+            () = &mut timeout => {
                 // This connection is currently holding a permit, but has not received data for some time. Release
                 // the permit to let another connection try
                 continue;
             }
             res = frames.next() => {
-                match res {
-                    Some(frame) => {
-                        if let Some(permit) = &mut permit {
-                            // Note that this is intentionally not the "number of events in a single request", but rather
-                            // the "number of events currently available". This may contain events from multiple events,
-                            // but it should always contain all events from each request.
-                            permit.decoding_finished(1);
-                        };
-                        handle_tcp_frame(&mut frame_handler, frame, &mut event_sink, received_from.clone(), Arc::clone(&active_parsing_task_nums)).await;
+                if let Some(frame) = res {
+                    if let Some(permit) = &mut permit {
+                        // Note that this is intentionally not the "number of events in a single request", but rather
+                        // the "number of events currently available". This may contain events from multiple events,
+                        // but it should always contain all events from each request.
+                        permit.decoding_finished(1);
                     }
-                    None => {
-                        debug!("Connection closed.");
-                        break
-                    },
+                    handle_tcp_frame(&mut frame_handler, frame, &mut event_sink, received_from.clone(), Arc::clone(&active_parsing_task_nums)).await;
+                } else {
+                    debug!("Connection closed.");
+                    break
                 }
             }
             else => break,
@@ -682,10 +691,23 @@ async fn handle_tcp_frame<T>(
 }
 
 /**
- * Based off of the build_unix_source function.
- * Functions similarly, but uses the FrameStreamReader to deal with
+ * Based off of the `build_unix_source` function.
+ * Functions similarly, but uses the `FrameStreamReader` to deal with
  * framestream control packets, and responds appropriately.
  **/
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 pub fn build_framestream_unix_source(
     frame_handler: impl UnixFrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
@@ -705,7 +727,7 @@ pub fn build_framestream_unix_source(
             error!("Unable to get socket information; error = {e:?}.");
             return Err(Box::new(e));
         }
-    };
+    }
 
     let listener = UnixListener::bind(&path)?;
 
@@ -748,15 +770,15 @@ pub fn build_framestream_unix_source(
             .into());
         }
         match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
-            Ok(_) => {
+            Ok(()) => {
                 info!("Socket permissions updated to {socket_permission:#o}.");
             }
             Err(e) => {
                 error!("Failed to update listener socket permissions; error = {e:?}.");
                 return Err(Box::new(e));
             }
-        };
-    };
+        }
+    }
 
     let fut = async move {
         let active_parsing_task_nums = Arc::new(AtomicUsize::new(0));
@@ -778,7 +800,7 @@ pub fn build_framestream_unix_source(
 
             let span = info_span!("connection");
             let path = if let Some(addr) = peer_addr {
-                if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
+                if let Some(path) = addr.as_pathname().map(std::borrow::ToOwned::to_owned) {
                     span.record("peer_path", field::debug(&path));
                     Some(path)
                 } else {
@@ -822,6 +844,11 @@ pub fn build_framestream_unix_source(
 }
 
 #[allow(clippy::too_many_arguments)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn build_framestream_source<T: Send + 'static>(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     socket: impl AsyncRead + AsyncWrite + Send + 'static,
@@ -849,23 +876,10 @@ fn build_framestream_source<T: Send + 'static>(
         .filter_map(move |frame| {
             future::ready(match frame {
                 Ok(f) => fs_reader.handle_frame(Bytes::from(f)),
-                Err(_) => None,
+                Err(()) => None,
             })
         });
-    if !frame_handler.multithreaded() {
-        let mut events = frames.filter_map(move |f| {
-            future::ready(frame_handler_copy.handle_event(received_from.clone(), f))
-        });
-
-        let handler = async move {
-            if let Err(e) = event_sink.send_event_stream(&mut events).await {
-                error!("Error sending event: {e:?}.");
-            }
-
-            info!("Finished sending.");
-        };
-        tokio::spawn(handler.instrument(span.or_current()));
-    } else {
+    if frame_handler.multithreaded() {
         let handler = async move {
             frames
                 .for_each(move |f| {
@@ -888,6 +902,19 @@ fn build_framestream_source<T: Send + 'static>(
                     }
                 })
                 .await;
+            info!("Finished sending.");
+        };
+        tokio::spawn(handler.instrument(span.or_current()));
+    } else {
+        let mut events = frames.filter_map(move |f| {
+            future::ready(frame_handler_copy.handle_event(received_from.clone(), f))
+        });
+
+        let handler = async move {
+            if let Err(e) = event_sink.send_event_stream(&mut events).await {
+                error!("Error sending event: {e:?}.");
+            }
+
             info!("Finished sending.");
         };
         tokio::spawn(handler.instrument(span.or_current()));
@@ -1044,6 +1071,11 @@ mod test {
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockFrameHandler<F> {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+        )]
         pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 content_type,
@@ -1081,7 +1113,7 @@ mod test {
                     self.host_key.as_ref().map(LegacyKey::Overwrite),
                     path!("host"),
                     host,
-                )
+                );
             }
 
             (self.extra_task_handling_routine.clone())();
@@ -1316,6 +1348,11 @@ mod test {
         Bytes::from(header.to_u32().to_be_bytes().to_vec())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn create_control_frame_with_content(
         header: ControlHeader,
         content_types: Vec<Bytes>,
@@ -1329,6 +1366,15 @@ mod test {
         Bytes::from(frame)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn assert_accept_frame(frame: &mut BytesMut, expected_content_type: Bytes) {
         //frame should start with 4 bytes saying ACCEPT
 
@@ -1468,6 +1514,11 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[should_panic]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::should_panic_without_expect,
+        reason = "Keep the existing panic assertion until its expected failure text is audited."
+    )]
     async fn blocked_framestream_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();

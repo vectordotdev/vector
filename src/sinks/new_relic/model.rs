@@ -26,7 +26,7 @@ pub(super) enum NewRelicApiModel {
 
 /// The metrics API data model.
 ///
-/// Reference: https://docs.newrelic.com/docs/data-apis/ingest-apis/metric-api/report-metrics-metric-api/
+/// Reference: <https://docs.newrelic.com/docs/data-apis/ingest-apis/metric-api/report-metrics-metric-api>/
 #[derive(Debug, Serialize)]
 pub(super) struct MetricsApiModel(pub [MetricDataStore; 1]);
 
@@ -82,7 +82,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                             num_missing_interval += 1;
                             return None;
                         };
-                        (value, "count", Some(interval_ms.get() as i64))
+                        (value, "count", Some(i64::from(interval_ms.get())))
                     }
                     (MetricValue::Counter { value }, MetricKind::Absolute)
                     | (MetricValue::Gauge { value }, _) => (value, "gauge", None),
@@ -97,7 +97,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 if value.is_nan() {
                     num_nan_value += 1;
                     return None;
-                };
+                }
 
                 let timestamp = data.time.timestamp.unwrap_or_else(Utc::now);
                 Some(MetricData {
@@ -136,17 +136,17 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             });
         }
 
-        if !metric_array.is_empty() {
-            Ok(Self::new(metric_array))
-        } else {
+        if metric_array.is_empty() {
             Err(NewRelicSinkError::new("No valid metrics to generate"))
+        } else {
+            Ok(Self::new(metric_array))
         }
     }
 }
 
 /// The events API data mode.
 ///
-/// Reference: https://docs.newrelic.com/docs/data-apis/ingest-apis/event-api/introduction-event-api/
+/// Reference: <https://docs.newrelic.com/docs/data-apis/ingest-apis/event-api/introduction-event-api>/
 #[derive(Debug, Serialize)]
 pub(super) struct EventsApiModel(pub Vec<ObjectMap>);
 
@@ -233,17 +233,17 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
             });
         }
 
-        if !events_array.is_empty() {
-            Ok(Self::new(events_array))
-        } else {
+        if events_array.is_empty() {
             Err(NewRelicSinkError::new("No valid events to generate"))
+        } else {
+            Ok(Self::new(events_array))
         }
     }
 }
 
 /// The logs API data model.
 ///
-/// Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/
+/// Reference: <https://docs.newrelic.com/docs/logs/log-api/introduction-log-api>/
 #[derive(Serialize, Debug)]
 pub(super) struct LogsApiModel(pub [LogDataStore; 1]);
 
@@ -328,10 +328,10 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
             });
         }
 
-        if !logs_array.is_empty() {
-            Ok(Self::new(logs_array))
-        } else {
+        if logs_array.is_empty() {
             Err(NewRelicSinkError::new("No valid logs to generate"))
+        } else {
+            Ok(Self::new(logs_array))
         }
     }
 }
@@ -341,7 +341,12 @@ const MILLISECONDS: f64 = 1000.0;
 /// Convert a value into a timestamp value. New Relic accepts either milliseconds or seconds since
 /// epoch as an integer, or ISO8601-formatted timestamp as a string.
 ///
-/// Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#json-logs
+/// Reference: <https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/#json-logs>
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn map_timestamp_value(value: Value) -> Option<Timestamp> {
     match value {
         Value::Timestamp(t) => Some(Timestamp::Numeric(t.timestamp_millis())),
@@ -362,6 +367,11 @@ fn get_message_string(value: Option<Value>) -> String {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn strip_arrays(obj: &mut ObjectMap) {
     obj.retain(|_key, value| !value.is_array());
     obj.iter_mut().for_each(|(_key, value)| {

@@ -38,6 +38,11 @@ pub trait FileDescriptorConfig: NamedComponent {
     fn decoding(&self) -> DeserializerConfig;
     fn description(&self) -> String;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn source<R>(
         &self,
         reader: R,
@@ -185,21 +190,23 @@ async fn process_stream(
     }
     .boxed();
 
-    match out.send_event_stream(&mut stream).await {
-        Ok(()) => {
-            debug!("Finished sending.");
-            Ok(())
-        }
-        Err(_) => {
-            let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
-            Err(())
-        }
+    if let Ok(()) = out.send_event_stream(&mut stream).await {
+        debug!("Finished sending.");
+        Ok(())
+    } else {
+        let (count, _) = stream.size_hint();
+        emit!(StreamClosedError { count });
+        Err(())
     }
 }
 
 /// Builds the `vector_lib::config::Outputs` for stdin and
-/// file_descriptor sources.
+/// `file_descriptor` sources.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn outputs(
     log_namespace: LogNamespace,
     host_key: &Option<OptionalValuePath>,

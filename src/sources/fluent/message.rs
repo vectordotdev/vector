@@ -8,8 +8,8 @@ use vector_lib::event::{KeyString, ObjectMap, Value};
 /// Fluent msgpack messages can be encoded in one of three ways, each with and
 /// without options, all using arrays to encode the top-level fields.
 ///
-/// The spec refers to 4 ways, but really CompressedPackedForward is encoded the
-/// same as PackedForward, it just has an additional decompression step.
+/// The spec refers to 4 ways, but really `CompressedPackedForward` is encoded the
+/// same as `PackedForward`, it just has an additional decompression step.
 ///
 /// Not yet handled are the handshake messages.
 ///
@@ -59,7 +59,7 @@ pub(super) type FluentRecord = BTreeMap<String, FluentValue>;
 /// Fluent message tag.
 pub(super) type FluentTag = String;
 
-/// Custom decoder for Fluent's EventTime msgpack extension.
+/// Custom decoder for Fluent's `EventTime` msgpack extension.
 ///
 /// <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#eventtime-ext-format>
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -147,19 +147,14 @@ impl From<FluentValue> for Value {
             rmpv::Value::Boolean(b) => Value::Boolean(b),
             rmpv::Value::Integer(i) => i
                 .as_i64()
-                .map(Value::Integer)
-                // unwrap large numbers to string similar to how
-                // `From<serde_json::Value> for Value` handles it
-                .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
+                .map_or_else(|| Value::Bytes(i.to_string().into()), Value::Integer),
             rmpv::Value::F32(f) => {
                 // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
-                NotNan::new(f as f64)
-                    .map(Value::Float)
-                    .unwrap_or(Value::Null)
+                NotNan::new(f64::from(f)).map_or(Value::Null, Value::Float)
             }
             rmpv::Value::F64(f) => {
                 // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
-                NotNan::new(f).map(Value::Float).unwrap_or(Value::Null)
+                NotNan::new(f).map_or(Value::Null, Value::Float)
             }
             rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
             rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
@@ -203,7 +198,7 @@ impl From<FluentValue> for Value {
 
 /// Fluent message timestamp.
 ///
-/// Message timestamps can be a unix timestamp or EventTime messagepack ext.
+/// Message timestamps can be a unix timestamp or `EventTime` messagepack ext.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub(super) enum FluentTimestamp {
@@ -250,10 +245,10 @@ mod test {
         fn from_u64(input: u64) -> () {
             if input > i64::MAX as u64 {
                 assert_eq!(Value::from(FluentValue(rmpv::Value::Integer(rmpv::Integer::from(input)))),
-                           Value::Bytes(input.to_string().into()))
+                           Value::Bytes(input.to_string().into()));
             } else {
                 assert_eq!(Value::from(FluentValue(rmpv::Value::Integer(rmpv::Integer::from(input)))),
-                           Value::Integer(input as i64))
+                           Value::Integer(i64::try_from(input).unwrap()));
             }
         }
     }
@@ -264,7 +259,7 @@ mod test {
           if input.is_nan() {
               assert_eq!(val, Value::Null);
           } else {
-              assert_relative_eq!(input as f64, val.as_float().unwrap().into_inner());
+              assert_relative_eq!(f64::from(input), val.as_float().unwrap().into_inner());
           }
         }
     }
@@ -310,7 +305,7 @@ mod test {
             let actual = rmpv::Value::Map(actual_inner);
 
             let mut expected_inner = ObjectMap::new();
-            for (k,v) in input.into_iter() {
+            for (k,v) in input {
                 expected_inner.insert(k.into(), Value::Integer(v));
             }
             let expected = Value::Object(expected_inner);

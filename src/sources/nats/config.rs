@@ -41,7 +41,7 @@ pub enum BuildError {
     Messages { source: ConsumerStreamError },
 }
 
-/// Batch settings for a JetStream pull consumer.
+/// Batch settings for a `JetStream` pull consumer.
 ///
 /// By default, messages are pulled in batches of up to 200.
 /// Each pull request expires after 30 seconds if not fulfilled.
@@ -78,7 +78,7 @@ impl Default for BatchConfig {
     }
 }
 
-/// Configuration for NATS JetStream.
+/// Configuration for NATS `JetStream`.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct JetStreamConfig {

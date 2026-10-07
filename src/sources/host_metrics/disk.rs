@@ -17,6 +17,11 @@ pub struct DiskConfig {
 }
 
 impl HostMetrics {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub async fn disk_metrics(&self, output: &mut super::MetricsBuffer) {
         match heim::disk::io_counters().await {
             Ok(counters) => {

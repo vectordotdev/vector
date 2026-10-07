@@ -488,6 +488,11 @@ async fn many_tenants() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 async fn out_of_order_drop() {
     let batch_size = 5;
     let lines = random_lines(100).take(10).collect::<Vec<_>>();
@@ -518,6 +523,11 @@ async fn out_of_order_drop() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 async fn out_of_order_accept() {
     let batch_size = 5;
     let lines = random_lines(100).take(10).collect::<Vec<_>>();
@@ -550,6 +560,11 @@ async fn out_of_order_accept() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 async fn out_of_order_rewrite() {
     let batch_size = 5;
     let lines = random_lines(100).take(10).collect::<Vec<_>>();
@@ -591,6 +606,11 @@ async fn out_of_order_rewrite() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 async fn out_of_order_per_partition() {
     let batch_size = 2;
     let big_lines = random_lines(1_000_000).take(2);
@@ -657,7 +677,7 @@ async fn test_out_of_order_events(
                 .unwrap()
                 .to_string_lossy(),
             output,
-        )
+        );
     }
     for (i, ts) in timestamps.iter().enumerate() {
         assert_eq!(

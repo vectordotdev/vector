@@ -22,6 +22,11 @@ use crate::{
 };
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn emits_internal_events() {
     assert_transform_compliance(async move {
         let config = SampleConfig {
@@ -46,10 +51,15 @@ async fn emits_internal_events() {
         topology.stop().await;
         assert_eq!(out.recv().await, None);
     })
-    .await
+    .await;
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn hash_samples_at_roughly_the_configured_rate() {
     let num_events = 10000;
 
@@ -305,6 +315,11 @@ fn handles_trace_event() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn group_by_uses_independent_ratio_samplers() {
     let mut sampler = Sample::new(
         "sample".to_string(),
@@ -325,6 +340,11 @@ fn group_by_uses_independent_ratio_samplers() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn sample_at_rates_higher_then_half() {
     // Retain 80% of the events of the stream
     let events = random_events(10000);
@@ -641,12 +661,17 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn dynamic_field_config_drives_dynamic_sampling() {
     assert_transform_compliance(async move {
-        let config: SampleConfig = serde_yaml::from_str(indoc! {r#"
+        let config: SampleConfig = serde_yaml::from_str(indoc! {r"
             ratio_field: dynamic_ratio
             ratio: 1.0
-        "#})
+        "})
         .expect("config should deserialize");
 
         let (tx, rx) = mpsc::channel(1);
@@ -663,9 +688,14 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
         topology.stop().await;
         assert_eq!(out.recv().await, None);
     })
-    .await
+    .await;
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
         source: format!(r#"contains!(."{key}", "{needle}")"#),

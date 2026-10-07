@@ -56,6 +56,11 @@ mod integration_test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn healthcheck() {
         crate::test_util::trace_init();
 
@@ -71,14 +76,14 @@ mod integration_test {
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
         self::sink::healthcheck(config.clone(), confined_topic(topic), Default::default())
             .await
@@ -86,6 +91,11 @@ mod integration_test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn healthcheck_topic() {
         crate::test_util::trace_init();
 
@@ -101,14 +111,14 @@ mod integration_test {
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
         self::sink::healthcheck(config.clone(), confined_topic(topic), Default::default())
             .await
@@ -188,6 +198,11 @@ mod integration_test {
         .await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn kafka_batch_options_overrides(
         batch: BatchConfig<NoDefaultsBatchSettings>,
         librdkafka_options: HashMap<String, String>,
@@ -205,15 +220,15 @@ mod integration_test {
                 sasl: None,
                 tls: None,
             },
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             batch,
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
         config.clone().to_rdkafka()?;
         let topic = confined_topic(topic);
@@ -238,7 +253,7 @@ mod integration_test {
             )
             .await
             .is_err()
-        )
+        );
     }
 
     #[tokio::test]
@@ -270,7 +285,7 @@ mod integration_test {
             )
             .await
             .is_err()
-        )
+        );
     }
 
     #[tokio::test]
@@ -290,7 +305,7 @@ mod integration_test {
             )
             .await
             .is_err()
-        )
+        );
     }
 
     #[tokio::test]
@@ -332,6 +347,23 @@ mod integration_test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn kafka_happy_path_trace_events() {
         crate::test_util::trace_init();
 
@@ -354,14 +386,14 @@ mod integration_test {
                 batch: BatchConfig::default(),
                 compression: KafkaCompression::None,
                 auth: KafkaAuthConfig::default(),
-                socket_timeout_ms: Duration::from_millis(60000),
-                message_timeout_ms: Duration::from_millis(300000),
+                socket_timeout_ms: Duration::from_mins(1),
+                message_timeout_ms: Duration::from_mins(5),
                 rate_limit_duration_secs: 1,
                 rate_limit_num: i64::MAX as u64,
                 librdkafka_options: HashMap::new(),
                 headers_key: Some(headers_key.clone()),
                 acknowledgements: Default::default(),
-                confinement: Default::default(),
+                confinement: ConfinementConfig::default(),
             };
 
             let num_events = 100;
@@ -454,6 +486,19 @@ mod integration_test {
         .await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn kafka_happy_path(
         server: String,
         sasl: Option<KafkaSaslConfig>,
@@ -488,14 +533,14 @@ mod integration_test {
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
         let topic = format!("{topic}-{}", chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {topic:?}");

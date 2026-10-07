@@ -92,10 +92,10 @@ where
 }
 
 /// Returns a `KinesisProcessedEvent` containing the unmodified log event + metadata consisting of
-/// the partition key. The partition key is either generated from the provided partition_key_field
+/// the partition key. The partition key is either generated from the provided `partition_key_field`
 /// or is generated randomly.
 ///
-/// If the provided partition_key_field was not found in the log, `Error` `EventsDropped` internal
+/// If the provided `partition_key_field` was not found in the log, `Error` `EventsDropped` internal
 /// events are emitted and None is returned.
 pub(crate) fn process_log(
     log: LogEvent,
@@ -153,7 +153,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            events: self.events.to_vec(),
+            events: self.events.clone(),
             metadata: self.metadata.clone(),
         }
     }

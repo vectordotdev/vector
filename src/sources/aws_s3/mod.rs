@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::RequestPayer;
 use aws_smithy_types::byte_stream::ByteStream;
@@ -189,7 +187,7 @@ impl SourceConfig for AwsS3Config {
         let multiline_config: Option<line_agg::Config> = self
             .multiline
             .as_ref()
-            .map(|config| config.try_into())
+            .map(std::convert::TryInto::try_into)
             .transpose()?;
 
         match self.strategy {
@@ -327,6 +325,15 @@ enum CreateSqsIngestorError {
 }
 
 /// None if body is empty
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn s3_object_decoder(
     compression: Compression,
     key: &str,
@@ -356,7 +363,7 @@ async fn s3_object_decoder(
         _ => compression,
     };
 
-    use Compression::*;
+    use Compression::{Auto, Gzip, None, Zstd};
     match compression {
         Auto => unreachable!(), // is mapped above
         None => Box::new(r),
@@ -402,12 +409,17 @@ fn content_type_to_compression(content_type: &str) -> Option<Compression> {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 fn object_key_to_compression(key: &str) -> Option<Compression> {
     let extension = std::path::Path::new(key)
         .extension()
         .and_then(std::ffi::OsStr::to_str);
 
-    use Compression::*;
+    use Compression::{Gzip, Zstd};
     extension.and_then(|extension| match extension {
         "gz" => Some(Gzip),
         "zst" => Some(Zstd),
@@ -532,6 +544,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message() {
         trace_init();
 
@@ -553,6 +570,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_json_message() {
         trace_init();
 
@@ -582,6 +604,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message_with_log_namespace() {
         trace_init();
 
@@ -603,6 +630,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message_spaces() {
         trace_init();
 
@@ -625,6 +657,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message_special_characters() {
         trace_init();
 
@@ -647,6 +684,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message_gzip() {
         use std::io::Read;
 
@@ -677,6 +719,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message_multipart_gzip() {
         use std::io::Read;
 
@@ -708,6 +755,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message_multipart_zstd() {
         use std::io::Read;
 
@@ -739,6 +791,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn s3_process_message_multiline() {
         trace_init();
 
@@ -755,7 +812,7 @@ mod integration_tests {
                 start_pattern: "abc".to_owned(),
                 mode: line_agg::Mode::HaltWith,
                 condition_pattern: "geh".to_owned(),
-                timeout_ms: Duration::from_millis(1000),
+                timeout_ms: Duration::from_secs(1),
             }),
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],
@@ -771,6 +828,15 @@ mod integration_tests {
     //       https://github.com/vectordotdev/vector/issues/17456
     #[ignore]
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ignore_without_reason,
+        reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+    )]
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn handles_errored_status() {
         trace_init();
 
@@ -792,6 +858,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn handles_failed_status() {
         trace_init();
 
@@ -813,6 +884,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn handles_failed_status_without_deletion() {
         trace_init();
 
@@ -868,6 +944,15 @@ mod integration_tests {
 
     // puts an object and asserts that the logs it gets back match
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn test_event(
         key: Option<String>,
         content_encoding: Option<&str>,
@@ -906,8 +991,8 @@ mod integration_tests {
                 .bucket(bucket.clone())
                 .key(key.clone())
                 .body(ByteStream::from(payload))
-                .set_content_type(content_type.map(|t| t.to_owned()))
-                .set_content_encoding(content_encoding.map(|t| t.to_owned()))
+                .set_content_type(content_type.map(std::borrow::ToOwned::to_owned))
+                .set_content_encoding(content_encoding.map(std::borrow::ToOwned::to_owned))
                 .send()
                 .await
                 .expect("Could not put object");
@@ -1015,7 +1100,7 @@ mod integration_tests {
                 _ => {
                     assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
                 }
-            };
+            }
         }).await;
     }
 
@@ -1047,10 +1132,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        sqs_result
-            .messages
-            .map(|messages| messages.len())
-            .unwrap_or(0)
+        sqs_result.messages.map_or(0, |messages| messages.len())
     }
 
     /// creates a new S3 bucket

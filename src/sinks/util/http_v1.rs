@@ -36,6 +36,11 @@ pub(crate) trait HttpServiceRequestBuilder<T: Send> {
 
 /// The response returned by the native `http 1` sink service.
 #[derive(Debug)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub(crate) struct HttpResponse {
     pub http_response: Response<Bytes>,
     pub events_byte_size: GroupedCountByteSize,

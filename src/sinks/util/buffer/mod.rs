@@ -37,6 +37,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
+    #[must_use]
     pub const fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
         Self {
             inner: None,
@@ -69,6 +70,11 @@ impl Buffer {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn push(&mut self, input: &[u8]) {
         self.num_items += 1;
         match self.buffer() {
@@ -88,17 +94,15 @@ impl Buffer {
         }
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.inner
-            .as_ref()
-            .map(|inner| match inner {
-                InnerBuffer::Plain(inner) => inner.get_ref().is_empty(),
-                InnerBuffer::Gzip(inner) => inner.get_ref().get_ref().is_empty(),
-                InnerBuffer::Zlib(inner) => inner.get_ref().get_ref().is_empty(),
-                InnerBuffer::Zstd(inner) => inner.get_ref().get_ref().is_empty(),
-                InnerBuffer::Snappy(inner) => inner.is_empty(),
-            })
-            .unwrap_or(true)
+        self.inner.as_ref().is_none_or(|inner| match inner {
+            InnerBuffer::Plain(inner) => inner.get_ref().is_empty(),
+            InnerBuffer::Gzip(inner) => inner.get_ref().get_ref().is_empty(),
+            InnerBuffer::Zlib(inner) => inner.get_ref().get_ref().is_empty(),
+            InnerBuffer::Zstd(inner) => inner.get_ref().get_ref().is_empty(),
+            InnerBuffer::Snappy(inner) => inner.is_empty(),
+        })
     }
 }
 
@@ -217,7 +221,7 @@ mod test {
             .unwrap();
 
         assert!(output.len() > 1);
-        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 80_000);
+        assert!(output.iter().map(bytes::BytesMut::len).sum::<usize>() < 80_000);
 
         let decompressed = output
             .into_iter()

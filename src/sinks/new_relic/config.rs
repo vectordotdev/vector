@@ -111,6 +111,15 @@ pub struct NewRelicConfig {
 impl_generate_config_from_default!(NewRelicConfig);
 
 impl NewRelicConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     pub fn build_healthcheck(
         &self,
         client: HttpClient,

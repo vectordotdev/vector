@@ -31,6 +31,11 @@ type SketchIntake =
     BTreeMap<SketchContext, (TimeSketchData<Dogsketch>, TimeSketchData<Distribution>)>;
 
 // massages the raw payloads into our intake structure
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn generate_sketch_intake(mut payloads: Vec<SketchPayload>) -> SketchIntake {
     let mut intake = SketchIntake::new();
 
@@ -72,6 +77,11 @@ fn generate_sketch_intake(mut payloads: Vec<SketchPayload>) -> SketchIntake {
 
 // runs assertions that each set of payloads should be true to regardless
 // of the pipeline
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn common_sketch_assertions(sketches: &SketchIntake) {
     // we should have received some metrics from the emitter
     assert!(!sketches.is_empty());

@@ -182,6 +182,11 @@ enum AdjacentAliases {
 
 #[test]
 fn generated_enum_aliases_preserve_spelling_and_coerce_payloads() {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn check<T: vector_config::Configurable + serde::de::DeserializeOwned + 'static>(
         input: serde_json::Value,
         expected: serde_json::Value,
@@ -406,7 +411,7 @@ fn structured_values_are_not_coerced_to_strings() {
             schema: json!({"type": "string"}),
             input: json!({"source": "bad"}),
             expected_error: Error::ExpectedString {
-                path: "".into(),
+                path: String::new(),
                 actual: "object",
             },
         },
@@ -415,7 +420,7 @@ fn structured_values_are_not_coerced_to_strings() {
             schema: json!({"type": "string"}),
             input: json!(["bad"]),
             expected_error: Error::ExpectedString {
-                path: "".into(),
+                path: String::new(),
                 actual: "array",
             },
         },
@@ -470,6 +475,11 @@ fn generated_test_output_preserves_null_conditions() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn scalar_coercions() {
     for case in [
         CoercionCase {
@@ -550,6 +560,11 @@ fn scalar_coercions() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
     for case in [
         RejectionCase {
@@ -557,7 +572,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "integer"}),
             input: json!("18446744073709551616"),
             expected_error: Error::ExpectedInteger {
-                path: "".into(),
+                path: String::new(),
                 actual: "string",
             },
         },
@@ -566,7 +581,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "integer"}),
             input: json!("-9223372036854775809"),
             expected_error: Error::ExpectedInteger {
-                path: "".into(),
+                path: String::new(),
                 actual: "string",
             },
         },
@@ -575,7 +590,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "integer"}),
             input: json!(u64::MAX as f64),
             expected_error: Error::ExpectedInteger {
-                path: "".into(),
+                path: String::new(),
                 actual: "number",
             },
         },
@@ -584,7 +599,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "integer"}),
             input: json!((i64::MIN as f64).next_down()),
             expected_error: Error::ExpectedInteger {
-                path: "".into(),
+                path: String::new(),
                 actual: "number",
             },
         },
@@ -593,7 +608,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "integer"}),
             input: json!(1.5),
             expected_error: Error::ExpectedInteger {
-                path: "".into(),
+                path: String::new(),
                 actual: "number",
             },
         },
@@ -602,7 +617,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "number"}),
             input: json!("NaN"),
             expected_error: Error::ExpectedNumber {
-                path: "".into(),
+                path: String::new(),
                 actual: "string",
             },
         },
@@ -611,7 +626,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "number"}),
             input: json!("inf"),
             expected_error: Error::ExpectedNumber {
-                path: "".into(),
+                path: String::new(),
                 actual: "string",
             },
         },
@@ -620,7 +635,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "boolean"}),
             input: json!("yes"),
             expected_error: Error::ExpectedBool {
-                path: "".into(),
+                path: String::new(),
                 actual: "string",
             },
         },
@@ -629,7 +644,7 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             schema: json!({"type": "string"}),
             input: json!(null),
             expected_error: Error::ExpectedString {
-                path: "".into(),
+                path: String::new(),
                 actual: "null",
             },
         },
@@ -740,14 +755,16 @@ fn enum_const_and_boolean_schemas() {
             name: "value outside the enum",
             schema: json!({"enum": [1, 2]}),
             input: json!("bad"),
-            expected_error: Error::InvalidEnumValue { path: "".into() },
+            expected_error: Error::InvalidEnumValue {
+                path: String::new(),
+            },
         },
         RejectionCase {
             name: "value does not match the constant",
             schema: json!({"const": false}),
             input: json!("bad"),
             expected_error: Error::InvalidConst {
-                path: "".into(),
+                path: String::new(),
                 expected: "false".into(),
             },
         },
@@ -755,7 +772,9 @@ fn enum_const_and_boolean_schemas() {
             name: "false schema rejects every value",
             schema: json!(false),
             input: json!("bad"),
-            expected_error: Error::DisallowedProperty { path: "".into() },
+            expected_error: Error::DisallowedProperty {
+                path: String::new(),
+            },
         },
     ] {
         case.check();
@@ -763,6 +782,11 @@ fn enum_const_and_boolean_schemas() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn enum_and_const_share_scalar_conversions_but_keep_distinct_errors() {
     // Run each conversion against both a constant and a single-value enum.
     struct ConstraintCase {
@@ -913,6 +937,11 @@ fn generated_unsigned_integer_accepts_integral_float_above_signed_range() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn generated_signed_integer_leaves_unsigned_overflow_for_serde() {
     let schema =
         serde_json::to_value(vector_config::schema::generate_root_schema::<i64>().unwrap())
@@ -1078,6 +1107,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_coercion_with_array_support() {
         let mut input = json!({
             "proxy": {

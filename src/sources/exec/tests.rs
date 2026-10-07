@@ -302,7 +302,7 @@ async fn test_spawn_reader_thread() {
 async fn test_drop_receiver() {
     let config = standard_scheduled_test_config();
     let hostname = Some("Some.Machine".to_string());
-    let decoder = Default::default();
+    let decoder = Decoder::default();
     let shutdown = ShutdownSignal::noop();
     let (tx, rx) = SourceSender::new_test();
 
@@ -331,6 +331,11 @@ async fn test_drop_receiver() {
 #[tokio::test]
 #[cfg(unix)]
 #[cfg_attr(target_os = "macos", ignore)] // Flaky when running `cargo test`
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ignore_without_reason,
+    reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+)]
 async fn test_run_command_linux() {
     let config = standard_scheduled_test_config();
 
@@ -338,7 +343,7 @@ async fn test_run_command_linux() {
         &crate::test_util::components::SOURCE_TAGS,
         async {
             let hostname = Some("Some.Machine".to_string());
-            let decoder = Default::default();
+            let decoder = Decoder::default();
             let shutdown = ShutdownSignal::noop();
             let (tx, rx) = SourceSender::new_test();
 
@@ -394,7 +399,7 @@ async fn test_graceful_shutdown() {
         ),
     ];
     let hostname = Some("Some.Machine".to_string());
-    let decoder = Default::default();
+    let decoder = Decoder::default();
     let (trigger, shutdown, _) = ShutdownSignal::new_wired();
     let (tx, mut rx) = SourceSender::new_test();
 
@@ -438,7 +443,7 @@ async fn test_graceful_shutdown() {
 }
 
 fn standard_scheduled_test_config() -> ExecConfig {
-    Default::default()
+    ExecConfig::default()
 }
 
 fn standard_streaming_test_config() -> ExecConfig {

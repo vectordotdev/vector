@@ -187,6 +187,7 @@ pub enum OverrideMode {
 
 impl OverrideMode {
     /// Returns the equivalent global `Mode` if this scope is tracked, or `None` if excluded.
+    #[must_use]
     pub const fn as_mode(&self) -> Option<Mode> {
         match self {
             OverrideMode::Exact => Some(Mode::Exact),
@@ -278,12 +279,12 @@ pub struct BloomFilterConfig {
     pub cache_size_per_key: usize,
 }
 
-/// Configuration of internal metrics for the TagCardinalityLimit transform.
+/// Configuration of internal metrics for the `TagCardinalityLimit` transform.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct InternalMetricsConfig {
-    /// Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+    /// Whether to include extended tags (`metric_name`, `tag_key`) in the `tag_value_limit_exceeded_total` metric.
     ///
     /// This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
     /// increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.

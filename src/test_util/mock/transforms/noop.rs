@@ -57,16 +57,19 @@ impl GenerateConfig for NoopTransformConfig {
 }
 
 impl NoopTransformConfig {
+    #[must_use]
     pub fn with_delay_ms(mut self, delay_ms: u64) -> Self {
         self.delay_ms = Some(delay_ms);
         self
     }
 
+    #[must_use]
     pub fn with_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
         self.cpu_burn_ms = Some(cpu_burn_ms);
         self
     }
 
+    #[must_use]
     pub fn with_concurrency(mut self) -> Self {
         self.enable_concurrency = true;
         self

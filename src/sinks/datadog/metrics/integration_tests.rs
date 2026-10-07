@@ -45,7 +45,7 @@ fn generate_counters() -> Vec<Event> {
                     format!("counter_{}", rng().random::<u32>()),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: index as f64,
+                        value: f64::from(index),
                     },
                 )
                 .with_timestamp(Some(ts))
@@ -118,6 +118,11 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 
 /// Same as [`start_test`], but selects the series API version explicitly. Passing `None` omits
 /// the option entirely so the sink's default applies.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::format_push_string,
+    reason = "Keep the existing formatting and error-handling behavior during the lint rollout."
+)]
 async fn start_test_with_series_version(
     events: Vec<Event>,
     series_api_version: Option<&str>,
@@ -156,6 +161,11 @@ async fn start_test_with_series_version(
     (events, rx)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
     CappedDecoder::zstd(&payload[..])?.decompress()
 }
@@ -244,6 +254,11 @@ fn validate_common(request: &(Parts, Bytes)) {
     assert!(request.0.headers.contains_key("DD-Agent-Payload"));
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
@@ -320,6 +335,11 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     );
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),

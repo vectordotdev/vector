@@ -17,7 +17,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 /// content-length) if missing and adds the `Authorization: SharedKey {account}:{signature}` header. The signature
 /// is computed according to the "Authorize with Shared Key" rules for the Blob service:
 ///
-/// StringToSign =
+/// `StringToSign` =
 ///   VERB + "\n" +
 ///   Content-Encoding + "\n" +
 ///   Content-Language + "\n" +
@@ -30,8 +30,8 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 ///   If-None-Match + "\n" +
 ///   If-Unmodified-Since + "\n" +
 ///   Range + "\n" +
-///   CanonicalizedHeaders +
-///   CanonicalizedResource
+///   `CanonicalizedHeaders` +
+///   `CanonicalizedResource`
 ///
 /// Notes:
 /// - We set x-ms-date, leaving the standard Date field empty in the signature.
@@ -52,6 +52,15 @@ impl SharedKeyAuthorizationPolicy {
     /// - `account_name`: The storage account name.
     /// - `account_key_b64`: Base64-encoded storage account key.
     /// - `storage_version`: x-ms-version value to send (e.g. "2025-11-05").
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn new(
         account_name: String,
         account_key_b64: String,
@@ -70,6 +79,11 @@ impl SharedKeyAuthorizationPolicy {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn ensure_signing_headers(&self, request: &mut Request) -> AzureResult<(String, String)> {
         // Always set x-ms-date and x-ms-version explicitly to known values for signing.
         let now = OffsetDateTime::now_utc();
@@ -271,6 +285,11 @@ impl Policy for SharedKeyAuthorizationPolicy {
 
 // ---------- Helpers ----------
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing return type and caller contracts during the lint rollout."
+)]
 fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> AzureResult<()> {
     // "/{account_name}{path}\n"
     s.push('/');

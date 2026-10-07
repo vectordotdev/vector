@@ -148,7 +148,7 @@ fn get_processed_event_timestamp(
 fn get_processed_event() -> HecProcessedEvent {
     get_processed_event_timestamp(
         Some(vrl::value::Value::Timestamp(
-            Utc.timestamp_nanos(1638366107111456123),
+            Utc.timestamp_nanos(1_638_366_107_111_456_123),
         )),
         Some(OptionalTargetPath {
             path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
@@ -176,6 +176,11 @@ fn splunk_process_log_event() {
     assert!(metadata.fields.contains(vrl::event_path!("event_field2")));
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
     let transformer = encoding.transformer();
     let serializer = encoding.build().unwrap();
@@ -211,10 +216,10 @@ fn splunk_encode_log_event_json() {
 
     assert_eq!(hec_data.fields.get("event_field1").unwrap(), "test_value1");
 
-    assert_eq!(hec_data.time, Some(1638366107.111));
+    assert_eq!(hec_data.time, Some(1_638_366_107.111));
     assert_eq!(
         event.get("ts_nanos_key").unwrap(),
-        &serde_json::Value::from(456123)
+        &serde_json::Value::from(456_123)
     );
 }
 
@@ -233,10 +238,15 @@ fn splunk_encode_log_event_text() {
 
     assert_eq!(hec_data.fields.get("event_field1").unwrap(), "test_value1");
 
-    assert_eq!(hec_data.time, 1638366107.111);
+    assert_eq!(hec_data.time, 1_638_366_107.111);
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn splunk_passthrough_token() {
     let (_guard, addr) = next_addr();
     let config = HecLogsSinkConfig {
@@ -257,7 +267,7 @@ async fn splunk_passthrough_token() {
         timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
     let cx = SinkContext::default();
 
@@ -288,10 +298,15 @@ async fn splunk_passthrough_token() {
             "Splunk passthrough-token-2",
             "Splunk token"
         ]
-    )
+    );
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 fn splunk_encode_log_event_json_timestamps() {
     crate::test_util::trace_init();
 
@@ -347,6 +362,11 @@ fn splunk_encode_log_event_json_timestamps() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn splunk_encode_log_event_semantic_meanings() {
     let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
         Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])

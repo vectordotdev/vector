@@ -8,6 +8,11 @@ use vector_lib::{
 
 use crate::sources::http_server::HttpConfigParamKind;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Keep the current collection type and API bounds during the lint rollout."
+)]
 pub fn add_query_parameters(
     events: &mut [Event],
     query_parameters_config: &[HttpConfigParamKind],
@@ -58,7 +63,7 @@ pub fn add_query_parameters(
                     }
                 }
             }
-        };
+        }
     }
 }
 

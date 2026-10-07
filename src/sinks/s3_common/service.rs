@@ -77,10 +77,12 @@ pub struct S3Service {
 }
 
 impl S3Service {
+    #[must_use]
     pub const fn new(client: S3Client) -> S3Service {
         S3Service { client }
     }
 
+    #[must_use]
     pub fn client(&self) -> S3Client {
         self.client.clone()
     }
@@ -103,7 +105,7 @@ impl Service<S3Request> for S3Service {
         let content_encoding = request.content_encoding;
         let content_encoding = options
             .content_encoding
-            .or_else(|| content_encoding.map(|ce| ce.to_string()));
+            .or_else(|| content_encoding.map(std::string::ToString::to_string));
         let content_type = options
             .content_type
             .or_else(|| Some("text/x-log".to_owned()));

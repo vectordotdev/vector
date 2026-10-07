@@ -3,7 +3,7 @@
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 use exitcode::ExitCode;
 use vector_lib::enrichment::{Case, IndexHandle, TableRegistry};
 use vector_vrl_metrics::MetricsStorage;
@@ -70,6 +70,11 @@ const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Keep the existing state representation pending a separate type-design review."
+)]
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
     /// Secret placeholders are not resolved unless `--resolve-secrets` is also given.
@@ -160,13 +165,18 @@ impl Opts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
 }
 
 /// Performs topology, component, and health checks.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 pub async fn validate(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
@@ -201,6 +211,11 @@ pub async fn validate(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 pub async fn validate_config(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
@@ -244,7 +259,9 @@ pub async fn validate_config(
         .ok()?;
 
     // Warnings
-    if !warnings.is_empty() {
+    if warnings.is_empty() {
+        fmt.success(format!("Loaded {:?}", &paths_list));
+    } else {
         if opts.deny_warnings {
             report_error(warnings);
             return None;
@@ -252,8 +269,6 @@ pub async fn validate_config(
 
         fmt.title(format!("Loaded with warnings {:?}", &paths_list));
         fmt.sub_warning(warnings);
-    } else {
-        fmt.success(format!("Loaded {:?}", &paths_list));
     }
 
     Some(config)
@@ -360,6 +375,11 @@ fn validate_sinks_with_context(config: &Config, fmt: &mut Formatter) -> bool {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
@@ -429,7 +449,7 @@ async fn validate_healthchecks(
             }
             Ok(Err(e)) => failed(format!("Health check for \"{id}\" failed: {e}")),
             Err(error) if error.is_cancelled() => {
-                failed(format!("Health check for \"{id}\" was cancelled"))
+                failed(format!("Health check for \"{id}\" was cancelled"));
             }
             Err(_) => failed(format!("Health check for \"{id}\" panicked")),
         }
@@ -458,6 +478,11 @@ fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<Path
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn remove_tmp_directory(path: PathBuf) {
     if let Err(error) = remove_dir_all(&path) {
         error!(message = "Failed to remove temporary directory.", path = ?path, %error);
@@ -477,6 +502,7 @@ pub struct Formatter {
 }
 
 impl Formatter {
+    #[must_use]
     pub fn new(color: bool) -> Self {
         Self {
             max_line_width: 0,
@@ -522,24 +548,24 @@ impl Formatter {
         } else {
             #[allow(clippy::print_stdout)]
             {
-                println!("{:>width$}", "Validated", width = self.max_line_width)
+                println!("{:>width$}", "Validated", width = self.max_line_width);
             }
         }
     }
 
     /// Standalone line
     fn success(&mut self, msg: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.success_intro, msg.as_ref()))
+        self.print(format!("{} {}\n", self.success_intro, msg.as_ref()));
     }
 
     /// Standalone line
     fn warning(&mut self, warning: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.warning_intro, warning.as_ref()))
+        self.print(format!("{} {}\n", self.warning_intro, warning.as_ref()));
     }
 
     /// Standalone line
     fn error(&mut self, error: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.error_intro, error.as_ref()))
+        self.print(format!("{} {}\n", self.error_intro, error.as_ref()));
     }
 
     /// Marks sub
@@ -550,7 +576,7 @@ impl Formatter {
             title.as_ref(),
             "",
             width = title.as_ref().len()
-        ))
+        ));
     }
 
     /// A list of warnings that go with a title.
@@ -558,7 +584,7 @@ impl Formatter {
     where
         I::Item: fmt::Display,
     {
-        self.sub(self.warning_intro.clone(), warnings)
+        self.sub(self.warning_intro.clone(), warnings);
     }
 
     /// A list of errors that go with a title.
@@ -566,7 +592,7 @@ impl Formatter {
     where
         I::Item: fmt::Display,
     {
-        self.sub(self.error_intro.clone(), errors)
+        self.sub(self.error_intro.clone(), errors);
     }
 
     fn sub<I: IntoIterator>(&mut self, intro: impl AsRef<str>, msgs: I)
@@ -605,7 +631,7 @@ impl Formatter {
         self.print_space = true;
         #[allow(clippy::print_stdout)]
         {
-            print!("{}", print.as_ref())
+            print!("{}", print.as_ref());
         }
     }
 }

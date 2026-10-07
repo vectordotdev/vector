@@ -93,14 +93,19 @@ pub struct SematextMetricsConfig {
 
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_namespace: vector
             token: ${SEMATEXT_TOKEN}
-        "#})
+        "})
         .unwrap()
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     let uri = HttpEndpoint::parse(&endpoint)?
         .append_path("health")?
@@ -192,6 +197,11 @@ fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
 }
 
 impl SematextMetricsService {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn from_validated(
         config: SematextMetricsConfig,
         validated: &ValidatedSematextMetrics,
@@ -290,7 +300,7 @@ fn encode_events(
     let mut output = BytesMut::new();
     let byte_size = metrics.size_of();
     let json_byte_size = metrics.estimated_json_encoded_size_of();
-    for metric in metrics.into_iter() {
+    for metric in metrics {
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
             .name
@@ -319,7 +329,7 @@ fn encode_events(
             &mut output,
         ) {
             emit!(SematextMetricsEncodeEventError { error });
-        };
+        }
     }
 
     if !output.is_empty() {
@@ -365,9 +375,9 @@ mod tests {
             region: Region::Us,
             endpoint: Some("http://localhost:9999".to_string()),
             token: "atoken".to_string().into(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -387,9 +397,9 @@ mod tests {
             region: Region::Us,
             endpoint: Some(endpoint.to_string()),
             token: "atoken".to_string().into(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         // Non-http(s) schemes are rejected by the HttpEndpoint type-level validation.
@@ -462,7 +472,9 @@ mod tests {
             Metric::new(
                 "pool.committed",
                 MetricKind::Incremental,
-                MetricValue::Counter { value: 18874368.0 },
+                MetricValue::Counter {
+                    value: 18_874_368.0,
+                },
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
@@ -481,6 +493,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn smoke() {
         assert_sink_compliance(&HTTP_SINK_TAGS, async {
 
@@ -504,15 +521,15 @@ mod tests {
 
         // Make our test metrics.
         let metrics = vec![
-            ("os", "swap.size", 324292.0),
+            ("os", "swap.size", 324_292.0),
             ("os", "network.tx", 42000.0),
             ("os", "network.rx", 54293.0),
             ("process", "count", 12.0),
             ("process", "uptime", 32423.0),
-            ("process", "rss", 2342333.0),
-            ("jvm", "pool.used", 18874368.0),
-            ("jvm", "pool.committed", 18868584.0),
-            ("jvm", "pool.max", 18874368.0),
+            ("process", "rss", 2_342_333.0),
+            ("jvm", "pool.used", 18_874_368.0),
+            ("jvm", "pool.committed", 18_868_584.0),
+            ("jvm", "pool.max", 18_874_368.0),
         ];
 
         let mut events = Vec::new();

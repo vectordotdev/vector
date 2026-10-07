@@ -76,6 +76,11 @@ pub const LLMOBS: &str = "llmobs";
 ))]
 #[serde_as]
 #[derive(Clone, Debug)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Keep the existing state representation pending a separate type-design review."
+)]
 pub struct DatadogAgentConfig {
     /// The socket address to accept connections on.
     ///
@@ -262,6 +267,11 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let definition = self
             .decoding
@@ -365,25 +375,26 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             if !self.disable_logs {
-                output.push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS))
+                output
+                    .push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS));
             }
             if !self.disable_metrics {
-                output.push(SourceOutput::new_metrics().with_port(METRICS))
+                output.push(SourceOutput::new_metrics().with_port(METRICS));
             }
             if !self.disable_traces {
-                output.push(SourceOutput::new_traces().with_port(TRACES))
+                output.push(SourceOutput::new_traces().with_port(TRACES));
             }
             if !self.disable_llmobs {
                 output.push(
                     SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
                         .with_port(LLMOBS),
-                )
+                );
             }
         } else {
             output.push(SourceOutput::new_maybe_logs(
                 DataType::all_bits(),
                 definition,
-            ))
+            ));
         }
         output
     }
@@ -435,6 +446,7 @@ pub struct ApiKeyExtractor {
 }
 
 impl ApiKeyExtractor {
+    #[must_use]
     pub fn extract(
         &self,
         path: &str,
@@ -521,6 +533,11 @@ impl DatadogAgentSource {
         filters.ok_or_else(|| "At least one of the supported data type shall be enabled".into())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     pub(crate) fn decode(
         &self,
         header: &Option<String>,

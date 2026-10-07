@@ -69,7 +69,7 @@ impl<N: MetricNormalize> MetricState<N> {
 
 impl<N: MetricNormalize> Extend<Event> for MetricState<N> {
     fn extend<T: IntoIterator<Item = Event>>(&mut self, iter: T) {
-        for event in iter.into_iter() {
+        for event in iter {
             self.merge(event.into_metric());
         }
     }
@@ -78,7 +78,7 @@ impl<N: MetricNormalize> Extend<Event> for MetricState<N> {
 impl<N: MetricNormalize + Default> FromIterator<Event> for MetricState<N> {
     fn from_iter<T: IntoIterator<Item = Event>>(iter: T) -> Self {
         let mut state = MetricState::default();
-        for event in iter.into_iter() {
+        for event in iter {
             state.merge(event.into_metric());
         }
         state
@@ -105,6 +105,12 @@ impl<N: Default> Default for MetricState<N> {
     }
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn read_counter_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
     metrics
         .get(&series)
@@ -114,6 +120,12 @@ pub fn read_counter_value(metrics: &SplitMetrics, series: MetricSeries) -> Optio
         })
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn read_gauge_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<f64> {
     metrics
         .get(&series)
@@ -123,6 +135,12 @@ pub fn read_gauge_value(metrics: &SplitMetrics, series: MetricSeries) -> Option<
         })
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn read_distribution_samples(
     metrics: &SplitMetrics,
     series: MetricSeries,
@@ -135,6 +153,12 @@ pub fn read_distribution_samples(
         })
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<HashSet<String>> {
     metrics
         .get(&series)
@@ -166,6 +190,15 @@ macro_rules! series {
 	};
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn assert_counter(metrics: &SplitMetrics, series: MetricSeries, expected: f64) {
     let actual_counter = read_counter_value(metrics, series.clone());
     assert!(actual_counter.is_some(), "counter '{series}' was not found");
@@ -177,6 +210,15 @@ pub fn assert_counter(metrics: &SplitMetrics, series: MetricSeries, expected: f6
     );
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn assert_gauge(metrics: &SplitMetrics, series: MetricSeries, expected: f64) {
     let actual_gauge = read_gauge_value(metrics, series.clone());
     assert!(actual_gauge.is_some(), "gauge '{series}' was not found");
@@ -188,6 +230,15 @@ pub fn assert_gauge(metrics: &SplitMetrics, series: MetricSeries, expected: f64)
     );
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn assert_distribution(
     metrics: &SplitMetrics,
     series: MetricSeries,
@@ -204,7 +255,7 @@ pub fn assert_distribution(
     let mut actual_count = 0;
     let mut actual_bounds = vec![0u32; expected_bounds.len()];
     for sample in &samples {
-        actual_sum += sample.rate as f64 * sample.value;
+        actual_sum += f64::from(sample.rate) * sample.value;
         actual_count += sample.rate;
 
         for (i, (bound, _)) in expected_bounds.iter().enumerate() {
@@ -232,6 +283,15 @@ pub fn assert_distribution(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn assert_set(metrics: &SplitMetrics, series: MetricSeries, expected_values: &[&str]) {
     let actual_values = read_set_values(metrics, series.clone());
     assert!(actual_values.is_some(), "set '{series}' was not found");
@@ -239,7 +299,7 @@ pub fn assert_set(metrics: &SplitMetrics, series: MetricSeries, expected_values:
     let actual_values = actual_values.expect("set must be valid");
     let expected_values = expected_values
         .iter()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect::<HashSet<_>>();
 
     assert_eq!(actual_values, expected_values);
@@ -274,7 +334,7 @@ fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u64) {
     let mut sum = 0.0;
     let mut count = 0;
     for value in values {
-        for bucket in buckets.iter_mut() {
+        for bucket in &mut buckets {
             if *value <= bucket.upper_limit {
                 bucket.count += 1;
             }
@@ -287,6 +347,12 @@ fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u64) {
     (buckets, sum, count)
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn generate_f64s(start: u16, end: u16) -> Vec<f64> {
     assert!(start <= end);
     let mut samples = Vec::new();
@@ -350,14 +416,21 @@ where
     )
 }
 
+#[must_use]
 pub fn get_counter(value: f64, kind: MetricKind) -> Metric {
     Metric::new("counter", kind, MetricValue::Counter { value })
 }
 
+#[must_use]
 pub fn get_gauge(value: f64, kind: MetricKind) -> Metric {
     Metric::new("gauge", kind, MetricValue::Gauge { value })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn assert_normalize<N: MetricNormalize>(
     mut normalizer: N,
     inputs: Vec<Metric>,
@@ -376,7 +449,7 @@ pub mod tests {
 
     pub fn absolute_counter_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
         let first_value = 3.14;
-        let second_value = 8.675309;
+        let second_value = 8.675_309;
 
         let counters = vec![
             get_counter(first_value, MetricKind::Absolute),
@@ -396,7 +469,7 @@ pub mod tests {
 
     pub fn incremental_counter_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
         let first_value = 3.14;
-        let second_value = 8.675309;
+        let second_value = 8.675_309;
 
         let counters = vec![
             get_counter(first_value, MetricKind::Incremental),
@@ -414,7 +487,7 @@ pub mod tests {
 
     pub fn mixed_counter_normalize_to_incremental<N: MetricNormalize>(normalizer: N) {
         let first_value = 3.14;
-        let second_value = 8.675309;
+        let second_value = 8.675_309;
         let third_value = 16.19;
 
         let counters = vec![
@@ -443,7 +516,7 @@ pub mod tests {
 
     pub fn absolute_gauge_normalize_to_absolute<N: MetricNormalize>(normalizer: N) {
         let first_value = 3.14;
-        let second_value = 8.675309;
+        let second_value = 8.675_309;
 
         let gauges = vec![
             get_gauge(first_value, MetricKind::Absolute),
@@ -461,7 +534,7 @@ pub mod tests {
 
     pub fn incremental_gauge_normalize_to_absolute<N: MetricNormalize>(normalizer: N) {
         let first_value = 3.14;
-        let second_value = 8.675309;
+        let second_value = 8.675_309;
 
         let gauges = vec![
             get_gauge(first_value, MetricKind::Incremental),
@@ -478,7 +551,7 @@ pub mod tests {
 
     pub fn mixed_gauge_normalize_to_absolute<N: MetricNormalize>(normalizer: N) {
         let first_value = 3.14;
-        let second_value = 8.675309;
+        let second_value = 8.675_309;
         let third_value = 16.19;
 
         let gauges = vec![

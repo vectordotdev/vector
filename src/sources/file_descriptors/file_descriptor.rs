@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io,
-    os::fd::{FromRawFd as _, IntoRawFd as _, RawFd},
+    os::fd::{FromRawFd as _, RawFd},
 };
 
 use vector_lib::{
@@ -72,9 +72,9 @@ impl GenerateConfig for FileDescriptorSourceConfig {
     fn generate_config() -> serde_json::Value {
         let fd = null_fd().unwrap();
         toml::from_str(&format!(
-            r#"
+            r"
             fd = {fd}
-            "#
+            "
         ))
         .unwrap()
     }
@@ -87,12 +87,17 @@ pub(crate) fn null_fd() -> crate::Result<RawFd> {
     const FILENAME: &str = "C:\\NUL";
     File::open(FILENAME)
         .map_err(|error| format!("Could not open dummy file at {FILENAME:?}: {error}").into())
-        .map(|file| file.into_raw_fd())
+        .map(std::os::fd::IntoRawFd::into_raw_fd)
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         // SAFETY: The configured descriptor is open and its ownership is transferred here.
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
@@ -121,6 +126,7 @@ mod tests {
     use futures::StreamExt;
     use nix::unistd::{close, pipe, write};
     use std::os::fd::AsRawFd;
+    use std::os::fd::IntoRawFd as _;
     use vector_lib::lookup::path;
     use vrl::value;
 
@@ -139,13 +145,18 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn file_descriptor_decodes_line() {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let (read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
                 max_length: crate::serde::default_max_length(),
-                host_key: Default::default(),
+                host_key: Option::default(),
                 framing: None,
                 decoding: default_decoding(),
                 fd: read_fd.into_raw_fd() as u32,
@@ -180,13 +191,18 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn file_descriptor_decodes_line_vector_namespace() {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let (read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
                 max_length: crate::serde::default_max_length(),
-                host_key: Default::default(),
+                host_key: Option::default(),
                 framing: None,
                 decoding: default_decoding(),
                 fd: read_fd.into_raw_fd() as u32,
@@ -230,13 +246,18 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn file_descriptor_handles_invalid_fd() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let (_read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
                 max_length: crate::serde::default_max_length(),
-                host_key: Default::default(),
+                host_key: Option::default(),
                 framing: None,
                 decoding: default_decoding(),
                 fd: write_fd.as_raw_fd() as u32, // intentionally giving the source a write-only fd

@@ -141,6 +141,7 @@ pub struct UnixConfig {
 
 impl SyslogConfig {
     #[cfg(test)]
+    #[must_use]
     pub fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
@@ -265,7 +266,7 @@ impl SourceConfig for SyslogConfig {
                             config.socket_file_mode,
                             decoder,
                             move |events, host| {
-                                handle_events(events, &host_key, host, log_namespace)
+                                handle_events(events, &host_key, host, log_namespace);
                             },
                             shutdown,
                             out,
@@ -335,6 +336,7 @@ impl TcpSource for SyslogTcpSource {
     }
 }
 
+#[must_use]
 pub fn udp(
     addr: SocketListenAddr,
     _max_length: usize,
@@ -350,7 +352,7 @@ pub fn udp(
             emit!(SocketBindError {
                 mode: SocketMode::Udp,
                 error: &error,
-            })
+            });
         })?;
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes
@@ -406,20 +408,26 @@ pub fn udp(
         })
         .boxed();
 
-        match out.send_event_stream(&mut stream).await {
-            Ok(()) => {
-                debug!("Finished sending.");
-                Ok(())
-            }
-            Err(_) => {
-                let (count, _) = stream.size_hint();
-                emit!(StreamClosedError { count });
-                Err(())
-            }
+        if let Ok(()) = out.send_event_stream(&mut stream).await {
+            debug!("Finished sending.");
+            Ok(())
+        } else {
+            let (count, _) = stream.size_hint();
+            emit!(StreamClosedError { count });
+            Err(())
         }
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn handle_events(
     events: &mut [Event],
     host_key: &Option<OwnedValuePath>,
@@ -431,6 +439,11 @@ fn handle_events(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn enrich_syslog_event(
     event: &mut Event,
     host_key: &Option<OwnedValuePath>,
@@ -451,7 +464,7 @@ fn enrich_syslog_event(
 
     let parsed_hostname = log
         .get(event_path!("hostname"))
-        .map(|hostname| hostname.coerce_to_bytes());
+        .map(vector_lib::event::Value::coerce_to_bytes);
 
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
         let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
@@ -470,7 +483,7 @@ fn enrich_syslog_event(
     if log_namespace == LogNamespace::Legacy {
         let timestamp = log
             .get(event_path!("timestamp"))
-            .and_then(|timestamp| timestamp.as_timestamp().cloned())
+            .and_then(|timestamp| timestamp.as_timestamp().copied())
             .unwrap_or_else(Utc::now);
         log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
     }
@@ -536,10 +549,10 @@ mod test {
 
     #[test]
     fn unix_mode_deserializes_on_all_platforms() {
-        let config: SyslogConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: SyslogConfig = serde_yaml::from_str(indoc::indoc! {r"
             mode: unix
             path: /tmp/vector-syslog.sock
-        "#})
+        "})
         .unwrap();
 
         assert!(matches!(config.mode, Mode::Unix(_)));
@@ -713,6 +726,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn config_tcp_with_receive_buffer_size() {
         let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -735,6 +753,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn config_tcp_keepalive_empty() {
         let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -753,6 +776,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn config_tcp_keepalive_full() {
         let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -788,6 +816,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn config_udp_with_receive_buffer_size() {
         let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -847,7 +880,7 @@ mod test {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let msg = "i am foobar";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {msg}"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {msg}",
             r#"[meta sequenceId="1" sysUpTime="37" language="EN"]"#,
             r#"[origin ip="192.168.0.1" software="test"]"#
         );
@@ -899,7 +932,7 @@ mod test {
     fn handles_incorrect_sd_element() {
         let msg = "qwerty";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}",
             r"[incorrect x]"
         );
 
@@ -939,7 +972,7 @@ mod test {
         assert_event_data_eq!(event, expected);
 
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}",
             r"[incorrect x=]"
         );
 
@@ -955,6 +988,11 @@ mod test {
 
     #[test]
     fn handles_empty_sd_element() {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::needless_pass_by_value,
+            reason = "Keep ownership and drop timing unchanged during the lint rollout."
+        )]
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
@@ -964,7 +1002,7 @@ mod test {
         }
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r"[empty]"
         );
 
@@ -972,7 +1010,7 @@ mod test {
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r#"[non_empty x="1"][empty]"#
         );
 
@@ -980,7 +1018,7 @@ mod test {
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r#"[empty][non_empty x="1"]"#
         );
 
@@ -988,7 +1026,7 @@ mod test {
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty",
             r#"[empty not_really="testing the test"]"#
         );
 
@@ -1031,7 +1069,7 @@ mod test {
     #[test]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
-        let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}"#);
+        let raw = format!(r"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}");
         let event = event_from_bytes(
             "host",
             Some(Bytes::from("192.168.0.254")),
@@ -1199,8 +1237,10 @@ mod test {
                 .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
                 .collect();
 
-            let input_lines: Vec<String> =
-                input_messages.iter().map(|msg| msg.to_string()).collect();
+            let input_lines: Vec<String> = input_messages
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect();
 
             send_lines(in_addr, input_lines).await.unwrap();
 
@@ -1262,8 +1302,10 @@ mod test {
                 .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
                 .collect();
 
-            let input_lines: Vec<String> =
-                input_messages.iter().map(|msg| msg.to_string()).collect();
+            let input_lines: Vec<String> = input_messages
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect();
 
             let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
             for line in input_lines {
@@ -1345,7 +1387,10 @@ mod test {
             let stream = UnixStream::connect(&in_path).await.unwrap();
             let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
-            let lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
+            let lines: Vec<String> = input_messages
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect();
             let mut lines = stream::iter(lines).map(Ok);
             sink.send_all(&mut lines).await.unwrap();
 
@@ -1559,7 +1604,7 @@ mod test {
     fn structured_data_from_fields(fields: ObjectMap) -> StructuredData {
         let mut structured_data = StructuredData::default();
 
-        for (key, value) in fields.into_iter() {
+        for (key, value) in fields {
             let subfields = value
                 .into_object()
                 .unwrap()
@@ -1686,6 +1731,11 @@ mod test {
         facility as u8 | severity as u8
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn value_to_string(v: Value) -> String {
         if v.is_bytes() {
             let buf = v.as_bytes().unwrap();

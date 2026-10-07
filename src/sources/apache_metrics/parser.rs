@@ -22,7 +22,7 @@ static SCOREBOARD: LazyLock<HashMap<char, &'static str>> = LazyLock::new(|| {
     .collect()
 });
 
-/// enum of mod_status fields we care about
+/// enum of `mod_status` fields we care about
 enum StatusFieldStatistic<'a> {
     ServerUptimeSeconds(u64),
     TotalAccesses(u64),
@@ -96,14 +96,14 @@ impl<'a> StatusFieldStatistic<'a> {
     }
 }
 
-/// Parses the text output from Apache's mod_status and returns:
+/// Parses the text output from Apache's `mod_status` and returns:
 ///
 /// - A list of metrics generated from the output
 /// - A list of parse errors that were encountered
 ///
 /// # Arguments
 ///
-/// - `payload` - the mod_status output
+/// - `payload` - the `mod_status` output
 /// - `namespace` - the namespace to put the generated metrics in
 /// - `now` - the time the payload was fetched
 /// - `tags` - any base tags to apply to the metrics
@@ -136,12 +136,21 @@ pub fn parse(
             match v {
                 Ok(metrics) => metrics.for_each(|v| acc.push(Ok(v))),
                 Err(error) => acc.push(Err(error)),
-            };
+            }
             acc
         })
         .into_iter()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn line_to_metrics<'a>(
     key: &str,
     value: &str,
@@ -486,6 +495,11 @@ mod test {
     // Test ExtendedStatus: Off
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_not_extended() {
         let payload = r"
 localhost
@@ -670,6 +684,11 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
     // Test ExtendedStatus: On
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_extended() {
         let payload = r"
 localhost
@@ -758,7 +777,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 Metric::new(
                     "cpu_load",
                     MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.846154 },
+                    MetricValue::Gauge { value: 0.846_154 },
                 )
                 .with_namespace(Some("apache"))
                 .with_timestamp(Some(now)),
@@ -892,7 +911,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 Metric::new(
                     "sent_bytes_total",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 222208.0 },
+                    MetricValue::Counter { value: 222_208.0 },
                 )
                 .with_namespace(Some("apache"))
                 .with_timestamp(Some(now)),

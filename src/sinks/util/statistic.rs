@@ -21,6 +21,12 @@ pub struct DistributionStatistic {
 }
 
 impl DistributionStatistic {
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn from_samples(source: &[Sample], quantiles: &[f64]) -> Option<Self> {
         let mut bins = source
             .iter()
@@ -38,8 +44,8 @@ impl DistributionStatistic {
                     max: val,
                     median: val,
                     avg: val,
-                    sum: val * count as f64,
-                    count: count as u64,
+                    sum: val * f64::from(count),
+                    count: u64::from(count),
                     quantiles: quantiles.iter().map(|&p| (p, val)).collect(),
                 }
             }),
@@ -50,7 +56,7 @@ impl DistributionStatistic {
                 let max = bins.last().unwrap().value;
                 let sum = bins
                     .iter()
-                    .map(|sample| sample.value * sample.rate as f64)
+                    .map(|sample| sample.value * f64::from(sample.rate))
                     .sum::<f64>();
 
                 for i in 1..bins.len() {
@@ -58,7 +64,7 @@ impl DistributionStatistic {
                 }
 
                 let count = bins.last().unwrap().rate;
-                let avg = sum / count as f64;
+                let avg = sum / f64::from(count);
 
                 let median = find_quantile(&bins, 0.5);
                 let quantiles = quantiles
@@ -72,7 +78,7 @@ impl DistributionStatistic {
                     median,
                     avg,
                     sum,
-                    count: count as u64,
+                    count: u64::from(count),
                     quantiles,
                 }
             }),
@@ -86,15 +92,29 @@ impl DistributionStatistic {
 ///
 /// List of quantile functions:
 /// <https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample>
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn find_quantile(bins: &[Sample], p: f64) -> f64 {
     let count = bins.last().expect("bins is empty").rate;
-    find_sample(bins, (p * count as f64).round() as u32)
+    find_sample(bins, (p * f64::from(count)).round() as u32)
 }
 
 /// `bins` is a cumulative histogram
 /// Return the i-th smallest value,
 /// i starts from 1 (i == 1 mean the smallest value).
 /// i == 0 is equivalent to i == 1.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
 fn find_sample(bins: &[Sample], i: u32) -> f64 {
     let index = match bins.binary_search_by_key(&i, |sample| sample.rate) {
         Ok(index) => index,
@@ -103,6 +123,11 @@ fn find_sample(bins: &[Sample], i: u32) -> f64 {
     bins[index].value
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {
     if quantiles
         .iter()
@@ -225,7 +250,7 @@ mod test {
 
     #[test]
     fn sort_unstable_doesnt_panic() {
-        let to_float = |v: i32| -> f64 { v as f64 };
+        let to_float = |v: i32| -> f64 { f64::from(v) };
 
         let v: Vec<f64> = (0..=15)
             .map(to_float)
@@ -239,6 +264,6 @@ mod test {
 
         let rates: Vec<u32> = std::iter::repeat([1]).flatten().take(v.len()).collect();
         let s: Vec<(f64, u32)> = v.into_iter().zip(rates).collect();
-        DistributionStatistic::from_samples(&samples(&s), &[0.0, 1.0]);
+        let _statistic = DistributionStatistic::from_samples(&samples(&s), &[0.0, 1.0]);
     }
 }

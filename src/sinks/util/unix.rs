@@ -66,10 +66,16 @@ pub struct UnixSinkConfig {
 }
 
 impl UnixSinkConfig {
+    #[must_use]
     pub const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(
         &self,
         transformer: Transformer,
@@ -98,7 +104,7 @@ impl UnixEither {
     pub(super) async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
             Self::Datagram(datagram) => datagram.send(buf).await,
-            Self::Stream(stream) => stream.write_all(buf).await.map(|_| buf.len()),
+            Self::Stream(stream) => stream.write_all(buf).await.map(|()| buf.len()),
         }
     }
 }
@@ -145,7 +151,7 @@ impl UnixConnector {
                             .context(ConnectionSnafu {
                                 path: self.path.clone(),
                             })
-                            .map(|_| UnixEither::Datagram(datagram))
+                            .map(|()| UnixEither::Datagram(datagram))
                     })
             }
         }
@@ -323,7 +329,7 @@ mod tests {
         assert!(
             UnixSinkConfig::new(good_path.clone())
                 .build(
-                    Default::default(),
+                    Transformer::default(),
                     Encoder::<()>::new(TextSerializerConfig::default().build().into()),
                     UnixMode::Stream
                 )
@@ -335,7 +341,7 @@ mod tests {
         assert!(
             UnixSinkConfig::new(good_path.clone())
                 .build(
-                    Default::default(),
+                    Transformer::default(),
                     Encoder::<()>::new(TextSerializerConfig::default().build().into()),
                     UnixMode::Datagram
                 )
@@ -350,7 +356,7 @@ mod tests {
         assert!(
             UnixSinkConfig::new(bad_path.clone())
                 .build(
-                    Default::default(),
+                    Transformer::default(),
                     Encoder::<()>::new(TextSerializerConfig::default().build().into()),
                     UnixMode::Stream
                 )
@@ -362,7 +368,7 @@ mod tests {
         assert!(
             UnixSinkConfig::new(bad_path.clone())
                 .build(
-                    Default::default(),
+                    Transformer::default(),
                     Encoder::<()>::new(TextSerializerConfig::default().build().into()),
                     UnixMode::Datagram
                 )
@@ -385,7 +391,7 @@ mod tests {
         let config = UnixSinkConfig::new(out_path);
         let (sink, _healthcheck) = config
             .build(
-                Default::default(),
+                Transformer::default(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::default().into(),
                     TextSerializerConfig::default().build().into(),
@@ -410,6 +416,11 @@ mod tests {
 
     #[cfg_attr(target_os = "macos", ignore)]
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ignore_without_reason,
+        reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+    )]
     async fn basic_unix_datagram_sink() {
         let num_lines = 1000;
         let out_path = temp_uds_path("unix_datagram_test");
@@ -440,7 +451,7 @@ mod tests {
         let config = UnixSinkConfig::new(out_path.clone());
         let (sink, _healthcheck) = config
             .build(
-                Default::default(),
+                Transformer::default(),
                 Encoder::<Framer>::new(
                     BytesEncoder.into(),
                     TextSerializerConfig::default().build().into(),

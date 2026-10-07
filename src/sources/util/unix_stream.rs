@@ -36,6 +36,15 @@ use crate::{
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
 /// syslog source).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn build_unix_stream_source<D, F, E>(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
@@ -83,7 +92,7 @@ where
                 .peer_addr()
                 .ok()
                 .and_then(|addr| {
-                    addr.as_pathname().map(|e| e.to_owned()).map({
+                    addr.as_pathname().map(std::borrow::ToOwned::to_owned).map({
                         |path| {
                             span.record("peer_path", field::debug(&path));
                             path.to_string_lossy().into_owned().into()

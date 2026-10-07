@@ -41,7 +41,7 @@ use crate::{
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
-/// The Amazon OpenSearch service type, either managed or serverless; primarily, selects the
+/// The Amazon `OpenSearch` service type, either managed or serverless; primarily, selects the
 /// correct AWS service to use when calculating the AWS v4 signature + disables features
 /// unsupported by serverless: Elasticsearch API version autodetection, health checks
 #[configurable_component]
@@ -49,14 +49,15 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 #[derive(Default)]
 pub enum OpenSearchServiceType {
-    /// Elasticsearch or OpenSearch Managed domain
+    /// Elasticsearch or `OpenSearch` Managed domain
     #[default]
     Managed,
-    /// OpenSearch Serverless collection
+    /// `OpenSearch` Serverless collection
     Serverless,
 }
 
 impl OpenSearchServiceType {
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             OpenSearchServiceType::Managed => "es",
@@ -109,7 +110,7 @@ pub struct ElasticsearchConfig {
 
     /// The API version of Elasticsearch.
     ///
-    /// Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
+    /// Amazon `OpenSearch` Serverless requires this option to be set to `auto` (the default).
     #[serde(default)]
     pub api_version: ElasticsearchApiVersion,
 
@@ -173,7 +174,7 @@ pub struct ElasticsearchConfig {
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
-    /// Amazon OpenSearch service type
+    /// Amazon `OpenSearch` service type
     #[serde(default)]
     pub opensearch_service_type: OpenSearchServiceType,
 
@@ -222,27 +223,27 @@ impl Default for ElasticsearchConfig {
             endpoint: None,
             endpoints: vec![],
             doc_type: default_doc_type(),
-            api_version: Default::default(),
+            api_version: ElasticsearchApiVersion::default(),
             suppress_type_name: false,
             request_retry_partial: false,
             id_key: None,
             pipeline: None,
-            mode: Default::default(),
-            compression: Default::default(),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            mode: ElasticsearchMode::default(),
+            compression: Compression::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: RequestConfig::default(),
             auth: None,
             query: None,
             #[cfg(feature = "aws-core")]
             aws: None,
-            opensearch_service_type: Default::default(),
+            opensearch_service_type: OpenSearchServiceType::default(),
             tls: None,
             endpoint_health: None,
             bulk: BulkConfig::default(), // the default mode is Bulk
             data_stream: None,
             metrics: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }
     }
@@ -253,6 +254,11 @@ impl ElasticsearchConfig {
     /// active mode. `common_mode()` ignores the inactive branch, so a leftover unused template
     /// (e.g. a `bulk.index` in a config that runs in `data_stream` mode) is never confined and
     /// cannot reject an otherwise-valid config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
@@ -337,8 +343,8 @@ impl Default for BulkConfig {
         Self {
             action: default_bulk_action(),
             index: default_index(),
-            template_fallback_index: Default::default(),
-            version: Default::default(),
+            template_fallback_index: Option::default(),
+            version: Option::default(),
             version_type: default_version_type(),
         }
     }
@@ -423,6 +429,11 @@ impl DataStreamConfig {
     ///
     /// This is the only way to obtain a `DataStreamMode`, so the `data_stream.*` templates can
     /// never be rendered without first passing through confinement.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn confine(
         self,
         confinement: &ConfinementConfig,
@@ -510,6 +521,11 @@ impl DataStreamMode {
             .ok()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn sync_fields(&self, log: &mut LogEvent) {
         if !self.sync_fields {
             return;
@@ -546,10 +562,9 @@ impl DataStreamMode {
         }
     }
 
+    #[must_use]
     pub fn index(&self, log: &LogEvent) -> Option<String> {
-        let (dtype, dataset, namespace) = if !self.auto_routing {
-            (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
-        } else {
+        let (dtype, dataset, namespace) = if self.auto_routing {
             let data_stream = log
                 .get(event_path!("data_stream"))
                 .and_then(|ds| ds.as_object());
@@ -572,6 +587,8 @@ impl DataStreamMode {
                 || self.namespace(log),
             )?;
             (dtype, dataset, namespace)
+        } else {
+            (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         };
 
         let name = [dtype, dataset, namespace]
@@ -666,6 +683,11 @@ where
 /// Empty is legitimate — `DataStreamConfig::index` filters empty parts
 /// out of the joined name, so an event field explicitly overriding one
 /// part to `""` just skips it.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
     if s.is_empty() {
         return true;
@@ -692,7 +714,7 @@ fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
         return false;
     }
     // Control characters have no place in a routing identifier.
-    if s.chars().any(|c| c.is_control()) {
+    if s.chars().any(char::is_control) {
         return false;
     }
     // `-` is the separator inside the composed data-stream name
@@ -770,7 +792,11 @@ impl ValidatedSink for ElasticsearchConfig {
         // of failing at build time.
         #[cfg(feature = "aws-core")]
         if matches!(self.auth, Some(ElasticsearchAuthConfig::Aws(_)))
-            && self.aws.as_ref().and_then(|aws| aws.region()).is_none()
+            && self
+                .aws
+                .as_ref()
+                .and_then(crate::aws::region::RegionOrEndpoint::region)
+                .is_none()
         {
             return Err(ParseError::RegionRequired.into());
         }

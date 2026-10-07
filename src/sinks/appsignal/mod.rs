@@ -1,4 +1,4 @@
-//! The AppSignal sink
+//! The `AppSignal` sink
 //!
 //! This sink provides downstream support for `AppSignal` to collect logs and a subset of Vector
 //! metric types. These events are sent to the `appsignal-endpoint.net` domain, which is part of

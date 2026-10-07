@@ -36,6 +36,11 @@ pub struct FileOpen {
 }
 
 impl InternalEvent for FileOpen {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn emit(self) {
         gauge!(GaugeName::OpenFiles).set(self.count as f64);
     }
@@ -502,6 +507,11 @@ mod source {
     }
 
     impl InternalEvent for FileCheckpointed {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+        )]
         fn emit(self) {
             debug!(
                 message = "Files checkpointed.",

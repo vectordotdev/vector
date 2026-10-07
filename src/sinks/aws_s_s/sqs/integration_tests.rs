@@ -42,6 +42,19 @@ async fn create_test_client() -> SqsClient {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn sqs_send_message_batch() {
     let queue_name = gen_queue_name();
     ensure_queue(queue_name.clone()).await;
@@ -54,9 +67,9 @@ async fn sqs_send_message_batch() {
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
     };
 
@@ -102,6 +115,11 @@ async fn sqs_send_message_batch() {
     assert_eq!(input_lines.len(), response.messages.unwrap().len());
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 async fn ensure_queue(queue_name: String) {
     let client = create_test_client().await;
 

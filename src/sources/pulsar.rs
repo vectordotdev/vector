@@ -144,12 +144,12 @@ pub struct OAuth2Config {
     #[configurable(metadata(docs::examples = "data:application/json;base64,cHVsc2FyCg=="))]
     credentials_url: String,
 
-    /// The OAuth2 audience.
+    /// The `OAuth2` audience.
     #[configurable(metadata(docs::examples = "${OAUTH2_AUDIENCE}"))]
     #[configurable(metadata(docs::examples = "pulsar"))]
     audience: Option<String>,
 
-    /// The OAuth2 scope.
+    /// The `OAuth2` scope.
     #[configurable(metadata(docs::examples = "${OAUTH2_SCOPE}"))]
     #[configurable(metadata(docs::examples = "admin"))]
     scope: Option<String>,
@@ -179,7 +179,7 @@ pub struct TlsOptions {
     /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
 
-    /// Whether hostname verification is enabled when verify_certificate is false
+    /// Whether hostname verification is enabled when `verify_certificate` is false
     ///
     /// Set to true if not specified.
     pub verify_hostname: Option<bool>,
@@ -363,6 +363,11 @@ async fn pulsar_source(
 }
 
 #[allow(clippy::too_many_arguments)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 async fn parse_message(
     msg: Message<String>,
     decoder: &Decoder,
@@ -455,6 +460,11 @@ async fn parse_message(
 }
 
 /// Send the event stream created by the framed read to the `out` stream.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 async fn finalize_event_stream(
     consumer: &mut Consumer<String, TokioExecutor>,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
@@ -473,7 +483,7 @@ async fn finalize_event_stream(
                 Err(_error) => {
                     emit!(StreamClosedError { count: 1 });
                 }
-                Ok(_) => {
+                Ok(()) => {
                     finalizer.add(FinalizerEntry { topic, message_id }, receiver);
                 }
             }
@@ -482,7 +492,7 @@ async fn finalize_event_stream(
             Err(_error) => {
                 emit!(StreamClosedError { count: 1 });
             }
-            Ok(_) => {
+            Ok(()) => {
                 if let Err(error) = consumer.ack_with_id(topic.as_str(), message_id).await {
                     pulsar_error_events.emit(PulsarErrorEventData {
                         msg: error.to_string(),
@@ -558,6 +568,11 @@ mod integration_tests {
         format!("{scheme}://{}:{port}", pulsar_host())
     }
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn consumes_event_with_acknowledgements() {
         pulsar_send_receive(
             &pulsar_address("pulsar", 6650),
@@ -569,6 +584,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn consumes_event_with_acknowledgements_vector_namespace() {
         pulsar_send_receive(
             &pulsar_address("pulsar", 6650),
@@ -580,6 +600,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn consumes_event_without_acknowledgements() {
         pulsar_send_receive(
             &pulsar_address("pulsar", 6650),
@@ -591,6 +616,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn consumes_event_without_acknowledgements_vector_namespace() {
         pulsar_send_receive(
             &pulsar_address("pulsar", 6650),
@@ -602,6 +632,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn consumes_event_with_tls() {
         pulsar_send_receive(
             &pulsar_address("pulsar+ssl", 6651),
@@ -616,6 +651,11 @@ mod integration_tests {
         .await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn pulsar_send_receive(
         endpoint: &str,
         acknowledgements: bool,

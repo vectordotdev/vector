@@ -30,7 +30,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
         .expect("config build must with success");
     let result = health_check.await;
 
-    assert!(result.is_err())
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -41,7 +41,7 @@ async fn hdfs_healthchecks_valid_node_node() {
         .expect("config build must with success");
     let result = health_check.await;
 
-    assert!(result.is_ok())
+    assert!(result.is_ok());
 }
 
 #[tokio::test]
@@ -106,6 +106,11 @@ fn webhdfs_endpoint() -> String {
     std::env::var("WEBHDFS_ENDPOINT").unwrap_or_else(|_| "http://127.0.0.1:9870".into())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(batch_size);

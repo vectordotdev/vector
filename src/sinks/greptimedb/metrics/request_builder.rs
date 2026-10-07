@@ -35,6 +35,19 @@ fn encode_f64_value(
     columns.push(f64_value(value));
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn metric_to_insert_request(
     metric: Metric,
     options: &RequestBuilderOptions,
@@ -52,8 +65,7 @@ pub fn metric_to_insert_request(
     // timestamp
     let timestamp = metric
         .timestamp()
-        .map(|t| t.timestamp_millis())
-        .unwrap_or_else(|| Utc::now().timestamp_millis());
+        .map_or_else(|| Utc::now().timestamp_millis(), |t| t.timestamp_millis());
     schema.push(ts_column(if options.use_new_naming {
         TIME_INDEX_COLUMN_NAME
     } else {
@@ -144,6 +156,11 @@ pub fn metric_to_insert_request(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn encode_distribution(
     samples: &[Sample],
     schema: &mut Vec<ColumnSchema>,
@@ -167,6 +184,11 @@ fn encode_distribution(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn encode_histogram(buckets: &[Bucket], schema: &mut Vec<ColumnSchema>, columns: &mut Vec<Value>) {
     for bucket in buckets {
         let column_name = format!("b{}", bucket.upper_limit);
@@ -186,7 +208,7 @@ fn encode_quantiles(
 }
 
 fn encode_sketch(sketch: &AgentDDSketch, schema: &mut Vec<ColumnSchema>, columns: &mut Vec<Value>) {
-    encode_f64_value("count", sketch.count() as f64, schema, columns);
+    encode_f64_value("count", f64::from(sketch.count()), schema, columns);
     if let Some(min) = sketch.min() {
         encode_f64_value("min", min, schema, columns);
     }
@@ -488,7 +510,7 @@ mod tests {
         let mut sketch = AgentDDSketch::with_agent_defaults();
         let samples = 10;
         for i in 0..samples {
-            sketch.insert(i as f64);
+            sketch.insert(f64::from(i));
         }
 
         let metric = Metric::new(
@@ -514,7 +536,7 @@ mod tests {
         assert!(get_column(&rows, "p95") <= 9.0);
         assert!(get_column(&rows, "p99") > 8.0);
         assert!(get_column(&rows, "p99") <= 9.0);
-        assert_eq!(get_column(&rows, "count"), samples as f64);
+        assert_eq!(get_column(&rows, "count"), f64::from(samples));
         assert_eq!(get_column(&rows, "sum"), 45.0);
         assert_eq!(get_column(&rows, "max"), 9.0);
         assert_eq!(get_column(&rows, "min"), 0.0);

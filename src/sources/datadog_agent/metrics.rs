@@ -164,6 +164,11 @@ fn series_v2_service(
         .boxed()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn decode_datadog_sketches(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -191,6 +196,11 @@ fn decode_datadog_sketches(
     Ok(metrics)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn decode_datadog_series_v2(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -236,6 +246,23 @@ fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
         })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
@@ -355,13 +382,12 @@ pub(crate) fn decode_ddseries_v2(
                     .map(|dd_point| {
                         let i = Some(serie.interval)
                             .filter(|v| *v != 0)
-                            .map(|v| v as u32)
-                            .unwrap_or(1);
+                            .map_or(1, |v| v as u32);
                         Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
-                                value: dd_point.value * (i as f64),
+                                value: dd_point.value * f64::from(i),
                             },
                             event_metadata.clone(),
                         )
@@ -393,6 +419,11 @@ pub(crate) fn decode_ddseries_v2(
     Ok(decoded_metrics)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn decode_datadog_series_v1(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -434,10 +465,20 @@ fn decode_datadog_series_v1(
     Ok(decoded_metrics)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
     tags.iter().map(extract_tag_key_and_value).collect()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn into_vector_metric(
     dd_metric: DatadogSeriesMetric,
     api_key: Option<Arc<str>>,
@@ -513,7 +554,7 @@ fn into_vector_metric(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: dd_point.1 * (i as f64),
+                        value: dd_point.1 * f64::from(i),
                     },
                 )
                 .with_timestamp(Some(
@@ -553,6 +594,19 @@ fn namespace_name_from_dd_metric(dd_metric_name: &str) -> (Option<&str>, &str) {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,

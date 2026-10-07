@@ -42,16 +42,16 @@ use crate::{
 #[allow(clippy::enum_variant_names)]
 pub enum Format {
     #[default]
-    /// JSONEachRow.
+    /// `JSONEachRow`.
     JsonEachRow,
 
-    /// JSONAsObject.
+    /// `JSONAsObject`.
     JsonAsObject,
 
-    /// JSONAsString.
+    /// `JSONAsString`.
     JsonAsString,
 
-    /// ArrowStream (beta).
+    /// `ArrowStream` (beta).
     #[configurable(metadata(status = "beta"))]
     ArrowStream,
 }
@@ -89,7 +89,7 @@ impl fmt::Display for Format {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
-    /// The endpoint of the ClickHouse server.
+    /// The endpoint of the `ClickHouse` server.
     #[serde(alias = "host")]
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
     pub endpoint: UriSerde,
@@ -106,17 +106,17 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub format: Format,
 
-    /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
+    /// Sets `input_format_skip_unknown_fields`, allowing `ClickHouse` to discard fields not present in the table schema.
     ///
     /// If left unspecified, use the default provided by the `ClickHouse` server.
     #[serde(default)]
     pub skip_unknown_fields: Option<bool>,
 
-    /// Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601.
+    /// Sets `date_time_input_format` to `best_effort`, allowing `ClickHouse` to properly parse RFC3339/ISO 8601.
     #[serde(default)]
     pub date_time_best_effort: bool,
 
-    /// Sets `insert_distributed_one_random_shard`, allowing ClickHouse to insert data into a random shard when using Distributed Table Engine.
+    /// Sets `insert_distributed_one_random_shard`, allowing `ClickHouse` to insert data into a random shard when using Distributed Table Engine.
     #[serde(default)]
     pub insert_random_shard: bool,
 
@@ -171,14 +171,19 @@ pub struct QuerySettingsConfig {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 #[serde(deny_unknown_fields)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    reason = "Defer the remaining documentation formatting until its source or generator is audited."
+)]
 pub struct AsyncInsertSettingsConfig {
-    /// Sets `async_insert`, allowing ClickHouse to queue the inserted data and later flush to table in the background.
+    /// Sets `async_insert`, allowing `ClickHouse` to queue the inserted data and later flush to table in the background.
     ///
     /// If left unspecified, use the default provided by the `ClickHouse` server.
     #[serde(default)]
     pub enabled: Option<bool>,
 
-    /// Sets `wait_for`, allowing ClickHouse to wait for processing of asynchronous insertion.
+    /// Sets `wait_for`, allowing `ClickHouse` to wait for processing of asynchronous insertion.
     ///
     /// If left unspecified, use the default provided by the `ClickHouse` server.
     #[serde(default)]
@@ -190,7 +195,7 @@ pub struct AsyncInsertSettingsConfig {
     #[serde(default)]
     pub wait_for_processing_timeout: Option<u64>,
 
-    /// Sets `async_insert_deduplicate`, allowing ClickHouse to perform deduplication when inserting blocks in the replicated table.
+    /// Sets `async_insert_deduplicate`, allowing `ClickHouse` to perform deduplication when inserting blocks in the replicated table.
     ///
     /// If left unspecified, use the default provided by the `ClickHouse` server.
     #[serde(default)]
@@ -348,7 +353,7 @@ impl ValidatedSink for ClickhouseConfig {
 impl ClickhouseConfig {
     /// Resolves the encoding strategy (format + encoder) based on configuration.
     ///
-    /// This method determines the appropriate ClickHouse format and Vector encoder
+    /// This method determines the appropriate `ClickHouse` format and Vector encoder
     /// based on the user's configuration, ensuring they are consistent.
     async fn resolve_strategy(
         &self,
@@ -431,18 +436,14 @@ impl ClickhouseConfig {
 
         debug!(
             "Successfully fetched Arrow schema with {} fields.",
-            config
-                .schema
-                .as_ref()
-                .map(|s| s.fields().len())
-                .unwrap_or(0)
+            config.schema.as_ref().map_or(0, |s| s.fields().len())
         );
 
         Ok(())
     }
 }
 
-/// Purely validated ClickHouse sink configuration.
+/// Purely validated `ClickHouse` sink configuration.
 ///
 /// This type captures all validation results that can be computed purely from
 /// configuration without network/filesystem/credentials/async operations.
@@ -547,12 +548,12 @@ mod tests {
     #[test]
     fn batch_encoding_rejects_unsupported_codec() {
         let err = serde_yaml::from_str::<ClickhouseConfig>(
-            r#"
+            r"
             endpoint: http://localhost:8123
             table: test_table
             batch_encoding:
               codec: parquet
-            "#,
+            ",
         )
         .unwrap_err();
 
@@ -562,7 +563,7 @@ mod tests {
         );
     }
 
-    /// Helper to create a minimal ClickhouseConfig for testing
+    /// Helper to create a minimal `ClickhouseConfig` for testing
     fn create_test_config(
         format: Format,
         batch_encoding: Option<ClickhouseBatchEncoding>,

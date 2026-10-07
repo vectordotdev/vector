@@ -15,6 +15,7 @@ pub struct SplitIterator {
 
 impl SplitIterator {
     /// Creates an iterator for a single metric.
+    #[must_use]
     pub const fn single(metric: Metric) -> Self {
         Self {
             state: SplitState::Single(Some(metric)),
@@ -110,6 +111,15 @@ impl<S> From<S> for MetricSplitter<S> {
 pub struct AggregatedSummarySplitter;
 
 impl MetricSplit for AggregatedSummarySplitter {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn split(&mut self, input: Metric) -> SplitIterator {
         let (series, data, metadata) = input.into_parts();
         match data.value() {
@@ -197,6 +207,11 @@ mod tests {
     use super::{AggregatedSummarySplitter, MetricSplitter};
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_agg_summary_split() {
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
 

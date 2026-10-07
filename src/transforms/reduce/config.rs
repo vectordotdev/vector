@@ -39,7 +39,7 @@ pub struct ReduceConfig {
     pub expire_after_ms: Duration,
 
     /// If supplied, every time this interval elapses for a given grouping, the reduced value
-    /// for that grouping is flushed. Checked every flush_period_ms.
+    /// for that grouping is flushed. Checked every `flush_period_ms`.
     #[serde_as(as = "Option<serde_with::DurationMilliSeconds<u64>>")]
     #[derivative(Default(value = "Option::None"))]
     #[configurable(metadata(docs::human_name = "End-Every Period"))]
@@ -103,11 +103,11 @@ pub struct ReduceConfig {
 }
 
 const fn default_expire_after_ms() -> Duration {
-    Duration::from_millis(30000)
+    Duration::from_secs(30)
 }
 
 const fn default_flush_period_ms() -> Duration {
-    Duration::from_millis(1000)
+    Duration::from_secs(1)
 }
 
 impl_generate_config_from_default!(ReduceConfig);
@@ -124,6 +124,11 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn outputs(
         &self,
         _: &TransformContext,
@@ -139,7 +144,7 @@ impl TransformConfig for ReduceConfig {
 
         let mut schema_definition = merged_definition;
 
-        for (key, merge_strategy) in self.merge_strategies.iter() {
+        for (key, merge_strategy) in &self.merge_strategies {
             let key = if let Ok(key) = parse_target_path(key) {
                 key
             } else {
@@ -239,7 +244,13 @@ impl TransformConfig for ReduceConfig {
         for (path, _) in &self.merge_strategies {
             match parse_target_path(path) {
                 Err(_) => errors.push(format!("Could not parse path: `{path}`")),
-                Ok(parsed) if parsed.path.segments.iter().any(|s| s.is_index()) => {
+                Ok(parsed)
+                    if parsed
+                        .path
+                        .segments
+                        .iter()
+                        .any(vrl::path::OwnedSegment::is_index) =>
+                {
                     errors.push(format!(
                         "Merge strategies with indexes are currently not supported. Path: `{path}`"
                     ));

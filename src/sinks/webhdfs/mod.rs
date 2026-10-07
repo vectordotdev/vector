@@ -24,7 +24,7 @@
 //!                      └────────────┘
 //! ```
 //!
-//! WebHDFS will connect to the HTTP RESTful API of HDFS.
+//! `WebHDFS` will connect to the HTTP `RESTful` API of HDFS.
 //!
 //! For more information, please refer to:
 //!
@@ -32,7 +32,7 @@
 //! - [WebHDFS REST API](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/WebHDFS.html)
 //! - [opendal::services::webhdfs](https://docs.rs/opendal/latest/opendal/services/struct.Webhdfs.html)
 //!
-//! `webhdfs` is an OpenDal based services. This mod itself only provide
+//! `webhdfs` is an `OpenDal` based services. This mod itself only provide
 //! config to build an [`crate::sinks::opendal_common::OpenDalSink`]. All real implement are powered by
 //! [`crate::sinks::opendal_common::OpenDalSink`].
 

@@ -26,7 +26,7 @@ pub enum NormalizerError {
     InvalidTimeToLive,
 }
 
-/// Defines behavior for creating the MetricNormalizer
+/// Defines behavior for creating the `MetricNormalizer`
 #[serde_as]
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
@@ -64,12 +64,17 @@ const fn default_time_to_live<D: NormalizerSettings>() -> Option<u64> {
 }
 
 impl<D: NormalizerSettings + Clone> NormalizerConfig<D> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn validate(&self) -> Result<NormalizerConfig<D>, NormalizerError> {
         let config = NormalizerConfig::<D> {
             max_bytes: self.max_bytes.or(D::MAX_BYTES),
             max_events: self.max_events.or(D::MAX_EVENTS),
             time_to_live: self.time_to_live.or(D::TIME_TO_LIVE),
-            _d: Default::default(),
+            _d: PhantomData,
         };
         match (config.max_bytes, config.max_events, config.time_to_live) {
             (Some(0), _, _) => Err(NormalizerError::InvalidMaxBytes),
@@ -79,6 +84,7 @@ impl<D: NormalizerSettings + Clone> NormalizerConfig<D> {
         }
     }
 
+    #[must_use]
     pub const fn into_settings(self) -> MetricSetSettings {
         MetricSetSettings {
             max_bytes: self.max_bytes,
@@ -145,6 +151,15 @@ pub struct MetricNormalizer<N> {
 
 impl<N> MetricNormalizer<N> {
     /// Creates a new normalizer with the given configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn with_config<D: NormalizerSettings + Clone>(
         normalizer: N,
         config: NormalizerConfig<D>,
@@ -218,7 +233,8 @@ impl ByteSizeOf for MetricEntry {
 }
 
 impl MetricEntry {
-    /// Creates a new MetricEntry with the given data, metadata, and timestamp.
+    /// Creates a new `MetricEntry` with the given data, metadata, and timestamp.
+    #[must_use]
     pub const fn new(
         data: MetricData,
         metadata: EventMetadata,
@@ -231,7 +247,8 @@ impl MetricEntry {
         }
     }
 
-    /// Creates a new MetricEntry from a Metric.
+    /// Creates a new `MetricEntry` from a Metric.
+    #[must_use]
     pub fn from_metric(metric: Metric, timestamp: Option<Instant>) -> (MetricSeries, Self) {
         let (series, data, metadata) = metric.into_parts();
         let entry = Self::new(data, metadata, timestamp);
@@ -239,6 +256,7 @@ impl MetricEntry {
     }
 
     /// Converts this entry back to a Metric with the given series.
+    #[must_use]
     pub fn into_metric(self, series: MetricSeries) -> Metric {
         Metric::from_parts(series, self.data, self.metadata)
     }
@@ -251,6 +269,7 @@ impl MetricEntry {
     /// Checks if this entry has expired based on the given TTL and reference time.
     ///
     /// Using a provided reference time ensures consistency across multiple expiration checks.
+    #[must_use]
     pub fn is_expired(&self, ttl: Duration, reference_time: Instant) -> bool {
         match self.timestamp {
             Some(ts) => reference_time.duration_since(ts) >= ttl,
@@ -272,6 +291,7 @@ pub struct CapacityPolicy {
 
 impl CapacityPolicy {
     /// Creates a new capacity policy with both memory and entry limits.
+    #[must_use]
     pub const fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
         Self {
             max_bytes,
@@ -281,6 +301,7 @@ impl CapacityPolicy {
     }
 
     /// Gets the current memory usage.
+    #[must_use]
     pub const fn current_memory(&self) -> usize {
         self.current_memory
     }
@@ -290,8 +311,8 @@ impl CapacityPolicy {
         self.current_memory = self.current_memory.saturating_sub(bytes);
     }
 
-    /// Frees the memory for an item if max_bytes is set.
-    /// Only calculates and tracks memory when max_bytes is specified.
+    /// Frees the memory for an item if `max_bytes` is set.
+    /// Only calculates and tracks memory when `max_bytes` is specified.
     pub fn free_item(&mut self, series: &MetricSeries, entry: &MetricEntry) {
         if self.max_bytes.is_some() {
             let freed_memory = self.item_size(series, entry);
@@ -331,6 +352,7 @@ impl CapacityPolicy {
     }
 
     /// Gets the total memory size of entry/series, excluding LRU cache overhead.
+    #[must_use]
     pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
         entry.allocated_bytes() + series.allocated_bytes()
     }
@@ -350,6 +372,7 @@ pub struct TtlPolicy {
 impl TtlPolicy {
     /// Creates a new TTL policy with the given duration.
     /// Cleanup interval defaults to TTL/10 with a 10-second minimum.
+    #[must_use]
     pub fn new(ttl: Duration) -> Self {
         Self {
             ttl,
@@ -360,7 +383,8 @@ impl TtlPolicy {
 
     /// Checks if it's time to run cleanup.
     ///
-    /// Returns Some(current_time) if cleanup should be performed, None otherwise.
+    /// Returns `Some(current_time)` if cleanup should be performed, None otherwise.
+    #[must_use]
     pub fn should_cleanup(&self) -> Option<Instant> {
         let now = Instant::now();
         if now.duration_since(self.last_cleanup) >= self.cleanup_interval {
@@ -480,7 +504,8 @@ pub struct MetricSet {
 }
 
 impl MetricSet {
-    /// Creates a new MetricSet with the given settings.
+    /// Creates a new `MetricSet` with the given settings.
+    #[must_use]
     pub fn new(settings: MetricSetSettings) -> Self {
         // Create capacity policy if any capacity limit is set
         let capacity_policy = match (settings.max_bytes, settings.max_events) {
@@ -496,7 +521,8 @@ impl MetricSet {
         Self::with_policies(capacity_policy, ttl_policy)
     }
 
-    /// Creates a new MetricSet with the given policies.
+    /// Creates a new `MetricSet` with the given policies.
+    #[must_use]
     pub fn with_policies(
         capacity_policy: Option<CapacityPolicy>,
         ttl_policy: Option<TtlPolicy>,
@@ -516,11 +542,13 @@ impl MetricSet {
     }
 
     /// Gets the current capacity policy.
+    #[must_use]
     pub const fn capacity_policy(&self) -> Option<&CapacityPolicy> {
         self.capacity_policy.as_ref()
     }
 
     /// Gets the current TTL policy.
+    #[must_use]
     pub const fn ttl_policy(&self) -> Option<&TtlPolicy> {
         self.ttl_policy.as_ref()
     }
@@ -531,16 +559,19 @@ impl MetricSet {
     }
 
     /// Gets the current number of entries in the cache.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
     /// Returns true if the cache contains no entries.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
     /// Gets the current memory usage in bytes.
+    #[must_use]
     pub fn weighted_size(&self) -> u64 {
         self.capacity_policy
             .as_ref()
@@ -575,9 +606,14 @@ impl MetricSet {
     }
 
     /// Perform TTL cleanup if configured and needed.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn maybe_cleanup(&mut self) {
         // Check if cleanup is needed and get the current timestamp in one operation
-        let now = match self.ttl_policy().and_then(|config| config.should_cleanup()) {
+        let now = match self.ttl_policy().and_then(TtlPolicy::should_cleanup) {
             Some(timestamp) => timestamp,
             None => return, // No cleanup needed
         };
@@ -645,7 +681,8 @@ impl MetricSet {
         self.enforce_capacity_policy();
     }
 
-    /// Consumes this MetricSet and returns a vector of Metric.
+    /// Consumes this `MetricSet` and returns a vector of Metric.
+    #[must_use]
     pub fn into_metrics(mut self) -> Vec<Metric> {
         // Clean up expired entries first (using current time)
         self.cleanup_expired(Instant::now());

@@ -35,6 +35,11 @@ pub struct ElasticsearchSink<S> {
 }
 
 impl<S> ElasticsearchSink<S> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(
         common: &ElasticsearchCommon,
         config: &ElasticsearchConfig,
@@ -60,6 +65,11 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mode = self.mode;
         let id_key_field = self.id_key_field.as_ref();
@@ -116,16 +126,14 @@ pub(super) fn process_log(
     if let Some(cfg) = mode.as_data_stream_config() {
         cfg.sync_fields(&mut log);
         cfg.remap_timestamp(&mut log);
-    };
+    }
 
     let id = id_key_field
         .and_then(|key| log.remove((PathPrefix::Event, key)))
         .and_then(|id| id.as_str().map(Into::into));
     let document_metadata = match (id, mode.version_type(), mode.version(&log)) {
         (None, _, _) => DocumentMetadata::WithoutId,
-        (Some(id), None, None) | (Some(id), None, Some(_)) | (Some(id), Some(_), None) => {
-            DocumentMetadata::Id(id)
-        }
+        (Some(id), None | Some(_), None) | (Some(id), None, Some(_)) => DocumentMetadata::Id(id),
         (Some(id), Some(version_type), Some(version)) => match version_type {
             VersionType::Internal => DocumentMetadata::Id(id),
             VersionType::External => DocumentMetadata::IdAndVersion(

@@ -68,6 +68,11 @@ enum EsResultItem {
 }
 
 impl EsResultItem {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     const fn result(&self) -> &EsIndexResult {
         match self {
             EsResultItem::Index(r) => r,
@@ -104,6 +109,11 @@ impl RetryLogic for ElasticsearchRetryLogic {
         true
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn should_retry_response(
         &self,
         response: &ElasticsearchResponse,

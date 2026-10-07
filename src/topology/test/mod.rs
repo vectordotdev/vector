@@ -73,6 +73,11 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
     config.build().unwrap()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn into_message(event: Event) -> String {
     let message_key = crate::config::log_schema()
         .message_key_target_path()
@@ -200,11 +205,11 @@ async fn topology_multiple_sources() {
 
     in1.send_event(event1.clone()).await.unwrap();
 
-    let out_event1: Option<EventArray> = out1.next().await.map(|item| item.into());
+    let out_event1: Option<EventArray> = out1.next().await.map(std::convert::Into::into);
 
     in2.send_event(event2.clone()).await.unwrap();
 
-    let out_event2: Option<EventArray> = out1.next().await.map(|item| item.into());
+    let out_event2: Option<EventArray> = out1.next().await.map(std::convert::Into::into);
 
     topology.stop().await;
 
@@ -280,6 +285,11 @@ async fn topology_transform_chain() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_remove_one_source() {
     trace_init();
 
@@ -326,6 +336,11 @@ async fn topology_remove_one_source() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_remove_one_sink() {
     trace_init();
 
@@ -365,6 +380,11 @@ async fn topology_remove_one_sink() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_remove_one_transform() {
     trace_init();
 
@@ -420,6 +440,11 @@ async fn topology_remove_one_transform() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_swap_source() {
     trace_init();
 
@@ -475,6 +500,11 @@ async fn topology_swap_source() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_swap_transform() {
     trace_init();
 
@@ -533,6 +563,11 @@ async fn topology_swap_transform() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_swap_sink() {
     trace_init();
 
@@ -587,6 +622,11 @@ async fn topology_swap_sink() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_swap_transform_is_atomic() {
     trace_init();
 
@@ -655,6 +695,11 @@ async fn topology_swap_transform_is_atomic() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_rebuild_connected() {
     trace_init();
 
@@ -697,6 +742,11 @@ async fn topology_rebuild_connected() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_rebuild_connected_transform() {
     trace_init();
 
@@ -750,6 +800,11 @@ async fn topology_rebuild_connected_transform() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_required_healthcheck_fails_start() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
@@ -761,6 +816,11 @@ async fn topology_required_healthcheck_fails_start() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
     assert!(
@@ -771,6 +831,11 @@ async fn topology_optional_healthcheck_does_not_fail_start() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_optional_healthcheck_does_not_fail_reload() {
     let config = basic_config();
     let (mut topology, _) = start_topology(config, false).await;
@@ -782,6 +847,11 @@ async fn topology_optional_healthcheck_does_not_fail_reload() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_healthcheck_not_run_on_unchanged_reload() {
     let config = basic_config();
 
@@ -795,6 +865,11 @@ async fn topology_healthcheck_not_run_on_unchanged_reload() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_healthcheck_run_for_changes_on_reload() {
     trace_init();
 
@@ -843,7 +918,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
         sink1,
     );
     sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: std::num::NonZeroU64::new(268435488).unwrap(),
+        max_size: std::num::NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::DropNewest,
     });
     config.add_sink_outer("out1", sink1_outer);
@@ -879,6 +954,11 @@ async fn topology_disk_buffer_flushes_on_idle() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn topology_transform_error_definition() {
     trace_init();
 

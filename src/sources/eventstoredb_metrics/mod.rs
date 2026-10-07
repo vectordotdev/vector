@@ -56,6 +56,7 @@ const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
 }
@@ -83,6 +84,15 @@ impl SourceConfig for EventStoreDbConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_continue,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn eventstoredb(
     endpoint: String,
     interval: Duration,

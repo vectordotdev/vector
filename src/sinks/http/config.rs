@@ -173,9 +173,9 @@ impl HttpSinkConfig {
 impl GenerateConfig for HttpSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"uri: https://10.22.212.22:9000/endpoint
+            r"uri: https://10.22.212.22:9000/endpoint
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -284,12 +284,12 @@ impl SinkConfig for HttpSinkConfig {
         let mut files = Vec::new();
         if let Some(tls) = &self.tls {
             if let Some(crt_file) = &tls.crt_file {
-                files.push(crt_file)
+                files.push(crt_file);
             }
             if let Some(key_file) = &tls.key_file {
-                files.push(key_file)
+                files.push(key_file);
             }
-        };
+        }
         files
     }
 
@@ -380,8 +380,8 @@ impl ValidatedSink for HttpSinkConfig {
         )?;
 
         let content_type = {
-            use FramingConfig::*;
-            use SerializerConfig::*;
+            use FramingConfig::{CharacterDelimited, NewlineDelimited};
+            use SerializerConfig::{Json, Otlp, RawMessage, Text};
             match (serializer_config, &framer_config) {
                 (RawMessage | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
                 (Json(_), NewlineDelimited) => Some(CONTENT_TYPE_NDJSON.to_owned()),
@@ -426,6 +426,11 @@ impl ValidatedSink for HttpSinkConfig {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn build(
         &self,
         validated: &ValidatedHttp,
@@ -440,6 +445,11 @@ impl HttpSinkConfig {
     /// templated headers happens here (not in `validate`) because the
     /// `component_name` threaded from the `opentelemetry`/`axiom` delegations
     /// must appear in per-template security warnings.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     pub(crate) async fn build_from_validated(
         &self,
         validated: &ValidatedHttp,

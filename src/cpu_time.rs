@@ -60,12 +60,14 @@ pub struct ThreadTime(Inner);
 impl ThreadTime {
     /// Captures the current thread CPU time.
     #[inline]
+    #[must_use]
     pub fn now() -> Self {
         ThreadTime(Inner::now())
     }
 
     /// Returns the CPU time elapsed since this snapshot was taken.
     #[inline]
+    #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.0.elapsed()
     }
@@ -78,6 +80,15 @@ struct Inner(Duration);
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 impl Inner {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     fn now() -> Self {
         let mut ts = libc::timespec {
             tv_sec: 0,
@@ -256,6 +267,11 @@ pub struct CpuTimedFuture<F> {
 impl<F: Future> Future for CpuTimedFuture<F> {
     type Output = F::Output;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
         let t0 = ThreadTime::now();
         let this = self.project();

@@ -115,7 +115,7 @@ pub(super) struct MemoryWriter {
     metadata: MemoryMetadata,
 }
 
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a memory structure.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a memory structure.
 pub struct Memory {
     read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
     read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
@@ -128,6 +128,7 @@ pub struct Memory {
 
 impl Memory {
     /// Creates a new [Memory] based on the provided config.
+    #[must_use]
     pub fn new(config: MemoryConfig) -> Self {
         let (read_handle, write_handle) = evmap::new();
         // Buffer could only be used if source is stuck exporting available items, but in that case,
@@ -148,6 +149,7 @@ impl Memory {
     }
 
     /// Creates a new [Memory] based on the provided config and previous state.
+    #[must_use]
     pub fn from_previous_state(
         config: MemoryConfig,
         prev_state: Box<dyn std::any::Any + Send + Sync>,
@@ -175,11 +177,16 @@ impl Memory {
         self.expired_items_sender.subscribe()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     fn handle_value(&self, value: ObjectMap) {
         let mut writer = self.write_handle.lock().expect("mutex poisoned");
         let now = Instant::now();
 
-        for (k, value) in value.into_iter() {
+        for (k, value) in value {
             let new_entry_key = String::from(k);
             let Ok(v) = serde_json::to_string(&value) else {
                 emit!(MemoryEnrichmentTableInsertFailed {
@@ -197,9 +204,8 @@ impl Memory {
                     .path
                     .as_ref()
                     .and_then(|p| value.get(p))
-                    .and_then(|v| v.as_integer())
-                    .map(|v| v as u64)
-                    .unwrap_or(self.config.ttl),
+                    .and_then(vector_lib::event::Value::as_integer)
+                    .map_or(self.config.ttl, |v| v as u64),
             };
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
             if let Some(max_byte_size) = self.config.max_byte_size
@@ -240,7 +246,7 @@ impl Memory {
         // elements via the writer, while we are iterating the reader
         // Refresh will happen only after we manually invoke it after iteration
         if let Some(reader) = self.get_read_handle().read() {
-            for (k, v) in reader.iter() {
+            for (k, v) in &reader {
                 if let Some(entry) = v.get_one()
                     && entry.expired(now)
                 {
@@ -254,7 +260,7 @@ impl Memory {
                     needs_flush = true;
                 }
             }
-        };
+        }
 
         needs_flush
     }
@@ -272,8 +278,7 @@ impl Memory {
             .config
             .source_config
             .as_ref()
-            .map(|c| c.export_expired_items)
-            .unwrap_or_default()
+            .is_some_and(|c| c.export_expired_items)
         {
             let pending_removal = writer
                 .write_handle
@@ -286,7 +291,7 @@ impl Memory {
                 })
                 .filter_map(|key| {
                     writer.write_handle.get_one(key).map(|v| MemoryEntryPair {
-                        key: key.to_string(),
+                        key: key.clone(),
                         entry: v.clone(),
                     })
                 })
@@ -302,7 +307,7 @@ impl Memory {
         writer.write_handle.refresh();
         if let Some(reader) = self.get_read_handle().read() {
             let mut byte_size = 0;
-            for (k, v) in reader.iter() {
+            for (k, v) in &reader {
                 byte_size += k.size_of() + v.get_one().size_of();
             }
             writer.metadata.byte_size = byte_size as u64;
@@ -371,21 +376,18 @@ impl Table for Memory {
             Some(_) if condition.len() > 1 => Err(Error::OnlyOneConditionAllowed),
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy();
-                match self.get_read_handle().get_one(key.as_ref()) {
-                    Some(row) => {
-                        emit!(MemoryEnrichmentTableRead {
-                            key: &key,
-                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                        });
-                        row.as_object_map(Instant::now(), &key).map(|r| vec![r])
-                    }
-                    None => {
-                        emit!(MemoryEnrichmentTableReadFailed {
-                            key: &key,
-                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                        });
-                        Ok(Default::default())
-                    }
+                if let Some(row) = self.get_read_handle().get_one(key.as_ref()) {
+                    emit!(MemoryEnrichmentTableRead {
+                        key: &key,
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    });
+                    row.as_object_map(Instant::now(), &key).map(|r| vec![r])
+                } else {
+                    emit!(MemoryEnrichmentTableReadFailed {
+                        key: &key,
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    });
+                    Ok(Vec::default())
                 }
             }
             Some(_) => Err(Error::OnlyEqualityConditionAllowed),
@@ -426,6 +428,11 @@ impl std::fmt::Debug for Memory {
 
 #[async_trait]
 impl StreamSink<Event> for Memory {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
@@ -434,10 +441,10 @@ impl StreamSink<Event> for Memory {
             .flush_interval
             .map(NonZeroU64::get)
             .map(Duration::from_secs)
-            .map::<Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>>, _>(|d| {
-                Box::pin(IntervalStream::new(interval(d)))
-            })
-            .unwrap_or(Box::pin(stream::empty()));
+            .map_or::<Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>>, _>(
+                Box::pin(stream::empty()),
+                |d| Box::pin(IntervalStream::new(interval(d))),
+            );
         let mut scan_interval = IntervalStream::new(interval(Duration::from_secs(
             self.config.scan_interval.into(),
         )));
@@ -458,8 +465,8 @@ impl StreamSink<Event> for Memory {
                     let log = event.into_log();
 
                     if let (Value::Object(map), _) = log.into_parts() {
-                        self.handle_value(map)
-                    };
+                        self.handle_value(map);
+                    }
 
                     finalizers.update_status(EventStatus::Delivered);
                     events_sent.emit(CountByteSize(1, event_byte_size));
@@ -517,7 +524,7 @@ mod tests {
 
     #[test]
     fn finds_row() {
-        let memory = Memory::new(Default::default());
+        let memory = Memory::new(MemoryConfig::default());
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let condition = Condition::Equals {
@@ -536,8 +543,13 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn extract_state_preserves_data() {
-        let memory = Memory::new(Default::default());
+        let memory = Memory::new(MemoryConfig::default());
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let condition = Condition::Equals {
@@ -583,7 +595,10 @@ mod tests {
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
-                    update_time: (Instant::now() - Duration::from_secs(secs_to_subtract)).into(),
+                    update_time: Instant::now()
+                        .checked_sub(Duration::from_secs(secs_to_subtract))
+                        .unwrap()
+                        .into(),
                     ttl,
                 },
             );
@@ -675,7 +690,10 @@ mod tests {
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
-                    update_time: (Instant::now() - Duration::from_secs(ttl + 10)).into(),
+                    update_time: Instant::now()
+                        .checked_sub(Duration::from_secs(ttl + 10))
+                        .unwrap()
+                        .into(),
                     ttl,
                 },
             );
@@ -743,7 +761,10 @@ mod tests {
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
-                    update_time: (Instant::now() - Duration::from_secs(ttl / 2)).into(),
+                    update_time: Instant::now()
+                        .checked_sub(Duration::from_secs(ttl / 2))
+                        .unwrap()
+                        .into(),
                     ttl,
                 },
             );
@@ -844,7 +865,7 @@ mod tests {
 
     #[test]
     fn missing_key() {
-        let memory = Memory::new(Default::default());
+        let memory = Memory::new(MemoryConfig::default());
 
         let condition = Condition::Equals {
             field: "key",
@@ -867,7 +888,7 @@ mod tests {
             Value::from(5),
         )])));
 
-        let memory = Memory::new(Default::default());
+        let memory = Memory::new(MemoryConfig::default());
 
         run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(memory),
@@ -884,7 +905,7 @@ mod tests {
             Value::from(5),
         )])));
 
-        let memory = Memory::new(Default::default());
+        let memory = Memory::new(MemoryConfig::default());
 
         run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(memory),
@@ -1063,7 +1084,7 @@ mod tests {
             Value::from(5),
         )])));
 
-        let memory = Memory::new(Default::default());
+        let memory = Memory::new(MemoryConfig::default());
 
         run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(memory),

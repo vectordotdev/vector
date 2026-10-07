@@ -11,6 +11,6 @@ impl InternalEvent for SampleEventDiscarded {
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: "Sample discarded."
-        })
+        });
     }
 }

@@ -70,6 +70,11 @@ thread_local! {
     static GROUP_MEM_STATS: GroupMemStats = GroupMemStats::new();
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 struct GroupInfo {
     component_kind: String,
     component_type: String,
@@ -96,6 +101,11 @@ pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
 
 pub struct MainTracer;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::inline_always,
+    reason = "Keep the existing inlining decision pending separate performance validation."
+)]
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
@@ -117,6 +127,15 @@ impl Tracer for MainTracer {
 }
 
 /// Initializes allocation tracing.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn init_allocation_tracing() {
     for group in &GROUP_INFO {
         let mut writer = group.lock().unwrap();
@@ -175,7 +194,7 @@ pub fn init_allocation_tracing() {
                 thread::sleep(Duration::from_millis(
                     REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
                 ));
-            })
+            });
         })
         .unwrap();
 }
@@ -187,6 +206,11 @@ pub fn init_allocation_tracing() {
 /// a [`tracing::Span`] to achieve this" we utilize the logical invariants provided by spans --
 /// entering, exiting, and how spans exist as a stack -- in order to handle keeping the "current
 /// allocation group" accurate across all threads.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn acquire_allocation_group_id(
     component_id: String,
     component_type: String,
@@ -197,9 +221,9 @@ pub fn acquire_allocation_group_id(
     {
         let mut writer = group_lock.lock().unwrap();
         *writer = GroupInfo {
-            component_id,
             component_kind,
             component_type,
+            component_id,
         };
 
         return group_id;

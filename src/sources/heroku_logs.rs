@@ -233,6 +233,11 @@ struct LogplexSource {
 }
 
 impl LogplexSource {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_assert,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn decode_message(
         &self,
         body: Bytes,
@@ -337,6 +342,11 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     )
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn line_to_events(
     mut decoder: Decoder,
     log_namespace: LogNamespace,
@@ -416,8 +426,8 @@ fn line_to_events(
             fields = parts.len()
         );
 
-        events.push(LogEvent::from_str_legacy(line).into())
-    };
+        events.push(LogEvent::from_str_legacy(line).into());
+    }
 
     let now = Utc::now();
 
@@ -463,6 +473,15 @@ mod tests {
         crate::test_util::test_generate_config::<LogplexConfig>();
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     async fn source(
         auth: Option<HttpServerAuthConfig>,
         query_parameters: Vec<String>,
@@ -488,7 +507,7 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
         (recv, address, _guard)
@@ -543,7 +562,7 @@ mod tests {
                     assert_eq!(
                         200,
                         send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                    )
+                    );
                 },
                 rx,
                 SAMPLE_BODY.lines().count(),
@@ -589,7 +608,7 @@ mod tests {
                     assert_eq!(
                         200,
                         send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                    )
+                    );
                 },
                 rx,
                 SAMPLE_BODY.lines().count(),
@@ -629,7 +648,7 @@ mod tests {
                     assert_eq!(
                         400,
                         send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                    )
+                    );
                 },
                 rx,
                 SAMPLE_BODY.lines().count(),
@@ -653,7 +672,7 @@ mod tests {
                 assert_eq!(
                     200,
                     send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                )
+                );
             },
             rx,
             SAMPLE_BODY.lines().count(),
@@ -681,6 +700,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn logplex_handles_normal_lines() {
         let log_namespace = LogNamespace::Legacy;
         let body = "267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - foo bar baz";
@@ -700,6 +724,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn logplex_handles_malformed_lines() {
         let log_namespace = LogNamespace::Legacy;
         let body = "what am i doing here";
@@ -712,6 +741,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn logplex_doesnt_blow_up_on_bad_framing() {
         let log_namespace = LogNamespace::Legacy;
         let body = "1000000 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - i'm not that long";
@@ -781,7 +815,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -813,6 +847,6 @@ mod tests {
         .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }

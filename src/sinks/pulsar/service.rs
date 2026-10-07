@@ -64,6 +64,11 @@ pub struct PulsarService<Exe: Executor> {
 }
 
 impl<Exe: Executor> PulsarService<Exe> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub(crate) fn new(
         pulsar_client: Pulsar<Exe>,
         producer_options: ProducerOptions,
@@ -95,14 +100,19 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     fn call(&mut self, request: PulsarRequest) -> Self::Future {
         let producer = Arc::clone(&self.producer);
         let topic = request.metadata.topic.clone();
-        let event_time = request
-            .metadata
-            .timestamp_millis
-            .to_owned()
-            .map(|t| t as u64);
+        let event_time = request.metadata.timestamp_millis.map(|t| t as u64);
 
         Box::pin(async move {
             let body = request.body.clone();

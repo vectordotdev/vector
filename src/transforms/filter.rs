@@ -140,6 +140,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn filter_basic() {
         assert_transform_compliance(async {
             let transform_config = FilterConfig::from(AnyCondition::from(ConditionConfig::IsLog));

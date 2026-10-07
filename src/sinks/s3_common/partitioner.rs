@@ -23,6 +23,7 @@ pub struct S3KeyPartitioner {
 }
 
 impl S3KeyPartitioner {
+    #[must_use]
     pub const fn new(
         key_prefix_template: ConfinedTemplate,
         ssekms_key_id_template: Option<ConfinedTemplate>,

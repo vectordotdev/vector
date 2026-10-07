@@ -117,7 +117,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                 }],
                 dropped_attributes_count: 0,
             }),
-            schema_url: "".to_string(),
+            schema_url: String::new(),
             scope_metrics: vec![ScopeMetrics {
                 scope: Some(InstrumentationScope {
                     name: "vector-collector-instrumentation".to_string(),
@@ -125,7 +125,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                     attributes: vec![],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 metrics: vec![Metric {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
@@ -187,8 +187,8 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     flags: 0,
                     name: "span".to_string(),
                     kind: 1,
-                    start_time_unix_nano: 1713525203000000000,
-                    end_time_unix_nano: 1713525205000000000,
+                    start_time_unix_nano: 1_713_525_203_000_000_000,
+                    end_time_unix_nano: 1_713_525_205_000_000_000,
                     attributes: vec![],
                     dropped_attributes_count: 0,
                     events: vec![],
@@ -196,11 +196,11 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     links: vec![],
                     dropped_links_count: 0,
                     status: None,
-                    trace_state: "".to_string(),
+                    trace_state: String::new(),
                 }],
-                schema_url: "".to_string(),
+                schema_url: String::new(),
             }],
-            schema_url: "".to_string(),
+            schema_url: String::new(),
         }],
     }
 }
@@ -643,7 +643,7 @@ async fn receive_sum_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -651,7 +651,7 @@ async fn receive_sum_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -736,7 +736,7 @@ async fn receive_sum_non_monotonic_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -744,7 +744,7 @@ async fn receive_sum_non_monotonic_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -829,7 +829,7 @@ async fn receive_gauge_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -837,7 +837,7 @@ async fn receive_gauge_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -898,6 +898,11 @@ async fn receive_gauge_metric() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn receive_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let env = build_otlp_test_env(METRICS, None).await;
@@ -919,7 +924,7 @@ async fn receive_histogram_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -927,7 +932,7 @@ async fn receive_histogram_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1026,6 +1031,11 @@ async fn receive_histogram_metric() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn receive_histogram_delta_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let env = build_otlp_test_env(METRICS, None).await;
@@ -1047,7 +1057,7 @@ async fn receive_histogram_delta_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1055,7 +1065,7 @@ async fn receive_histogram_delta_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1154,6 +1164,11 @@ async fn receive_histogram_delta_metric() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn receive_exponential_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let env = build_otlp_test_env(METRICS, None).await;
@@ -1175,7 +1190,7 @@ async fn receive_exponential_histogram_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1183,7 +1198,7 @@ async fn receive_exponential_histogram_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1259,7 +1274,7 @@ async fn receive_exponential_histogram_metric() {
                     buckets: vec![
                         Bucket {
                             count: 1,
-                            upper_limit: -0.8408964152537146,
+                            upper_limit: -0.840_896_415_253_714_6,
                         },
                         Bucket {
                             count: 2,
@@ -1271,11 +1286,11 @@ async fn receive_exponential_histogram_metric() {
                         },
                         Bucket {
                             count: 2,
-                            upper_limit: 1.189207115002721,
+                            upper_limit: 1.189_207_115_002_721,
                         },
                         Bucket {
                             count: 1,
-                            upper_limit: 1.4142135623730951,
+                            upper_limit: 1.414_213_562_373_095_1,
                         },
                     ],
                     count: 7,
@@ -1295,6 +1310,11 @@ async fn receive_exponential_histogram_metric() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn receive_summary_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let env = build_otlp_test_env(METRICS, None).await;
@@ -1316,7 +1336,7 @@ async fn receive_summary_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: "".to_string(),
+                schema_url: String::new(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1324,7 +1344,7 @@ async fn receive_summary_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: "".to_string(),
+                    schema_url: String::new(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1426,6 +1446,11 @@ async fn receive_summary_metric() {
     .await;
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn get_source_config_with_headers(
     grpc_addr: net::SocketAddr,
     http_addr: net::SocketAddr,
@@ -1434,12 +1459,12 @@ fn get_source_config_with_headers(
     OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Default::default(),
+            tls: Option::default(),
             keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Default::default(),
+            tls: Option::default(),
             keepalive: Default::default(),
             headers: vec![
                 "User-Agent".to_string(),
@@ -1450,7 +1475,7 @@ fn get_source_config_with_headers(
         acknowledgements: Default::default(),
         max_concurrent_requests: None,
         request_timeout_secs: None,
-        log_namespace: Default::default(),
+        log_namespace: Option::default(),
         use_otlp_decoding: use_otlp_decoding.into(),
     }
 }
@@ -1811,6 +1836,11 @@ pub async fn build_otlp_test_env(
     build_otlp_test_env_with(event_name, log_namespace, false).await
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn build_otlp_test_env_with(
     event_name: &'static str,
     log_namespace: Option<bool>,
@@ -1822,14 +1852,14 @@ async fn build_otlp_test_env_with(
     let config = OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Default::default(),
+            tls: Option::default(),
             keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Default::default(),
+            tls: Option::default(),
             keepalive: Default::default(),
-            headers: Default::default(),
+            headers: Vec::default(),
         },
         acknowledgements: Default::default(),
         max_concurrent_requests: None,
@@ -1910,6 +1940,11 @@ fn current_time_and_nanos() -> (SystemTime, u64) {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn http_logs_use_otlp_decoding_emits_metric() {
     use crate::metrics::Controller;
 
@@ -1921,14 +1956,14 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
     let source = OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Default::default(),
+            tls: Option::default(),
             keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Default::default(),
+            tls: Option::default(),
             keepalive: Default::default(),
-            headers: Default::default(),
+            headers: Vec::default(),
         },
         acknowledgements: Default::default(),
         max_concurrent_requests: None,
@@ -2146,6 +2181,11 @@ mod otlp_decoding_config_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn test_get_signal_deserializer_per_signal() {
         let config_all_true = OpentelemetryConfig {
             grpc: GrpcConfig {
@@ -2235,6 +2275,11 @@ mod otlp_decoding_config_tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn test_outputs_configuration_per_signal() {
         let config_mixed = OpentelemetryConfig {
             grpc: GrpcConfig {

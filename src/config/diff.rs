@@ -15,10 +15,12 @@ pub struct ConfigDiff {
 }
 
 impl ConfigDiff {
+    #[must_use]
     pub fn initial(initial: &Config) -> Self {
         Self::new(&Config::default(), initial, HashSet::new())
     }
 
+    #[must_use]
     pub fn new(old: &Config, new: &Config, components_to_reload: HashSet<ComponentKey>) -> Self {
         ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources, &components_to_reload),
@@ -34,6 +36,7 @@ impl ConfigDiff {
     }
 
     /// Swaps removed with added in Differences.
+    #[must_use]
     pub const fn flip(mut self) -> Self {
         self.sources.flip();
         self.transforms.flip();
@@ -43,6 +46,7 @@ impl ConfigDiff {
     }
 
     /// Checks whether the given component is present at all.
+    #[must_use]
     pub fn contains(&self, key: &ComponentKey) -> bool {
         self.sources.contains(key)
             || self.transforms.contains(key)
@@ -51,6 +55,7 @@ impl ConfigDiff {
     }
 
     /// Checks whether the given component is changed.
+    #[must_use]
     pub fn is_changed(&self, key: &ComponentKey) -> bool {
         self.sources.is_changed(key)
             || self.transforms.is_changed(key)
@@ -59,6 +64,7 @@ impl ConfigDiff {
     }
 
     /// Checks whether the given component is removed.
+    #[must_use]
     pub fn is_removed(&self, key: &ComponentKey) -> bool {
         self.sources.is_removed(key)
             || self.transforms.is_removed(key)
@@ -147,6 +153,11 @@ impl EnrichmentTableDiff {
 }
 
 #[derive(Debug)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct Difference {
     pub to_remove: HashSet<ComponentKey>,
     pub to_change: HashSet<ComponentKey>,
@@ -402,7 +413,7 @@ mod tests {
         let diff = EnrichmentTableDiff::new(
             &old_config.enrichment_tables,
             &new_config.enrichment_tables,
-            &Default::default(),
+            &HashSet::default(),
         );
 
         assert_eq!(
@@ -482,7 +493,7 @@ mod tests {
         let diff = EnrichmentTableDiff::new(
             &old_config.enrichment_tables,
             &new_config.enrichment_tables,
-            &Default::default(),
+            &HashSet::default(),
         );
         let table_key = ComponentKey::from("file_table");
 
@@ -547,7 +558,7 @@ mod tests {
         let diff = EnrichmentTableDiff::new(
             &old_config.enrichment_tables,
             &new_config.enrichment_tables,
-            &Default::default(),
+            &HashSet::default(),
         );
 
         assert_eq!(

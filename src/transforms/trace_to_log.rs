@@ -88,6 +88,11 @@ mod tests {
         crate::test_util::test_generate_config::<TraceToLogConfig>();
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn do_transform(trace: TraceEvent) -> Option<LogEvent> {
         assert_transform_compliance(async move {
             let config = TraceToLogConfig {
@@ -107,10 +112,15 @@ mod tests {
             result
         })
         .await
-        .map(|e| e.into_log())
+        .map(vector_lib::event::Event::into_log)
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_trace() {
         use vrl::btreemap;
 
@@ -136,6 +146,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn drops_trace_layout_marker() {
         use vrl::btreemap;
 

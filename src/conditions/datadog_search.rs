@@ -34,6 +34,11 @@ impl Default for DatadogSearchConfig {
 }
 
 impl DatadogSearchConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<LogEvent>>> {
         Ok(build_matcher(&self.source, &EventFilter)?)
     }
@@ -239,6 +244,11 @@ impl Filter<LogEvent> for EventFilter {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn compare(
         &self,
         field: Field,
@@ -482,6 +492,11 @@ mod test {
     /// should pass when matched against the compiled source, and an `Event` that should fail.
     /// This is exported as public so any implementor of this lib can assert that each check
     /// still passes/fails in the context it's used.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn get_checks() -> Vec<(&'static str, Event, Event)> {
         vec![
             // Tag exists.
@@ -1606,6 +1621,11 @@ mod test {
     /// Test a `Matcher` by providing a `Filter<V>` and a processor that receives an
     /// `Event`, and returns a `V`. This allows testing against the pass/fail events that are returned
     /// from `get_checks()` and modifying into a type that allows for their processing.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn test_filter<V, F, P>(filter: F, processor: P)
     where
         V: std::fmt::Debug + Send + Sync + Clone + 'static,
@@ -1626,7 +1646,7 @@ mod test {
     #[test]
     /// Parse each Datadog Search Syntax query and check that it passes/fails.
     fn event_filter() {
-        test_filter(EventFilter, |ev| ev.into_log())
+        test_filter(EventFilter, vector_lib::event::Event::into_log);
     }
 
     #[test]
@@ -1635,13 +1655,18 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn check_datadog() {
         for (source, pass, fail) in get_checks() {
             let config: DatadogSearchConfig = source.parse().unwrap();
 
             // Every query should build successfully.
             let cond = config
-                .build(&Default::default(), &Default::default())
+                .build(&Default::default(), &MetricsStorage::default())
                 .unwrap_or_else(|_| panic!("build failed: {source}"));
 
             assert!(

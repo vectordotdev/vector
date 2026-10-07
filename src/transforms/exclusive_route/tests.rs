@@ -32,6 +32,11 @@ fn get_outputs_buf() -> (Vec<&'static str>, TransformOutputsBuf) {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn exclusive_routes() {
     let config = serde_yaml::from_str::<ExclusiveRouteConfig>(indoc! {r#"
             routes:

@@ -65,6 +65,11 @@ where
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "Preserve the existing selection of diagnostic fields pending a separate audit."
+)]
 impl<S, R1, R2> fmt::Debug for Map<S, R1, R2>
 where
     S: fmt::Debug,

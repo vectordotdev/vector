@@ -73,6 +73,11 @@ pub struct DatadogTracesRequestBuilder {
 }
 
 impl DatadogTracesRequestBuilder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     pub const fn new(
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
@@ -111,7 +116,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         let (key, events) = input;
         let trace_events = events
             .into_iter()
-            .filter_map(|e| e.try_into_trace())
+            .filter_map(vector_lib::event::Event::try_into_trace)
             .collect::<Vec<TraceEvent>>();
 
         // Compute APM stats from the incoming events. The stats payloads are sent out
@@ -231,14 +236,13 @@ fn encode_traces(
                     }));
 
                     break;
-                } else {
-                    // try with a fresh payload
-                    results.push(Ok((
-                        payload.encode_to_vec(),
-                        std::mem::take(&mut processed),
-                    )));
-                    payload = build_empty_payload(key);
                 }
+                // try with a fresh payload
+                results.push(Ok((
+                    payload.encode_to_vec(),
+                    std::mem::take(&mut processed),
+                )));
+                payload = build_empty_payload(key);
             } else {
                 processed.push(trace);
                 break;
@@ -252,6 +256,11 @@ fn encode_traces(
     results
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
     dd_proto::AgentPayload {
         host_name: key.hostname.clone().unwrap_or_default(),
@@ -267,6 +276,11 @@ fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
     let tags = trace
         .get(event_path!("tags"))
@@ -301,7 +315,7 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
             .unwrap_or_default(),
         dropped_trace: trace
             .get(event_path!("dropped"))
-            .and_then(|v| v.as_boolean())
+            .and_then(vector_lib::event::Value::as_boolean)
             .unwrap_or(false),
         spans,
         tags: tags.clone(),
@@ -346,6 +360,15 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn convert_span(span: &ObjectMap) -> dd_proto::Span {
     let trace_id = match span.get("trace_id") {
         Some(Value::Integer(val)) => *val,
@@ -461,6 +484,15 @@ fn convert_span_events(events: &[Value]) -> Vec<dd_proto::SpanEvent> {
         .collect()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
     dd_proto::SpanLink {
         trace_id: u64_id_field(link, "trace_id"),
@@ -472,6 +504,11 @@ fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn convert_span_event(event: &ObjectMap) -> dd_proto::SpanEvent {
     dd_proto::SpanEvent {
         time_unix_nano: match event.get("time_unix_nano") {
@@ -505,7 +542,7 @@ fn integer_field(object: &ObjectMap, key: &str) -> i64 {
 }
 
 fn u64_id_field(object: &ObjectMap, key: &str) -> u64 {
-    object.get(key).map(decode_u64_id).unwrap_or(0)
+    object.get(key).map_or(0, decode_u64_id)
 }
 
 fn string_field(object: &ObjectMap, key: &str) -> String {

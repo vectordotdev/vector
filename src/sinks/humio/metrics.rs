@@ -148,10 +148,10 @@ fn default_endpoint() -> HttpEndpoint {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             host_key: hostname
             token: ${HUMIO_TOKEN}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -230,7 +230,7 @@ impl HumioMetricsConfig {
             batch: self.batch,
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             // hard coded as humio expects this format so no sense in making it configurable
             timestamp_key: OptionalTargetPath::from(
                 vrl::path::PathPrefix::Event,
@@ -291,6 +291,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn validate_rejects_unconfined_template() {
         use crate::config::ValidatedSink;
 
@@ -307,7 +312,7 @@ mod tests {
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: Default::default(),
         };
 

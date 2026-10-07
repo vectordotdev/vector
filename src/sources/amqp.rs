@@ -1,5 +1,5 @@
 //! `AMQP` source.
-//! Handles version AMQP 0.9.1 which is used by RabbitMQ.
+//! Handles version AMQP 0.9.1 which is used by `RabbitMQ`.
 use std::{io::Cursor, pin::Pin};
 
 use async_stream::stream;
@@ -102,7 +102,7 @@ pub struct AmqpSourceConfig {
 
     /// Maximum number of unacknowledged messages the broker will deliver to this consumer.
     ///
-    /// This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
+    /// This controls flow control via AMQP `QoS` prefetch. Lower values limit memory usage and
     /// prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
     /// throughput but consume more memory.
     ///
@@ -299,7 +299,7 @@ fn populate_log_event(
                     metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
                     timestamp,
                 );
-            };
+            }
 
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
@@ -308,10 +308,15 @@ fn populate_log_event(
                 log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
-    };
+    }
 }
 
 /// Receives an event from `AMQP` and pushes it along the pipeline.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 async fn receive_event(
     config: &AmqpSourceConfig,
     out: &mut SourceSender,
@@ -386,6 +391,11 @@ async fn receive_event(
 }
 
 /// Send the event stream created by the framed read to the `out` stream.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::redundant_pattern_matching,
+    reason = "Preserve temporary drop timing while handling the result."
+)]
 async fn finalize_event_stream(
     finalizer: Option<&UnorderedFinalizer<FinalizerEntry>>,
     out: &mut SourceSender,
@@ -401,22 +411,21 @@ async fn finalize_event_stream(
                 Err(_) => {
                     emit!(StreamClosedError { count: 1 });
                 }
-                Ok(_) => {
+                Ok(()) => {
                     finalizer.add(msg.into(), receiver);
                 }
             }
         }
-        None => match out.send_event_stream(&mut stream).await {
-            Err(_) => {
+        None => {
+            if let Err(_) = out.send_event_stream(&mut stream).await {
                 emit!(StreamClosedError { count: 1 });
-            }
-            Ok(_) => {
+            } else {
                 let ack_options = lapin::options::BasicAckOptions::default();
                 if let Err(error) = msg.acker.ack(ack_options).await {
                     emit!(AmqpAckError { error });
                 }
             }
-        },
+        }
     }
 }
 
@@ -473,7 +482,7 @@ async fn run_amqp_source(
                             return Err(());
                         }
                         Ok(msg) => {
-                            receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?
+                            receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?;
                         }
                     }
                 } else {
@@ -486,6 +495,11 @@ async fn run_amqp_source(
     Ok(())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
 async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
     match status {
         BatchStatus::Delivered => {
@@ -521,6 +535,7 @@ pub mod test {
         crate::test_util::test_generate_config::<AmqpSourceConfig>();
     }
 
+    #[must_use]
     pub fn make_config() -> AmqpSourceConfig {
         let mut config = AmqpSourceConfig {
             queue: "it".to_string(),
@@ -535,6 +550,7 @@ pub mod test {
         config
     }
 
+    #[must_use]
     pub fn make_tls_config() -> AmqpSourceConfig {
         let mut config = AmqpSourceConfig {
             queue: "it".to_string(),

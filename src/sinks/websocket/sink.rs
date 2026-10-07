@@ -36,6 +36,11 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     pub(crate) fn new(
         config: &WebSocketSinkConfig,
         connector: WebSocketConnector,
@@ -76,6 +81,11 @@ impl WebSocketSink {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn handle_events<I, WS, O>(
         &mut self,
         input: &mut I,
@@ -107,7 +117,7 @@ impl WebSocketSink {
             let result = tokio::select! {
                 _ = ping_interval.tick() => {
                     match self.check_received_pong_time(last_pong) {
-                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map(|_| ()),
+                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await,
                         Err(e) => Err(e)
                     }
                 },
@@ -138,28 +148,25 @@ impl WebSocketSink {
                     let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
-                    match self.encoder.encode(event, &mut bytes) {
-                        Ok(()) => {
-                            finalizers.update_status(EventStatus::Delivered);
+                    if let Ok(()) = self.encoder.encode(event, &mut bytes) {
+                        finalizers.update_status(EventStatus::Delivered);
 
-                            let message = if encode_as_binary {
-                                Message::binary(bytes)
-                            }
-                            else {
-                                Message::text(String::from_utf8_lossy(&bytes))
-                            };
-                            let message_len = message.len();
-
-                            ws_sink.send(message).await.map(|_| {
-                                events_sent.emit(CountByteSize(1, event_byte_size));
-                                bytes_sent.emit(ByteSize(message_len));
-                            })
-                        },
-                        Err(_) => {
-                            // Error is handled by `Encoder`.
-                            finalizers.update_status(EventStatus::Errored);
-                            Ok(())
+                        let message = if encode_as_binary {
+                            Message::binary(bytes)
                         }
+                        else {
+                            Message::text(String::from_utf8_lossy(&bytes))
+                        };
+                        let message_len = message.len();
+
+                        ws_sink.send(message).await.map(|()| {
+                            events_sent.emit(CountByteSize(1, event_byte_size));
+                            bytes_sent.emit(ByteSize(message_len));
+                        })
+                    } else {
+                        // Error is handled by `Encoder`.
+                        finalizers.update_status(EventStatus::Errored);
+                        Ok(())
                     }
                 },
                 else => break,
@@ -236,6 +243,11 @@ mod tests {
     };
 
     #[tokio::test(flavor = "multi_thread")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn test_websocket() {
         trace_init();
 
@@ -257,6 +269,11 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn test_auth_websocket() {
         trace_init();
 
@@ -282,6 +299,11 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn test_tls_websocket() {
         trace_init();
 
@@ -313,6 +335,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn test_websocket_reconnect() {
         trace_init();
 
@@ -354,6 +381,11 @@ mod tests {
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn send_events_and_assert(
         addr: SocketAddr,
         config: WebSocketSinkConfig,
@@ -460,9 +492,10 @@ mod tests {
                 })
                 .flatten();
 
-            match interrupt_stream {
-                false => stream.boxed(),
-                true => stream.take_until(stream_tripwire).boxed(),
+            if interrupt_stream {
+                stream.take_until(stream_tripwire).boxed()
+            } else {
+                stream.boxed()
             }
         })
     }

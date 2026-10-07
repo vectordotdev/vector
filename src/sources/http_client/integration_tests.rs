@@ -1,4 +1,4 @@
-//! Integration tests for http_client source.
+//! Integration tests for `http_client` source.
 //! The container configuration file is `docker-compose.http_client.yml`
 //! It leverages a static file server ("dufs"), which serves the files in tests/data/http-client
 
@@ -35,7 +35,7 @@ fn dufs_https_address() -> String {
 }
 
 /// The error path should not yield any events and must emit the required error internal events.
-/// Consider extracting this function into test_util , if it is always true that if the error
+/// Consider extracting this function into `test_util` , if it is always true that if the error
 /// internal event metric is fired that no events would be outputted by the source.
 pub(crate) async fn run_error(config: HttpClientConfig) {
     let events =
@@ -92,6 +92,11 @@ async fn collected_logs_bytes() {
 
 /// Logs (json) should be collected and decoded successfully.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn collected_logs_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_address()),
@@ -118,6 +123,11 @@ async fn collected_logs_json() {
 
 /// Metrics should be collected and decoded successfully.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn collected_metrics_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/metrics/native.json", dufs_address()),
@@ -149,6 +159,11 @@ async fn collected_metrics_native_json() {
 
 /// Traces should be collected and decoded successfully.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn collected_trace_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/traces/native.json", dufs_address()),
@@ -175,6 +190,11 @@ async fn collected_trace_native_json() {
 
 /// Passing no authentication for the auth-gated endpoint should yield errors.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn unauthorized_no_auth() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
@@ -195,6 +215,11 @@ async fn unauthorized_no_auth() {
 
 /// Passing the incorrect credentials for the auth-gated endpoint should yield errors.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn unauthorized_wrong_auth() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
@@ -218,6 +243,11 @@ async fn unauthorized_wrong_auth() {
 
 /// Passing the correct credentials for the auth-gated endpoint should succeed.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn authorized() {
     run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
@@ -241,6 +271,11 @@ async fn authorized() {
 
 /// Passing an incorrect CA file for TLS should yield errors.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn tls_invalid_ca() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
@@ -264,6 +299,11 @@ async fn tls_invalid_ca() {
 
 /// Passing the correct CA file for TLS should succeed.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn tls_valid() {
     run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
@@ -287,6 +327,11 @@ async fn tls_valid() {
 
 /// The source should shutdown cleanly when the shutdown signal is received.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn shutdown() {
     let source_id = ComponentKey::from("http_client_shutdown");
     let source = HttpClientConfig {

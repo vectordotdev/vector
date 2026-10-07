@@ -7,7 +7,7 @@ use std::{
 };
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
 use crate::{
@@ -48,7 +48,7 @@ pub struct Opts {
     )]
     pub config_dirs: Vec<PathBuf>,
 
-    /// Output path for JUnit reports
+    /// Output path for `JUnit` reports
     #[arg(id = "junit-report", long, value_delimiter(','))]
     junit_report_paths: Option<Vec<PathBuf>>,
 
@@ -74,7 +74,7 @@ impl Opts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
@@ -99,7 +99,7 @@ impl<'a> JUnitReporter<'a> {
     fn add_test_result(&mut self, name: &str, errors: &[String], time: Duration) {
         if self.output_paths.is_none() {
             return;
-        }; // early return in case no output paths were specified
+        } // early return in case no output paths were specified
 
         if errors.is_empty() {
             // successful test
@@ -119,7 +119,7 @@ impl<'a> JUnitReporter<'a> {
     fn write_reports(mut self, time: Duration) -> Result<(), String> {
         if self.output_paths.is_none() {
             return Ok(());
-        }; // early return in case no output paths were specified
+        } // early return in case no output paths were specified
 
         // create a report from the test cases
         self.test_suite.set_time(time);
@@ -145,6 +145,11 @@ impl<'a> JUnitReporter<'a> {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
@@ -179,17 +184,17 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
 
                     junit_reporter.add_test_result(&name, &errors, test_case_elapsed);
 
-                    if !errors.is_empty() {
+                    if errors.is_empty() {
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("test {name} ... {}", "passed".green());
+                        }
+                    } else {
                         #[allow(clippy::print_stdout)]
                         {
                             println!("test {name} ... {}", "failed".red());
                         }
                         aggregated_test_errors.push((name, errors));
-                    } else {
-                        #[allow(clippy::print_stdout)]
-                        {
-                            println!("test {name} ... {}", "passed".green());
-                        }
                     }
                 }
 
@@ -212,7 +217,9 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
         }
     }
 
-    if !aggregated_test_errors.is_empty() {
+    if aggregated_test_errors.is_empty() {
+        exitcode::OK
+    } else {
         #[allow(clippy::print_stdout)]
         {
             println!("\nfailures:");
@@ -231,7 +238,5 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
         }
 
         exitcode::CONFIG
-    } else {
-        exitcode::OK
     }
 }

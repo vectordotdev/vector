@@ -29,6 +29,15 @@ pub struct AmqpPropertiesConfig {
 }
 
 impl AmqpPropertiesConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     pub(super) fn build(&self, event: &Event) -> Option<BasicProperties> {
         let mut prop = BasicProperties::default();
         if let Some(content_type) = &self.content_type {
@@ -321,7 +330,7 @@ mod tests {
                 .unwrap()
                 .render(event)
                 .unwrap(),
-            priority as u64
+            u64::from(priority)
         );
     }
 

@@ -1,11 +1,11 @@
 //! Common logic for sources that are HTTP clients.
 //!
 //! Specific HTTP client sources will:
-//!   - Call build_url() to build the URL(s) to call.
+//!   - Call `build_url()` to build the URL(s) to call.
 //!   - Implement a specific context struct which:
-//!       - Contains the data that source needs in order to process the HTTP responses into internal_events
-//!       - Implements the HttpClient trait
-//!   - Call call() supplying the generic inputs for calling and the source-specific
+//!       - Contains the data that source needs in order to process the HTTP responses into `internal_events`
+//!       - Implements the `HttpClient` trait
+//!   - Call `call()` supplying the generic inputs for calling and the source-specific
 //!     context.
 
 // Okta source only imports defaults but doesn't use the rest of the client
@@ -146,7 +146,7 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
-    };
+    }
     for (k, query_value) in query {
         match query_value {
             QueryParameterValue::SingleParam(param) => {
@@ -157,15 +157,15 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
                     serializer.append_pair(k, v.value());
                 }
             }
-        };
+        }
     }
     let mut builder = Uri::builder();
     if let Some(scheme) = uri.scheme() {
         builder = builder.scheme(scheme.clone());
-    };
+    }
     if let Some(authority) = uri.authority() {
         builder = builder.authority(authority.clone());
-    };
+    }
     builder = builder.path_and_query(match serializer.finish() {
         query if !query.is_empty() => format!("{}?{query}", uri.path()),
         _ => uri.path().to_string(),
@@ -190,6 +190,11 @@ pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
 ///   - The events are then sent to the output stream.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 pub(crate) async fn call<
     B: HttpClientBuilder<Context = C> + Send + Clone,
     C: HttpClientContext + Send,
@@ -336,16 +341,13 @@ pub(crate) async fn call<
         .flatten_unordered(None)
         .boxed();
 
-    match out.send_event_stream(&mut stream).await {
-        Ok(()) => {
-            debug!("Finished sending.");
-            Ok(())
-        }
-        Err(_) => {
-            let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
-            Err(())
-        }
+    if let Ok(()) = out.send_event_stream(&mut stream).await {
+        debug!("Finished sending.");
+        Ok(())
+    } else {
+        let (count, _) = stream.size_hint();
+        emit!(StreamClosedError { count });
+        Err(())
     }
 }
 

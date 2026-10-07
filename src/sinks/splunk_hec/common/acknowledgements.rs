@@ -60,7 +60,7 @@ impl Default for HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
             max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
-            inner: Default::default(),
+            inner: AcknowledgementsConfig::default(),
         }
     }
 }
@@ -154,7 +154,7 @@ impl HecAckClient {
                         }
                     }
                 }
-            };
+            }
         }
     }
 
@@ -265,9 +265,9 @@ pub async fn run_acknowledgements(
     http_request_builder: Arc<HttpRequestBuilder>,
     indexer_acknowledgements: HecClientAcknowledgementsConfig,
 ) {
-    let mut interval = tokio::time::interval(Duration::from_secs(
-        indexer_acknowledgements.query_interval.get() as u64,
-    ));
+    let mut interval = tokio::time::interval(Duration::from_secs(u64::from(
+        indexer_acknowledgements.query_interval.get(),
+    )));
     let mut ack_client = HecAckClient::new(
         indexer_acknowledgements.retry_limit.get(),
         client,
@@ -314,9 +314,9 @@ mod tests {
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = HttpRequestBuilder::new(
-            String::from(""),
+            String::new(),
             EndpointTarget::default(),
-            String::from(""),
+            String::new(),
             Compression::default(),
         );
         HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))
@@ -360,7 +360,7 @@ mod tests {
         ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
 
         let ack_request_body = ack_client.get_ack_query_body();
-        assert!(ack_request_body.acks.is_empty())
+        assert!(ack_request_body.acks.is_empty());
     }
 
     #[tokio::test]

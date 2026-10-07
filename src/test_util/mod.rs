@@ -93,6 +93,11 @@ macro_rules! log_event {
     };
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
@@ -116,6 +121,11 @@ where
     });
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
     let test_file = File::open(path)?;
     let value: serde_json::Value = serde_json::from_reader(test_file)?;
@@ -145,6 +155,11 @@ pub fn trace_init() {
     vector_lib::metrics::init_test();
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub async fn send_lines(
     addr: SocketAddr,
     lines: impl IntoIterator<Item = String>,
@@ -152,6 +167,15 @@ pub async fn send_lines(
     send_encodable(addr, LinesCodec::new(), lines).await
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     addr: SocketAddr,
     encoder: impl Encoder<I, Error = E>,
@@ -172,6 +196,15 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     Ok(local_addr)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn send_lines_tls(
     addr: SocketAddr,
     host: String,
@@ -221,18 +254,21 @@ pub async fn send_lines_tls(
     Ok(local_addr)
 }
 
+#[must_use]
 pub fn temp_file() -> PathBuf {
     let path = std::env::temp_dir();
     let file_name = random_string(16);
     path.join(file_name + ".log")
 }
 
+#[must_use]
 pub fn temp_dir() -> PathBuf {
     let path = std::env::temp_dir();
     let dir_name = random_string(16);
     path.join(dir_name)
 }
 
+#[must_use]
 pub fn random_table_name() -> String {
     format!("test_{}", random_string(10).to_lowercase())
 }
@@ -281,7 +317,7 @@ pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
 ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count).map(generator).collect::<Vec<_>>();
     let stream = map_batch_stream(
-        stream::iter(events.clone()).map(|event| event.into_log()),
+        stream::iter(events.clone()).map(vector_lib::event::Event::into_log),
         batch,
     );
     (events, stream)
@@ -312,6 +348,19 @@ pub fn random_metrics_with_stream(
 ///
 /// # Returns
 /// A tuple of the generated metric events and the stream of the generated events
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn random_metrics_with_stream_timestamp(
     count: usize,
     batch: Option<BatchNotifier>,
@@ -351,7 +400,7 @@ pub fn random_events_with_stream(
         .map(|_| Event::from(LogEvent::from_str_legacy(random_string(len))))
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
-        stream::iter(events.clone()).map(|event| event.into_log()),
+        stream::iter(events.clone()).map(vector_lib::event::Event::into_log),
         batch,
     );
     (events, stream)
@@ -373,7 +422,7 @@ where
         .map(Event::Log)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
-        stream::iter(events.clone()).map(|event| event.into_log()),
+        stream::iter(events.clone()).map(vector_lib::event::Event::into_log),
         batch,
     );
     (events, stream)
@@ -402,6 +451,7 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
     iter::repeat_with(move || random_string(len))
 }
 
+#[must_use]
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
     let size = rng().random_range(0..max_size);
 
@@ -424,6 +474,11 @@ where
     rx.take(n).collect().await
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
     let mut events = Vec::with_capacity(n);
 
@@ -469,14 +524,24 @@ pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n:
     items
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
     file.read_to_string(&mut output).unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
+    output.lines().map(std::borrow::ToOwned::to_owned).collect()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading gzip file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -486,11 +551,16 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     String::from_utf8(output)
         .unwrap()
         .lines()
-        .map(|s| s.to_owned())
+        .map(std::borrow::ToOwned::to_owned)
         .collect()
 }
 
 #[cfg(test)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading zstd file.", path = %path.as_ref().display());
     let file = File::open(path).unwrap();
@@ -498,10 +568,16 @@ pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     String::from_utf8(output)
         .unwrap()
         .lines()
-        .map(|s| s.to_owned())
+        .map(std::borrow::ToOwned::to_owned)
         .collect()
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn runtime() -> runtime::Runtime {
     runtime::Builder::new_multi_thread()
         .enable_all()
@@ -510,6 +586,11 @@ pub fn runtime() -> runtime::Runtime {
 }
 
 // Wait for a Future to resolve, or the duration to elapse (will panic)
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn wait_for_duration<F, Fut>(mut f: F, duration: Duration)
 where
     F: FnMut() -> Fut,
@@ -519,9 +600,7 @@ where
     let mut delay = WAIT_FOR_MIN_MILLIS;
     while !f().await {
         sleep(Duration::from_millis(delay)).await;
-        if started.elapsed() > duration {
-            panic!("Timed out while waiting");
-        }
+        assert!(started.elapsed() <= duration, "Timed out while waiting");
         // quadratic backoff up to a maximum delay
         delay = (delay * 2).min(WAIT_FOR_MAX_MILLIS);
     }
@@ -533,7 +612,7 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = bool> + Send + 'static,
 {
-    wait_for_duration(f, Duration::from_secs(WAIT_FOR_SECS)).await
+    wait_for_duration(f, Duration::from_secs(WAIT_FOR_SECS)).await;
 }
 
 // Wait (for 5 secs) for a TCP socket to be reachable
@@ -545,7 +624,7 @@ where
         let addr = addr.clone();
         async move { TcpStream::connect(addr).await.is_ok() }
     })
-    .await
+    .await;
 }
 
 // Allows specifying a custom duration to wait for a TCP socket to be reachable
@@ -554,7 +633,7 @@ pub async fn wait_for_tcp_duration(addr: SocketAddr, duration: Duration) {
         || async move { TcpStream::connect(addr).await.is_ok() },
         duration,
     )
-    .await
+    .await;
 }
 
 pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
@@ -563,7 +642,7 @@ where
     F: Fn(usize) -> bool,
 {
     let value = value.as_ref();
-    wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await
+    wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await;
 }
 
 pub async fn wait_for_atomic_usize_timeout_ms<T, F>(value: T, unblock: F, timeout_ms: u64)
@@ -576,10 +655,15 @@ where
         || ready(unblock(value.load(Ordering::SeqCst))),
         Duration::from_millis(timeout_ms),
     )
-    .await
+    .await;
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn retry_until<'a, F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
 where
     F: FnMut() -> Fut,
@@ -603,11 +687,17 @@ pub struct CountReceiver<T> {
 }
 
 impl<T: Send + 'static> CountReceiver<T> {
+    #[must_use]
     pub fn count(&self) -> usize {
         self.count.load(Ordering::Relaxed)
     }
 
     /// Succeeds once first connection has been made.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
             tripwire.await.unwrap();
@@ -664,6 +754,12 @@ impl<T> Future for CountReceiver<T> {
 }
 
 impl CountReceiver<String> {
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire, connected| async move {
             let listener = TcpListener::bind(addr).await.unwrap();
@@ -678,6 +774,11 @@ impl CountReceiver<String> {
     }
 
     #[cfg(unix)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn receive_lines_unix<P>(path: P) -> CountReceiver<String>
     where
         P: AsRef<Path> + Send + 'static,
@@ -722,6 +823,11 @@ impl CountReceiver<String> {
 }
 
 impl CountReceiver<Event> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn receive_events<S>(stream: S) -> CountReceiver<Event>
     where
         S: Stream<Item = Event> + Send + 'static,
@@ -739,6 +845,15 @@ impl CountReceiver<Event> {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
@@ -754,6 +869,11 @@ pub async fn start_topology(
 /// happen concurrent with the sending process (ie the stream is
 /// handling finalization, which is required for the future to receive
 /// an acknowledgement).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
@@ -774,6 +894,11 @@ where
 /// used for tests where the collect has to happen concurrent with the
 /// sending process (ie the stream is handling finalization, which is
 /// required for the future to receive an acknowledgement).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn spawn_collect_ready<F, S>(future: F, stream: S, sleep: u64) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
@@ -796,6 +921,11 @@ mod tests {
     use super::retry_until;
 
     // helper which errors the first 3x, and succeeds on the 4th
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
         if *count.read().unwrap() < 3 {
             let mut c = count.write().unwrap();

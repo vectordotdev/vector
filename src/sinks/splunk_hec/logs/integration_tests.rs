@@ -111,6 +111,11 @@ async fn find_entries(messages: &[String]) -> bool {
     found_all
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn config(
     encoding: EncodingConfig,
     indexed_fields: Vec<ConfigValuePath>,
@@ -131,7 +136,7 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Default::default(),
+        acknowledgements: HecClientAcknowledgementsConfig::default(),
         timestamp_nanos_key: None,
         timestamp_key: None,
         auto_extract_timestamp: None,
@@ -489,10 +494,7 @@ async fn splunk_auto_extracted_timestamp() {
     // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
     // This environment variable is set by the integration test docker-compose file.
-    if std::env::var("CONFIG_VERSION")
-        .map(|version| !version.starts_with("7."))
-        .unwrap_or(true)
-    {
+    if std::env::var("CONFIG_VERSION").map_or(true, |version| !version.starts_with("7.")) {
         let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {
@@ -549,10 +551,7 @@ async fn splunk_non_auto_extracted_timestamp() {
     // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
     // This environment variable is set by the integration test docker-compose file.
-    if std::env::var("CONFIG_VERSION")
-        .map(|version| !version.starts_with("7."))
-        .unwrap_or(true)
-    {
+    if std::env::var("CONFIG_VERSION").map_or(true, |version| !version.starts_with("7.")) {
         let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {

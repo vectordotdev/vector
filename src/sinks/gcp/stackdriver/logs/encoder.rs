@@ -100,8 +100,7 @@ impl StackdriverLogsEncoder {
             .severity_key
             .as_ref()
             .and_then(|key| log.remove((PathPrefix::Event, &key.0)))
-            .map(remap_severity)
-            .unwrap_or_else(|| 0.into());
+            .map_or_else(|| 0.into(), remap_severity);
 
         let default_labels_key = default_labels_key();
         let labels_key = self
@@ -147,7 +146,7 @@ impl StackdriverLogsEncoder {
     }
 
     fn log_name(&self, event: &Event) -> Result<String, TemplateRenderingError> {
-        use StackdriverLogName::*;
+        use StackdriverLogName::{BillingAccount, Folder, Organization, Project};
 
         let log_id = self.log_id.render_string(event)?;
 
@@ -160,6 +159,11 @@ impl StackdriverLogsEncoder {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 pub(super) fn remap_severity(severity: Value) -> Value {
     let n = match severity {
         Value::Integer(n) => n - n % 100,
@@ -213,7 +217,7 @@ impl SinkEncoder<Vec<Event>> for StackdriverLogsEncoder {
             let size = event.estimated_json_encoded_size_of();
             if let Some(data) = self.encode_event(event.clone()) {
                 byte_size.add_event(event, size);
-                entries.push(data)
+                entries.push(data);
             } else {
                 // encode_event() emits the `TemplateRenderingError` internal event,
                 // which emits an `EventsDropped`, so no need to here.

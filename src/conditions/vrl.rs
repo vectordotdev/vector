@@ -87,11 +87,15 @@ pub struct Vrl {
 }
 
 impl Vrl {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn run(&self, event: Event) -> (Event, RuntimeResult) {
         let log_namespace = event
             .maybe_as_log()
-            .map(|log| log.namespace())
-            .unwrap_or(LogNamespace::Legacy);
+            .map_or(LogNamespace::Legacy, vector_lib::event::LogEvent::namespace);
         let mut target = VrlTarget::new(event, self.program.info(), MetricTagMode::Single);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
@@ -109,17 +113,18 @@ impl Conditional for Vrl {
     fn check(&self, event: Event) -> (bool, Event) {
         let (event, result) = self.run(event);
 
-        let result = result
-            .map(|value| match value {
-                Value::Boolean(boolean) => boolean,
-                _ => panic!("VRL condition did not return a boolean type"),
-            })
-            .unwrap_or_else(|err| {
+        let result = result.map_or_else(
+            |err| {
                 emit!(VrlConditionExecutionError {
                     error: err.to_string().as_ref()
                 });
                 false
-            });
+            },
+            |value| match value {
+                Value::Boolean(boolean) => boolean,
+                _ => panic!("VRL condition did not return a boolean type"),
+            },
+        );
         (result, event)
     }
 
@@ -180,6 +185,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn check_vrl() {
         let checks = vec![
             (
@@ -245,21 +255,21 @@ mod test {
             let source = source.to_owned();
             let config = VrlConfig {
                 source,
-                runtime: Default::default(),
+                runtime: VrlRuntime::default(),
             };
 
             assert_eq!(
                 config
-                    .build(&Default::default(), &Default::default())
+                    .build(&Default::default(), &MetricsStorage::default())
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(&Default::default(), &Default::default()) {
+            if let Ok(cond) = config.build(&Default::default(), &MetricsStorage::default()) {
                 assert_eq!(
                     cond.check_with_context(event.clone()).0,
-                    check.map_err(|e| e.to_string())
+                    check.map_err(std::string::ToString::to_string)
                 );
             }
         }

@@ -85,6 +85,11 @@ pub(crate) struct MemoryEnrichmentTableFlushed {
 }
 
 impl InternalEvent for MemoryEnrichmentTableFlushed {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn emit(self) {
         counter!(CounterName::MemoryEnrichmentTableFlushesTotal,).increment(1);
         gauge!(GaugeName::MemoryEnrichmentTableObjectsCount,).set(self.new_objects_count as f64);
@@ -269,6 +274,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn ttl_expired_count_emits_total_and_legacy() {
         let count = 7;
         let metrics = capture_metrics(|| {

@@ -72,6 +72,7 @@ pub struct Config {
 impl Config {
     /// Build `Config` from legacy `file` source line aggregator configuration
     /// params.
+    #[must_use]
     pub fn for_legacy(marker: Regex, timeout_ms: u64) -> Self {
         let start_pattern = marker;
         let condition_pattern = start_pattern.clone();
@@ -129,6 +130,7 @@ pub struct Logic<K, C> {
 
 impl<K, C> Logic<K, C> {
     /// Create a new `Logic` using the specified `Config`.
+    #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -231,7 +233,7 @@ where
 
                     return Poll::Pending;
                 }
-            };
+            }
         }
     }
 }
@@ -301,6 +303,11 @@ where
     K: Hash + Eq + Clone,
 {
     /// Handle line, if we have something to output - return it.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     pub fn handle_line(
         &mut self,
         src: K,
@@ -623,7 +630,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    /// https://github.com/vectordotdev/vector/issues/3237
+    /// <https://github.com/vectordotdev/vector/issues/3237>
     #[tokio::test]
     async fn two_lines_emit_with_continue_through() {
         let lines = vec![
@@ -808,6 +815,11 @@ mod tests {
     }
 
     /// Compare actual output to expected; expected is a list of the expected strings and context
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn assert_results(
         actual: Vec<(Filename, Bytes, usize, Option<usize>)>,
         expected: &[(&str, usize, Option<usize>)],

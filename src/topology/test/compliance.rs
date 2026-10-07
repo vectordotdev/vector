@@ -60,6 +60,11 @@ async fn create_topology(
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn test_function_transform_single_event() {
     assert_transform_compliance(async {
         let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
@@ -80,6 +85,11 @@ async fn test_function_transform_single_event() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn test_sync_transform_single_event() {
     assert_transform_compliance(async {
         let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
@@ -101,6 +111,11 @@ async fn test_sync_transform_single_event() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn test_task_transform_single_event() {
     assert_transform_compliance(async {
         let mut original_event = Event::Log(LogEvent::from("function transform being tested"));

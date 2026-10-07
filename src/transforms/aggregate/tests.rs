@@ -217,6 +217,11 @@ fn event_time_config_with(
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn incremental_auto() {
     let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
@@ -330,6 +335,11 @@ fn passes_through_ignored_kind() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn absolute_auto() {
     let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
@@ -895,13 +905,18 @@ async fn transform_shutdown() {
             "counter_a" => assert_eq!(counter_a_summed, event),
             "gauge_a" => assert_eq!(gauge_a_2, event),
             _ => panic!("Unexpected metric name in aggregate output"),
-        };
+        }
     }
     // There were only 2
     assert_eq!(2, count);
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn transform_interval() {
     let transform_config = serde_yaml::from_str::<AggregateConfig>("{}").unwrap();
 
@@ -961,7 +976,7 @@ async fn transform_interval() {
                         "counter_a" => assert_eq!(counter_a_summed, event),
                         "gauge_a" => assert_eq!(gauge_a_2, event),
                         _ => panic!("Unexpected metric name in aggregate output"),
-                    };
+                    }
                     count += 1;
                 }
                 _ => {
@@ -1099,6 +1114,11 @@ fn event_time_diff_uses_previous_bucket() {
 /// by watermark after a bucket has already been emitted — even when
 /// `allowed_lateness_ms` would still allow recording into an unflushed bucket.
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn event_time_late_events_are_rejected_by_cutoff_and_watermark() {
     let interval_ms = 10_000_u64;
     let interval_i64 = interval_ms as i64;
@@ -1219,7 +1239,7 @@ fn event_time_previous_bucket_retention_is_mode_specific_and_bounded() {
     }
 }
 
-/// `event_time.missing_timestamp` parses the snake_case literals shown in docs.
+/// `event_time.missing_timestamp` parses the `snake_case` literals shown in docs.
 #[test]
 fn event_time_block_parses_documented_literals() {
     use crate::config::GenerateConfig;
@@ -1268,11 +1288,11 @@ fn event_time_block_parses_documented_literals() {
 async fn event_time_drains_open_buckets_on_shutdown() {
     // Long interval/grace so only the final-flush path can emit.
     let agg = toml::from_str::<AggregateConfig>(
-        r#"
+        r"
 interval_ms = 600000
 [event_time]
 allowed_lateness_ms = 600000
-"#,
+",
     )
     .unwrap()
     .build(&TransformContext::default())
@@ -1340,7 +1360,7 @@ fn event_time_future_skew_gating_and_boundary() {
 }
 
 /// Far-future buckets must use saturating cutoff math so non-forced flush
-/// does not wrap, emit early, or advance the watermark to ~i64::MAX.
+/// does not wrap, emit early, or advance the watermark to ~`i64::MAX`.
 #[test]
 fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
     let mut agg = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
@@ -1378,8 +1398,13 @@ fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
     );
 }
 
-/// Missing-timestamp drop vs use_system_time, plus same-instant cutoff reuse.
+/// Missing-timestamp drop vs `use_system_time`, plus same-instant cutoff reuse.
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
     let interval_ms = 1_000_u64;
     let interval_i64 = interval_ms as i64;
@@ -1463,9 +1488,14 @@ fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
     assert_eq!(out.len(), 1);
 }
 
-/// EventMetadata::merge keeps finalizers/secrets but not attribution (`source_type`).
+/// `EventMetadata::merge` keeps finalizers/secrets but not attribution (`source_type`).
 /// Every replacement path must use the winner as the metadata base, then merge losers.
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
     let interval_ms = 10_000;
     let base_time = open_bucket_timestamp(interval_ms);

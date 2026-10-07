@@ -188,6 +188,11 @@ impl SimpleHttpConfig {
         schema_definition
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
         let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
         let framing = self
@@ -279,11 +284,19 @@ pub enum HttpConfigParamKind {
     Exact(String),
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParamKind>> {
     list.iter()
-        .map(|s| match s.contains('*') {
-            true => Ok(HttpConfigParamKind::Glob(glob::Pattern::new(s)?)),
-            false => Ok(HttpConfigParamKind::Exact(s.to_string())),
+        .map(|s| {
+            if s.contains('*') {
+                Ok(HttpConfigParamKind::Glob(glob::Pattern::new(s)?))
+            } else {
+                Ok(HttpConfigParamKind::Exact(s.clone()))
+            }
         })
         .collect::<crate::Result<Vec<HttpConfigParamKind>>>()
 }
@@ -331,10 +344,10 @@ impl SourceConfig for SimpleHttpConfig {
         let schema_definition = self.schema_definition(log_namespace);
 
         vec![SourceOutput::new_maybe_logs(
-            self.decoding
-                .as_ref()
-                .map(|d| d.output_type())
-                .unwrap_or(DataType::Log),
+            self.decoding.as_ref().map_or(
+                DataType::Log,
+                vector_lib::codecs::decoding::DeserializerConfig::output_type,
+            ),
             schema_definition,
         )]
     }
@@ -369,6 +382,11 @@ impl HttpSource for SimpleHttpSource {
 
     /// Enriches the log events with metadata for the `request_path` and for each of the headers.
     /// Non-log events are skipped.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_continue,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn enrich_events(
         &self,
         events: &mut [Event],
@@ -517,6 +535,15 @@ mod tests {
     }
 
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     async fn source<'a>(
         headers: Vec<String>,
         query_parameters: Vec<String>,
@@ -1724,7 +1751,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1755,7 +1782,7 @@ mod tests {
         )
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1962,7 +1989,7 @@ mod tests {
     impl ValidatableComponent for SimpleHttpConfig {
         fn validation_configuration() -> ValidationConfiguration {
             let config = Self {
-                decoding: Some(DeserializerConfig::Json(Default::default())),
+                decoding: Some(DeserializerConfig::Json(JsonDeserializerConfig::default())),
                 ..Default::default()
             };
 

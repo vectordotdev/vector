@@ -19,6 +19,12 @@ use crate::{
     },
 };
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn default_endpoint() -> HttpEndpoint {
     HttpEndpoint::parse("https://storage.googleapis.com")
         .expect("static default endpoint should be a valid http(s) URL")
@@ -109,6 +115,11 @@ pub enum GcsError {
     BucketNotFound { bucket: String },
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
@@ -130,6 +141,15 @@ pub fn build_healthcheck(
     Ok(healthcheck.boxed())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn healthcheck_response(
     response: http::Response<hyper::Body>,
     not_found_error: crate::Error,
@@ -139,6 +159,11 @@ pub fn healthcheck_response(
 
 /// Classifies a GCP healthcheck response by status alone, shared by the legacy and native
 /// HTTP clients.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn healthcheck_status(
     status: http::StatusCode,
     not_found_error: crate::Error,

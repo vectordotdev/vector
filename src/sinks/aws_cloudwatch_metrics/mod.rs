@@ -265,6 +265,15 @@ pub struct CloudWatchMetricsSvc {
 }
 
 impl CloudWatchMetricsSvc {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         client: CloudwatchClient,
@@ -305,6 +314,15 @@ impl CloudWatchMetricsSvc {
         Ok(VectorSink::from_event_sink(sink))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
         let resolutions = &self.storage_resolution;
         events
@@ -334,7 +352,7 @@ impl CloudWatchMetricsSvc {
                         MetricDatum::builder()
                             .metric_name(metric_name)
                             .set_values(Some(samples.iter().map(|s| s.value).collect()))
-                            .set_counts(Some(samples.iter().map(|s| s.rate as f64).collect()))
+                            .set_counts(Some(samples.iter().map(|s| f64::from(s.rate)).collect()))
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
                             .set_storage_resolution(resolution)
@@ -400,7 +418,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
 fn validate_storage_resolutions(
     storage_resolutions: IndexMap<String, i32>,
 ) -> crate::Result<IndexMap<String, i32>> {
-    for (metric_name, storage_resolution) in storage_resolutions.iter() {
+    for (metric_name, storage_resolution) in &storage_resolutions {
         if !matches!(storage_resolution, 1 | 60) {
             return Err(
                 format!("Storage resolution for {metric_name} should be '1' or '60'").into(),

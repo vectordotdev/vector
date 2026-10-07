@@ -2,7 +2,7 @@
 //!
 //! This module contains the logic for computing APM statistics based on the incoming trace
 //! events this sink receives. It is modelled closely to the trace-agent component of the
-//! Datadog Agent, and sends out StatsPayload packets formatted and Aggregated by the same
+//! Datadog Agent, and sends out `StatsPayload` packets formatted and Aggregated by the same
 //! algorithm, at ten second intervals, independently of the sink's trace payloads.
 
 use std::sync::{Arc, Mutex};
@@ -103,9 +103,18 @@ pub(crate) struct ClientGroupedStats {
 ///
 /// # arguments
 ///
-/// * `key`           - PartitionKey associated with this set of trace events.
+/// * `key`           - `PartitionKey` associated with this set of trace events.
 /// * `aggregator`    - Aggregator to use in computing and caching APM stats buckets.
 /// * `trace_events`  - Newly received trace events to process.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub(crate) fn compute_apm_stats(
     key: &PartitionKey,
     aggregator: Arc<Mutex<Aggregator>>,

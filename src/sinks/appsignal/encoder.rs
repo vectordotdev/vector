@@ -15,6 +15,11 @@ pub(super) struct AppsignalEncoder {
 }
 
 impl Encoder<Vec<Event>> for AppsignalEncoder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn encode_input(
         &self,
         events: Vec<Event>,

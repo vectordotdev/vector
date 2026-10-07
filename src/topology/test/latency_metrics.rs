@@ -32,6 +32,11 @@ struct LatencyTestRun {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 async fn component_latency_metrics_emitted() {
     let run = run_latency_topology().await;
 

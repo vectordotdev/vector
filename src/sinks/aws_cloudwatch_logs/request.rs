@@ -36,6 +36,11 @@ pub struct CloudwatchFuture {
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 struct Client {
     client: CloudwatchLogsClient,
     stream_name: String,
@@ -57,8 +62,13 @@ enum State {
 }
 
 impl CloudwatchFuture {
-    /// Panics if events.is_empty()
+    /// Panics if `events.is_empty()`
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub(super) fn new(
         client: CloudwatchLogsClient,
         headers: BTreeMap<OrderedHeaderName, HeaderValue>,
@@ -107,6 +117,11 @@ impl CloudwatchFuture {
 impl Future for CloudwatchFuture {
     type Output = Result<(), CloudwatchError>;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         loop {
             match &mut self.state {
@@ -159,7 +174,7 @@ impl Future for CloudwatchFuture {
 
                 State::CreateGroup(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
                                 SdkError::ServiceError(inner) => matches!(
@@ -172,7 +187,7 @@ impl Future for CloudwatchFuture {
                                 return Poll::Ready(Err(CloudwatchError::CreateGroup(err)));
                             }
                         }
-                    };
+                    }
 
                     info!(message = "Group created.", name = %self.client.group_name);
 
@@ -189,7 +204,7 @@ impl Future for CloudwatchFuture {
 
                 State::CreateStream(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
                                 SdkError::ServiceError(inner) => matches!(
@@ -202,7 +217,7 @@ impl Future for CloudwatchFuture {
                                 return Poll::Ready(Err(CloudwatchError::CreateStream(err)));
                             }
                         }
-                    };
+                    }
 
                     info!(message = "Stream created.", name = %self.client.stream_name);
 
@@ -233,7 +248,7 @@ impl Future for CloudwatchFuture {
 
                 State::PutRetentionPolicy(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(error) => {
                             return Poll::Ready(Err(CloudwatchError::PutRetentionPolicy(error)));
                         }
@@ -268,7 +283,7 @@ impl Client {
                 .log_stream_name(stream_name)
                 .customize()
                 .mutate_request(move |req| {
-                    for (header, value) in headers.iter() {
+                    for (header, value) in &headers {
                         req.headers_mut()
                             .insert(header.inner().clone(), value.clone());
                     }

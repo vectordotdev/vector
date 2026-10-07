@@ -30,6 +30,11 @@ pub(super) struct SSRequestBuilder {
 }
 
 impl SSRequestBuilder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub(super) fn new(
         message_group_id: Option<UnconfinedTemplate>,
         message_deduplication_id: Option<UnconfinedTemplate>,

@@ -75,7 +75,7 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: HttpEndpoint,
 
-    /// The InfluxDB API version to use.
+    /// The `InfluxDB` API version to use.
     ///
     /// Omitting this option is deprecated and it will be required in a future release. When
     /// unset, the version is temporarily inferred from the configured settings.
@@ -86,7 +86,7 @@ pub struct InfluxDbConfig {
 
     /// The name of the database to write into.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "vector-database"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     #[configurable(metadata(docs::required_when = "version = \"1\""))]
@@ -94,35 +94,35 @@ pub struct InfluxDbConfig {
 
     /// The consistency level to use for writes.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "any"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub consistency: Option<String>,
 
     /// The target retention policy for writes.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "autogen"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub retention_policy_name: Option<String>,
 
     /// The username to authenticate with.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "todd"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub username: Option<String>,
 
     /// The password to authenticate with.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub password: Option<SensitiveString>,
 
     /// The name of the organization to write into.
     ///
-    /// Only relevant when using InfluxDB v2.x and above.
+    /// Only relevant when using `InfluxDB` v2.x and above.
     #[configurable(metadata(docs::examples = "my-org"))]
     #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
     #[configurable(metadata(docs::required_when = "version = \"2\""))]
@@ -131,7 +131,7 @@ pub struct InfluxDbConfig {
 
     /// The name of the bucket to write into.
     ///
-    /// Only relevant when using InfluxDB v2.x and above.
+    /// Only relevant when using `InfluxDB` v2.x and above.
     #[configurable(metadata(docs::examples = "vector-bucket"))]
     #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
     #[configurable(metadata(docs::required_when = "version = \"2\""))]
@@ -140,7 +140,7 @@ pub struct InfluxDbConfig {
 
     /// The [token][token_docs] to authenticate with.
     ///
-    /// Only relevant when using InfluxDB v2.x and above.
+    /// Only relevant when using `InfluxDB` v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
@@ -174,10 +174,12 @@ pub struct InfluxDbConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+#[must_use]
 pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
+#[must_use]
 pub fn example_tags() -> HashMap<String, String> {
     HashMap::from([("region".to_string(), "us-west-1".to_string())])
 }
@@ -197,18 +199,15 @@ impl GenerateConfig for InfluxDbConfig {
 
 impl InfluxDbConfig {
     fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        let version = match self.version {
-            Some(version) => {
-                self.validate_version(version)?;
-                version
-            }
-            None => {
-                warn!(
-                    "The `version` option is currently optional but will be required in a future release. \
-                     Please set it to `1` or `2` to match your InfluxDB settings."
-                );
-                self.infer_version()?
-            }
+        let version = if let Some(version) = self.version {
+            self.validate_version(version)?;
+            version
+        } else {
+            warn!(
+                "The `version` option is currently optional but will be required in a future release. \
+                 Please set it to `1` or `2` to match your InfluxDB settings."
+            );
+            self.infer_version()?
         };
         match version {
             InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
@@ -346,6 +345,11 @@ impl InfluxDbSvc {
         Self::from_validated(config, &validated, client)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn from_validated(
         config: InfluxDbConfig,
         validated: &ValidatedInfluxDbMetrics,
@@ -483,7 +487,7 @@ fn encode_events(
     let mut output = BytesMut::new();
     let count = events.len();
 
-    for event in events.into_iter() {
+    for event in events {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
         let tags = merge_tags(&event, tags);
@@ -504,7 +508,7 @@ fn encode_events(
                 error_message,
                 count,
             });
-        };
+        }
     }
 
     // remove last '\n'
@@ -514,6 +518,11 @@ fn encode_events(
     output
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn get_type_and_fields(
     value: &MetricValue,
     quantiles: &[f64],
@@ -606,6 +615,11 @@ fn get_type_and_fields(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<KeyString, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
 
@@ -682,12 +696,12 @@ mod tests {
             retention_policy_name: None,
             username: None,
             password: None,
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tags: None,
             tls: None,
             quantiles: default_summary_quantiles(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -769,6 +783,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn test_encode_histogram_v1() {
         let events = vec![
             Metric::new(
@@ -798,7 +817,7 @@ mod tests {
             line_protocol1.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            line_protocol1.2.clone(),
             [
                 "bucket_1=1i",
                 "bucket_2.1=2i",
@@ -812,6 +831,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn test_encode_histogram() {
         let events = vec![
             Metric::new(
@@ -841,7 +865,7 @@ mod tests {
             line_protocol1.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            line_protocol1.2.clone(),
             [
                 "bucket_1=1u",
                 "bucket_2.1=2u",
@@ -855,6 +879,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn test_encode_summary_v1() {
         let events = vec![
             Metric::new(
@@ -884,7 +913,7 @@ mod tests {
             line_protocol1.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            line_protocol1.2.clone(),
             [
                 "count=6i",
                 "quantile_0.01=1.5",
@@ -898,6 +927,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn test_encode_summary() {
         let events = vec![
             Metric::new(
@@ -927,7 +961,7 @@ mod tests {
             line_protocol1.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            line_protocol1.2.clone(),
             [
                 "count=6u",
                 "quantile_0.01=1.5",
@@ -941,6 +975,15 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_encode_distribution() {
         let events = vec![
             Metric::new(
@@ -999,7 +1042,7 @@ mod tests {
             line_protocol1.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            line_protocol1.2.clone(),
             [
                 "avg=1.875",
                 "count=8",
@@ -1017,7 +1060,7 @@ mod tests {
         assert_eq!("ns.dense_stats", line_protocol2.0);
         assert_eq!("metric_type=distribution", line_protocol2.1);
         assert_fields(
-            line_protocol2.2.to_string(),
+            line_protocol2.2.clone(),
             [
                 "avg=9.5",
                 "count=20",
@@ -1035,7 +1078,7 @@ mod tests {
         assert_eq!("ns.sparse_stats", line_protocol3.0);
         assert_eq!("metric_type=distribution", line_protocol3.1);
         assert_fields(
-            line_protocol3.2.to_string(),
+            line_protocol3.2.clone(),
             [
                 "avg=3",
                 "count=10",
@@ -1125,7 +1168,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            line_protocol.2.clone(),
             [
                 "avg=1.875",
                 "count=8",
@@ -1229,14 +1272,23 @@ mod integration_tests {
                 ..Default::default()
             }),
         )
-        .await
+        .await;
     }
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_http() {
-        insert_metrics_v1(address_v1(false).as_str(), None).await
+        insert_metrics_v1(address_v1(false).as_str(), None).await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn insert_metrics_v1(url: &str, tls: Option<TlsConfig>) {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
@@ -1331,6 +1383,15 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn influxdb2_metrics_put_data() {
         crate::test_util::trace_init();
         let endpoint = address_v2();
@@ -1370,7 +1431,9 @@ mod integration_tests {
                 Metric::new(
                     metric.clone(),
                     MetricKind::Incremental,
-                    MetricValue::Counter { value: i as f64 },
+                    MetricValue::Counter {
+                        value: f64::from(i),
+                    },
                 )
                 .with_namespace(Some("ns"))
                 .with_tags(Some(metric_tags!(
@@ -1451,7 +1514,9 @@ mod integration_tests {
             Metric::new(
                 format!("counter-{i}"),
                 MetricKind::Incremental,
-                MetricValue::Counter { value: i as f64 },
+                MetricValue::Counter {
+                    value: f64::from(i),
+                },
             )
             .with_namespace(Some("ns"))
             .with_tags(Some(metric_tags!(

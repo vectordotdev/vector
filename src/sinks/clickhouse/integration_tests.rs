@@ -439,9 +439,11 @@ impl ClickhouseClient {
             .await
             .unwrap();
 
-        if !response.status().is_success() {
-            panic!("create table failed: {}", response.text().await.unwrap())
-        }
+        assert!(
+            response.status().is_success(),
+            "create table failed: {}",
+            response.text().await.unwrap()
+        );
     }
 
     async fn create_table_with_sql(&self, sql: &str) {
@@ -453,9 +455,11 @@ impl ClickhouseClient {
             .await
             .unwrap();
 
-        if !response.status().is_success() {
-            panic!("create table failed: {}", response.text().await.unwrap())
-        }
+        assert!(
+            response.status().is_success(),
+            "create table failed: {}",
+            response.text().await.unwrap()
+        );
     }
 
     async fn select_all(&self, table: &str) -> QueryResponse {
@@ -467,14 +471,14 @@ impl ClickhouseClient {
             .await
             .unwrap();
 
-        if !response.status().is_success() {
-            panic!("select all failed: {}", response.text().await.unwrap())
-        } else {
+        if response.status().is_success() {
             let text = response.text().await.unwrap();
             match serde_json::from_str(&text) {
                 Ok(value) => value,
                 Err(_) => panic!("json failed: {text:?}"),
             }
+        } else {
+            panic!("select all failed: {}", response.text().await.unwrap())
         }
     }
 }
@@ -511,7 +515,9 @@ async fn insert_events_arrow_format() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -535,7 +541,7 @@ async fn insert_events_arrow_format() {
     for i in 0..5 {
         let mut event = LogEvent::from(format!("log message {i}"));
         event.insert(event_path!("host"), format!("host{i}.example.com"));
-        event.insert(event_path!("count"), i as i64);
+        event.insert(event_path!("count"), i64::from(i));
         events.push(event.into());
     }
 
@@ -545,7 +551,7 @@ async fn insert_events_arrow_format() {
     assert_eq!(5, output.rows);
 
     // Verify fields exist and are correctly typed
-    for row in output.data.iter() {
+    for row in &output.data {
         assert!(row.get("host").and_then(|v| v.as_str()).is_some());
         assert!(row.get("message").and_then(|v| v.as_str()).is_some());
         assert!(
@@ -583,7 +589,9 @@ async fn insert_events_arrow_with_schema_fetching() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -600,9 +608,9 @@ async fn insert_events_arrow_with_schema_fetching() {
     for i in 0..3 {
         let mut event = LogEvent::from(format!("Test message {i}"));
         event.insert(event_path!("host"), format!("host{i}.example.com"));
-        event.insert(event_path!("id"), i as i64);
+        event.insert(event_path!("id"), i64::from(i));
         event.insert(event_path!("name"), format!("user_{i}"));
-        event.insert(event_path!("score"), 95.5 + i as f64);
+        event.insert(event_path!("score"), 95.5 + f64::from(i));
         event.insert(event_path!("active"), i % 2 == 0);
         event.insert(
             event_path!("request_id"),
@@ -631,8 +639,16 @@ async fn insert_events_arrow_with_schema_fetching() {
                 .is_some()
         );
         assert!(row.get("name").and_then(|v| v.as_str()).is_some());
-        assert!(row.get("score").and_then(|v| v.as_f64()).is_some());
-        assert!(row.get("active").and_then(|v| v.as_bool()).is_some());
+        assert!(
+            row.get("score")
+                .and_then(serde_json::Value::as_f64)
+                .is_some()
+        );
+        assert!(
+            row.get("active")
+                .and_then(serde_json::Value::as_bool)
+                .is_some()
+        );
 
         // Check UUID field
         let request_id = row
@@ -647,6 +663,15 @@ async fn insert_events_arrow_with_schema_fetching() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn test_complex_types() {
     trace_init();
 
@@ -1244,7 +1269,7 @@ async fn test_complex_types() {
     assert_eq!(2, nested3.len());
 }
 
-/// Tests that missing required fields emit EncoderNullConstraintError and reject the batch
+/// Tests that missing required fields emit `EncoderNullConstraintError` and reject the batch
 #[tokio::test]
 async fn test_missing_required_field_emits_null_constraint_error() {
     init_test();
@@ -1270,7 +1295,9 @@ async fn test_missing_required_field_emits_null_constraint_error() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
-        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(Default::default())),
+        batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
         batch,
         request: TowerRequestConfig {
             retry_attempts: 1,
@@ -1306,8 +1333,7 @@ async fn test_missing_required_field_emits_null_constraint_error() {
         .filter(|m| {
             m.name() == "component_errors_total"
                 && m.tags()
-                    .map(|t| t.get("error_code") == Some("encoding_null_constraint"))
-                    .unwrap_or(false)
+                    .is_some_and(|t| t.get("error_code") == Some("encoding_null_constraint"))
         })
         .collect();
 
@@ -1317,7 +1343,7 @@ async fn test_missing_required_field_emits_null_constraint_error() {
     );
 }
 
-/// Tests that Arrow schema fetching correctly handles special ClickHouse column types:
+/// Tests that Arrow schema fetching correctly handles special `ClickHouse` column types:
 /// - MATERIALIZED and ALIAS columns are excluded from the schema (can't receive INSERT data)
 /// - DEFAULT columns are kept but marked nullable (server fills them in if omitted)
 /// - EPHEMERAL columns are excluded (not stored, only used in expressions)

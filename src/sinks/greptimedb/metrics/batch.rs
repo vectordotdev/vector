@@ -10,24 +10,32 @@ use super::request_builder::{
 const F64_BYTE_SIZE: usize = 8;
 const I64_BYTE_SIZE: usize = 8;
 
-/// GreptimeDBBatchSizer is a batch sizer for metrics.
+/// `GreptimeDBBatchSizer` is a batch sizer for metrics.
 #[derive(Default)]
 pub struct GreptimeDBBatchSizer;
 
 impl GreptimeDBBatchSizer {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     pub fn estimated_size_of(&self, item: &Metric) -> usize {
         // Metric name.
         item.series().name().name().len()
         // Metric namespace, with an additional 1 to account for the namespace separator.
-        + item.series().name().namespace().map(|s| s.len() + 1).unwrap_or(0)
+        + item.series().name().namespace().map_or(0, |s| s.len() + 1)
         // Metric tags, with an additional 1 per tag to account for the tag key/value separator.
-        + item.series().tags().map(|t| {
+        + item.series().tags().map_or(0, |t| {
             t.iter_all().map(|(k, v)| {
-                k.len() + 1 + v.map(|v| v.len()).unwrap_or(0)
+                k.len() + 1 + v.map_or(0, str::len)
             })
             .sum()
         })
-            .unwrap_or(0)
             // timestamp
             + I64_BYTE_SIZE
             +

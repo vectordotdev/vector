@@ -18,6 +18,19 @@ pub enum Error {
 /// TODO: Describe more, especially why we have a bool in the key.
 type Cache = HashMap<(bool, Vec<OutputId>), Vec<(OutputId, Definition)>>;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn possible_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
@@ -107,6 +120,11 @@ pub fn possible_definitions(
 /// definitions, one for each route leading into `Sink 1`, with the route going through `Transform
 /// 5` being expanded into two individual routes (So1 -> T3 -> T5 -> Si1 AND So1 -> T4 -> T5 ->
 /// Si1).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub(super) fn expanded_definitions(
     enrichment_tables: vector_lib::enrichment::TableRegistry,
     inputs: &[OutputId],
@@ -206,6 +224,11 @@ pub(super) fn expanded_definitions(
 /// Returns a list of definitions from the given inputs.
 /// Errors if any of the definitions are [`Kind::never`] implying that
 /// an error condition has been reached.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub(crate) fn input_definitions(
     inputs: &[OutputId],
     config: &Config,
@@ -359,6 +382,11 @@ pub trait ComponentContainer {
     /// Returns Err(()) if there is no transform with the given key
     /// Returns Some(None) if the source does not have an output for the port given
     #[allow(clippy::result_unit_err)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn transform_output_for_port(
         &self,
         key: &ComponentKey,
@@ -378,6 +406,11 @@ pub trait ComponentContainer {
     /// Returns Err(()) if there is no source with the given key
     /// Returns Some(None) if the source does not have an output for the port given
     #[allow(clippy::result_unit_err)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn source_output_for_port(
         &self,
         key: &ComponentKey,
@@ -391,6 +424,11 @@ pub trait ComponentContainer {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn get_output_for_port(
     outputs: Vec<TransformOutput>,
     port: &Option<String>,
@@ -398,6 +436,11 @@ fn get_output_for_port(
     outputs.into_iter().find(|output| &output.port == port)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn get_source_output_for_port(
     outputs: Vec<SourceOutput>,
     port: &Option<String>,
@@ -453,6 +496,11 @@ mod tests {
     use super::*;
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_expanded_definition() {
         struct TestCase {
             inputs: Vec<(&'static str, Option<String>)>,

@@ -140,11 +140,11 @@ impl GenerateConfig for FileSinkConfig {
             path: UnconfinedTemplate::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-            compression: Default::default(),
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            internal_metrics: Default::default(),
-            truncate: Default::default(),
+            compression: Compression::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         })
@@ -318,6 +318,11 @@ pub struct FileSink {
 }
 
 impl FileSink {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let validated = config.validate()?;
         Self::from_validated(config, &validated, cx)
@@ -326,6 +331,11 @@ impl FileSink {
     /// Constructs the sink from the validated state, performing only the
     /// environment-dependent (non-`validate`) work: timezone offset resolution
     /// and path confinement construction.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn from_validated(
         config: &FileSinkConfig,
         validated: &ValidatedFileSink,
@@ -419,34 +429,31 @@ impl FileSink {
         loop {
             tokio::select! {
                 event = input.next() => {
-                    match event {
-                        Some(event) => self.process_event(event).await,
-                        None => {
-                            // If we got `None` - terminate the processing.
-                            debug!(message = "Receiver exhausted, terminating the processing loop.");
+                    if let Some(event) = event { self.process_event(event).await } else {
+                        // If we got `None` - terminate the processing.
+                        debug!(message = "Receiver exhausted, terminating the processing loop.");
 
-                            // Close all the open files.
-                            debug!(message = "Closing all the open files.");
-                            for (path, file) in self.files.iter_mut() {
-                                if let Err(error) = file.close().await {
-                                    emit!(FileIoError {
-                                        error,
-                                        code: "failed_closing_file",
-                                        message: "Failed to close file.",
-                                        path,
-                                        dropped_events: 0,
-                                    });
-                                } else{
-                                    trace!(message = "Successfully closed file.", path = ?path);
-                                }
+                        // Close all the open files.
+                        debug!(message = "Closing all the open files.");
+                        for (path, file) in self.files.iter_mut() {
+                            if let Err(error) = file.close().await {
+                                emit!(FileIoError {
+                                    error,
+                                    code: "failed_closing_file",
+                                    message: "Failed to close file.",
+                                    path,
+                                    dropped_events: 0,
+                                });
+                            } else{
+                                trace!(message = "Successfully closed file.", path = ?path);
                             }
-
-                            emit!(FileOpen {
-                                count: 0
-                            });
-
-                            break;
                         }
+
+                        emit!(FileOpen {
+                            count: 0
+                        });
+
+                        break;
                     }
                 }
                 result = self.files.next_expired(), if !self.files.is_empty() => {
@@ -467,17 +474,21 @@ impl FileSink {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn process_event(&mut self, mut event: Event) {
-        let path = match self.partition_event(&event) {
-            Some(path) => path,
-            None => {
-                // We weren't able to find the path to use for the
-                // file.
-                // The error is already handled at `partition_event`, so
-                // here we just skip the event.
-                event.metadata().update_status(EventStatus::Errored);
-                return;
-            }
+        let path = if let Some(path) = self.partition_event(&event) {
+            path
+        } else {
+            // We weren't able to find the path to use for the
+            // file.
+            // The error is already handled at `partition_event`, so
+            // here we just skip the event.
+            event.metadata().update_status(EventStatus::Errored);
+            return;
         };
 
         let next_deadline = self.deadline_at();
@@ -670,6 +681,11 @@ impl std::error::Error for OpenError {}
 /// which is Phase 1b scope. `verify_parent` provides a second layer of
 /// defence after this call.
 #[cfg(unix)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve the existing diagnostic text and escaping behavior."
+)]
 async fn create_dirs_nofollow(path: &Path, base: &Path) -> std::io::Result<()> {
     fs::create_dir_all(base).await?;
     let suffix = path.strip_prefix(base).unwrap_or(path);
@@ -836,12 +852,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -865,12 +881,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -894,12 +910,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -915,6 +931,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn log_many_partitions() {
         let directory = temp_dir();
 
@@ -928,12 +949,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1039,12 +1060,12 @@ mod tests {
             idle_timeout: Duration::from_secs(1),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1061,7 +1082,7 @@ mod tests {
                     .await
                     .expect("Running sink failed");
             })
-            .await
+            .await;
         });
 
         // send initial payload
@@ -1098,12 +1119,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1120,6 +1141,15 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::format_push_string,
+        reason = "Keep the existing formatting and error-handling behavior during the lint rollout."
+    )]
     async fn metric_many_partitions() {
         let directory = temp_dir();
 
@@ -1132,12 +1162,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1186,12 +1216,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1212,10 +1242,10 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            internal_metrics: Default::default(),
-            truncate: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         }
@@ -1226,6 +1256,11 @@ mod tests {
     // shifts (NoDerivableBase vs DerivedBaseIsRoot).
     #[cfg(unix)]
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn sink_build_cases() {
         enum Expected {
             NoConfinement,
@@ -1405,7 +1440,7 @@ mod tests {
             VectorSink::from_event_streamsink(sink)
                 .run(Box::pin(stream::iter(events.map(Into::into))))
                 .await
-                .expect("Running sink failed")
+                .expect("Running sink failed");
         })
         .await;
     }

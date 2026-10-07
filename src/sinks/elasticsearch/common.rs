@@ -38,6 +38,23 @@ pub struct ElasticsearchCommon {
 }
 
 impl ElasticsearchCommon {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub async fn parse_config(
         config: &ElasticsearchConfig,
         endpoint: &HttpEndpoint,
@@ -209,15 +226,15 @@ impl ElasticsearchCommon {
         };
 
         Ok(Self {
-            auth,
-            service_type,
             base_url,
             bulk_uri,
+            auth,
+            service_type,
             mode,
             request_builder,
-            query_params,
-            request,
             tls_settings,
+            request,
+            query_params,
             metric_to_log,
         })
     }
@@ -243,7 +260,7 @@ impl ElasticsearchCommon {
                 let region = config
                     .aws
                     .as_ref()
-                    .map(|config| config.region())
+                    .map(crate::aws::region::RegionOrEndpoint::region)
                     .ok_or(ParseError::RegionRequired)?
                     .ok_or(ParseError::RegionRequired)?;
                 Some(Auth::Aws {
@@ -269,7 +286,12 @@ impl ElasticsearchCommon {
         Ok(auth)
     }
 
-    /// Parses endpoints into a vector of ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
+    /// Parses endpoints into a vector of `ElasticsearchCommons`. The resulting vector is guaranteed to not be empty.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn parse_many(
         config: &ElasticsearchConfig,
         proxy_config: &ProxyConfig,
@@ -290,7 +312,7 @@ impl ElasticsearchCommon {
             Err(ParseError::EndpointRequired.into())
         } else {
             let mut commons = Vec::new();
-            for endpoint in config.endpoints.iter() {
+            for endpoint in &config.endpoints {
                 commons
                     .push(Self::parse_config(config, endpoint, proxy_config, &mut version).await?);
             }
@@ -300,6 +322,15 @@ impl ElasticsearchCommon {
 
     /// Parses a single endpoint, else panics.
     #[cfg(test)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
         let mut commons =
             Self::parse_many(config, crate::config::SinkContext::default().proxy()).await?;
@@ -307,6 +338,11 @@ impl ElasticsearchCommon {
         Ok(commons.remove(0))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         if self.service_type == OpenSearchServiceType::Serverless {
             warn!(
@@ -334,6 +370,11 @@ impl ElasticsearchCommon {
 }
 
 #[cfg(feature = "aws-core")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub async fn sign_request(
     service_type: &OpenSearchServiceType,
     request: &mut http::Request<Bytes>,

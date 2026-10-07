@@ -12,6 +12,11 @@ pub struct WebSocketListenerConnectionEstablished {
 }
 
 impl InternalEvent for WebSocketListenerConnectionEstablished {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn emit(self) {
         debug!(
             message = format!(
@@ -61,6 +66,11 @@ pub struct WebSocketListenerConnectionShutdown {
 }
 
 impl InternalEvent for WebSocketListenerConnectionShutdown {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn emit(self) {
         info!(
             message = format!(

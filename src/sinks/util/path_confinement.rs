@@ -82,6 +82,12 @@ pub enum ConfineError {
 /// This is pure: it never follows symlinks, never reads the FS, and never
 /// pops past a root or prefix component. The result has the same root /
 /// prefix as the input.
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
 pub fn normalize_lexically(p: &Path) -> PathBuf {
     let mut out: Vec<Component<'_>> = Vec::new();
     for component in p.components() {
@@ -176,6 +182,11 @@ impl PathConfinement {
     /// - `Err(_)` if no usable base can be derived and `explicit` is unset.
     ///
     /// Performs no filesystem I/O.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn for_template(
         tpl: &UnconfinedTemplate,
         explicit: Option<&Path>,
@@ -190,32 +201,29 @@ impl PathConfinement {
             None => Vec::new(),
         };
 
-        let base_path = match explicit {
-            Some(p) => {
-                if !p.is_absolute() {
-                    return Err(BuildError::BaseNotAbsolute {
-                        path: p.to_path_buf(),
-                    });
-                }
-                normalize_lexically(p)
+        let base_path = if let Some(p) = explicit {
+            if !p.is_absolute() {
+                return Err(BuildError::BaseNotAbsolute {
+                    path: p.to_path_buf(),
+                });
             }
-            None => {
-                let raw = tpl.literal_prefix();
-                let dir_prefix = truncate_to_separator(raw);
-                if dir_prefix.is_empty() {
-                    return Err(BuildError::NoDerivableBase { fields });
-                }
-                let candidate = normalize_lexically(Path::new(dir_prefix));
-                if !candidate.is_absolute() {
-                    return Err(BuildError::NoDerivableBase { fields });
-                }
-                if is_filesystem_root(&candidate) {
-                    return Err(BuildError::DerivedBaseIsRoot {
-                        prefix: dir_prefix.to_owned(),
-                    });
-                }
-                candidate
+            normalize_lexically(p)
+        } else {
+            let raw = tpl.literal_prefix();
+            let dir_prefix = truncate_to_separator(raw);
+            if dir_prefix.is_empty() {
+                return Err(BuildError::NoDerivableBase { fields });
             }
+            let candidate = normalize_lexically(Path::new(dir_prefix));
+            if !candidate.is_absolute() {
+                return Err(BuildError::NoDerivableBase { fields });
+            }
+            if is_filesystem_root(&candidate) {
+                return Err(BuildError::DerivedBaseIsRoot {
+                    prefix: dir_prefix.to_owned(),
+                });
+            }
+            candidate
         };
 
         if explicit.is_some() && is_filesystem_root(&base_path) {
@@ -252,12 +260,18 @@ impl PathConfinement {
     }
 
     /// The lexical base directory used for containment checks.
+    #[must_use]
     pub fn base_dir(&self) -> &Path {
         &self.base_lexical
     }
 
     /// Apply lexical confinement to a rendered path. Pure — runs before
     /// any FS mutation.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn confine(&self, rendered: &Path) -> Result<PathBuf, ConfineError> {
         let raw_bytes = path_bytes(rendered);
         if raw_bytes.contains(&0) {
@@ -316,6 +330,15 @@ impl PathConfinement {
     /// race between this call and the subsequent `open` to swap a directory
     /// for a symlink; closing that gap requires fd-based traversal
     /// (`openat`/`cap-std`), which is Phase 1b scope.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn verify_parent(&mut self, parent: &Path) -> Result<PathBuf, ConfineError> {
         if self.base_canonical.is_none() {
             tokio_fs::create_dir_all(&self.base_lexical)

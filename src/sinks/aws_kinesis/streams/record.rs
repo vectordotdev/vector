@@ -33,7 +33,7 @@ impl Record for KinesisStreamRecord {
             .record
             .explicit_hash_key
             .as_ref()
-            .map(|s| s.len())
+            .map(std::string::String::len)
             .unwrap_or_default();
 
         // data is base64 encoded
@@ -57,6 +57,11 @@ impl SendRecord for KinesisStreamClient {
     type T = KinesisRecord;
     type E = KinesisError;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn send(
         &self,
         records: Vec<Self::T>,

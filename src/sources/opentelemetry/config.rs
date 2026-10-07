@@ -84,7 +84,7 @@ pub struct OtlpDecodingConfig {
 }
 
 impl From<bool> for OtlpDecodingConfig {
-    /// Converts a boolean value to an OtlpDecodingConfig.
+    /// Converts a boolean value to an `OtlpDecodingConfig`.
     ///
     /// This provides backward compatibility with the previous boolean configuration.
     /// - `true` enables OTLP decoding for all signals
@@ -100,16 +100,19 @@ impl From<bool> for OtlpDecodingConfig {
 
 impl OtlpDecodingConfig {
     /// Returns true if any signal is configured to use OTLP decoding.
+    #[must_use]
     pub const fn any_enabled(&self) -> bool {
         self.logs || self.metrics || self.traces
     }
 
     /// Returns true if all signals are configured to use OTLP decoding.
+    #[must_use]
     pub const fn all_enabled(&self) -> bool {
         self.logs && self.metrics && self.traces
     }
 
     /// Returns true if signals have mixed configuration (some enabled, some disabled).
+    #[must_use]
     pub const fn is_mixed(&self) -> bool {
         self.any_enabled() && !self.all_enabled()
     }
@@ -273,7 +276,7 @@ impl GenerateConfig for OpentelemetryConfig {
         serde_json::to_value(Self {
             grpc: example_grpc_config(),
             http: example_http_config(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
@@ -284,6 +287,11 @@ impl GenerateConfig for OpentelemetryConfig {
 }
 
 impl OpentelemetryConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     pub(crate) fn get_signal_deserializer(
         &self,
         signal_type: OtlpSignalType,
@@ -306,6 +314,11 @@ impl OpentelemetryConfig {
 
 impl OpentelemetryConfig {
     /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_with_tls_reloaders(
         &self,
         cx: SourceContext,

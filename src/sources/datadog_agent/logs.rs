@@ -60,6 +60,19 @@ pub(super) fn build_warp_filter(
         .boxed()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 pub(crate) fn decode_log_body(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -224,7 +237,7 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
     if ddtags.is_empty() && !ddtags_str.is_empty() {
         warn!(
             message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed."
-        )
+        );
     }
 
     ddtags.into()
@@ -239,7 +252,7 @@ mod tests {
 
     #[test]
     fn ddtags_parse_empty() {
-        let raw = Bytes::from(String::from(""));
+        let raw = Bytes::from(String::new());
         let val = parse_ddtags(&raw);
 
         assert_eq!(val, value!([]));

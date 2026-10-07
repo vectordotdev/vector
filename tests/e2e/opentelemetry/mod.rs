@@ -70,7 +70,7 @@ where
     let message_descriptor = descriptor_pool
         .get_message_by_name(request_message_type)
         .ok_or_else(|| {
-            format!("Message type '{request_message_type}' not found in descriptor pool",)
+            format!("Message type '{request_message_type}' not found in descriptor pool")
         })?;
 
     let dynamic_message = vrl::protobuf::encode::encode_message(
@@ -122,9 +122,18 @@ pub fn assert_service_name_with<ResourceT, F>(
     }
 }
 
-/// Verifies that the component_received_events_total internal metric counts
+/// Verifies that the `component_received_events_total` internal metric counts
 /// individual log records/metrics/spans, not batch requests.
-/// This ensures consistency when use_otlp_decoding is enabled.
+/// This ensures consistency when `use_otlp_decoding` is enabled.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 pub fn assert_component_received_events_total(data_type: &str, expected_count: usize) {
     let metrics_content = read_file_helper(data_type, "vector-internal-metrics-sink.log")
         .expect("Failed to read internal metrics file");
@@ -155,7 +164,7 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
                 found_metric = true;
                 // Get the counter value
                 if let Some(counter) = metric.get("counter")
-                    && let Some(value) = counter.get("value").and_then(|v| v.as_f64())
+                    && let Some(value) = counter.get("value").and_then(serde_json::Value::as_f64)
                 {
                     total_events = value as u64;
                 }

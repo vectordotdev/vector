@@ -16,6 +16,11 @@ use crate::{
 
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn test_source_error() {
     trace_init();
 
@@ -60,6 +65,11 @@ async fn test_source_error() {
 
 /// Ensures that an unrelated source panicking does not prematurely terminate the topology.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn test_source_panic() {
     trace_init();
 
@@ -106,6 +116,11 @@ async fn test_source_panic() {
 
 /// Ensures that an unrelated sink completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn test_sink_error() {
     trace_init();
 
@@ -154,6 +169,11 @@ async fn test_sink_error() {
 
 /// Ensures that an unrelated sink panicking does not prematurely terminate the topology.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn test_sink_panic() {
     trace_init();
 

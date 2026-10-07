@@ -47,7 +47,7 @@ pub struct BufferingAckConfig {
     #[serde(default = "default_decoding")]
     pub ack_decoding: DeserializerConfig,
 
-    /// Name of the field that contains the ACKed message ID. Use "." if message ID is the root of
+    /// Name of the field that contains the `ACKed` message ID. Use "." if message ID is the root of
     /// the message.
     pub message_id_path: ConfigValuePath,
 
@@ -55,7 +55,7 @@ pub struct BufferingAckConfig {
     pub client_key: ClientKeyConfig,
 }
 
-/// Configuration for client key used for tracking ACKed message for message buffering.
+/// Configuration for client key used for tracking `ACKed` message for message buffering.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -128,7 +128,7 @@ pub trait WsMessageBufferConfig {
     /// Returns true if this configuration enables buffering.
     fn should_buffer(&self) -> bool;
     /// Generates key for a client based on connection request and address.
-    /// This key should be used for storing client checkpoints (last ACKed message).
+    /// This key should be used for storing client checkpoints (last `ACKed` message).
     fn client_key(&self, request: &Request, client_address: &SocketAddr) -> Option<String>;
     /// Returns configured size of the buffer.
     fn buffer_capacity(&self) -> usize;
@@ -181,11 +181,10 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             return BufferReplayRequest::NO_REPLAY;
         }
 
-        let default_request = client_checkpoint
-            .map(BufferReplayRequest::with_replay_from)
-            // If we don't have ACK support, or don't have an ACK stored for the client,
-            // default to no replay
-            .unwrap_or(BufferReplayRequest::NO_REPLAY);
+        let default_request = client_checkpoint.map_or(
+            BufferReplayRequest::NO_REPLAY,
+            BufferReplayRequest::with_replay_from,
+        );
 
         // Early return if query params are missing
         let Some(query_params) = request.uri().query() else {
@@ -213,13 +212,13 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
                             return BufferReplayRequest::with_replay_from(last_received_val);
                         }
                         Err(err) => {
-                            warn!(message = "Parsing last received message UUID failed.", %err)
+                            warn!(message = "Parsing last received message UUID failed.", %err);
                         }
                     }
                 }
             }
             Err(err) => {
-                warn!(message = "Parsing request URL for websocket connection request failed.", %err)
+                warn!(message = "Parsing request URL for websocket connection request failed.", %err);
             }
         }
 
@@ -244,6 +243,11 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
         message_id
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn handle_ack_request(&self, request: Message) -> Option<Uuid> {
         let ack_config = self.as_ref().and_then(|mb| mb.client_ack_config.as_ref())?;
 

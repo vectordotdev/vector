@@ -1,4 +1,4 @@
-//! ClickHouse type parsing and conversion to Arrow types.
+//! `ClickHouse` type parsing and conversion to Arrow types.
 
 use std::str::FromStr;
 
@@ -19,7 +19,7 @@ const DECIMAL64_PRECISION: u8 = 18;
 const DECIMAL128_PRECISION: u8 = 38;
 const DECIMAL256_PRECISION: u8 = 76;
 
-/// Represents a ClickHouse type with its modifiers and nested structure.
+/// Represents a `ClickHouse` type with its modifiers and nested structure.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ClickHouseType {
     // Numeric types
@@ -68,7 +68,7 @@ impl ClickHouseType {
         }
     }
 
-    /// Converts this ClickHouse type to an Arrow DataType.
+    /// Converts this `ClickHouse` type to an Arrow `DataType`.
     /// Recursively handles nested types including Nullable/LowCardinality wrappers.
     fn to_data_type(&self) -> Result<DataType, String> {
         match self {
@@ -183,20 +183,17 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 /// Parses a single tuple element (either "Type" or "name Type").
 fn tuple_element(input: &str) -> IResult<&str, (Option<String>, ClickHouseType)> {
     let (rest, name) = identifier(input)?;
-    match rest.strip_prefix(' ') {
-        Some(after_space) => {
-            let (rest, ty) = ch_type(after_space)?;
-            Ok((rest, (Some(name.to_owned()), ty)))
-        }
-        None => {
-            // No space after identifier, so re-parse as a type
-            let (rest, ty) = ch_type(input)?;
-            Ok((rest, (None, ty)))
-        }
+    if let Some(after_space) = rest.strip_prefix(' ') {
+        let (rest, ty) = ch_type(after_space)?;
+        Ok((rest, (Some(name.to_owned()), ty)))
+    } else {
+        // No space after identifier, so re-parse as a type
+        let (rest, ty) = ch_type(input)?;
+        Ok((rest, (None, ty)))
     }
 }
 
-/// Parses a complete ClickHouse type.
+/// Parses a complete `ClickHouse` type.
 ///
 /// Nom parsers return `(rest, output)` where `rest` is the remaining unparsed input.
 /// For example, parsing `"Array(String)"`:

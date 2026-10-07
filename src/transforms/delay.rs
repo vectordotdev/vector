@@ -47,10 +47,10 @@ const fn default_queue_capacity() -> NonZeroUsize {
 impl Default for DelayConfig {
     fn default() -> Self {
         Self {
-            delay_ms: Default::default(),
+            delay_ms: Duration::default(),
             queue_capacity: default_queue_capacity(),
-            overflow_strategy: Default::default(),
-            condition: Default::default(),
+            overflow_strategy: OverflowStrategy::default(),
+            condition: Option::default(),
         }
     }
 }
@@ -116,16 +116,18 @@ impl TransformConfig for DelayConfig {
     }
 
     fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
-        self.condition
-            .as_ref()
-            .map(|c| {
-                c.validate(&context.enrichment_tables, &context.metrics_storage)
-                    .map_err(|e| vec![format!("condition: {e}")])
-            })
-            .unwrap_or(Ok(()))
+        self.condition.as_ref().map_or(Ok(()), |c| {
+            c.validate(&context.enrichment_tables, &context.metrics_storage)
+                .map_err(|e| vec![format!("condition: {e}")])
+        })
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct Delay {
     delay: Duration,
     queue: DelayQueue<Event>,
@@ -135,6 +137,11 @@ pub struct Delay {
 }
 
 impl Delay {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: &DelayConfig, context: &TransformContext) -> crate::Result<Self> {
         Ok(Self {
             delay: config.delay_ms,
@@ -282,9 +289,10 @@ mod tests {
         // Wait long enough for delay to end
         tokio::time::sleep(Duration::from_secs_f64(0.3)).await;
 
-        if !matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))) {
-            panic!("Unexpectedly received None or Pending in output stream");
-        }
+        assert!(
+            matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))),
+            "Unexpectedly received None or Pending in output stream"
+        );
     }
 
     #[tokio::test]

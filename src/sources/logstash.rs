@@ -126,7 +126,7 @@ impl Default for LogstashConfig {
             permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             connection_limit: None,
             tls_handshake_timeout_secs: None,
             log_namespace: None,
@@ -384,7 +384,7 @@ impl LogstashDecoder {
     /// completed window later.
     ///
     /// If a sender omits `WindowSize`, we keep the previous behavior and treat
-    /// each standalone frame as ACKable on its own.
+    /// each standalone frame as `ACKable` on its own.
     const fn annotate_frame(&mut self, frame: &mut LogstashEventFrame) {
         match self.window_events_remaining {
             Some(remaining) if remaining.get() == 1 => {
@@ -453,7 +453,7 @@ enum LogstashProtocolVersion {
 
 impl From<LogstashProtocolVersion> for u8 {
     fn from(frame_type: LogstashProtocolVersion) -> u8 {
-        use LogstashProtocolVersion::*;
+        use LogstashProtocolVersion::{V1, V2};
 
         match frame_type {
             V1 => b'1',
@@ -466,7 +466,7 @@ impl TryFrom<u8> for LogstashProtocolVersion {
     type Error = DecodeError;
 
     fn try_from(frame_type: u8) -> Result<LogstashProtocolVersion, DecodeError> {
-        use LogstashProtocolVersion::*;
+        use LogstashProtocolVersion::{V1, V2};
 
         match frame_type {
             b'1' => Ok(V1),
@@ -489,7 +489,7 @@ enum LogstashFrameType {
 
 impl From<LogstashFrameType> for u8 {
     fn from(frame_type: LogstashFrameType) -> u8 {
-        use LogstashFrameType::*;
+        use LogstashFrameType::{Ack, Compressed, Data, Json, WindowSize};
 
         match frame_type {
             Ack => b'A',
@@ -505,7 +505,7 @@ impl TryFrom<u8> for LogstashFrameType {
     type Error = DecodeError;
 
     fn try_from(frame_type: u8) -> Result<LogstashFrameType, DecodeError> {
-        use LogstashFrameType::*;
+        use LogstashFrameType::{Ack, Compressed, Data, Json, WindowSize};
 
         match frame_type {
             b'A' => Ok(Ack),
@@ -537,6 +537,11 @@ impl Decoder for LogstashDecoder {
     type Item = (LogstashEventFrame, usize);
     type Error = DecodeError;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // This implements a sort of simple state machine to read the frames from the wire
         //
@@ -554,21 +559,21 @@ impl Decoder for LogstashDecoder {
                 LogstashDecoderReadState::PendingDecompressed {
                     ref mut buf,
                     ref mut decoder,
-                } => match decoder.decode(buf)? {
-                    Some(frame) => return Ok(Some(frame)),
-                    None => {
-                        // Payload exhausted: carry the window countdown back across the
-                        // compression boundary before dropping the nested decoder.
-                        self.window_events_remaining = decoder.window_events_remaining;
-                        LogstashDecoderReadState::ReadProtocol
+                } => {
+                    if let Some(frame) = decoder.decode(buf)? {
+                        return Ok(Some(frame));
                     }
-                },
+                    // Payload exhausted: carry the window countdown back across the
+                    // compression boundary before dropping the nested decoder.
+                    self.window_events_remaining = decoder.window_events_remaining;
+                    LogstashDecoderReadState::ReadProtocol
+                }
                 LogstashDecoderReadState::ReadProtocol => {
                     if src.remaining() < 1 {
                         return Ok(None);
                     }
 
-                    use LogstashProtocolVersion::*;
+                    use LogstashProtocolVersion::{V1, V2};
 
                     match LogstashProtocolVersion::try_from(src.get_u8())? {
                         V1 => LogstashDecoderReadState::ReadType(V1),
@@ -580,7 +585,7 @@ impl Decoder for LogstashDecoder {
                         return Ok(None);
                     }
 
-                    use LogstashFrameType::*;
+                    use LogstashFrameType::{Ack, Compressed, Data, Json, WindowSize};
 
                     match LogstashFrameType::try_from(src.get_u8())? {
                         WindowSize => LogstashDecoderReadState::ReadFrame(protocol, WindowSize),
@@ -974,6 +979,11 @@ mod test {
         assert!(log.get(event_path!("timestamp")).is_some());
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn push_req(req: &mut BytesMut, seq: u32, pairs: &[(&str, &str)]) {
         req.put_u8(b'2');
         req.put_u8(b'D');
@@ -999,6 +1009,11 @@ mod test {
         req.put_u32(size);
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn push_compressed(req: &mut BytesMut, inner: &[u8]) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(inner).unwrap();
@@ -1098,6 +1113,11 @@ mod test {
         frames
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn decode_frames_with_decoder_and_assert_sequences(
         decoder: &mut LogstashDecoder,
         src: BytesMut,
@@ -1127,6 +1147,11 @@ mod test {
     // any decode exception.
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn malformed_json_frame_is_a_fatal_decode_error() {
         let mut decoder = LogstashDecoder::new();
         let mut src = BytesMut::new();
@@ -1146,6 +1171,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn malformed_compressed_frame_is_a_fatal_decode_error() {
         let mut decoder = LogstashDecoder::new();
         let mut src = BytesMut::new();
@@ -1302,6 +1332,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn frames_within_the_cap_still_decode() {
         let mut decoder = LogstashDecoder::new();
         decoder.max_frame_size = 100;
@@ -1314,6 +1349,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn fragmented_input_is_assembled_across_decode_calls() {
         // Feed a frame one byte at a time to verify state is preserved across
         // `Ok(None)` returns (TCP can split at any byte boundary).
@@ -1322,7 +1362,7 @@ mod test {
 
         let mut src = BytesMut::new();
         let mut decoded = Vec::new();
-        for byte in full.iter() {
+        for byte in &full {
             src.put_u8(*byte);
             if let Some(frame) = decoder.decode(&mut src).unwrap() {
                 decoded.push(frame);
@@ -1332,6 +1372,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn malformed_frame_closes_connection_without_ack() {
         let (address, _recv) = start_logstash(EventStatus::Delivered).await;
 
@@ -1436,6 +1481,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     async fn window_larger_than_ready_frames_capacity_in_one_compressed_frame_acks_once() {
         const WINDOW: u32 = 5;
         const CAPACITY: usize = 2;
@@ -1568,6 +1618,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn fresh_window_after_completed_window_is_accepted() {
         // A decoder reused across reads accepts a fresh window once the previous
         // window has completed. This is the legitimate counterpart to the
@@ -1656,7 +1711,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1681,7 +1736,7 @@ mod test {
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -1716,7 +1771,7 @@ mod integration_tests {
         let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let out = source(heartbeat_address(), None).await;
 
-            timeout(Duration::from_secs(60), collect_n(out, 1))
+            timeout(Duration::from_mins(1), collect_n(out, 1))
                 .await
                 .unwrap()
         })
@@ -1762,7 +1817,7 @@ mod integration_tests {
             )
             .await;
 
-            timeout(Duration::from_secs(60), collect_n(out, 1))
+            timeout(Duration::from_mins(1), collect_n(out, 1))
                 .await
                 .unwrap()
         })
@@ -1806,7 +1861,7 @@ mod integration_tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
         recv

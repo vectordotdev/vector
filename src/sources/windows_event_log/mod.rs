@@ -618,16 +618,13 @@ impl SourceConfig for WindowsEventLogConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let log_namespace = self
-            .log_namespace
-            .map(|b| {
-                if b {
-                    LogNamespace::Vector
-                } else {
-                    LogNamespace::Legacy
-                }
-            })
-            .unwrap_or(global_log_namespace);
+        let log_namespace = self.log_namespace.map_or(global_log_namespace, |b| {
+            if b {
+                LogNamespace::Vector
+            } else {
+                LogNamespace::Legacy
+            }
+        });
 
         let schema_definition = match log_namespace {
             LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(

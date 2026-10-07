@@ -20,6 +20,11 @@ fn generate_config() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn check_batch_size() {
     // Sink builder should limit the batch size to the upper bound.
     let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
@@ -38,7 +43,7 @@ async fn check_batch_size() {
         partition_key_field: None,
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
     let res = config.build(cx).await;
@@ -52,6 +57,11 @@ async fn check_batch_size() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn check_batch_events() {
     let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
     batch.max_events = Some(MAX_PAYLOAD_EVENTS + 1);
@@ -69,7 +79,7 @@ async fn check_batch_events() {
         partition_key_field: None,
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
     let res = config.build(cx).await;

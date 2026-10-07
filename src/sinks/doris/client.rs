@@ -45,13 +45,13 @@ const GROUP_COMMIT_HEADER: &str = "group_commit";
 const GROUP_COMMIT_SYNC_MODE: &str = "sync_mode";
 
 /// Group commit async mode - data written to WAL first, returns immediately.
-/// Data is visible after async commit based on group_commit_interval.
+/// Data is visible after async commit based on `group_commit_interval`.
 const GROUP_COMMIT_ASYNC_MODE: &str = "async_mode";
 
-/// Thread-safe version of the DorisSinkClient, wrapped in an Arc
+/// Thread-safe version of the `DorisSinkClient`, wrapped in an Arc
 pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
 
-/// DorisSinkClient handles the HTTP communication with Doris server
+/// `DorisSinkClient` handles the HTTP communication with Doris server
 /// This client is thread-safe by design
 #[derive(Clone, Debug)]
 pub struct DorisSinkClient {
@@ -86,7 +86,7 @@ impl DorisSinkClient {
         }
     }
 
-    /// Converts a DorisSinkClient into a thread-safe version
+    /// Converts a `DorisSinkClient` into a thread-safe version
     pub fn into_thread_safe(self) -> ThreadSafeDorisSinkClient {
         Arc::new(self)
     }
@@ -106,9 +106,9 @@ impl DorisSinkClient {
 
     /// Check if group commit is enabled in the custom headers
     /// Group commit has three modes:
-    /// - off_mode: disabled, label is required
-    /// - sync_mode: enabled, label should be skipped
-    /// - async_mode: enabled, label should be skipped
+    /// - `off_mode`: disabled, label is required
+    /// - `sync_mode`: enabled, label should be skipped
+    /// - `async_mode`: enabled, label should be skipped
     fn is_group_commit_enabled(&self) -> bool {
         self.headers.iter().any(|(k, v)| {
             k.eq_ignore_ascii_case(GROUP_COMMIT_HEADER)
@@ -138,7 +138,10 @@ impl DorisSinkClient {
         } else {
             // Build original URL using Uri components to avoid trailing slash issues
             let scheme = self.base_url.scheme_str().unwrap_or("http");
-            let authority = self.base_url.authority().map(|a| a.as_str()).unwrap_or("");
+            let authority = self
+                .base_url
+                .authority()
+                .map_or("", http::uri::Authority::as_str);
             let encoded_database = utf8_percent_encode(database, PATH_SEGMENT);
             let encoded_table = utf8_percent_encode(table, PATH_SEGMENT);
             let stream_load_url = format!(
@@ -171,7 +174,7 @@ impl DorisSinkClient {
             let label = self.generate_label(database, table);
             debug!(%uri, %label, "Building request.");
             builder = builder.header("label", &label);
-        };
+        }
 
         // Add compression headers if needed
         if let Some(ce) = self.compression.content_encoding() {
@@ -213,6 +216,11 @@ impl DorisSinkClient {
 
     /// Handle redirects and send the HTTP request to Doris
     /// Returns the HTTP response and event status
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     pub async fn send_stream_load(
         &self,
         database: String,
@@ -334,7 +342,9 @@ impl DorisSinkClient {
     pub async fn healthcheck_fenode(&self, endpoint: &Uri) -> crate::Result<()> {
         // Use Doris bootstrap API endpoint for health check, GET method
         let scheme = endpoint.scheme_str().unwrap_or("http");
-        let authority = endpoint.authority().map(|a| a.as_str()).unwrap_or("");
+        let authority = endpoint
+            .authority()
+            .map_or("", http::uri::Authority::as_str);
         let uri_str = format!("{scheme}://{authority}/api/bootstrap");
 
         let uri = uri_str.parse::<Uri>().map_err(|source| {
@@ -383,17 +393,16 @@ impl DorisSinkClient {
                                 node = %endpoint
                             );
                             return Ok(());
-                        } else {
-                            debug!(
-                                message = "Doris FE node returned non-success message.",
-                                node = %endpoint,
-                                message = %msg
-                            );
-                            return Err(HealthCheckError::HealthCheckFailed {
-                                message: msg.to_string(),
-                            }
-                            .into());
                         }
+                        debug!(
+                            message = "Doris FE node returned non-success message.",
+                            node = %endpoint,
+                            message = %msg
+                        );
+                        return Err(HealthCheckError::HealthCheckFailed {
+                            message: msg.to_string(),
+                        }
+                        .into());
                     }
                 }
                 Err(source) => {

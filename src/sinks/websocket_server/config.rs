@@ -122,9 +122,9 @@ impl Default for WebSocketListenerSinkConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: JsonSerializerConfig::default().into(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             message_buffering: None,
-            subprotocol: Default::default(),
+            subprotocol: SubProtocolConfig::default(),
             auth: None,
             internal_metrics: InternalMetricsConfig::default(),
         }

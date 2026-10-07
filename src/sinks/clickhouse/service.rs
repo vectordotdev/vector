@@ -127,14 +127,24 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::format_push_string,
+    reason = "Keep the existing formatting and error-handling behavior during the lint rollout."
+)]
 fn append_param<T: ToString>(uri: &mut String, key: &str, value: Option<T>) {
     if let Some(val) = value {
         uri.push_str(&format!("{key}={}&", val.to_string()));
     }
 }
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::format_push_string,
+    reason = "Keep the existing formatting and error-handling behavior during the lint rollout."
+)]
 fn append_param_bool(uri: &mut String, key: &str, value: Option<bool>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{key}={}&", if val { 1 } else { 0 }));
+        uri.push_str(&format!("{key}={}&", i32::from(val)));
     }
 }
 
@@ -168,10 +178,10 @@ fn set_uri_query(
     uri.push_str("?input_format_import_nested_json=1&");
     append_param_bool(&mut uri, "input_format_skip_unknown_fields", skip_unknown);
     if date_time_best_effort {
-        uri.push_str("date_time_input_format=best_effort&")
+        uri.push_str("date_time_input_format=best_effort&");
     }
     if insert_random_shard {
-        uri.push_str("insert_distributed_one_random_shard=1&")
+        uri.push_str("insert_distributed_one_random_shard=1&");
     }
     append_param_bool(
         &mut uri,
@@ -224,6 +234,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn encode_valid() {
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),

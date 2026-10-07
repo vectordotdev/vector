@@ -147,6 +147,15 @@ struct LLMObsSpan {
     collection_errors: Option<Value>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 pub(crate) fn decode_llmobs_body(
     body: Bytes,
     api_key: Option<Arc<str>>,

@@ -18,6 +18,11 @@ use crate::sinks::{
 pub struct GreptimeDBMetricNormalize;
 
 impl MetricNormalize for GreptimeDBMetricNormalize {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
             (_, MetricValue::Counter { .. }) => state.make_absolute(metric),
@@ -28,7 +33,7 @@ impl MetricNormalize for GreptimeDBMetricNormalize {
     }
 }
 
-/// GreptimeDBGrpcSink is a sink that sends metrics to GreptimeDB via gRPC.
+/// `GreptimeDBGrpcSink` is a sink that sends metrics to `GreptimeDB` via gRPC.
 /// It uses the `GreptimeDBGrpcService` to send the metrics.
 pub struct GreptimeDBGrpcSink {
     pub(super) service: Svc<GreptimeDBGrpcService, GreptimeDBGrpcRetryLogic>,
@@ -39,7 +44,7 @@ pub struct GreptimeDBGrpcSink {
 impl GreptimeDBGrpcSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            .map(|event| event.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .normalized_with_default::<GreptimeDBMetricNormalize>()
             .batched(
                 self.batch_settings

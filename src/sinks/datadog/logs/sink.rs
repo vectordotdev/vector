@@ -71,11 +71,13 @@ impl<S> LogSinkBuilder<S> {
         }
     }
 
+    #[must_use]
     pub const fn compression(mut self, compression: Compression) -> Self {
         self.compression = Some(compression);
         self
     }
 
+    #[must_use]
     pub const fn truncation(mut self, truncation: Option<DatadogLogsTruncationConfig>) -> Self {
         self.truncation = truncation;
         self
@@ -235,6 +237,7 @@ pub fn position_reserved_attr_event_root(
 // `PartialEq<BorrowedTargetPath<'_>>`. The alternative is doing a comparison against another
 // `OwnedTargetPath`, but the naïve implementation of that requires multiple allocations and copies
 // just to test equality.
+#[must_use]
 pub fn path_is_field(path: &OwnedTargetPath, field: &str) -> bool {
     path.prefix == PathPrefix::Event
         && matches!(&path.path.segments[..], [OwnedSegment::Field(f)] if f.as_str() == field)
@@ -272,6 +275,11 @@ struct LogRequestBuilder {
 }
 
 impl LogRequestBuilder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn build_request(
         &self,
         events: Vec<Event>,
@@ -354,6 +362,11 @@ impl LogRequestBuilder {
         Ok((events_serialized, buf, byte_size))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn finish_request(
         &self,
         buf: Vec<u8>,
@@ -724,6 +737,11 @@ mod tests {
             .collect()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn build_requests(
         events: Vec<Event>,
         truncation: Option<DatadogLogsTruncationConfig>,

@@ -144,6 +144,11 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
 }
 
 #[derive(Serialize)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 struct Span {
     duration: i64,
     error: i32,
@@ -210,16 +215,18 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
     }
 
     // send first set of trace data
-    if !send_trace(urls, start, duration, span_id).await {
-        panic!("can't perform checks if traces aren't accepted by agent.");
-    }
+    assert!(
+        send_trace(urls, start, duration, span_id).await,
+        "can't perform checks if traces aren't accepted by agent."
+    );
 
     sleep(Duration::from_millis(100)).await;
 
     // send second set of trace data
-    if !send_trace(urls, start, duration, span_id + 1).await {
-        panic!("can't perform checks if traces aren't accepted by agent.");
-    }
+    assert!(
+        send_trace(urls, start, duration, span_id + 1).await,
+        "can't perform checks if traces aren't accepted by agent."
+    );
 }
 
 /// Receives the stats payloads from the Receiver channels from both of the server instances.
@@ -256,7 +263,7 @@ async fn receive_the_stats(
                     break;
                 }
             },
-            _ = &mut timeout => break,
+            () = &mut timeout => break,
         }
     }
 

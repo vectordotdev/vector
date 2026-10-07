@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     fs::{OpenOptions, create_dir},
     io::Write,
@@ -13,6 +15,7 @@ mod cli;
 mod shutdown;
 
 /// Creates a file with given content
+#[must_use]
 pub fn create_file(config: &str) -> PathBuf {
     let path = temp_file();
     overwrite_file(path.clone(), config);
@@ -20,6 +23,7 @@ pub fn create_file(config: &str) -> PathBuf {
 }
 
 /// Creates a YAML config file (`.yaml` extension so Vector parses it as YAML)
+#[must_use]
 pub fn create_yaml_file(config: &str) -> PathBuf {
     let mut path = temp_file();
     path.set_extension("yaml");
@@ -28,6 +32,11 @@ pub fn create_yaml_file(config: &str) -> PathBuf {
 }
 
 /// Overwrites file with given content
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn overwrite_file(path: PathBuf, config: &str) {
     let mut file = OpenOptions::new()
         .create(true)
@@ -40,6 +49,12 @@ pub fn overwrite_file(path: PathBuf, config: &str) {
     file.sync_all().unwrap();
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn create_directory() -> PathBuf {
     let path = temp_dir();
     create_dir(path.clone()).unwrap();

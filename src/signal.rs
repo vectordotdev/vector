@@ -31,8 +31,16 @@ pub enum SignalTo {
 }
 
 impl PartialEq for SignalTo {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn eq(&self, other: &Self) -> bool {
-        use SignalTo::*;
+        use SignalTo::{
+            Quit, ReloadComponents, ReloadEnrichmentTables, ReloadFromConfigBuilder,
+            ReloadFromDisk, Shutdown,
+        };
 
         match (self, other) {
             (ReloadComponents(a), ReloadComponents(b)) => a == b,
@@ -87,7 +95,7 @@ impl SignalPair {
     }
 }
 
-/// SignalHandler is a general `ControlTo` message receiver and transmitter. It's used by
+/// `SignalHandler` is a general `ControlTo` message receiver and transmitter. It's used by
 /// OS signals and providers to surface control events to the root of the application.
 pub struct SignalHandler {
     tx: SignalTx,
@@ -97,6 +105,7 @@ pub struct SignalHandler {
 impl SignalHandler {
     /// Create a new signal handler with space for 128 control messages at a time, to
     /// ensure the channel doesn't overflow and drop signals.
+    #[must_use]
     pub fn new() -> (Self, SignalRx) {
         let (tx, rx) = broadcast::channel(128);
         let handler = Self {
@@ -108,11 +117,13 @@ impl SignalHandler {
     }
 
     /// Clones the transmitter.
+    #[must_use]
     pub fn clone_tx(&self) -> SignalTx {
         self.tx.clone()
     }
 
     /// Subscribe to the stream, and return a new receiver.
+    #[must_use]
     pub fn subscribe(&self) -> SignalRx {
         self.tx.subscribe()
     }

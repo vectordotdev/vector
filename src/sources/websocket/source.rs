@@ -350,6 +350,11 @@ impl WebSocketSource {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn handle_close_frame(
         &self,
         frame: Option<CloseFrame<'_>>,
@@ -585,6 +590,11 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn websocket_source_consume_binary_event() {
         let server_addr = start_binary_push_server().await;
         let mut config = make_config(&server_addr);

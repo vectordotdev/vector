@@ -170,7 +170,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             timestamp_nanos_key: None,
             timestamp_key: None,
             auto_extract_timestamp: None,
@@ -286,6 +286,11 @@ impl ValidatedSink for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_processor(
         &self,
         client: HttpClient,
@@ -386,15 +391,15 @@ mod tests {
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             timestamp_nanos_key: None,
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         let validated = config.validate().expect("validation should succeed");

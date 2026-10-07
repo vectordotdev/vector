@@ -50,12 +50,30 @@ struct RequestLimiterData {
 }
 
 impl RequestLimiterData {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub fn update_average(&mut self, num_events: usize) {
         if num_events > 0 {
             self.average_request_size.update(num_events as f64);
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     pub fn target_requests_in_flight(&self) -> usize {
         let target = (self.event_limit_target as f64) / self.average_request_size.average();
         #[allow(clippy::manual_clamp)]
@@ -84,9 +102,19 @@ pub struct RequestLimiter {
 }
 
 impl RequestLimiter {
-    /// event_limit_target: The limit to the number of events that will be in-flight at one time.
-    /// max_requests: The most number of requests that can be processed concurrently
+    /// `event_limit_target`: The limit to the number of events that will be in-flight at one time.
+    /// `max_requests`: The most number of requests that can be processed concurrently
     /// The numbers of events in a request is not known until after it has been decoded, so this is not a hard limit.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn new(event_limit_target: usize, max_requests: usize) -> RequestLimiter {
         assert!(event_limit_target > 0);
 

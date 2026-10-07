@@ -6,6 +6,15 @@ use serde_json::Value;
 use super::representation::ConfigMap;
 
 /// Interpolates environment variables in string leaves without changing keys or value types.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Keep the current collection type and API bounds during the lint rollout."
+)]
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn interpolate_config_map_with_env_vars(
     map: &ConfigMap,
     vars: &HashMap<String, String>,
@@ -73,6 +82,15 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: LazyLock<Regex> = LazyLock:
 });
 
 /// Result<interpolated config, errors>
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Keep the current collection type and API bounds during the lint rollout."
+)]
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
 
@@ -83,7 +101,7 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String
             caps.get(1)
                 .or_else(|| caps.get(2))
                 .map(|m| m.as_str())
-                .map(|name| {
+                .map_or("$", |name| {
                     // Get the value and check for newlines (LF or CR)
                     let val = vars.get(name).and_then(|v| {
                         if v.contains(['\n', '\r']) {
@@ -125,7 +143,6 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String
                         }),
                     }
                 })
-                .unwrap_or("$")
                 .to_string()
         })
         .into_owned();
@@ -188,7 +205,7 @@ mod test {
             ("FOOBAR".into(), "cats".into()),
             // Java commonly uses .s in env var names
             ("FOO.BAR".into(), "turtles".into()),
-            ("EMPTY".into(), "".into()),
+            ("EMPTY".into(), String::new()),
         ]
         .into_iter()
         .collect();

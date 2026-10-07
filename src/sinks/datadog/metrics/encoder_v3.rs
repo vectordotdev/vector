@@ -104,6 +104,11 @@ impl DatadogMetricsV3Encoder {
     ///
     /// On success returns `(EncodeResult, processed_metrics)`.  On overflow
     /// returns `FinishError::TooLarge` with the metrics and a split hint.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let writer = mem::replace(&mut self.writer, V3Writer::new());
         let metrics = mem::take(&mut self.pending);
@@ -171,6 +176,19 @@ impl DatadogMetricsV3Encoder {
 
 // ── Metric → V3Writer ────────────────────────────────────────────────────────
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn encode_metric_to_v3(
     writer: &mut V3Writer,
     metric: &Metric,
@@ -207,7 +225,7 @@ fn encode_metric_to_v3(
     let name = encode_namespace(
         metric
             .namespace()
-            .or_else(|| default_namespace.as_ref().map(|s| s.as_ref())),
+            .or_else(|| default_namespace.as_ref().map(std::convert::AsRef::as_ref)),
         '.',
         metric.name(),
     );
@@ -275,7 +293,7 @@ fn encode_metric_to_v3(
     match metric.value() {
         MetricValue::Counter { value } => {
             let value = match maybe_interval {
-                Some(interval) => *value / (interval as f64),
+                Some(interval) => *value / f64::from(interval),
                 None => *value,
             };
             builder.add_point(timestamp, value);
@@ -300,8 +318,7 @@ fn encode_metric_to_v3(
 }
 
 fn encode_timestamp(ts: Option<DateTime<Utc>>) -> i64 {
-    ts.map(|t| t.timestamp())
-        .unwrap_or_else(|| Utc::now().timestamp())
+    ts.map_or_else(|| Utc::now().timestamp(), |t| t.timestamp())
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -348,7 +365,7 @@ mod tests {
             None,
         );
         for i in 0..10 {
-            enc.try_encode(counter("m", i as f64)).unwrap();
+            enc.try_encode(counter("m", f64::from(i))).unwrap();
         }
         let (_, metrics) = enc.finish().unwrap();
         assert_eq!(metrics.len(), 10);

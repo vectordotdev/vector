@@ -57,7 +57,7 @@ pub struct Opts {
 
     /// Set the output format
     ///
-    /// See https://mermaid.js.org/syntax/flowchart.html#styling-and-classes for
+    /// See <https://mermaid.js.org/syntax/flowchart.html#styling-and-classes> for
     /// information on the `mermaid` format.
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
@@ -90,7 +90,7 @@ impl Opts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
@@ -114,6 +114,11 @@ fn edge_attributes_to_string(attributes: &EdgeAttributes, default_label: Option<
     attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -139,6 +144,11 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn render_dot(config: config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
@@ -164,7 +174,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
             .expect("write to String never fails");
         }
 
-        for input in table.inputs.iter() {
+        for input in &table.inputs {
             render_dot_edge(&mut dot, &id, input, &table.graph);
         }
     }
@@ -186,7 +196,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         )
         .expect("write to String never fails");
 
-        for input in transform.inputs.iter() {
+        for input in &transform.inputs {
             render_dot_edge(&mut dot, id, input, &transform.graph);
         }
     }
@@ -242,6 +252,11 @@ fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     let mut mermaid = String::from("flowchart TD;\n");
 
@@ -258,7 +273,7 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
             writeln!(mermaid, "  {id}[({id})]").unwrap();
         }
 
-        for input in table.inputs.iter() {
+        for input in &table.inputs {
             if let Some(port) = &input.port {
                 writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {
@@ -276,7 +291,7 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     for (id, transform) in config.transforms() {
         writeln!(mermaid, "  {id}{{{id}}}").unwrap();
 
-        for input in transform.inputs.iter() {
+        for input in &transform.inputs {
             if let Some(port) = &input.port {
                 writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {

@@ -30,6 +30,6 @@ impl InternalEvent for ThrottleEventDiscarded {
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: message
-        })
+        });
     }
 }

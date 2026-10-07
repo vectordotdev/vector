@@ -6,7 +6,7 @@ mod logs;
 #[cfg(feature = "sinks-greptimedb_metrics")]
 mod metrics;
 
-/// Compression algorithm for gRPC requests to GreptimeDB.
+/// Compression algorithm for gRPC requests to `GreptimeDB`.
 #[cfg(feature = "sinks-greptimedb_metrics")]
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]

@@ -115,6 +115,11 @@ pub struct GcpSeries<'a> {
     time_series: &'a [GcpSerie],
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn serialize_int64_value<S>(value: &Option<i64>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -136,6 +141,11 @@ where
     )
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn serialize_optional_datetime<S>(
     value: &Option<chrono::DateTime<chrono::Utc>>,
     serializer: S,
@@ -152,7 +162,7 @@ mod tests {
 
     use super::*;
 
-    /// Ensures that serialized `GcpSeries` matches the format that GCP expects (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/TimeSeries).
+    /// Ensures that serialized `GcpSeries` matches the format that GCP expects (<https://cloud.google.com/monitoring/api/ref_v3/rest/v3/TimeSeries>).
     #[test]
     fn serialize_gcp_series() {
         let end_time = chrono::Utc

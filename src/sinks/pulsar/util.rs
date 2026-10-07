@@ -34,11 +34,20 @@ pub(super) fn make_pulsar_event(
         event,
         topic,
         key,
-        timestamp_millis,
         properties,
+        timestamp_millis,
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_wildcard_for_single_variants,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn get_key(event: &Event, partition_key_field: &Option<OptionalTargetPath>) -> Option<Bytes> {
     partition_key_field
         .as_ref()
@@ -46,7 +55,7 @@ fn get_key(event: &Event, partition_key_field: &Option<OptionalTargetPath>) -> O
             Event::Log(log) => partition_key_field
                 .path
                 .as_ref()
-                .and_then(|path| log.get(path).map(|value| value.coerce_to_bytes())),
+                .and_then(|path| log.get(path).map(vector_lib::event::Value::coerce_to_bytes)),
             Event::Metric(metric) => partition_key_field
                 .path
                 .as_ref()
@@ -56,6 +65,11 @@ fn get_key(event: &Event, partition_key_field: &Option<OptionalTargetPath>) -> O
         })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_wildcard_for_single_variants,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn get_timestamp_millis(event: &Event) -> Option<i64> {
     match &event {
         Event::Log(log) => log.get_timestamp().and_then(|v| v.as_timestamp()).copied(),
@@ -65,6 +79,11 @@ fn get_timestamp_millis(event: &Event) -> Option<i64> {
     .map(|ts| ts.timestamp_millis())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 pub(super) fn get_properties(
     event: &Event,
     properties_key: &Option<OptionalTargetPath>,
@@ -72,8 +91,8 @@ pub(super) fn get_properties(
     properties_key.as_ref().and_then(|properties_key| {
         properties_key.path.as_ref().and_then(|path| {
             event.maybe_as_log().and_then(|log| {
-                log.get(path).and_then(|properties| match properties {
-                    Value::Object(headers_map) => {
+                log.get(path).and_then(|properties| {
+                    if let Value::Object(headers_map) = properties {
                         let mut property_map = HashMap::new();
                         for (key, value) in headers_map {
                             if let Value::Bytes(value_bytes) = value {
@@ -85,8 +104,7 @@ pub(super) fn get_properties(
                             }
                         }
                         Some(property_map)
-                    }
-                    _ => {
+                    } else {
                         emit!(PulsarPropertyExtractionError {
                             property_field: path
                         });

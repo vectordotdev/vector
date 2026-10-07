@@ -68,6 +68,11 @@ where
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn call(&mut self, request: Request) -> Self::Future {
         // Make sure a permit has been acquired
         let permit = match mem::replace(&mut self.state, State::Empty) {

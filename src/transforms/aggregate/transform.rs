@@ -104,6 +104,11 @@ pub struct Aggregate {
 const MAX_DURATION_MS: u64 = i64::MAX as u64;
 
 impl Aggregate {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         if config.interval_ms == 0 {
             return Err("`interval_ms` must be greater than 0".into());
@@ -132,11 +137,11 @@ impl Aggregate {
 
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
-            map: Default::default(),
+            map: HashMap::default(),
             mode: config.mode.into(),
-            event_time_buckets: Default::default(),
-            event_time_prev_buckets: Default::default(),
-            event_time_multi_buckets: Default::default(),
+            event_time_buckets: BTreeMap::default(),
+            event_time_prev_buckets: BTreeMap::default(),
+            event_time_multi_buckets: BTreeMap::default(),
             watermark: None,
             config: *config,
         })
@@ -153,16 +158,24 @@ impl Aggregate {
 
         match (&mut self.mode, data.kind) {
             (InnerMode::Sum, MetricKind::Absolute)
-            | (InnerMode::Latest | InnerMode::Diff { .. }, MetricKind::Incremental)
-            | (InnerMode::Max | InnerMode::Min, MetricKind::Incremental)
-            | (InnerMode::Mean { .. } | InnerMode::Stdev { .. }, MetricKind::Incremental) => {
+            | (
+                InnerMode::Latest
+                | InnerMode::Diff { .. }
+                | InnerMode::Max
+                | InnerMode::Min
+                | InnerMode::Mean { .. }
+                | InnerMode::Stdev { .. },
+                MetricKind::Incremental,
+            ) => {
                 return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
             }
             (InnerMode::Auto | InnerMode::Sum, MetricKind::Incremental) => {
                 self.record_sum(series, data, metadata);
             }
-            (InnerMode::Auto, MetricKind::Absolute)
-            | (InnerMode::Latest | InnerMode::Diff { .. }, MetricKind::Absolute) => {
+            (
+                InnerMode::Auto | InnerMode::Latest | InnerMode::Diff { .. },
+                MetricKind::Absolute,
+            ) => {
                 self.map.insert(series, (data, metadata));
             }
             (InnerMode::Count, _) => {
@@ -196,12 +209,15 @@ impl Aggregate {
         matches!(
             (mode, data.kind),
             (AggregationMode::Sum, MetricKind::Absolute)
-                | (AggregationMode::Latest, MetricKind::Incremental)
-                | (AggregationMode::Diff, MetricKind::Incremental)
-                | (AggregationMode::Max, MetricKind::Incremental)
-                | (AggregationMode::Min, MetricKind::Incremental)
-                | (AggregationMode::Mean, MetricKind::Incremental)
-                | (AggregationMode::Stdev, MetricKind::Incremental)
+                | (
+                    AggregationMode::Latest
+                        | AggregationMode::Diff
+                        | AggregationMode::Max
+                        | AggregationMode::Min
+                        | AggregationMode::Mean
+                        | AggregationMode::Stdev,
+                    MetricKind::Incremental
+                )
         )
     }
 
@@ -344,9 +360,14 @@ impl Aggregate {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn flush_system_time(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
-        for (series, entry) in map.clone().into_iter() {
+        for (series, entry) in map.clone() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
             if let InnerMode::Diff { prev_map } = &self.mode
                 && let Some(prev_entry) = prev_map.get(metric.series())
@@ -365,7 +386,7 @@ impl Aggregate {
             _ => HashMap::default(),
         };
 
-        'outer: for (series, entries) in multi_map.into_iter() {
+        'outer: for (series, entries) in multi_map {
             if entries.is_empty() {
                 continue;
             }
@@ -409,7 +430,7 @@ impl Aggregate {
                         / entries.len() as f64;
                     let mut final_stdev = final_mean;
                     if let MetricValue::Gauge { value } = final_stdev.value_mut() {
-                        *value = variance.sqrt()
+                        *value = variance.sqrt();
                     }
                     let metric = Metric::from_parts(series, final_stdev, final_metadata);
                     output.push(Event::Metric(metric));

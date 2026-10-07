@@ -59,18 +59,23 @@ fn generate_config() {
     crate::test_util::test_generate_config::<HttpSinkConfig>();
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
     HttpSinkConfig {
         uri: Default::default(),
         method: Default::default(),
-        auth: Default::default(),
+        auth: Option::default(),
         compression: Default::default(),
         encoding,
-        payload_prefix: Default::default(),
-        payload_suffix: Default::default(),
+        payload_prefix: String::default(),
+        payload_suffix: String::default(),
         batch: Default::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         acknowledgements: Default::default(),
         retry_strategy: Default::default(),
         confinement: Default::default(),
@@ -78,6 +83,11 @@ fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn http_encode_event_text() {
     let event = Event::Log(LogEvent::from("hello world"));
 
@@ -85,7 +95,7 @@ fn http_encode_event_text() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
+    let encoder = HttpEncoder::new(encoder, transformer, String::new(), String::new());
 
     let mut encoded = vec![];
     let (encoded_size, _byte_size) = encoder.encode_input(vec![event], &mut encoded).unwrap();
@@ -95,6 +105,15 @@ fn http_encode_event_text() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn http_encode_event_ndjson() {
     let event = Event::Log(LogEvent::from("hello world"));
 
@@ -108,7 +127,7 @@ fn http_encode_event_ndjson() {
     let encoder = cfg.build_encoder().unwrap();
     let transformer = cfg.encoding.transformer();
 
-    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
+    let encoder = HttpEncoder::new(encoder, transformer, String::new(), String::new());
 
     let mut encoded = vec![];
     encoder.encode_input(vec![event], &mut encoded).unwrap();
@@ -244,12 +263,12 @@ async fn http_headers_auth_conflict() {
 #[tokio::test]
 async fn http_happy_path_post() {
     run_sink(
-        indoc::indoc! {r#"
+        indoc::indoc! {r"
         auth:
           strategy: basic
           user: waldo
           password: hunter2
-        "#},
+        "},
         |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -265,13 +284,13 @@ async fn http_happy_path_post() {
 #[tokio::test]
 async fn http_happy_path_put() {
     run_sink(
-        indoc::indoc! {r#"
+        indoc::indoc! {r"
         method: put
         auth:
           strategy: basic
           user: waldo
           password: hunter2
-        "#},
+        "},
         |parts| {
             assert_eq!(Method::PUT, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -287,12 +306,12 @@ async fn http_happy_path_put() {
 #[tokio::test]
 async fn http_passes_custom_headers() {
     run_sink(
-        indoc::indoc! {r#"
+        indoc::indoc! {r"
         request:
           headers:
             foo: bar
             baz: quux
-        "#},
+        "},
         |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
@@ -494,7 +513,7 @@ async fn custom_retry_retries_only_configured_status_code() {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         const NUM_LINES: usize = 1;
         const NUM_FAILURES: usize = 2;
-        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r#"
+        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r"
             request:
               retry_attempts: 2
               retry_initial_backoff_secs: 1
@@ -502,7 +521,7 @@ async fn custom_retry_retries_only_configured_status_code() {
             retry_strategy:
               type: custom
               status_codes: [408, 425, 429, 503]
-        "#};
+        "};
 
         let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
 
@@ -549,7 +568,7 @@ async fn custom_retry_retries_only_configured_status_code() {
 async fn custom_retry_does_not_retry_unconfigured_status_code() {
     components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
         const NUM_LINES: usize = 1;
-        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r#"
+        const CUSTOM_RETRY_CONFIG: &str = indoc::indoc! {r"
             request:
               retry_attempts: 2
               retry_initial_backoff_secs: 1
@@ -557,7 +576,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             retry_strategy:
               type: custom
               status_codes: [408, 425, 429, 503]
-        "#};
+        "};
 
         let (in_addr, sink) = build_sink(CUSTOM_RETRY_CONFIG).await;
 
@@ -759,7 +778,7 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
 
                 let message: serde_json::Value = parse_compressed_json(compression, body);
 
-                let lines: Vec<serde_json::Value> = message["data"].as_array().unwrap().to_vec();
+                let lines: Vec<serde_json::Value> = message["data"].as_array().unwrap().clone();
                 stream::iter(lines)
             })
             .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
@@ -773,6 +792,11 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 async fn templateable_uri_path() {
     init_test();
     fn create_event_with_id(id: i64) -> Event {
@@ -829,7 +853,7 @@ async fn templateable_uri_path() {
 
             for event in events {
                 let event_id = event["id"].as_i64().unwrap();
-                assert_eq!(event_id, expected_event_id)
+                assert_eq!(event_id, expected_event_id);
             }
 
             // Assert that the uri path is the expected one for the given id
@@ -838,10 +862,15 @@ async fn templateable_uri_path() {
         })
         .collect::<Vec<_>>()
         .await;
-    assert_eq!(request_batches.len(), 2)
+    assert_eq!(request_batches.len(), 2);
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 async fn templateable_uri_auth() {
     init_test();
 
@@ -1079,6 +1108,11 @@ async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::
 /// Events should be delivered through the configured authenticated HTTP proxy,
 /// which forwards the request to the origin without leaking the proxy credentials.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn sends_through_authenticated_proxy() {
     init_test();
 

@@ -21,6 +21,11 @@ pub struct NetworkConfig {
 }
 
 impl HostMetrics {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub async fn network_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "network";
         match heim::net::io_counters().await {

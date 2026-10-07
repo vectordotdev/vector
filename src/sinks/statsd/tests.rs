@@ -32,6 +32,11 @@ fn tags() -> MetricTags {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn test_send_to_statsd() {
     trace_init();
 
@@ -88,7 +93,7 @@ async fn test_send_to_statsd() {
 
         sink.run(stream::iter(events).map(Into::into))
             .await
-            .expect("Running sink failed")
+            .expect("Running sink failed");
     })
     .await;
 

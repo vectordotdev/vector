@@ -216,6 +216,7 @@ impl<D: TowerRequestConfigDefaults> Default for TowerRequestConfig<D> {
 }
 
 impl<D: TowerRequestConfigDefaults> TowerRequestConfig<D> {
+    #[must_use]
     pub const fn into_settings(&self) -> TowerRequestSettings {
         // the unwrap() calls below are safe because the final defaults are always Some<>
         TowerRequestSettings {
@@ -306,8 +307,13 @@ impl TowerRequestSettings {
 
     /// Distributes requests to services [(Endpoint, service, healthcheck)]
     ///
-    /// [BufferLayer] suggests that the `buffer_bound` should be at least equal to
+    /// [`BufferLayer`] suggests that the `buffer_bound` should be at least equal to
     /// the number of the callers of the service. For sinks, this should typically be 1.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn distributed_service<Req, RL, HL, S>(
         self,
         retry_logic: RL,
@@ -456,7 +462,7 @@ mod tests {
         let settings = cfg.into_settings();
 
         assert_eq!(settings.concurrency, None);
-        assert_eq!(settings.timeout, Duration::from_secs(60));
+        assert_eq!(settings.timeout, Duration::from_mins(1));
         assert_eq!(settings.rate_limit_duration, Duration::from_secs(1));
         assert_eq!(settings.rate_limit_num, i64::MAX as u64);
         assert_eq!(settings.retry_attempts, isize::MAX as usize);

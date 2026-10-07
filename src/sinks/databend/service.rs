@@ -29,6 +29,11 @@ impl RetryLogic for DatabendRetryLogic {
     type Request = DatabendRequest;
     type Response = DatabendResponse;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             DatabendError::Response { status, .. } => {
@@ -129,7 +134,7 @@ impl DatabendService {
             .take(8)
             .map(char::from)
             .collect::<String>();
-        format!("@~/vector/{database}/{}/{now}-{suffix}", self.table,)
+        format!("@~/vector/{database}/{}/{now}-{suffix}", self.table)
     }
 
     pub(crate) async fn insert_with_stage(&self, data: Bytes) -> Result<(), DatabendError> {

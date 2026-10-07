@@ -72,7 +72,7 @@ impl SqsSource {
                 loop {
                     select! {
                         _ = &mut shutdown => break,
-                        _ = source.run_once(&mut out, finalizer, events_received.clone()) => {},
+                        () = source.run_once(&mut out, finalizer, events_received.clone()) => {},
                     }
                 }
             }));
@@ -90,6 +90,11 @@ impl SqsSource {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
     async fn run_once(
         &self,
         out: &mut SourceSender,
@@ -120,7 +125,7 @@ impl SqsSource {
         if let Some(messages) = receive_message_output.messages {
             let byte_size = messages
                 .iter()
-                .map(|message| message.body().map(|body| body.len()).unwrap_or(0))
+                .map(|message| message.body().map_or(0, str::len))
                 .sum();
             emit!(EndpointBytesReceived {
                 byte_size,
@@ -170,7 +175,7 @@ impl SqsSource {
                                     receipts_to_ack,
                                     self.queue_url.clone(),
                                 )
-                                .await
+                                .await;
                             }
                         }
                     }
@@ -181,6 +186,11 @@ impl SqsSource {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn get_timestamp(
     attributes: &Option<HashMap<MessageSystemAttributeName, String>>,
 ) -> Option<DateTime<Utc>> {
@@ -339,7 +349,7 @@ mod tests {
         assert_eq!(
             get_timestamp(&Some(attributes)),
             Some(
-                Utc.timestamp_millis_opt(1636408546018)
+                Utc.timestamp_millis_opt(1_636_408_546_018)
                     .single()
                     .expect("invalid timestamp")
             )

@@ -37,7 +37,7 @@ const fn default_pool_size() -> u32 {
 #[derive(Clone, Default, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PostgresConfig {
-    /// The PostgreSQL server connection string. It can contain the username and password.
+    /// The `PostgreSQL` server connection string. It can contain the username and password.
     /// See [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) about connection strings for more information
     /// about valid formats and options that can be used.
     pub endpoint: String,
@@ -45,7 +45,7 @@ pub struct PostgresConfig {
     /// The table that data is inserted into. This table parameter is vulnerable
     /// to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
     /// This parameter will be directly interpolated in the SQL query statement,
-    /// as table names as parameters in prepared statements are not allowed in PostgreSQL.
+    /// as table names as parameters in prepared statements are not allowed in `PostgreSQL`.
     pub table: String,
 
     /// The postgres connection pool size. See [this](https://docs.rs/sqlx/latest/sqlx/struct.Pool.html#why-use-a-pool) for more
@@ -55,7 +55,7 @@ pub struct PostgresConfig {
 
     /// Event batching behavior.
     ///
-    /// Note that as PostgreSQL's `jsonb_populate_recordset` function is used to insert events,
+    /// Note that as `PostgreSQL`'s `jsonb_populate_recordset` function is used to insert events,
     /// a single event in the batch can make the whole batch to fail. For example, if a single event within the batch triggers
     /// a unique constraint violation in the destination table, the whole event batch will fail.
     ///
@@ -107,18 +107,18 @@ pub struct ValidatedPostgres {
     endpoint_uri: UriSerde,
 }
 
-/// PostgreSQL endpoints may carry credentials as userinfo or as a `password`
-/// query parameter (SQLx percent-decodes query keys), so they are always
+/// `PostgreSQL` endpoints may carry credentials as userinfo or as a `password`
+/// query parameter (`SQLx` percent-decodes query keys), so they are always
 /// redacted from error messages.
 fn redact_endpoint(_endpoint: &str) -> String {
     "<redacted endpoint>".to_owned()
 }
 
-/// Validates the PostgreSQL connection string without touching the network or
+/// Validates the `PostgreSQL` connection string without touching the network or
 /// filesystem.
 ///
-/// SQLx applies `.pgpass` when a connection string has no password. An empty
-/// password is appended to the validation-only URL so SQLx validates every
+/// `SQLx` applies `.pgpass` when a connection string has no password. An empty
+/// password is appended to the validation-only URL so `SQLx` validates every
 /// option without reading `$PGPASSFILE` or `~/.pgpass`.
 fn validate_pg_endpoint(endpoint: &str) -> crate::Result<()> {
     let mut url = url::Url::parse(endpoint).map_err(|e| {
@@ -140,7 +140,7 @@ fn validate_pg_endpoint(endpoint: &str) -> crate::Result<()> {
     pg_connect_options(url.as_str()).map(|_| ())
 }
 
-/// Parses the PostgreSQL connection string into SQLx connect options.
+/// Parses the `PostgreSQL` connection string into `SQLx` connect options.
 ///
 /// Unlike [`validate_pg_endpoint`], this may read `$PGPASSFILE` or `~/.pgpass`
 /// to resolve a missing password, so it is only invoked at build time.

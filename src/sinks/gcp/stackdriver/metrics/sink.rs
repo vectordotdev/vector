@@ -13,6 +13,11 @@ use crate::sinks::{
 struct StackdriverMetricsNormalize;
 
 impl MetricNormalize for StackdriverMetricsNormalize {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
             (_, MetricValue::Counter { .. }) => state.make_absolute(metric),
@@ -49,6 +54,11 @@ where
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             .filter_map(|event| {

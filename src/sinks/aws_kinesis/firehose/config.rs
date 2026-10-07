@@ -104,6 +104,11 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisFirehoseClientBuilder>(
             &KinesisFirehoseClientBuilder {},
@@ -182,9 +187,9 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
 impl GenerateConfig for KinesisFirehoseSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"stream_name: my-stream
+            r"stream_name: my-stream
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -227,6 +232,11 @@ mod tests {
     use super::*;
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn validate_produces_batch_settings() {
         let config = KinesisFirehoseSinkConfig {
             batch: BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default(),
@@ -242,7 +252,7 @@ mod tests {
                 tls: None,
                 auth: Default::default(),
                 request_retry_partial: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
                 partition_key_field: None,
             },
         };

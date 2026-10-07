@@ -99,6 +99,11 @@ impl KinesisStreamsSinkConfig {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisClientBuilder>(
             &KinesisClientBuilder {},
@@ -177,10 +182,10 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
 impl GenerateConfig for KinesisStreamsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"partition_key_field: foo
+            r"partition_key_field: foo
             stream_name: my-stream
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -247,6 +252,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn validate_produces_batch_settings() {
         let config = KinesisStreamsSinkConfig {
             batch: BatchConfig::<KinesisDefaultBatchSettings>::default(),
@@ -262,7 +272,7 @@ mod tests {
                 tls: None,
                 auth: Default::default(),
                 request_retry_partial: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
                 partition_key_field: None,
             },
         };

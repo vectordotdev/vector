@@ -52,7 +52,7 @@ impl MqttSink {
                     error: missing_keys,
                     field: Some("topic"),
                     drop_event: true,
-                })
+                });
             })
             .ok()?;
 

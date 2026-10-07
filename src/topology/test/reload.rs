@@ -64,6 +64,11 @@ fn splunk_source_config(addr: SocketAddr) -> SplunkConfig {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_reuse_old_port() {
     test_util::trace_init();
 
@@ -85,6 +90,11 @@ async fn topology_reuse_old_port() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_rebuild_old() {
     test_util::trace_init();
 
@@ -112,6 +122,11 @@ async fn topology_rebuild_old() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_old() {
     test_util::trace_init();
 
@@ -202,14 +217,14 @@ async fn topology_disk_buffer_conflict() {
 
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
     let mut new_config = old_config.clone();
     new_config.sinks[&sink_key].inner = prom_exporter_sink(address_1, 1).into();
     new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
@@ -254,6 +269,11 @@ async fn topology_reload_with_new_components() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_readd_input() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
     // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
@@ -301,6 +321,11 @@ async fn topology_readd_input() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_reload_component() {
     test_util::trace_init();
     let (_guard, address_0) = next_addr();
@@ -324,12 +349,17 @@ async fn topology_reload_component() {
     sleep(Duration::from_secs(2)).await;
 
     tokio::select! {
-        _ = wait_for_tcp(address_0) => {},
+        () = wait_for_tcp(address_0) => {},
         _ = crash_stream.next() => panic!(),
     }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_disk_buffer_config_change_does_not_stall() {
     // Changing a disk buffer's configuration on a running sink (e.g. via in-situ
     // config edit) must not stall the reload. Previously, the detach trigger was
@@ -350,14 +380,14 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
 
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
     // Change only the disk buffer's max_size.
     let mut new_config = old_config.clone();
     new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(536870912).unwrap(),
+        max_size: NonZeroU64::new(536_870_912).unwrap(),
         when_full: WhenFull::Block,
     });
 
@@ -365,7 +395,7 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
     let mut crash_stream = UnboundedReceiverStream::new(crash);
 
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed before reload"),
     }
 
@@ -387,12 +417,17 @@ async fn topology_disk_buffer_config_change_does_not_stall() {
 
     // Verify the new sink is running.
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
     }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     // Same as above but with a chained memory → disk overflow buffer to verify
     // that the writer-drop notification is collected from overflow stages too.
@@ -417,7 +452,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     old_config.sinks[&sink_key].buffer = BufferConfig::Chained(vec![
         memory_stage,
         BufferType::DiskV2 {
-            max_size: NonZeroU64::new(268435488).unwrap(),
+            max_size: NonZeroU64::new(268_435_488).unwrap(),
             when_full: WhenFull::Block,
         },
     ]);
@@ -427,7 +462,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     new_config.sinks[&sink_key].buffer = BufferConfig::Chained(vec![
         memory_stage,
         BufferType::DiskV2 {
-            max_size: NonZeroU64::new(536870912).unwrap(),
+            max_size: NonZeroU64::new(536_870_912).unwrap(),
             when_full: WhenFull::Block,
         },
     ]);
@@ -436,7 +471,7 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
     let mut crash_stream = UnboundedReceiverStream::new(crash);
 
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed before reload"),
     }
 
@@ -456,12 +491,17 @@ async fn topology_disk_buffer_config_change_chained_does_not_stall() {
 
     // Verify the new sink is running.
     tokio::select! {
-        _ = wait_for_tcp(address) => {},
+        () = wait_for_tcp(address) => {},
         _ = crash_stream.next() => panic!("topology crashed after reload"),
     }
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_reload_preserves_enrichment_table_state() {
     // Changing an enrichment table that has state and supports state preservation should preserve
     // the state after reload, even if it was changed (if the state is still valid after the chaange).
@@ -559,7 +599,7 @@ async fn topology_reload_preserves_enrichment_table_state() {
                 });
             assert_eq!(message.unwrap(), "test");
         },
-        _ = tokio::time::sleep(Duration::from_secs(10)) => {
+        () = tokio::time::sleep(Duration::from_secs(10)) => {
             panic!("Never received the events")
         }
         _ = crash_stream.next() => panic!(),
@@ -567,6 +607,11 @@ async fn topology_reload_preserves_enrichment_table_state() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn topology_reload_reuses_removed_enrichment_table_source_key() {
     test_util::trace_init();
 
@@ -622,7 +667,7 @@ async fn topology_reload_reuses_removed_enrichment_table_source_key() {
                 .collect::<Vec<_>>();
             assert!(!events.is_empty());
         },
-        _ = tokio::time::sleep(Duration::from_secs(5)) => {
+        () = tokio::time::sleep(Duration::from_secs(5)) => {
             panic!("old table source never produced output")
         }
         error = crash_stream.next() => panic!("topology crashed before reload: {error:?}"),
@@ -647,13 +692,18 @@ async fn topology_reload_reuses_removed_enrichment_table_source_key() {
                 .collect::<Vec<_>>();
             assert_eq!(events.len(), 1);
         },
-        _ = tokio::time::sleep(Duration::from_secs(5)) => {
+        () = tokio::time::sleep(Duration::from_secs(5)) => {
             panic!("new source never produced output after reload")
         }
         error = crash_stream.next() => panic!("topology crashed after reload: {error:?}"),
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn reload_sink_test(
     old_config: Config,
     new_config: Config,
@@ -679,7 +729,7 @@ async fn reload_sink_test(
     sleep(Duration::from_secs(2)).await;
 
     tokio::select! {
-        _ = wait_for_tcp(new_address) => {},
+        () = wait_for_tcp(new_address) => {},
         _ = crash_stream.next() => panic!(),
     }
 }

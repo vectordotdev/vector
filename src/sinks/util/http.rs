@@ -169,6 +169,11 @@ where
         + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn with_logic(
         sink: T,
         batch: B,
@@ -317,6 +322,11 @@ where
         + Send
         + 'static,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn with_retry_logic(
         sink: T,
         batch: B,
@@ -346,6 +356,7 @@ where
     }
 
     /// Enforces per partition ordering of request.
+    #[must_use]
     pub fn ordered(mut self) -> Self {
         self.inner.ordered();
         self
@@ -420,11 +431,11 @@ pub struct SigV4Config {
     pub(crate) service: String,
 }
 
-/// @struct HttpBatchService
+/// @struct `HttpBatchService`
 ///
 /// NOTE: This has been deprecated, please do not use directly when creating new sinks.
 ///       The `HttpService` currently wraps this structure. Eventually all sinks currently using the
-///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
+///       `HttpBatchService` directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.
 pub struct HttpBatchService<F, B = Bytes> {
     inner: HttpClient<Body>,
@@ -848,6 +859,7 @@ fn headers_examples() -> BTreeMap<String, String> {
 
 impl RequestConfig {
     /// Split headers into static (non-dynamic) and template (dynamic) maps.
+    #[must_use]
     pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
@@ -884,6 +896,11 @@ pub enum HeaderValidationError {
     },
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn validate_headers(
     headers: &BTreeMap<String, String>,
 ) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
@@ -984,6 +1001,7 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Creates a `RetryLogic` for use with `HttpResponse`.
+#[must_use]
 pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: RetryStrategy,
 ) -> HttpStatusRetryLogic<
@@ -1021,6 +1039,11 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
 
 /// HTTP request builder for HTTP stream sinks using the generic `HttpService`
 pub trait HttpServiceRequestBuilder<T: Send> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
 }
 
@@ -1169,7 +1192,7 @@ mod test {
             retry_strategy: RetryStrategy::None,
         };
         let status_logic =
-            HttpStatusRetryLogic::<_, (), ()>::new(|_: &()| StatusCode::OK, RetryStrategy::None);
+            HttpStatusRetryLogic::<_, (), ()>::new(|(): &()| StatusCode::OK, RetryStrategy::None);
 
         assert!(!logic.is_retriable_timeout());
         assert!(!status_logic.is_retriable_timeout());

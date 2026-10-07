@@ -6,7 +6,7 @@ use std::{
 };
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 use indexmap::IndexMap;
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -112,6 +112,15 @@ pub(crate) fn strip_nulls(value: Value) -> Value {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve the existing diagnostic text and escaping behavior."
+)]
 pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
@@ -160,7 +169,7 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(source_type.to_owned()));
+                .insert("type".to_string(), Value::String(source_type.clone()));
 
             sources.insert(name, example);
         }
@@ -215,7 +224,7 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(transform_type.to_owned()));
+                .insert("type".to_string(), Value::String(transform_type.clone()));
 
             transforms.insert(
                 name,
@@ -261,7 +270,7 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(sink_type.to_owned()));
+                .insert("type".to_string(), Value::String(sink_type.clone()));
 
             sinks.insert(
                 name,
@@ -270,10 +279,10 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
                         .last()
                         .map(|s| vec![s.to_owned()])
                         .or_else(|| {
-                            if !source_names.is_empty() {
-                                Some(source_names.clone())
-                            } else {
+                            if source_names.is_empty() {
                                 None
+                            } else {
+                                Some(source_names.clone())
                             }
                         })
                         .unwrap_or_else(|| vec!["component-id".to_owned()]),
@@ -294,13 +303,13 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
     }
 
     let full_config = FullConfig {
-        global_options: if !opts.fragment {
+        global_options: if opts.fragment {
+            None
+        } else {
             Some(GlobalOptions {
                 data_dir: default_data_dir(),
                 ..Default::default()
             })
-        } else {
-            None
         },
         config,
     };
@@ -317,23 +326,29 @@ pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
     if let Some(path) = file {
         match write_config(path, &builder) {
             #[allow(clippy::print_stdout)]
-            Ok(_) => {
+            Ok(()) => {
                 println!(
                     "Config file written to {:?}",
                     &file.as_ref().unwrap().join("\n")
-                )
+                );
             }
             Err(e) => errs.push(format!("failed to write to file: {e}")),
-        };
-    };
+        }
+    }
 
-    if !errs.is_empty() {
-        Err(errs)
-    } else {
+    if errs.is_empty() {
         Ok(builder)
+    } else {
+        Err(errs)
     }
 }
 
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match generate_example(opts) {
         Ok(s) => {
@@ -353,6 +368,11 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve the existing diagnostic text and escaping behavior."
+)]
 fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
     if filepath.exists() {
         // If the file exists, we don't want to overwrite, that's just rude.
@@ -431,11 +451,16 @@ mod tests {
         )
         .expect("Could not read config file");
         fs::remove_file(filepath).expect("Could not cleanup config file!");
-        assert_eq!(cfg.unwrap(), filecontents)
+        assert_eq!(cfg.unwrap(), filecontents);
     }
 
     #[cfg(all(feature = "sources-stdin", feature = "sinks-console"))]
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn generate_basic_toml() {
         let mut opts = Opts {
             fragment: false,

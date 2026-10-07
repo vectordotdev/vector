@@ -57,6 +57,11 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
     /// Create the object defined [here][api_docs].
     ///
     /// [api_docs]: https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.timeSeries/create
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn encode_input(
         &self,
         input: Vec<Metric>,

@@ -82,8 +82,8 @@ impl SinkBatchSettings for KeepDefaultBatchSettings {
 impl GenerateConfig for KeepConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"api_key: ${KEEP_API_KEY}
-            "#,
+            r"api_key: ${KEEP_API_KEY}
+            ",
         })
         .unwrap()
     }
@@ -168,6 +168,11 @@ impl ValidatedSink for KeepConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_same_arms,
+    reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+)]
 async fn healthcheck(
     endpoint: HttpEndpoint,
     api_key: SensitiveString,

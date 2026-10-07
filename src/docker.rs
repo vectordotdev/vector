@@ -32,6 +32,11 @@ pub enum Error {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct DockerTlsConfig {
     /// Path to the CA certificate file.
     ca_file: PathBuf,
@@ -43,6 +48,11 @@ pub struct DockerTlsConfig {
     key_file: PathBuf,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
@@ -54,8 +64,8 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                 .ok()
                 .and_then(|uri| uri.into_parts().scheme);
 
-            match scheme.as_ref().map(|scheme| scheme.as_str()) {
-                Some("http") | Some("tcp") => {
+            match scheme.as_ref().map(http::uri::Scheme::as_str) {
+                Some("http" | "tcp") => {
                     let host = get_authority(&host)?;
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                         .map_err(Into::into)
@@ -75,7 +85,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                     )
                     .map_err(Into::into)
                 }
-                Some("unix") | Some("npipe") | None => {
+                Some("unix" | "npipe") | None => {
                     Docker::connect_with_socket(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                         .map_err(Into::into)
                 }
@@ -130,7 +140,7 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
                     panic!("{error:?}");
                 }
             })
-            .await
+            .await;
     }
 }
 
@@ -159,6 +169,7 @@ pub struct Container {
 }
 
 impl Container {
+    #[must_use]
     pub const fn new(image: &'static str, tag: &'static str) -> Self {
         Self {
             image,
@@ -168,17 +179,24 @@ impl Container {
         }
     }
 
+    #[must_use]
     pub fn bind(mut self, src: impl std::fmt::Display, dst: &str) -> Self {
         let bind = format!("{src}:{dst}");
         self.binds.get_or_insert_with(Vec::new).push(bind);
         self
     }
 
+    #[must_use]
     pub fn cmd(mut self, option: &str) -> Self {
         self.cmd.get_or_insert_with(Vec::new).push(option.into());
         self
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn run<T>(self, doit: impl futures::Future<Output = T>) -> T {
         let docker = docker(None, None).unwrap();
 

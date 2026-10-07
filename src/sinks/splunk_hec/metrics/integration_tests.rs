@@ -29,6 +29,11 @@ use crate::{
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn config() -> HecMetricsSinkConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(10);
@@ -50,6 +55,11 @@ async fn config() -> HecMetricsSinkConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn get_gauge(batch: BatchNotifier) -> Event {
     Metric::new(
         "example-gauge",
@@ -63,6 +73,11 @@ fn get_gauge(batch: BatchNotifier) -> Event {
     .into()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn get_counter(batch: BatchNotifier) -> Event {
     Metric::new(
         "example-counter",
@@ -165,6 +180,11 @@ async fn splunk_insert_gauge_metric() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::single_element_loop,
+    reason = "Preserve the existing integration-test workload until its intended event count is audited."
+)]
 async fn splunk_insert_multiple_counter_metrics() {
     let cx = SinkContext::default();
 
@@ -175,7 +195,7 @@ async fn splunk_insert_multiple_counter_metrics() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut events = Vec::new();
     for _ in [..20] {
-        events.push(get_counter(batch.clone()))
+        events.push(get_counter(batch.clone()));
     }
     drop(batch);
 
@@ -192,6 +212,11 @@ async fn splunk_insert_multiple_counter_metrics() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::single_element_loop,
+    reason = "Preserve the existing integration-test workload until its intended event count is audited."
+)]
 async fn splunk_insert_multiple_gauge_metrics() {
     let cx = SinkContext::default();
 
@@ -202,7 +227,7 @@ async fn splunk_insert_multiple_gauge_metrics() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut events = Vec::new();
     for _ in [..20] {
-        events.push(get_gauge(batch.clone()))
+        events.push(get_gauge(batch.clone()));
     }
     drop(batch);
 

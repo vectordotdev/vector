@@ -126,6 +126,11 @@ impl HecMetricsProcessedEventMetadata {
         encode_namespace(metric.namespace().or(default_namespace), '.', metric.name())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn extract_metric_value(metric: &Metric) -> Option<f64> {
         match *metric.value() {
             MetricValue::Counter { value } => Some(value),

@@ -257,17 +257,22 @@ pub struct Query {
 }
 
 impl Query {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, sources::BuildError> {
         let functions = vector_vrl_functions::all();
 
         let mut compiled: HashMap<String, CompiledQueryParameterValue> = HashMap::new();
 
-        for (k, v) in params.iter() {
+        for (k, v) in params {
             let compiled_param = Self::compile_param(v, &functions)?;
             compiled.insert(k.clone(), compiled_param);
         }
 
-        let has_vrl = compiled.values().any(|v| v.has_vrl());
+        let has_vrl = compiled.values().any(CompiledQueryParameterValue::has_vrl);
 
         Ok(Query {
             original: params.clone(),
@@ -402,6 +407,7 @@ impl SourceConfig for HttpClientConfig {
 }
 
 impl HttpClientConfig {
+    #[must_use]
     pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();
@@ -556,7 +562,7 @@ impl http_client::HttpClientContext for HttpClientContext {
         Some(build_url(&base_uri, &processed_query?))
     }
 
-    /// Enriches events with source_type, timestamp
+    /// Enriches events with `source_type`, timestamp
     fn enrich_events(&mut self, events: &mut Vec<Event>) {
         let now = Utc::now();
 

@@ -111,23 +111,28 @@ impl Default for AzureLogsIngestionConfig {
     fn default() -> Self {
         Self {
             endpoint: HttpEndpoint::parse("http://localhost:8080").unwrap(),
-            dcr_immutable_id: Default::default(),
-            stream_name: Default::default(),
-            auth: Default::default(),
+            dcr_immutable_id: String::default(),
+            stream_name: String::default(),
+            auth: AzureAuthentication::default(),
             token_scope: default_scope(),
             timestamp_field: default_timestamp_field(),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            retry_strategy: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            retry_strategy: RetryStrategy::default(),
         }
     }
 }
 
 impl AzureLogsIngestionConfig {
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub(super) fn build_inner(
         &self,
         cx: SinkContext,

@@ -105,6 +105,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn build_rejects_missing_address() {
         let config: VectorConfig = toml::from_str("").unwrap();
 
@@ -122,6 +127,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn build_rejects_address_and_routing() {
         let config: VectorConfig = toml::from_str(
             r#"
@@ -146,6 +156,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn build_rejects_empty_routing_endpoints() {
         let config: VectorConfig = toml::from_str(
             r#"
@@ -249,7 +264,7 @@ mod tests {
 
             TestType::DataVolume => {
                 run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS)
-                    .await
+                    .await;
             }
         }
 
@@ -958,7 +973,7 @@ mod tests {
                     .unwrap()
                     .to_string_lossy()
                     .into_owned();
-                events.push(string)
+                events.push(string);
             }
 
             events
@@ -971,6 +986,15 @@ mod tests {
     }
 
     // taken from <https://github.com/hyperium/tonic/blob/5aa8ae1fec27377cd4c2a41d309945d7e38087d0/examples/src/grpc-web/client.rs#L45-L75>
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn encode_body<T>(msg: T) -> Bytes
     where
         T: prost::Message,

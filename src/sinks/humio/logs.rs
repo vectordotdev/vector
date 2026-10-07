@@ -148,11 +148,17 @@ fn default_endpoint() -> HttpEndpoint {
     HttpEndpoint::parse(HOST).expect("static default endpoint should be a valid http(s) URL")
 }
 
+#[must_use]
 pub fn timestamp_nanos_key() -> Option<String> {
     Some("@timestamp.nanos".to_string())
 }
 
 impl GenerateConfig for HumioLogsConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             token: "${HUMIO_TOKEN}".to_owned().into(),
@@ -168,7 +174,7 @@ impl GenerateConfig for HumioLogsConfig {
             batch: BatchConfig::default(),
             tls: None,
             timestamp_nanos_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             timestamp_key: config_timestamp_key_target_path(),
             confinement: Default::default(),
         })
@@ -277,6 +283,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn validate_rejects_unconfined_template() {
         use crate::config::ValidatedSink;
 
@@ -294,7 +305,7 @@ mod tests {
             batch: BatchConfig::default(),
             tls: None,
             timestamp_nanos_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             timestamp_key: config_timestamp_key_target_path(),
             confinement: Default::default(),
         };
@@ -461,6 +472,11 @@ mod integration_tests {
     }
 
     /// create a new test config with the given ingest token
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn config(token: &str) -> super::HumioLogsConfig {
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -481,8 +497,8 @@ mod integration_tests {
             batch,
             tls: None,
             timestamp_nanos_key: timestamp_nanos_key(),
-            acknowledgements: Default::default(),
-            timestamp_key: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timestamp_key: OptionalTargetPath::default(),
             confinement: Default::default(),
         }
     }

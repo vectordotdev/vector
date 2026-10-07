@@ -50,6 +50,11 @@ impl TestHarness {
 // ============================================================================
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 async fn displays_pipeline_topology_and_metrics() {
     const EXPECTED_EVENTS: i64 = 100;
 
@@ -279,6 +284,11 @@ async fn watch_mode_auto_reloads() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_continue,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn multi_output_transform_reports_per_output_sent_events() {
     // Pipeline: demo_logs -> route (two named outputs) -> two blackhole sinks
     // The route transform splits events into "all" (everything) and "has_host" (subset).
@@ -408,12 +418,17 @@ async fn multi_output_transform_reports_per_output_sent_events() {
 /// Regression test: `component_errors_total` emitted from a spawned task must carry
 /// the component's tracing span so that the metric is labelled with `component_id`.
 ///
-/// The gcp_pubsub source immediately tries to connect to a non-existent endpoint from
+/// The `gcp_pubsub` source immediately tries to connect to a non-existent endpoint from
 /// inside a `tokio::spawn`-ed per-stream task.  Before the `spawn_in_current_span` fix
 /// the task ran without the component span, so the counter had no `component_id` tag
 /// and never appeared in the API's `ErrorsTotal` stream.  With the fix the tag is
 /// present and the stream delivers an entry for `component_id = "gcp"`.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_continue,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn gcp_pubsub_spawned_task_errors_carry_component_span() {
     // Point the source at an unreachable local endpoint so the per-stream task
     // immediately gets ECONNREFUSED, emitting GcpPubsubConnectError

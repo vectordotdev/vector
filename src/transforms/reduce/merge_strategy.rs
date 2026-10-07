@@ -117,6 +117,11 @@ struct ConcatMerger {
 }
 
 impl ConcatMerger {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn new(v: Bytes, join_by: Option<char>) -> Self {
         // We need to get the resulting bytes for this character in case it's actually a multi-byte character.
         let join_by = join_by.map(|c| c.to_string().into_bytes());
@@ -351,7 +356,7 @@ impl TimestampWindowMerger {
 impl ReduceValueMerger for TimestampWindowMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Timestamp(ts) = v {
-            self.latest = ts
+            self.latest = ts;
         } else {
             return Err(format!(
                 "expected timestamp value, found: {}",
@@ -451,25 +456,28 @@ impl MaxNumberMerger {
 }
 
 impl ReduceValueMerger for MaxNumberMerger {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
         match v {
-            Value::Integer(i) => {
-                match self.v {
-                    NumberMergerValue::Int(i2) => {
-                        if i > i2 {
-                            self.v = NumberMergerValue::Int(i);
-                        }
+            Value::Integer(i) => match self.v {
+                NumberMergerValue::Int(i2) => {
+                    if i > i2 {
+                        self.v = NumberMergerValue::Int(i);
                     }
-                    NumberMergerValue::Float(f2) => {
-                        let f = NotNan::new(i as f64).unwrap();
-                        if f > f2 {
-                            self.v = NumberMergerValue::Float(f);
-                        }
+                }
+                NumberMergerValue::Float(f2) => {
+                    let f = NotNan::new(i as f64).unwrap();
+                    if f > f2 {
+                        self.v = NumberMergerValue::Float(f);
                     }
-                };
-            }
+                }
+            },
             Value::Float(f) => {
                 let f2 = match self.v {
                     NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
@@ -514,25 +522,28 @@ impl MinNumberMerger {
 }
 
 impl ReduceValueMerger for MinNumberMerger {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
         match v {
-            Value::Integer(i) => {
-                match self.v {
-                    NumberMergerValue::Int(i2) => {
-                        if i < i2 {
-                            self.v = NumberMergerValue::Int(i);
-                        }
+            Value::Integer(i) => match self.v {
+                NumberMergerValue::Int(i2) => {
+                    if i < i2 {
+                        self.v = NumberMergerValue::Int(i);
                     }
-                    NumberMergerValue::Float(f2) => {
-                        let f = NotNan::new(i as f64).unwrap();
-                        if f < f2 {
-                            self.v = NumberMergerValue::Float(f);
-                        }
+                }
+                NumberMergerValue::Float(f2) => {
+                    let f = NotNan::new(i as f64).unwrap();
+                    if f < f2 {
+                        self.v = NumberMergerValue::Float(f);
                     }
-                };
-            }
+                }
+            },
             Value::Float(f) => {
                 let f2 = match self.v {
                     NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
@@ -566,7 +577,17 @@ impl ReduceValueMerger for MinNumberMerger {
 }
 
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync + DynClone {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn add(&mut self, v: Value) -> Result<(), String>;
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn insert_into(self: Box<Self>, path: &OwnedTargetPath, v: &mut LogEvent)
     -> Result<(), String>;
 }
@@ -574,6 +595,11 @@ pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync + DynClone {
 dyn_clone::clone_trait_object!(ReduceValueMerger);
 
 impl From<Value> for Box<dyn ReduceValueMerger> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn from(v: Value) -> Self {
         match v {
             Value::Integer(i) => Box::new(AddNumbersMerger::new(i.into())),
@@ -778,6 +804,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn merging_values() {
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Discard),

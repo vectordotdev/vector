@@ -10,10 +10,12 @@ use vector_lib::{
     configurable::configurable_component,
 };
 
+#[must_use]
 pub const fn default_true() -> bool {
     true
 }
 
+#[must_use]
 pub const fn default_false() -> bool {
     false
 }
@@ -21,14 +23,22 @@ pub const fn default_false() -> bool {
 /// The default max length of the input buffer.
 ///
 /// Any input exceeding this limit will be discarded.
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 pub fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
+#[must_use]
 pub fn default_framing_message_based() -> FramingConfig {
     BytesDecoderConfig::new().into()
 }
 
+#[must_use]
 pub fn default_decoding() -> DeserializerConfig {
     BytesDeserializerConfig::new().into()
 }

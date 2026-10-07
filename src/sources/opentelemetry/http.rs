@@ -193,7 +193,7 @@ fn parse_with_deserializer(
 ) -> Result<Vec<Event>, ErrorMessage> {
     let events = deserializer
         .parse(body, log_namespace)
-        .map(|r| r.into_vec())
+        .map(smallvec::SmallVec::into_vec)
         .map_err(emit_decode_error)?;
 
     // Count individual items within OTLP batches for consistency with other sources
@@ -386,7 +386,7 @@ fn decode_trace_body(
     let events: Vec<Event> = request
         .resource_spans
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(vector_lib::opentelemetry::proto::trace::v1::ResourceSpans::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(
@@ -427,7 +427,7 @@ fn decode_metrics_body(
     let events: Vec<Event> = request
         .resource_metrics
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(vector_lib::opentelemetry::proto::metrics::v1::ResourceMetrics::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(

@@ -13,7 +13,7 @@ pub struct LogsSinkSetting {
     pub pipeline_version: Option<ConfinedTemplate>,
 }
 
-/// A sink that ingests logs into GreptimeDB.
+/// A sink that ingests logs into `GreptimeDB`.
 pub struct GreptimeDBLogsHttpSink<S> {
     batcher_settings: BatcherSettings,
     service: S,

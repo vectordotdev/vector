@@ -237,7 +237,7 @@ impl Partitioner for EventPartitioner {
                 error,
                 field: Some(field),
                 drop_event: false,
-            })
+            });
         };
 
         let source = self.source.as_ref().and_then(|source| {
@@ -324,6 +324,11 @@ fn user_or_namespaced_path(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let mut log = event.into_log();
 

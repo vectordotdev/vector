@@ -122,7 +122,7 @@ impl From<Vec<LokiRecord>> for LokiBatch {
                 stream.values.push(item.event);
                 res
             });
-        for (_k, stream) in result.stream_by_labels.iter_mut() {
+        for stream in result.stream_by_labels.values_mut() {
             stream.values.sort_by_key(|e| e.timestamp);
         }
         result
@@ -221,7 +221,6 @@ impl ByteSizeOf for PartitionKey {
     fn allocated_bytes(&self) -> usize {
         self.tenant_id
             .as_ref()
-            .map(|value| value.allocated_bytes())
-            .unwrap_or(0)
+            .map_or(0, vector_lib::ByteSizeOf::allocated_bytes)
     }
 }

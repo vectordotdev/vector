@@ -13,6 +13,7 @@ pub struct Opts {
     shell: Shell,
 }
 
+#[must_use]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut cmd = RootCli::command();
     let bin_name = cmd.get_name().to_string();

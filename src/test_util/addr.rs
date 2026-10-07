@@ -23,13 +23,14 @@ const MAX_PORT_ALLOCATION_ATTEMPTS: usize = 100;
 
 /// A guard that reserves a port in the registry, preventing port reuse until dropped.
 /// The guard does NOT hold the actual listener - it just marks the port as reserved
-/// so that concurrent calls to next_addr() won't return the same port.
+/// so that concurrent calls to `next_addr()` won't return the same port.
 pub struct PortGuard {
     addr: SocketAddr,
 }
 
 impl PortGuard {
     /// Get the socket address that this guard is holding.
+    #[must_use]
     pub const fn addr(&self) -> SocketAddr {
         self.addr
     }
@@ -65,6 +66,11 @@ static RESERVED_PORTS: LazyLock<Mutex<HashSet<u16>>> = LazyLock::new(|| Mutex::n
 /// // Use addr for your test
 /// // Port is automatically released when _guard goes out of scope
 /// ```
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
     for _ in 0..MAX_PORT_ALLOCATION_ATTEMPTS {
         let listener = StdTcpListener::bind((ip, 0)).expect("Failed to bind to OS-assigned port");
@@ -104,14 +110,17 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
     panic!("Failed to allocate a unique port after {MAX_PORT_ALLOCATION_ATTEMPTS} attempts");
 }
 
+#[must_use]
 pub fn next_addr() -> (PortGuard, SocketAddr) {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::LOCALHOST))
 }
 
+#[must_use]
 pub fn next_addr_any() -> (PortGuard, SocketAddr) {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
 }
 
+#[must_use]
 pub fn next_addr_v6() -> (PortGuard, SocketAddr) {
     next_addr_for_ip(IpAddr::V6(Ipv6Addr::LOCALHOST))
 }

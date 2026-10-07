@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    ConfigurableString, ConfinedTemplate, ConfinedUriTemplate, ConfinementChecker,
+    ConfinementConfig, FixedOffset, PathBuf, Template, TemplateParseError, TryFrom,
+    UnconfinedTemplate, UriTemplate,
+};
 
 impl Template {
     /// Confine this template to its literal prefix, returning a [`ConfinedTemplate`] that enforces
@@ -7,6 +11,11 @@ impl Template {
     /// Most sinks reach this through [`Template::confine`]; call this directly only when a sink
     /// constructs an [`UnconfinedTemplate`] itself (e.g. from a default value) and needs to confine
     /// it.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn confine(
         self,
         config: &ConfinementConfig,
@@ -32,6 +41,7 @@ impl Template {
     }
 
     /// Set the tz offset used when rendering strftime specifiers.
+    #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.inner.tz_offset = tz_offset;
         self
@@ -41,6 +51,7 @@ impl Template {
     ///
     /// This is a read-only inspection that does not render, so it is available before confinement
     /// (e.g. for topology field detection).
+    #[must_use]
     pub fn get_fields(&self) -> Option<Vec<String>> {
         self.inner.get_fields()
     }
@@ -50,21 +61,25 @@ impl Template {
     ///
     /// Sinks use this to derive a confinement boundary from the
     /// operator-authored portion of the template.
+    #[must_use]
     pub fn literal_prefix(&self) -> &str {
         self.inner.literal_prefix()
     }
 
     /// Returns a reference to the template source string.
+    #[must_use]
     pub const fn get_ref(&self) -> &str {
         self.inner.get_ref()
     }
 
     /// Returns `true` if the template source is empty.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
     /// Returns `true` if the template depends on the input event or time.
+    #[must_use]
     pub const fn is_dynamic(&self) -> bool {
         self.inner.is_dynamic()
     }
@@ -124,6 +139,11 @@ impl UriTemplate {
     /// by inspecting template content. The return type [`ConfinedUriTemplate`] is
     /// distinct from [`ConfinedTemplate`], making it impossible to accidentally wire
     /// a prefix-confined template into a URI field.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn confine(
         self,
         config: &ConfinementConfig,
@@ -150,6 +170,7 @@ impl UriTemplate {
 
 impl UriTemplate {
     /// Set the tz offset used when rendering strftime specifiers.
+    #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.0.inner.tz_offset = tz_offset;
         self
@@ -158,21 +179,25 @@ impl UriTemplate {
     /// Returns the names of the fields referenced by this template, if any.
     ///
     /// This is a read-only inspection that does not render, so it is available before confinement.
+    #[must_use]
     pub fn get_fields(&self) -> Option<Vec<String>> {
         self.0.get_fields()
     }
 
     /// Returns a reference to the template source string.
+    #[must_use]
     pub const fn get_ref(&self) -> &str {
         self.0.get_ref()
     }
 
     /// Returns `true` if the template source is empty.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Returns `true` if the template depends on the input event or time.
+    #[must_use]
     pub const fn is_dynamic(&self) -> bool {
         self.0.is_dynamic()
     }

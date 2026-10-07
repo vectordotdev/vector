@@ -11,18 +11,21 @@ const MAX_RETRIES: usize = 10;
 const WAIT_INTERVAL: Duration = Duration::from_secs(1);
 
 fn expected_log_events() -> usize {
-    std::env::var("EXPECTED_LOG_EVENTS")
-        .map(|n_expected| {
-            n_expected
-                .parse::<usize>()
-                .expect("EXPECTED_LOG_EVENTS should be an unsigned integer.")
-        })
-        .unwrap_or(1000)
+    std::env::var("EXPECTED_LOG_EVENTS").map_or(1000, |n_expected| {
+        n_expected
+            .parse::<usize>()
+            .expect("EXPECTED_LOG_EVENTS should be an unsigned integer.")
+    })
 }
 
 // Asserts that each log event has the hostname and timestamp fields, and
 // Removes them from the log so that comparison can more easily be made.
 // @return the number of log entries in the payload.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
     let mut n_log_events = 0;
 
@@ -43,7 +46,7 @@ fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
                 // to handle it.
                 assert!(log.remove("timestamp").is_some());
                 assert!(log.remove("hostname").is_some());
-            })
+            });
     });
 
     n_log_events

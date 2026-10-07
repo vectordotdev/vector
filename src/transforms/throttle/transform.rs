@@ -35,6 +35,15 @@ where
     C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(
         config: &ThrottleConfig,
         context: &TransformContext,
@@ -117,7 +126,7 @@ where
                                     error,
                                     field: Some("key_field"),
                                     drop_event: false,
-                                })
+                                });
                             })
                             .ok()
                     });
@@ -359,6 +368,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn emits_internal_events() {
         assert_transform_compliance(async move {
             let config = ThrottleConfig {
@@ -366,7 +380,7 @@ mod tests {
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
-                internal_metrics: Default::default(),
+                internal_metrics: ThrottleInternalMetricsConfig::default(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -380,6 +394,6 @@ mod tests {
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
-        .await
+        .await;
     }
 }

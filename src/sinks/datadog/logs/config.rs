@@ -109,6 +109,11 @@ pub struct DatadogLogsConfig {
     pub truncate_oversized_logs: Option<DatadogLogsTruncationConfig>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing return type and caller contracts during the lint rollout."
+)]
 const fn default_max_payload_bytes() -> Option<usize> {
     Some(MAX_PAYLOAD_BYTES)
 }
@@ -117,15 +122,20 @@ const fn default_max_log_bytes() -> usize {
     DEFAULT_MAX_LOG_BYTES
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing return type and caller contracts during the lint rollout."
+)]
 const fn default_compression() -> Option<Compression> {
     Some(Compression::zstd_default())
 }
 
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_api_key: ${DATADOG_API_KEY_ENV_VAR}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -137,16 +147,30 @@ impl DatadogLogsConfig {
     fn logs_endpoint(endpoint: Option<&str>, site: &str) -> crate::Result<HttpEndpoint> {
         let base_url = endpoint.map_or_else(
             || format!("https://http-intake.logs.{site}"),
-            |endpoint| endpoint.to_string(),
+            std::string::ToString::to_string,
         );
 
         Ok(HttpEndpoint::parse(&base_url)?.append_path("/api/v2/logs")?)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn get_uri(&self, dd_common: &DatadogCommonConfig) -> crate::Result<HttpEndpoint> {
         Self::logs_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub fn build_processor<C>(
         &self,
         dd_common: &DatadogCommonConfig,
@@ -206,16 +230,20 @@ impl DatadogLogsConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let default_tls_config;
 
         let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
+            Some(if let Some(config) = self.local_dd_common.tls.as_ref() {
+                config
+            } else {
+                default_tls_config = TlsEnableableConfig::enabled();
+                &default_tls_config
             }),
             false,
         )?;
@@ -543,7 +571,7 @@ mod test {
             endpoint: Some("localhost:8080".to_string()),
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             config.get_uri(&custom).unwrap().to_string(),
@@ -554,7 +582,7 @@ mod test {
             endpoint: None,
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             config.get_uri(&default).unwrap().to_string(),

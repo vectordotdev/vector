@@ -349,7 +349,7 @@ mod tests {
         }
         let mut grpc_request = Box::pin(grpc.oneshot(Request::new(Body::empty())));
         assert!(futures::poll!(&mut grpc_request).is_pending());
-        tokio::time::advance(Duration::from_secs(60)).await;
+        tokio::time::advance(Duration::from_mins(1)).await;
         for request in &mut requests {
             assert!(futures::poll!(request).is_pending());
         }
@@ -383,7 +383,7 @@ mod tests {
             }));
         let mut request = Box::pin(grpc.oneshot(Request::new(Body::empty())));
         assert!(futures::poll!(&mut request).is_pending());
-        tokio::time::advance(Duration::from_secs(60)).await;
+        tokio::time::advance(Duration::from_mins(1)).await;
         assert!(futures::poll!(&mut request).is_pending());
         assert_eq!(active_requests(), 1.0);
         let rejected = http

@@ -241,6 +241,11 @@ pub struct NetworkConnector {
 }
 
 impl NetworkConnector {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn on_connected(&self, metadata: ConnectionMetadata) {
         match metadata {
             ConnectionMetadata::Tcp { peer_addr } => {
@@ -255,6 +260,11 @@ impl NetworkConnector {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn on_connection_error<E: std::error::Error>(&self, error: E) {
         emit!(SocketOutgoingConnectionError { error });
     }
@@ -308,12 +318,14 @@ impl NetworkConnector {
     }
 
     /// Gets a `Healthcheck` based on the configured destination of this connector.
+    #[must_use]
     pub fn healthcheck(&self) -> Healthcheck {
         let connector = self.clone();
         Box::pin(async move { connector.connect().await.map(|_| ()).map_err(Into::into) })
     }
 
     /// Gets a `Service` suitable for sending data to the configured destination of this connector.
+    #[must_use]
     pub fn service(&self) -> NetworkService {
         NetworkService::new(self.clone())
     }
@@ -371,6 +383,11 @@ impl Service<Vec<u8>> for NetworkService {
         Poll::Ready(Ok(()))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 

@@ -84,7 +84,7 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = ""))]
     pub pod_annotations: OptionalTargetPath,
 
-    /// Event field for the Pod's node_name.
+    /// Event field for the Pod's `node_name`.
     ///
     /// Set to `""` to suppress this key.
     #[configurable(metadata(docs::examples = ".k8s.pod_host"))]
@@ -249,7 +249,7 @@ impl PodMetadataAnnotator {
                         &self.fields_spec,
                         container_status,
                         self.log_namespace,
-                    )
+                    );
                 }
             }
         }
@@ -329,7 +329,7 @@ fn annotate_from_metadata(
     metadata: &ObjectMeta,
     log_namespace: LogNamespace,
 ) {
-    for (legacy_key, metadata_key, value) in [
+    for (legacy_key, metadata_key, value) in &[
         (&fields_spec.pod_name, path!("pod_name"), &metadata.name),
         (
             &fields_spec.pod_namespace,
@@ -337,9 +337,7 @@ fn annotate_from_metadata(
             &metadata.namespace,
         ),
         (&fields_spec.pod_uid, path!("pod_uid"), &metadata.uid),
-    ]
-    .iter()
-    {
+    ] {
         if let Some(value) = value {
             let legacy_key = legacy_key
                 .path
@@ -371,13 +369,13 @@ fn annotate_from_metadata(
             legacy_key,
             path!("pod_owner"),
             format!("{}/{}", owner_references[0].kind, owner_references[0].name),
-        )
+        );
     }
 
     if let Some(labels) = &metadata.labels {
         let legacy_key_prefix = fields_spec.pod_labels.path.as_ref().map(|k| &k.path);
 
-        for (key, value) in labels.iter() {
+        for (key, value) in labels {
             let key_path = path!(key);
             let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
@@ -389,14 +387,14 @@ fn annotate_from_metadata(
                 legacy_key,
                 path!("pod_labels", key),
                 value.to_owned(),
-            )
+            );
         }
     }
 
     if let Some(annotations) = &metadata.annotations {
         let legacy_key_prefix = fields_spec.pod_annotations.path.as_ref().map(|k| &k.path);
 
-        for (key, value) in annotations.iter() {
+        for (key, value) in annotations {
             let key_path = path!(key);
             let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
@@ -408,7 +406,7 @@ fn annotate_from_metadata(
                 legacy_key,
                 path!("pod_annotations", key),
                 value.to_owned(),
-            )
+            );
         }
     }
 }
@@ -433,7 +431,7 @@ fn annotate_from_pod_spec(
             legacy_key,
             path!("pod_node_name"),
             value.to_owned(),
-        )
+        );
     }
 }
 
@@ -457,7 +455,7 @@ fn annotate_from_pod_status(
             legacy_key,
             path!("pod_ip"),
             value.to_owned(),
-        )
+        );
     }
 
     if let Some(value) = &pod_status.pod_ips {
@@ -470,7 +468,13 @@ fn annotate_from_pod_status(
 
         let value = value.iter().map(|k| k.ip.clone()).collect::<Vec<String>>();
 
-        log_namespace.insert_source_metadata(Config::NAME, log, legacy_key, path!("pod_ips"), value)
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("pod_ips"),
+            value,
+        );
     }
 }
 
@@ -494,7 +498,7 @@ fn annotate_from_container_status(
             legacy_key,
             path!("container_id"),
             value.to_owned(),
-        )
+        );
     }
 
     let legacy_key = fields_spec
@@ -509,8 +513,8 @@ fn annotate_from_container_status(
         log,
         legacy_key,
         path!("container_image_id"),
-        container_status.image_id.to_owned(),
-    )
+        container_status.image_id.clone(),
+    );
 }
 
 fn annotate_from_container(
@@ -533,7 +537,7 @@ fn annotate_from_container(
             legacy_key,
             path!("container_image"),
             value.to_owned(),
-        )
+        );
     }
 }
 
@@ -548,6 +552,11 @@ mod tests {
     use super::*;
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_annotate_from_metadata() {
         let cases = vec![
             (
@@ -806,7 +815,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
             assert_eq!(log, expected);
@@ -863,7 +872,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, file, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, file, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             let file_info = parse_log_file_path(file).unwrap();
             annotate_from_file_info(&mut log, &fields_spec, &file_info, log_namespace);
@@ -950,7 +959,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, pod_spec, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, pod_spec, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec, log_namespace);
             assert_eq!(log, expected);
@@ -958,6 +967,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_annotate_from_pod_status() {
         let cases = vec![
             (
@@ -1058,7 +1072,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, pod_status, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, pod_status, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_pod_status(&mut log, &fields_spec, &pod_status, log_namespace);
             assert_eq!(log, expected);
@@ -1102,7 +1116,7 @@ mod tests {
                 LogNamespace::Legacy,
             ),
         ];
-        for (fields_spec, container_status, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, container_status, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_container_status(
                 &mut log,
@@ -1158,7 +1172,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, container, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, container, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_container(&mut log, &fields_spec, &container, log_namespace);
             assert_eq!(log, expected);

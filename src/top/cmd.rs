@@ -84,7 +84,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
     )
     .await
     {
-        Ok(_) => {
+        Ok(()) => {
             connection.abort();
             exitcode::OK
         }
@@ -101,6 +101,11 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
 
 // This task handles reconnecting the gRPC client and all
 // subscriptions in the case of a connection failure
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn subscription(
     opts: super::Opts,
     uri: Uri,
@@ -111,12 +116,12 @@ async fn subscription(
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(uri.clone(), &opts.components).await {
-            Ok(state) => state,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
+        let state = if let Ok(state) = metrics::init_components(uri.clone(), &opts.components).await
+        {
+            state
+        } else {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
         };
         let initial_components = state
             .components
@@ -126,20 +131,19 @@ async fn subscription(
         _ = tx.send(EventType::InitializeState(state)).await;
 
         // Subscribe to updated metrics via gRPC streaming
-        let handles = match metrics::subscribe(
+        let handles = if let Ok(handles) = metrics::subscribe(
             uri.clone(),
             tx.clone(),
-            opts.interval as i64,
+            i64::from(opts.interval),
             opts.components.clone(),
             initial_components,
         )
         .await
         {
-            Ok(handles) => handles,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
+            handles
+        } else {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
         };
 
         _ = tx

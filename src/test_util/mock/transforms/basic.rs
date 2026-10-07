@@ -29,6 +29,7 @@ pub struct BasicTransformConfig {
 impl_generate_config_from_default!(BasicTransformConfig);
 
 impl BasicTransformConfig {
+    #[must_use]
     pub const fn new(suffix: String, increase: f64) -> Self {
         Self { suffix, increase }
     }
@@ -70,6 +71,11 @@ struct BasicTransform {
 }
 
 impl FunctionTransform for BasicTransform {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
@@ -124,7 +130,7 @@ impl FunctionTransform for BasicTransform {
                     trace.insert(message_key, Value::from(v));
                 }
             }
-        };
+        }
         output.push(event);
     }
 }

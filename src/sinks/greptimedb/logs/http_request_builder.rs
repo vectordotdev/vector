@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-/// Partition key for GreptimeDB logs sink.
+/// Partition key for `GreptimeDB` logs sink.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(super) struct PartitionKey {
     pub dbname: String,
@@ -33,7 +33,7 @@ pub(super) struct PartitionKey {
     pub pipeline_version: Option<String>,
 }
 
-/// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
+/// `KeyPartitioner` that partitions events by (dbname, table, `pipeline_name`, `pipeline_version`) pair.
 pub(super) struct KeyPartitioner {
     dbname: ConfinedTemplate,
     table: ConfinedTemplate,
@@ -113,7 +113,7 @@ impl Partitioner for KeyPartitioner {
     }
 }
 
-/// GreptimeDB logs HTTP request builder.
+/// `GreptimeDB` logs HTTP request builder.
 #[derive(Debug, Clone)]
 pub(super) struct GreptimeDBLogsHttpRequestBuilder {
     pub(super) endpoint: HttpEndpoint,
@@ -124,6 +124,11 @@ pub(super) struct GreptimeDBLogsHttpRequestBuilder {
     pub(super) extra_headers: Option<HashMap<String, String>>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn prepare_log_ingester_url(
     endpoint: &HttpEndpoint,
     db: &str,
@@ -147,7 +152,7 @@ fn prepare_log_ingester_url(
     }
 
     if let Some(extra_params) = extra_params.as_ref() {
-        for (key, value) in extra_params.iter() {
+        for (key, value) in extra_params {
             url_builder.append_pair(key, value);
         }
     }
@@ -173,7 +178,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             .header(CONTENT_LENGTH, payload.len());
 
         if let Some(extra_headers) = self.extra_headers.as_ref() {
-            for (key, value) in extra_headers.iter() {
+            for (key, value) in extra_headers {
                 builder = builder.header(key, value);
             }
         }

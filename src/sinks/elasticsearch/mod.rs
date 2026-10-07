@@ -54,7 +54,7 @@ pub enum ElasticsearchAuthConfig {
     },
 
     #[cfg(feature = "aws-core")]
-    /// Amazon OpenSearch Service-specific authentication.
+    /// Amazon `OpenSearch` Service-specific authentication.
     Aws(crate::aws::AwsAuthentication),
 }
 
@@ -94,6 +94,7 @@ pub enum BulkAction {
 }
 
 impl BulkAction {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             BulkAction::Index => "index",
@@ -102,6 +103,7 @@ impl BulkAction {
         }
     }
 
+    #[must_use]
     pub const fn as_json_pointer(self) -> &'static str {
         match self {
             BulkAction::Index => "/index",
@@ -140,6 +142,7 @@ pub enum VersionType {
 }
 
 impl VersionType {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Internal => "internal",
@@ -183,7 +186,7 @@ struct VersionValueParseError<'a> {
 
 impl InternalEvent for VersionValueParseError<'_> {
     fn emit(self) {
-        warn!("{self}")
+        warn!("{self}");
     }
 }
 
@@ -284,6 +287,15 @@ impl ElasticsearchCommonMode {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     const fn version_type(&self) -> Option<VersionType> {
         match self {
             ElasticsearchCommonMode::Bulk { version_type, .. } => Some(*version_type),
@@ -291,6 +303,11 @@ impl ElasticsearchCommonMode {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     const fn as_data_stream_config(&self) -> Option<&DataStreamMode> {
         match self {
             Self::DataStream(value) => Some(value),
@@ -319,7 +336,7 @@ pub enum ElasticsearchApiVersion {
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
-    /// Use the Elasticsearch 7.x-compatible API, including OpenSearch.
+    /// Use the Elasticsearch 7.x-compatible API, including `OpenSearch`.
     V7,
     /// Use the Elasticsearch 8.x API.
     V8,

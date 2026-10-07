@@ -237,7 +237,7 @@ impl DatadogMetricsConfig {
                 let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
                 format!("https://{version}-vector.agent.{site}")
             },
-            |endpoint| endpoint.to_string(),
+            std::string::ToString::to_string,
         )
     }
 
@@ -261,12 +261,11 @@ impl DatadogMetricsConfig {
         let default_tls_config;
 
         let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
+            Some(if let Some(config) = self.local_dd_common.tls.as_ref() {
+                config
+            } else {
+                default_tls_config = TlsEnableableConfig::enabled();
+                &default_tls_config
             }),
             false,
         )?;

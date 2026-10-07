@@ -49,6 +49,7 @@ impl RequestMetadataBuilder {
         }
     }
 
+    #[must_use]
     pub const fn new(
         event_count: usize,
         events_byte_size: usize,
@@ -61,6 +62,11 @@ impl RequestMetadataBuilder {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn track_event<E>(&mut self, event: E)
     where
         E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
@@ -73,6 +79,7 @@ impl RequestMetadataBuilder {
 
     /// Builds the [`RequestMetadata`] with the given size.
     /// This is used when there is no encoder in the process to provide an `EncodeResult`
+    #[must_use]
     pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
         let size = size.get();
 

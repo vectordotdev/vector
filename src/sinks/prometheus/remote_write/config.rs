@@ -180,12 +180,20 @@ fn validate_headers(
 ///
 /// Mirrors the check in `build`.
 #[cfg(feature = "aws-core")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn validate_aws_region(
     auth: &Option<PrometheusRemoteWriteAuth>,
     aws: &Option<crate::aws::RegionOrEndpoint>,
 ) -> crate::Result<()> {
     if matches!(auth, Some(PrometheusRemoteWriteAuth::Aws(_)))
-        && aws.as_ref().and_then(|config| config.region()).is_none()
+        && aws
+            .as_ref()
+            .and_then(crate::aws::region::RegionOrEndpoint::region)
+            .is_none()
     {
         return Err(Errors::AwsRegionRequired.into());
     }
@@ -248,6 +256,11 @@ impl ValidatedSink for RemoteWriteConfig {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn build(
         &self,
         validated: &ValidatedRemoteWrite,
@@ -281,7 +294,11 @@ impl ValidatedSink for RemoteWriteConfig {
             }
             #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
-                let region = match self.aws.as_ref().and_then(|config| config.region()) {
+                let region = match self
+                    .aws
+                    .as_ref()
+                    .and_then(crate::aws::region::RegionOrEndpoint::region)
+                {
                     Some(region) => region,
                     None => {
                         unreachable!("aws.region validated by validate() when AWS auth is selected")

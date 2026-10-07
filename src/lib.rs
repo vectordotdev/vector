@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![recursion_limit = "256"] // for async-stream
 #![deny(unreachable_pub)]
 #![deny(unused_extern_crates)]
@@ -136,8 +137,9 @@ static USE_COLOR: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 /// The name used to identify this Vector application.
 ///
-/// This can be set at compile-time through the VECTOR_APP_NAME env variable.
+/// This can be set at compile-time through the `VECTOR_APP_NAME` env variable.
 /// Defaults to "Vector".
+#[must_use]
 pub fn get_app_name() -> &'static str {
     option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
 }
@@ -180,6 +182,7 @@ pub fn format_vrl_diagnostics(
 
 /// The current version of Vector in simplified format.
 /// `<version-number>-nightly`.
+#[must_use]
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
@@ -201,6 +204,7 @@ pub fn vector_version() -> impl std::fmt::Display {
 }
 
 /// Returns a string containing full version information of the current build.
+#[must_use]
 pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
@@ -228,7 +232,12 @@ pub mod built_info {
 }
 
 /// Returns the host name of the current system.
-/// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
+/// The hostname can be overridden by setting the `VECTOR_HOSTNAME` environment variable.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
         hostname
@@ -262,6 +271,11 @@ where
 }
 
 /// Returns an estimate of the number of recommended threads that Vector should spawn.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn num_threads() -> usize {
     let count = match std::thread::available_parallelism() {
         Ok(count) => count,

@@ -8,7 +8,10 @@ use vector_lib::{
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig},
 };
 
-use super::{ConnectorType, HostAndPort, NetError, NetworkConnector, net_error::*};
+use super::{
+    ConnectorType, HostAndPort, NetError, NetworkConnector,
+    net_error::{FailedToConfigureTLS, FailedToConnectTLS, FailedToResolve},
+};
 use crate::dns;
 
 /// TCP configuration.
@@ -30,6 +33,7 @@ pub struct TcpConnectorConfig {
 }
 
 impl TcpConnectorConfig {
+    #[must_use]
     pub const fn from_address(host: String, port: u16) -> Self {
         Self {
             address: HostAndPort { host, port },
@@ -40,6 +44,7 @@ impl TcpConnectorConfig {
     }
 
     /// Creates a [`NetworkConnector`] from this TCP connector configuration.
+    #[must_use]
     pub fn as_connector(&self) -> NetworkConnector {
         NetworkConnector {
             inner: ConnectorType::Tcp(TcpConnector {

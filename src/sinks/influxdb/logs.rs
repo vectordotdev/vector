@@ -50,7 +50,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
-    /// The name of the InfluxDB measurement that is written to.
+    /// The name of the `InfluxDB` measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
     #[configurable(metadata(docs::required = true))]
     pub measurement: Option<String>,
@@ -70,7 +70,7 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "parent.child_field"))]
     pub tags: Vec<KeyString>,
 
-    /// The InfluxDB API version to use.
+    /// The `InfluxDB` API version to use.
     ///
     /// Omitting this option is deprecated and it will be required in a future release. When
     /// unset, the version is temporarily inferred from the configured settings.
@@ -81,7 +81,7 @@ pub struct InfluxDbLogsConfig {
 
     /// The name of the database to write into.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "vector-database"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     #[configurable(metadata(docs::required_when = "version = \"1\""))]
@@ -89,35 +89,35 @@ pub struct InfluxDbLogsConfig {
 
     /// The consistency level to use for writes.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "any"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub consistency: Option<String>,
 
     /// The target retention policy for writes.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "autogen"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub retention_policy_name: Option<String>,
 
     /// The username to authenticate with.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "todd"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub username: Option<String>,
 
     /// The password to authenticate with.
     ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
+    /// Only relevant when using `InfluxDB` v0.x/v1.x.
     #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
     #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
     pub password: Option<SensitiveString>,
 
     /// The name of the organization to write into.
     ///
-    /// Only relevant when using InfluxDB v2.x and above.
+    /// Only relevant when using `InfluxDB` v2.x and above.
     #[configurable(metadata(docs::examples = "my-org"))]
     #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
     #[configurable(metadata(docs::required_when = "version = \"2\""))]
@@ -126,7 +126,7 @@ pub struct InfluxDbLogsConfig {
 
     /// The name of the bucket to write into.
     ///
-    /// Only relevant when using InfluxDB v2.x and above.
+    /// Only relevant when using `InfluxDB` v2.x and above.
     #[configurable(metadata(docs::examples = "vector-bucket"))]
     #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
     #[configurable(metadata(docs::required_when = "version = \"2\""))]
@@ -135,7 +135,7 @@ pub struct InfluxDbLogsConfig {
 
     /// The [token][token_docs] to authenticate with.
     ///
-    /// Only relevant when using InfluxDB v2.x and above.
+    /// Only relevant when using `InfluxDB` v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
@@ -178,7 +178,7 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "text"))]
     pub message_key: Option<OptionalValuePath>,
 
-    /// Use this option to customize the key containing the source_type.
+    /// Use this option to customize the key containing the `source_type`.
     ///
     /// The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
     #[configurable(metadata(docs::examples = "source"))]
@@ -419,7 +419,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
                 count: 1
             });
             return None;
-        };
+        }
 
         Some(output)
     }
@@ -453,18 +453,15 @@ impl HttpSink for InfluxDbLogsSink {
 
 impl InfluxDbLogsConfig {
     fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        let version = match self.version {
-            Some(version) => {
-                self.validate_version(version)?;
-                version
-            }
-            None => {
-                warn!(
-                    "The `version` option is currently optional but will be required in a future release. \
-                     Please set it to `1` or `2` to match your InfluxDB settings."
-                );
-                self.infer_version()?
-            }
+        let version = if let Some(version) = self.version {
+            self.validate_version(version)?;
+            version
+        } else {
+            warn!(
+                "The `version` option is currently optional but will be required in a future release. \
+                 Please set it to `1` or `2` to match your InfluxDB settings."
+            );
+            self.infer_version()?
         };
         match version {
             InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
@@ -638,11 +635,11 @@ mod tests {
             retention_policy_name: None,
             username: None,
             password: None,
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             host_key: None,
             message_key: None,
             source_type_key: None,
@@ -673,11 +670,11 @@ mod tests {
             retention_policy_name: None,
             username: None,
             password: None,
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             message_key: None,
             source_type_key: None,
         };
@@ -718,7 +715,7 @@ mod tests {
         let line_protocol = split_line_protocol(string);
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
-        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_fields(line_protocol.2.clone(), ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
 
         sink.transformer
@@ -772,7 +769,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            line_protocol.2.clone(),
             [
                 "int=4i",
                 "float=5.5",
@@ -823,7 +820,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            line_protocol.2.clone(),
             [
                 "int=4i",
                 "float=5.5",
@@ -944,7 +941,7 @@ mod tests {
             "as_a_tag=10,metric_type=logs,source_type=file",
             line_protocol.1
         );
-        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_fields(line_protocol.2.clone(), ["message=\"hello\""].to_vec());
 
         assert_eq!("1542182950000000011\n", line_protocol.3);
     }
@@ -1014,6 +1011,11 @@ mod tests {
         .await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn smoke_test(
         config: &str,
         status_code: StatusCode,
@@ -1046,7 +1048,7 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
         let lines = std::iter::repeat(())
-            .map(move |_| "message_value")
+            .map(move |()| "message_value")
             .take(5)
             .collect::<Vec<_>>();
         let mut events = Vec::new();
@@ -1099,7 +1101,7 @@ mod tests {
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs,source_type=file", line_protocol.1);
         assert_fields(
-            line_protocol.2.to_string(),
+            line_protocol.2.clone(),
             [
                 &*format!("key{i}=\"value{i}\""),
                 "message=\"message_value\"",
@@ -1107,7 +1109,7 @@ mod tests {
             .to_vec(),
         );
 
-        assert_eq!(((i + 1) * 1000000000).to_string(), line_protocol.3);
+        assert_eq!(((i + 1) * 1_000_000_000).to_string(), line_protocol.3);
     }
 
     fn create_sink(
@@ -1120,14 +1122,14 @@ mod tests {
         let uri = uri.parse::<Uri>().unwrap();
         let token = token.to_string();
         let measurement = measurement.to_string();
-        let tags: HashSet<_> = tags.into_iter().map(|tag| tag.into()).collect();
+        let tags: HashSet<_> = tags.into_iter().map(std::convert::Into::into).collect();
         InfluxDbLogsSink {
             uri,
             token,
             protocol_version,
             measurement,
             tags,
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             host_key: owned_value_path!("host"),
             message_key: owned_value_path!("message"),
             source_type_key: owned_value_path!("source_type"),
@@ -1162,6 +1164,15 @@ mod integration_tests {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn influxdb2_logs_put_data() {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
@@ -1177,7 +1188,7 @@ mod integration_tests {
         let config = InfluxDbLogsConfig {
             measurement: Some(measure.clone()),
             endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
-            tags: Default::default(),
+            tags: Vec::default(),
             version: Some(InfluxDbVersion::V2),
             database: None,
             consistency: None,
@@ -1187,11 +1198,11 @@ mod integration_tests {
             org: Some(ORG.to_string()),
             bucket: Some(BUCKET.to_string()),
             token: Some(TOKEN.to_string().into()),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             host_key: None,
             message_key: None,
             source_type_key: None,

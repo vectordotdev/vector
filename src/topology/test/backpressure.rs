@@ -127,6 +127,11 @@ async fn buffer_drop_fan_out() {
 /// by the sources is how many the single sink accepted.
 #[tokio::test]
 #[ignore]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ignore_without_reason,
+    reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+)]
 async fn multiple_inputs_backpressure() {
     test_util::trace_init();
 

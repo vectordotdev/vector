@@ -45,6 +45,11 @@ impl BlackholeSink {
 
 #[async_trait]
 impl StreamSink<EventArray> for BlackholeSink {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, EventArray>) -> Result<(), ()> {
         // Spin up a task that does the periodic reporting.  This is decoupled from the main sink so
         // that rate limiting support can be added more simply without having to interleave it with

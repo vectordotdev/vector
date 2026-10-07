@@ -103,6 +103,7 @@ fn default_port_key() -> OptionalValuePath {
 }
 
 impl TcpConfig {
+    #[must_use]
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -126,38 +127,47 @@ impl TcpConfig {
         self.host_key.clone().unwrap_or(default_host_key())
     }
 
+    #[must_use]
     pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
+    #[must_use]
     pub const fn tls(&self) -> &Option<TlsSourceConfig> {
         &self.tls
     }
 
+    #[must_use]
     pub const fn framing(&self) -> &Option<FramingConfig> {
         &self.framing
     }
 
+    #[must_use]
     pub const fn decoding(&self) -> &DeserializerConfig {
         &self.decoding
     }
 
+    #[must_use]
     pub const fn address(&self) -> SocketListenAddr {
         self.address
     }
 
+    #[must_use]
     pub const fn keepalive(&self) -> Option<TcpKeepaliveConfig> {
         self.keepalive
     }
 
+    #[must_use]
     pub const fn shutdown_timeout_secs(&self) -> Duration {
         self.shutdown_timeout_secs
     }
 
+    #[must_use]
     pub const fn receive_buffer_bytes(&self) -> Option<usize> {
         self.receive_buffer_bytes
     }
 
+    #[must_use]
     pub const fn max_connection_duration_secs(&self) -> Option<u64> {
         self.max_connection_duration_secs
     }
@@ -167,6 +177,7 @@ impl TcpConfig {
         self
     }
 
+    #[must_use]
     pub const fn tls_handshake_timeout_secs(&self) -> Option<NonZeroU64> {
         self.tls_handshake_timeout_secs
     }

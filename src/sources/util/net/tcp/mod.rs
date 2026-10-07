@@ -48,6 +48,11 @@ use crate::{
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
@@ -119,6 +124,11 @@ where
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn run(
         self,
         addr: SocketListenAddr,
@@ -147,15 +157,14 @@ where
                     emit!(SocketBindError {
                         mode: SocketMode::Tcp,
                         error: &error,
-                    })
+                    });
                 })?;
 
             info!(
                 message = "Listening.",
                 addr = %listener
                     .local_addr()
-                    .map(SocketListenAddr::SocketAddr)
-                    .unwrap_or(addr)
+                    .map_or(addr, SocketListenAddr::SocketAddr)
             );
 
             let tripwire = cx.shutdown.clone();
@@ -199,7 +208,7 @@ where
                         let span = info_span!("connection", %peer_addr);
 
                         let tripwire = tripwire
-                            .map(move |_| {
+                            .map(move |()| {
                                 info!(
                                     message = "Resetting connection (still open after seconds).",
                                     seconds = ?shutdown_timeout_secs
@@ -254,6 +263,11 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn handle_stream<T>(
     mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
@@ -286,7 +300,7 @@ async fn handle_stream<T>(
                 return;
             }
         },
-        Some(_) = &mut handshake_timeout => {
+        Some(()) = &mut handshake_timeout => {
             emit!(TcpSocketTlsHandshakeTimeout {
                 peer_addr,
                 timeout: Duration::from_secs(
@@ -338,8 +352,8 @@ async fn handle_stream<T>(
 
     loop {
         let mut permit = tokio::select! {
-            _ = &mut tripwire => break,
-            Some(_) = &mut connection_close_timeout  => {
+            () = &mut tripwire => break,
+            Some(()) = &mut connection_close_timeout  => {
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
@@ -361,13 +375,13 @@ async fn handle_stream<T>(
         tokio::pin!(timeout);
 
         tokio::select! {
-            _ = &mut tripwire => break,
+            () = &mut tripwire => break,
             _ = &mut shutdown_signal => {
                 if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
             },
-            _ = &mut timeout => {
+            () = &mut timeout => {
                 // This connection is currently holding a permit, but has not received data for some time. Release
                 // the permit to let another connection try
                 continue;
@@ -419,47 +433,44 @@ async fn handle_stream<T>(
                         }
 
                         source.handle_events(&mut events, peer_addr);
-                        match out.send_batch(events).await {
-                            Ok(_) => {
-                                let ack = match receiver {
-                                    None => TcpSourceAck::Ack,
-                                    Some(receiver) =>
-                                        match receiver.await {
-                                            BatchStatus::Delivered => TcpSourceAck::Ack,
-                                            BatchStatus::Errored => {TcpSourceAck::Error},
-                                            BatchStatus::Rejected => {
-                                                // Sinks are responsible for emitting ComponentEventsDropped.
-                                                TcpSourceAck::Reject
-                                            }
+                        if let Ok(()) = out.send_batch(events).await {
+                            let ack = match receiver {
+                                None => TcpSourceAck::Ack,
+                                Some(receiver) =>
+                                    match receiver.await {
+                                        BatchStatus::Delivered => TcpSourceAck::Ack,
+                                        BatchStatus::Errored => {TcpSourceAck::Error},
+                                        BatchStatus::Rejected => {
+                                            // Sinks are responsible for emitting ComponentEventsDropped.
+                                            TcpSourceAck::Reject
                                         }
-                                };
-                                if let Some(ack_bytes) = acker.build_ack(ack){
-                                    let stream = reader.get_mut().get_mut();
-                                    if let Err(error) = stream.write_all(&ack_bytes).await {
-                                        // Per spec, `*Error` events MUST only be
-                                        // emitted on real errors. A peer-initiated
-                                        // graceful TLS shutdown during the ack
-                                        // write is a lifecycle event, not an error
-                                        // — log at warn and skip the emit.
-                                        if is_graceful_tls_shutdown(&error) {
-                                            warn!(
-                                                message = "Connection closed by peer before acknowledgement could be sent.",
-                                                error = %error,
-                                            );
-                                        } else {
-                                            emit!(TcpSendAckError { error, peer_addr });
-                                        }
-                                        break;
                                     }
-                                }
-                                if ack != TcpSourceAck::Ack {
+                            };
+                            if let Some(ack_bytes) = acker.build_ack(ack){
+                                let stream = reader.get_mut().get_mut();
+                                if let Err(error) = stream.write_all(&ack_bytes).await {
+                                    // Per spec, `*Error` events MUST only be
+                                    // emitted on real errors. A peer-initiated
+                                    // graceful TLS shutdown during the ack
+                                    // write is a lifecycle event, not an error
+                                    // — log at warn and skip the emit.
+                                    if is_graceful_tls_shutdown(&error) {
+                                        warn!(
+                                            message = "Connection closed by peer before acknowledgement could be sent.",
+                                            error = %error,
+                                        );
+                                    } else {
+                                        emit!(TcpSendAckError { error, peer_addr });
+                                    }
                                     break;
                                 }
                             }
-                            Err(_) => {
-                                emit!(StreamClosedError { count });
+                            if ack != TcpSourceAck::Ack {
                                 break;
                             }
+                        } else {
+                            emit!(StreamClosedError { count });
+                            break;
                         }
                     }
                     Some(Err(error)) => {

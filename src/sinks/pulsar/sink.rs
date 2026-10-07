@@ -55,7 +55,7 @@ impl ByteSizeOf for PulsarEvent {
     fn allocated_bytes(&self) -> usize {
         self.event.size_of()
             + self.topic.size_of()
-            + self.key.as_ref().map_or(0, |bytes| bytes.size_of())
+            + self.key.as_ref().map_or(0, vector_lib::ByteSizeOf::size_of)
             + self.properties.as_ref().map_or(0, |props| {
                 props
                     .iter()
@@ -71,6 +71,11 @@ impl EstimatedJsonEncodedSizeOf for PulsarEvent {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 pub(crate) async fn healthcheck(
     config: PulsarSinkConfig,
     topic_template: ConfinedTemplate,
@@ -94,10 +99,10 @@ impl PulsarSink {
         let service = PulsarService::new(client, producer_opts, config.producer_name.clone());
 
         Ok(PulsarSink {
-            config,
             transformer,
             encoder,
             service,
+            config,
             topic_template,
         })
     }

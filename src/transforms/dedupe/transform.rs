@@ -21,28 +21,28 @@ pub struct Dedupe {
 
 type TypeId = u8;
 
-/// A CacheEntry comes in two forms, depending on the FieldMatchConfig in use.
+/// A `CacheEntry` comes in two forms, depending on the `FieldMatchConfig` in use.
 ///
-/// When matching fields, a CacheEntry contains a vector of optional 2-tuples.
+/// When matching fields, a `CacheEntry` contains a vector of optional 2-tuples.
 /// Each element in the vector represents one field in the corresponding
-/// LogEvent. Elements in the vector will correspond 1:1 (and in order) to the
-/// fields specified in "fields.match". The tuples each store the TypeId for
+/// `LogEvent`. Elements in the vector will correspond 1:1 (and in order) to the
+/// fields specified in "fields.match". The tuples each store the `TypeId` for
 /// this field and the data as Bytes for the field. There is no need to store
 /// the field name because the elements of the vector correspond 1:1 to
 /// "fields.match", so there is never any ambiguity about what field is being
 /// referred to. If a field from "fields.match" does not show up in an incoming
-/// Event, the CacheEntry will have None in the correspond location in the
+/// Event, the `CacheEntry` will have None in the correspond location in the
 /// vector.
 ///
-/// When ignoring fields, a CacheEntry contains a vector of 3-tuples. Each
-/// element in the vector represents one field in the corresponding LogEvent.
-/// The tuples will each contain the field name, TypeId, and data as Bytes for
+/// When ignoring fields, a `CacheEntry` contains a vector of 3-tuples. Each
+/// element in the vector represents one field in the corresponding `LogEvent`.
+/// The tuples will each contain the field name, `TypeId`, and data as Bytes for
 /// the corresponding field (in that order). Since the set of fields that might
-/// go into CacheEntries is not known at startup, we must store the field names
-/// as part of CacheEntries. Since Event objects store their field in alphabetic
-/// order (as they are backed by a BTreeMap), and we build CacheEntries by
+/// go into `CacheEntries` is not known at startup, we must store the field names
+/// as part of `CacheEntries`. Since Event objects store their field in alphabetic
+/// order (as they are backed by a `BTreeMap`), and we build `CacheEntries` by
 /// iterating over the fields of the incoming Events, we know that the
-/// CacheEntries for 2 equivalent events will always contain the fields in the
+/// `CacheEntries` for 2 equivalent events will always contain the fields in the
 /// same order.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) enum CacheEntry {
@@ -50,7 +50,7 @@ pub(crate) enum CacheEntry {
     Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
 }
 
-/// Assigns a unique number to each of the types supported by Event::Value.
+/// Assigns a unique number to each of the types supported by `Event::Value`.
 const fn type_id_for_value(val: &Value) -> TypeId {
     match val {
         Value::Bytes(_) => 0,
@@ -66,6 +66,7 @@ const fn type_id_for_value(val: &Value) -> TypeId {
 }
 
 impl Dedupe {
+    #[must_use]
     pub fn new(num_entries: NonZeroUsize, fields: FieldMatchConfig) -> Self {
         Self {
             fields,
@@ -84,14 +85,14 @@ impl Dedupe {
     }
 }
 
-/// Takes in an Event and returns a CacheEntry to place into the LRU cache
+/// Takes in an Event and returns a `CacheEntry` to place into the LRU cache
 /// containing all relevant information for the fields that need matching
-/// against according to the specified FieldMatchConfig.
+/// against according to the specified `FieldMatchConfig`.
 pub(crate) fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     match &fields {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
-            for field_name in fields.iter() {
+            for field_name in fields {
                 if let Some(value) = event.as_log().get(field_name) {
                     entry.push(Some((type_id_for_value(value), value.coerce_to_bytes())));
                 } else {

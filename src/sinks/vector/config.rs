@@ -185,6 +185,11 @@ struct RoutingConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn from_address(addr: Uri) -> Self {
         let addr = addr.to_string();
         default_config(addr.as_str())
@@ -210,7 +215,7 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         keepalive: None,
-        acknowledgements: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
     }
 }
 
@@ -586,6 +591,11 @@ impl Service<VectorRequest> for FailoverVectorService {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn failover_request_settings(
     mut request_settings: TowerRequestSettings,
     endpoint_timeout: Duration,
@@ -663,6 +673,11 @@ struct FailoverNextAttempts {
     rebuilt: bool,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn failover_next_attempts(
     endpoint_strategy: EndpointStrategy,
     endpoints: usize,
@@ -678,15 +693,14 @@ fn failover_next_attempts(
             state: advance.state,
             rebuilt: false,
         };
-    } else {
-        *attempts = stale_failover_attempt_indices(
-            endpoint_strategy,
-            failover_state_index(advance.state, endpoints),
-            endpoints,
-            tried,
-        );
-        *attempt = 0;
     }
+    *attempts = stale_failover_attempt_indices(
+        endpoint_strategy,
+        failover_state_index(advance.state, endpoints),
+        endpoints,
+        tried,
+    );
+    *attempt = 0;
 
     FailoverNextAttempts {
         state: advance.state,
@@ -807,6 +821,11 @@ async fn healthcheck(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn healthchecks(
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     uris: &[Uri],
@@ -867,7 +886,7 @@ fn healthcheck_uris_for_strategy(
 const fn default_endpoint_health_config() -> HealthConfig {
     HealthConfig {
         retry_initial_backoff_secs: 1,
-        retry_max_duration_secs: Duration::from_secs(60 * 60),
+        retry_max_duration_secs: Duration::from_hours(1),
     }
 }
 
@@ -904,7 +923,10 @@ impl RetryLogic for VectorGrpcRetryLogic {
     type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
-        use tonic::Code::*;
+        use tonic::Code::{
+            AlreadyExists, DataLoss, InvalidArgument, NotFound, OutOfRange, PermissionDenied,
+            Unauthenticated, Unimplemented,
+        };
 
         match err {
             VectorSinkError::Request { source } => !matches!(

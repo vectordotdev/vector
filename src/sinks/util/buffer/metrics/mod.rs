@@ -27,6 +27,7 @@ pub struct MetricsBuffer {
 
 impl MetricsBuffer {
     /// Creates a new `MetricsBuffer` with the given batch settings.
+    #[must_use]
     pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::with_capacity(settings.events)
     }
@@ -85,10 +86,7 @@ impl Batch for MetricsBuffer {
     }
 
     fn num_items(&self) -> usize {
-        self.metrics
-            .as_ref()
-            .map(|metrics| metrics.len())
-            .unwrap_or(0)
+        self.metrics.as_ref().map_or(0, normalize::MetricSet::len)
     }
 }
 
@@ -160,7 +158,10 @@ mod tests {
             format!("set-{num}"),
             kind,
             MetricValue::Set {
-                values: values.iter().map(|s| s.to_string()).collect(),
+                values: values
+                    .iter()
+                    .map(std::string::ToString::to_string)
+                    .collect(),
             },
         )
     }
@@ -170,7 +171,7 @@ mod tests {
             format!("dist-{num}"),
             kind,
             MetricValue::Distribution {
-                samples: vector_lib::samples![num as f64 => rate],
+                samples: vector_lib::samples![f64::from(num) => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -198,6 +199,15 @@ mod tests {
         )
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
         Metric::new(
             format!("quantiles-{num}"),
@@ -238,7 +248,7 @@ mod tests {
         }
 
         if !buffer.is_empty() {
-            result.push(buffer.finish())
+            result.push(buffer.finish());
         }
 
         // Sort each batch to provide a predictable result ordering
@@ -251,11 +261,16 @@ mod tests {
             .collect()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn rebuffer_incremental_counters<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         for i in 0..4 {
             // counter-0 is repeated 5 times
-            events.push(sample_counter(0, "production", Incremental, i as f64));
+            events.push(sample_counter(0, "production", Incremental, f64::from(i)));
         }
 
         for i in 0..4 {
@@ -325,6 +340,11 @@ mod tests {
         assert_eq!(buffer.len(), 2);
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn rebuffer_absolute_counters<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         // counter-0 and -1 only emitted once
@@ -375,6 +395,11 @@ mod tests {
         assert_eq!(buffer.len(), 1);
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn rebuffer_incremental_gauges<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         // gauge-1 emitted once
@@ -427,6 +452,11 @@ mod tests {
         assert_eq!(buffer.len(), 1);
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn rebuffer_absolute_gauges<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         // gauge-2 emitted once
@@ -589,7 +619,7 @@ mod tests {
 
     #[test]
     fn compress_distributions_doesnt_panic() {
-        let to_float = |v: i32| -> f64 { v as f64 };
+        let to_float = |v: i32| -> f64 { f64::from(v) };
 
         let mut samples = (0..=15)
             .map(to_float)
@@ -609,6 +639,11 @@ mod tests {
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn rebuffer_absolute_aggregated_histograms<State: MetricNormalize + Default>() -> Buffer {
         let mut events = Vec::new();
         for _ in 2..5 {
@@ -697,7 +732,7 @@ mod tests {
                 events.push(sample_aggregated_summary(
                     num,
                     Absolute,
-                    (factor + num) as f64,
+                    f64::from(factor + num),
                 ));
             }
         }
@@ -730,6 +765,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn normalizer_does_not_hold_finalizer_references() {
         use vector_common::finalization::{
             BatchNotifier, BatchStatus, EventFinalizer, EventStatus,

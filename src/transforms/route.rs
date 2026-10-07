@@ -23,9 +23,14 @@ pub struct Route {
 }
 
 impl Route {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
-        for (output_name, condition) in config.route.iter() {
+        for (output_name, condition) in &config.route {
             let condition =
                 condition.build(&context.enrichment_tables, &context.metrics_storage)?;
             conditions.push((output_name.clone(), condition));
@@ -252,7 +257,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -298,7 +303,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -341,7 +346,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -385,7 +390,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()

@@ -46,6 +46,7 @@ enum Mode {
 }
 
 impl BasicSinkConfig {
+    #[must_use]
     pub const fn new(sink: SourceSender, healthy: bool) -> Self {
         Self {
             sink: Mode::Normal(sink),
@@ -55,6 +56,7 @@ impl BasicSinkConfig {
         }
     }
 
+    #[must_use]
     pub fn new_with_data(sink: SourceSender, healthy: bool, data: &str) -> Self {
         Self {
             sink: Mode::Normal(sink),
@@ -68,6 +70,7 @@ impl BasicSinkConfig {
     /// confinement-aware so the topology emits its
     /// `security_confinement_disabled` gauge. `allowed` sets
     /// `dangerously_allow_unconfined_template_resolution`.
+    #[must_use]
     pub fn with_confinement(mut self, allowed: bool) -> Self {
         self.confinement = Some(crate::template::ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: allowed,

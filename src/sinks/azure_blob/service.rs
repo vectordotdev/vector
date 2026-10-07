@@ -26,6 +26,7 @@ pub struct AzureBlobService {
 }
 
 impl AzureBlobService {
+    #[must_use]
     pub const fn new(client: Arc<BlobContainerClient>) -> AzureBlobService {
         AzureBlobService { client }
     }
@@ -108,7 +109,7 @@ async fn upload_block_blob(
         .instrument(info_span!("request").or_current())
         .await
         .map(|_| ())
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
 }
 
 // Extracts the Azure storage error code string from an azure_core::Error, if present.
@@ -197,5 +198,5 @@ async fn append_blob(
         .instrument(info_span!("request").or_current())
         .await
         .map(|_| ())
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
 }

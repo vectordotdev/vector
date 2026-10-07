@@ -221,7 +221,7 @@ impl TransformConfig for LogToMetricConfig {
     }
 }
 
-/// Kinds of TransformError for Parsing
+/// Kinds of `TransformError` for Parsing
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub enum TransformParseErrorKind {
@@ -273,6 +273,11 @@ fn render_template(template: &UnconfinedTemplate, event: &Event) -> Result<Strin
         .map_err(TransformError::TemplateRenderingError)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn render_tags(
     tags: &Option<IndexMap<UnconfinedTemplate, TagConfig>>,
     event: &Event,
@@ -315,7 +320,7 @@ fn render_tags(
                         "Static tags overrides dynamic tags. \
                 key: {k}, value: {v:?}, discarded value: {discarded_v:?}"
                     );
-                };
+                }
             }
             result.as_option()
         }
@@ -362,17 +367,22 @@ fn render_tag_into(
             }
             Err(other) => return Err(other),
         },
-    };
+    }
     Ok(())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
     let timestamp = log
         .get_timestamp()
         .and_then(Value::as_timestamp)
-        .cloned()
+        .copied()
         .or_else(|| Some(Utc::now()));
 
     // Assign the OriginService for the new metric
@@ -486,7 +496,9 @@ fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric,
 
 fn bytes_to_str(value: &Value) -> Option<String> {
     match value {
-        Value::Bytes(bytes) => std::str::from_utf8(bytes).ok().map(|s| s.to_string()),
+        Value::Bytes(bytes) => std::str::from_utf8(bytes)
+            .ok()
+            .map(std::string::ToString::to_string),
         _ => None,
     }
 }
@@ -565,6 +577,19 @@ fn get_set_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_samples = log
         .get(event_path!("distribution", "samples"))
@@ -620,7 +645,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
         "summary" => Ok(StatisticKind::Summary),
         _ => Err(TransformError::MetricValueError {
             path: "distribution.statistic".to_string(),
-            path_value: statistic_str.to_string(),
+            path_value: statistic_str.clone(),
         }),
     }?;
 
@@ -630,6 +655,11 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_buckets = log
         .get(event_path!("aggregated_histogram", "buckets"))
@@ -701,6 +731,11 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_quantiles = log
         .get(event_path!("aggregated_summary", "quantiles"))
@@ -740,7 +775,7 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         quantiles.push(Quantile {
             quantile: *quantile,
             value: *value,
-        })
+        });
     }
 
     let count = log
@@ -772,12 +807,17 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
     let timestamp = log
         .get_timestamp()
         .and_then(Value::as_timestamp)
-        .cloned()
+        .copied()
         .or_else(|| Some(Utc::now()));
 
     let name = match try_get_string_from_log(log, "name")? {
@@ -859,42 +899,40 @@ impl FunctionTransform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(err) => {
-                    match err {
-                        TransformError::MetricValueError { path, path_value } => {
-                            emit!(MetricMetadataInvalidFieldValueError {
-                                field: path.as_ref(),
-                                field_value: path_value.as_ref()
-                            })
-                        }
-                        TransformError::PathNotFound { path } => {
-                            emit!(ParserMissingFieldError::<DROP_EVENT> {
-                                field: path.as_ref()
-                            })
-                        }
-                        TransformError::ParseError { path, kind } => {
-                            emit!(MetricMetadataParseError {
-                                field: path.as_ref(),
-                                kind: &kind.to_string(),
-                            })
-                        }
-                        TransformError::MetricDetailsNotFound => {
-                            emit!(MetricMetadataMetricDetailsNotFoundError {})
-                        }
-                        TransformError::PairExpansionError { key, value, error } => {
-                            emit!(crate::internal_events::PairExpansionError {
-                                key: &key,
-                                value: &value,
-                                drop_event: true,
-                                error
-                            })
-                        }
-                        _ => {}
-                    };
-                }
+                Err(err) => match err {
+                    TransformError::MetricValueError { path, path_value } => {
+                        emit!(MetricMetadataInvalidFieldValueError {
+                            field: path.as_ref(),
+                            field_value: path_value.as_ref()
+                        });
+                    }
+                    TransformError::PathNotFound { path } => {
+                        emit!(ParserMissingFieldError::<DROP_EVENT> {
+                            field: path.as_ref()
+                        });
+                    }
+                    TransformError::ParseError { path, kind } => {
+                        emit!(MetricMetadataParseError {
+                            field: path.as_ref(),
+                            kind: &kind.to_string(),
+                        });
+                    }
+                    TransformError::MetricDetailsNotFound => {
+                        emit!(MetricMetadataMetricDetailsNotFoundError {});
+                    }
+                    TransformError::PairExpansionError { key, value, error } => {
+                        emit!(crate::internal_events::PairExpansionError {
+                            key: &key,
+                            value: &value,
+                            drop_event: true,
+                            error
+                        });
+                    }
+                    _ => {}
+                },
             }
         } else {
-            for config in self.metrics.iter() {
+            for config in &self.metrics {
                 match to_metric_with_config(config, &event) {
                     Ok(metric) => {
                         buffer.push(Event::Metric(metric));
@@ -904,25 +942,25 @@ impl FunctionTransform for LogToMetric {
                             TransformError::PathNull { path } => {
                                 emit!(LogToMetricFieldNullError {
                                     field: path.as_ref()
-                                })
+                                });
                             }
                             TransformError::PathNotFound { path } => {
                                 emit!(ParserMissingFieldError::<DROP_EVENT> {
                                     field: path.as_ref()
-                                })
+                                });
                             }
                             TransformError::ParseFloatError { path, error } => {
                                 emit!(LogToMetricParseFloatError {
                                     field: path.as_ref(),
                                     error
-                                })
+                                });
                             }
                             TransformError::TemplateRenderingError(error) => {
                                 emit!(crate::internal_events::TemplateRenderingError {
                                     error,
                                     drop_event: true,
                                     field: None,
-                                })
+                                });
                             }
                             TransformError::PairExpansionError { key, value, error } => {
                                 emit!(crate::internal_events::PairExpansionError {
@@ -930,10 +968,10 @@ impl FunctionTransform for LogToMetric {
                                     value: &value,
                                     drop_event: true,
                                     error
-                                })
+                                });
                             }
                             _ => {}
-                        };
+                        }
                         // early return to prevent the partial buffer from being sent
                         return;
                     }
@@ -1014,6 +1052,11 @@ mod tests {
         metadata.set_source_type(TEST_SOURCE_TYPE);
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn do_transform(config: LogToMetricConfig, event: Event) -> Option<Event> {
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
@@ -1030,6 +1073,11 @@ mod tests {
         .await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn do_transform_multiple_events(
         config: LogToMetricConfig,
         event: Event,
@@ -1059,6 +1107,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn count_http_status_codes() {
         let config = parse_config(
             r#"
@@ -1096,6 +1149,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn count_http_requests_with_tags() {
         let config = parse_config(
             r#"
@@ -1145,6 +1203,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn count_http_requests_with_tags_expansion() {
         let config = parse_config(
             r#"
@@ -1197,6 +1260,11 @@ mod tests {
         );
     }
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn count_http_requests_with_colliding_dynamic_tags() {
         let config = parse_config(
             r#"
@@ -1245,6 +1313,11 @@ mod tests {
         }
     }
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn multi_value_tags_yaml() {
         // Have to use YAML to represent bare tags
         let config = parse_yaml_config(
@@ -1273,6 +1346,11 @@ mod tests {
         }
     }
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn multi_value_tags_expansion_yaml() {
         // Have to use YAML to represent bare tags
         let config = parse_yaml_config(
@@ -1308,6 +1386,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn multi_value_tags_toml() {
         let config = parse_config(
             r#"
@@ -1333,6 +1416,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn count_exceptions() {
         let config = parse_config(
             r#"
@@ -1372,6 +1460,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn count_exceptions_no_match() {
         let config = parse_config(
             r#"
@@ -1387,6 +1480,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn sum_order_amounts() {
         let config = parse_config(
             r#"
@@ -1426,6 +1524,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn count_absolute() {
         let config = parse_config(
             r#"
@@ -1467,6 +1570,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn memory_usage_gauge() {
         let config = parse_config(
             r#"
@@ -1508,6 +1616,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn parse_failure() {
         let config = parse_config(
             r#"
@@ -1524,6 +1637,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn missing_field() {
         let config = parse_config(
             r#"
@@ -1539,6 +1657,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn null_field() {
         let config = parse_config(
             r#"
@@ -1554,6 +1677,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn multiple_metrics() {
         let config = parse_config(
             r#"
@@ -1616,6 +1744,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn multiple_metrics_with_multiple_templates() {
         let config = parse_config(
             r#"
@@ -1686,6 +1819,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn user_ip_set() {
         let config = parse_config(
             r#"
@@ -1727,6 +1865,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn response_time_histogram() {
         let config = parse_config(
             r#"
@@ -1769,6 +1912,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn response_time_summary() {
         let config = parse_config(
             r#"
@@ -1832,6 +1980,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_gauge() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -1869,6 +2022,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_histogram() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -1946,6 +2104,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_distribution_histogram() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -2005,6 +2168,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_distribution_summary() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -2064,6 +2232,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_summary() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -2125,6 +2298,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_counter() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -2162,6 +2340,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_set() {
         let config = LogToMetricConfig {
             metrics: None,
@@ -2201,6 +2384,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn transform_all_metrics_optional_namespace() {
         let config = LogToMetricConfig {
             metrics: None,

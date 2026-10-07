@@ -45,9 +45,9 @@ pub struct DatadogEventsConfig {
 
 impl GenerateConfig for DatadogEventsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_api_key: ${DATADOG_API_KEY_ENV_VAR}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -67,6 +67,11 @@ impl DatadogEventsConfig {
         Ok(client)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn build_sink(
         &self,
         dd_common: &DatadogCommonConfig,

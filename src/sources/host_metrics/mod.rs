@@ -182,6 +182,7 @@ const fn default_scrape_interval() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
@@ -201,6 +202,11 @@ const fn example_collectors() -> [&'static str; 10] {
     ]
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing return type and caller contracts during the lint rollout."
+)]
 fn default_collectors() -> Option<Vec<Collector>> {
     let mut collectors = vec![
         Collector::Cpu,
@@ -365,6 +371,7 @@ pub struct HostMetrics {
 
 impl HostMetrics {
     #[cfg(not(target_os = "linux"))]
+    #[must_use]
     pub fn new(config: HostMetricsConfig) -> Self {
         Self {
             config,
@@ -387,6 +394,7 @@ impl HostMetrics {
         }
     }
 
+    #[must_use]
     pub fn buffer(&self) -> MetricsBuffer {
         MetricsBuffer::new(self.config.namespace.clone())
     }
@@ -448,17 +456,17 @@ impl HostMetrics {
             Ok(loadavg) => {
                 output.gauge(
                     GaugeName::Load1,
-                    loadavg.0.get::<ratio>() as f64,
+                    f64::from(loadavg.0.get::<ratio>()),
                     MetricTags::default(),
                 );
                 output.gauge(
                     GaugeName::Load5,
-                    loadavg.1.get::<ratio>() as f64,
+                    f64::from(loadavg.1.get::<ratio>()),
                     MetricTags::default(),
                 );
                 output.gauge(
                     GaugeName::Load15,
-                    loadavg.2.get::<ratio>() as f64,
+                    f64::from(loadavg.2.get::<ratio>()),
                     MetricTags::default(),
                 );
             }
@@ -524,6 +532,7 @@ impl MetricsBuffer {
     }
 
     /// Consumes the buffer, returning the collected metrics.
+    #[must_use]
     pub fn into_metrics(self) -> Vec<Metric> {
         self.metrics
     }
@@ -546,7 +555,7 @@ impl MetricsBuffer {
             .with_namespace(self.namespace.clone())
             .with_tags(Some(self.tags(tags)))
             .with_timestamp(Some(self.timestamp)),
-        )
+        );
     }
 
     fn gauge(&mut self, name: GaugeName, value: f64, tags: MetricTags) {
@@ -559,7 +568,7 @@ impl MetricsBuffer {
             .with_namespace(self.namespace.clone())
             .with_tags(Some(self.tags(tags)))
             .with_timestamp(Some(self.timestamp)),
-        )
+        );
     }
 }
 
@@ -620,6 +629,15 @@ fn init_roots() {
 }
 
 impl FilterList {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     fn contains<T, M>(&self, value: &Option<T>, matches: M) -> bool
     where
         M: Fn(&PatternWrapper, &T) -> bool,
@@ -910,8 +928,7 @@ mod tests {
                 .tags()
                 .unwrap()
                 .get(tag)
-                .map(|value| !matches(value))
-                .unwrap_or(false)
+                .is_some_and(|value| !matches(value))
         })
     }
 

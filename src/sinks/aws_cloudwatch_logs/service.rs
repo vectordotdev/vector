@@ -242,6 +242,11 @@ impl CloudwatchLogsSvc {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     pub fn process_events(&self, mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
         // Sort by timestamp
         events.sort_by_key(|e| e.timestamp);

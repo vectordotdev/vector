@@ -30,25 +30,30 @@ use crate::{
     },
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {
-        auth: Default::default(),
-        connection_string: Default::default(),
-        account_name: Default::default(),
-        blob_endpoint: Default::default(),
-        container_name: Default::default(),
+        auth: Option::default(),
+        connection_string: Option::default(),
+        account_name: Option::default(),
+        blob_endpoint: Option::default(),
+        container_name: String::default(),
         blob_prefix: Default::default(),
-        blob_time_format: Default::default(),
-        blob_append_uuid: Default::default(),
-        blob_type: Default::default(),
+        blob_time_format: Option::default(),
+        blob_append_uuid: Option::default(),
+        blob_type: AzureBlobType::default(),
         encoding,
         compression: Compression::gzip_default(),
-        tags: Default::default(),
-        metadata: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
+        tags: Option::default(),
+        metadata: Option::default(),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig::default(),
         acknowledgements: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         confinement: Default::default(),
     }
 }
@@ -68,7 +73,7 @@ fn azure_blob_build_request_without_compression() {
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
-    let blob_time_format = String::from("");
+    let blob_time_format = String::new();
     let blob_append_uuid = false;
 
     let key = sink_config
@@ -83,7 +88,7 @@ fn azure_blob_build_request_without_compression() {
         blob_append_uuid,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -119,7 +124,7 @@ fn azure_blob_build_request_with_compression() {
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
-    let blob_time_format = String::from("");
+    let blob_time_format = String::new();
     let blob_append_uuid = false;
 
     let key = sink_config
@@ -134,7 +139,7 @@ fn azure_blob_build_request_with_compression() {
         blob_append_uuid,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -185,7 +190,7 @@ fn azure_blob_build_request_with_time_format() {
         blob_append_uuid,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -224,7 +229,7 @@ fn azure_blob_build_request_with_uuid() {
         container_name: container_name.clone(),
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
-    let blob_time_format = String::from("");
+    let blob_time_format = String::new();
     let blob_append_uuid = true;
 
     let key = sink_config
@@ -239,7 +244,7 @@ fn azure_blob_build_request_with_uuid() {
         blob_append_uuid,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -388,12 +393,12 @@ async fn azure_blob_build_config_with_account_name() {
 #[tokio::test]
 async fn azure_blob_build_config_with_account_name_with_no_auth() {
     let config: AzureBlobSinkConfig =
-        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r#"
+        serde_yaml::from_str::<AzureBlobSinkConfig>(indoc::indoc! {r"
             account_name: mylogstorage
             container_name: my-logs
             encoding:
               codec: json
-        "#})
+        "})
         .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
 
     let cx = SinkContext::default();
@@ -571,11 +576,11 @@ fn azure_blob_build_request_with_blob_tags() {
 
     let request_options = AzureBlobRequestOptions {
         container_name,
-        blob_time_format: String::from(""),
+        blob_time_format: String::new(),
         blob_append_uuid: false,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -628,11 +633,11 @@ fn azure_blob_build_request_with_blob_metadata() {
 
     let request_options = AzureBlobRequestOptions {
         container_name,
-        blob_time_format: String::from(""),
+        blob_time_format: String::new(),
         blob_append_uuid: false,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -679,11 +684,11 @@ fn azure_blob_build_request_with_empty_blob_tags_and_metadata() {
     // Empty maps must collapse to `None` so we do not emit empty headers.
     let request_options = AzureBlobRequestOptions {
         container_name,
-        blob_time_format: String::from(""),
+        blob_time_format: String::new(),
         blob_append_uuid: false,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -730,7 +735,7 @@ fn azure_blob_build_request_append_blob_defaults() {
         blob_append_uuid: false,
         blob_type: AzureBlobType::Append,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -900,6 +905,11 @@ fn azure_blob_block_blob_allows_non_terminating_framing() {
 /// mode rejects that default instead of writing an unparseable blob; block mode is unaffected, and
 /// an explicit `framing` is still honored.
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn azure_blob_append_blob_rejects_unterminated_default_framing() {
     let append_default = AzureBlobSinkConfig {
         blob_type: AzureBlobType::Append,
@@ -1055,11 +1065,11 @@ fn azure_blob_build_request_append_blob_with_compression() {
 
     let request_options = AzureBlobRequestOptions {
         container_name,
-        blob_time_format: "".to_string(),
+        blob_time_format: String::new(),
         blob_append_uuid: false,
         blob_type: AzureBlobType::Append,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -1139,11 +1149,11 @@ fn azure_blob_block_blob_request_carries_block_type() {
 
     let request_options = AzureBlobRequestOptions {
         container_name,
-        blob_time_format: "".to_string(),
+        blob_time_format: String::new(),
         blob_append_uuid: false,
         blob_type: AzureBlobType::Block,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -1187,11 +1197,11 @@ fn azure_blob_append_blob_with_uuid_override_generates_unique_keys() {
 
         let request_options = AzureBlobRequestOptions {
             container_name: container_name.clone(),
-            blob_time_format: "".to_string(),
+            blob_time_format: String::new(),
             blob_append_uuid: true, // explicit override: UUID even for append type
             blob_type: AzureBlobType::Append,
             encoder: (
-                Default::default(),
+                Transformer::default(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::default().into(),
                     TextSerializerConfig::default().build().into(),
@@ -1244,11 +1254,11 @@ fn azure_blob_append_blob_stable_name_without_uuid_and_time() {
 
         let request_options = AzureBlobRequestOptions {
             container_name: container_name.clone(),
-            blob_time_format: "".to_string(), // no time component
-            blob_append_uuid: false,          // no UUID
+            blob_time_format: String::new(), // no time component
+            blob_append_uuid: false,         // no UUID
             blob_type: AzureBlobType::Append,
             encoder: (
-                Default::default(),
+                Transformer::default(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::default().into(),
                     TextSerializerConfig::default().build().into(),
@@ -1306,11 +1316,11 @@ fn azure_blob_append_blob_compression_change_rotates_blob_name() {
 
         let request_options = AzureBlobRequestOptions {
             container_name: container_name.clone(),
-            blob_time_format: "".to_string(),
+            blob_time_format: String::new(),
             blob_append_uuid: false,
             blob_type: AzureBlobType::Append,
             encoder: (
-                Default::default(),
+                Transformer::default(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::default().into(),
                     TextSerializerConfig::default().build().into(),
@@ -1386,7 +1396,7 @@ fn azure_blob_append_blob_custom_time_format_hourly_rotation() {
         blob_append_uuid: false,
         blob_type: AzureBlobType::Append,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
@@ -1480,6 +1490,11 @@ async fn azure_blob_append_blob_default_max_bytes_succeeds() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn azure_blob_append_blob_explicit_oversized_batch_fails_at_startup() {
     // If the user explicitly sets batch.max_bytes above the 4 MiB Azure limit, build must fail.
     let config: AzureBlobSinkConfig = toml::from_str(
@@ -1687,11 +1702,11 @@ fn azure_blob_build_request_append_blob_with_tags_and_metadata() {
 
     let request_options = AzureBlobRequestOptions {
         container_name,
-        blob_time_format: String::from(""),
+        blob_time_format: String::new(),
         blob_append_uuid: false,
         blob_type: AzureBlobType::Append,
         encoder: (
-            Default::default(),
+            Transformer::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),

@@ -43,6 +43,11 @@ impl ClientBuilder for KMSClientBuilder {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn cloudwatch_insert_log_event() {
     trace_init();
 
@@ -58,11 +63,11 @@ async fn cloudwatch_insert_log_event() {
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -97,6 +102,11 @@ async fn cloudwatch_insert_log_event() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn cloudwatch_insert_log_events_sorted() {
     trace_init();
 
@@ -112,11 +122,11 @@ async fn cloudwatch_insert_log_events_sorted() {
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -176,6 +186,11 @@ async fn cloudwatch_insert_log_events_sorted() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn cloudwatch_insert_out_of_range_timestamp() {
     trace_init();
 
@@ -191,11 +206,11 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -256,6 +271,11 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn cloudwatch_dynamic_group_and_stream_creation() {
     trace_init();
 
@@ -271,11 +291,11 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -310,6 +330,11 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
     trace_init();
 
@@ -325,11 +350,11 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: Some(
             create_kms_client_test()
@@ -395,6 +420,11 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn cloudwatch_insert_log_event_batched() {
     trace_init();
 
@@ -417,9 +447,9 @@ async fn cloudwatch_insert_log_event_batched() {
         compression: Default::default(),
         batch,
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -454,6 +484,11 @@ async fn cloudwatch_insert_log_event_batched() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn cloudwatch_insert_log_event_partitioned() {
     trace_init();
 
@@ -469,11 +504,11 @@ async fn cloudwatch_insert_log_event_partitioned() {
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
@@ -550,6 +585,15 @@ async fn cloudwatch_insert_log_event_partitioned() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 async fn cloudwatch_healthcheck() {
     trace_init();
     use super::healthcheck::healthcheck;
@@ -565,11 +609,11 @@ async fn cloudwatch_healthcheck() {
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         request: Default::default(),
-        tls: Default::default(),
+        tls: Option::default(),
         assume_role: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,

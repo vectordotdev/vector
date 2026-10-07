@@ -16,6 +16,7 @@ pub struct JsonArrayBuffer {
 }
 
 impl JsonArrayBuffer {
+    #[must_use]
     pub const fn new(settings: BatchSize<Self>) -> Self {
         Self {
             buffer: Vec::new(),

@@ -13,6 +13,11 @@ pub struct LuaGcTriggered {
 }
 
 impl InternalEvent for LuaGcTriggered {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn emit(self) {
         gauge!(GaugeName::LuaMemoryUsedBytes).set(self.used_memory as f64);
     }
@@ -70,12 +75,19 @@ impl InternalEvent for LuaBuildError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
 fn mlua_error_code(err: &mlua::Error) -> &'static str {
-    use mlua::Error::*;
+    use mlua::Error::{
+        BadArgument, BindError, CallbackDestructed, CallbackError, CoroutineUnresumable,
+        ExternalError, FromLuaConversionError, MemoryControlNotAvailable, MemoryError,
+        MetaMethodRestricted, MetaMethodTypeError, MismatchedRegistryKey, PreviouslyResumedPanic,
+        RecursiveMutCallback, RuntimeError, SafetyError, StackError, SyntaxError,
+        ToLuaConversionError, UserDataBorrowError, UserDataBorrowMutError, UserDataDestructed,
+        UserDataTypeMismatch, WithContext,
+    };
 
     match err {
         SyntaxError { .. } => "syntax_error",
@@ -107,7 +119,11 @@ fn mlua_error_code(err: &mlua::Error) -> &'static str {
 }
 
 const fn lua_build_error_code(err: &BuildError) -> &'static str {
-    use BuildError::*;
+    use BuildError::{
+        InvalidHooksInit, InvalidHooksProcess, InvalidHooksShutdown, InvalidSearchDirs,
+        InvalidSource, InvalidTimerHandler, RuntimeErrorGc, RuntimeErrorHooksInit,
+        RuntimeErrorHooksProcess, RuntimeErrorHooksShutdown, RuntimeErrorTimerHandler,
+    };
 
     match err {
         InvalidSearchDirs { .. } => "invalid_search_dir",

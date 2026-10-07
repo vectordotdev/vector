@@ -139,7 +139,7 @@ impl AcceptedTagValueSet {
             }
             TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
             TagValueSetStorage::Fingerprint(fp) => fp.insert(&value),
-        };
+        }
     }
 }
 

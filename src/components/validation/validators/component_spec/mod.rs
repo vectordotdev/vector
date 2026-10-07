@@ -2,7 +2,8 @@ use vector_lib::event::{Event, Metric, MetricKind};
 
 use super::{ComponentMetricType, Validator};
 use crate::components::validation::{
-    ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent, component_names::*,
+    ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent,
+    component_names::{TEST_SINK_NAME, TEST_SOURCE_NAME, TEST_TRANSFORM_NAME},
 };
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
@@ -96,6 +97,11 @@ impl Validator for ComponentSpecValidator {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 fn validate_telemetry(
     component_type: ComponentType,
     telemetry_events: &[Event],
@@ -209,7 +215,7 @@ fn filter_events_by_metric_and_component<'a>(
 
     let metrics: Vec<&Metric> = telemetry_events
         .iter()
-        .flat_map(|e| {
+        .filter_map(|e| {
             if let vector_lib::event::Event::Metric(m) = e {
                 Some(m)
             } else {
@@ -235,6 +241,15 @@ fn filter_events_by_metric_and_component<'a>(
     metrics
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn sum_counters(
     metric_name: &ComponentMetricType,
     metrics: &[&Metric],
@@ -251,7 +266,7 @@ fn sum_counters(
                     sum += *value;
                 }
             }
-            _ => errs.push(format!("{metric_name}: metric value is not a counter",)),
+            _ => errs.push(format!("{metric_name}: metric value is not a counter")),
         }
     }
 

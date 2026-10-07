@@ -80,7 +80,7 @@ impl<L> Controller<L> {
                 in_flight: 0,
                 past_rtt: EwmaVar::new(settings.ewma_alpha),
                 next_update: instant_now(),
-                current_rtt: Default::default(),
+                current_rtt: Mean::default(),
                 had_back_pressure: false,
                 reached_limit: false,
             })),
@@ -96,6 +96,11 @@ impl<L> Controller<L> {
     /// An estimate of current load on service managed by this controller.
     ///
     /// 0.0 is no load, while 1.0 is max load.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub(super) fn load(&self) -> f64 {
         let inner = self.inner.lock().expect("Controller mutex is poisoned");
         if inner.current_limit > 0 {
@@ -172,7 +177,7 @@ impl<L> Controller<L> {
         // calculated deviance. Rounding these values forces the
         // differences to zero.
         #[cfg(test)]
-        let current_rtt = current_rtt.map(|c| (c * 1000000.0).round() / 1000000.0);
+        let current_rtt = current_rtt.map(|c| (c * 1_000_000.0).round() / 1_000_000.0);
 
         match inner.past_rtt.state() {
             None => {
@@ -207,7 +212,7 @@ impl<L> Controller<L> {
                         past_rtt = inner.past_rtt.update(current_rtt);
                     }
                     inner.next_update = now + Duration::from_secs_f64(past_rtt.mean);
-                    inner.current_rtt = Default::default();
+                    inner.current_rtt = Mean::default();
                     inner.had_back_pressure = false;
                     inner.reached_limit = false;
                 }
@@ -215,6 +220,19 @@ impl<L> Controller<L> {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     fn manage_limit(
         &self,
         inner: &mut MutexGuard<Inner>,
@@ -300,6 +318,6 @@ where
         };
         // Only adjust to the RTT when the request was successfully processed.
         let use_rtt = matches!(response_action, Ok(RetryAction::Successful));
-        self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
+        self.adjust_to_response_inner(start, is_back_pressure, use_rtt);
     }
 }

@@ -105,12 +105,14 @@ pub struct AwsEcsMetricsSourceConfig {
 const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI";
 const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI_V4";
 
+#[must_use]
 pub fn default_endpoint() -> String {
     env::var(METADATA_URI_V4)
         .or_else(|_| env::var(METADATA_URI_V3))
         .unwrap_or_else(|_| "http://169.254.170.2/v2".into())
 }
 
+#[must_use]
 pub fn default_version() -> Version {
     if env::var(METADATA_URI_V4).is_ok() {
         Version::V4
@@ -121,10 +123,12 @@ pub fn default_version() -> Version {
     }
 }
 
+#[must_use]
 pub const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> String {
     "awsecs".to_string()
 }
@@ -227,7 +231,7 @@ async fn aws_ecs_metrics(
                     Err(error) => {
                         emit!(HttpClientHttpError {
                             error: crate::Error::from(error),
-                            url: url.to_owned(),
+                            url: url.clone(),
                         });
                     }
                 }
@@ -235,13 +239,13 @@ async fn aws_ecs_metrics(
             Ok(response) => {
                 emit!(HttpClientHttpResponseError {
                     code: response.status(),
-                    url: url.to_owned(),
+                    url: url.clone(),
                 });
             }
             Err(error) => {
                 emit!(HttpClientHttpError {
                     error: crate::Error::from(error),
-                    url: url.to_owned(),
+                    url: url.clone(),
                 });
             }
         }
@@ -270,6 +274,11 @@ mod test {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn test_aws_ecs_metrics_source() {
         let (_guard, in_addr) = next_addr();
 
@@ -592,7 +601,7 @@ mod test {
 
         let metrics = events
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(vector_lib::event::Event::into_metric)
             .collect::<Vec<_>>();
 
         match metrics
@@ -600,7 +609,12 @@ mod test {
             .find(|m| m.name() == "network_receive_bytes_total")
         {
             Some(m) => {
-                assert_eq!(m.value(), &MetricValue::Counter { value: 329932716.0 });
+                assert_eq!(
+                    m.value(),
+                    &MetricValue::Counter {
+                        value: 329_932_716.0
+                    }
+                );
                 assert_eq!(m.namespace(), Some("awsecs"));
 
                 match m.tags() {

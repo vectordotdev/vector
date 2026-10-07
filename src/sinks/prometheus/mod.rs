@@ -25,7 +25,7 @@ pub enum PrometheusRemoteWriteAuth {
 
     /// Bearer authentication.
     ///
-    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    /// A bearer token (`OAuth2`, JWT, etc) is passed as-is.
     Bearer {
         /// The bearer token to send.
         token: SensitiveString,

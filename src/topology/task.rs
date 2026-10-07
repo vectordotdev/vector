@@ -92,6 +92,11 @@ impl Future for Task {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "Preserve the existing selection of diagnostic fields pending a separate audit."
+)]
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")

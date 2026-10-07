@@ -136,10 +136,10 @@ pub struct AxiomConfig {
 impl GenerateConfig for AxiomConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"token: ${AXIOM_TOKEN}
+            r"token: ${AXIOM_TOKEN}
             dataset: ${AXIOM_DATASET}
             url: ${AXIOM_URL}
-            org_id: ${AXIOM_ORG_ID}"#,
+            org_id: ${AXIOM_ORG_ID}",
         })
         .unwrap()
     }
@@ -188,6 +188,11 @@ impl ValidatedSink for AxiomConfig {
         Ok(ValidatedAxiom { uri, http })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn build(
         &self,
         validated: &ValidatedAxiom,
@@ -208,6 +213,11 @@ impl AxiomConfig {
     /// Build the derived HTTP sink configuration. The org-id header is added
     /// here so the derived config (including the header value) is validated
     /// during `validate`.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn http_sink_config(&self, uri: UriTemplate) -> crate::Result<HttpSinkConfig> {
         let mut request = self.request.clone();
         if let Some(org_id) = &self.org_id {
@@ -242,8 +252,8 @@ impl AxiomConfig {
                 }),
                 Transformer::default(),
             ),
-            payload_prefix: "".into(), // Always newline delimited JSON
-            payload_suffix: "".into(), // Always newline delimited JSON
+            payload_prefix: String::new(), // Always newline delimited JSON
+            payload_suffix: String::new(), // Always newline delimited JSON
             retry_strategy: self.retry_strategy.clone(),
             confinement: self.confinement.clone(),
         })

@@ -25,6 +25,11 @@ pub struct MqttSource {
 }
 
 impl MqttSource {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     pub fn new(
         connector: MqttConnector,
         decoder: Decoder,
@@ -39,6 +44,11 @@ impl MqttSource {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (client, mut connection) = self.connector.connect();
 

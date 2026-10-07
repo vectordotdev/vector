@@ -42,10 +42,10 @@ pub(super) struct SnsSinkConfig {
 impl GenerateConfig for SnsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic
+            r"topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic
             region: us-east-2
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -94,6 +94,11 @@ impl fmt::Debug for ValidatedSnsSink {
 impl ValidatedSink for SnsSinkConfig {
     type Validated = ValidatedSnsSink;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::case_sensitive_file_extension_comparisons,
+        reason = "Preserve the existing case-sensitive file matching behavior."
+    )]
     fn validate(&self) -> crate::Result<ValidatedSnsSink> {
         let message_group_id = message_group_id(
             self.base_config.message_group_id.clone(),
@@ -156,6 +161,11 @@ mod tests {
     use super::*;
     use vector_lib::codecs::TextSerializerConfig;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn test_config(topic_arn: &str) -> SnsSinkConfig {
         SnsSinkConfig {
             region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
@@ -165,10 +175,10 @@ mod tests {
                 message_group_id: None,
                 message_deduplication_id: None,
                 request: Default::default(),
-                tls: Default::default(),
+                tls: Option::default(),
                 assume_role: None,
                 auth: Default::default(),
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
             },
         }
     }

@@ -74,7 +74,7 @@ pub fn add_headers(
                     }
                 }
             }
-        };
+        }
     }
 }
 
@@ -178,6 +178,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn multiple_headers_wildcard() {
         let header_names = [HttpConfigParamKind::Glob(
             glob::Pattern::new("Content-*").unwrap(),

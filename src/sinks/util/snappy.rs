@@ -26,6 +26,11 @@ impl<W: io::Write> SnappyEncoder<W> {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn finish(mut self) -> io::Result<W> {
         let mut encoder = Encoder::new();
         let compressed = encoder.compress_vec(&self.buffer)?;

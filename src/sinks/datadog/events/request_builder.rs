@@ -70,6 +70,7 @@ impl Default for DatadogEventsRequestBuilder {
 }
 
 impl DatadogEventsRequestBuilder {
+    #[must_use]
     pub fn new() -> DatadogEventsRequestBuilder {
         DatadogEventsRequestBuilder { encoder: encoder() }
     }

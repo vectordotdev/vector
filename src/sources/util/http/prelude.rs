@@ -53,6 +53,11 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
     fn name() -> &'static str;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn build_events(
         &self,
         body: Bytes,
@@ -107,11 +112,25 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         decompress_body(encoding_header, body)
     }
 
     #[allow(clippy::too_many_arguments)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn run(
         self,
         address: SocketAddr,
@@ -146,7 +165,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             };
 
             for s in path.split('/').filter(|&x| !x.is_empty()) {
-                filter = filter.and(warp::path(s.to_string())).boxed()
+                filter = filter.and(warp::path(s.to_string())).boxed();
             }
             let body_filter = capped_body();
 
@@ -332,7 +351,7 @@ async fn handle_request(
                     emit!(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(response_code, receiver))
+                .and_then(|()| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {

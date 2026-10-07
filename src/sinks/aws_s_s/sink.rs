@@ -17,6 +17,11 @@ where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     pub(super) fn new(
         request_builder: SSRequestBuilder,
         request: TowerRequestConfig,

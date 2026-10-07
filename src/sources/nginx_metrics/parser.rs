@@ -39,6 +39,11 @@ impl<'a> TryFrom<&'a str> for NginxStubStatus {
 
     // The `ngx_http_stub_status_module` response:
     // https://github.com/nginx/nginx/blob/master/src/http/modules/ngx_http_stub_status_module.c#L137-L145
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     fn try_from(input: &'a str) -> Result<Self, Self::Error> {
         // `usize::MAX` eq `18446744073709551615` (20 characters)
         match all_consuming((
@@ -88,9 +93,9 @@ mod tests {
             NginxStubStatus::try_from(data).expect("valid data"),
             NginxStubStatus {
                 active: 291,
-                accepts: 16630948,
-                handled: 16630948,
-                requests: 31070465,
+                accepts: 16_630_948,
+                handled: 16_630_948,
+                requests: 31_070_465,
                 reading: 6,
                 writing: 179,
                 waiting: 106

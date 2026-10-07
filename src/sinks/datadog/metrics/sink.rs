@@ -44,6 +44,11 @@ impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
     type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let series = DatadogMetricsEndpoint::Series(self.series_api_version);
         let endpoint = match item.data().value() {
@@ -95,6 +100,11 @@ where
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
         let series_batch_settings = self.series_batch_settings;
@@ -203,7 +213,7 @@ where
 /// tends to compress better than a random ordering by 2-3x (JSON encoded, deflate algorithm).
 ///
 /// Note that the time complexity of this function is O(n log n) and the space complexity is O(1).
-/// If needed, we can trade space for time by using a HashMap, which would be O(n) time and O(n) space.
+/// If needed, we can trade space for time by using a `HashMap`, which would be O(n) time and O(n) space.
 fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Metric> {
     let now_ts = Utc::now().timestamp();
 
@@ -214,12 +224,12 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
         (
             a.value().as_name(),
             a.series(),
-            a.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
+            a.timestamp().map_or(now_ts, |dt| dt.timestamp()),
         )
             .cmp(&(
                 b.value().as_name(),
                 b.series(),
-                b.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
+                b.timestamp().map_or(now_ts, |dt| dt.timestamp()),
             ))
     });
 
@@ -232,8 +242,8 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
             return false;
         }
 
-        let left_ts = left.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts);
-        let right_ts = right.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts);
+        let left_ts = left.timestamp().map_or(now_ts, |dt| dt.timestamp());
+        let right_ts = right.timestamp().map_or(now_ts, |dt| dt.timestamp());
         if left_ts != right_ts {
             return false;
         }
@@ -347,6 +357,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn collapse_identical_metrics_counter() {
         let counter_value = 42.0;
         let input = vec![
@@ -367,6 +382,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn collapse_identical_metrics_counter_unsorted() {
         let gauge_value = 1.0;
         let counter_value = 42.0;
@@ -469,6 +489,11 @@ mod tests {
     }
 
     #[derive(Eq, Ord, PartialEq, PartialOrd)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::struct_field_names,
+        reason = "Preserve existing field names and their configuration or API contracts."
+    )]
     struct MetricCollapseSort {
         metric_type: &'static str,
         metric_name: String,

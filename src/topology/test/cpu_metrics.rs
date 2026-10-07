@@ -49,7 +49,7 @@ fn assert_cpu_counter_positive(metrics: &[Metric], transform_id: &str) {
                  available metrics: {:?}",
                 metrics
                     .iter()
-                    .map(|m| m.name())
+                    .map(vector_lib::event::Metric::name)
                     .collect::<std::collections::BTreeSet<_>>(),
             )
         });

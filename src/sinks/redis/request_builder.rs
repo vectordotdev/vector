@@ -3,7 +3,7 @@ use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
 
 use super::{RedisEvent, RedisKvEntry, RedisRequest};
-use crate::sinks::{prelude::*, util::EncodedLength};
+use crate::sinks::prelude::*;
 
 pub(super) fn encode_event(
     mut event: Event,
@@ -47,7 +47,10 @@ fn encode_events(
         })
         .collect::<Vec<_>>();
 
-    let uncompressed_byte_size = request.iter().map(|event| event.encoded_length()).sum();
+    let uncompressed_byte_size = request
+        .iter()
+        .map(super::super::util::buffer::vec::EncodedLength::encoded_length)
+        .sum();
 
     EncodeResult {
         payload: request,
@@ -61,6 +64,11 @@ fn encode_events(
 /// The `[RequestBuilder]` trait doesn't work since the encoded event is not just `Byte`s.
 /// This function allows us to accept a list of `Event`s and return a list of key -> encoded
 /// event objects.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 pub(super) fn request_builder(
     mut events: Vec<RedisEvent>,
     transformer: &Transformer,

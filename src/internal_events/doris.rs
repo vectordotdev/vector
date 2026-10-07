@@ -11,6 +11,11 @@ pub struct DorisRowsLoaded {
 }
 
 impl InternalEvent for DorisRowsLoaded {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     fn emit(self) {
         trace!(
             message = "Doris rows loaded successfully.",
@@ -33,6 +38,11 @@ pub struct DorisRowsFiltered {
 }
 
 impl InternalEvent for DorisRowsFiltered {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     fn emit(self) {
         warn!(
             message = "Doris rows filtered during loading.",

@@ -14,6 +14,11 @@ struct BlockIoStat {
 }
 
 #[derive(Deserialize)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 struct BlockIoStats {
     io_merged_recursive: Option<Vec<BlockIoStat>>,
     io_queue_recursive: Option<Vec<BlockIoStat>>,
@@ -161,6 +166,11 @@ fn blkio_tags(item: &BlockIoStat, tags: &MetricTags) -> MetricTags {
 }
 
 /// reference <https://www.kernel.org/doc/Documentation/cgroup-v1/blkio-controller.txt>
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn blkio_metrics(
     blkio: &BlockIoStats,
     timestamp: DateTime<Utc>,
@@ -253,6 +263,15 @@ fn blkio_metrics(
     metrics
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn cpu_metrics(
     cpu: &CpuStats,
     timestamp: DateTime<Utc>,
@@ -363,6 +382,11 @@ fn cpu_metrics(
     metrics
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn memory_metrics(
     memory: &MemoryStats,
     timestamp: DateTime<Utc>,
@@ -471,6 +495,11 @@ fn memory_metrics(
     metrics
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn network_metrics(
     interface: &str,
     network: &NetworkStats,
@@ -515,6 +544,15 @@ enum StatsPayload {
     Null,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub(super) fn parse(
     bytes: &[u8],
     namespace: Option<String>,
@@ -644,7 +682,7 @@ mod test {
                 Metric::new(
                     "blkio_recursive_io_service_bytes_total",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 520192.0 },
+                    MetricValue::Counter { value: 520_192.0 },
                 )
                 .with_namespace(Some(namespace()))
                 .with_tags(Some(metric_tags!(
@@ -659,6 +697,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn parse_cpu_metrics() {
         let json = r#"
         {
@@ -709,7 +752,7 @@ mod test {
                     "cpu_usage_system_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 2007130000000.0
+                        value: 2_007_130_000_000.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -721,7 +764,9 @@ mod test {
                 Metric::new(
                     "cpu_usage_usermode_jiffies_total",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 510000000.0 },
+                    MetricValue::Counter {
+                        value: 510_000_000.0
+                    },
                 )
                 .with_namespace(Some(namespace()))
                 .with_tags(Some(metric_tags!(
@@ -732,7 +777,9 @@ mod test {
                 Metric::new(
                     "cpu_usage_kernelmode_jiffies_total",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 190000000.0 },
+                    MetricValue::Counter {
+                        value: 190_000_000.0
+                    },
                 )
                 .with_namespace(Some(namespace()))
                 .with_tags(Some(metric_tags!(
@@ -744,7 +791,7 @@ mod test {
                     "cpu_usage_total_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 2324920942.0
+                        value: 2_324_920_942.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -790,7 +837,7 @@ mod test {
                     "cpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 1095931487.0
+                        value: 1_095_931_487.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -804,7 +851,7 @@ mod test {
                     "cpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 1228989455.0
+                        value: 1_228_989_455.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -819,6 +866,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn parse_precpu_metrics() {
         let json = r#"
         {
@@ -867,7 +919,7 @@ mod test {
                     "precpu_usage_system_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 2007130000000.0
+                        value: 2_007_130_000_000.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -879,7 +931,9 @@ mod test {
                 Metric::new(
                     "precpu_usage_usermode_jiffies_total",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 510000000.0 },
+                    MetricValue::Counter {
+                        value: 510_000_000.0
+                    },
                 )
                 .with_namespace(Some(namespace()))
                 .with_tags(Some(metric_tags!(
@@ -890,7 +944,9 @@ mod test {
                 Metric::new(
                     "precpu_usage_kernelmode_jiffies_total",
                     MetricKind::Absolute,
-                    MetricValue::Counter { value: 190000000.0 },
+                    MetricValue::Counter {
+                        value: 190_000_000.0
+                    },
                 )
                 .with_namespace(Some(namespace()))
                 .with_tags(Some(metric_tags!(
@@ -902,7 +958,7 @@ mod test {
                     "precpu_usage_total_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 2324920942.0
+                        value: 2_324_920_942.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -948,7 +1004,7 @@ mod test {
                     "precpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 1095931487.0
+                        value: 1_095_931_487.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -962,7 +1018,7 @@ mod test {
                     "precpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: 1228989455.0
+                        value: 1_228_989_455.0
                     },
                 )
                 .with_namespace(Some(namespace()))
@@ -977,6 +1033,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn parse_memory_metrics() {
         let json = r#"
         {
@@ -1036,7 +1097,9 @@ mod test {
             &Metric::new(
                 "memory_used_bytes",
                 MetricKind::Absolute,
-                MetricValue::Gauge { value: 40120320.0 },
+                MetricValue::Gauge {
+                    value: 40_120_320.0
+                },
             )
             .with_namespace(Some(namespace()))
             .with_tags(Some(metric_tags!(
@@ -1054,7 +1117,9 @@ mod test {
             &Metric::new(
                 "memory_max_used_bytes",
                 MetricKind::Absolute,
-                MetricValue::Gauge { value: 47177728.0 },
+                MetricValue::Gauge {
+                    value: 47_177_728.0
+                },
             )
             .with_namespace(Some(namespace()))
             .with_tags(Some(metric_tags!(
@@ -1072,7 +1137,9 @@ mod test {
             &Metric::new(
                 "memory_active_anonymous_bytes",
                 MetricKind::Absolute,
-                MetricValue::Gauge { value: 34885632.0 },
+                MetricValue::Gauge {
+                    value: 34_885_632.0
+                },
             )
             .with_namespace(Some(namespace()))
             .with_tags(Some(metric_tags!(
@@ -1134,7 +1201,9 @@ mod test {
             &Metric::new(
                 "network_receive_bytes_total",
                 MetricKind::Absolute,
-                MetricValue::Counter { value: 329932716.0 },
+                MetricValue::Counter {
+                    value: 329_932_716.0
+                },
             )
             .with_namespace(Some(namespace()))
             .with_tags(Some(metric_tags!(
@@ -1153,7 +1222,7 @@ mod test {
             &Metric::new(
                 "network_transmit_bytes_total",
                 MetricKind::Absolute,
-                MetricValue::Counter { value: 2001229.0 },
+                MetricValue::Counter { value: 2_001_229.0 },
             )
             .with_namespace(Some(namespace()))
             .with_tags(Some(metric_tags!(

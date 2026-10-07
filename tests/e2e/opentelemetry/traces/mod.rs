@@ -234,6 +234,11 @@ fn collector_trace_ids_are_deserialized_as_binary() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
 fn vector_sink_otel_sink_traces_match() {
     // Read the collector-source output (what telemetrygen sent)
     let collector_source_content = read_file_helper("traces", "collector-source-file-exporter.log")

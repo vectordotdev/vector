@@ -397,6 +397,11 @@ pub enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
         let req = client
@@ -425,6 +430,11 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
     Ok(healthcheck.boxed())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub async fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,

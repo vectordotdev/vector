@@ -39,7 +39,7 @@ impl GenerateConfig for WebSocketSinkConfig {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -125,7 +125,7 @@ mod test {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let _validated = config.validate().expect("validation should succeed");
         // Serializer construction is deferred to `build`; validation retains the
@@ -144,7 +144,7 @@ mod test {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -161,7 +161,7 @@ mod test {
                 ..Default::default()
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(

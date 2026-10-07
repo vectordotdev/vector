@@ -62,6 +62,7 @@ pub struct UdpSinkConfig {
 }
 
 impl UdpSinkConfig {
+    #[must_use]
     pub const fn from_address(address: String) -> Self {
         Self {
             address,
@@ -73,6 +74,11 @@ impl UdpSinkConfig {
     ///
     /// The address must include a port; this is a pure check (no network I/O)
     /// shared by validation and `build_connector`.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn parse_address(&self) -> crate::Result<(String, u16)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -85,6 +91,11 @@ impl UdpSinkConfig {
         Ok(UdpConnector::new(host, port, self.send_buffer_bytes))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(
         &self,
         transformer: Transformer,

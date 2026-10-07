@@ -107,7 +107,7 @@ impl CompressionScheme {
         req.headers()
             .get(GRPC_ENCODING_HEADER)
             .map(|s| {
-                s.to_str().map(|s| s.to_string()).map_err(|_| {
+                s.to_str().map(std::string::ToString::to_string).map_err(|_| {
                     Status::unimplemented(format!(
                         "`{GRPC_ENCODING_HEADER}` contains non-visible characters and is not a valid encoding"
                     ))
@@ -160,6 +160,11 @@ enum DecompressStage {
 /// `out_of_range` (a client fault, matching the existing >4GB handling) while anything else falls
 /// back to `internal` with the stage the error came from and the underlying error appended, so
 /// failures such as a corrupt or truncated payload stay diagnosable from the returned status.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn decompressor_error_to_status(error: &io::Error, stage: DecompressStage) -> Status {
     if is_decompressed_size_limit_error(error) {
         Status::out_of_range("decompressed message exceeds the maximum allowed size")
@@ -212,6 +217,11 @@ enum Decompressor {
 }
 
 impl Decompressor {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn new(scheme: &CompressionScheme) -> Result<Self, io::Error> {
         // Create the backing buffer for the decompressor and set the compression flag to false (0)
         // and pre-allocate the space for the length prefix, which we'll fill out once we've
@@ -275,6 +285,11 @@ impl Decompressor {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn drive_body_decompression(
     mut source: Body,
     mut destination: Sender,
@@ -537,7 +552,7 @@ where
         Err(error) => {
             emit!(GrpcError { error: &error });
         }
-    };
+    }
 
     // Advertise the set of compression schemes this layer can accept to the client.
     // Since this layer is the single owner of compression negotiation, individual

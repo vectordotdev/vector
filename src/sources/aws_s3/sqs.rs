@@ -158,7 +158,7 @@ pub(super) struct Config {
     /// Defaults to 10
     ///
     /// Should be set to a smaller value when the files are large to help prevent the ingestion of
-    /// one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+    /// one file from causing the other files to exceed the `visibility_timeout`. Valid values are 1 - 10
     // NOTE: We restrict this to u32 for safe conversion to i32 later.
     #[serde(default = "default_max_number_of_messages")]
     #[derivative(Default(value = "default_max_number_of_messages()"))]
@@ -301,6 +301,11 @@ pub(super) struct Ingestor {
 }
 
 impl Ingestor {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
     pub(super) fn new(
         region: Region,
         sqs_client: SqsClient,
@@ -329,8 +334,7 @@ impl Ingestor {
             max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
-                .map(|n| n.get())
-                .unwrap_or_else(crate::num_threads),
+                .map_or_else(crate::num_threads, std::num::NonZero::get),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
             delete_failed_message: config.delete_failed_message,
@@ -416,25 +420,27 @@ impl IngestorProcess {
             select! {
                 _ = &mut shutdown => break,
                 result = self.run_once() => {
-                    match result {
-                        Ok(()) => {
-                            // Reset backoff on successful receive
-                            self.backoff.reset();
-                        }
-                        Err(_) => {
-                            let delay = self.backoff.next().expect("backoff never ends");
-                            trace!(
-                                delay_ms = delay.as_millis(),
-                                "`run_once` failed, will retry after delay.",
-                            );
-                            tokio::time::sleep(delay).await;
-                        }
+                    if let Ok(()) = result {
+                        // Reset backoff on successful receive
+                        self.backoff.reset();
+                    } else {
+                        let delay = self.backoff.next().expect("backoff never ends");
+                        trace!(
+                            delay_ms = delay.as_millis(),
+                            "`run_once` failed, will retry after delay.",
+                        );
+                        tokio::time::sleep(delay).await;
                     }
                 },
             }
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn run_once(&mut self) -> Result<(), ()> {
         let messages = match self.receive_messages().await {
             Ok(messages) => {
@@ -551,13 +557,13 @@ impl IngestorProcess {
                     if !result.successful.is_empty() {
                         emit!(SqsMessageSentSucceeded {
                             message_ids: result.successful,
-                        })
+                        });
                     }
 
                     if !result.failed.is_empty() {
                         emit!(SqsMessageSentPartialError {
                             entries: result.failed
-                        })
+                        });
                     }
                 }
                 Err(err) => {
@@ -623,11 +629,20 @@ impl IngestorProcess {
     async fn handle_s3_event(&mut self, s3_event: S3Event) -> Result<(), ProcessingError> {
         for record in s3_event.records {
             self.handle_s3_event_record(record, self.log_namespace)
-                .await?
+                .await?;
         }
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn handle_s3_event_record(
         &mut self,
         s3_event: S3EventRecord,
@@ -785,7 +800,7 @@ impl IngestorProcess {
         });
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
-            Ok(_) => None,
+            Ok(()) => None,
             Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
@@ -908,6 +923,11 @@ impl IngestorProcess {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn handle_single_log(
     log: &mut LogEvent,
     log_namespace: LogNamespace,
@@ -976,7 +996,7 @@ fn handle_single_log(
                 );
             }
         }
-    };
+    }
 }
 
 // https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html

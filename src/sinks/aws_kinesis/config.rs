@@ -64,16 +64,23 @@ pub struct KinesisSinkBaseConfig {
 }
 
 impl KinesisSinkBaseConfig {
+    #[must_use]
     pub fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
+    #[must_use]
     pub const fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
 }
 
-/// Builds an aws_kinesis sink.
+/// Builds an `aws_kinesis` sink.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn build_sink<C, R, RR, E, RT>(
     config: &KinesisSinkBaseConfig,
     partition_key_field: Option<ConfigValuePath>,

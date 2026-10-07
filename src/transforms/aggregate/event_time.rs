@@ -177,10 +177,7 @@ impl Aggregate {
                             entry.insert((data, metadata));
                         }
                         Entry::Occupied(mut entry) => {
-                            if entry.get().0.kind != data.kind {
-                                emit!(AggregateUpdateFailed);
-                                Self::replace_entry(entry.get_mut(), data, metadata);
-                            } else {
+                            if entry.get().0.kind == data.kind {
                                 // In event-time mode, "latest" means latest *event timestamp*
                                 // within the time bucket, not latest arrival order.
                                 Self::select_latest_by_event_timestamp(
@@ -188,6 +185,9 @@ impl Aggregate {
                                     data,
                                     metadata,
                                 );
+                            } else {
+                                emit!(AggregateUpdateFailed);
+                                Self::replace_entry(entry.get_mut(), data, metadata);
                             }
                         }
                     },
@@ -251,8 +251,8 @@ impl Aggregate {
         data: MetricData,
         metadata: EventMetadata,
     ) {
-        let new_ts = data.timestamp().cloned();
-        let existing_ts = existing.0.timestamp().cloned();
+        let new_ts = data.timestamp().copied();
+        let existing_ts = existing.0.timestamp().copied();
         let should_replace = match (new_ts, existing_ts) {
             (Some(n), Some(e)) => n >= e,
             (Some(_), None) => true,
@@ -375,6 +375,15 @@ impl Aggregate {
             },
         }
     }
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub(crate) fn flush_event_time_buckets(&mut self, output: &mut Vec<Event>, force: bool) {
         let now = Utc::now();
         let now_ms = now.timestamp_millis();
@@ -453,7 +462,7 @@ impl Aggregate {
                 }
 
                 if let Some(multi_bucket) = self.event_time_multi_buckets.remove(&bucket_key) {
-                    'outer: for (series, entries) in multi_bucket.into_iter() {
+                    'outer: for (series, entries) in multi_bucket {
                         if entries.is_empty() {
                             continue;
                         }
@@ -496,7 +505,7 @@ impl Aggregate {
                                     / entries.len() as f64;
                                 let mut final_stdev = final_mean;
                                 if let MetricValue::Gauge { value } = final_stdev.value_mut() {
-                                    *value = variance.sqrt()
+                                    *value = variance.sqrt();
                                 }
                                 let metric =
                                     Metric::from_parts(series, final_stdev, final_metadata);

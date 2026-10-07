@@ -127,6 +127,11 @@ pub struct HecMetricsSinkConfig {
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             default_namespace: None,
@@ -140,7 +145,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             confinement: Default::default(),
         })
         .unwrap()
@@ -226,6 +231,11 @@ impl ValidatedSink for HecMetricsSinkConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 pub(super) fn compute_templated_field_keys(
     index: &Option<Template>,
     source: &Option<Template>,
@@ -234,13 +244,18 @@ pub(super) fn compute_templated_field_keys(
     [index, source, sourcetype]
         .iter()
         .filter_map(|t| t.as_ref())
-        .filter_map(|t| t.get_fields())
+        .filter_map(crate::template::Template::get_fields)
         .flatten()
         .map(|f| f.replace("tags.", ""))
         .collect()
 }
 
 impl HecMetricsSinkConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_processor(
         &self,
         client: HttpClient,
@@ -300,6 +315,11 @@ mod tests {
     use crate::config::ValidatedSink;
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn validate_produces_usable_state() {
         let config = HecMetricsSinkConfig {
             default_namespace: None,
@@ -310,10 +330,10 @@ mod tests {
             sourcetype: None,
             source: None,
             compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             confinement: Default::default(),
         };
 

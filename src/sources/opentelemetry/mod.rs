@@ -28,27 +28,30 @@ fn count_items_inner(resource: &Value, array_id: &str, inner_id: &str) -> usize 
         .map(|r| {
             r.get(vrl::path!(array_id))
                 .and_then(|s| s.as_array())
-                .map(|scope_array| {
+                .map_or(0, |scope_array| {
                     scope_array
                         .iter()
                         .map(|sl| {
                             sl.get(vrl::path!(inner_id))
                                 .and_then(|lr| lr.as_array())
-                                .map(|arr| arr.len())
-                                .unwrap_or(0)
+                                .map_or(0, <[vector_lib::event::Value]>::len)
                         })
                         .sum::<usize>()
                 })
-                .unwrap_or(0)
         })
         .sum()
 }
 
 /// Counts individual log records, metrics, or spans within OTLP batch events.
-/// When use_otlp_decoding is enabled, events contain entire OTLP batches, but
+/// When `use_otlp_decoding` is enabled, events contain entire OTLP batches, but
 /// we want to count the individual items for metric consistency with other sources.
 /// This iterates through the Value structure, which is less efficient than
 /// counting from the typed protobuf request, but avoids decoding twice.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::match_wildcard_for_single_variants,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 pub(crate) fn count_otlp_items(events: &[Event]) -> usize {
     events
         .iter()

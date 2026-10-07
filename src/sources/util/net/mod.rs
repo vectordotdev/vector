@@ -68,12 +68,14 @@ impl SocketListenAddr {
 
     /// Gets this listen address as a `Resource`, specifically for TCP.
     #[cfg(feature = "sources-utils-net-tcp")]
+    #[must_use]
     pub const fn as_tcp_resource(self) -> Resource {
         self.as_resource(Protocol::Tcp)
     }
 
     /// Gets this listen address as a `Resource`, specifically for UDP.
     #[cfg(feature = "sources-utils-net-udp")]
+    #[must_use]
     pub const fn as_udp_resource(self) -> Resource {
         self.as_resource(Protocol::Udp)
     }
@@ -103,6 +105,11 @@ impl From<usize> for SocketListenAddr {
 impl TryFrom<String> for SocketListenAddr {
     type Error = SocketListenAddrParseError;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::single_match_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn try_from(input: String) -> Result<Self, Self::Error> {
         // first attempt to parse the string into a SocketAddr directly
         match input.parse::<SocketAddr>() {

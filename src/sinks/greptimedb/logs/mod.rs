@@ -2,7 +2,7 @@
 //!
 //! This sink writes Vector's log data into
 //! [GreptimeDB](https://github.com/greptimeteam/greptimedb), a cloud-native
-//! time-series database. It uses GreptimeDB's logs http API
+//! time-series database. It uses `GreptimeDB`'s logs http API
 
 mod config;
 mod http_request_builder;

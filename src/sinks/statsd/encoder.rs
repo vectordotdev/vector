@@ -14,7 +14,7 @@ use crate::{
 
 /// Error type for errors that can never happen, but for use with `Encoder`.
 ///
-/// For the StatsD encoder, the encoding operation is infallible. However, as `Encoder<T>` requires
+/// For the `StatsD` encoder, the encoding operation is infallible. However, as `Encoder<T>` requires
 /// that the associated error type can be created by `From<io::Error>`, we can't simply use
 /// `Infallible`. This type exists to bridge that gap, acting as a marker type for "we emit no
 /// errors" while supporting the trait bounds on `Encoder<T>::Error`.
@@ -51,21 +51,19 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
             MetricValue::Counter { value } => {
                 encode_and_write_single_event(buf, &name, tags.as_deref(), value, "c", None);
             }
-            MetricValue::Gauge { value } => {
-                match metric.kind() {
-                    MetricKind::Incremental => encode_and_write_single_event(
-                        buf,
-                        &name,
-                        tags.as_deref(),
-                        format!("{value:+}"),
-                        "g",
-                        None,
-                    ),
-                    MetricKind::Absolute => {
-                        encode_and_write_single_event(buf, &name, tags.as_deref(), value, "g", None)
-                    }
-                };
-            }
+            MetricValue::Gauge { value } => match metric.kind() {
+                MetricKind::Incremental => encode_and_write_single_event(
+                    buf,
+                    &name,
+                    tags.as_deref(),
+                    format!("{value:+}"),
+                    "g",
+                    None,
+                ),
+                MetricKind::Absolute => {
+                    encode_and_write_single_event(buf, &name, tags.as_deref(), value, "g", None);
+                }
+            },
             MetricValue::Distribution { samples, statistic } => {
                 let metric_type = match statistic {
                     StatisticKind::Histogram => "h",
@@ -104,7 +102,7 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
 
                 return Ok(());
             }
-        };
+        }
 
         Ok(())
     }
@@ -142,11 +140,11 @@ fn encode_and_write_single_event<V: Display>(
         && sample_rate != 1
     {
         write!(&mut writer, "|@{}", 1.0 / f64::from(sample_rate)).unwrap();
-    };
+    }
 
     if let Some(t) = metric_tags {
         write!(&mut writer, "|#{t}").unwrap();
-    };
+    }
 
     writeln!(&mut writer).unwrap();
 }
@@ -203,13 +201,13 @@ mod tests {
     fn test_encode_tags() {
         let actual = encode_tags(&tags());
         let mut actual = actual.split(',').collect::<Vec<_>>();
-        actual.sort();
+        actual.sort_unstable();
 
         let mut expected =
             "bare_tag,normal_tag:value,multi_value:true,multi_value:false,multi_value"
                 .split(',')
                 .collect::<Vec<_>>();
-        expected.sort();
+        expected.sort_unstable();
 
         assert_eq!(actual, expected);
     }

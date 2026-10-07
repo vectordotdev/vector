@@ -56,6 +56,11 @@ fn s3_address() -> String {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 async fn s3_insert_message_into_with_flat_key_prefix() {
     let cx = SinkContext::default();
 
@@ -65,7 +70,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
 
     let config = S3SinkConfig {
         key_prefix: "test-prefix".to_string(),
-        ..config(&bucket, 1000000, 5.0)
+        ..config(&bucket, 1_000_000, 5.0)
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
@@ -93,6 +98,11 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 async fn s3_insert_message_into_with_folder_key_prefix() {
     let cx = SinkContext::default();
 
@@ -102,7 +112,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
 
     let config = S3SinkConfig {
         key_prefix: "test-prefix/".to_string(),
-        ..config(&bucket, 1000000, 5.0)
+        ..config(&bucket, 1_000_000, 5.0)
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
@@ -130,6 +140,11 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 async fn s3_insert_message_into_with_ssekms_key_id() {
     let cx = SinkContext::default();
 
@@ -144,7 +159,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
             ssekms_key_id: Some("alias/aws/s3".to_string()),
             ..S3Options::default()
         },
-        ..config(&bucket, 1000000, 5.0)
+        ..config(&bucket, 1_000_000, 5.0)
     };
     let prefix = config.key_prefix.clone();
 
@@ -323,6 +338,11 @@ async fn s3_zstd() {
 // buckets with object lock enabled
 // https://github.com/localstack/localstack/issues/4166
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Preserve the existing case-sensitive file matching behavior."
+)]
 async fn s3_insert_message_into_object_lock() {
     let cx = SinkContext::default();
 
@@ -333,7 +353,7 @@ async fn s3_insert_message_into_object_lock() {
     client()
         .await
         .put_object_lock_configuration()
-        .bucket(bucket.to_string())
+        .bucket(bucket.clone())
         .object_lock_configuration(
             ObjectLockConfiguration::builder()
                 .object_lock_enabled(ObjectLockEnabled::Enabled)
@@ -354,7 +374,7 @@ async fn s3_insert_message_into_object_lock() {
         .await
         .unwrap();
 
-    let config = config(&bucket, 1000000, 5.0);
+    let config = config(&bucket, 1_000_000, 5.0);
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
@@ -494,6 +514,11 @@ async fn s3_flush_on_exhaustion() {
 
 #[cfg(feature = "codecs-parquet")]
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::items_after_statements,
+    reason = "Keep the existing local helper placement until its surrounding function is refactored."
+)]
 async fn s3_parquet_insert_message() {
     use vector_lib::codecs::encoding::format::{
         ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
@@ -574,6 +599,11 @@ async fn s3_parquet_insert_message() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn s3_disk_buffer_reload_delivers_all_events() {
     test_util::trace_init();
 
@@ -597,14 +627,14 @@ async fn s3_disk_buffer_reload_delivers_all_events() {
 
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
     // Clone config before building so we can create the reload config.
     let mut new_config = old_config.clone();
     new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(536870912).unwrap(),
+        max_size: NonZeroU64::new(536_870_912).unwrap(),
         when_full: WhenFull::Block,
     });
 
@@ -720,6 +750,11 @@ async fn client() -> S3Client {
     .unwrap()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(batch_size);
@@ -739,10 +774,10 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
         compression: Compression::None,
         batch,
         request: TowerRequestConfig::default(),
-        tls: Default::default(),
-        auth: Default::default(),
+        tls: Option::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
-        timezone: Default::default(),
+        timezone: Option::default(),
         force_path_style: true,
         retry_strategy: Default::default(),
         confinement: Default::default(),

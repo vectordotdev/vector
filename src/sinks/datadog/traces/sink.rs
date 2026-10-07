@@ -64,10 +64,10 @@ impl Partitioner for EventPartitioner {
                     .map(|s| s.to_string_lossy().into_owned()),
                 target_tps: t
                     .get(event_path!("target_tps"))
-                    .and_then(|tps| tps.as_integer()),
+                    .and_then(vector_lib::event::Value::as_integer),
                 error_tps: t
                     .get(event_path!("error_tps"))
-                    .and_then(|tps| tps.as_integer()),
+                    .and_then(vector_lib::event::Value::as_integer),
             },
         }
     }
@@ -104,6 +104,11 @@ where
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let batch_settings = self.batch_settings;
 

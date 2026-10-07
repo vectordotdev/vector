@@ -21,6 +21,7 @@ pub struct Decoder {
 }
 
 impl Decoder {
+    #[must_use]
     pub fn new(encoding: &'static Encoding) -> Self {
         Self {
             buffer: [0; BUFFER_SIZE],
@@ -44,6 +45,11 @@ impl Decoder {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub fn decode_to_utf8(&mut self, input: Bytes) -> Bytes {
         let mut total_read_from_input = 0;
         let mut total_had_errors = false;
@@ -114,6 +120,7 @@ enum Utf16Encoding {
 }
 
 impl Encoder {
+    #[must_use]
     pub fn new(encoding: &'static Encoding) -> Self {
         Self {
             buffer: [0; BUFFER_SIZE],

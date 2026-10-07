@@ -97,8 +97,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
         let extension = self
             .filename_extension
-            .as_ref()
-            .cloned()
+            .clone()
             .unwrap_or_else(|| self.compression.extension().into());
 
         s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);

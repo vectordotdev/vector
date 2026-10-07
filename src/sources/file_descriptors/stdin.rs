@@ -66,7 +66,7 @@ impl Default for StdinConfig {
     fn default() -> Self {
         StdinConfig {
             max_length: crate::serde::default_max_length(),
-            host_key: Default::default(),
+            host_key: Option::default(),
             framing: None,
             decoding: default_decoding(),
             log_namespace: None,

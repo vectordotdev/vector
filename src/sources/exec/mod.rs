@@ -157,7 +157,7 @@ impl Default for ExecConfig {
 
 const fn default_maximum_buffer_size() -> usize {
     // 1MB
-    1000000
+    1_000_000
 }
 
 const fn default_exec_interval_secs() -> u64 {
@@ -295,7 +295,7 @@ impl SourceConfig for ExecConfig {
                 Some(LegacyKey::InsertIfEmpty(
                     log_schema()
                         .host_key()
-                        .map_or(OwnedValuePath::root(), |key| key.clone()),
+                        .map_or(OwnedValuePath::root(), std::clone::Clone::clone),
                 )),
                 &owned_value_path!("host"),
                 Kind::bytes().or_undefined(),
@@ -422,7 +422,7 @@ async fn run_streaming(
 
             tokio::select! {
                 _ = &mut shutdown => break, // will break early if a shutdown is started
-                _ = sleep(duration) => debug!("Restarting streaming process."),
+                () = sleep(duration) => debug!("Restarting streaming process."),
             }
         }
     } else {
@@ -624,7 +624,7 @@ fn build_command(config: &ExecConfig) -> Command {
 
     if config.command.len() > 1 {
         command.args(&config.command[1..]);
-    };
+    }
 
     command.kill_on_drop(true);
 
@@ -659,6 +659,11 @@ fn build_command(config: &ExecConfig) -> Command {
     command
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn handle_event(
     config: &ExecConfig,
     hostname: &Option<String>,
@@ -688,7 +693,7 @@ fn handle_event(
                 log,
                 Some(LegacyKey::InsertIfEmpty(path!(PID_KEY))),
                 path!(PID_KEY),
-                pid as i64,
+                i64::from(pid),
             );
         }
 

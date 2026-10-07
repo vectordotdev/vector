@@ -123,7 +123,7 @@ impl CloudwatchRequestBuilder {
     }
 }
 
-/// ByteSizeOf is being abused to represent the encoded size of a request for the Partitioned Batcher
+/// `ByteSizeOf` is being abused to represent the encoded size of a request for the Partitioned Batcher
 ///
 /// The maximum batch size is 1,048,576 bytes. This size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
 /// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
@@ -157,6 +157,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn test() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),
@@ -175,6 +180,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn test_rejects_oversized_log_event() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),

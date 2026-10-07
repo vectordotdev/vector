@@ -1,7 +1,7 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt, stream};
-use mlua::{ExternalError, FromLua};
+use mlua::FromLua;
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
@@ -38,6 +38,11 @@ pub struct LuaConfig {
 }
 
 impl LuaConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(&self) -> crate::Result<Transform> {
         warn!(
             "DEPRECATED The `lua` transform API version 1 is deprecated. Please convert your script to version 2."
@@ -45,10 +50,12 @@ impl LuaConfig {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
+    #[must_use]
     pub fn input(&self) -> Input {
         Input::log()
     }
 
+    #[must_use]
     pub fn outputs(
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
@@ -82,6 +89,11 @@ impl LuaConfig {
 const GC_INTERVAL: usize = 16;
 
 #[derive(derive_more::Debug)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct Lua {
     #[debug(skip)]
     source: String,
@@ -108,6 +120,11 @@ struct LuaEvent {
 }
 
 impl Lua {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(source: String, search_dirs: Vec<String>) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
@@ -222,7 +239,8 @@ impl mlua::UserData for LuaEvent {
         methods.add_meta_method_mut(
             mlua::MetaMethod::NewIndex,
             |_lua, this, (key, value): (String, Option<mlua::Value>)| {
-                let key_path = parse_target_path(key.as_str()).map_err(|e| e.into_lua_err())?;
+                let key_path =
+                    parse_target_path(key.as_str()).map_err(mlua::ExternalError::into_lua_err)?;
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
@@ -310,6 +328,7 @@ impl mlua::UserData for LuaEvent {
     }
 }
 
+#[must_use]
 pub fn format_error(error: &mlua::Error) -> String {
     match error {
         mlua::Error::CallbackError { traceback, cause } => format_error(cause) + "\n" + traceback,

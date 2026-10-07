@@ -9,6 +9,11 @@ use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 pub(crate) struct DatadogMetricsNormalizer;
 
 impl MetricNormalize for DatadogMetricsNormalizer {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         // We primarily care about making sure that counters are incremental, and that gauges are
         // always absolute.  For other metric kinds, we want them to be incremental.

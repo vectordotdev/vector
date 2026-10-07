@@ -150,7 +150,7 @@ impl Default for PrometheusExporterConfig {
             distributions_as_summaries: default_distributions_as_summaries(),
             flush_period_secs: default_flush_period_secs(),
             suppress_timestamp: default_suppress_timestamp(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
@@ -164,7 +164,7 @@ const fn default_distributions_as_summaries() -> bool {
 }
 
 const fn default_flush_period_secs() -> Duration {
-    Duration::from_secs(60)
+    Duration::from_mins(1)
 }
 
 const fn default_suppress_timestamp() -> bool {
@@ -314,6 +314,11 @@ impl Hash for MetricRef {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
     if let Some(auth) = auth {
         let headers = req.headers();
@@ -358,6 +363,11 @@ struct Handler {
 }
 
 impl Handler {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn handle<T: HttpBody>(
         &self,
         req: Request<T>,
@@ -489,6 +499,11 @@ impl PrometheusExporter {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
     fn normalize(&mut self, metric: Metric) -> Option<Metric> {
         let new_metric = match metric.value() {
             MetricValue::Distribution { .. } => {
@@ -581,34 +596,31 @@ impl StreamSink<Event> for PrometheusExporter {
                 continue;
             }
 
-            match self.normalize(metric) {
-                Some(normalized) => {
-                    let normalized = if self.config.suppress_timestamp {
-                        normalized.with_timestamp(None)
-                    } else {
-                        normalized
-                    };
+            if let Some(normalized) = self.normalize(metric) {
+                let normalized = if self.config.suppress_timestamp {
+                    normalized.with_timestamp(None)
+                } else {
+                    normalized
+                };
 
-                    // We have a normalized metric, in absolute form.  If we're already aware of this
-                    // metric, update its expiration deadline, otherwise, start tracking it.
-                    let mut metrics = self.metrics.write().expect(LOCK_FAILED);
+                // We have a normalized metric, in absolute form.  If we're already aware of this
+                // metric, update its expiration deadline, otherwise, start tracking it.
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                    match metrics.entry(MetricRef::from_metric(&normalized)) {
-                        Entry::Occupied(mut entry) => {
-                            let (data, metadata) = entry.get_mut();
-                            *data = normalized;
-                            metadata.refresh();
-                        }
-                        Entry::Vacant(entry) => {
-                            entry.insert((normalized, MetricMetadata::new(flush_period)));
-                        }
+                match metrics.entry(MetricRef::from_metric(&normalized)) {
+                    Entry::Occupied(mut entry) => {
+                        let (data, metadata) = entry.get_mut();
+                        *data = normalized;
+                        metadata.refresh();
                     }
-                    finalizers.update_status(EventStatus::Delivered);
+                    Entry::Vacant(entry) => {
+                        entry.insert((normalized, MetricMetadata::new(flush_period)));
+                    }
                 }
-                _ => {
-                    emit!(PrometheusNormalizationError {});
-                    finalizers.update_status(EventStatus::Errored);
-                }
+                finalizers.update_status(EventStatus::Delivered);
+            } else {
+                emit!(PrometheusNormalizationError {});
+                finalizers.update_status(EventStatus::Errored);
             }
         }
 
@@ -680,6 +692,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn prometheus_noauth() {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -710,6 +727,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn prometheus_successful_basic_auth() {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -747,6 +769,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn prometheus_successful_token_auth() {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -783,6 +810,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn prometheus_missing_auth() {
         let (_, event1) = create_metric_gauge(None, 123.4);
         let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -800,6 +832,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn prometheus_wrong_auth() {
         let (_, event1) = create_metric_gauge(None, 123.4);
         let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -827,6 +864,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn encoding_gzip() {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let events = vec![event1];
@@ -849,6 +891,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn updates_timestamps() {
         let timestamp1 = Utc::now();
         let (name, event1) = create_metric_gauge(None, 123.4);
@@ -1088,6 +1135,11 @@ mod tests {
         Ok(result)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+    )]
     async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -1553,7 +1605,7 @@ mod tests {
 
         // Even long after "now", a metric with expiration disabled should never be considered
         // expired.
-        let far_future = Instant::now() + std::time::Duration::from_secs(60 * 60 * 24 * 365);
+        let far_future = Instant::now() + std::time::Duration::from_hours(8760);
         assert!(!metadata.has_expired(far_future));
     }
 
@@ -1661,6 +1713,11 @@ mod integration_tests {
         never_expire_when_flush_period_disabled().await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     async fn prometheus_scrapes_metrics() {
         let start = Utc::now().timestamp();
 

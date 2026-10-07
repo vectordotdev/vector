@@ -88,7 +88,7 @@ struct DorisAuth {
 fn config_auth() -> DorisAuth {
     DorisAuth {
         user: "root".to_string(),
-        password: "".to_string(),
+        password: String::new(),
     }
 }
 
@@ -103,6 +103,11 @@ fn default_headers() -> HashMap<String, String> {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn insert_events() {
     trace_init();
 
@@ -271,6 +276,11 @@ impl DorisTestClient {
     }
 
     /// Check if an error can be safely ignored
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn is_ignorable_error(&self, query: &str, error: &sqlx::Error) -> bool {
         let error_str = error.to_string();
         (query.starts_with("CREATE DATABASE") && error_str.contains("already exists"))
@@ -343,7 +353,7 @@ impl DorisTestClient {
         self.execute_query(&query).await;
     }
 
-    /// Count rows using the common fetch_one pattern
+    /// Count rows using the common `fetch_one` pattern
     async fn count_rows(&self, database: &str, table: &str) -> i64 {
         let query = format!("SELECT COUNT(*) FROM {database}.{table}");
         let row = self.fetch_one_query(&query, "Counting rows").await;
@@ -357,7 +367,7 @@ impl DorisTestClient {
         count
     }
 
-    /// Get column names using the common fetch_all pattern
+    /// Get column names using the common `fetch_all` pattern
     async fn get_column_names(&self, database: &str, table: &str) -> Vec<String> {
         let query = format!(
             "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{database}' AND TABLE_NAME = '{table}' ORDER BY ORDINAL_POSITION"
@@ -367,7 +377,7 @@ impl DorisTestClient {
         rows.iter().map(|row| row.get::<String, _>(0)).collect()
     }
 
-    /// Convert a database row value to DbValue enum
+    /// Convert a database row value to `DbValue` enum
     fn extract_db_value(row: &sqlx::mysql::MySqlRow, column_index: usize) -> DbValue {
         // Try different types in order of preference
         if let Ok(value) = row.try_get::<Option<String>, _>(column_index) {

@@ -96,8 +96,8 @@ impl GreptimeDBGrpcService {
             client.set_auth(AuthScheme::Basic(Basic {
                 username: username.to_owned(),
                 password: password.clone().into(),
-            }))
-        };
+            }));
+        }
 
         Ok(GreptimeDBGrpcService {
             client: Arc::new(client),
@@ -130,7 +130,7 @@ impl Service<GreptimeDBGrpcRequest> for GreptimeDBGrpcService {
     }
 }
 
-/// Configuration for the GreptimeDB gRPC service
+/// Configuration for the `GreptimeDB` gRPC service
 pub(super) struct GreptimeDBGrpcServiceConfig {
     endpoint: String,
     dbname: String,
@@ -159,5 +159,11 @@ pub(super) fn healthcheck(
     let config = config.into();
     let client = new_client_from_config(&config)?;
 
-    Ok(async move { client.health_check().await.map_err(|error| error.into()) }.boxed())
+    Ok(async move {
+        client
+            .health_check()
+            .await
+            .map_err(std::convert::Into::into)
+    }
+    .boxed())
 }

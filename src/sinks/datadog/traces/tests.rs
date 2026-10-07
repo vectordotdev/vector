@@ -106,6 +106,11 @@ pub fn simple_trace_event(resource: String) -> TraceEvent {
     t
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn validate_simple_span(span: dd_proto::Span, resource: String) {
     assert_eq!(span.service, "a_service");
     assert_eq!(span.name, "a_name");
@@ -233,6 +238,11 @@ async fn smoke() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 async fn multiple_traces() {
     let mut t1 = simple_trace_event("trace_1".to_string());
     t1.metadata_mut().set_datadog_api_key(Arc::from("a_key"));

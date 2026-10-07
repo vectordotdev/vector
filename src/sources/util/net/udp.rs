@@ -6,6 +6,11 @@ use tokio::net::UdpSocket;
 use super::SocketListenAddr;
 
 /// Binds a UDP socket to the listen address.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub async fn try_bind_udp_socket(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,

@@ -196,16 +196,21 @@ pub enum OutOfOrderAction {
 impl GenerateConfig for LokiConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"endpoint: http://localhost:3100
+            r"endpoint: http://localhost:3100
             encoding:
               codec: json
-            labels: {}"#,
+            labels: {}",
         })
         .unwrap()
     }
 }
 
 impl LokiConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     pub(super) fn build_client(&self, cx: SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
@@ -341,6 +346,7 @@ impl ValidatedSink for LokiConfig {
     }
 }
 
+#[must_use]
 pub fn valid_label_name(label: &Template) -> bool {
     label.is_dynamic() || {
         // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -353,7 +359,7 @@ pub fn valid_label_name(label: &Template) -> bool {
         // underlying object keys.
         let mut label_trim = label.get_ref().trim();
         if let Some(without_opening_end) = label_trim.strip_suffix('*') {
-            label_trim = without_opening_end
+            label_trim = without_opening_end;
         }
 
         let mut label_chars = label_trim.chars();

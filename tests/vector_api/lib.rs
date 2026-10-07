@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Integration tests for Vector's gRPC API
 //!
 //! This test suite verifies the gRPC API that powers both `vector top` and `vector tap` commands.

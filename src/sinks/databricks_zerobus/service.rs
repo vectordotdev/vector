@@ -499,7 +499,7 @@ impl ZerobusService {
                     return Err(ZerobusSinkError::StreamClosed);
                 };
                 match s.ingest_batch(batch).await {
-                    Ok(offset) => s.wait_for_offset(offset).await.map(|_| ()),
+                    Ok(offset) => s.wait_for_offset(offset).await,
                     Err(e) => Err(e),
                 }
             }
@@ -715,6 +715,11 @@ mod tests {
     use databricks_zerobus_ingest_sdk::ZerobusError;
     use vector_lib::sensitive_string::SensitiveString;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn test_config() -> ZerobusSinkConfig {
         ZerobusSinkConfig {
             ingestion_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),

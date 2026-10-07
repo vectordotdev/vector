@@ -26,10 +26,15 @@ use crate::{
 /// # arguments
 ///
 /// * `tripwire`                 - Receiver that the sink signals when shutting down.
-/// * `client`                   - HttpClient to use in sending the stats payloads.
+/// * `client`                   - `HttpClient` to use in sending the stats payloads.
 /// * `compression`              - Compression to use when creating the HTTP requests.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
 /// * `aggregator`               - The Aggregator object containing cached stats buckets.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::single_match_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
 pub async fn flush_apm_stats_thread(
     mut tripwire: Receiver<Sender<()>>,
     client: HttpClient,
@@ -135,6 +140,11 @@ impl ApmStatsSender {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn build_apm_stats_request_data(
         &self,
         api_key: Arc<str>,

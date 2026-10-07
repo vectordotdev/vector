@@ -127,6 +127,11 @@ async fn no_gauge_for_non_confinement_sink() {
 /// On reload the gauge value is updated to reflect the sink's current
 /// confinement setting.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn value_updated_on_reload() {
     trace_init();
     let controller = Controller::get().expect("metrics controller");

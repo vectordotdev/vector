@@ -17,6 +17,11 @@ const LOGICAL_CPUS: GaugeName = GaugeName::LogicalCpus;
 const PHYSICAL_CPUS: GaugeName = GaugeName::PhysicalCpus;
 
 impl HostMetrics {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     pub async fn cpu_metrics(&self, output: &mut super::MetricsBuffer) {
         // adds the metrics from cpu time for each cpu
         match heim::cpu::times().await {

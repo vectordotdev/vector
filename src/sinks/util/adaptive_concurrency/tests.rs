@@ -88,17 +88,20 @@ impl LimitParams {
             .and_then(|limit| (level > limit).then_some(self.action))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn scale(&self, level: usize) -> f64 {
         ((level - 1) as f64).mul_add(
             self.scale,
-            self.knee_start
-                .map(|knee| {
-                    self.knee_exp
-                        .unwrap_or(self.scale + 1.0)
-                        .powf(level.saturating_sub(knee) as f64)
-                        - 1.0
-                })
-                .unwrap_or(0.0),
+            self.knee_start.map_or(0.0, |knee| {
+                self.knee_exp
+                    .unwrap_or(self.scale + 1.0)
+                    .powf(level.saturating_sub(knee) as f64)
+                    - 1.0
+            }),
         )
     }
 }
@@ -365,7 +368,7 @@ impl TestController {
         Self {
             todo,
             send_done: Some(send_done),
-            stats: Default::default(),
+            stats: Statistics::default(),
         }
     }
 
@@ -391,7 +394,7 @@ impl Statistics {
         self.prune_old_requests(now);
         self.rate.add(self.requests.len(), now.into());
         self.in_flight.adjust(-1, now.into());
-        self.completed += completed as usize;
+        self.completed += usize::from(completed);
     }
 
     /// Prune any requests that are more than one second old. The
@@ -434,7 +437,7 @@ async fn run_test(params: TestParams) -> TestResults {
         },
         params,
         control: Arc::new(Mutex::new(TestController::new(params.requests, send_done))),
-        controller_stats: Default::default(),
+        controller_stats: Arc::default(),
     };
 
     let control = Arc::clone(&test_config.control);
@@ -527,6 +530,19 @@ struct Failure {
 struct Range(f64, f64);
 
 impl Range {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     fn assert_usize(&self, value: usize, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 as usize {
             Some(Failure {

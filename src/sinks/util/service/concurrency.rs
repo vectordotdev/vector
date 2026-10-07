@@ -49,6 +49,7 @@ impl Serialize for Concurrency {
 }
 
 impl Concurrency {
+    #[must_use]
     pub const fn parse_concurrency(&self) -> Option<usize> {
         match self {
             Concurrency::None => Some(1),
@@ -83,6 +84,15 @@ impl<'de> Deserialize<'de> for Concurrency {
                 }
             }
 
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+            )]
+            #[allow(
+                clippy::cast_sign_loss,
+                reason = "Preserve the existing signed conversion until its input bounds are audited."
+            )]
             fn visit_i64<E: de::Error>(self, value: i64) -> Result<Concurrency, E> {
                 if value > 0 {
                     Ok(Concurrency::Fixed(value as usize))
@@ -94,6 +104,11 @@ impl<'de> Deserialize<'de> for Concurrency {
                 }
             }
 
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+            )]
             fn visit_u64<E: de::Error>(self, value: u64) -> Result<Concurrency, E> {
                 if value > 0 {
                     Ok(Concurrency::Fixed(value as usize))
@@ -178,6 +193,6 @@ fn is_serialization_reversible() {
         let deserialized = serde_json::from_value::<Concurrency>(value)
             .expect("Failed to deserialize a previously serialized Concurrency value");
 
-        assert_eq!(v, deserialized)
+        assert_eq!(v, deserialized);
     }
 }

@@ -93,6 +93,11 @@ fn get_processed_event(
     .unwrap()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn make_encoder(
     sourcetype: &Option<Template>,
     source: &Option<Template>,
@@ -116,6 +121,11 @@ fn generate_config() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn validate_rejects_unconfined_template() {
     use crate::config::ValidatedSink;
 
@@ -132,7 +142,7 @@ fn validate_rejects_unconfined_template() {
         tls: None,
         acknowledgements: Default::default(),
         default_namespace: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let result = config.validate();
@@ -202,7 +212,7 @@ fn test_encode_event_templated_counter_returns_expected_json() {
     );
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "host": "host_value",
         "index": "index_value",
         "source": "source_value",
@@ -243,7 +253,7 @@ fn test_encode_event_static_counter_returns_expected_json() {
     );
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "host": "host_value",
         "index": "index_value",
         "source": "source_value",
@@ -278,7 +288,7 @@ fn test_encode_event_gauge_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "example-gauge",
             "_value": 26.8,
@@ -303,7 +313,7 @@ fn test_encode_event_gauge_with_namespace_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "namespace.example-gauge",
             "_value": 26.8,
@@ -328,7 +338,7 @@ fn test_encode_event_gauge_default_namespace_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "default.example-gauge",
             "_value": 26.8,
@@ -353,7 +363,7 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
     let processed_event = get_processed_event(metric, None, None, None, default_namespace);
 
     let expected = json!({
-        "time": 1134396775.123,
+        "time": 1_134_396_775.123,
         "fields": {
             "metric_name": "this_namespace_will_override_the_default.example-gauge",
             "_value": 26.8,
@@ -372,6 +382,11 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn splunk_passthrough_token() {
     let (_guard, addr) = next_addr();
     let config = HecMetricsSinkConfig {
@@ -387,7 +402,7 @@ async fn splunk_passthrough_token() {
         tls: None,
         acknowledgements: Default::default(),
         default_namespace: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
     let cx = SinkContext::default();
 
@@ -418,5 +433,5 @@ async fn splunk_passthrough_token() {
             "Splunk passthrough-token-2",
             "Splunk token"
         ]
-    )
+    );
 }

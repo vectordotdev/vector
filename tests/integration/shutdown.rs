@@ -98,6 +98,11 @@ fn test_timely_shutdown(cmd: Command) {
 
 /// Returns stdout output
 #[allow(clippy::print_stdout)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) {
     let mut vector = cmd
         .stdin(std::process::Stdio::piped())
@@ -204,6 +209,11 @@ fn log_schema() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn log_schema_multiple_config_files() {
     // Vector command
     let mut cmd = Command::cargo_bin("vector").unwrap();
@@ -246,8 +256,8 @@ fn log_schema_multiple_config_files() {
 
     overwrite_file(
         input_file.clone(),
-        r#"42
-    "#,
+        r"42
+    ",
     );
 
     cmd.arg("--quiet")
@@ -283,6 +293,11 @@ fn log_schema_multiple_config_files() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn configuration_path_recomputed() {
     // Directory with configuration files
     let dir = create_directory();
@@ -653,6 +668,11 @@ fn timely_reload_shutdown() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 async fn health_503_during_shutdown() {
     use std::process::Command;
 

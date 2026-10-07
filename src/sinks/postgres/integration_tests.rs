@@ -50,6 +50,11 @@ fn create_event_with_notifier(id: i64) -> (Event, BatchStatusReceiver) {
     (event, receiver)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion until signed overflow behavior is audited."
+)]
 fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
     let mut events = (0..count as i64).map(create_event).collect::<Vec<_>>();
     let receiver = BatchNotifier::apply_to(&mut events);

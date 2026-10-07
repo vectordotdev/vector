@@ -33,6 +33,11 @@ fn redis_sentinel_server() -> Vec<String> {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_sentinel_reaches_primary() {
     trace_init();
 
@@ -73,6 +78,11 @@ async fn redis_sink_sentinel_reaches_primary() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_sentinel_rpush() {
     trace_init();
 
@@ -148,6 +158,11 @@ async fn redis_sink_sentinel_rpush() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_list_lpush() {
     trace_init();
 
@@ -223,6 +238,11 @@ async fn redis_sink_list_lpush() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_list_rpush() {
     trace_init();
 
@@ -298,6 +318,11 @@ async fn redis_sink_list_rpush() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_sorted_set_zadd() {
     trace_init();
 
@@ -378,6 +403,11 @@ async fn redis_sink_sorted_set_zadd() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_channel() {
     trace_init();
 
@@ -445,6 +475,11 @@ async fn redis_sink_channel() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_channel_data_volume_tags() {
     trace_init();
 
@@ -524,6 +559,15 @@ async fn redis_sink_channel_data_volume_tags() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_metrics() {
     trace_init();
 
@@ -630,6 +674,11 @@ async fn redis_sink_metrics() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn redis_sink_traces() {
     use crate::test_util::components::{SINK_TAGS, assert_sink_compliance};
 

@@ -160,16 +160,31 @@ fn make_transform_with_global_per_tag_limits(
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_event_hashset() {
     drop_event(make_transform_hashset(2, LimitExceededAction::DropEvent)).await;
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_event_bloom() {
     drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_event_fingerprint() {
     drop_event(make_transform_fingerprint(
         2,
@@ -178,6 +193,11 @@ async fn tag_cardinality_limit_drop_event_fingerprint() {
     .await;
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn drop_event(config: Config) {
     assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1"));
@@ -221,20 +241,40 @@ async fn drop_event(config: Config) {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_tag_hashset() {
     drop_tag(make_transform_hashset(2, LimitExceededAction::DropTag)).await;
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_tag_bloom() {
     drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_tag_fingerprint() {
     drop_tag(make_transform_fingerprint(2, LimitExceededAction::DropTag)).await;
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn drop_tag(config: Config) {
     assert_transform_compliance(async move {
         let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
@@ -294,15 +334,30 @@ async fn drop_tag(config: Config) {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_tag_hashset_multi_value() {
     drop_tag_multi_value(make_transform_hashset(2, LimitExceededAction::DropTag)).await;
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_drop_tag_bloom_multi_value() {
     drop_tag_multi_value(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn drop_tag_multi_value(config: Config) {
     assert_transform_compliance(async move {
         let mut tags1 = MetricTags::default();
@@ -377,17 +432,32 @@ async fn drop_tag_multi_value(config: Config) {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_separate_value_limit_per_tag_hashset() {
     separate_value_limit_per_tag(make_transform_hashset(2, LimitExceededAction::DropEvent)).await;
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_separate_value_limit_per_tag_bloom() {
     separate_value_limit_per_tag(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
 }
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn separate_value_limit_per_tag(config: Config) {
     assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val1"));
@@ -492,6 +562,11 @@ fn override_inner_bloom(value_limit: usize, action: LimitExceededAction) -> Over
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_separate_value_limit_per_metric_name_hashset() {
     separate_value_limit_per_metric_name(make_transform_hashset_with_per_metric_limits(
         2,
@@ -519,6 +594,11 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_hashset() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
 async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
     separate_value_limit_per_metric_name(make_transform_bloom_with_per_metric_limits(
         2,
@@ -547,6 +627,19 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::large_futures,
+    reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+)]
+#[allow(
+    clippy::similar_names,
+    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn separate_value_limit_per_metric_name(config: Config) {
     assert_transform_compliance(async move {
         let mut event_a1 =
@@ -1231,7 +1324,7 @@ fn per_tag_zero_limit_drop_event_drops_first_event() {
 /// Per-tag YAML syntax: `mode: limit_override` with `value_limit`, and `mode: excluded`.
 #[test]
 fn per_tag_modes_deserialize() {
-    let yaml = r#"
+    let yaml = r"
 value_limit: 5
 mode: exact
 per_metric_limits:
@@ -1243,7 +1336,7 @@ per_metric_limits:
         value_limit: 10
       excluded_tag:
         mode: excluded
-"#;
+";
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
     let per_metric = parsed.per_metric_limits.get("metric_a").unwrap();
 
@@ -1497,7 +1590,7 @@ fn global_per_tag_overridden_by_per_metric_entry() {
 /// with `value_limit`, and `mode: excluded`.
 #[test]
 fn global_per_tag_modes_deserialize() {
-    let yaml = r#"
+    let yaml = r"
 value_limit: 5
 mode: exact
 per_tag_limits:
@@ -1506,7 +1599,7 @@ per_tag_limits:
     value_limit: 10
   excluded_tag:
     mode: excluded
-"#;
+";
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
 
     let capped = parsed.per_tag_limits.get("capped_tag").unwrap();
@@ -1523,7 +1616,7 @@ per_tag_limits:
 }
 
 /// A re-sent already-accepted tag value must pass through even after the limit is hit,
-/// for both DropTag and DropEvent actions.
+/// for both `DropTag` and `DropEvent` actions.
 #[test]
 fn fingerprint_accepted_value_passes_through_after_limit() {
     for action in [LimitExceededAction::DropTag, LimitExceededAction::DropEvent] {
@@ -1629,7 +1722,7 @@ fn apply_cache_size_override_probabilistic_with_none_inherits() {
 /// A per-metric `limit_override` with `cache_size_per_key` set deserializes correctly.
 #[test]
 fn per_tag_cache_size_per_key_deserializes() {
-    let yaml = r#"
+    let yaml = r"
 value_limit: 5
 mode: probabilistic
 cache_size_per_key: 5120
@@ -1645,7 +1738,7 @@ per_metric_limits:
       default_tag:
         mode: limit_override
         value_limit: 10
-"#;
+";
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
     let per_metric = parsed.per_metric_limits.get("metric_a").unwrap();
 
@@ -1672,7 +1765,7 @@ per_metric_limits:
 /// A global `per_tag_limits` `limit_override` with `cache_size_per_key` set deserializes correctly.
 #[test]
 fn global_per_tag_cache_size_per_key_deserializes() {
-    let yaml = r#"
+    let yaml = r"
 value_limit: 5
 mode: probabilistic
 cache_size_per_key: 5120
@@ -1684,7 +1777,7 @@ per_tag_limits:
   default_tag:
     mode: limit_override
     value_limit: 10
-"#;
+";
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
 
     let big_tag = parsed.per_tag_limits.get("big_tag").unwrap();
@@ -1710,7 +1803,7 @@ per_tag_limits:
 // Config validation tests
 // ============================================================================
 
-/// cache_size_per_key on a global per-tag entry in exact mode is a build error.
+/// `cache_size_per_key` on a global per-tag entry in exact mode is a build error.
 #[test]
 fn validation_rejects_cache_size_in_global_exact_mode() {
     let config = make_transform_with_global_per_tag_limits(
@@ -1730,7 +1823,7 @@ fn validation_rejects_cache_size_in_global_exact_mode() {
     assert!(config.validate_structure().is_err());
 }
 
-/// cache_size_per_key on a per-metric per-tag entry in exact mode is a build error.
+/// `cache_size_per_key` on a per-metric per-tag entry in exact mode is a build error.
 #[test]
 fn validation_rejects_cache_size_in_per_metric_exact_mode() {
     let config = make_transform_hashset_with_per_metric_limits(
@@ -1756,7 +1849,7 @@ fn validation_rejects_cache_size_in_per_metric_exact_mode() {
     assert!(config.validate_structure().is_err());
 }
 
-/// cache_size_per_key on a per-metric per-tag entry in excluded mode is a build error.
+/// `cache_size_per_key` on a per-metric per-tag entry in excluded mode is a build error.
 #[test]
 fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
     let config = make_transform_hashset_with_per_metric_limits(
@@ -1778,7 +1871,7 @@ fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
     assert!(config.validate_structure().is_err());
 }
 
-/// cache_size_per_key in probabilistic mode is valid.
+/// `cache_size_per_key` in probabilistic mode is valid.
 #[tokio::test]
 async fn validation_allows_cache_size_in_probabilistic_mode() {
     let config = make_transform_with_global_per_tag_limits(
@@ -1800,7 +1893,7 @@ async fn validation_allows_cache_size_in_probabilistic_mode() {
     assert!(config.build(&TransformContext::default()).await.is_ok());
 }
 
-/// cache_size_per_key: None in exact mode is fine (no regression).
+/// `cache_size_per_key`: None in exact mode is fine (no regression).
 #[tokio::test]
 async fn validation_allows_no_cache_size_override_in_exact_mode() {
     let config = make_transform_with_global_per_tag_limits(

@@ -40,7 +40,7 @@ use crate::event::LogEvent;
 /// when it has started doing, or waiting, for input.
 static BUFFER: Mutex<Option<Vec<LogEvent>>> = Mutex::new(Some(Vec::new()));
 
-/// SHOULD_BUFFER controls whether or not internal log events should be buffered or sent directly to the trace broadcast
+/// `SHOULD_BUFFER` controls whether or not internal log events should be buffered or sent directly to the trace broadcast
 /// channel.
 static SHOULD_BUFFER: AtomicBool = AtomicBool::new(true);
 
@@ -57,6 +57,11 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn init(
     color: bool,
     json: bool,
@@ -142,6 +147,10 @@ pub fn init(
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::must_use_candidate,
+    reason = "Resetting the buffer is the operation; inspecting its previous contents is optional."
+)]
 pub fn reset_early_buffer() -> Option<Vec<LogEvent>> {
     get_early_buffer().replace(Vec::new())
 }
@@ -278,6 +287,7 @@ pub struct TraceSubscription {
 
 impl TraceSubscription {
     /// Registers a subscription to the internal log event stream.
+    #[must_use]
     pub fn subscribe() -> TraceSubscription {
         let buffered_events_rx = try_register_for_early_events();
         let trace_rx = get_trace_receiver();
@@ -439,6 +449,11 @@ mod tests {
     /// async executor.
     #[tokio::test]
     #[serial]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Keep the existing local helper placement until its surrounding function is refactored."
+    )]
     async fn broadcast_rate_limits_repeated_messages() {
         let trace_sub = TraceSubscription::subscribe();
         // Disable early buffering so events flow directly to the broadcast channel

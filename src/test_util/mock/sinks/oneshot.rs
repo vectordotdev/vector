@@ -26,6 +26,7 @@ pub struct OneshotSinkConfig {
 impl_generate_config_from_default!(OneshotSinkConfig);
 
 impl OneshotSinkConfig {
+    #[must_use]
     pub fn new(tx: Sender<EventArray>) -> Self {
         Self {
             tx: Arc::new(Mutex::new(Some(tx))),

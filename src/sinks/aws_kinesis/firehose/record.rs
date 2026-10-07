@@ -44,6 +44,11 @@ impl SendRecord for KinesisFirehoseClient {
     type T = KinesisRecord;
     type E = KinesisError;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing signed conversion until its input bounds are audited."
+    )]
     async fn send(
         &self,
         records: Vec<Self::T>,

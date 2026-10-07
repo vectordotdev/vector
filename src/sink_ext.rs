@@ -68,6 +68,11 @@ where
 {
     type Output = Result<(), Error>;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             match Pin::new(&mut *self.stream).as_mut().poll_peek(cx) {

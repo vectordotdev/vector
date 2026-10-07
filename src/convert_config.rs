@@ -5,7 +5,7 @@ use std::{
 };
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 
 use crate::config::{ConfigBuilder, Format, format};
 
@@ -24,6 +24,11 @@ pub struct Opts {
     pub(crate) output_format: Format,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve the existing diagnostic text and escaping behavior."
+)]
 fn check_paths(opts: &Opts) -> Result<(), String> {
     let in_metadata = fs::metadata(&opts.input_path)
         .unwrap_or_else(|_| panic!("Failed to get metadata for: {:?}", &opts.input_path));
@@ -52,6 +57,15 @@ fn check_paths(opts: &Opts) -> Result<(), String> {
     Ok(())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_for_each,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve the existing diagnostic text and escaping behavior."
+)]
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     if let Err(e) = check_paths(opts) {
         #[allow(clippy::print_stderr)]
@@ -71,7 +85,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
 
         match convert_config(&opts.input_path, &opts.output_path, opts.output_format) {
-            Ok(_) => exitcode::OK,
+            Ok(()) => exitcode::OK,
             Err(errors) => {
                 #[allow(clippy::print_stderr)]
                 {
@@ -103,6 +117,15 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::manual_let_else,
+    reason = "Keep the existing branching and control flow during the lint rollout."
+)]
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve the existing diagnostic text and escaping behavior."
+)]
 fn convert_config(
     input_path: &Path,
     output_path: &Path,
@@ -143,6 +166,11 @@ fn convert_config(
     Ok(())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve the existing diagnostic text and escaping behavior."
+)]
 fn walk_dir_and_convert(
     input_path: &Path,
     output_dir: &Path,

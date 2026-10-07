@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![deny(warnings)]
 
 extern crate vector;
@@ -6,6 +7,15 @@ use std::process::ExitCode;
 use vector::{app::Application, extra_context::ExtraContext};
 
 #[cfg(unix)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 fn main() -> ExitCode {
     #[cfg(all(unix, feature = "tikv-jemallocator"))]
     {

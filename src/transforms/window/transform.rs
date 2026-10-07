@@ -25,6 +25,11 @@ pub struct Window {
 }
 
 impl Window {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(
         forward_when: Option<Condition>,
         flush_when: Condition,
@@ -113,6 +118,11 @@ mod test {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_flush() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -134,6 +144,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_pass() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -156,6 +171,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_10_in_50() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -183,6 +203,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_50_in_10() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -210,6 +235,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_before_and_after() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -239,6 +269,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_flush_and_pass() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -275,6 +310,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_zero_before() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -300,6 +340,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_zero_flush() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -325,6 +370,11 @@ mod test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::large_futures,
+        reason = "Preserve the current future allocation strategy; boxing needs separate performance validation."
+    )]
     async fn test_zero_pass() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
@@ -361,13 +411,18 @@ mod test {
         num_events_after: usize,
     ) -> WindowConfig {
         WindowConfig {
-            flush_when,
             forward_when,
+            flush_when,
             num_events_before,
             num_events_after,
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn get_condition(message: &str) -> AnyCondition {
         AnyCondition::from(ConditionConfig::Vrl(VrlConfig {
             source: format!(r#".message == "{message}""#),

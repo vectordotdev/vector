@@ -52,6 +52,11 @@ fn http_client_generate_config() {
 }
 
 impl ValidatableComponent for HttpClientConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn validation_configuration() -> ValidationConfiguration {
         let uri = Uri::from_static("http://127.0.0.1:9898");
 
@@ -115,6 +120,11 @@ async fn bytes_decoding() {
 
 /// JSON with newline delimiter should be decoded and HTTP header set to application/x-ndjson.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn json_decoding_newline_delimited() {
     let (_guard, in_addr) = next_addr();
 
@@ -145,6 +155,11 @@ async fn json_decoding_newline_delimited() {
 
 /// JSON with character delimiter should be decoded and HTTP header set to application/json.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn json_decoding_character_delimited() {
     let (_guard, in_addr) = next_addr();
 
@@ -181,6 +196,11 @@ async fn json_decoding_character_delimited() {
 
 /// HTTP request queries configured by the user should be applied correctly.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn request_query_applied() {
     let (_guard, in_addr) = next_addr();
 
@@ -219,7 +239,10 @@ async fn request_query_applied() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events
+        .into_iter()
+        .map(vector_lib::event::Event::into_log)
+        .collect();
 
     let expected = HashMap::from([
         (
@@ -251,6 +274,15 @@ async fn request_query_applied() {
 
 /// VRL query parameters should be parsed correctly
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 async fn request_query_vrl_applied() {
     let (_guard, in_addr) = next_addr();
 
@@ -333,7 +365,10 @@ async fn request_query_vrl_applied() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events
+        .into_iter()
+        .map(vector_lib::event::Event::into_log)
+        .collect();
 
     let mut expected = HashMap::from([
         (
@@ -383,6 +418,11 @@ async fn request_query_vrl_applied() {
 
 /// VRL query parameters should dynamically update on each request
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn request_query_vrl_dynamic_updates() {
     let (_guard, in_addr) = next_addr();
 
@@ -417,7 +457,10 @@ async fn request_query_vrl_dynamic_updates() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events
+        .into_iter()
+        .map(vector_lib::event::Event::into_log)
+        .collect();
 
     // Make sure we have at least 2 events to check for unique timestamps
     assert!(
@@ -463,7 +506,7 @@ async fn headers_applied() {
             assert_eq!(&"bazz", iter.next().unwrap());
             assert_eq!(&"bizz", iter.next().unwrap());
         }))
-        .map(|_| r#"{"data" : "foo"}"#);
+        .map(|()| r#"{"data" : "foo"}"#);
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
@@ -520,6 +563,11 @@ async fn accept_header_override() {
 
 /// POST request with JSON body data should send the body correctly
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn post_with_body() {
     let (_guard, in_addr) = next_addr();
 
@@ -554,7 +602,10 @@ async fn post_with_body() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events
+        .into_iter()
+        .map(vector_lib::event::Event::into_log)
+        .collect();
 
     // Verify the body was echoed back correctly
     for log in logs {
@@ -572,6 +623,11 @@ async fn post_with_body() {
 
 /// POST request without body should work as before
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn post_without_body() {
     let (_guard, in_addr) = next_addr();
 
@@ -601,6 +657,11 @@ async fn post_without_body() {
 
 /// Custom Content-Type header should override the default
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn post_with_custom_content_type() {
     let (_guard, in_addr) = next_addr();
 
@@ -631,6 +692,11 @@ async fn post_with_custom_content_type() {
 
 /// POST request with VRL body should resolve correctly
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn post_with_vrl_body() {
     let (_guard, in_addr) = next_addr();
 
@@ -665,7 +731,10 @@ async fn post_with_vrl_body() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events
+        .into_iter()
+        .map(vector_lib::event::Event::into_log)
+        .collect();
 
     // Verify VRL was evaluated correctly
     for log in logs {
@@ -683,6 +752,11 @@ async fn post_with_vrl_body() {
 
 /// VRL compilation errors in query parameters should fail the build
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn query_vrl_compilation_error() {
     use crate::config::SourceConfig;
     use vector_lib::source_sender::SourceSender;
@@ -728,6 +802,11 @@ async fn query_vrl_compilation_error() {
 
 /// VRL compilation errors in request body should fail the build
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn body_vrl_compilation_error() {
     use crate::config::SourceConfig;
     use vector_lib::source_sender::SourceSender;
@@ -771,6 +850,11 @@ async fn body_vrl_compilation_error() {
 /// Requests should be routed through the configured authenticated HTTP proxy,
 /// which forwards them to the origin without leaking the proxy credentials.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn requests_through_authenticated_proxy() {
     let (_guard, in_addr) = next_addr();
 

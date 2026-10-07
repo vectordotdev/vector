@@ -80,6 +80,7 @@ pub struct RunningTopology {
 }
 
 impl RunningTopology {
+    #[must_use]
     pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<ShutdownError>) -> Self {
         Self {
             inputs: HashMap::new(),
@@ -106,6 +107,7 @@ impl RunningTopology {
     }
 
     /// Gets the configuration that represents this running topology.
+    #[must_use]
     pub const fn config(&self) -> &Config {
         &self.config
     }
@@ -122,6 +124,7 @@ impl RunningTopology {
     /// Creates a subscription to topology changes.
     ///
     /// This is used by the tap API to observe configuration changes, and re-wire tap sinks.
+    #[must_use]
     pub fn watch(&self) -> watch::Receiver<TapResource> {
         self.watch.1.clone()
     }
@@ -133,6 +136,7 @@ impl RunningTopology {
     /// detect that the sources in the topology are no longer
     /// producing. [`Application`][crate::app::Application], as an example, uses this as a
     /// shutdown signal.
+    #[must_use]
     pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }
@@ -148,7 +152,7 @@ impl RunningTopology {
     /// in the [`RunningTopology`] instance has been dropped except for the
     /// `tasks` map. This map gets moved into the returned future and is used to
     /// poll for when the tasks have completed. Once the returned future is
-    /// dropped then everything from this RunningTopology instance is fully
+    /// dropped then everything from this `RunningTopology` instance is fully
     /// dropped.
     ///
     /// The returned future resolves to `true` if every component finished on its own before
@@ -200,7 +204,7 @@ impl RunningTopology {
                 });
                 let remaining_components = check_handles2
                     .keys()
-                    .map(|item| item.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ");
 
@@ -228,7 +232,7 @@ impl RunningTopology {
                 });
                 let remaining_components = check_handles
                     .keys()
-                    .map(|item| item.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ");
 
@@ -281,7 +285,7 @@ impl RunningTopology {
         }
 
         futures::future::join(source_shutdown_complete, shutdown_complete_future)
-            .map(|(_, graceful)| graceful)
+            .map(|((), graceful)| graceful)
     }
 
     /// Attempts to load a new configuration and update this running topology.
@@ -295,6 +299,11 @@ impl RunningTopology {
     /// topology back to its previous state, returning the appropriate error.
     ///
     /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
@@ -432,6 +441,11 @@ impl RunningTopology {
     /// Shuts down any changed/removed component in the given configuration diff.
     ///
     /// If buffers for any of the changed/removed components can be recovered, they'll be returned.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     async fn shutdown_diff(
         &mut self,
         diff: &ConfigDiff,
@@ -736,6 +750,11 @@ impl RunningTopology {
     }
 
     /// Connects all changed/added components in the given configuration diff.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     pub(crate) fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut TopologyPieces) {
         debug!("Connecting changed/added component(s).");
 
@@ -885,7 +904,7 @@ impl RunningTopology {
                 .outputs
                 .clone()
                 .into_iter()
-                .flat_map(|(output_id, control_tx)| {
+                .filter_map(|(output_id, control_tx)| {
                     self.outputs_tap_metadata.get(&output_id.component).map(
                         |(component_kind, component_type)| {
                             (
@@ -911,18 +930,22 @@ impl RunningTopology {
                     source_keys: diff
                         .sources
                         .changed_and_added()
-                        .map(|key| key.to_string())
+                        .map(std::string::ToString::to_string)
                         .chain(
                             added_changed_table_sources
                                 .iter()
-                                .map(|key| key.to_string()),
+                                .map(std::string::ToString::to_string),
                         )
                         .collect(),
                     sink_keys: diff
                         .sinks
                         .changed_and_added()
-                        .map(|key| key.to_string())
-                        .chain(added_changed_tables.iter().map(|key| key.to_string()))
+                        .map(std::string::ToString::to_string)
+                        .chain(
+                            added_changed_tables
+                                .iter()
+                                .map(std::string::ToString::to_string),
+                        )
                         .collect(),
                     // Note, only sources and transforms are relevant. Sinks do
                     // not have outputs to tap.
@@ -1358,6 +1381,11 @@ impl RunningTopology {
         Self::start_validated(config, diff, pieces).await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
     pub async fn start_validated(
         config: Config,
         diff: ConfigDiff,
@@ -1458,6 +1486,11 @@ impl RunningTopology {
 /// disappeared as one kind of producer and reappeared as another (e.g. an enrichment-table-derived
 /// source removed while a regular source with the same key was added, or a transform removed while
 /// a source with the same key was added).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<OutputId> {
     let producer_destroyed = |key: &ComponentKey| {
         diff.sources.to_change.contains(key)
@@ -1514,6 +1547,11 @@ mod tests {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     async fn pending_component_reloads_are_consumed_after_reload() {
         trace_init();
         let config = || {

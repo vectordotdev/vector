@@ -13,6 +13,11 @@ pub struct Heartbeat {
 }
 
 impl InternalEvent for Heartbeat {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn emit(self) {
         trace!(target: "vector", message = "Beep.");
         gauge!(GaugeName::UptimeSeconds).set(self.since.elapsed().as_secs() as f64);

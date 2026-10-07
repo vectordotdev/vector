@@ -21,6 +21,11 @@ use crate::{
     config::{SinkConfig, SinkContext},
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
 where
     for<'a> T: Deserialize<'a> + SinkConfig,
@@ -31,6 +36,11 @@ where
     Ok((sink_config, cx))
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn load_sink_with_context<T>(config: &str, cx: SinkContext) -> crate::Result<(T, SinkContext)>
 where
     for<'a> T: Deserialize<'a> + SinkConfig,
@@ -66,6 +76,11 @@ pub fn build_test_server_status(
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub fn build_test_server_generic<B>(
     addr: SocketAddr,
     responder: impl Fn() -> Response<B> + Clone + Send + Sync + 'static,

@@ -24,6 +24,11 @@ fn kinesis_address() -> String {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn kinesis_put_records_with_partition_key() {
     let stream = gen_stream();
 
@@ -42,14 +47,14 @@ async fn kinesis_put_records_with_partition_key() {
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
+        tls: Option::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: Some(partition_key.clone()),
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -83,10 +88,15 @@ async fn kinesis_put_records_with_partition_key() {
 
     input_lines.sort();
     output_lines.sort();
-    assert_eq!(output_lines, input_lines)
+    assert_eq!(output_lines, input_lines);
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn kinesis_put_records_without_partition_key() {
     let stream = gen_stream();
 
@@ -101,14 +111,14 @@ async fn kinesis_put_records_without_partition_key() {
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
+        tls: Option::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
         partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -132,7 +142,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     input_lines.sort();
     output_lines.sort();
-    assert_eq!(output_lines, input_lines)
+    assert_eq!(output_lines, input_lines);
 }
 
 async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec<Record>> {
@@ -200,7 +210,7 @@ async fn ensure_stream(stream_name: String) {
     {
         Ok(_) => (),
         Err(error) => panic!("Unable to check the stream {error:?}"),
-    };
+    }
 
     // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors
     // during PutRecords
@@ -215,6 +225,11 @@ fn gen_stream() -> String {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn kinesis_retry_failed_records_on_partial_failure() {
     let stream = gen_stream();
 
@@ -229,14 +244,14 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
+        tls: Option::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         request_retry_partial: true, // Enable partial failure retry
         partition_key_field: Some(ConfigValuePath::try_from("partition_key".to_string()).unwrap()),
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 
@@ -288,6 +303,11 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
 }
 
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 async fn kinesis_no_retry_failed_records_when_disabled() {
     let stream = gen_stream();
 
@@ -302,14 +322,14 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
-        tls: Default::default(),
-        auth: Default::default(),
+        tls: Option::default(),
+        auth: AwsAuthentication::default(),
         acknowledgements: Default::default(),
         request_retry_partial: false, // Disable partial failure retry
         partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig { batch, base };
+    let config = KinesisStreamsSinkConfig { base, batch };
 
     let cx = SinkContext::default();
 

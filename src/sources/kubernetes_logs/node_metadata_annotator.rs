@@ -84,7 +84,7 @@ fn annotate_from_metadata(
     if let Some(labels) = &metadata.labels {
         let legacy_key_prefix = fields_spec.node_labels.path.as_ref().map(|k| &k.path);
 
-        for (key, value) in labels.iter() {
+        for (key, value) in labels {
             let key_path = path!(key);
             let legacy_key = legacy_key_prefix
                 .map(|k| k.concat(key_path))
@@ -96,7 +96,7 @@ fn annotate_from_metadata(
                 legacy_key,
                 path!("node_labels", key),
                 value.to_owned(),
-            )
+            );
         }
     }
 }
@@ -109,6 +109,11 @@ mod tests {
     use super::*;
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing control flow intact during the lint rollout."
+    )]
     fn test_annotate_from_metadata() {
         let cases = vec![
             (
@@ -246,7 +251,7 @@ mod tests {
             ),
         ];
 
-        for (fields_spec, metadata, expected, log_namespace) in cases.into_iter() {
+        for (fields_spec, metadata, expected, log_namespace) in cases {
             let mut log = LogEvent::default();
             annotate_from_metadata(&mut log, &fields_spec, &metadata, log_namespace);
             assert_eq!(log, expected);

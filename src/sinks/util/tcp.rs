@@ -77,6 +77,7 @@ pub struct TcpSinkConfig {
 }
 
 impl TcpSinkConfig {
+    #[must_use]
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -91,6 +92,7 @@ impl TcpSinkConfig {
         }
     }
 
+    #[must_use]
     pub const fn from_address(address: String) -> Self {
         Self {
             address,
@@ -105,6 +107,11 @@ impl TcpSinkConfig {
     /// This performs only pure parsing — no DNS resolution and no TLS setup —
     /// so it can run during validation. TLS resolution remains in
     /// [`Self::build`].
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn parse_address(&self) -> crate::Result<(String, u16)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -112,6 +119,11 @@ impl TcpSinkConfig {
         Ok((host, port))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(
         &self,
         transformer: Transformer,
@@ -130,6 +142,11 @@ impl TcpSinkConfig {
     /// Used by sinks whose `validate` already parsed the address, so the
     /// parsed value is plumbed through the validated state rather than
     /// re-parsed here. TLS resolution still happens in this method.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build_with_address(
         &self,
         host: String,
