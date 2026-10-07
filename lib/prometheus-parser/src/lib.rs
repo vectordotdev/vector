@@ -350,12 +350,8 @@ impl MetricGroupSet {
         {
             base
         } else {
-            let kind = if name.ends_with("_total") {
-                MetricKind::Counter
-            } else {
-                MetricKind::Untyped
-            };
-            self.0.insert(name.into(), GroupKind::new(kind));
+            self.0
+                .insert(name.into(), GroupKind::new(MetricKind::Untyped));
             name
         };
         self.0.get_full_mut(name).unwrap()
@@ -412,7 +408,17 @@ impl MetricGroupSet {
     fn finish(self) -> Vec<MetricGroup> {
         self.0
             .into_iter()
-            .map(|(name, metrics)| MetricGroup { name, metrics })
+            .map(|(name, metrics)| {
+                // Remote write carries no type for untyped/unknown series, so infer
+                // counters from the conventional `_total` suffix.
+                let metrics = match metrics {
+                    GroupKind::Untyped(metrics) if name.ends_with("_total") => {
+                        GroupKind::Counter(metrics)
+                    }
+                    metrics => metrics,
+                };
+                MetricGroup { name, metrics }
+            })
             .collect()
     }
 }
@@ -883,6 +889,27 @@ mod test {
         let parsed = parse_request(
             write_request!(
                 [],
+                [[__name__ => "requests_total"] => [12 @ 1395066367600]]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367600), labels!(), 12.0)
+            );
+        });
+    }
+
+    #[test]
+    fn parse_request_counter_from_total_suffix_with_unknown_metadata() {
+        let parsed = parse_request(
+            write_request!(
+                ["requests_total" = Unknown],
                 [[__name__ => "requests_total"] => [12 @ 1395066367600]]
             ),
             MetadataConflictStrategy::Ignore,
