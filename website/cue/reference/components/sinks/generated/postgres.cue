@@ -16,7 +16,7 @@ generated: components: sinks: postgres: configuration: {
 		description: """
 			Event batching behavior.
 
-			Note that as PostgreSQL's `jsonb_populate_recordset` function is used to insert events,
+			Note that as `PostgreSQL`'s `jsonb_populate_recordset` function is used to insert events,
 			a single event in the batch can make the whole batch to fail. For example, if a single event within the batch triggers
 			a unique constraint violation in the destination table, the whole event batch will fail.
 
@@ -30,7 +30,7 @@ generated: components: sinks: postgres: configuration: {
 	}
 	endpoint: {
 		description: """
-			The PostgreSQL server connection string. It can contain the username and password.
+			The `PostgreSQL` server connection string. It can contain the username and password.
 			See [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) about connection strings for more information
 			about valid formats and options that can be used.
 			"""
@@ -61,7 +61,7 @@ generated: components: sinks: postgres: configuration: {
 			The table that data is inserted into. This table parameter is vulnerable
 			to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
 			This parameter will be directly interpolated in the SQL query statement,
-			as table names as parameters in prepared statements are not allowed in PostgreSQL.
+			as table names as parameters in prepared statements are not allowed in `PostgreSQL`.
 			"""
 		required: true
 		type: string: {}

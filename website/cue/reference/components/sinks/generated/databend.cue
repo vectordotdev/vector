@@ -135,8 +135,8 @@ generated: components: sinks: databend: configuration: {
 	}
 	missing_field_as: {
 		description: """
-			Defines how missing fields are handled for NDJson.
-			Refer to https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as
+			Defines how missing fields are handled for `NDJson`.
+			Refer to <https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as>
 			"""
 		required: false
 		type: string: {

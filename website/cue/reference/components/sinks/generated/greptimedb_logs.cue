@@ -70,10 +70,10 @@ generated: components: sinks: greptimedb_logs: configuration: {
 		description: """
 			The [GreptimeDB database][database] name to connect.
 
-			Default to `public`, the default database of GreptimeDB.
+			Default to `public`, the default database of `GreptimeDB`.
 
 			Database can be created via `create database` statement on
-			GreptimeDB. If you are using GreptimeCloud, use `dbname` from the
+			`GreptimeDB`. If you are using `GreptimeCloud`, use `dbname` from the
 			connection information of your instance.
 
 			[database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
@@ -93,13 +93,13 @@ generated: components: sinks: greptimedb_logs: configuration: {
 		type:        _schemaDefinitions["codecs::encoding::transformer::Transformer"]
 	}
 	endpoint: {
-		description: "The endpoint of the GreptimeDB server."
+		description: "The endpoint of the `GreptimeDB` server."
 		required:    true
 		type: string: examples: ["http://localhost:4000"]
 	}
 	extra_headers: {
 		description: """
-			Custom headers to add to the HTTP request sent to GreptimeDB.
+			Custom headers to add to the HTTP request sent to `GreptimeDB`.
 			Note that these headers will override the existing headers.
 			"""
 		required: false
@@ -110,7 +110,7 @@ generated: components: sinks: greptimedb_logs: configuration: {
 		}
 	}
 	extra_params: {
-		description: "Custom parameters to add to the query string for each HTTP request sent to GreptimeDB."
+		description: "Custom parameters to add to the query string for each HTTP request sent to `GreptimeDB`."
 		required:    false
 		type: object: {
 			examples: [{
@@ -125,7 +125,7 @@ generated: components: sinks: greptimedb_logs: configuration: {
 	}
 	password: {
 		description: """
-			The password for your GreptimeDB instance.
+			The password for your `GreptimeDB` instance.
 
 			This is required if your instance has authentication enabled.
 			"""
@@ -179,7 +179,7 @@ generated: components: sinks: greptimedb_logs: configuration: {
 	}
 	username: {
 		description: """
-			The username for your GreptimeDB instance.
+			The username for your `GreptimeDB` instance.
 
 			This is required if your instance has authentication enabled.
 			"""

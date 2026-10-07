@@ -21,10 +21,10 @@ generated: components: sinks: greptimedb_metrics: configuration: {
 		description: """
 			The [GreptimeDB database][database] name to connect.
 
-			Default to `public`, the default database of GreptimeDB.
+			Default to `public`, the default database of `GreptimeDB`.
 
 			Database can be created via `create database` statement on
-			GreptimeDB. If you are using GreptimeCloud, use `dbname` from the
+			`GreptimeDB`. If you are using `GreptimeCloud`, use `dbname` from the
 			connection information of your instance.
 
 			[database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
@@ -39,10 +39,10 @@ generated: components: sinks: greptimedb_metrics: configuration: {
 	}
 	endpoint: {
 		description: """
-			The host and port of GreptimeDB gRPC service.
+			The host and port of `GreptimeDB` gRPC service.
 
-			This sink uses GreptimeDB's gRPC interface for data ingestion. By
-			default, GreptimeDB listens to port 4001 for gRPC protocol.
+			This sink uses `GreptimeDB`'s gRPC interface for data ingestion. By
+			default, `GreptimeDB` listens to port 4001 for gRPC protocol.
 
 			The address _must_ include a port.
 			"""
@@ -65,13 +65,13 @@ generated: components: sinks: greptimedb_metrics: configuration: {
 		description: """
 			Use Greptime's prefixed naming for time index and value columns.
 
-			This is to keep consistency with GreptimeDB's naming pattern. By
+			This is to keep consistency with `GreptimeDB`'s naming pattern. By
 			default, this sink will use `val` for value column name, and `ts` for
 			time index name. When turned on, `greptime_value` and
 			`greptime_timestamp` will be used for these names.
 
 			If you are using this Vector sink together with other data ingestion
-			sources of GreptimeDB, like Prometheus Remote Write and Influxdb Line
+			sources of `GreptimeDB`, like Prometheus Remote Write and Influxdb Line
 			Protocol, it is highly recommended to turn on this.
 
 			Also if there is a tag name conflict from your data source, for
@@ -85,7 +85,7 @@ generated: components: sinks: greptimedb_metrics: configuration: {
 	}
 	password: {
 		description: """
-			The password for your GreptimeDB instance.
+			The password for your `GreptimeDB` instance.
 
 			This is required if your instance has authentication enabled.
 			"""
@@ -110,7 +110,7 @@ generated: components: sinks: greptimedb_metrics: configuration: {
 	}
 	username: {
 		description: """
-			The username for your GreptimeDB instance.
+			The username for your `GreptimeDB` instance.
 
 			This is required if your instance has authentication enabled.
 			"""

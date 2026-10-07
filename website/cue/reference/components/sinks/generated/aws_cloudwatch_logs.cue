@@ -139,7 +139,7 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 	}
 	group_name: {
 		description: """
-			The [group name][group_name] of the target CloudWatch Logs stream.
+			The [group name][group_name] of the target `CloudWatch` Logs stream.
 
 			[group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 			"""
@@ -174,7 +174,7 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 		type:        _schemaDefinitions["vector::sinks::util::http::RequestConfig"]
 	}
 	retention: {
-		description: "Retention policy configuration for AWS CloudWatch Log Group"
+		description: "Retention policy configuration for AWS `CloudWatch` Log Group"
 		required:    false
 		type: object: options: {
 			days: {
@@ -191,7 +191,7 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 	}
 	stream_name: {
 		description: """
-			The [stream name][stream_name] of the target CloudWatch Logs stream.
+			The [stream name][stream_name] of the target `CloudWatch` Logs stream.
 
 			There can only be one writer to a log stream at a time. If multiple instances are writing to
 			the same log group, the stream name must include an identifier that is guaranteed to be

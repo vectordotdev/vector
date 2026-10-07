@@ -130,7 +130,7 @@ generated: components: sinks: clickhouse: configuration: {
 		}
 	}
 	date_time_best_effort: {
-		description: "Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601."
+		description: "Sets `date_time_input_format` to `best_effort`, allowing `ClickHouse` to properly parse RFC3339/ISO 8601."
 		required:    false
 		type: bool: default: false
 	}
@@ -140,7 +140,7 @@ generated: components: sinks: clickhouse: configuration: {
 		type:        _schemaDefinitions["codecs::encoding::transformer::Transformer"]
 	}
 	endpoint: {
-		description: "The endpoint of the ClickHouse server."
+		description: "The endpoint of the `ClickHouse` server."
 		required:    true
 		type: string: examples: ["http://localhost:8123"]
 	}
@@ -154,15 +154,15 @@ generated: components: sinks: clickhouse: configuration: {
 		type: string: {
 			default: "json_each_row"
 			enum: {
-				arrow_stream:   "ArrowStream (beta)."
-				json_as_object: "JSONAsObject."
-				json_as_string: "JSONAsString."
-				json_each_row:  "JSONEachRow."
+				arrow_stream:   "`ArrowStream` (beta)."
+				json_as_object: "`JSONAsObject`."
+				json_as_string: "`JSONAsString`."
+				json_each_row:  "`JSONEachRow`."
 			}
 		}
 	}
 	insert_random_shard: {
-		description: "Sets `insert_distributed_one_random_shard`, allowing ClickHouse to insert data into a random shard when using Distributed Table Engine."
+		description: "Sets `insert_distributed_one_random_shard`, allowing `ClickHouse` to insert data into a random shard when using Distributed Table Engine."
 		required:    false
 		type: bool: default: false
 	}
@@ -175,7 +175,7 @@ generated: components: sinks: clickhouse: configuration: {
 			type: object: options: {
 				deduplicate: {
 					description: """
-						Sets `async_insert_deduplicate`, allowing ClickHouse to perform deduplication when inserting blocks in the replicated table.
+						Sets `async_insert_deduplicate`, allowing `ClickHouse` to perform deduplication when inserting blocks in the replicated table.
 
 						If left unspecified, use the default provided by the `ClickHouse` server.
 						"""
@@ -184,7 +184,7 @@ generated: components: sinks: clickhouse: configuration: {
 				}
 				enabled: {
 					description: """
-						Sets `async_insert`, allowing ClickHouse to queue the inserted data and later flush to table in the background.
+						Sets `async_insert`, allowing `ClickHouse` to queue the inserted data and later flush to table in the background.
 
 						If left unspecified, use the default provided by the `ClickHouse` server.
 						"""
@@ -211,7 +211,7 @@ generated: components: sinks: clickhouse: configuration: {
 				}
 				wait_for_processing: {
 					description: """
-						Sets `wait_for`, allowing ClickHouse to wait for processing of asynchronous insertion.
+						Sets `wait_for`, allowing `ClickHouse` to wait for processing of asynchronous insertion.
 
 						If left unspecified, use the default provided by the `ClickHouse` server.
 						"""
@@ -243,7 +243,7 @@ generated: components: sinks: clickhouse: configuration: {
 	}
 	skip_unknown_fields: {
 		description: """
-			Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
+			Sets `input_format_skip_unknown_fields`, allowing `ClickHouse` to discard fields not present in the table schema.
 
 			If left unspecified, use the default provided by the `ClickHouse` server.
 			"""

@@ -21,7 +21,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The name of the bucket to write into.
 
-			Only relevant when using InfluxDB v2.x and above.
+			Only relevant when using `InfluxDB` v2.x and above.
 			"""
 		minimal:       true
 		relevant_when: "version = \"2\""
@@ -33,7 +33,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The consistency level to use for writes.
 
-			Only relevant when using InfluxDB v0.x/v1.x.
+			Only relevant when using `InfluxDB` v0.x/v1.x.
 			"""
 		relevant_when: "version = \"1\""
 		required:      false
@@ -45,7 +45,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The name of the database to write into.
 
-			Only relevant when using InfluxDB v0.x/v1.x.
+			Only relevant when using `InfluxDB` v0.x/v1.x.
 			"""
 		relevant_when: "version = \"1\""
 		required:      false
@@ -75,7 +75,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The name of the organization to write into.
 
-			Only relevant when using InfluxDB v2.x and above.
+			Only relevant when using `InfluxDB` v2.x and above.
 			"""
 		minimal:       true
 		relevant_when: "version = \"2\""
@@ -89,7 +89,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The password to authenticate with.
 
-			Only relevant when using InfluxDB v0.x/v1.x.
+			Only relevant when using `InfluxDB` v0.x/v1.x.
 			"""
 		relevant_when: "version = \"1\""
 		required:      false
@@ -118,7 +118,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The target retention policy for writes.
 
-			Only relevant when using InfluxDB v0.x/v1.x.
+			Only relevant when using `InfluxDB` v0.x/v1.x.
 			"""
 		relevant_when: "version = \"1\""
 		required:      false
@@ -147,7 +147,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The [token][token_docs] to authenticate with.
 
-			Only relevant when using InfluxDB v2.x and above.
+			Only relevant when using `InfluxDB` v2.x and above.
 
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
@@ -161,7 +161,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The username to authenticate with.
 
-			Only relevant when using InfluxDB v0.x/v1.x.
+			Only relevant when using `InfluxDB` v0.x/v1.x.
 			"""
 		relevant_when: "version = \"1\""
 		required:      false
@@ -171,7 +171,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 	}
 	version: {
 		description: """
-			The InfluxDB API version to use.
+			The `InfluxDB` API version to use.
 
 			Omitting this option is deprecated and it will be required in a future release. When
 			unset, the version is temporarily inferred from the configured settings.
@@ -180,8 +180,8 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		required: false
 		type: string: {
 			enum: {
-				"1": "InfluxDB v0.x/v1.x."
-				"2": "InfluxDB v2.x."
+				"1": "`InfluxDB` v0.x/v1.x."
+				"2": "`InfluxDB` v2.x."
 			}
 			examples: ["2", "1"]
 		}

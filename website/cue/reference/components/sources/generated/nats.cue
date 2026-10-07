@@ -37,12 +37,12 @@ generated: components: sources: nats: configuration: {
 		type:     _schemaDefinitions["derived::codecs::decoding::FramingConfig::2a4f9b813a8f495175f80ccf"]
 	}
 	jetstream: {
-		description: "Configuration for NATS JetStream."
+		description: "Configuration for NATS `JetStream`."
 		required:    false
 		type: object: options: {
 			batch_config: {
 				description: """
-					Batch settings for a JetStream pull consumer.
+					Batch settings for a `JetStream` pull consumer.
 
 					By default, messages are pulled in batches of up to 200.
 					Each pull request expires after 30 seconds if not fulfilled.

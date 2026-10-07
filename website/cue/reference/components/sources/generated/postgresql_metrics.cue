@@ -3,7 +3,7 @@ package metadata
 generated: components: sources: postgresql_metrics: configuration: {
 	endpoints: {
 		description: """
-			A list of PostgreSQL instances to scrape.
+			A list of `PostgreSQL` instances to scrape.
 
 			Each endpoint must be in the [Connection URI
 			format](https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.6).
@@ -52,7 +52,7 @@ generated: components: sources: postgresql_metrics: configuration: {
 		}
 	}
 	tls: {
-		description: "Configuration of TLS when connecting to PostgreSQL."
+		description: "Configuration of TLS when connecting to `PostgreSQL`."
 		required:    false
 		type: object: options: ca_file: {
 			description: """

@@ -136,7 +136,7 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						A bearer token (`OAuth2`, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -412,7 +412,7 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 															strategy.
 
 															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
-															of creating accidental denial of service (DoS) conditions against your own systems when
+															of creating accidental denial of service (`DoS`) conditions against your own systems when
 															many clients are recovering from a failure state.
 															"""
 						None: "No jitter."

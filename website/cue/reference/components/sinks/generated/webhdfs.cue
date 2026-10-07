@@ -78,7 +78,7 @@ generated: components: sinks: webhdfs: configuration: {
 	}
 	endpoint: {
 		description: """
-			An HDFS cluster consists of a single NameNode, a master server that manages the file system namespace and regulates access to files by clients.
+			An HDFS cluster consists of a single `NameNode`, a master server that manages the file system namespace and regulates access to files by clients.
 
 			The endpoint is the HDFS's web restful HTTP API endpoint.
 
@@ -115,7 +115,7 @@ generated: components: sinks: webhdfs: configuration: {
 	}
 	root: {
 		description: """
-			The root path for WebHDFS.
+			The root path for `WebHDFS`.
 
 			Must be a valid directory.
 

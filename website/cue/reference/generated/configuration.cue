@@ -455,7 +455,7 @@ generated: configuration: {
 								type: bool: default: false
 								description: """
 																		If set to true, all data will be removed from cache after exporting.
-																		Only valid if used as a source and export_interval > 0
+																		Only valid if used as a source and `export_interval` > 0
 
 																		By default, export will not remove data from cache
 																		"""
@@ -495,7 +495,7 @@ generated: configuration: {
 						description: """
 														The locale to use when querying the database.
 
-														MaxMind includes localized versions of some of the fields within their database, such as
+														`MaxMind` includes localized versions of some of the fields within their database, such as
 														country name. This setting can control which of those localized versions are returned by the
 														transform.
 

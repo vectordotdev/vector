@@ -16,7 +16,7 @@ generated: components: sinks: elasticsearch: configuration: {
 		description: """
 			The API version of Elasticsearch.
 
-			Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
+			Amazon `OpenSearch` Serverless requires this option to be set to `auto` (the default).
 			"""
 		required: false
 		type: string: {
@@ -34,7 +34,7 @@ generated: components: sinks: elasticsearch: configuration: {
 					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
 					"""
 				v6: "Use the Elasticsearch 6.x API."
-				v7: "Use the Elasticsearch 7.x-compatible API, including OpenSearch."
+				v7: "Use the Elasticsearch 7.x-compatible API, including `OpenSearch`."
 				v8: "Use the Elasticsearch 8.x API."
 			}
 		}
@@ -162,7 +162,7 @@ generated: components: sinks: elasticsearch: configuration: {
 					"""
 				required: true
 				type: string: enum: {
-					aws:   "Amazon OpenSearch Service-specific authentication."
+					aws:   "Amazon `OpenSearch` Service-specific authentication."
 					basic: "HTTP Basic Authentication."
 				}
 			}
@@ -506,13 +506,13 @@ generated: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	opensearch_service_type: {
-		description: "Amazon OpenSearch service type"
+		description: "Amazon `OpenSearch` service type"
 		required:    false
 		type: string: {
 			default: "managed"
 			enum: {
-				managed:    "Elasticsearch or OpenSearch Managed domain"
-				serverless: "OpenSearch Serverless collection"
+				managed:    "Elasticsearch or `OpenSearch` Managed domain"
+				serverless: "`OpenSearch` Serverless collection"
 			}
 		}
 	}

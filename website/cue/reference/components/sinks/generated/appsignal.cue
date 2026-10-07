@@ -87,7 +87,7 @@ generated: components: sinks: appsignal: configuration: {
 		type:        _schemaDefinitions["codecs::encoding::transformer::Transformer"]
 	}
 	endpoint: {
-		description: "The URI for the AppSignal API to send data to."
+		description: "The URI for the `AppSignal` API to send data to."
 		required:    false
 		type: string: {
 			default: "https://appsignal-endpoint.net/"
@@ -95,7 +95,7 @@ generated: components: sinks: appsignal: configuration: {
 		}
 	}
 	push_api_key: {
-		description: "A valid app-level AppSignal Push API key."
+		description: "A valid app-level `AppSignal` Push API key."
 		required:    true
 		type: string: examples: ["00000000-0000-0000-0000-000000000000", "${APPSIGNAL_PUSH_API_KEY}"]
 	}

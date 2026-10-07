@@ -34,7 +34,7 @@ _schemaDefinitions: "core::option::Option<vector::http::Auth>": object: options:
 			bearer: """
 				Bearer authentication.
 
-				The bearer token value (OAuth2, JWT, etc.) is passed as-is.
+				The bearer token value (`OAuth2`, JWT, etc.) is passed as-is.
 				"""
 			custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
 		}

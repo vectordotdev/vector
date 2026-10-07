@@ -8,7 +8,7 @@ _schemaDefinitions: "core::option::Option<vector::nats::NatsAuthConfig>": object
 		type:          _schemaDefinitions["vector::nats::NatsAuthCredentialsFile"]
 	}
 	nkey: {
-		description:   "NKeys configuration."
+		description:   "`NKeys` configuration."
 		relevant_when: "strategy = \"nkey\""
 		required:      true
 		type:          _schemaDefinitions["vector::nats::NatsAuthNKey"]
@@ -26,7 +26,7 @@ _schemaDefinitions: "core::option::Option<vector::nats::NatsAuthConfig>": object
 		required: true
 		type: string: enum: {
 			credentials_file: "Credentials file authentication. (JWT-based)"
-			nkey:             "NKey authentication."
+			nkey:             "`NKey` authentication."
 			token:            "Token authentication."
 			user_password:    "Username/password authentication."
 		}
