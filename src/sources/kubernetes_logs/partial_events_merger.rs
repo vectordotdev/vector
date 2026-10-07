@@ -26,12 +26,33 @@ use crate::{
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
+/// The key we use for `stream` field.
+const STREAM_KEY: &str = "stream";
+
 const EXPIRATION_TIME: Duration = Duration::from_secs(30);
 
 const TRUNCATED_SUFFIX: &[u8] = b"..TRUNCATED";
 
+/// Identifies the sequence of partial events that an event belongs to.
+///
+/// A container runtime multiplexes a container's `stdout` and `stderr` into a *single*
+/// log file, tagging each line with the stream it came from, and it writes each line
+/// independently. When one stream emits a line longer than the runtime's per-line limit
+/// (16 KiB in containerd) that line is split into several partial chunks, and a line
+/// written on the *other* stream can land in between two of those chunks. Bucketing on
+/// the file alone concatenates those unrelated lines into one corrupted event and
+/// orphans the remainder of the split line.
+///
+/// Within a single stream this cannot happen: the runtime writes that stream
+/// sequentially, so its partial chunks are always contiguous.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct BucketKey {
+    file: String,
+    stream: String,
+}
+
 struct PartialEventMergeState {
-    buckets: HashMap<String, Bucket>,
+    buckets: HashMap<BucketKey, Bucket>,
     maybe_max_merged_line_bytes: Option<usize>,
     oversized_action: OversizedAction,
 }
@@ -40,12 +61,12 @@ impl PartialEventMergeState {
     fn add_event(
         &mut self,
         event: LogEvent,
-        file: &str,
+        key: &BucketKey,
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
     ) {
         let mut bytes_mut = BytesMut::new();
-        if let Some(bucket) = self.buckets.get_mut(file) {
+        if let Some(bucket) = self.buckets.get_mut(key) {
             if bucket.exceeds_max_merged_line_limit {
                 if !bucket.truncated {
                     emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -139,7 +160,7 @@ impl PartialEventMergeState {
             }
 
             self.buckets.insert(
-                file.to_owned(),
+                key.clone(),
                 Bucket {
                     event,
                     expiration: Instant::now() + expiration_time,
@@ -154,9 +175,9 @@ impl PartialEventMergeState {
         !bucket.exceeds_max_merged_line_limit || bucket.truncated
     }
 
-    fn remove_event(&mut self, file: &str) -> Option<LogEvent> {
+    fn remove_event(&mut self, key: &BucketKey) -> Option<LogEvent> {
         self.buckets
-            .remove(file)
+            .remove(key)
             .filter(Self::should_emit)
             .map(|bucket| bucket.event)
     }
@@ -225,6 +246,13 @@ fn merge_partial_events_with_custom_expiration(
         LogNamespace::Legacy => OwnedTargetPath::event(owned_value_path!(FILE_KEY)),
     };
 
+    let stream_path = match log_namespace {
+        LogNamespace::Vector => {
+            OwnedTargetPath::metadata(owned_value_path!(super::Config::NAME, STREAM_KEY))
+        }
+        LogNamespace::Legacy => OwnedTargetPath::event(owned_value_path!(STREAM_KEY)),
+    };
+
     let state = PartialEventMergeState {
         buckets: HashMap::new(),
         maybe_max_merged_line_bytes,
@@ -252,8 +280,18 @@ fn merge_partial_events_with_custom_expiration(
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 
-            state.add_event(event, &file, &message_path, expiration_time);
-            if !is_partial && let Some(log_event) = state.remove_event(&file) {
+            // The stream is part of the key so that a line on one stream is never
+            // merged into a partial line on the other. See `BucketKey`.
+            let stream = event
+                .get(&stream_path)
+                .and_then(|x| x.as_str())
+                .map(|x| x.to_string())
+                .unwrap_or_default();
+
+            let key = BucketKey { file, stream };
+
+            state.add_event(event, &key, &message_path, expiration_time);
+            if !is_partial && let Some(log_event) = state.remove_event(&key) {
                 emitter.emit(log_event);
             }
         },
@@ -685,6 +723,119 @@ mod test {
         assert_eq!(
             output[0].as_log().get(event_path!("message")),
             Some(&value!("test mess..TRUNCATED"))
+        );
+    }
+
+    #[tokio::test]
+    async fn does_not_merge_across_streams_legacy() {
+        // A complete stderr line arrives between two chunks of a split stdout line, which
+        // is what the container runtime does when both streams share one log file.
+        let mut e_1 = LogEvent::from("audit head ");
+        e_1.insert(event_path!(FILE_KEY), "0.log");
+        e_1.insert(event_path!(STREAM_KEY), "stdout");
+        e_1.insert(event_path!("_partial"), true);
+
+        let mut e_2 = LogEvent::from("klog noise");
+        e_2.insert(event_path!(FILE_KEY), "0.log");
+        e_2.insert(event_path!(STREAM_KEY), "stderr");
+
+        let mut e_3 = LogEvent::from("audit tail");
+        e_3.insert(event_path!(FILE_KEY), "0.log");
+        e_3.insert(event_path!(STREAM_KEY), "stdout");
+
+        let input_stream = futures::stream::iter([e_1.into(), e_2.into(), e_3.into()]);
+        let output_stream = merge_partial_events(
+            input_stream,
+            LogNamespace::Legacy,
+            None,
+            OversizedAction::Drop,
+        );
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 2);
+        // The stderr line is emitted untouched rather than spliced into the stdout line.
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("klog noise"))
+        );
+        // The stdout line is reassembled whole rather than orphaned.
+        assert_eq!(
+            output[1].as_log().get(event_path!("message")),
+            Some(&value!("audit head audit tail"))
+        );
+    }
+
+    #[tokio::test]
+    async fn does_not_merge_across_streams_vector_namespace() {
+        // Same interleaving as the legacy test, except the file and the stream are read
+        // from the source's metadata rather than from fields on the event.
+        let mut e_1 = LogEvent::from(value!("audit head "));
+        e_1.insert(
+            vrl::metadata_path!(super::super::Config::NAME, "_partial"),
+            true,
+        );
+        e_1.insert(
+            vrl::metadata_path!(super::super::Config::NAME, FILE_KEY),
+            "0.log",
+        );
+        e_1.insert(
+            vrl::metadata_path!(super::super::Config::NAME, STREAM_KEY),
+            "stdout",
+        );
+
+        let mut e_2 = LogEvent::from(value!("klog noise"));
+        e_2.insert(
+            vrl::metadata_path!(super::super::Config::NAME, FILE_KEY),
+            "0.log",
+        );
+        e_2.insert(
+            vrl::metadata_path!(super::super::Config::NAME, STREAM_KEY),
+            "stderr",
+        );
+
+        let mut e_3 = LogEvent::from(value!("audit tail"));
+        e_3.insert(
+            vrl::metadata_path!(super::super::Config::NAME, FILE_KEY),
+            "0.log",
+        );
+        e_3.insert(
+            vrl::metadata_path!(super::super::Config::NAME, STREAM_KEY),
+            "stdout",
+        );
+
+        let input_stream = futures::stream::iter([e_1.into(), e_2.into(), e_3.into()]);
+        let output_stream = merge_partial_events(
+            input_stream,
+            LogNamespace::Vector,
+            None,
+            OversizedAction::Drop,
+        );
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 2);
+
+        // The stderr line is emitted untouched rather than spliced into the stdout line.
+        assert_eq!(
+            output[0].as_log().get(event_path!()),
+            Some(&value!("klog noise"))
+        );
+        assert_eq!(
+            output[0]
+                .as_log()
+                .get(metadata_path!("kubernetes_logs", STREAM_KEY)),
+            Some(&value!("stderr"))
+        );
+
+        // The stdout line is reassembled whole rather than orphaned.
+        assert_eq!(
+            output[1].as_log().get(event_path!()),
+            Some(&value!("audit head audit tail"))
+        );
+        assert_eq!(
+            output[1]
+                .as_log()
+                .get(metadata_path!("kubernetes_logs", STREAM_KEY)),
+            Some(&value!("stdout"))
         );
     }
 }
