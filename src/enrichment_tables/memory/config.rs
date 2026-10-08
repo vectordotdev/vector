@@ -118,7 +118,7 @@ pub struct MemorySourceConfig {
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub export_batch_size: Option<u64>,
     /// If set to true, all data will be removed from cache after exporting.
-    /// Only valid if used as a source and export_interval > 0
+    /// Only valid if used as a source and `export_interval` is greater than 0.
     ///
     /// By default, export will not remove data from cache
     #[serde(default = "crate::serde::default_false")]
@@ -171,7 +171,7 @@ impl Default for MemoryConfig {
             source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
             ttl_field: OptionalValuePath::none(),
-            reload_behavior: Default::default(),
+            reload_behavior: ReloadBehavior::default(),
             filter: None,
         }
     }
@@ -394,8 +394,7 @@ impl SourceConfig for MemoryConfig {
         if self
             .source_config
             .as_ref()
-            .map(|c| c.export_expired_items)
-            .unwrap_or_default()
+            .is_some_and(|c| c.export_expired_items)
         {
             vec![
                 SourceOutput::new_maybe_logs(DataType::Log, schema_definition.clone()),
@@ -415,6 +414,11 @@ impl SourceConfig for MemoryConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_fields_in_debug,
+    reason = "Preserve the existing selection of diagnostic fields pending a separate audit."
+)]
 impl std::fmt::Debug for MemoryConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MemoryConfig")
