@@ -302,6 +302,7 @@ fn set_metric_tag_values(
                 Value::Bytes(bytes) => {
                     Some(TagValue::Value(String::from_utf8_lossy(bytes).to_string()))
                 }
+                Value::String(string) => Some(TagValue::Value(string.to_string())),
                 Value::Null => Some(TagValue::Bare),
                 _ => None,
             })

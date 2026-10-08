@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use bytes::Bytes;
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
@@ -23,10 +25,10 @@ fn benchmark_query_parsing(c: &mut Criterion) {
                     Bytes::from(dnstap_data),
                     DnsParserOptions::default(),
                 )
-                .unwrap()
+                .unwrap();
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.finish();
@@ -50,10 +52,10 @@ fn benchmark_update_parsing(c: &mut Criterion) {
                     Bytes::from(dnstap_data),
                     DnsParserOptions::default(),
                 )
-                .unwrap()
+                .unwrap();
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.finish();

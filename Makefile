@@ -480,10 +480,6 @@ release-docker: ## Release to Docker Hub
 release-github: ## Release to GitHub
 	@$(VDEV) release github
 
-.PHONY: release-homebrew
-release-homebrew: ## Release to vectordotdev Homebrew tap
-	@$(VDEV) release homebrew --vector-version $(VECTOR_VERSION)
-
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
 	@$(VDEV) release prepare
@@ -514,7 +510,7 @@ clean: ## Clean everything
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from the latest (or CHART_VERSION) Helm chart
-	$(VDEV) build manifests -- $(if $(CHART_VERSION),--chart-version $(CHART_VERSION))
+	$(VDEV) build manifests $(if $(CHART_VERSION),--chart-version "$(CHART_VERSION)")
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.

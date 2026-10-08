@@ -35,42 +35,22 @@ closes the window automatically once both are done.
 
 # Publish the release
 
-- [ ] On release day, squash-merge the approved preparation PR directly into `master` using the
-      release-freeze bypass. Do not use the merge queue.
+- [ ] On release day, squash-merge the approved preparation PR directly into `master` using admin
+      permissions (`Merge without waiting for requirements to be met (bypass rules)`). Do not use the merge queue.
 
-The merge approves the release. [Tag approved release](https://github.com/vectordotdev/vector/actions/workflows/release_autotag.yml)
-validates the squash-merge commit and creates the version tag and release branch at that exact commit.
+The merge kicks off the [Tag approved release](https://github.com/vectordotdev/vector/actions/workflows/release_autotag.yml)
+workflow, which creates the version tag and release branch at that exact commit.
 The tag starts the release workflow; do not create the tag or release branch manually.
 
-- [ ] Wait for release workflow to complete.
-  - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
-- [ ] Wait for the release workflow to reset the `website` branch to the release commit,
-      publishing the release notes to https://vector.dev
-  - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
-    - Refer to the internal releasing doc to monitor the deployment.
+- [ ] Wait for [release workflow](https://github.com/vectordotdev/vector/actions/workflows/release.yml) to complete.
+  - If it fails, use **Re-run failed jobs** to continue the release.
+- [ ] Confirm that the release changelog was published to https://vector.dev/releases/
+  - Refer to the internal releasing doc to monitor the deployment.
+- [ ] Confirm that [Homebrew](https://github.com/vectordotdev/homebrew-brew) was released ([workflow](https://github.com/vectordotdev/homebrew-brew/actions/workflows/release.yml))
 - [ ] Release Linux packages. Refer to the internal releasing doc.
-- [ ] Review and squash-merge the Helm release PR, then wait for the chart release.
-  - The Vector release workflow starts [Helm release preparation](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml)
-    automatically for the latest stable Vector release.
-  - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) for the review steps.
-- [ ] Release Homebrew. Refer to the internal releasing doc.
-- [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/releases) description with the release announcement.
 
-# Post-release housekeeping
+- [ ] Wait for the Helm chart [Post Release](https://github.com/vectordotdev/helm-charts/actions/workflows/release-post.yml) to complete.
+  - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
 
-- [ ] Wait for the release workflow to push its post-release housekeeping directly to `master`.
-      It begins the next minor `-dev` version, restores VRL `main`, and refreshes licenses and documentation.
-- [ ] Wait for the Helm chart release to push the Kubernetes manifests directly to `master`.
-  - The chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml),
-    which runs `cargo vdev build manifests` and, when the generated manifests differ,
-    commits and pushes them to `master` itself as the `vectordotdev-bot` — no PR, no review,
-    no merge queue. If the run reports no changes, the manifests already match the chart.
-- [ ] Wait for the [Unfreeze master](https://github.com/vectordotdev/vector/actions/workflows/release_unfreeze.yml)
-      workflow to close the direct-push window after the manifests run succeeds.
-  - It removes the temporary `vectordotdev-bot` **Always** bypass from every ruleset in
-    `RELEASE_FREEZE_BOT_BYPASS`, then sets the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
-    It waits for the "Release Suite" run and any pending release workflow first,
-    and gives up after ten minutes, leaving the freeze active.
-  - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, if that
-    run fails, or to retry a failed closeout.
-    A manual run makes the same checks unless you set `force`, which closes the window anyway.
+- [ ] Wait for the Helm chart release to push the Kubernetes manifests directly to `master` ([workflow](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml)).
+- [ ] Wait for the [Unfreeze master](https://github.com/vectordotdev/vector/actions/workflows/release_unfreeze.yml) workflow to finalize the release.
