@@ -607,7 +607,7 @@ mod tests {
                 assert_event_data_eq!(
                     events,
                     vec![log_event! {
-                        "source_type" => Bytes::from("aws_kinesis_firehose"),
+                        "source_type" => "aws_kinesis_firehose",
                         "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                         "message" => Bytes::from(expected),
                         "request_id" => REQUEST_ID,
@@ -792,7 +792,7 @@ mod tests {
             assert_event_data_eq!(
                 events,
                 vec![log_event! {
-                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "source_type" => "aws_kinesis_firehose",
                     "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                     "message"=> RECORD,
                     "request_id" => REQUEST_ID,
@@ -839,7 +839,7 @@ mod tests {
             assert_event_data_eq!(
                 events,
                 vec![log_event! {
-                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "source_type" => "aws_kinesis_firehose",
                     "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                     "message"=> RECORD,
                     "request_id" => REQUEST_ID,
@@ -975,7 +975,7 @@ mod tests {
             assert_event_data_eq!(
                 events,
                 vec![log_event! {
-                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "source_type" => "aws_kinesis_firehose",
                     "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                     "message"=> RECORD,
                     "request_id" => REQUEST_ID,
@@ -1309,7 +1309,7 @@ mod tests {
         assert_event_data_eq!(
             events,
             vec![log_event! {
-                "source_type" => Bytes::from("aws_kinesis_firehose"),
+                "source_type" => "aws_kinesis_firehose",
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                 "message"=> Bytes::from(expected),
                 "request_id" => REQUEST_ID,

@@ -23,7 +23,7 @@ use vector_lib::{
     finalizer::OrderedFinalizer,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
@@ -766,7 +766,7 @@ fn create_event(
         &mut event,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(FileConfig::NAME.as_bytes()),
+        Value::from_static_str(FileConfig::NAME),
     );
     log_namespace.insert_vector_metadata(
         &mut event,
