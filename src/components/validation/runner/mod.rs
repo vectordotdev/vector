@@ -64,10 +64,7 @@ impl RunnerInput {
     /// this function will panic, as one or the other must be provided.
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::match_same_arms,
-        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
-    )]
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn into_sender(
         self,
         controlled_edge: Option<mpsc::Sender<TestEvent>>,
@@ -117,10 +114,7 @@ impl RunnerOutput {
     /// this function will panic, as one or the other must be provided.
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::match_same_arms,
-        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
-    )]
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn into_receiver(
         self,
         controlled_edge: Option<mpsc::Receiver<Vec<Event>>>,
@@ -216,18 +210,9 @@ impl Runner {
 
     #[allow(clippy::print_stdout)]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Keep the existing control flow intact during the lint rollout."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+    #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
     pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.
         initialize_test_environment();

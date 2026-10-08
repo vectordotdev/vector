@@ -86,7 +86,7 @@ impl InputEdge {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::needless_pass_by_value,
-        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+        reason = "Preserve ownership and drop timing"
     )]
     pub fn from_address(address: GrpcAddress) -> Self {
         let channel = Endpoint::from(address.as_uri()).connect_lazy();

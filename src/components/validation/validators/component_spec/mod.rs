@@ -98,10 +98,7 @@ impl Validator for ComponentSpecValidator {
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::needless_for_each,
-    reason = "Keep the existing branching and control flow during the lint rollout."
-)]
+#[allow(clippy::needless_for_each, reason = "Preserve existing control flow")]
 fn validate_telemetry(
     component_type: ComponentType,
     telemetry_events: &[Event],
@@ -244,12 +241,9 @@ fn filter_events_by_metric_and_component<'a>(
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::cast_possible_truncation,
-    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    reason = "Bounds and overflow audit deferred"
 )]
-#[allow(
-    clippy::cast_sign_loss,
-    reason = "Preserve the existing signed conversion until its input bounds are audited."
-)]
+#[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
 fn sum_counters(
     metric_name: &ComponentMetricType,
     metrics: &[&Metric],

@@ -94,10 +94,7 @@ pub enum TestEvent {
 impl TestEvent {
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::match_same_arms,
-        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
-    )]
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn into_event(self) -> Event {
         match self {
             Self::Passthrough(event) => event,
@@ -107,10 +104,7 @@ impl TestEvent {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::match_same_arms,
-        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
-    )]
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub const fn get_event(&mut self) -> &mut Event {
         match self {
             Self::Passthrough(event) => event,
@@ -122,10 +116,7 @@ impl TestEvent {
     /// (`should_fail`, event)
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::match_same_arms,
-        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
-    )]
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn get(self) -> (bool, Event) {
         match self {
             Self::Passthrough(event) => (false, event),
@@ -171,10 +162,7 @@ impl From<RawTestEvent> for TestEvent {
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Audit and document the existing panic conditions separately from lint enforcement."
-)]
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn encode_test_event(
     encoder: &mut Encoder<encoding::Framer>,
     buf: &mut BytesMut,

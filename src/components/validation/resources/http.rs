@@ -62,7 +62,7 @@ impl HttpResourceConfig {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::needless_pass_by_value,
-        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+        reason = "Preserve ownership and drop timing"
     )]
     pub fn spawn_as_input(
         self,
@@ -85,13 +85,10 @@ impl HttpResourceConfig {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     #[allow(
         clippy::needless_pass_by_value,
-        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+        reason = "Preserve ownership and drop timing"
     )]
     pub fn spawn_as_output(self, ctx: HttpResourceOutputContext) -> vector_lib::Result<()> {
         match ctx.direction {
@@ -107,7 +104,7 @@ impl HttpResourceConfig {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::needless_pass_by_value,
-    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    reason = "Preserve ownership and drop timing"
 )]
 fn spawn_input_http_server(
     config: HttpResourceConfig,
@@ -218,7 +215,7 @@ fn spawn_input_http_server(
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::needless_pass_by_value,
-    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    reason = "Preserve ownership and drop timing"
 )]
 fn spawn_input_http_client(
     config: HttpResourceConfig,
@@ -322,7 +319,7 @@ impl HttpResourceOutputContext<'_> {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::needless_pass_by_value,
-        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+        reason = "Preserve ownership and drop timing"
     )]
     fn spawn_output_http_server(&self, config: HttpResourceConfig) -> vector_lib::Result<()> {
         // This HTTP server will wait for events to be sent by a sink, and collect them and send them on

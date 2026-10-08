@@ -443,10 +443,7 @@ fn get_validation_configuration_from_test_case_path(
 
 #[cfg(feature = "component-validation-runner")]
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Audit and document the existing panic conditions separately from lint enforcement."
-)]
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn validate_component(test_case_data_path: std::path::PathBuf) {
     assert!(
         test_case_data_path.exists(),

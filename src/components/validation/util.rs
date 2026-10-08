@@ -27,10 +27,7 @@ impl GrpcAddress {
     /// This is a URI in the form of `http://<socket address>/`. The scheme and path are hard-coded.
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn as_uri(&self) -> Uri {
         let addr_str = self.addr.to_string();
         Uri::builder()

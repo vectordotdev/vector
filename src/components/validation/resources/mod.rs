@@ -77,10 +77,7 @@ impl ResourceCodec {
     /// given, we generate an encoder that satisfies that decoding configuration, and vice versa.
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
@@ -113,10 +110,7 @@ impl ResourceCodec {
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn into_decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
@@ -159,7 +153,7 @@ impl From<DecodingConfig> for ResourceCodec {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::default_trait_access,
-    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    reason = "Preserve inferred default types"
 )]
 fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::Serializer {
     let serializer_config = match config {
@@ -234,7 +228,7 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::default_trait_access,
-    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    reason = "Preserve inferred default types"
 )]
 fn serializer_config_to_deserializer(
     config: &SerializerConfig,
@@ -270,7 +264,7 @@ fn serializer_config_to_deserializer(
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::default_trait_access,
-    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    reason = "Preserve inferred default types"
 )]
 fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decoding::Framer {
     let framing_config = match framing {
@@ -404,10 +398,7 @@ impl ExternalResource {
 
     /// Spawns this resource for use as an output for a sink.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn spawn_as_output(
         self,
         output_tx: mpsc::Sender<Vec<Event>>,

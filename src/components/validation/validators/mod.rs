@@ -20,10 +20,7 @@ pub trait Validator {
     /// Additionally, all telemetry events received for the component for the validation run are
     /// provided as well.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn check_validation(
         &self,
         component_type: ComponentType,

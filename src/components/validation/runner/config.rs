@@ -29,10 +29,7 @@ pub struct TopologyBuilder {
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn from_configuration(
         configuration: &ValidationConfiguration,
         config_name: Option<&String>,
