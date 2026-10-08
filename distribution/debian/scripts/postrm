@@ -27,19 +27,4 @@ do
     "/etc/vector/examples/$_example_conffile" 0.59.0-1~ vector -- "$@"
 done
 
-# If preinst moved a pre-existing /etc/vector/vector.yaml aside (see preinst)
-# and the install or upgrade then failed before postinst could restore it,
-# put it back here so a failed upgrade never leaves Vector without the
-# configuration it was running with.
-case "$1" in
-  abort-install|abort-upgrade)
-    if [ -e /etc/vector/vector.yaml.vector-preserve ]; then
-      mv -f /etc/vector/vector.yaml.vector-preserve /etc/vector/vector.yaml
-    fi
-    ;;
-  purge)
-    rm -f /etc/vector/vector.yaml.vector-preserve
-    ;;
-esac
-
 #DEBHELPER#
