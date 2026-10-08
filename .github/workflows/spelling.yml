@@ -15,7 +15,7 @@ permissions:
 jobs:
   spelling:
     name: Check Spelling
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     if: "contains(github.event_name, 'pull_request') || github.event_name == 'push'"
     concurrency:

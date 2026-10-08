@@ -10,7 +10,7 @@ on:
 jobs:
   remove_label:
     if: "contains(github.event.pull_request.labels.*.name, 'meta: awaiting author')"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       - name: Remove label

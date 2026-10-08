@@ -22,7 +22,7 @@ env:
 jobs:
   download:
     if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       actions: read
@@ -48,7 +48,7 @@ jobs:
   remove_label:
     needs: download
     if: needs.download.outputs.pr_number != ''
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     concurrency:
       group: pr-labels-${{ needs.download.outputs.pr_number }}

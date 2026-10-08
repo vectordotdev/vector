@@ -39,7 +39,7 @@ env:
 
 jobs:
   add_label:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       - name: Check member approval

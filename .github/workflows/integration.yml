@@ -290,7 +290,7 @@ jobs:
 
   integration-test-suite:
     name: Integration Test Suite
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     if: always()
     needs:
       - changes
