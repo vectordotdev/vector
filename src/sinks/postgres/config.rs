@@ -198,7 +198,7 @@ impl ValidatedSink for PostgresConfig {
         let healthcheck = healthcheck(connection_pool.clone()).boxed();
 
         // The endpoint label must not carry credentials or query parameters.
-        let endpoint = protocol_endpoint(endpoint_uri.uri.clone()).1;
+        let endpoint = protocol_endpoint(endpoint_uri.uri).1;
         let service = PostgresService::new(connection_pool, self.table.clone(), endpoint);
         let service = ServiceBuilder::new()
             .settings(request_settings, PostgresRetryLogic)

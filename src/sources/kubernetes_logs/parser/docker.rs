@@ -61,6 +61,7 @@ fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), Par
 
     let bytes = match value {
         Value::Bytes(bytes) => bytes,
+        Value::String(string) => string.into_bytes(),
         _ => return Err(ParsingError::MessageFieldNotInBytes),
     };
 
@@ -133,6 +134,7 @@ fn normalize_event(
     let message = log.remove(&message_path).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
+        Value::String(val) => val.into_bytes(),
         _ => return Err(NormalizationError::LogValueUnexpectedType),
     };
     // Here we apply out heuristics to detect if message is partial.

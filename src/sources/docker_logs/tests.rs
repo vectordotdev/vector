@@ -571,7 +571,7 @@ mod integration_tests {
             let id1 = container_log_n(1, &included0, None, included0_message, &docker).await;
             let id2 = container_log_n(1, &included1, None, included1_message, &docker).await;
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let events = collect_ready(out).await;
+            let events = collect_ready(out);
             container_remove(&id0, &docker).await;
             container_remove(&id1, &docker).await;
             container_remove(&id2, &docker).await;

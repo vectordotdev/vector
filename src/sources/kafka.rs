@@ -408,7 +408,7 @@ impl SourceConfig for KafkaSourceConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                keys.key_field.clone().map(LegacyKey::Overwrite),
+                keys.key_field.map(LegacyKey::Overwrite),
                 &owned_value_path!("message_key"),
                 Kind::bytes(),
                 None,

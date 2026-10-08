@@ -61,9 +61,12 @@ pub async fn try_bind_tcp_listener(
             .await
             .map_err(Into::into),
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset)? {
-            Some(listener) => TcpListener::from_std(listener)
-                .map(Into::into)
-                .map_err(Into::into),
+            Some(listener) => {
+                listener.set_nonblocking(true)?;
+                TcpListener::from_std(listener)
+                    .map(Into::into)
+                    .map_err(Into::into)
+            }
             None => {
                 Err(io::Error::new(io::ErrorKind::AddrInUse, "systemd fd already consumed").into())
             }
@@ -279,7 +282,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketTlsConnectionError { error });
+                emit!(TcpSocketTlsConnectionError { error, peer_addr });
                 return;
             }
         },
@@ -444,7 +447,7 @@ async fn handle_stream<T>(
                                                 error = %error,
                                             );
                                         } else {
-                                            emit!(TcpSendAckError { error });
+                                            emit!(TcpSendAckError { error, peer_addr });
                                         }
                                         break;
                                     }

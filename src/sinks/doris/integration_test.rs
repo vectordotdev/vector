@@ -62,6 +62,7 @@ fn assert_fields_match(
         // Convert event value to string
         let event_str = match &event_value {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).to_string(),
+            Value::String(string) => string.to_string(),
             other => other.to_string(),
         };
         // Database value already has Display implementation, use directly
@@ -109,7 +110,7 @@ async fn insert_events() {
     let database = format!("test_db_{}_point", random_string(5).to_lowercase());
     let table = format!("test_table_{}", random_string(5).to_lowercase());
 
-    let client = DorisTestClient::new(doris_mysql_address_port()).await;
+    let client = DorisTestClient::new(doris_mysql_address_port());
     info!(
         message = "DorisTestClient created successfully, creating database...",
         internal_log_rate_limit = true
@@ -138,8 +139,8 @@ async fn insert_events() {
         headers: default_headers(),
         batch,
         auth: Some(crate::http::Auth::Basic {
-            user: config_auth().user.clone(),
-            password: SensitiveString::from(config_auth().password.clone()),
+            user: config_auth().user,
+            password: SensitiveString::from(config_auth().password),
         }),
         request: Default::default(),
         ..Default::default()
@@ -192,7 +193,7 @@ struct DorisTestClient {
 }
 
 impl DorisTestClient {
-    async fn new(query_address_port: (String, u16)) -> Self {
+    fn new(query_address_port: (String, u16)) -> Self {
         let auth = config_auth();
         let (host, port) = query_address_port;
 

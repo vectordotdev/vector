@@ -182,7 +182,7 @@ const fn default_ttl() -> u64 {
 }
 
 const fn default_scan_interval() -> NonZeroU64 {
-    unsafe { NonZeroU64::new_unchecked(30) }
+    NonZeroU64::new(30).expect("the default scan interval is nonzero")
 }
 
 impl MemoryConfig {

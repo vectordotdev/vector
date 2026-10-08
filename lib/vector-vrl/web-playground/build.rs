@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     env, fs,
     fs::File,
@@ -20,7 +22,6 @@ fn get_vector_lock_path() -> PathBuf {
     parent_path
         .expect("Failed to find vector repo root")
         .join("Cargo.lock")
-        .to_path_buf()
 }
 
 fn get_git_hash() -> String {

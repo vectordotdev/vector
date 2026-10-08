@@ -66,6 +66,11 @@ impl Transformer {
     ///
     /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
     /// exclusive.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn new(
         only_fields: Option<Vec<ConfigValuePath>>,
         except_fields: Option<Vec<ConfigValuePath>>,
@@ -82,16 +87,19 @@ impl Transformer {
 
     /// Get the `Transformer`'s `only_fields`.
     #[cfg(any(test, feature = "test"))]
+    #[must_use]
     pub const fn only_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.only_fields
     }
 
     /// Get the `Transformer`'s `except_fields`.
+    #[must_use]
     pub const fn except_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.except_fields
     }
 
     /// Get the `Transformer`'s `timestamp_format`.
+    #[must_use]
     pub const fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
     }
@@ -173,7 +181,7 @@ impl Transformer {
         }
     }
 
-    fn format_timestamps<F, T>(&self, log: &mut LogEvent, extract: F)
+    fn format_timestamps<F, T>(log: &mut LogEvent, extract: F)
     where
         F: Fn(&DateTime<Utc>) -> T,
         T: Into<Value>,
@@ -202,16 +210,25 @@ impl Transformer {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing floating-point representation of numeric values."
+    )]
     fn apply_timestamp_format(&self, log: &mut LogEvent) {
         if let Some(timestamp_format) = self.timestamp_format.as_ref() {
             match timestamp_format {
-                TimestampFormat::Unix => self.format_timestamps(log, |ts| ts.timestamp()),
-                TimestampFormat::UnixMs => self.format_timestamps(log, |ts| ts.timestamp_millis()),
-                TimestampFormat::UnixUs => self.format_timestamps(log, |ts| ts.timestamp_micros()),
-                TimestampFormat::UnixNs => self.format_timestamps(log, |ts| {
+                TimestampFormat::Unix => Self::format_timestamps(log, chrono::DateTime::timestamp),
+                TimestampFormat::UnixMs => {
+                    Self::format_timestamps(log, chrono::DateTime::timestamp_millis);
+                }
+                TimestampFormat::UnixUs => {
+                    Self::format_timestamps(log, chrono::DateTime::timestamp_micros);
+                }
+                TimestampFormat::UnixNs => Self::format_timestamps(log, |ts| {
                     ts.timestamp_nanos_opt().expect("Timestamp out of range")
                 }),
-                TimestampFormat::UnixFloat => self.format_timestamps(log, |ts| {
+                TimestampFormat::UnixFloat => Self::format_timestamps(log, |ts| {
                     NotNan::new(ts.timestamp_micros() as f64 / 1e6)
                         .expect("this division will never produce a NaN")
                 }),
@@ -226,6 +243,11 @@ impl Transformer {
     /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
     /// with `only_fields`.
     #[cfg(any(test, feature = "test"))]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn set_except_fields(
         &mut self,
         except_fields: Option<Vec<ConfigValuePath>>,
@@ -369,6 +391,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing floating-point representation of numeric values."
+    )]
     fn deserialize_and_transform_timestamp() {
         let mut base = Event::Log(LogEvent::from("Demo"));
         let timestamp = base
@@ -421,7 +448,7 @@ mod tests {
             except_fields = ["Doop"]
             only_fields = ["Doop"]
         "#});
-        assert!(config.is_err())
+        assert!(config.is_err());
     }
 
     #[test]
@@ -433,7 +460,7 @@ mod tests {
         let config: std::result::Result<Transformer, _> = toml::from_str(indoc! {r#"
             onlyfields = ["Doop"]
         "#});
-        assert!(config.is_err())
+        assert!(config.is_err());
     }
 
     #[test]

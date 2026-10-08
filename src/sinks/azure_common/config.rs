@@ -222,9 +222,9 @@ impl ClientAssertion for ManagedIdentityClientAssertion {
 
 impl AzureAuthentication {
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
-    pub async fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
+    pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
         match self {
-            Self::Specific(specific) => specific.credential().await,
+            Self::Specific(specific) => specific.credential(),
 
             #[cfg(test)]
             Self::MockCredential => Ok(Arc::new(MockTokenCredential) as Arc<dyn TokenCredential>),
@@ -234,7 +234,7 @@ impl AzureAuthentication {
 
 impl SpecificAzureCredential {
     /// Returns the provider for the credentials based on the specific credential type.
-    pub async fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
+    pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
         let credential: Arc<dyn TokenCredential> = match self {
             #[cfg(not(target_arch = "wasm32"))]
             Self::AzureCli {} => AzureCliCredential::new(None)?,
@@ -417,8 +417,7 @@ impl TokenCredential for MockTokenCredential {
             BASE64_STANDARD
                 .encode(serde_json::to_string(&jwt).unwrap())
                 .trim_end_matches("=")
-        )
-        .to_string();
+        );
 
         warn!(
             "Using mock token credential, JWT: {}, base64: {jwt_base64}",

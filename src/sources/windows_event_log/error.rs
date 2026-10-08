@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_error_conversions() {
-        let xml_error = quick_xml::Error::UnexpectedEof("test".to_string());
+        let xml_error = quick_xml::Error::Syntax(quick_xml::errors::SyntaxError::UnclosedTag);
         let converted: WindowsEventLogError = xml_error.into();
         assert!(matches!(
             converted,

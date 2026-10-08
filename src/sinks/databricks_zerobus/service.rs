@@ -67,6 +67,7 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
 /// would be wasteful.
 #[derive(Clone)]
 pub struct ZerobusRequest {
+    #[allow(clippy::rc_buffer)]
     pub events: Arc<Vec<Event>>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
@@ -312,10 +313,7 @@ pub struct ZerobusService {
 }
 
 impl ZerobusService {
-    pub async fn new(
-        config: ZerobusSinkConfig,
-        proxy: &ProxyConfig,
-    ) -> Result<Self, ZerobusSinkError> {
+    pub fn new(config: ZerobusSinkConfig, proxy: &ProxyConfig) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
             .endpoint(config.ingestion_endpoint.to_string())
             .unity_catalog_url(
@@ -584,7 +582,7 @@ pub struct ZerobusRetryLogic;
 #[cfg(test)]
 impl ZerobusService {
     /// Create a service with a mock stream already installed for testing.
-    pub async fn new_with_mock(
+    pub fn new_with_mock(
         config: ZerobusSinkConfig,
         mock: MockStream,
     ) -> Result<Self, ZerobusSinkError> {
@@ -746,9 +744,8 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_succeeds_with_mock_stream() {
-        let service = ZerobusService::new_with_mock(test_config(), MockStream::succeeding())
-            .await
-            .unwrap();
+        let service =
+            ZerobusService::new_with_mock(test_config(), MockStream::succeeding()).unwrap();
 
         let stream = current_stream(&service).await;
         let result = service
@@ -764,9 +761,7 @@ mod tests {
         let mock = MockStream::failing(ZerobusError::ChannelCreationError(
             "connection reset".to_string(),
         ));
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
 
@@ -785,9 +780,7 @@ mod tests {
     #[tokio::test]
     async fn non_retryable_error_keeps_stream() {
         let mock = MockStream::failing(ZerobusError::InvalidArgument("bad field".to_string()));
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
 
@@ -807,9 +800,7 @@ mod tests {
     async fn stream_recovers_after_retryable_failure() {
         // Simulate: success → retryable failure → success again.
         let mock = MockStream::succeeding();
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         // First ingest succeeds.
         let stream = current_stream(&service).await;
@@ -860,9 +851,7 @@ mod tests {
         let mock = MockStream::succeeding();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
         assert!(!closed.load(std::sync::atomic::Ordering::Relaxed));
@@ -887,9 +876,7 @@ mod tests {
         .with_gate();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         // Spawn two concurrent ingests. Each clones the same stream `Arc`,
         // then blocks in the gate.

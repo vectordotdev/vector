@@ -82,7 +82,6 @@ pub(super) fn message_deduplication_id(
     message_deduplication_id: Option<String>,
 ) -> crate::Result<Option<UnconfinedTemplate>> {
     Ok(message_deduplication_id
-        .clone()
         .map(UnconfinedTemplate::try_from)
         .transpose()?)
 }

@@ -128,7 +128,7 @@ impl Default for AzureLogsIngestionConfig {
 
 impl AzureLogsIngestionConfig {
     #[allow(clippy::too_many_arguments)]
-    pub(super) async fn build_inner(
+    pub(super) fn build_inner(
         &self,
         cx: SinkContext,
         validated: &ValidatedAzureLogsIngestion,
@@ -220,7 +220,7 @@ impl ValidatedSink for AzureLogsIngestionConfig {
         validated: &ValidatedAzureLogsIngestion,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let credential: Arc<dyn TokenCredential> = self.auth.credential().await?;
+        let credential: Arc<dyn TokenCredential> = self.auth.credential()?;
 
         self.build_inner(
             cx,
@@ -230,6 +230,5 @@ impl ValidatedSink for AzureLogsIngestionConfig {
             self.token_scope.clone(),
             self.timestamp_field.clone(),
         )
-        .await
     }
 }

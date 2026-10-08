@@ -213,7 +213,12 @@ fn default_profile() -> String {
 
 impl AwsAuthentication {
     /// Creates the identity cache to store credentials based on the authentication mechanism chosen.
-    pub(super) async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
+    pub(super) fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
         match self {
             AwsAuthentication::Role {
                 load_timeout_secs, ..
@@ -223,9 +228,7 @@ impl AwsAuthentication {
             } => {
                 let credentials_cache = IdentityCache::lazy()
                     .load_timeout(
-                        load_timeout_secs
-                            .map(Duration::from_secs)
-                            .unwrap_or(DEFAULT_LOAD_TIMEOUT),
+                        load_timeout_secs.map_or(DEFAULT_LOAD_TIMEOUT, Duration::from_secs),
                     )
                     .build();
 
@@ -235,7 +238,7 @@ impl AwsAuthentication {
         }
     }
 
-    /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
+    /// Create the `AssumeRoleProviderBuilder`, ensuring we create the HTTP client with
     /// the correct proxy and TLS options.
     async fn assume_role_provider_builder(
         proxy: &ProxyConfig,
@@ -262,17 +265,22 @@ impl AwsAuthentication {
             .configure(&config);
 
         if let Some(external_id) = external_id {
-            builder = builder.external_id(external_id)
+            builder = builder.external_id(external_id);
         }
 
         if let Some(session_name) = session_name {
-            builder = builder.session_name(session_name)
+            builder = builder.session_name(session_name);
         }
 
         Ok(builder)
     }
 
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn credentials_provider(
         &self,
         service_region: Region,
@@ -295,7 +303,7 @@ impl AwsAuthentication {
                     session_token.clone().map(|v| v.inner().into()),
                 ));
                 if let Some(assume_role) = assume_role {
-                    let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                    let auth_region = region.clone().map_or(service_region, Region::new);
                     let builder = Self::assume_role_provider_builder(
                         proxy,
                         tls_options,
@@ -382,6 +390,7 @@ impl AwsAuthentication {
 
     #[cfg(test)]
     /// Creates dummy authentication for tests.
+    #[must_use]
     pub fn test_auth() -> AwsAuthentication {
         AwsAuthentication::AccessKey {
             access_key_id: "dummy".to_string().into(),

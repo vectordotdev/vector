@@ -36,7 +36,7 @@ pub(super) struct AmqpSink {
 }
 
 impl AmqpSink {
-    pub(super) async fn new(
+    pub(super) fn new(
         config: AmqpSinkConfig,
         exchange: ConfinedTemplate,
         routing_key: Option<ConfinedTemplate>,
