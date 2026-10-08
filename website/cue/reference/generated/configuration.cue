@@ -455,7 +455,7 @@ generated: configuration: {
 								type: bool: default: false
 								description: """
 																		If set to true, all data will be removed from cache after exporting.
-																		Only valid if used as a source and `export_interval` > 0
+																		Only valid if used as a source and `export_interval` is greater than 0.
 
 																		By default, export will not remove data from cache
 																		"""
