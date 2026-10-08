@@ -44,10 +44,7 @@ impl<T> UnixOnly<T> {
     /// compiled on other targets. Context is accepted on every target and is
     /// dropped, together with the configuration, if Unix is unavailable.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn on_unix<C, R>(
         self,
         context: C,

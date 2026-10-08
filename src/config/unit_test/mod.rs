@@ -67,10 +67,7 @@ pub struct UnitTestResult {
 
 impl UnitTest {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
         let (topology, _) = RunningTopology::start_validated(self.config, diff, self.pieces)
@@ -110,10 +107,7 @@ fn init_log_schema_from_paths(
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
@@ -134,10 +128,7 @@ pub async fn build_unit_tests_main(
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub async fn build_unit_tests(
     mut config_builder: ConfigBuilder,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
@@ -190,14 +181,8 @@ pub struct UnitTestBuildMetadata {
 
 impl UnitTestBuildMetadata {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn initialize(config_builder: &mut ConfigBuilder) -> Result<Self, Vec<String>> {
         // A unique id used to name test sources and sinks to avoid name clashes
         let random_id = Uuid::new_v4().to_string();
@@ -262,14 +247,8 @@ impl UnitTestBuildMetadata {
 
     /// Convert test inputs into sources for use in a unit testing topology
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn hydrate_into_sources(
         &self,
         inputs: &[TestInput],
@@ -304,14 +283,8 @@ impl UnitTestBuildMetadata {
 
     /// Convert test outputs into sinks for use in a unit testing topology
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn hydrate_into_sinks(
         &self,
         test_name: &str,
@@ -609,7 +582,7 @@ pub(super) struct BuiltOutput {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::default_trait_access,
-    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    reason = "Preserve inferred default types"
 )]
 fn build_outputs(
     test_outputs: &[TestOutput],

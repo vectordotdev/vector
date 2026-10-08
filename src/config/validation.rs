@@ -91,10 +91,7 @@ pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::items_after_statements,
-    reason = "Keep the existing local helper placement until its surrounding function is refactored."
-)]
+#[allow(clippy::items_after_statements, reason = "Helper relocation deferred")]
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
