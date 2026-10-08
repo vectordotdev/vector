@@ -20,24 +20,32 @@ pub struct ConfigBuilderLoader {
 
 impl ConfigBuilderLoader {
     /// Sets whether to interpolate environment variables in the config.
+    #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
     }
 
     /// Sets the secrets map for secret interpolation.
+    #[must_use]
     pub fn secrets(mut self, secrets: HashMap<String, String>) -> Self {
         self.secrets = secrets;
         self
     }
 
     /// Sets whether to allow empty configuration.
+    #[must_use]
     pub const fn allow_empty(mut self, allow_empty: bool) -> Self {
         self.builder.allow_empty = allow_empty;
         self
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -45,7 +53,12 @@ impl ConfigBuilderLoader {
         super::loader_from_paths(self, config_paths)
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn load_from_input<R: Read>(
         self,
         input: R,
@@ -113,7 +126,7 @@ impl Process for ConfigBuilderLoader {
             None => {
                 self.builder.append(deserialize_config_map(map)?)?;
             }
-        };
+        }
 
         Ok(())
     }
