@@ -158,7 +158,7 @@ impl SourceContext {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
-        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+        reason = "Preserve inferred default types"
     )]
     pub fn new_shutdown(
         key: &ComponentKey,
@@ -189,7 +189,7 @@ impl SourceContext {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
-        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+        reason = "Preserve inferred default types"
     )]
     pub fn new_test(
         out: SourceSender,

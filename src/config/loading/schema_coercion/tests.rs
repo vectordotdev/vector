@@ -185,7 +185,7 @@ fn generated_enum_aliases_preserve_spelling_and_coerce_payloads() {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::needless_pass_by_value,
-        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+        reason = "Preserve ownership and drop timing"
     )]
     fn check<T: vector_config::Configurable + serde::de::DeserializeOwned + 'static>(
         input: serde_json::Value,
@@ -478,7 +478,7 @@ fn generated_test_output_preserves_null_conditions() {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::cast_precision_loss,
-    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    reason = "Numeric precision audit deferred"
 )]
 fn scalar_coercions() {
     for case in [
@@ -563,7 +563,7 @@ fn scalar_coercions() {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::cast_precision_loss,
-    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    reason = "Numeric precision audit deferred"
 )]
 fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
     for case in [
@@ -783,10 +783,7 @@ fn enum_const_and_boolean_schemas() {
 
 #[test]
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::too_many_lines,
-    reason = "Keep the existing control flow intact during the lint rollout."
-)]
+#[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
 fn enum_and_const_share_scalar_conversions_but_keep_distinct_errors() {
     // Run each conversion against both a constant and a single-value enum.
     struct ConstraintCase {
@@ -940,7 +937,7 @@ fn generated_unsigned_integer_accepts_integral_float_above_signed_range() {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::cast_precision_loss,
-    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    reason = "Numeric precision audit deferred"
 )]
 fn generated_signed_integer_leaves_unsigned_overflow_for_serde() {
     let schema =
@@ -1108,10 +1105,7 @@ mod test {
 
     #[test]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Keep the existing control flow intact during the lint rollout."
-    )]
+    #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
     fn test_coercion_with_array_support() {
         let mut input = json!({
             "proxy": {

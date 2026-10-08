@@ -77,10 +77,7 @@ pub trait ValidatedSink {
     /// credential resolution, no spawning, and no async/await. All such environment-
     /// dependent operations belong in `build`.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn validate(&self) -> crate::Result<Self::Validated>;
 
     /// Performs context-dependent validation that requires the enrichment tables.
@@ -89,10 +86,7 @@ pub trait ValidatedSink {
     /// (e.g. custom-auth VRL programs) override this to run against the configured
     /// tables, which are only available at the config-validation layer.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn validate_with_context(&self, _cx: &SinkContext) -> crate::Result<()> {
         Ok(())
     }
@@ -116,19 +110,13 @@ pub trait ValidatedSink {
 pub trait DynValidatedSink {
     /// Erases the validated state into a `Box<dyn Any>`.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn validate_dyn(&self) -> crate::Result<Box<dyn Any + Send + Sync>>;
 
     /// Validates context-dependent configuration (e.g. VRL programs that resolve
     /// enrichment tables) against the given context.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn validate_with_context_dyn(&self, cx: &SinkContext) -> crate::Result<()>;
 
     /// Restores the validated state from `&dyn Any` and builds the sink.

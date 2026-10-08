@@ -138,7 +138,7 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
-    reason = "Keep the current collection type and API bounds during the lint rollout."
+    reason = "Preserve collection type and API bounds"
 )]
 pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, HashSet<String>>) {
     fn visit(value: &serde_json::Value, keys: &mut HashMap<String, HashSet<String>>) {
@@ -162,12 +162,9 @@ pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, 
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
-    reason = "Keep the current collection type and API bounds during the lint rollout."
+    reason = "Preserve collection type and API bounds"
 )]
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate_config_map_with_secrets(
     map: &ConfigMap,
     secrets: &HashMap<String, String>,
@@ -193,16 +190,10 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
-    reason = "Keep the current collection type and API bounds during the lint rollout."
+    reason = "Preserve collection type and API bounds"
 )]
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Audit and document the existing panic conditions separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
     let output = COLLECTOR

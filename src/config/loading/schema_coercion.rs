@@ -126,10 +126,7 @@ impl<'a> ValueCoercer<'a> {
 
     /// Coerces a value in place. On error, some fields may already be coerced.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn coerce(&mut self, value: &mut Value) -> Result<(), Error> {
         self.path.clear();
         self.coerce_value(value, self.schema)
@@ -161,10 +158,7 @@ impl<'a> ValueCoercer<'a> {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::match_same_arms,
-        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
-    )]
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     fn coerce_value(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         if self.is_unknown_component(value, schema) {
             return Ok(());
@@ -940,16 +934,13 @@ impl<'a> ValueCoercer<'a> {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::cast_possible_truncation,
-        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+        reason = "Bounds and overflow audit deferred"
     )]
     #[allow(
         clippy::cast_precision_loss,
-        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+        reason = "Numeric precision audit deferred"
     )]
-    #[allow(
-        clippy::cast_sign_loss,
-        reason = "Preserve the existing signed conversion until its input bounds are audited."
-    )]
+    #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn coerce_integer(&mut self, value: &mut Value) -> Result<(), Error> {
         if let Value::Number(n) = value {
             if n.is_i64() || n.is_u64() {

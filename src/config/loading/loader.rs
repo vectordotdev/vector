@@ -76,13 +76,10 @@ pub(super) mod process {
         /// Helper method used by other methods to recursively handle file/dir loading, merging
         /// values against a provided configuration map.
         // https://github.com/vectordotdev/vector/issues/23659
-        #[allow(
-            clippy::manual_let_else,
-            reason = "Keep the existing branching and control flow during the lint rollout."
-        )]
+        #[allow(clippy::manual_let_else, reason = "Preserve existing control flow")]
         #[allow(
             clippy::unnecessary_debug_formatting,
-            reason = "Preserve the existing diagnostic text and escaping behavior."
+            reason = "Preserve diagnostic text and escaping"
         )]
         fn load_dir_into(
             &mut self,
@@ -230,10 +227,7 @@ where
     fn take(self) -> T;
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn load_from_str<R: std::io::Read>(
         &mut self,
         input: R,
@@ -248,10 +242,7 @@ where
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<(), Vec<String>> {
         if let Some((_, map)) = self.load_file(path, format)? {
             self.merge(map, None)?;
@@ -264,10 +255,7 @@ where
     /// Deserializes a dir with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn load_from_dir(&mut self, path: &Path) -> Result<(), Vec<String>> {
         // Iterator containing component-specific sub-folders to attempt traversing into.
         let hints = [

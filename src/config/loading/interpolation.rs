@@ -9,12 +9,9 @@ use super::representation::ConfigMap;
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
-    reason = "Keep the current collection type and API bounds during the lint rollout."
+    reason = "Preserve collection type and API bounds"
 )]
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate_config_map_with_env_vars(
     map: &ConfigMap,
     vars: &HashMap<String, String>,
@@ -85,12 +82,9 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: LazyLock<Regex> = LazyLock:
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
-    reason = "Keep the current collection type and API bounds during the lint rollout."
+    reason = "Preserve collection type and API bounds"
 )]
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
 

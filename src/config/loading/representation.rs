@@ -272,7 +272,7 @@ mod tests {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::unnecessary_wraps,
-        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+        reason = "Preserve return type and caller contracts"
     )]
     fn default_optional_value() -> Option<String> {
         Some("default".to_string())

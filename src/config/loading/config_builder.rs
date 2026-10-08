@@ -42,10 +42,7 @@ impl ConfigBuilderLoader {
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -55,10 +52,7 @@ impl ConfigBuilderLoader {
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn load_from_input<R: Read>(
         self,
         input: R,
