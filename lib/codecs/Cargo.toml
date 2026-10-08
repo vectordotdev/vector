@@ -82,7 +82,7 @@ zstd = { workspace = true, features = ["zdict_builder"] }
 [features]
 arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
-opentelemetry = ["dep:opentelemetry-proto"]
+opentelemetry = ["dep:opentelemetry-proto", "opentelemetry-proto/typed-trace", "vector-core/typed-trace"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]
 test = []
 
