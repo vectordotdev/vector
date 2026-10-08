@@ -7,7 +7,10 @@ use super::{
 use crate::{
     components::validation::{
         ComponentConfiguration, ComponentType, ValidationConfiguration,
-        component_names::*,
+        component_names::{
+            TEST_INPUT_SOURCE_NAME, TEST_OUTPUT_SINK_NAME, TEST_SINK_NAME, TEST_SOURCE_NAME,
+            TEST_TRANSFORM_NAME,
+        },
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
     },
@@ -25,6 +28,11 @@ pub struct TopologyBuilder {
 
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn from_configuration(
         configuration: &ValidationConfiguration,
         config_name: Option<&String>,
