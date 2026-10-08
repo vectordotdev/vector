@@ -109,7 +109,7 @@ pub struct MqttConnector {
 }
 
 impl MqttConnector {
-    /// Creates a new MqttConnector
+    /// Creates a new `MqttConnector`
     pub const fn new(options: MqttOptions) -> Self {
         Self { options }
     }
@@ -121,6 +121,11 @@ impl MqttConnector {
     }
 
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
     }

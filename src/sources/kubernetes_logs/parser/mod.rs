@@ -55,6 +55,7 @@ impl FunctionTransform for Parser {
 
                 let bytes = match message {
                     Value::Bytes(bytes) => bytes,
+                    Value::String(string) => string.as_bytes(),
                     _ => {
                         emit!(KubernetesLogsFormatPickerEdgeCase {
                             what: "got an event with non-bytes message"
