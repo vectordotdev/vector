@@ -386,7 +386,7 @@ services:
         - CMD
         - php
         - "-r"
-        - fsockopen('localhost', 8090) or die('fail');
+        - fsockopen('localhost', 8090) or exit(1);
       timeout: 5s
       interval: 5s
       retries: 20
