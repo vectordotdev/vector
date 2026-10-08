@@ -75,7 +75,8 @@ jobs:
       (needs.changes.outputs.dependencies == 'true' ||
       needs.changes.outputs.integration-yml == 'true' ||
       needs.changes.outputs.int-tests-any == 'true' ||
-      needs.changes.outputs.e2e-tests-any == 'true')))
+      needs.changes.outputs.e2e-tests-any == 'true'))) &&
+      github.repository == 'vectordotdev/vector'
       }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
@@ -93,7 +94,7 @@ jobs:
 
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
       (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) &&
-      github.repository_owner == 'vectordotdev' }}
+      github.repository == 'vectordotdev/vector' }}
     strategy:
       fail-fast: false
       matrix:
@@ -211,7 +212,7 @@ jobs:
       - build-test-runner
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
       (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) &&
-      github.repository_owner == 'vectordotdev' }}
+      github.repository == 'vectordotdev/vector' }}
     strategy:
       fail-fast: false
       matrix:

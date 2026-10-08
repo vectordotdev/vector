@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   test-windows:
-    if: github.repository_owner == 'vectordotdev'
+    if: github.repository == 'vectordotdev/vector'
     runs-on: windows-2025-8core
     timeout-minutes: 60
     steps:

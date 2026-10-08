@@ -65,7 +65,7 @@ jobs:
 
   build-linux-gnu-native:
     name: Build Vector for ${{ matrix.target }} (native)
-    if: github.repository_owner == 'vectordotdev'
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ${{ matrix.runner }}
     container:
       image: almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c
@@ -137,7 +137,7 @@ jobs:
 
   build-linux-cross:
     name: Build Vector for ${{ matrix.target }}
-    if: github.repository_owner == 'vectordotdev'
+    if: github.repository == 'vectordotdev/vector'
     runs-on: release-builder-linux
     timeout-minutes: 60
     needs: generate-publish-metadata
@@ -179,6 +179,7 @@ jobs:
 
   build-apple-darwin-packages:
     name: Build Vector for ${{ matrix.architecture }}-apple-darwin (.tar.gz)
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     needs: generate-publish-metadata
@@ -227,7 +228,7 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
-    if: github.repository_owner == 'vectordotdev'
+    if: github.repository == 'vectordotdev/vector'
     runs-on: windows-2025-8core
     timeout-minutes: 90
     needs: generate-publish-metadata

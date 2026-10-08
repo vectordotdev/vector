@@ -61,7 +61,7 @@ env:
 jobs:
   tests:
     name: Tests
-    if: github.repository_owner == 'vectordotdev'
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04-8core
     permissions:
       contents: read

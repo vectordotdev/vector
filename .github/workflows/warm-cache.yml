@@ -25,7 +25,7 @@ concurrency:
 jobs:
   warm:
     name: Warm shared workspace cache
-    if: github.repository_owner == 'vectordotdev'
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 90
     steps:

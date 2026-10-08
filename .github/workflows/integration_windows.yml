@@ -31,7 +31,7 @@ jobs:
 
   run-test-integration-windows:
     needs: changes
-    if: needs.changes.outputs.windows == 'true' && github.repository_owner == 'vectordotdev'
+    if: needs.changes.outputs.windows == 'true' && github.repository == 'vectordotdev/vector'
     runs-on: windows-2025-8core
     timeout-minutes: 60
     steps:
