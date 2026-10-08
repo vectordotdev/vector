@@ -711,7 +711,8 @@ services:
       - "--headless"
       - "--users=1"
       - "--spawn-rate=1"
-      - "--run-time=90s"
+      # cartFailure connection retries can be slow in CI. The scenario exits when done.
+      - "--run-time=15m"
       - "--stop-timeout=15"
       - DemoUser
     volumes:
