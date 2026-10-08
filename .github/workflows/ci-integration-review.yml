@@ -55,6 +55,8 @@ jobs:
     if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
     permissions:
       statuses: write # Required to set commit status to pending
+    env:
+      IS_FORK_PR: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -70,8 +72,10 @@ jobs:
           team: "Vector"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
+      # Only fork PRs require Vector-team membership. This lets Observability Pipelines
+      # members trigger CI on branches in this repository without joining the Vector team.
       - name: Validate author membership
-        if: steps.comment.outputs.isTeamMember == 'false'
+        if: env.IS_FORK_PR == 'true' && steps.comment.outputs.isTeamMember == 'false'
         run: exit 1
 
       - name: (PR review) Set latest commit status as pending
