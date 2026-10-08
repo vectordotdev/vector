@@ -46,7 +46,7 @@ fn validate_accepts_valid_config() {
 
 #[test]
 fn validate_rejects_invalid_path_segments() {
-    // A space in either path segment makes the request path unparseable, so
+    // A space in either path segment makes the request path unparsable, so
     // validation must fail rather than panicking at build time.
     let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
             endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"

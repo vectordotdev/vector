@@ -124,7 +124,8 @@ jobs:
   check-docs:
     name: Check Cue docs
     runs-on: ubuntu-24.04
-    if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    # `make generate-vrl-docs` fetches GITHUB_SHA from vectordotdev/vector, which fails on forks.
+    if: ${{ github.repository == 'vectordotdev/vector' && (needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true') }}
     needs: changes
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -152,7 +153,8 @@ jobs:
   check-generated-docs:
     name: Check Generated Docs
     runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    # `make generate-vrl-docs` fetches GITHUB_SHA from vectordotdev/vector, which fails on forks.
+    if: ${{ github.repository == 'vectordotdev/vector' && (needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true') }}
     needs: changes
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
