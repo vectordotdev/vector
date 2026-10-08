@@ -30,7 +30,13 @@ components: sinks: opentelemetry: {
 	}
 
 	support: {
-		requirements: ["This sink accepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
+		requirements: ["""
+			With `encoding.codec: otlp`, native Vector logs and metrics are converted to the
+			[OTEL proto format](\(urls.opentelemetry_proto)), and events that already have the OTLP
+			structure (for example from the `opentelemetry` source with `use_otlp_decoding`) are sent as
+			they are. Trace events must already have the OTLP structure. With other codecs, you can use
+			[Remap](\(urls.vector_remap_transform)) to prepare events for ingestion.
+			"""]
 		warnings: [
 			"""
 				Batching only works with `encoding.codec: otlp`, which encodes events as protobuf
@@ -45,6 +51,37 @@ components: sinks: opentelemetry: {
 
 	configuration: generated.components.sinks.opentelemetry.configuration
 	how_it_works: {
+		native_log_conversion: {
+			title: "Native log conversion"
+			body: """
+				With `encoding.codec: otlp`, a log event without a `resourceLogs` field is converted
+				to one OTLP log record. The conversion is the inverse of the `opentelemetry` source
+				decoding, so logs that the source decodes without `use_otlp_decoding` are sent back
+				unchanged.
+
+				| Event field (Legacy namespace) | OTLP field |
+				| --- | --- |
+				| `message` | `body` |
+				| `timestamp` | `timeUnixNano` |
+				| `observed_timestamp` | `observedTimeUnixNano` |
+				| `attributes` | `attributes` |
+				| `resources` | `resource.attributes` |
+				| `scope.name`, `scope.version`, `scope.attributes`, `scope.dropped_attributes_count` | `scope` |
+				| `trace_id`, `span_id` (hex strings) | `traceId`, `spanId` |
+				| `severity_text`, `severity_number` | `severityText`, `severityNumber` |
+				| `flags`, `dropped_attributes_count` | `flags`, `droppedAttributesCount` |
+
+				With the Vector log namespace, the event becomes the `body` and the other fields are
+				read from the `opentelemetry` source metadata. If that metadata is missing, the field
+				with the `timestamp` meaning gives `timeUnixNano`, and the Vector ingest timestamp
+				gives `observedTimeUnixNano`.
+
+				All other event fields are sent as log record attributes. This includes a mapped field
+				that does not have the type OTLP requires, for example a `trace_id` that is not 32 hex
+				characters. If a key is both in `attributes` and at the top level, the value from
+				`attributes` is used. The `source_type` field is not sent.
+				"""
+		}
 		quickstart: {
 			title: "Quickstart"
 			body: """
