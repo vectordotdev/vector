@@ -88,10 +88,7 @@ pub struct Vrl {
 
 impl Vrl {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::manual_let_else,
-        reason = "Keep the existing branching and control flow during the lint rollout."
-    )]
+    #[allow(clippy::manual_let_else, reason = "Preserve existing control flow")]
     fn run(&self, event: Event) -> (Event, RuntimeResult) {
         let log_namespace = event
             .maybe_as_log()
@@ -188,7 +185,7 @@ mod test {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
-        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+        reason = "Preserve inferred default types"
     )]
     fn check_vrl() {
         let checks = vec![
