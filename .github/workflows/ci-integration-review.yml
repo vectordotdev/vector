@@ -67,7 +67,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
@@ -277,7 +277,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: (PR review) Submit PR result as success
