@@ -72,10 +72,9 @@ with this [issue filter][vrl-wasm-unsupported-filter].
 
 ### macOS Troubleshooting
 
-On macOS the `zstd-sys` dependency (pulled in by VRL's stdlib) must compile C
-code for WebAssembly, but the system Apple `clang` has no WebAssembly backend.
-Point the build at a clang that has one, for example LLVM from Homebrew
-(`brew install llvm`):
+If compilation fails because the selected C compiler does not support the
+`wasm32-unknown-unknown` target, try a compiler with WebAssembly support, such
+as Homebrew LLVM. The following command explicitly selects that toolchain.
 
 ```shell
 CC_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/clang" \
