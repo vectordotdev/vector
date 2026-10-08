@@ -289,8 +289,13 @@
 
 }
 
-/* Focus outlines for copy buttons and code blocks (Hugo makes each pre focusable for keyboard
-   scrolling). Unlayered and more specific than toc.sass's `.prose *:focus { outline: none }`. */
+/* Focus outlines for heading links, copy buttons, and code blocks. Hugo makes each pre focusable
+   for keyboard scrolling. These are unlayered and more specific than toc.sass's
+   `.prose *:focus { outline: none }`. */
+.prose .heading-link:focus-visible {
+  @apply rounded-sm outline-2 outline-offset-2 outline-secondary;
+}
+
 .prose .code-copy-button:focus-visible {
   @apply outline-2 outline-offset-2 outline-secondary text-white;
 }
