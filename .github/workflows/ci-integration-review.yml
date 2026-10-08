@@ -72,10 +72,12 @@ jobs:
           team: "Vector"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
-      # Only fork PRs require Vector-team membership. This lets Observability Pipelines
-      # members trigger CI on branches in this repository without joining the Vector team.
+      # Let Observability Pipelines members trigger CI on their own same-repository PRs.
+      # Other reviewers and fork PRs still require Vector-team membership.
       - name: Validate author membership
-        if: env.IS_FORK_PR == 'true' && steps.comment.outputs.isTeamMember == 'false'
+        if: >-
+          steps.comment.outputs.isTeamMember == 'false' &&
+          (env.IS_FORK_PR == 'true' || github.actor != github.event.pull_request.user.login)
         run: exit 1
 
       - name: (PR review) Set latest commit status as pending
