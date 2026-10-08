@@ -10,6 +10,7 @@ use vrl::{
         runtime::{Runtime, Terminate},
     },
     diagnostic::{DiagnosticList, Formatter},
+    docs::{FunctionDoc, build_functions_doc},
     value::{Secrets, Value},
 };
 use wasm_bindgen::prelude::*;
@@ -178,6 +179,22 @@ pub fn run_vrl(incoming: &JsValue, tz_str: &str) -> JsValue {
     }
 }
 
+fn function_docs() -> Vec<FunctionDoc> {
+    build_functions_doc(&vector_vrl_functions::all())
+}
+
+/// Describes every function the playground can compile, in the shape of VRL's
+/// `docs/generated` files. The editor builds its completion, signature help and
+/// hover from it.
+///
+/// # Panics
+/// Panics if the documentation cannot be serialized.
+#[wasm_bindgen]
+#[must_use]
+pub fn vrl_functions() -> JsValue {
+    JsValue::from_serde(&function_docs()).unwrap()
+}
+
 #[wasm_bindgen]
 #[must_use]
 pub fn vector_version() -> String {
@@ -223,6 +240,20 @@ mod tests {
         assert_eq!(
             to_pretty_json(&Value::from(-2_796_170_501_982_571_315_i64)).unwrap(),
             "-2796170501982571315"
+        );
+    }
+
+    #[test]
+    fn function_docs_describe_vector_and_stdlib_functions() {
+        let docs = function_docs();
+        let parse_json = docs.iter().find(|doc| doc.name == "parse_json").unwrap();
+        assert_eq!(parse_json.arguments[0].name, "value");
+        assert!(parse_json.arguments[0].required);
+        assert!(!parse_json.internal_failure_reasons.is_empty());
+        // Vector's own functions are documented too, not only the stdlib's.
+        assert!(
+            docs.iter()
+                .any(|doc| doc.name == "get_enrichment_table_record")
         );
     }
 
