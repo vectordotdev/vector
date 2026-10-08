@@ -51,8 +51,9 @@ fn decoding(c: &mut Criterion) {
                         let framer = Framer::CharacterDelimited(
                             param
                                 .max_length
-                                .map(|ml| CharacterDelimitedDecoder::new_with_max_length(b'a', ml))
-                                .unwrap_or(CharacterDelimitedDecoder::new(b'a')),
+                                .map_or(CharacterDelimitedDecoder::new(b'a'), |ml| {
+                                    CharacterDelimitedDecoder::new_with_max_length(b'a', ml)
+                                }),
                         );
                         let deserializer = Deserializer::Bytes(BytesDeserializer);
                         let decoder = Decoder::new(framer, deserializer);
@@ -61,7 +62,7 @@ fn decoding(c: &mut Criterion) {
                     },
                     |(mut decoder, mut input)| loop {
                         match decoder.decode_eof(&mut input) {
-                            Ok(Some(_)) => continue,
+                            Ok(Some(_)) => {}
                             Ok(None) => break,
                             Err(_) => {
                                 unreachable!()
@@ -69,7 +70,7 @@ fn decoding(c: &mut Criterion) {
                         }
                     },
                     BatchSize::SmallInput,
-                )
+                );
             },
         );
     }
@@ -79,7 +80,7 @@ criterion_group!(
     name = benches;
     config = Criterion::default()
         .warm_up_time(Duration::from_secs(5))
-        .measurement_time(Duration::from_secs(120))
+        .measurement_time(Duration::from_mins(2))
         // degree of noise to ignore in measurements, here 1%
         .noise_threshold(0.01)
         // likelihood of noise registering as difference, here 5%

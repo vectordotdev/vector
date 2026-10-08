@@ -302,32 +302,18 @@ impl File {
                     let current_row_value = &row[idx];
 
                     // Helper closure for comparing current_row_value with another value,
-                    // respecting the specified case for Value::Bytes.
+                    // respecting the specified case for string values.
                     let compare_values = |val_to_compare: &Value| -> bool {
-                        match (case, current_row_value, val_to_compare) {
-                            (
-                                Case::Insensitive,
-                                Value::Bytes(bytes_row),
-                                Value::Bytes(bytes_cmp),
-                            ) => {
-                                // Perform case-insensitive comparison for byte strings.
-                                // If both are valid UTF-8, compare their lowercase versions.
-                                // If both are non-UTF-8 bytes, compare them directly.
-                                // If one is UTF-8 and the other is not, they are considered not equal.
-                                match (
-                                    std::str::from_utf8(bytes_row),
-                                    std::str::from_utf8(bytes_cmp),
-                                ) {
-                                    (Ok(s_row), Ok(s_cmp)) => {
-                                        s_row.to_lowercase() == s_cmp.to_lowercase()
-                                    }
-                                    (Err(_), Err(_)) => bytes_row == bytes_cmp,
-                                    _ => false,
-                                }
-                            }
-                            // For Case::Sensitive, or for Case::Insensitive with non-Bytes types,
-                            // perform a direct equality check.
-                            _ => current_row_value == val_to_compare,
+                        if case == Case::Insensitive
+                            && let (Some(row), Some(value)) = (
+                                lowercase_string_value(current_row_value),
+                                lowercase_string_value(val_to_compare),
+                            )
+                        {
+                            row == value
+                        } else {
+                            // Invalid UTF-8 bytes and non-string values use ordinary equality.
+                            current_row_value == val_to_compare
                         }
                     };
 
@@ -520,11 +506,19 @@ impl File {
     }
 }
 
+fn lowercase_string_value(value: &Value) -> Option<String> {
+    match value {
+        Value::Bytes(bytes) => std::str::from_utf8(bytes).map(str::to_lowercase).ok(),
+        Value::String(string) => Some(string.to_lowercase()),
+        _ => None,
+    }
+}
+
 /// Adds the bytes from the given value to the hash.
 /// Each field is terminated by a `0` value to separate the fields
 fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Result<(), Error> {
-    match value {
-        Value::Bytes(bytes) => match case {
+    if let Some(bytes) = value.as_bytes() {
+        match case {
             Case::Sensitive => hasher.write(bytes),
             Case::Insensitive => hasher.write(
                 std::str::from_utf8(bytes)
@@ -532,13 +526,12 @@ fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Res
                     .to_lowercase()
                     .as_bytes(),
             ),
-        },
-        value => {
-            let bytes: bytes::Bytes = value
-                .encode_as_bytes()
-                .map_err(|details| Error::FailedToEncodeValue { details })?;
-            hasher.write(&bytes);
         }
+    } else {
+        let bytes: bytes::Bytes = value
+            .encode_as_bytes()
+            .map_err(|details| Error::FailedToEncodeValue { details })?;
+        hasher.write(&bytes);
     }
 
     hasher.write_u8(0);
@@ -1124,6 +1117,76 @@ mod tests {
                 Some(handle)
             )
         );
+    }
+
+    #[test]
+    fn case_insensitive_lookup_accepts_strings_and_bytes() {
+        for value in [Value::from("ZiP"), Value::Bytes("ZiP".into())] {
+            let mut file = File::new(
+                Default::default(),
+                FileData {
+                    modified: SystemTime::now(),
+                    data: vec![vec![value]],
+                    headers: vec!["field".to_string()],
+                },
+            );
+            let handle = file.add_index(Case::Insensitive, &["field"]).unwrap();
+            for value in [Value::from("zIp"), Value::Bytes("zIp".into())] {
+                for index in [None, Some(handle)] {
+                    let rows = file
+                        .find_table_rows(
+                            Case::Insensitive,
+                            &[Condition::Equals {
+                                field: "field",
+                                value: value.clone(),
+                            }],
+                            None,
+                            None,
+                            index,
+                        )
+                        .unwrap();
+                    assert_eq!(
+                        rows,
+                        vec![ObjectMap::from([("field".into(), Value::from("ZiP"))])]
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn case_insensitive_lookup_preserves_invalid_bytes_and_non_strings() {
+        let values = [
+            Value::Bytes(Bytes::from_static(&[0xff])),
+            Value::Bytes(Bytes::from_static(&[0xfe])),
+            Value::from("\u{fffd}"),
+            Value::Integer(42),
+            Value::Null,
+        ];
+        let file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: values.iter().cloned().map(|value| vec![value]).collect(),
+                headers: vec!["field".to_string()],
+            },
+        );
+
+        for value in values {
+            let rows = file
+                .find_table_rows(
+                    Case::Insensitive,
+                    &[Condition::Equals {
+                        field: "field",
+                        value: value.clone(),
+                    }],
+                    None,
+                    None,
+                    None,
+                )
+                .unwrap();
+            assert_eq!(rows, vec![ObjectMap::from([("field".into(), value)])]);
+        }
     }
 
     #[test]

@@ -29,6 +29,7 @@ pub struct AvroDeserializerConfig {
 
 impl AvroDeserializerConfig {
     /// Creates a new `AvroDeserializerConfig`.
+    #[must_use]
     pub const fn new(schema: String, strip_schema_id_prefix: bool) -> Self {
         Self {
             avro_options: AvroDeserializerOptions {
@@ -39,6 +40,11 @@ impl AvroDeserializerConfig {
     }
 
     /// Build the `AvroDeserializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> vector_common::Result<AvroDeserializer> {
         let schema = apache_avro::Schema::parse_str(&self.avro_options.schema)
             .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
@@ -50,11 +56,13 @@ impl AvroDeserializerConfig {
     }
 
     /// The data type of events that are accepted by `AvroDeserializer`.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
@@ -112,6 +120,7 @@ pub struct AvroDeserializer {
 
 impl AvroDeserializer {
     /// Creates a new `AvroDeserializer`.
+    #[must_use]
     pub const fn new(schema: apache_avro::Schema, strip_schema_id_prefix: bool) -> Self {
         Self {
             schema,
@@ -196,11 +205,11 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Duration(_) => Err(vector_common::Error::from(
             "AvroValue::Duration is not supported",
         )),
-        AvroValue::Enum(_, string) => Ok(VrlValue::from(string)),
+        AvroValue::Enum(_, string) | AvroValue::String(string) => Ok(VrlValue::from(string)),
         AvroValue::Fixed(_, _) => Err(vector_common::Error::from(
             "AvroValue::Fixed is not supported",
         )),
-        AvroValue::Float(float) => Ok(VrlValue::from_f64_or_zero(float as f64)),
+        AvroValue::Float(float) => Ok(VrlValue::from_f64_or_zero(f64::from(float))),
         AvroValue::Int(int) => Ok(VrlValue::from(int)),
         AvroValue::Long(long) => Ok(VrlValue::from(long)),
         AvroValue::Map(items) => items
@@ -214,15 +223,16 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             .map(|(key, value)| try_from(value).map(|v| (KeyString::from(key), v)))
             .collect::<Result<Vec<_>, _>>()
             .map(|v| VrlValue::Object(v.into_iter().collect())),
-        AvroValue::String(string) => Ok(VrlValue::from(string)),
         AvroValue::TimeMicros(time_micros) => Ok(VrlValue::from(time_micros)),
         AvroValue::TimeMillis(millis) => Ok(VrlValue::from(millis)),
-        AvroValue::TimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
-        AvroValue::TimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
+        AvroValue::TimestampMicros(ts_micros) | AvroValue::LocalTimestampMicros(ts_micros) => {
+            Ok(VrlValue::from(ts_micros))
+        }
+        AvroValue::TimestampMillis(ts_millis) | AvroValue::LocalTimestampMillis(ts_millis) => {
+            Ok(VrlValue::from(ts_millis))
+        }
         AvroValue::Union(_, v) => try_from(*v),
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
-        AvroValue::LocalTimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
-        AvroValue::LocalTimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
         AvroValue::BigDecimal(_) => Err(vector_common::Error::from(
             "AvroValue::BigDecimal is not supported",
         )),

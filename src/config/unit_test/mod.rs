@@ -33,11 +33,14 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_transform_output_ids};
+use super::{
+    OutputId, compiler::expand_globs, graph::Graph, graph_builder,
+    transform::get_transform_output_ids,
+};
 use crate::{
     conditions::Condition,
     config::{
-        self, Component, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
         TestDefinition, TestInput, TestOutput, enrichment_table_sinks, loading,
         loading::ConfigBuilderLoader,
     },
@@ -380,33 +383,13 @@ fn get_relevant_test_components(
     }
 }
 
-fn graph_components(
-    config: &ConfigBuilder,
-) -> impl Iterator<Item = (&ComponentKey, Component<'_, String>)> + Clone {
-    let sources = config
-        .sources
-        .iter()
-        .map(|(key, c)| (key, Component::from(c)));
-    let transforms = config
-        .transforms
-        .iter()
-        .map(|(key, c)| (key, Component::from(c)));
-    let sinks = config
-        .sinks
-        .iter()
-        .map(|(key, c)| (key, Component::from(c)));
-
-    sources.chain(transforms).chain(sinks)
-}
-
 async fn build_unit_test(
     metadata: &UnitTestBuildMetadata,
     test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
     let graph = Graph::new(
-        graph_components(&config_builder),
-        config_builder.schema,
+        graph_builder::nodes(&config_builder),
         config_builder.global.wildcard_matching.unwrap_or_default(),
     )?;
     let output_map = graph.output_map()?;
@@ -424,8 +407,7 @@ async fn build_unit_test(
     // Inspect the connected paths before pruning those inputs; the final config
     // build below checks all remaining inputs.
     let graph = Graph::new(
-        graph_components(&config_builder),
-        config_builder.schema,
+        graph_builder::nodes(&config_builder),
         config_builder.global.wildcard_matching.unwrap_or_default(),
     )?;
 
@@ -460,8 +442,7 @@ async fn build_unit_test(
 
     // Sanitize the inputs of all relevant transforms
     let graph = Graph::new(
-        graph_components(&config_builder),
-        config_builder.schema,
+        graph_builder::nodes(&config_builder),
         config_builder.global.wildcard_matching.unwrap_or_default(),
     )?;
     let valid_outputs = graph.output_map()?;
