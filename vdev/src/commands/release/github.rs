@@ -207,7 +207,7 @@ fn render_notes(
     if let Some(url) = &upgrade_guide_url {
         writeln!(
             out,
-            "Before upgrading, read the [{}.{} upgrade guide]({url}).\n",
+            "Upgrading to {}.{}? Read the [upgrade guide]({url}).\n",
             version.major, version.minor
         )
         .unwrap();
@@ -215,7 +215,7 @@ fn render_notes(
 
     write!(
         out,
-        "[View the full release notes]({release_url}) · [Release calendar]({RELEASE_CALENDAR_URL})"
+        "[View the full release notes]({release_url}) · See upcoming releases on the [release calendar]({RELEASE_CALENDAR_URL})."
     )
     .unwrap();
     out
@@ -258,9 +258,9 @@ mod tests {
                 - [1 new feature](https://vector.dev/releases/0.59.0/#new-features)
                 - [2 bug fixes](https://vector.dev/releases/0.59.0/#bug-fixes)
 
-                Before upgrading, read the [0.59 upgrade guide](https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/).
+                Upgrading to 0.59? Read the [upgrade guide](https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/).
 
-                [View the full release notes](https://vector.dev/releases/0.59.0/) · [Release calendar](https://calendar.vector.dev)"}
+                [View the full release notes](https://vector.dev/releases/0.59.0/) · See upcoming releases on the [release calendar](https://calendar.vector.dev)."}
         );
     }
 
@@ -279,7 +279,7 @@ mod tests {
                 - [1 breaking change](https://vector.dev/releases/0.59.1/)
                 - [1 bug fix](https://vector.dev/releases/0.59.1/#bug-fixes)
 
-                [View the full release notes](https://vector.dev/releases/0.59.1/) · [Release calendar](https://calendar.vector.dev)"}
+                [View the full release notes](https://vector.dev/releases/0.59.1/) · See upcoming releases on the [release calendar](https://calendar.vector.dev)."}
         );
     }
 }
