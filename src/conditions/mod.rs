@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use vector_lib::configurable::configurable_component;
 use vector_vrl_metrics::MetricsStorage;
@@ -70,6 +71,11 @@ impl Condition {
     ///
     /// This can be mildly expensive for conditions that do not often match, as it allocates a string for the error
     /// case. As such, it should typically be avoided in hot paths.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_same_arms,
+        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
+    )]
     pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         match self {
             Condition::IsLog => check_is_log_with_context(e),
@@ -118,6 +124,11 @@ pub enum ConditionConfig {
 }
 
 impl ConditionConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -154,6 +165,11 @@ pub trait Conditional: std::fmt::Debug {
 }
 
 pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -194,6 +210,15 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -211,6 +236,11 @@ impl AnyCondition {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn validate(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -244,7 +274,7 @@ mod tests {
         assert_eq!(
             r#"String(".nork == false")"#,
             format!("{:?}", conf.condition)
-        )
+        );
     }
 
     #[test]
@@ -259,6 +289,6 @@ mod tests {
         assert_eq!(
             r#"Map(Vrl(VrlConfig { source: ".nork == true", runtime: Ast }))"#,
             format!("{:?}", conf.condition)
-        )
+        );
     }
 }
