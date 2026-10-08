@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
@@ -41,6 +43,11 @@ impl<T> UnixOnly<T> {
     /// Pass the closure with `#[cfg(unix)]` so Unix-only APIs in its body are not
     /// compiled on other targets. Context is accepted on every target and is
     /// dropped, together with the configuration, if Unix is unavailable.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn on_unix<C, R>(
         self,
         context: C,
