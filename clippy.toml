@@ -1,3 +1,4 @@
+doc-valid-idents = ["OAuth2", ".."]
 large-error-threshold = 256  # in bytes
 allow-unwrap-in-tests = true
 
