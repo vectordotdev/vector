@@ -291,3 +291,23 @@ impl InternalEvent for JsonSerializationError<'_> {
         .increment(1);
     }
 }
+
+#[cfg(feature = "opentelemetry")]
+#[derive(Debug, NamedInternalEvent)]
+/// Emitted when the OTLP serializer changes or drops part of a trace while converting it.
+///
+/// The event itself is still encoded, so this is not an error and does not count as a drop.
+pub(crate) struct OtlpTraceConversionIssue<'a> {
+    pub issue: vector_core::event::typed_trace::TraceConversionIssue<'a>,
+}
+
+#[cfg(feature = "opentelemetry")]
+impl InternalEvent for OtlpTraceConversionIssue<'_> {
+    fn emit(self) {
+        tracing::warn!(
+            message = "Trace data was changed or dropped during OTLP conversion.",
+            issue = ?self.issue,
+            internal_log_rate_limit = true,
+        );
+    }
+}
