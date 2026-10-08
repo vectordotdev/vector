@@ -1,0 +1,3 @@
+Sinks that distribute requests across multiple endpoints (`elasticsearch`, `doris` and `vector`) now bound the number of requests that can be retrying at the same time, so a sustained failure at the destination no longer lets in-flight retrying batches accumulate without limit. Backpressure now reaches buffers and sources instead. The bound is the per endpoint `request.concurrency` ceiling times the number of endpoints, and for adaptive concurrency that ceiling is `request.adaptive_concurrency.max_concurrency_limit`, so lowering that value now also lowers peak memory during an outage.
+
+authors: samvallad33
