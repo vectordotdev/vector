@@ -1,6 +1,5 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
 
-use bytes::Bytes;
 use futures::{FutureExt, StreamExt};
 use smallvec::SmallVec;
 use tokio::{
@@ -40,7 +39,7 @@ pub fn build_unix_stream_source<D, F, E>(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
     decoder: D,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<String>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source>
@@ -79,14 +78,14 @@ where
 
             let span = info_span!("connection");
 
-            let received_from: Bytes = socket
+            let received_from = socket
                 .peer_addr()
                 .ok()
                 .and_then(|addr| {
                     addr.as_pathname().map(|e| e.to_owned()).map({
                         |path| {
                             span.record("peer_path", field::debug(&path));
-                            path.to_string_lossy().into_owned().into()
+                            path.to_string_lossy().into_owned()
                         }
                     })
                 })
@@ -94,7 +93,7 @@ where
                 // an unnamed socket (a socket not bound to a
                 // file). Instead of a filename, we'll surface a specific
                 // host value.
-                .unwrap_or_else(|| UNNAMED_SOCKET_HOST.into());
+                .unwrap_or_else(|| UNNAMED_SOCKET_HOST.to_owned());
 
             let handle_events = handle_events.clone();
 
