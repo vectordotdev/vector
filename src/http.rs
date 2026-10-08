@@ -433,7 +433,7 @@ pub enum Auth {
 
     /// Bearer authentication.
     ///
-    /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
+    /// The bearer token value (OAuth 2.0, JWT, etc.) is passed as-is.
     Bearer {
         /// The bearer authentication token.
         token: SensitiveString,
