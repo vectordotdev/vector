@@ -1,9 +1,12 @@
 use bytes::Bytes;
+use chrono::SecondsFormat;
 use ordered_float::NotNan;
 use vector_core::event::metric::{TagValue, TagValueSet};
 use vrl::value::{ObjectMap, Value};
 
-use super::proto::common::v1::{AnyValue, ArrayValue, KeyValue, any_value::Value as PBValue};
+use super::proto::common::v1::{
+    AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value as PBValue,
+};
 
 impl From<PBValue> for Value {
     fn from(av: PBValue) -> Self {
@@ -21,6 +24,40 @@ impl From<PBValue> for Value {
             ),
             PBValue::KvlistValue(arr) => kv_list_into_value(arr.values),
         }
+    }
+}
+
+/// Inverse of `From<PBValue> for Value`. Strings and byte strings that are valid UTF-8 become
+/// `string_value`; other byte strings become `bytes_value`. Timestamps and regexes have no
+/// OTLP equivalent and are encoded as strings. `Null` becomes an empty `AnyValue`.
+impl From<Value> for AnyValue {
+    fn from(value: Value) -> Self {
+        let value = match value {
+            Value::Bytes(bytes) => string_or_bytes(bytes),
+            Value::String(string) => string_or_bytes(string.into_bytes()),
+            Value::Regex(regex) => PBValue::StringValue(regex.as_str().to_owned()),
+            Value::Integer(int) => PBValue::IntValue(int),
+            Value::Float(float) => PBValue::DoubleValue(float.into_inner()),
+            Value::Boolean(boolean) => PBValue::BoolValue(boolean),
+            Value::Timestamp(timestamp) => {
+                PBValue::StringValue(timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+            }
+            Value::Object(object) => PBValue::KvlistValue(KeyValueList {
+                values: object_into_kv_list(object),
+            }),
+            Value::Array(array) => PBValue::ArrayValue(ArrayValue {
+                values: array.into_iter().map(Into::into).collect(),
+            }),
+            Value::Null => return Self { value: None },
+        };
+        Self { value: Some(value) }
+    }
+}
+
+fn string_or_bytes(bytes: Bytes) -> PBValue {
+    match String::from_utf8(Vec::from(bytes)) {
+        Ok(string) => PBValue::StringValue(string),
+        Err(error) => PBValue::BytesValue(error.into_bytes()),
     }
 }
 
@@ -78,6 +115,18 @@ pub fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
             })
             .collect::<ObjectMap>(),
     )
+}
+
+/// Inverse of [`kv_list_into_value`].
+#[must_use]
+pub fn object_into_kv_list(object: ObjectMap) -> Vec<KeyValue> {
+    object
+        .into_iter()
+        .map(|(key, value)| KeyValue {
+            key: key.into(),
+            value: Some(value.into()),
+        })
+        .collect()
 }
 
 #[must_use]
