@@ -115,12 +115,23 @@ pub enum TlsVersion {
 }
 
 impl TlsVersion {
+    const ALL: [Self; 4] = [Self::Tls10, Self::Tls11, Self::Tls12, Self::Tls13];
+
     const fn as_ssl_version(self) -> SslVersion {
         match self {
             Self::Tls10 => SslVersion::TLS1,
             Self::Tls11 => SslVersion::TLS1_1,
             Self::Tls12 => SslVersion::TLS1_2,
             Self::Tls13 => SslVersion::TLS1_3,
+        }
+    }
+
+    const fn disable_option(self) -> SslOptions {
+        match self {
+            Self::Tls10 => SslOptions::NO_TLSV1,
+            Self::Tls11 => SslOptions::NO_TLSV1_1,
+            Self::Tls12 => SslOptions::NO_TLSV1_2,
+            Self::Tls13 => SslOptions::NO_TLSV1_3,
         }
     }
 
@@ -408,52 +419,55 @@ impl TlsSettings {
     /// Constrains `context` to the configured `[min_tls_version, max_tls_version]` window.
     ///
     /// Does nothing unless at least one bound is configured, so the library defaults are left
-    /// untouched for anyone who has not opted in.
-    fn apply_protocol_versions(&self, context: &mut SslContextBuilder) -> Result<()> {
+    /// untouched for anyone who has not opted in. A configured bound only ever narrows one
+    /// already in force from the host's OpenSSL configuration.
+    fn apply_protocol_versions(
+        &self,
+        context: &mut SslContextBuilder,
+        for_server: bool,
+    ) -> Result<()> {
         if self.min_tls_version.is_none() && self.max_tls_version.is_none() {
             return Ok(());
         }
 
-        // Each setter is called only when Vector has an explicit bound for that side.
-        // `SSL_CTX_set_min_proto_version(0)` -- which is what passing `None` compiles to --
-        // does not mean "leave unchanged", it clears whatever bound is already in force. That
-        // includes a bound applied from the host's OpenSSL configuration (`MinProtocol` in
-        // `openssl.cnf`), so unconditionally calling both setters would let a config that sets
-        // only one side silently re-enable versions the host policy forbids.
-        if let Some(min) = self.min_tls_version {
+        // Setting a bound replaces the host's `MinProtocol`/`MaxProtocol`, so only ever tighten it.
+        if let Some(min) = self.min_tls_version
+            && context
+                .min_proto_version()
+                .is_none_or(|host| TlsVersion::from_ssl_version(host).is_none_or(|host| min > host))
+        {
             context
                 .set_min_proto_version(Some(min.as_ssl_version()))
                 .context(SetTlsVersionSnafu)?;
         }
-        if let Some(max) = self.max_tls_version {
+        if let Some(max) = self.max_tls_version
+            && context.max_proto_version().is_none_or(|host| {
+                TlsVersion::from_ssl_version(host).is_some_and(|host| max < host)
+            })
+        {
             context
                 .set_max_proto_version(Some(max.as_ssl_version()))
                 .context(SetTlsVersionSnafu)?;
         }
 
-        // Acceptors are built from `SslAcceptor::mozilla_intermediate`, which sets
-        // `SSL_OP_NO_TLSv1_3`. OpenSSL treats the `SSL_OP_NO_*` options as a veto that outranks
-        // the min/max protocol version, so without clearing it a window containing TLS v1.3
-        // would still exclude v1.3 -- and a window of v1.3 alone would leave no usable version.
-        //
-        // Only this one option is cleared. Vector never sets the other `SSL_OP_NO_*` version
-        // flags, so clearing them could only relax a restriction configured elsewhere.
-        if self.window_contains(TlsVersion::Tls13) {
+        // `mozilla_intermediate` sets this veto on acceptors; on connectors it can only be host policy.
+        if for_server && self.window_contains(TlsVersion::Tls13) {
             context.clear_options(SslOptions::NO_TLSV1_3);
         }
 
-        // A bound Vector did not set can still be in force, supplied by the host's OpenSSL
-        // configuration. The effective window is the combination of both, so it can be empty
-        // even when the configured options are self-consistent -- a host `MinProtocol = TLSv1.3`
-        // together with `max_tls_version: TLSv1.2`, for instance. Both setters report success in
-        // that case, so without this check Vector would start and then fail every handshake.
-        if let (Some(min), Some(max)) = (context.min_proto_version(), context.max_proto_version())
-            && let (Some(min), Some(max)) = (
-                TlsVersion::from_ssl_version(min),
-                TlsVersion::from_ssl_version(max),
-            )
-            && min > max
-        {
+        let min = context
+            .min_proto_version()
+            .and_then(TlsVersion::from_ssl_version)
+            .unwrap_or(TlsVersion::Tls10);
+        let max = context
+            .max_proto_version()
+            .and_then(TlsVersion::from_ssl_version)
+            .unwrap_or(TlsVersion::Tls13);
+        let options = context.options();
+        // OpenSSL accepts a context with no usable version and only fails at handshake time.
+        if !TlsVersion::ALL.into_iter().any(|version| {
+            (min..=max).contains(&version) && !options.contains(version.disable_option())
+        }) {
             return Err(TlsError::EmptyTlsVersionWindow { min, max });
         }
 
@@ -473,7 +487,7 @@ impl TlsSettings {
         context: &mut SslContextBuilder,
         for_server: bool,
     ) -> Result<()> {
-        self.apply_protocol_versions(context)?;
+        self.apply_protocol_versions(context, for_server)?;
 
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT

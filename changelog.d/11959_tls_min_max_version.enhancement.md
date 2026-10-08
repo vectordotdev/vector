@@ -20,7 +20,12 @@ Some components pass the configured certificates to a third-party TLS implementa
 does not expose protocol version selection. Those components cannot enforce the bounds, so they now
 log a warning when either option is set rather than ignoring it silently: the `kafka` source and
 sink (librdkafka), the `nats` source and sink (async-nats), the `amqp` source and sink (lapin), the
-`mqtt` source and sink (rumqttc), and the `gcp_pubsub` source (tonic). The `greptimedb_metrics` sink
-lists them in its existing unsupported-options warning.
+`mqtt` source and sink (rumqttc), the `gcp_pubsub` source (tonic), and the `databend` sink, whose
+deprecated `tls` block is not read. The `greptimedb_metrics` sink lists them in its existing
+unsupported-options warning.
+
+A configured bound only narrows one already set by the host's OpenSSL configuration
+(`MinProtocol`/`MaxProtocol` in `openssl.cnf`); it never re-enables a version the host disables.
+Vector refuses to start if no protocol version is left usable.
 
 authors: sainad2222

@@ -58,16 +58,22 @@ pub(crate) async fn await_connection(connection: &AmqpConfig) {
 }
 
 impl AmqpConfig {
+    pub(crate) fn warn_unenforceable_protocol_versions(&self) {
+        if self
+            .tls
+            .as_ref()
+            .is_some_and(crate::tls::TlsConfig::has_protocol_version_bounds)
+        {
+            vector_lib::tls::warn_unenforceable_protocol_versions("lapin");
+        }
+    }
+
     pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {
         let addr = self.connection_string.clone();
         let conn = match &self.tls {
             Some(tls) => {
-                if tls.has_protocol_version_bounds() {
-                    vector_lib::tls::warn_unenforceable_protocol_versions("lapin");
-                }
-
                 let cert_chain = if let Some(ca) = &tls.ca_file {
                     Some(tokio::fs::read_to_string(ca.to_owned()).await?)
                 } else {

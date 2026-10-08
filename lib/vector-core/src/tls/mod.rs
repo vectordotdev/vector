@@ -123,9 +123,9 @@ pub enum TlsError {
     ))]
     InvalidTlsVersionRange { min: TlsVersion, max: TlsVersion },
     #[snafu(display(
-        "The effective TLS protocol version window is empty: the minimum ({}) is greater than the \
-         maximum ({}). One of these bounds comes from the host's OpenSSL configuration rather \
-         than from `min_tls_version`/`max_tls_version`.",
+        "No TLS protocol version is usable between {} and {}: the host's OpenSSL configuration \
+         sets a conflicting bound or disables every version left by `min_tls_version`/\
+         `max_tls_version`.",
         min,
         max
     ))]
