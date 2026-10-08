@@ -32,6 +32,12 @@ vector --version || (echo "vector --version failed" && exit 1)
 test -f /etc/default/vector || (echo "/etc/default/vector doesn't exist" && exit 1)
 test ! -e /etc/vector/vector.yaml || (echo "/etc/vector/vector.yaml should not be installed by default" && exit 1)
 test -f /usr/share/vector/examples/vector.yaml || (echo "/usr/share/vector/examples/vector.yaml doesn't exist" && exit 1)
+case "$package" in
+  *.deb)
+    test ! -d /etc/vector/examples || (echo "examples should not be installed under /etc/vector/examples" && exit 1)
+    test -f /usr/share/doc/vector/examples/stdio.yaml || (echo "/usr/share/doc/vector/examples/ examples missing" && exit 1)
+    ;;
+esac
 
 mkdir -p /etc/vector
 echo "FOO=bar" > /etc/default/vector

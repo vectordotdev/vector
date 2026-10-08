@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
 
-# /etc/vector/examples/*.yaml move to /usr/share/doc/vector/examples/ in
-# v0.59.0. Remove unmodified copies from earlier versions on upgrade.
+# Complete the rm_conffile transition started in preinst; see preinst for
+# context. dpkg-maintscript-helper requires rm_conffile to be called from
+# preinst, postinst *and* postrm so that aborted upgrades restore the files
+# it moved aside and purges clean up its backups.
 for _example_conffile in \
   docs_example.yaml \
   environment_variables.yaml \
@@ -24,16 +26,5 @@ do
   dpkg-maintscript-helper rm_conffile \
     "/etc/vector/examples/$_example_conffile" 0.59.0-1~ vector -- "$@"
 done
-
-# Add vector:vector user & group
-id --user vector >/dev/null 2>&1 || \
-  useradd --system --shell /sbin/nologin --home-dir /var/lib/vector --user-group \
-    --comment "Vector observability data router" vector
-
-# Create default Vector data directory
-mkdir -p /var/lib/vector
-
-# Make vector:vector the owner of the Vector data directory
-chown -R vector:vector /var/lib/vector
 
 #DEBHELPER#
