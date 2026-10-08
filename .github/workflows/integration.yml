@@ -92,7 +92,8 @@ jobs:
       - build-test-runner
 
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) }}
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) &&
+      github.repository_owner == 'vectordotdev' }}
     strategy:
       fail-fast: false
       matrix:
@@ -209,7 +210,8 @@ jobs:
       - changes
       - build-test-runner
     if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) }}
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) &&
+      github.repository_owner == 'vectordotdev' }}
     strategy:
       fail-fast: false
       matrix:

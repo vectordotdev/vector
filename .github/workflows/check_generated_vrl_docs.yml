@@ -40,7 +40,7 @@ jobs:
 
   run-check-generated-vrl-docs:
     needs: changes
-    if: needs.changes.outputs.docs == 'true'
+    if: needs.changes.outputs.docs == 'true' && github.repository_owner == 'vectordotdev'
     runs-on: ubuntu-24.04-8core
     permissions:
       contents: write

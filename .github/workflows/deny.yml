@@ -48,7 +48,7 @@ jobs:
   test-deny:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') && (github.event_name != 'schedule' || github.repository_owner == 'vectordotdev') }}
     needs: [changes]
     steps:
       - name: Checkout branch
@@ -67,7 +67,7 @@ jobs:
   test-deny-licenses:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') && (github.event_name != 'schedule' || github.repository_owner == 'vectordotdev') }}
     needs: [changes]
     steps:
       - name: Checkout branch

@@ -60,6 +60,7 @@ env:
 
 jobs:
   resolve-inputs:
+    if: ${{ github.repository_owner == 'vectordotdev' }}
     runs-on: ubuntu-24.04
     outputs:
       baseline-sha: ${{ steps.set_and_validate_shas.outputs.BASELINE_SHA }}
