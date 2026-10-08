@@ -92,9 +92,12 @@ jobs:
       - changes
       - build-test-runner
 
-    if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) &&
-      github.repository == 'vectordotdev/vector' }}
+    if: &integration_gate >-
+      always() && !failure() && !cancelled() &&
+      needs.build-test-runner.result == 'success' &&
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' ||
+       github.event_name == 'workflow_call' || inputs.run_all == true) &&
+      github.repository == 'vectordotdev/vector'
     strategy:
       fail-fast: false
       matrix:
@@ -210,9 +213,7 @@ jobs:
     needs:
       - changes
       - build-test-runner
-    if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) &&
-      github.repository == 'vectordotdev/vector' }}
+    if: *integration_gate
     strategy:
       fail-fast: false
       matrix:
