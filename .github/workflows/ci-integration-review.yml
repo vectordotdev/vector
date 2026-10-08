@@ -55,8 +55,6 @@ jobs:
     if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
     permissions:
       statuses: write # Required to set commit status to pending
-    env:
-      IS_FORK_PR: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -69,15 +67,11 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
-      # Let Observability Pipelines members trigger CI on their own same-repository PRs.
-      # Other reviewers and fork PRs still require Vector-team membership.
       - name: Validate author membership
-        if: >-
-          steps.comment.outputs.isTeamMember == 'false' &&
-          (env.IS_FORK_PR == 'true' || github.actor != github.event.pull_request.user.login)
+        if: steps.comment.outputs.isTeamMember == 'false'
         run: exit 1
 
       - name: (PR review) Set latest commit status as pending
@@ -282,7 +276,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: (PR review) Submit PR result as success
