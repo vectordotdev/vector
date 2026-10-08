@@ -68,6 +68,7 @@ impl From<VarintLengthDelimitedEncoderConfig> for FramingConfig {
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
@@ -139,7 +140,7 @@ impl From<BoxedFramer> for Framer {
 impl tokio_util::codec::Encoder<()> for Framer {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, (): (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
             Framer::Bytes(framer) => framer.encode((), buffer),
             Framer::CharacterDelimited(framer) => framer.encode((), buffer),

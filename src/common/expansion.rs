@@ -37,7 +37,7 @@ pub(crate) fn pair_expansion(
                     "Encountered duplicated dynamic pair. \
                                 key: {key}, value: {val:?}, discarded value: {prev:?}"
                 );
-            };
+            }
             expanded_pairs.insert(key, val);
         }
     } else {

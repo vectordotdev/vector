@@ -15,6 +15,7 @@ pub struct AvroSerializerConfig {
 
 impl AvroSerializerConfig {
     /// Creates a new `AvroSerializerConfig`.
+    #[must_use]
     pub const fn new(schema: String) -> Self {
         Self {
             avro: AvroSerializerOptions { schema },
@@ -22,6 +23,11 @@ impl AvroSerializerConfig {
     }
 
     /// Build the `AvroSerializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> Result<AvroSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
@@ -29,11 +35,13 @@ impl AvroSerializerConfig {
     }
 
     /// The data type of events that are accepted by `AvroSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         // TODO: Convert the Avro schema to a vector schema requirement.
         schema::Requirement::empty()
@@ -60,6 +68,7 @@ pub struct AvroSerializer {
 
 impl AvroSerializer {
     /// Creates a new `AvroSerializer`.
+    #[must_use]
     pub const fn new(schema: apache_avro::Schema) -> Self {
         Self { schema }
     }

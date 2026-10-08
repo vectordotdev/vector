@@ -56,10 +56,12 @@ impl PartialEventMergeState {
                 return;
             }
 
-            if let (Some(Value::Bytes(prev_value)), Some(Value::Bytes(new_value))) =
-                (bucket.event.get_mut(message_path), event.get(message_path))
+            if let (Some(prev_value), Some(new_value)) = (
+                bucket.event.get_mut(message_path),
+                event.get(message_path).and_then(Value::as_bytes),
+            ) && let Some(prev_bytes) = prev_value.as_bytes()
             {
-                bytes_mut.extend_from_slice(prev_value);
+                bytes_mut.extend_from_slice(prev_bytes);
                 bytes_mut.extend_from_slice(new_value);
 
                 if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
@@ -92,16 +94,16 @@ impl PartialEventMergeState {
                 }
 
                 if !bucket.exceeds_max_merged_line_limit || bucket.truncated {
-                    *prev_value = bytes_mut.freeze();
+                    *prev_value = Value::Bytes(bytes_mut.freeze());
                 } else {
-                    *prev_value = bytes::Bytes::new();
+                    *prev_value = Value::Bytes(bytes::Bytes::new());
                 }
             }
         } else {
             let mut exceeds_max_merged_line_limit = false;
             let mut truncated = false;
 
-            if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
+            if let Some(event_bytes) = event.get(message_path).and_then(Value::as_bytes) {
                 bytes_mut.extend_from_slice(event_bytes);
                 if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
                     && bytes_mut.len() > max_merged_line_bytes

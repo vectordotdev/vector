@@ -1,5 +1,5 @@
 //! Handles enrichment tables for `type = geoip`.
-//! Enrichment data is loaded from one of the MaxMind GeoIP databases,
+//! Enrichment data is loaded from one of the `MaxMind` `GeoIP` databases,
 //! [MaxMind GeoIP2][maxmind] or [GeoLite2 binary city database][geolite].
 //!
 //! [maxmind]: https://dev.maxmind.com/geoip/geoip2/downloadable
@@ -63,7 +63,7 @@ pub struct GeoipConfig {
 
     /// The locale to use when querying the database.
     ///
-    /// MaxMind includes localized versions of some of the fields within their database, such as
+    /// `MaxMind` includes localized versions of some of the fields within their database, such as
     /// country name. This setting can control which of those localized versions are returned by the
     /// transform.
     ///
@@ -108,7 +108,7 @@ impl EnrichmentTableConfig for GeoipConfig {
 }
 
 #[derive(Clone)]
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a GeoIP database.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a `GeoIP` database.
 pub struct Geoip {
     config: GeoipConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
@@ -131,11 +131,16 @@ fn lookup_value<'de, A: Deserialize<'de>>(
 }
 
 impl Geoip {
-    /// Creates a new GeoIP struct from the provided config.
+    /// Creates a new `GeoIP` struct from the provided config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
         let dbkind =
-            DatabaseKind::try_from(dbreader.metadata.database_type.as_str()).map_err(|_| {
+            DatabaseKind::try_from(dbreader.metadata.database_type.as_str()).map_err(|()| {
                 format!(
                     "Unsupported MMDB database type ({}). Use `mmdb` enrichment table instead.",
                     dbreader.metadata.database_type
@@ -165,10 +170,7 @@ impl Geoip {
     fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
         let mut map = ObjectMap::new();
         let mut add_field = |key: &str, value: Option<Value>| {
-            if select
-                .map(|fields| fields.iter().any(|field| field == key))
-                .unwrap_or(true)
-            {
+            if select.is_none_or(|fields| fields.iter().any(|field| field == key)) {
                 map.insert(key.into(), value.unwrap_or(Value::Null));
             }
         };

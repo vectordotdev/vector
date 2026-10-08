@@ -7,12 +7,10 @@ use ddmetric_proto::{
 };
 use serde::Deserialize;
 use tracing::info;
-use vector::common::datadog::DatadogSeriesMetric;
 
 use self::ddmetric_proto::metric_payload::{MetricPoint, Resource};
 use super::*;
 
-const SERIES_ENDPOINT_V1: &str = "/api/v1/series";
 const SERIES_ENDPOINT_V2: &str = "/api/v2/series";
 const SERIES_ENDPOINT_V3: &str = "/api/intake/metrics/v3/series";
 const RESOURCE_METRIC_NAME: &str = "foo_metric.resource";
@@ -117,45 +115,6 @@ fn common_series_assertions(series: &SeriesIntake) {
         .for_each(|(found, mtype)| assert!(found, "Didn't receive metric type {}", *mtype));
 }
 
-fn metric_series_from_v1(input: &DatadogSeriesMetric) -> MetricSeries {
-    let mut resources = vec![];
-    if let Some(host) = &input.host {
-        resources.push(Resource {
-            r#type: "host".to_string(),
-            name: host.clone(),
-        });
-    }
-
-    let points = input
-        .points
-        .iter()
-        .map(|point| MetricPoint {
-            value: point.1,
-            timestamp: point.0,
-        })
-        .collect();
-
-    let interval = input.interval.unwrap_or(0) as i64;
-
-    let r#type = match input.r#type {
-        vector::common::datadog::DatadogMetricType::Gauge => 3,
-        vector::common::datadog::DatadogMetricType::Count => 1,
-        vector::common::datadog::DatadogMetricType::Rate => 2,
-    };
-
-    MetricSeries {
-        resources,
-        metric: input.metric.clone(),
-        tags: input.tags.clone().unwrap_or_default(),
-        points,
-        r#type,
-        unit: "".to_string(),
-        source_type_name: input.clone().source_type_name.unwrap_or_default(),
-        interval,
-        metadata: None,
-    }
-}
-
 /// One series out of fakeintake's decoded view of a V3 columnar payload.
 ///
 /// V3 is a dictionary-compressed, delta-encoded columnar format, but fakeintake decodes it
@@ -244,44 +203,6 @@ fn unpack_v3_series(in_payloads: &[FakeIntakePayloadJson]) -> Vec<MetricPayload>
         .collect()
 }
 
-fn convert_v1_payloads_v2(input: &[DatadogSeriesMetric]) -> Vec<MetricPayload> {
-    input
-        .iter()
-        .map(|serie| MetricPayload {
-            series: vec![metric_series_from_v1(serie)],
-        })
-        .collect()
-}
-
-fn unpack_v1_series(in_payloads: &[FakeIntakePayloadJson]) -> Vec<DatadogSeriesMetric> {
-    in_payloads
-        .iter()
-        .flat_map(|payload| {
-            let series = payload.data.as_array().unwrap();
-            series
-                .iter()
-                .map(|serie| serde_json::from_value(serie.clone()).unwrap())
-        })
-        .collect()
-}
-
-fn assert_v1_resource_tag(series: &[DatadogSeriesMetric]) {
-    let series = series
-        .iter()
-        .find(|series| series.metric == RESOURCE_METRIC_NAME)
-        .expect("resource metric should be present in the V1 payload");
-    let tags = series
-        .tags
-        .as_ref()
-        .expect("resource metric should have tags");
-
-    assert!(
-        tags.iter()
-            .any(|tag| tag == &format!("resource.{RESOURCE_TYPE}:{RESOURCE_NAME}")),
-        "V1 payload should retain the resource as a tag"
-    );
-}
-
 fn assert_v2_resource(series: &[MetricPayload]) {
     let metric_names: Vec<_> = series
         .iter()
@@ -310,27 +231,6 @@ fn assert_v2_resource(series: &[MetricPayload]) {
             .any(|tag| tag.starts_with(&format!("resource.{RESOURCE_TYPE}:"))),
         "V2 payload should not retain the resource as a tag"
     );
-}
-
-async fn get_v1_series_from_pipeline(address: String) -> SeriesIntake {
-    info!("getting v1 series payloads");
-    let payloads =
-        get_fakeintake_payloads::<FakeIntakeResponseJson>(&address, SERIES_ENDPOINT_V1).await;
-
-    info!("unpacking payloads");
-    let payloads = unpack_v1_series(&payloads.payloads);
-    assert_v1_resource_tag(&payloads);
-    info!("converting payloads");
-    let payloads = convert_v1_payloads_v2(&payloads);
-
-    info!("generating series intake");
-    let intake = generate_series_intake(&payloads);
-
-    common_series_assertions(&intake);
-
-    info!("{intake:?}");
-
-    intake
 }
 
 async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
@@ -456,14 +356,13 @@ fn compare_intakes(agent_intake: &SeriesIntake, vector_intake: &SeriesIntake) {
 
 pub(super) async fn validate() {
     let api_version = std::env::var("CONFIG_SERIES_API_VERSION")
-        .expect("CONFIG_SERIES_API_VERSION must be set (e.g. 'v1', 'v2' or 'v3')");
+        .expect("CONFIG_SERIES_API_VERSION must be set ('v2' or 'v3')");
 
     info!("==== getting series data from agent-only pipeline ==== ");
     let agent_intake = get_v2_series_from_pipeline(fake_intake_agent_address()).await;
 
     info!("==== getting series data from agent-vector pipeline ({api_version}) ====");
     let vector_intake = match api_version.as_str() {
-        "v1" => get_v1_series_from_pipeline(fake_intake_vector_address()).await,
         "v2" => get_v2_series_from_pipeline(fake_intake_vector_address()).await,
         "v3" => get_v3_series_from_pipeline(fake_intake_vector_address()).await,
         v => panic!("Unknown CONFIG_SERIES_API_VERSION: {v}"),

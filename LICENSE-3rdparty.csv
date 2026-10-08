@@ -147,6 +147,7 @@ byteorder,https://github.com/BurntSushi/byteorder,Unlicense OR MIT,Andrew Gallan
 bytes,https://github.com/tokio-rs/bytes,MIT,"Carl Lerche <me@carllerche.com>, Sean McArthur <sean@seanmonstar.com>"
 bytes-utils,https://github.com/vorner/bytes-utils,Apache-2.0 OR MIT,Michal 'vorner' Vaner <vorner@vorner.cz>
 bytesize,https://github.com/bytesize-rs/bytesize,Apache-2.0,"Hyunsik Choi <hyunsik.choi@gmail.com>, MrCroxx <mrcroxx@outlook.com>, Rob Ede <robjtede@icloud.com>"
+bytestring,https://github.com/actix/actix-net,MIT OR Apache-2.0,"Nikolay Kim <fafhrd91@gmail.com>, Rob Ede <robjtede@icloud.com>"
 castaway,https://github.com/sagebind/castaway,MIT,Stephen M. Coakley <me@stephencoakley.com>
 cbc,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 cfb-mode,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers

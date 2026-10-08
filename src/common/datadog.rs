@@ -36,13 +36,14 @@ pub const DD_RESERVED_SEMANTIC_ATTRS: [(&str, &str); 6] = [
 ];
 
 /// Returns true if the parameter `attr` is one of the reserved Datadog log attributes
+#[must_use]
 pub fn is_reserved_attribute(attr: &str) -> bool {
     DD_RESERVED_SEMANTIC_ATTRS
         .iter()
         .any(|(_, attr_str)| &attr == attr_str)
 }
 
-/// DatadogSeriesMetric
+/// `DatadogSeriesMetric`
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DatadogSeriesMetric {
     /// metric
@@ -58,7 +59,7 @@ pub struct DatadogSeriesMetric {
     /// host
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
-    /// source_type_name
+    /// `source_type_name`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_type_name: Option<String>,
     /// device
@@ -156,6 +157,11 @@ pub(crate) fn encode_u64_id_hex(id: u64) -> String {
 ///
 /// Hex strings are the source encoding. Integers are still accepted so a sink can reverse
 /// the historical `u64 as i64` wrap for in-flight events.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
 pub(crate) fn decode_u64_id(value: &Value) -> u64 {
     match value {
         Value::Integer(v) => *v as u64,

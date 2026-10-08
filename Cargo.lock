@@ -283,7 +283,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2255,7 +2255,7 @@ dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "regex",
@@ -2601,6 +2601,15 @@ name = "bytesize"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bd91ee7b2422bcb158d90ef4d14f75ef67f340943fc4149891dcce8f8b972a3"
+
+[[package]]
+name = "bytestring"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86566c496f2f47d9b8147a4c8b02ffdb69c919fe0c2b2e7195d22cbba0e635c9"
+dependencies = [
+ "bytes",
+]
 
 [[package]]
 name = "cargo-lock"
@@ -2979,7 +2988,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3151,15 +3160,6 @@ name = "const-str"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18f12cc9948ed9604230cdddc7c86e270f9401ccbe3c2e98a4378c5e7632212f"
-
-[[package]]
-name = "convert_case"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb402b8d4c85569410425650ce3eddc7d698ed96d39a73f941b08fb63082f1e7"
-dependencies = [
- "unicode-segmentation",
-]
 
 [[package]]
 name = "convert_case"
@@ -4034,7 +4034,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.0",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5484,9 +5484,9 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hickory-net"
-version = "0.26.1"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2295ed2f9c31e471e1428a8f88a3f0e1f4b27c15049592138d1eebe9c35b183"
+checksum = "c480823ed7c2c5d0f09c41020cb6b7c28029ce60ec42dc942158dcf22f8e0a4d"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -5531,9 +5531,9 @@ dependencies = [
 
 [[package]]
 name = "hickory-resolver"
-version = "0.26.0"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a10bd64d950b4d38ca21e25c8ae230712e4955fb8290cfcb29a5e5dc6017e544"
+checksum = "3f3da5255c95d5a716857d54b5b8f4e8d67c3484d3beaaaae2ce25063b3ba981"
 dependencies = [
  "cfg-if",
  "futures-util",
@@ -9197,7 +9197,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
- "heck 0.5.0",
+ "heck 0.4.1",
  "itertools 0.12.1",
  "log",
  "multimap",
@@ -9217,8 +9217,8 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
- "heck 0.5.0",
- "itertools 0.14.0",
+ "heck 0.4.1",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -9237,8 +9237,8 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
- "heck 0.5.0",
- "itertools 0.14.0",
+ "heck 0.4.1",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -9272,7 +9272,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -9285,7 +9285,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -10332,9 +10332,9 @@ dependencies = [
 
 [[package]]
 name = "resolv-conf"
-version = "0.7.5"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b3789b30bd25ba102de4beabd95d21ac45b69b1be7d14522bab988c526d6799"
+checksum = "1e061d1b48cb8d38042de4ae0a7a6401009d6143dc80d2e2d6f31f0bdd6470c7"
 
 [[package]]
 name = "retry-policies"
@@ -10572,7 +10572,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -10675,7 +10675,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11448,7 +11448,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -11460,7 +11460,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "287f59010008f0d7cf5e3b03196d666c1acc46c8d3e9cf34c28a1a7157601e72"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -11489,7 +11489,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.61.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -12069,10 +12069,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -13390,7 +13390,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.26"
+version = "0.3.28"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -13427,7 +13427,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.59.0-dev"
+version = "0.60.0-dev"
 dependencies = [
  "antithesis-instrumentation",
  "approx",
@@ -14073,8 +14073,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.35.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#e7d8d0f59062e44c18da6f861a7fd0ddfe24cf9f"
+version = "0.36.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#09f1cd85b5b09d5dce9c479930e334b0b52dd574"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",
@@ -14083,6 +14083,7 @@ dependencies = [
  "base62",
  "base64-simd",
  "bytes",
+ "bytestring",
  "cbc",
  "cfb-mode",
  "cfg-if",
@@ -14095,7 +14096,7 @@ dependencies = [
  "clap",
  "codespan-reporting",
  "community-id",
- "convert_case 0.7.1",
+ "convert_case 0.12.0",
  "crc",
  "crypto_secretbox",
  "csv",
