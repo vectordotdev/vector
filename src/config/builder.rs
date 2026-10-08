@@ -135,10 +135,7 @@ impl From<Config> for ConfigBuilder {
 
 impl ConfigBuilder {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
@@ -150,10 +147,7 @@ impl ConfigBuilder {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
         compiler::compile(self)
     }
@@ -220,10 +214,7 @@ impl ConfigBuilder {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
@@ -292,10 +283,7 @@ impl ConfigBuilder {
     #[cfg(test)]
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn from_toml(input: &str) -> Self {
         crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
@@ -303,10 +291,7 @@ impl ConfigBuilder {
     #[cfg(test)]
     #[must_use]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "Audit and document the existing panic conditions separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn from_json(input: &str) -> Self {
         crate::config::format::deserialize(input, crate::config::format::Format::Json).unwrap()
     }

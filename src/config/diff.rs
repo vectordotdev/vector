@@ -158,7 +158,7 @@ impl EnrichmentTableDiff {
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::struct_field_names,
-    reason = "Preserve existing field names and their configuration or API contracts."
+    reason = "Preserve field names and API contracts"
 )]
 pub struct Difference {
     pub to_remove: HashSet<ComponentKey>,

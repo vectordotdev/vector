@@ -74,7 +74,7 @@ where
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
-        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+        reason = "Preserve inferred default types"
     )]
     pub fn as_sink(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SinkOuter<T>)> {
         self.inner.sink_config(default_key).map(|(key, sink)| {
@@ -98,7 +98,7 @@ where
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
-        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+        reason = "Preserve inferred default types"
     )]
     pub fn as_source(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SourceOuter)> {
         self.inner.source_config(default_key).map(|(key, source)| {

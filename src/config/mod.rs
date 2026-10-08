@@ -127,10 +127,7 @@ pub enum ConfigPath {
 
 impl<'a> From<&'a ConfigPath> for &'a PathBuf {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::match_same_arms,
-        reason = "Keep the existing match structure and branch-specific context during the lint rollout."
-    )]
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     fn from(config_path: &'a ConfigPath) -> &'a PathBuf {
         match config_path {
             ConfigPath::File(path, _) => path,
@@ -144,7 +141,7 @@ impl ConfigPath {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::match_wildcard_for_single_variants,
-        reason = "Keep the existing branching and control flow during the lint rollout."
+        reason = "Preserve existing control flow"
     )]
     pub const fn as_dir(&self) -> Option<&PathBuf> {
         match self {
@@ -244,10 +241,7 @@ impl Config {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
         let inputs: Vec<_> = self
             .sinks
@@ -589,10 +583,7 @@ impl TestDefinition<OutputId> {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::doc_markdown,
-    reason = "Defer the remaining documentation formatting until its source or generator is audited."
-)]
+#[allow(clippy::doc_markdown, reason = "Documentation formatting deferred")]
 pub struct TestInput {
     /// The name of the transform to insert the input event to.
     pub insert_at: ComponentKey,
@@ -1440,7 +1431,7 @@ mod resource_config_tests {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::ignore_without_reason,
-        reason = "Retain this pre-existing ignored test until its prerequisites and failure mode are documented."
+        reason = "Ignored test needs documentation"
     )]
     fn generate_component_config_schema() {
         use indexmap::IndexMap;

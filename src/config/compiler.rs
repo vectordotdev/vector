@@ -11,10 +11,7 @@ use super::{
 };
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::too_many_lines,
-    reason = "Keep the existing control flow intact during the lint rollout."
-)]
+#[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
@@ -232,10 +229,7 @@ impl InputMatcher {
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::similar_names,
-    reason = "Keep established local names during the lint rollout; naming cleanup is deferred."
-)]
+#[allow(clippy::similar_names, reason = "Naming cleanup deferred")]
 fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexSet<String>) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {

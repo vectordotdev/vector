@@ -54,10 +54,7 @@ pub fn default_address() -> Option<SocketAddr> {
 /// Default gRPC API address for `vector top` and other API clients
 #[must_use]
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Audit and document the existing panic conditions separately from lint enforcement."
-)]
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn default_grpc_url() -> Url {
     let addr = default_address().unwrap();
     Url::parse(&format!("http://{addr}"))
@@ -66,10 +63,7 @@ pub fn default_grpc_url() -> Url {
 
 impl Options {
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn merge(&mut self, other: Self) -> Result<(), String> {
         // Merge options
 

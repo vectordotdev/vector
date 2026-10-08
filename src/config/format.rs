@@ -65,10 +65,7 @@ impl fmt::Display for Format {
 impl Format {
     /// Obtain the format from the file path using extension as a hint.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn from_path<T: AsRef<Path>>(path: T) -> Result<Self, T> {
         match path.as_ref().extension().and_then(|ext| ext.to_str()) {
             Some("toml") => Ok(Format::Toml),
@@ -81,10 +78,7 @@ impl Format {
 
 /// Parse the string represented in the specified format.
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
@@ -103,10 +97,7 @@ where
 
 /// Serialize the specified `value` into a string.
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn serialize<T>(value: &T, format: Format) -> Result<String, String>
 where
     T: serde::ser::Serialize,
@@ -191,10 +182,7 @@ mod tests {
     ))]
     #[test]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Keep the existing control flow intact during the lint rollout."
-    )]
+    #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
     fn test_deserialize_matches_toml() {
         use crate::config::ConfigBuilder;
 

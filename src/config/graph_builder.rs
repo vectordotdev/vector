@@ -249,7 +249,7 @@ mod tests {
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
-        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+        reason = "Preserve inferred default types"
     )]
     fn lookup_only_table_has_no_execution_nodes() {
         let mut config = ConfigBuilder::default();
