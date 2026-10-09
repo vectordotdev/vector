@@ -273,7 +273,7 @@ impl ResourceLog {
 /// fields are also sent as log record attributes; when a key is in both, the value from
 /// `attributes` is used. The `source_type` field is internal to Vector and is not sent.
 #[must_use]
-pub fn log_event_to_export_request(log: LogEvent) -> ExportLogsServiceRequest {
+pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceRequest {
     let mut record = LogRecord::default();
 
     let mut fields = match log.namespace() {
@@ -307,10 +307,12 @@ pub fn log_event_to_export_request(log: LogEvent) -> ExportLogsServiceRequest {
         }
         LogNamespace::Legacy => {
             let schema = log_schema();
-            let (mut fields, _) = log.into_parts();
-            if let Some(path) = schema.message_key() {
-                record.body = fields.remove(path, true).and_then(into_body);
+            // The message key can point into metadata (for example `%message`), so remove it
+            // with its full target path before the metadata is discarded.
+            if let Some(path) = schema.message_key_target_path() {
+                record.body = log.remove_prune(path, true).and_then(into_body);
             }
+            let (mut fields, _) = log.into_parts();
             if let Some(path) = schema.source_type_key() {
                 fields.remove(path, true);
             }
@@ -480,7 +482,8 @@ fn into_kv_list(value: Value) -> Result<Vec<KeyValue>, Value> {
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
-    use vrl::event_path;
+    use vector_core::config::{LogSchema, init_log_schema};
+    use vrl::{event_path, owned_value_path, path::OwnedTargetPath};
 
     use super::*;
     use crate::proto::common::v1::{ArrayValue, KeyValueList};
@@ -581,6 +584,17 @@ mod tests {
     #[test]
     fn decoded_vector_namespace_log_round_trips() {
         round_trip(LogNamespace::Vector);
+    }
+
+    #[test]
+    fn decoded_legacy_log_with_metadata_message_key_round_trips() {
+        let mut schema = LogSchema::default();
+        schema.set_message_key(Some(OwnedTargetPath::metadata(owned_value_path!(
+            "message"
+        ))));
+        init_log_schema(schema, true);
+
+        round_trip(LogNamespace::Legacy);
     }
 
     #[test]
