@@ -1833,6 +1833,49 @@ fn set_interval_ms_sets_interval_on_flushed_incremental_metrics() {
 }
 
 #[test]
+fn set_interval_ms_stamps_system_time_window_start() {
+    let sample_ts = Utc.timestamp_opt(1_600_000_000, 0).single().unwrap();
+    let counter = || {
+        make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            sample_ts,
+        )
+    };
+    let timestamp_of = |event: &Event| event.as_metric().timestamp().unwrap();
+
+    let before_new = Utc::now();
+    let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
+        AggregationMode::Auto,
+    )))
+    .unwrap();
+    let after_new = Utc::now();
+
+    // The first window starts when the transform is created.
+    agg.record(counter());
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    let after_first_flush = Utc::now();
+    assert_eq!(1, out.len());
+    let first = timestamp_of(&out[0]);
+    assert!(before_new <= first && first <= after_new);
+
+    // Each later window starts at the previous flush.
+    agg.record(counter());
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    let second = timestamp_of(&out[0]);
+    assert!(after_new <= second && second <= after_first_flush);
+
+    // Flag off: the latest sample timestamp is kept, as before.
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
+    agg.record(counter());
+    let out = flush_final(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), sample_ts);
+}
+
+#[test]
 fn set_interval_ms_overwrites_input_interval() {
     let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
         AggregationMode::Sum,

@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_stream::stream;
+use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt};
 use vector_lib::event::{
     MetricValue,
@@ -98,6 +99,8 @@ pub struct Aggregate {
     pub(crate) config: AggregateConfig,
     /// Interval to set on flushed incremental metrics; `Some` only when `set_interval_ms` is enabled.
     pub(crate) output_interval_ms: Option<NonZeroU32>,
+    /// Start of the current system-time window: creation time, then the time of each flush.
+    window_start: DateTime<Utc>,
 }
 
 /// Upper bound for any millisecond-valued duration field that is later cast
@@ -156,6 +159,7 @@ impl Aggregate {
             watermark: None,
             config: *config,
             output_interval_ms,
+            window_start: Utc::now(),
         })
     }
 
@@ -346,6 +350,7 @@ impl Aggregate {
             self.flush_event_time_buckets(output, false);
         } else {
             self.flush_system_time(output);
+            self.set_window_start_timestamps(&mut output[start..]);
         }
         self.set_output_interval(&mut output[start..]);
     }
@@ -361,8 +366,24 @@ impl Aggregate {
             self.flush_event_time_buckets(output, true);
         } else {
             self.flush_system_time(output);
+            self.set_window_start_timestamps(&mut output[start..]);
         }
         self.set_output_interval(&mut output[start..]);
+    }
+
+    /// With `set_interval_ms`, a system-time flush emits the window since the previous flush, so
+    /// its incremental metrics get the window start as their timestamp.
+    fn set_window_start_timestamps(&mut self, flushed: &mut [Event]) {
+        let window_start = std::mem::replace(&mut self.window_start, Utc::now());
+        if self.output_interval_ms.is_none() {
+            return;
+        }
+        for event in flushed {
+            let metric = event.as_mut_metric();
+            if metric.kind() == MetricKind::Incremental {
+                metric.data_mut().time.timestamp = Some(window_start);
+            }
+        }
     }
 
     /// Overwrites `interval_ms` on flushed incremental metrics with the flush interval, so a
