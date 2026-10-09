@@ -97,4 +97,18 @@ generated: components: transforms: aggregate: configuration: {
 			}
 		}
 	}
+	set_interval_ms: {
+		description: """
+			Set `interval_ms` on each aggregated incremental metric to the flush interval.
+
+			Downstream components can then treat an aggregated counter as a rate over the flush
+			interval. For example, the `datadog_metrics` sink sends counters that have an interval
+			as rates. Absolute metrics and metrics that pass through unchanged are not modified.
+
+			When enabled, `interval_ms` must be a whole number of seconds (a multiple of 1000) and
+			must not be greater than 4294967295 (about 49.7 days).
+			"""
+		required: false
+		type: bool: default: false
+	}
 }

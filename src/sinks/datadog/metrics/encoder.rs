@@ -558,6 +558,27 @@ fn sketch_to_proto_message(
     })
 }
 
+/// A metric's interval, in the two forms the series wire formats need.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct SeriesInterval {
+    /// Whole seconds for the wire `interval` field, rounded to the nearest second and at least 1.
+    pub(super) whole_secs: u32,
+    /// Exact seconds, used to scale a rate's value to per-second.
+    pub(super) exact_secs: f64,
+}
+
+/// Converts a metric's millisecond `interval_ms`, if any, into a [`SeriesInterval`].
+pub(super) fn series_interval(metric: &Metric) -> Option<SeriesInterval> {
+    metric.interval_ms().map(|interval_ms| {
+        let ms = interval_ms.get();
+        let rounded_secs = ms / 1000 + u32::from(ms % 1000 >= 500);
+        SeriesInterval {
+            whole_secs: rounded_secs.max(1),
+            exact_secs: f64::from(ms) / 1000.0,
+        }
+    })
+}
+
 /// A metric's tags, split into the three pieces the series wire formats send separately.
 pub(super) struct SeriesTags {
     /// Remaining tags, encoded as sorted `key:value` (or bare `key`) strings.
@@ -646,8 +667,7 @@ fn series_to_proto_message(
 
     let timestamp = encode_timestamp(metric.timestamp());
 
-    // our internal representation is in milliseconds but the expected output is in seconds
-    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
+    let maybe_interval = series_interval(metric);
 
     let (points, metric_type) = match metric.value() {
         MetricValue::Counter { value } => {
@@ -655,7 +675,7 @@ fn series_to_proto_message(
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                let value = *value / (interval as f64);
+                let value = *value / interval.exact_secs;
                 (
                     vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }],
                     ddmetric_proto::metric_payload::MetricType::Rate,
@@ -703,7 +723,7 @@ fn series_to_proto_message(
         // unit is omitted
         unit: "".to_string(),
         source_type_name,
-        interval: maybe_interval.unwrap_or(0) as i64,
+        interval: maybe_interval.map_or(0, |interval| i64::from(interval.whole_secs)),
         metadata,
     })
 }
@@ -873,9 +893,10 @@ mod tests {
     };
 
     use super::{
-        DatadogMetricsEncoder, EncoderError, ddmetric_proto, encode_proto_key_and_message,
-        encode_tags, encode_timestamp, get_sketch_payload_sketches_field_number,
-        max_compressed_size, series_to_proto_message, sketch_to_proto_message,
+        DatadogMetricsEncoder, EncoderError, SeriesInterval, ddmetric_proto,
+        encode_proto_key_and_message, encode_tags, encode_timestamp,
+        get_sketch_payload_sketches_field_number, max_compressed_size, series_interval,
+        series_to_proto_message, sketch_to_proto_message,
     };
     use crate::sinks::{
         datadog::metrics::{
@@ -1204,6 +1225,56 @@ mod tests {
             assert_eq!(series_proto.interval, expected_interval as i64);
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
+        }
+    }
+
+    #[test]
+    fn series_interval_rounds_wire_field_and_keeps_exact_seconds() {
+        let cases = [
+            (1, 1, 0.001),
+            (500, 1, 0.5),
+            (1_000, 1, 1.0),
+            (1_499, 1, 1.499),
+            (1_500, 2, 1.5),
+            (10_000, 10, 10.0),
+            (u32::MAX, 4_294_967, 4_294_967.295),
+        ];
+        for (interval_ms, whole_secs, exact_secs) in cases {
+            let metric = get_simple_rate_counter(1.0, interval_ms);
+            assert_eq!(
+                series_interval(&metric),
+                Some(SeriesInterval {
+                    whole_secs,
+                    exact_secs
+                }),
+                "interval_ms = {interval_ms}"
+            );
+        }
+        assert_eq!(series_interval(&get_simple_counter()), None);
+    }
+
+    #[test]
+    fn encode_counter_with_fractional_second_interval_as_rate() {
+        for (value, interval_ms, expected_value, expected_interval) in
+            [(10.0, 500, 20.0, 1), (3.0, 1_500, 2.0, 2)]
+        {
+            let series_proto = series_to_proto_message(
+                &get_simple_rate_counter(value, interval_ms),
+                &None,
+                log_schema(),
+                DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+            )
+            .unwrap();
+            assert_eq!(series_proto.r#type, 2, "interval_ms = {interval_ms}");
+            assert_eq!(
+                series_proto.interval, expected_interval,
+                "interval_ms = {interval_ms}"
+            );
+            assert_eq!(series_proto.points.len(), 1);
+            assert_eq!(
+                series_proto.points[0].value, expected_value,
+                "interval_ms = {interval_ms}"
+            );
         }
     }
 

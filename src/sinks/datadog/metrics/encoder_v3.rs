@@ -24,7 +24,7 @@ use super::{
     config::DatadogMetricsEndpoint,
     encoder::{
         EncoderError, FinishError, ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE, SeriesTags,
-        generate_origin_metadata, split_series_tags,
+        generate_origin_metadata, series_interval, split_series_tags,
     },
 };
 use crate::sinks::util::{
@@ -180,7 +180,7 @@ fn encode_metric_to_v3(
 ) -> Result<(), EncoderError> {
     // Mirrors V2's `series_to_proto_message`: a Counter with an interval is sent as a
     // per-second-scaled Rate, not a raw Count.
-    let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
+    let maybe_interval = series_interval(metric);
 
     let metric_type = match metric.value() {
         MetricValue::Counter { .. } if maybe_interval.is_some() => V3MetricType::Rate,
@@ -261,9 +261,9 @@ fn encode_metric_to_v3(
     }
 
     // Interval — matches V2, which always stamps the interval field on the message
-    // (`interval: maybe_interval.unwrap_or(0)`), even though only Rate uses it to scale the value.
+    // when an interval is present, even though only Rate uses it to scale the value.
     if let Some(interval) = maybe_interval {
-        builder.set_interval(interval.into());
+        builder.set_interval(interval.whole_secs.into());
     }
 
     // Note: `unit` is intentionally never set — V2 always sends it empty (see
@@ -275,7 +275,7 @@ fn encode_metric_to_v3(
     match metric.value() {
         MetricValue::Counter { value } => {
             let value = match maybe_interval {
-                Some(interval) => *value / (interval as f64),
+                Some(interval) => *value / interval.exact_secs,
                 None => *value,
             };
             builder.add_point(timestamp, value);
@@ -518,6 +518,25 @@ mod tests {
             plain_result.into_payload(),
             "a counter with an interval must encode differently than a plain count"
         );
+    }
+
+    #[test]
+    fn v3_counter_with_sub_second_interval_scales_by_exact_seconds() {
+        let encode = |value: f64, interval_ms: u32| {
+            let mut enc = DatadogMetricsV3Encoder::new(
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+                None,
+            );
+            let metric = counter("rate.counter", value)
+                .with_timestamp(DateTime::from_timestamp(1_700_000_000, 0))
+                .with_interval_ms(NonZeroU32::new(interval_ms));
+            enc.try_encode(metric).unwrap();
+            enc.finish().unwrap().0.into_payload()
+        };
+
+        // Both are a rate of 1/s with a wire interval of 1 second.
+        assert_eq!(encode(0.5, 500), encode(1.0, 1_000));
+        assert_ne!(encode(1.0, 500), encode(1.0, 1_000));
     }
 
     #[test]
