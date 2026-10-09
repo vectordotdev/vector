@@ -296,8 +296,12 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
-        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
-            .map(|options| options.subscription_capacity(config.subscriber_capacity))
+        from_tls_auth_config(
+            &config.connection_name,
+            config.auth.as_ref(),
+            config.tls.as_ref(),
+        )
+        .map(|options| options.subscription_capacity(config.subscriber_capacity))
     }
 }
 

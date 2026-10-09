@@ -141,7 +141,7 @@ pub struct UnixConfig {
 
 impl SyslogConfig {
     #[cfg(test)]
-    pub fn from_mode(mode: Mode) -> Self {
+    pub const fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,

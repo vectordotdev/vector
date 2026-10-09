@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 //! Shared helper functions for NATS source and sink.
 #![allow(missing_docs)]
 
@@ -46,17 +47,17 @@ pub enum NatsAuthConfig {
     },
 
     /// NKey authentication.
+    #[expect(clippy::doc_markdown, reason = "NATS authentication name")]
     Nkey { nkey: NatsAuthNKey },
 }
 
 impl std::fmt::Display for NatsAuthConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use NatsAuthConfig::*;
         let word = match self {
-            UserPassword { .. } => "user_password",
-            Token { .. } => "token",
-            CredentialsFile { .. } => "credentials_file",
-            Nkey { .. } => "nkey",
+            Self::UserPassword { .. } => "user_password",
+            Self::Token { .. } => "token",
+            Self::CredentialsFile { .. } => "credentials_file",
+            Self::Nkey { .. } => "nkey",
         };
         write!(f, "{word}")
     }
@@ -94,6 +95,7 @@ pub struct NatsAuthCredentialsFile {
 }
 
 /// NKeys configuration.
+#[expect(clippy::doc_markdown, reason = "NATS authentication name")]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -153,10 +155,10 @@ pub(crate) fn validate_tls_cert_key_pair(
 
 pub(crate) fn from_tls_auth_config(
     connection_name: &str,
-    auth_config: &Option<NatsAuthConfig>,
-    tls_config: &Option<TlsEnableableConfig>,
+    auth_config: Option<&NatsAuthConfig>,
+    tls_config: Option<&TlsEnableableConfig>,
 ) -> Result<async_nats::ConnectOptions, NatsConfigError> {
-    let nats_options = match &auth_config {
+    let nats_options = match auth_config {
         None => async_nats::ConnectOptions::new(),
         Some(auth) => auth.to_nats_options()?,
     };
@@ -207,123 +209,123 @@ mod tests {
 
     #[test]
     fn auth_user_password_ok() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: user_password
             user_password:
               user: username
               password: password
-        "#})
+        "})
         .unwrap();
     }
 
     #[test]
     fn auth_user_password_missing_user() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: user_password
             user_password:
               password: password
-        "#})
+        "})
         .unwrap_err();
     }
 
     #[test]
     fn auth_user_password_missing_password() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: user_password
             user_password:
               user: username
-        "#})
+        "})
         .unwrap_err();
     }
 
     #[test]
     fn auth_user_password_missing_all() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: user_password
             token:
               value: foobar
-        "#})
+        "})
         .unwrap_err();
     }
 
     #[test]
     fn auth_token_ok() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: token
             token:
               value: token
-        "#})
+        "})
         .unwrap();
     }
 
     #[test]
     fn auth_token_missing() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: token
             user_password:
               user: foobar
-        "#})
+        "})
         .unwrap_err();
     }
 
     #[test]
     fn auth_credentials_file_ok() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: credentials_file
             credentials_file:
               path: tests/integration/nats/data/nats.creds
-        "#})
+        "})
         .unwrap();
     }
 
     #[test]
     fn auth_credentials_file_missing() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: credentials_file
             token:
               value: foobar
-        "#})
+        "})
         .unwrap_err();
     }
 
     #[test]
     fn auth_nkey_ok() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: nkey
             nkey:
               nkey: UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5
               seed: SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA
-        "#})
+        "})
         .unwrap();
     }
 
     #[test]
     fn auth_nkey_missing_nkey() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: nkey
             nkey:
               seed: SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA
-        "#})
+        "})
         .unwrap_err();
     }
 
     #[test]
     fn auth_nkey_missing_seed() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: nkey
             nkey:
               nkey: UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5
-        "#})
+        "})
         .unwrap_err();
     }
 
     #[test]
     fn auth_nkey_missing_both() {
-        parse_auth(indoc! {r#"
+        parse_auth(indoc! {r"
             strategy: nkey
             user_password:
               user: foobar
-        "#})
+        "})
         .unwrap_err();
     }
 }

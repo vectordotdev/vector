@@ -1,9 +1,15 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 
-use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt,
+    fs::remove_dir_all,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 use exitcode::ExitCode;
 use vector_lib::enrichment::{Case, IndexHandle, TableRegistry};
 use vector_vrl_metrics::MetricsStorage;
@@ -70,6 +76,11 @@ const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Independent validation flags"
+)]
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
     /// Secret placeholders are not resolved unless `--resolve-secrets` is also given.
@@ -160,7 +171,7 @@ impl Opts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
@@ -176,9 +187,8 @@ pub async fn validate(
 
     let mut validated = true;
 
-    let mut config = match validate_config(opts, signal_handler, &mut fmt).await {
-        Some(config) => config,
-        None => return exitcode::CONFIG,
+    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt).await else {
+        return exitcode::CONFIG;
     };
 
     validated &= validate_transforms(&config, &mut fmt);
@@ -187,7 +197,7 @@ pub async fn validate(
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
             validated &= validate_environment(opts, &config, &mut fmt).await;
-            remove_tmp_directory(tmp_directory);
+            remove_tmp_directory(&tmp_directory);
         } else {
             validated = false;
         }
@@ -208,9 +218,7 @@ pub async fn validate_config(
 ) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
-    let paths = if let Some(paths) = config::process_paths(&paths) {
-        paths
-    } else {
+    let Some(paths) = config::process_paths(&paths) else {
         fmt.error("No config file paths");
         return None;
     };
@@ -244,7 +252,9 @@ pub async fn validate_config(
         .ok()?;
 
     // Warnings
-    if !warnings.is_empty() {
+    if warnings.is_empty() {
+        fmt.success(format!("Loaded {:?}", &paths_list));
+    } else {
         if opts.deny_warnings {
             report_error(warnings);
             return None;
@@ -252,8 +262,6 @@ pub async fn validate_config(
 
         fmt.title(format!("Loaded with warnings {:?}", &paths_list));
         fmt.sub_warning(warnings);
-    } else {
-        fmt.success(format!("Loaded {:?}", &paths_list));
     }
 
     Some(config)
@@ -363,11 +371,8 @@ fn validate_sinks_with_context(config: &Config, fmt: &mut Formatter) -> bool {
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = match validate_components(config, &diff, fmt).await {
-        Some(pieces) => pieces,
-        _ => {
-            return false;
-        }
+    let Some(mut pieces) = validate_components(config, &diff, fmt).await else {
+        return false;
     };
     opts.skip_healthchecks || validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
@@ -429,7 +434,7 @@ async fn validate_healthchecks(
             }
             Ok(Err(e)) => failed(format!("Health check for \"{id}\" failed: {e}")),
             Err(error) if error.is_cancelled() => {
-                failed(format!("Health check for \"{id}\" was cancelled"))
+                failed(format!("Health check for \"{id}\" was cancelled"));
             }
             Err(_) => failed(format!("Health check for \"{id}\" panicked")),
         }
@@ -458,8 +463,8 @@ fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<Path
     }
 }
 
-fn remove_tmp_directory(path: PathBuf) {
-    if let Err(error) = remove_dir_all(&path) {
+fn remove_tmp_directory(path: &Path) {
+    if let Err(error) = remove_dir_all(path) {
         error!(message = "Failed to remove temporary directory.", path = ?path, %error);
     }
 }
@@ -477,6 +482,7 @@ pub struct Formatter {
 }
 
 impl Formatter {
+    #[must_use]
     pub fn new(color: bool) -> Self {
         Self {
             max_line_width: 0,
@@ -522,24 +528,24 @@ impl Formatter {
         } else {
             #[allow(clippy::print_stdout)]
             {
-                println!("{:>width$}", "Validated", width = self.max_line_width)
+                println!("{:>width$}", "Validated", width = self.max_line_width);
             }
         }
     }
 
     /// Standalone line
     fn success(&mut self, msg: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.success_intro, msg.as_ref()))
+        self.print(format!("{} {}\n", self.success_intro, msg.as_ref()));
     }
 
     /// Standalone line
     fn warning(&mut self, warning: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.warning_intro, warning.as_ref()))
+        self.print(format!("{} {}\n", self.warning_intro, warning.as_ref()));
     }
 
     /// Standalone line
     fn error(&mut self, error: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.error_intro, error.as_ref()))
+        self.print(format!("{} {}\n", self.error_intro, error.as_ref()));
     }
 
     /// Marks sub
@@ -550,7 +556,7 @@ impl Formatter {
             title.as_ref(),
             "",
             width = title.as_ref().len()
-        ))
+        ));
     }
 
     /// A list of warnings that go with a title.
@@ -558,7 +564,7 @@ impl Formatter {
     where
         I::Item: fmt::Display,
     {
-        self.sub(self.warning_intro.clone(), warnings)
+        self.sub(self.warning_intro.clone(), warnings);
     }
 
     /// A list of errors that go with a title.
@@ -566,7 +572,7 @@ impl Formatter {
     where
         I::Item: fmt::Display,
     {
-        self.sub(self.error_intro.clone(), errors)
+        self.sub(self.error_intro.clone(), errors);
     }
 
     fn sub<I: IntoIterator>(&mut self, intro: impl AsRef<str>, msgs: I)
@@ -605,7 +611,7 @@ impl Formatter {
         self.print_space = true;
         #[allow(clippy::print_stdout)]
         {
-            print!("{}", print.as_ref())
+            print!("{}", print.as_ref());
         }
     }
 }
