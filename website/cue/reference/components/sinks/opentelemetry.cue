@@ -102,6 +102,8 @@ components: sinks: opentelemetry: {
 				`use_otlp_decoding` on the source. With this option, the events have the OTLP structure
 				instead of the fields in the following table.
 
+				With `log_namespace: false` (Legacy namespace), the conversion uses these event fields:
+
 				| Event field (Legacy namespace) | OTLP field |
 				| --- | --- |
 				| `message` | `body` |
@@ -114,15 +116,27 @@ components: sinks: opentelemetry: {
 				| `severity_text`, `severity_number` | `severityText`, `severityNumber` |
 				| `flags`, `dropped_attributes_count` | `flags`, `droppedAttributesCount` |
 
-				With the Vector log namespace, the event becomes the `body` and the other fields are
-				read from the `opentelemetry` source metadata. If that metadata is missing, the field
-				with the `timestamp` meaning gives `timeUnixNano`, and the Vector ingest timestamp
-				gives `observedTimeUnixNano`.
-
 				All other event fields are sent as log record attributes. This includes a mapped field
 				that does not have the type OTLP requires, for example a `trace_id` that is not 32 hex
 				characters. If a key is both in `attributes` and at the top level, the value from
-				`attributes` is used. The `source_type` field is not sent.
+				`attributes` is used.
+
+				Vector's source type marker identifies the source component type that produced the
+				event, for example `source_type: file`. Its location is configured with
+				`log_schema.source_type_key` (default: `.source_type`). The codec omits this internal
+				field. If the configured path points to metadata and that field exists (for example,
+				`%source_type`), the matching payload field (`.source_type`) is kept as an attribute.
+				Otherwise, the matching event field is omitted, because some Legacy sources still
+				write the marker there.
+
+				With `log_namespace: true` (Vector namespace), the entire event payload becomes the
+				OTLP `body`. A payload field named `.source_type` is preserved in the body, not sent
+				as an attribute. The internal marker is stored separately in `%vector.source_type`
+				metadata and is not sent.
+
+				The other OTLP fields are read from the `opentelemetry` source metadata. If that
+				metadata is missing, the field with the `timestamp` meaning gives `timeUnixNano`,
+				and the Vector ingest timestamp gives `observedTimeUnixNano`.
 				"""
 		}
 		quickstart: {

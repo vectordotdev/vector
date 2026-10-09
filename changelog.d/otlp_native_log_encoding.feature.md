@@ -24,8 +24,22 @@ resourceLogs:
                   stringValue: web-1
 ```
 
-The conversion is the inverse of the `opentelemetry` source decoding. Fields with no OTLP equivalent are
-sent as log record attributes. A log event with a `resourceLogs`, `resourceMetrics`, or `resourceSpans`
-root field is treated as an OTLP request that is already built, and is sent as it is.
+The conversion is the inverse of the `opentelemetry` source decoding. A log event with a `resourceLogs`,
+`resourceMetrics`, or `resourceSpans` root field is treated as an OTLP request that is already built,
+and is sent as it is.
+
+The source type marker identifies the Vector source component type that produced the event, for example
+`source_type: file`.
+
+With `log_namespace: false` (Legacy namespace), fields with no OTLP equivalent are sent as log record
+attributes. The marker's location is configured with `log_schema.source_type_key` (default:
+`.source_type`). The codec omits this internal field. If the configured path points to metadata and
+that field exists (for example, `%source_type`), the matching payload field (`.source_type`) is kept as
+an attribute. Otherwise, the matching event field is omitted, because some Legacy sources still write
+the marker there.
+
+With `log_namespace: true` (Vector namespace), the entire event payload becomes the OTLP `body`.
+A payload field named `.source_type` is preserved in the body, not sent as an attribute. The internal
+marker is stored separately in `%vector.source_type` metadata and is not sent.
 
 authors: thomasqueirozb
