@@ -141,6 +141,7 @@ jobs:
             "pulsar",
             "redis",
             "splunk",
+            "victoriametrics",
             "webhdfs"
           ]
     steps:

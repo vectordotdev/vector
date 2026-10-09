@@ -1,0 +1,6 @@
+sinks:
+  my_sink_id:
+    type: victoriametrics
+    inputs:
+      - my-source-or-transform-id
+    endpoint: http://localhost:8428

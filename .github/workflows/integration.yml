@@ -133,6 +133,7 @@ jobs:
             "pulsar",
             "redis",
             "splunk",
+            "victoriametrics",
             "webhdfs"
           ]
     timeout-minutes: 90
