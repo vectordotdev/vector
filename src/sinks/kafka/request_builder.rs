@@ -101,7 +101,7 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
                 Value::Object(headers_map) => {
                     let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
                     for (key, value) in headers_map {
-                        if let Value::Bytes(value_bytes) = value {
+                        if let Some(value_bytes) = value.as_bytes() {
                             owned_headers = owned_headers.insert(Header {
                                 key,
                                 value: Some(value_bytes.as_ref()),
@@ -138,7 +138,7 @@ mod tests {
         let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
         let mut header_values = ObjectMap::new();
         header_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
-        header_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
+        header_values.insert("b-key".into(), Value::from("b-value"));
 
         let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert(&headers_key, header_values);
@@ -155,7 +155,7 @@ mod tests {
         let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
         let mut header_values = ObjectMap::new();
         header_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
-        header_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
+        header_values.insert("b-key".into(), Value::from("b-value"));
 
         let mut event = Event::Trace(TraceEvent::from(LogEvent::from("hello")));
         event.as_mut_trace().insert(&headers_key, header_values);

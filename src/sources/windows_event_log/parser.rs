@@ -417,14 +417,15 @@ impl EventLogParser {
                 let int_value = match value {
                     Value::Integer(i) => *i,
                     Value::Float(f) => f.into_inner() as i64,
-                    Value::Bytes(b) => String::from_utf8_lossy(b).parse::<i64>().map_err(|_| {
-                        WindowsEventLogError::FilterError {
+                    value @ (Value::Bytes(_) | Value::String(_)) => value
+                        .to_string_lossy()
+                        .parse::<i64>()
+                        .map_err(|_| WindowsEventLogError::FilterError {
                             message: format!(
                                 "Cannot convert '{}' to integer",
-                                String::from_utf8_lossy(b)
+                                value.to_string_lossy()
                             ),
-                        }
-                    })?,
+                        })?,
                     _ => {
                         return Err(WindowsEventLogError::FilterError {
                             message: format!("Cannot convert {value:?} to integer"),
@@ -437,14 +438,15 @@ impl EventLogParser {
                 let float_value = match value {
                     Value::Float(f) => f.into_inner(),
                     Value::Integer(i) => *i as f64,
-                    Value::Bytes(b) => String::from_utf8_lossy(b).parse::<f64>().map_err(|_| {
-                        WindowsEventLogError::FilterError {
+                    value @ (Value::Bytes(_) | Value::String(_)) => value
+                        .to_string_lossy()
+                        .parse::<f64>()
+                        .map_err(|_| WindowsEventLogError::FilterError {
                             message: format!(
                                 "Cannot convert '{}' to float",
-                                String::from_utf8_lossy(b)
+                                value.to_string_lossy()
                             ),
-                        }
-                    })?,
+                        })?,
                     _ => {
                         return Err(WindowsEventLogError::FilterError {
                             message: format!("Cannot convert {value:?} to float"),
@@ -460,8 +462,8 @@ impl EventLogParser {
                 let bool_value = match value {
                     Value::Boolean(b) => *b,
                     Value::Integer(i) => *i != 0,
-                    Value::Bytes(b) => {
-                        let s = String::from_utf8_lossy(b).to_lowercase();
+                    value @ (Value::Bytes(_) | Value::String(_)) => {
+                        let s = value.to_string_lossy().to_lowercase();
                         matches!(s.as_str(), "true" | "1" | "yes" | "on")
                     }
                     _ => {

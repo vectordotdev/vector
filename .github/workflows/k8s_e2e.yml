@@ -74,7 +74,7 @@ jobs:
       DISABLE_MOLD: true
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
       - run: sudo -E bash scripts/ci-free-disk-space.sh
@@ -124,11 +124,12 @@ jobs:
             // https://cloud.google.com/kubernetes-engine/docs/release-notes
             // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
+              { version: "v1.37.1",  is_essential: true  }, // Latest stable (Sep 23, 2026)
+              { version: "v1.36.5",  is_essential: true  }, // Latest stable (Apr 22, 2026)
               { version: "v1.35.1",  is_essential: true  }, // Latest stable (Feb 10, 2026)
               { version: "v1.34.4",  is_essential: true  }, // Current patch (Feb 10, 2026)
               { version: "v1.33.0",  is_essential: false }, // Widely supported
               { version: "v1.32.0",  is_essential: false }, // EOL Feb 28 2026
-              { version: "v1.31.0",  is_essential: false }, // Extended support on cloud providers
             ]
             const container_runtime = [
               "docker",
@@ -169,7 +170,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
@@ -191,7 +192,7 @@ jobs:
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
       - name: Checkout helm-charts
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: vectordotdev/helm-charts
           ref: develop

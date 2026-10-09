@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Asserts two properties:
 //!
 //! * **conservation** every id the oracle acked has come back. Peer to the
@@ -35,6 +37,11 @@ struct Args {
 }
 
 #[tokio::main(flavor = "current_thread")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the conservation and liveness checks together; splitting is deferred"
+)]
 async fn main() {
     antithesis_init();
     let args = Args::parse();
@@ -52,7 +59,7 @@ async fn main() {
     // and a probe that never round-trips is a real wedge, not a transient fault.
 
     // Faults stop instantly but recovery is not, so wait for every node to serve again.
-    let recovery_deadline = time::Instant::now() + time::Duration::from_secs(180);
+    let recovery_deadline = time::Instant::now() + time::Duration::from_mins(3);
     while time::Instant::now() < recovery_deadline
         && !all_endpoints_healthy(&http, &metrics_urls, time::Duration::from_secs(3)).await
     {
@@ -62,7 +69,7 @@ async fn main() {
     // Drain: wait until every acked id has come back, or until delivery stops
     // advancing for several polls. With no load and no faults a healthy buffer
     // flushes its backlog quickly; one that is still short here is wedged or lossy.
-    let drain_deadline = time::Instant::now() + time::Duration::from_secs(120);
+    let drain_deadline = time::Instant::now() + time::Duration::from_mins(2);
     let mut last_delivered = u64::MAX;
     let mut plateau = 0u32;
     while time::Instant::now() < drain_deadline {
@@ -151,7 +158,7 @@ async fn main() {
     // bring them up. The round-trip is therefore the real readiness signal and gets the
     // same budget as recovery rather than a tight window that expires before the data
     // path is serving.
-    let deadline = time::Instant::now() + time::Duration::from_secs(180);
+    let deadline = time::Instant::now() + time::Duration::from_mins(3);
     let mut probe = None;
     let mut progressed = false;
     while !progressed && time::Instant::now() < deadline {

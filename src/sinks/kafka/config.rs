@@ -358,7 +358,7 @@ impl ValidatedSink for KafkaSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedKafkaSink { topic } = validated;
         let sink = KafkaSink::new(self.clone(), topic.clone())?;
-        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck.clone()).boxed();
+        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 }

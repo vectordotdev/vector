@@ -13,10 +13,12 @@ pub struct OptionalTargetPath {
 }
 
 impl OptionalTargetPath {
+    #[must_use]
     pub fn none() -> Self {
         Self { path: None }
     }
 
+    #[must_use]
     pub fn event(path: &str) -> Self {
         Self {
             path: Some(OwnedTargetPath {
@@ -26,12 +28,14 @@ impl OptionalTargetPath {
         }
     }
 
+    #[must_use]
     pub fn from(prefix: PathPrefix, path: Option<OwnedValuePath>) -> Self {
         Self {
             path: path.map(|path| OwnedTargetPath { prefix, path }),
         }
     }
 
+    #[must_use]
     pub fn as_ref(&self) -> Option<&OwnedTargetPath> {
         self.path.as_ref()
     }
@@ -74,10 +78,12 @@ pub struct OptionalValuePath {
 }
 
 impl OptionalValuePath {
+    #[must_use]
     pub fn none() -> Self {
         Self { path: None }
     }
 
+    #[must_use]
     pub fn new(path: &str) -> Self {
         Self {
             path: Some(owned_value_path!(path)),

@@ -473,7 +473,7 @@ mod tests {
         builder.send().await
     }
 
-    async fn spawn_send(
+    fn spawn_send(
         address: SocketAddr,
         timestamp: DateTime<Utc>,
         records: Vec<&'static [u8]>,
@@ -596,8 +596,7 @@ mod tests {
                 false,
                 record_compression,
                 None,
-            )
-            .await;
+            );
 
             if success {
                 let events = collect_n(rx, 1).await;
@@ -706,8 +705,7 @@ mod tests {
                 false,
                 record_compression,
                 None,
-            )
-            .await;
+            );
 
             if success {
                 let events = collect_n(rx, 1).await;
@@ -785,8 +783,7 @@ mod tests {
                 true,
                 Compression::None,
                 None,
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -833,8 +830,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -882,8 +878,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -971,8 +966,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -1027,8 +1021,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -1104,8 +1097,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some("malformed-common-attributes"),
-            )
-            .await;
+            );
 
             let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -1307,8 +1299,7 @@ mod tests {
             false,
             Compression::None,
             None,
-        )
-        .await;
+        );
 
         let events = collect_n(rx, 1).await;
 
@@ -1353,8 +1344,7 @@ mod tests {
             false,
             Compression::None,
             None,
-        )
-        .await;
+        );
 
         let events = collect_n(rx, 1).await;
         let access_key = events[0]
@@ -1380,8 +1370,7 @@ mod tests {
             false,
             Compression::None,
             None,
-        )
-        .await;
+        );
 
         let events = collect_n(rx, 1).await;
 

@@ -185,12 +185,14 @@ pub struct Sample {
     group_states: LruCache<Option<String>, GroupState>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
+    include_group_tag: bool,
 }
 
 impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         static_mode: SampleMode,
@@ -199,6 +201,7 @@ impl Sample {
         max_groups: NonZeroUsize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
@@ -210,9 +213,11 @@ impl Sample {
             max_groups,
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new_with_dynamic(
         name: String,
         static_mode: SampleMode,
@@ -221,6 +226,7 @@ impl Sample {
         max_groups: NonZeroUsize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
@@ -229,6 +235,7 @@ impl Sample {
             max_groups,
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
@@ -239,6 +246,7 @@ impl Sample {
         max_groups: NonZeroUsize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         let next_group_state = GroupState {
             static_state: static_mode.new_state(),
@@ -259,6 +267,7 @@ impl Sample {
             group_states,
             exclude,
             sample_rate_key,
+            include_group_tag,
         }
     }
 
@@ -288,6 +297,7 @@ impl Sample {
             Value::Integer(value) => *value as f64,
             Value::Float(value) => value.into_inner(),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<f64>().ok()?,
+            Value::String(string) => string.parse::<f64>().ok()?,
             _ => return None,
         };
 
@@ -305,6 +315,7 @@ impl Sample {
         match value {
             Value::Integer(value) => u64::try_from(*value).ok().and_then(NonZeroU64::new),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<NonZeroU64>().ok(),
+            Value::String(string) => string.parse::<NonZeroU64>().ok(),
             _ => None,
         }
     }
@@ -368,6 +379,10 @@ impl FunctionTransform for Sample {
         };
 
         let group_by_key = self.group_by_key(&event);
+        let discarded_group = self
+            .include_group_tag
+            .then(|| group_by_key.clone())
+            .flatten();
         let static_key_sample = self.static_key_value(&event).map(|value| {
             self.static_mode
                 .hash_within_ratio(value.to_string_lossy().as_bytes())
@@ -407,7 +422,10 @@ impl FunctionTransform for Sample {
             }
             output.push(event);
         } else {
-            emit!(SampleEventDiscarded);
+            emit!(SampleEventDiscarded {
+                group: discarded_group,
+                include_group_tag: self.include_group_tag,
+            });
         }
     }
 }

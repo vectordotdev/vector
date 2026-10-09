@@ -52,7 +52,7 @@ async fn tap_internal(
     let tap_runner = TapRunner::new(
         &url,
         opts.inputs_of.clone(),
-        opts.outputs_patterns().clone(),
+        opts.outputs_patterns(),
         &output_channel,
     );
 

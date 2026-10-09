@@ -431,7 +431,6 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
-            .await
             .into_iter()
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
@@ -465,7 +464,6 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
-            .await
             .into_iter()
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();

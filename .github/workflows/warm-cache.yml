@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:
@@ -49,7 +49,7 @@ jobs:
       - name: Seed build-mode (.rlib)
         run: cargo build --workspace --tests --all-features --locked
 
-      # check-mode: serves check-clippy / check-generated-docs / check-rust-docs.
+      # check-mode: serves check-clippy / check-generated-docs.
       # Runs the exact command those jobs use (`vdev check rust` ->
       # `cargo clippy --workspace --all-targets --all-features`) so fingerprints match.
       - name: Seed check-mode (.rmeta)

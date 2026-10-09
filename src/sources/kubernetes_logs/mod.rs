@@ -4,7 +4,12 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-use std::{cmp::min, path::PathBuf, time::Duration};
+use std::{
+    cmp::min,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -48,8 +53,8 @@ use crate::{
     internal_events::{
         FileInternalMetricsConfig, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
-        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
-        KubernetesLogsPodInfo, StreamClosedError,
+        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived, PodCountersCache,
+        StreamClosedError,
     },
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
@@ -424,6 +429,17 @@ impl SourceConfig for Config {
             )
             .with_source_metadata(
                 Self::NAME,
+                self.namespace_annotation_fields
+                    .namespace_annotations
+                    .path
+                    .clone()
+                    .map(|x| LegacyKey::Overwrite(x.path)),
+                &owned_value_path!("namespace_annotations"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
                 self.node_annotation_fields
                     .node_labels
                     .path
@@ -611,6 +627,7 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    pod_counters_sweep_interval: Option<Duration>,
 }
 
 impl Source {
@@ -701,6 +718,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
+            pod_counters_sweep_interval: pod_counters_sweep_interval(globals),
         })
     }
 
@@ -739,6 +757,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
+            pod_counters_sweep_interval,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -905,6 +924,10 @@ impl Source {
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+        // The line stream and the sweep below both run on this task, so the lock is never
+        // contended.
+        let pod_counters = Arc::new(Mutex::new(PodCountersCache::default()));
+        let swept_pod_counters = Arc::clone(&pod_counters);
         let events = events.map(move |line| {
             let byte_size = line.text.len();
             bytes_received.emit(ByteSize(byte_size));
@@ -918,13 +941,15 @@ impl Source {
 
             let file_info = annotator.annotate(&mut event, &line.filename);
 
+            let event_json_size = event.estimated_json_encoded_size_of();
+
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size: event.estimated_json_encoded_size_of(),
-                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
-                    name: info.pod_name.to_owned(),
-                    namespace: info.pod_namespace.to_owned(),
-                }),
+                byte_size: event_json_size,
+                pod: file_info
+                    .as_ref()
+                    .map(|info| (info.pod_name, info.pod_namespace)),
+                counters: &mut pod_counters.lock().expect("Pod counters mutex is poisoned"),
             });
 
             if file_info.is_none() {
@@ -1009,6 +1034,28 @@ impl Source {
             });
             slot.bind(Box::pin(fut));
         }
+        if let Some(sweep_interval) = pod_counters_sweep_interval {
+            let (slot, mut shutdown) = lifecycle.add();
+            let fut = async move {
+                let mut sweeps = tokio::time::interval_at(
+                    tokio::time::Instant::now() + sweep_interval,
+                    sweep_interval,
+                );
+                sweeps.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                loop {
+                    tokio::select! {
+                        () = &mut shutdown => break,
+                        _ = sweeps.tick() => {
+                            swept_pod_counters
+                                .lock()
+                                .expect("Pod counters mutex is poisoned")
+                                .remove_idle();
+                        }
+                    }
+                }
+            };
+            slot.bind(Box::pin(fut));
+        }
 
         lifecycle.run(global_shutdown).await;
         // Stop Kubernetes object reflectors to avoid their leak on vector reload.
@@ -1027,6 +1074,28 @@ fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
     } else {
         watcher::Config::default().page_size
     }
+}
+
+/// Returns how often the source releases the cached counters of the pods that stopped logging.
+///
+/// A held handle keeps its metric from expiring, and a pod keeps its handles for at most twice
+/// this interval after its last line. Use half the shortest configured expiry, clamped to at
+/// least one millisecond to avoid excessive polling for very short expiries. Returns `None`
+/// when metrics never expire, since held handles then block nothing.
+fn pod_counters_sweep_interval(globals: &GlobalOptions) -> Option<Duration> {
+    let per_metric_set = globals
+        .expire_metrics_per_metric_set
+        .iter()
+        .flatten()
+        .map(|set| set.expire_secs);
+    let shortest = globals
+        .effective_expire_metrics_secs()
+        .into_iter()
+        .chain(per_metric_set)
+        .min_by(f64::total_cmp)?;
+    Duration::try_from_secs_f64(shortest / 2.0)
+        .ok()
+        .map(|interval| interval.max(Duration::from_millis(1)))
 }
 
 fn create_event(
@@ -1216,6 +1285,8 @@ fn resolve_max_line_bytes(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use vector_lib::{
@@ -1232,6 +1303,54 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn pod_counters_sweep_interval_follows_shortest_metric_expiry() {
+        let sweep_interval =
+            |yaml: &str| super::pod_counters_sweep_interval(&serde_yaml::from_str(yaml).unwrap());
+
+        // Metrics expire after 300 seconds by default.
+        assert_eq!(sweep_interval(""), Some(Duration::from_secs(150)));
+        assert_eq!(sweep_interval("expire_metrics_secs: -1.0"), None);
+        assert_eq!(
+            sweep_interval(indoc! {"
+                expire_metrics_secs: 600.0
+                expire_metrics_per_metric_set:
+                  - expire_secs: 60.0
+            "}),
+            Some(Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn pod_counters_sweep_interval_has_millisecond_minimum() {
+        let sweep_interval =
+            |yaml: &str| super::pod_counters_sweep_interval(&serde_yaml::from_str(yaml).unwrap());
+
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.0000000001"),
+            Some(Duration::from_millis(1))
+        );
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.001"),
+            Some(Duration::from_millis(1))
+        );
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.004"),
+            Some(Duration::from_millis(2))
+        );
+        assert_eq!(
+            sweep_interval(indoc! {"
+                expire_metrics_secs: 600.0
+                expire_metrics_per_metric_set:
+                  - name:
+                      type: exact
+                      value: unrelated_metric
+                    expire_secs: 0.0000000001
+            "}),
+            Some(Duration::from_millis(1))
+        );
     }
 
     #[test]
@@ -1455,6 +1574,12 @@ mod tests {
                         None
                     )
                     .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "namespace_annotations"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "node_labels"),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
@@ -1575,6 +1700,11 @@ mod tests {
                 )
                 .with_event_field(
                     &owned_value_path!("kubernetes", "namespace_labels"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
+                )
+                .with_event_field(
+                    &owned_value_path!("kubernetes", "namespace_annotations"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None
                 )

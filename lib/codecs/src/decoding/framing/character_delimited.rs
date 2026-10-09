@@ -31,12 +31,14 @@ pub struct CharacterDelimitedDecoderConfig {
 
 impl CharacterDelimitedDecoderConfig {
     /// Creates a `CharacterDelimitedDecoderConfig` with the specified delimiter and default max length.
+    #[must_use]
     pub const fn new(delimiter: u8) -> Self {
         Self {
             character_delimited: CharacterDelimitedDecoderOptions::new(delimiter, None),
         }
     }
     /// Build the `CharacterDelimitedDecoder` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> CharacterDelimitedDecoder {
         let oversized_action = self.character_delimited.oversized_action;
         if let Some(max_length) = self.character_delimited.max_length {
@@ -86,7 +88,8 @@ pub struct CharacterDelimitedDecoderOptions {
 }
 
 impl CharacterDelimitedDecoderOptions {
-    /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional max_length.
+    /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional `max_length`.
+    #[must_use]
     pub const fn new(delimiter: u8, max_length: Option<usize>) -> Self {
         Self {
             delimiter,
@@ -109,6 +112,7 @@ pub struct CharacterDelimitedDecoder {
 
 impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with the specified delimiter.
+    #[must_use]
     pub const fn new(delimiter: u8) -> Self {
         CharacterDelimitedDecoder {
             delimiter,
@@ -120,6 +124,7 @@ impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
+    #[must_use]
     pub const fn new_with_max_length(delimiter: u8, max_length: usize) -> Self {
         CharacterDelimitedDecoder {
             max_length,
@@ -128,12 +133,14 @@ impl CharacterDelimitedDecoder {
     }
 
     /// Sets the behavior when a frame exceeds `max_length`.
+    #[must_use]
     pub const fn with_oversized_action(mut self, action: OversizedAction) -> Self {
         self.oversized_action = action;
         self
     }
 
     /// Returns the maximum frame length when decoding.
+    #[must_use]
     pub const fn max_length(&self) -> usize {
         self.max_length
     }

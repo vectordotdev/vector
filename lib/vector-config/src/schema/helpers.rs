@@ -1,12 +1,19 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeSet, HashMap},
-    env, mem,
+    mem,
 };
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
-use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
+use vector_config_common::{
+    attributes::CustomAttribute,
+    constants,
+    schema::{
+        ArrayValidation, InstanceType, NumberValidation, ObjectValidation, RootSchema, Schema,
+        SchemaGenerator, SchemaObject, SchemaSettings, SingleOrVec, SubschemaValidation,
+    },
+};
 
 use super::visitors::{
     DisallowUnevaluatedPropertiesVisitor, GenerateHumanFriendlyNameVisitor,
@@ -18,12 +25,17 @@ use crate::{
 
 /// Applies metadata that is not associated with a configurable type to the given schema.
 pub fn apply_metadata(schema: &mut SchemaObject, metadata: Metadata) {
-    apply_configurable_metadata(&<()>::as_configurable_ref(), schema, metadata)
+    apply_configurable_metadata(&<()>::as_configurable_ref(), schema, metadata);
 }
 
 /// Applies resolved metadata to the given schema.
 ///
 /// All metadata, whether it comes from a type, field, or enum variant, flows through this function.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "retain ownership of metadata passed through the schema generation pipeline"
+)]
 fn apply_configurable_metadata(
     config: &ConfigurableRef,
     schema: &mut SchemaObject,
@@ -58,11 +70,10 @@ fn apply_configurable_metadata(
     let has_referenceable_description =
         config.referenceable_name().is_some() && base_metadata.description().is_some();
     let is_transparent = base_metadata.transparent() || metadata.transparent();
-    if schema_description.is_none() && !is_transparent && !has_referenceable_description {
-        panic!(
-            "No description provided for `{type_name}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used."
-        );
-    }
+    assert!(
+        schema_description.is_some() || is_transparent || has_referenceable_description,
+        "No description provided for `{type_name}`! All `Configurable` types must define a description, or have one specified at the field-level where the type is being used."
+    );
 
     apply_custom_attributes(schema, &metadata, type_name);
     apply_validations(schema, &metadata);
@@ -111,7 +122,7 @@ fn apply_custom_attributes(
         for attribute in metadata.custom_attributes() {
             match attribute {
                 CustomAttribute::Flag(key) => {
-                    match custom_map.insert(key.to_string(), Value::Bool(true)) {
+                    match custom_map.insert(key.clone(), Value::Bool(true)) {
                         // Overriding a flag is fine, because flags are only ever "enabled", so there's
                         // no harm to enabling it... again. Likewise, if there was no existing value,
                         // it's fine.
@@ -124,7 +135,7 @@ fn apply_custom_attributes(
                     }
                 }
                 CustomAttribute::KeyValue { key, value } => {
-                    custom_map.entry(key.to_string())
+                    custom_map.entry(key.clone())
                         .and_modify(|existing_value| match existing_value {
                             // We already have a flag entry for this key, which we cannot turn into an
                             // array, so we panic in this particular case to signify the weirdness.
@@ -178,6 +189,7 @@ pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: V
     }));
 }
 
+#[must_use]
 pub fn generate_null_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Null.into()),
@@ -185,6 +197,7 @@ pub fn generate_null_schema() -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_bool_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Boolean.into()),
@@ -192,6 +205,7 @@ pub fn generate_bool_schema() -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_string_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::String.into()),
@@ -199,6 +213,7 @@ pub fn generate_string_schema() -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_number_schema<N>() -> SchemaObject
 where
     N: ConfigurableNumber,
@@ -289,6 +304,7 @@ pub(crate) fn generate_map_schema(
     })
 }
 
+#[must_use]
 pub fn generate_struct_schema(
     properties: IndexMap<String, SchemaObject>,
     required: BTreeSet<String>,
@@ -405,10 +421,10 @@ pub(crate) fn generate_optional_schema(
         },
         Some(sov) => match sov {
             SingleOrVec::Single(ty) if **ty != InstanceType::Null => {
-                *sov = vec![**ty, InstanceType::Null].into()
+                *sov = vec![**ty, InstanceType::Null].into();
             }
             SingleOrVec::Vec(ty) if !ty.contains(&InstanceType::Null) => {
-                ty.push(InstanceType::Null)
+                ty.push(InstanceType::Null);
             }
             _ => {}
         },
@@ -442,6 +458,10 @@ pub(crate) fn generate_optional_schema(
 ///
 /// The wrapper is built from `T` rather than from a shared `Option<T>` definition, so a normal
 /// `Option<T>` property keeps its null branch and field-specific metadata stays on this site.
+///
+/// # Errors
+///
+/// Returns an error if a sibling field collides with the enum tag or generating the inner schema fails.
 pub fn generate_flattened_optional_schema(
     inner: &ConfigurableRef,
     optional: &ConfigurableRef,
@@ -518,6 +538,7 @@ fn absent_tag_schema(tag_field: String) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -533,6 +554,7 @@ pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_any_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -548,6 +570,7 @@ pub fn generate_any_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -567,6 +590,7 @@ pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_enum_schema(values: Vec<Value>) -> SchemaObject {
     SchemaObject {
         enum_values: Some(values),
@@ -574,6 +598,7 @@ pub fn generate_enum_schema(values: Vec<Value>) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_const_string_schema(value: String) -> SchemaObject {
     SchemaObject {
         const_value: Some(Value::String(value)),
@@ -581,6 +606,7 @@ pub fn generate_const_string_schema(value: String) -> SchemaObject {
     }
 }
 
+#[must_use]
 pub fn generate_internal_tagged_variant_schema(
     tag: String,
     value_schema: SchemaObject,
@@ -601,6 +627,11 @@ pub fn default_schema_settings() -> SchemaSettings {
         .with_visitor(GenerateHumanFriendlyNameVisitor::from_settings)
 }
 
+/// Generate a root schema using the default settings.
+///
+/// # Errors
+///
+/// Returns an error if metadata validation or schema generation fails.
 pub fn generate_root_schema<T>() -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
@@ -608,25 +639,58 @@ where
     generate_root_schema_with_settings::<T>(default_schema_settings())
 }
 
+thread_local! {
+    static GENERATING_ROOT_SCHEMA: Cell<bool> = const { Cell::new(false) };
+}
+
+struct SchemaGeneration {
+    previous: bool,
+}
+
+impl SchemaGeneration {
+    fn enable() -> Self {
+        let previous = GENERATING_ROOT_SCHEMA.replace(true);
+        Self { previous }
+    }
+}
+
+impl Drop for SchemaGeneration {
+    fn drop(&mut self) {
+        GENERATING_ROOT_SCHEMA.set(self.previous);
+    }
+}
+
+/// Returns whether the current thread is generating a root configuration schema.
+#[must_use]
+pub fn is_generating_root_schema() -> bool {
+    GENERATING_ROOT_SCHEMA.get()
+}
+
+/// Generate a root schema using the supplied settings.
+///
+/// # Errors
+///
+/// Returns an error if metadata validation or schema generation fails.
 pub fn generate_root_schema_with_settings<T>(
     schema_settings: SchemaSettings,
 ) -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
 {
+    let _generation = SchemaGeneration::enable();
     let schema_gen = RefCell::new(schema_settings.into_generator());
-
-    // Set env variable to enable generating all schemas, including platform-specific ones.
-    unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
 
-    unsafe { env::remove_var("VECTOR_GENERATE_SCHEMA") };
-
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
 
+/// Resolve or generate a configurable type schema and apply its metadata.
+///
+/// # Errors
+///
+/// Returns an error if metadata validation or generating the configurable type schema fails.
 pub fn get_or_generate_schema(
     config: &ConfigurableRef,
     generator: &RefCell<SchemaGenerator>,
@@ -704,10 +768,10 @@ pub fn get_or_generate_schema(
         Some(base) => match overrides {
             None => apply_configurable_metadata(config, &mut schema, base),
             Some(overrides) => {
-                apply_configurable_metadata(config, &mut schema, base.merge(overrides))
+                apply_configurable_metadata(config, &mut schema, base.merge(overrides));
             }
         },
-    };
+    }
 
     Ok(schema)
 }
@@ -764,11 +828,7 @@ pub(crate) fn assert_string_schema_for_map(
                 // As long as there's only one instance type, and it's string, we're fine
                 // with that, too.
                 SingleOrVec::Vec(its) => {
-                    its.len() == 1
-                        && its
-                            .first()
-                            .filter(|it| *it == &InstanceType::String)
-                            .is_some()
+                    its.len() == 1 && its.first().is_some_and(|it| it == &InstanceType::String)
                 }
             },
             // We match explicitly, so a lack of declared instance types is not considered
@@ -779,10 +839,10 @@ pub(crate) fn assert_string_schema_for_map(
         _ => false,
     };
 
-    if !is_string_like {
-        Err(GenerateError::MapKeyNotStringLike { key_type, map_type })
-    } else {
+    if is_string_like {
         Ok(())
+    } else {
+        Err(GenerateError::MapKeyNotStringLike { key_type, map_type })
     }
 }
 
@@ -796,17 +856,25 @@ pub enum EnumDiscriminant {
 
 impl EnumDiscriminant {
     /// Creates a discriminant from a variant schema.
+    #[must_use]
     pub fn schema(schema: SchemaObject) -> Self {
         Self::Schema(Box::new(schema))
     }
 
     /// Creates a discriminant for a named struct variant.
+    #[must_use]
     pub const fn object() -> Self {
         Self::Object
     }
 }
 
 /// Determines whether an enum schema is ambiguous based on discriminants of its variants.
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "preserve the existing default-hasher API; broader hasher support is deferred"
+)]
 pub fn has_ambiguous_discriminants(
     discriminants: &HashMap<&'static str, EnumDiscriminant>,
 ) -> bool {
@@ -898,6 +966,26 @@ fn instance_type_for_value(value: &Value) -> InstanceType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn root_schema_generation_state_is_scoped_to_the_current_thread() {
+        assert!(!is_generating_root_schema());
+
+        let outer = SchemaGeneration::enable();
+        assert!(is_generating_root_schema());
+        std::thread::spawn(|| assert!(!is_generating_root_schema()))
+            .join()
+            .unwrap();
+
+        {
+            let _inner = SchemaGeneration::enable();
+            assert!(is_generating_root_schema());
+        }
+        assert!(is_generating_root_schema());
+
+        drop(outer);
+        assert!(!is_generating_root_schema());
+    }
 
     #[test]
     fn single_discriminant_is_not_ambiguous() {

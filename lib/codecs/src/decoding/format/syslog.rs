@@ -30,6 +30,7 @@ pub struct SyslogDeserializerConfig {
 
 impl SyslogDeserializerConfig {
     /// Creates a new `SyslogDeserializerConfig`.
+    #[must_use]
     pub fn new(options: SyslogDeserializerOptions) -> Self {
         Self {
             source: None,
@@ -38,6 +39,7 @@ impl SyslogDeserializerConfig {
     }
 
     /// Create the `SyslogDeserializer` from the given source name.
+    #[must_use]
     pub fn from_source(source: &'static str) -> Self {
         Self {
             source: Some(source),
@@ -46,6 +48,7 @@ impl SyslogDeserializerConfig {
     }
 
     /// Build the `SyslogDeserializer` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> SyslogDeserializer {
         SyslogDeserializer {
             source: self.source,
@@ -54,11 +57,22 @@ impl SyslogDeserializerConfig {
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "The codec API panic documentation needs a separate audit."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep this codec mapping together during the lint rollout."
+    )]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match (log_namespace, self.source) {
             (LogNamespace::Legacy, _) => {
@@ -77,7 +91,7 @@ impl SyslogDeserializerConfig {
                         timestamp_key,
                         Kind::timestamp(),
                         Some("timestamp"),
-                    )
+                    );
                 }
 
                 definition = definition
@@ -273,25 +287,23 @@ impl Deserializer for SyslogDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let line: Cow<str> = match self.lossy {
-            true => String::from_utf8_lossy(&bytes),
-            false => Cow::from(std::str::from_utf8(&bytes)?),
+        let line: Cow<str> = if self.lossy {
+            String::from_utf8_lossy(&bytes)
+        } else {
+            Cow::from(std::str::from_utf8(&bytes)?)
         };
         let line = line.trim();
         let parsed =
             syslog_loose::parse_message_with_year_exact(line, resolve_year, Variant::Either)?;
 
-        let log = match (self.source, log_namespace) {
-            (Some(source), LogNamespace::Vector) => {
-                let mut log = LogEvent::from(Value::Bytes(Bytes::from(parsed.msg.to_string())));
-                insert_metadata_fields_from_syslog(&mut log, source, parsed, log_namespace);
-                log
-            }
-            _ => {
-                let mut log = LogEvent::from(Value::Object(ObjectMap::new()));
-                insert_fields_from_syslog(&mut log, parsed, log_namespace);
-                log
-            }
+        let log = if let (Some(source), LogNamespace::Vector) = (self.source, log_namespace) {
+            let mut log = LogEvent::from(Value::Bytes(Bytes::from(parsed.msg.to_string())));
+            insert_metadata_fields_from_syslog(&mut log, source, parsed, log_namespace);
+            log
+        } else {
+            let mut log = LogEvent::from(Value::Object(ObjectMap::new()));
+            insert_fields_from_syslog(&mut log, parsed, log_namespace);
+            log
         };
 
         Ok(smallvec![Event::from(log)])
@@ -363,7 +375,7 @@ fn insert_metadata_fields_from_syslog(
             log,
             None::<LegacyKey<&OwnedValuePath>>,
             &owned_value_path!("version"),
-            version as i64,
+            i64::from(version),
         );
     }
     if let Some(app_name) = parsed.appname {
@@ -399,7 +411,7 @@ fn insert_metadata_fields_from_syslog(
     }
 
     let mut sdata = ObjectMap::new();
-    for element in parsed.structured_data.into_iter() {
+    for element in parsed.structured_data {
         let mut data = ObjectMap::new();
 
         for (name, value) in element.params() {
@@ -441,7 +453,7 @@ fn insert_fields_from_syslog(
             LogNamespace::Vector => {
                 log.insert(event_path!("timestamp"), timestamp);
             }
-        };
+        }
     }
     if let Some(host) = parsed.hostname {
         log.insert(event_path!("hostname"), host.to_string());
@@ -453,7 +465,7 @@ fn insert_fields_from_syslog(
         log.insert(event_path!("facility"), facility.as_str().to_owned());
     }
     if let Protocol::RFC5424(version) = parsed.protocol {
-        log.insert(event_path!("version"), version as i64);
+        log.insert(event_path!("version"), i64::from(version));
     }
     if let Some(app_name) = parsed.appname {
         log.insert(event_path!("appname"), app_name.to_owned());
@@ -469,7 +481,7 @@ fn insert_fields_from_syslog(
         log.insert(event_path!("procid"), value);
     }
 
-    for element in parsed.structured_data.into_iter() {
+    for element in parsed.structured_data {
         let mut sdata = ObjectMap::new();
         for (name, value) in element.params() {
             sdata.insert(name.to_string().into(), value.into());

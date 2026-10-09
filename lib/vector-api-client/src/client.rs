@@ -23,7 +23,7 @@ use crate::{
 pub struct Client {
     endpoint: Endpoint,
     channel: Option<Channel>,
-    client: Option<ObservabilityServiceClient<Channel>>,
+    service: Option<ObservabilityServiceClient<Channel>>,
 }
 
 impl Client {
@@ -38,21 +38,25 @@ impl Client {
         Self {
             endpoint: Endpoint::from(uri),
             channel: None,
-            client: None,
+            service: None,
         }
     }
 
     /// Connect to the gRPC server
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the connection to the server cannot be established.
     pub async fn connect(&mut self) -> Result<()> {
         let channel = self.endpoint.connect().await?;
-        self.client = Some(ObservabilityServiceClient::new(channel.clone()));
+        self.service = Some(ObservabilityServiceClient::new(channel.clone()));
         self.channel = Some(channel);
         Ok(())
     }
 
     /// Ensure the client is connected
     fn ensure_connected(&mut self) -> Result<&mut ObservabilityServiceClient<Channel>> {
-        self.client.as_mut().ok_or(Error::NotConnected)
+        self.service.as_mut().ok_or(Error::NotConnected)
     }
 
     /// Get the underlying channel
@@ -70,6 +74,11 @@ impl Client {
     /// `grpc-health-probe`.
     ///
     /// Returns `Ok(())` if the server is `SERVING`, or an error otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected, the health RPC fails,
+    /// or the server reports a status other than `SERVING`.
     pub async fn health(&mut self) -> Result<()> {
         let channel = self.channel()?.clone();
         let mut health_client = HealthClient::new(channel);
@@ -86,6 +95,10 @@ impl Client {
     }
 
     /// Get metadata about the Vector instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the RPC fails.
     pub async fn get_meta(&mut self) -> Result<GetMetaResponse> {
         let client = self.ensure_connected()?;
         let response = client.get_meta(GetMetaRequest {}).await?;
@@ -97,6 +110,10 @@ impl Client {
     /// # Arguments
     ///
     /// * `limit` - Maximum number of components to return (0 = no limit)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the RPC fails.
     pub async fn get_components(&mut self, limit: i32) -> Result<GetComponentsResponse> {
         let client = self.ensure_connected()?;
         let response = client
@@ -106,6 +123,10 @@ impl Client {
     }
 
     /// Check whether allocation tracing is active on the connected Vector instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the RPC fails.
     pub async fn get_allocation_tracing_status(
         &mut self,
     ) -> Result<GetAllocationTracingStatusResponse> {
@@ -123,6 +144,11 @@ impl Client {
     /// # Arguments
     ///
     /// * `interval_ms` - Update interval in milliseconds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the streaming RPC
+    /// cannot be started. The returned stream yields errors if receiving a response fails.
     pub async fn stream_heartbeat(
         &mut self,
         interval_ms: i32,
@@ -139,6 +165,11 @@ impl Client {
     /// # Arguments
     ///
     /// * `interval_ms` - Update interval in milliseconds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the streaming RPC
+    /// cannot be started. The returned stream yields errors if receiving a response fails.
     pub async fn stream_uptime(
         &mut self,
         interval_ms: i32,
@@ -155,6 +186,11 @@ impl Client {
     /// # Arguments
     ///
     /// * `interval_ms` - Update interval in milliseconds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the streaming RPC
+    /// cannot be started. The returned stream yields errors if receiving a response fails.
     pub async fn stream_component_allocated_bytes(
         &mut self,
         interval_ms: i32,
@@ -172,6 +208,11 @@ impl Client {
     ///
     /// * `metric` - Which metric to stream
     /// * `interval_ms` - Update interval in milliseconds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the streaming RPC
+    /// cannot be started. The returned stream yields errors if receiving a response fails.
     pub async fn stream_component_metrics(
         &mut self,
         metric: MetricName,
@@ -190,6 +231,11 @@ impl Client {
     /// Stream events from components matching patterns
     ///
     /// This is used by `vector tap` to capture events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the client is not connected or the streaming RPC
+    /// cannot be started. The returned stream yields errors if receiving a response fails.
     pub async fn stream_output_events(
         &mut self,
         request: StreamOutputEventsRequest,

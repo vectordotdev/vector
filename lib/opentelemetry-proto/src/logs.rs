@@ -54,6 +54,11 @@ struct ResourceLog {
 
 // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.15.0/specification/logs/data-model.md
 impl ResourceLog {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "keep the existing protocol field mapping together; splitting is deferred"
+    )]
     fn into_event(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
         let mut log = match log_namespace {
             LogNamespace::Vector => {
@@ -192,6 +197,11 @@ impl ResourceLog {
 
         // According to log data model spec, if observed_time_unix_nano is missing, the collector
         // should set it to the current time.
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         let observed_timestamp = if self.log_record.observed_time_unix_nano > 0 {
             Utc.timestamp_nanos(self.log_record.observed_time_unix_nano as i64)
                 .into()
@@ -207,6 +217,11 @@ impl ResourceLog {
         );
 
         // If time_unix_nano is not present (0 represents missing or unknown timestamp) use observed time
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         let timestamp = if self.log_record.time_unix_nano > 0 {
             Utc.timestamp_nanos(self.log_record.time_unix_nano as i64)
                 .into()

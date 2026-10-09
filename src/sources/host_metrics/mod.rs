@@ -16,9 +16,10 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    configurable::configurable_component,
+    configurable::{configurable_component, schema::is_generating_root_schema},
     internal_event::{
-        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+        ByteSize, BytesReceived, CountByteSize, CounterName, GaugeName, InternalEventHandle as _,
+        Protocol, Registered,
     },
 };
 
@@ -218,7 +219,7 @@ fn default_collectors() -> Option<Vec<Collector>> {
         collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    if is_generating_root_schema() {
         collectors.push(Collector::CGroups);
         collectors.push(Collector::TCP);
     }
@@ -266,8 +267,8 @@ fn example_cgroups() -> FilterList {
 }
 
 fn default_cgroups_config() -> Option<CGroupsConfig> {
-    // Check env variable to allow generating docs on non-linux systems.
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    // Include the Linux-only default when generating docs on other platforms.
+    if is_generating_root_schema() {
         return Some(CGroupsConfig::default());
     }
 
@@ -401,7 +402,7 @@ impl HostMetrics {
             self.cpu_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Process) {
-            self.process_metrics(&mut buffer).await;
+            self.process_metrics(&mut buffer);
         }
         if self.config.has_collector(Collector::Disk) {
             self.disk_metrics(&mut buffer).await;
@@ -418,6 +419,8 @@ impl HostMetrics {
         if self.config.has_collector(Collector::Memory) {
             self.memory_metrics(&mut buffer).await;
             self.swap_metrics(&mut buffer).await;
+            #[cfg(target_os = "linux")]
+            self.vmstat_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Network) {
             self.network_metrics(&mut buffer).await;
@@ -427,10 +430,10 @@ impl HostMetrics {
             self.tcp_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Temperature) {
-            self.temperature_metrics(&mut buffer).await;
+            self.temperature_metrics(&mut buffer);
         }
 
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         self.events_received.emit(CountByteSize(
             metrics.len(),
             metrics.estimated_json_encoded_size_of(),
@@ -444,17 +447,17 @@ impl HostMetrics {
         match heim::cpu::os::unix::loadavg().await {
             Ok(loadavg) => {
                 output.gauge(
-                    "load1",
+                    GaugeName::Load1,
                     loadavg.0.get::<ratio>() as f64,
                     MetricTags::default(),
                 );
                 output.gauge(
-                    "load5",
+                    GaugeName::Load5,
                     loadavg.1.get::<ratio>() as f64,
                     MetricTags::default(),
                 );
                 output.gauge(
-                    "load15",
+                    GaugeName::Load15,
                     loadavg.2.get::<ratio>() as f64,
                     MetricTags::default(),
                 );
@@ -471,7 +474,11 @@ impl HostMetrics {
     pub async fn host_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "host";
         match heim::host::uptime().await {
-            Ok(time) => output.gauge("uptime", time.get::<second>(), MetricTags::default()),
+            Ok(time) => output.gauge(
+                GaugeName::Uptime,
+                time.get::<second>(),
+                MetricTags::default(),
+            ),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
                     message: "Failed to load host uptime info",
@@ -481,7 +488,11 @@ impl HostMetrics {
         }
 
         match heim::host::boot_time().await {
-            Ok(time) => output.gauge("boot_time", time.get::<second>(), MetricTags::default()),
+            Ok(time) => output.gauge(
+                GaugeName::BootTime,
+                time.get::<second>(),
+                MetricTags::default(),
+            ),
             Err(error) => {
                 emit!(HostMetricsScrapeDetailError {
                     message: "Failed to load host boot time info",
@@ -494,7 +505,7 @@ impl HostMetrics {
 
 #[derive(Default)]
 pub struct MetricsBuffer {
-    pub metrics: Vec<Metric>,
+    metrics: Vec<Metric>,
     name: &'static str,
     host: Option<String>,
     timestamp: DateTime<Utc>,
@@ -512,6 +523,11 @@ impl MetricsBuffer {
         }
     }
 
+    /// Consumes the buffer, returning the collected metrics.
+    pub fn into_metrics(self) -> Vec<Metric> {
+        self.metrics
+    }
+
     fn tags(&self, mut tags: MetricTags) -> MetricTags {
         tags.replace("collector".into(), self.name.to_string());
         if let Some(host) = &self.host {
@@ -520,21 +536,29 @@ impl MetricsBuffer {
         tags
     }
 
-    fn counter(&mut self, name: &str, value: f64, tags: MetricTags) {
+    fn counter(&mut self, name: CounterName, value: f64, tags: MetricTags) {
         self.metrics.push(
-            Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
-                .with_namespace(self.namespace.clone())
-                .with_tags(Some(self.tags(tags)))
-                .with_timestamp(Some(self.timestamp)),
+            Metric::new(
+                name.as_str(),
+                MetricKind::Absolute,
+                MetricValue::Counter { value },
+            )
+            .with_namespace(self.namespace.clone())
+            .with_tags(Some(self.tags(tags)))
+            .with_timestamp(Some(self.timestamp)),
         )
     }
 
-    fn gauge(&mut self, name: &str, value: f64, tags: MetricTags) {
+    fn gauge(&mut self, name: GaugeName, value: f64, tags: MetricTags) {
         self.metrics.push(
-            Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-                .with_namespace(self.namespace.clone())
-                .with_tags(Some(self.tags(tags)))
-                .with_timestamp(Some(self.timestamp)),
+            Metric::new(
+                name.as_str(),
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+            )
+            .with_namespace(self.namespace.clone())
+            .with_tags(Some(self.tags(tags)))
+            .with_timestamp(Some(self.timestamp)),
         )
     }
 }
@@ -845,7 +869,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .loadavg_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         assert_eq!(metrics.len(), 3);
         assert!(all_gauges(&metrics));
 
@@ -863,7 +887,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .host_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         assert_eq!(metrics.len(), 2);
         assert!(all_gauges(&metrics));
     }

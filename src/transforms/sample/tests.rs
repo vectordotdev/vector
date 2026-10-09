@@ -34,6 +34,7 @@ async fn emits_internal_events() {
             max_groups: default_max_groups(),
             exclude: None,
             sample_rate_key: default_sample_rate_key(),
+            internal_metrics: Default::default(),
         };
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -66,6 +67,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
     let total_passed = events
         .into_iter()
@@ -90,6 +92,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
     let total_passed = events
         .into_iter()
@@ -117,6 +120,7 @@ fn hash_consistently_samples_the_same_events() {
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
 
     let first_run = events
@@ -155,6 +159,7 @@ fn always_passes_events_matching_pass_list() {
                 "important",
             )),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -186,6 +191,7 @@ fn handles_group_by() {
                 "na",
             )),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -211,6 +217,7 @@ fn handles_key_field() {
             default_max_groups(),
             Some(condition_contains("other_field", "foo")),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -235,6 +242,7 @@ fn sampler_adds_sampling_rate_to_event() {
             default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
+            false,
         );
         let passing = events
             .into_iter()
@@ -252,6 +260,7 @@ fn sampler_adds_sampling_rate_to_event() {
             default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("custom_sample_rate")),
+            false,
         );
         let passing = events
             .into_iter()
@@ -270,6 +279,7 @@ fn sampler_adds_sampling_rate_to_event() {
             default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("")),
+            false,
         );
         let passing = events
             .into_iter()
@@ -287,6 +297,7 @@ fn sampler_adds_sampling_rate_to_event() {
             default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
+            false,
         );
         let event = Event::Log(LogEvent::from("nananana"));
         let passing = transform_one(&mut sampler, event).unwrap();
@@ -307,6 +318,7 @@ fn handles_trace_event() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let iterations = 0..2;
@@ -326,6 +338,7 @@ fn group_by_uses_independent_ratio_samplers() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let sampled = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
@@ -347,6 +360,7 @@ fn group_state_evicts_least_recently_used_group() {
         std::num::NonZeroUsize::new(2).unwrap(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let sampled = [
@@ -380,6 +394,7 @@ fn capacity_thrashing_does_not_bypass_static_sampling() {
             std::num::NonZeroUsize::new(2).unwrap(),
             None,
             default_sample_rate_key(),
+            false,
         );
 
         let sampled = (0..6).map(|index| {
@@ -423,6 +438,7 @@ fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
                 std::num::NonZeroUsize::new(2).unwrap(),
                 None,
                 default_sample_rate_key(),
+                false,
             )
         };
         let make_event = |service: &str| {
@@ -474,6 +490,7 @@ fn sample_at_rates_higher_then_half() {
             default_max_groups(),
             None,
             default_sample_rate_key(),
+            false,
         );
         let total_observed = events
             .iter()
@@ -500,6 +517,7 @@ fn dynamic_ratio_field_overrides_static_ratio() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -523,6 +541,7 @@ fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let event = Event::Log(LogEvent::from("hello"));
@@ -543,6 +562,7 @@ fn dynamic_rate_field_overrides_static_ratio() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -566,6 +586,7 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let event = Event::Log(LogEvent::from("hello"));
@@ -586,6 +607,7 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -611,6 +633,7 @@ fn dynamic_ratio_honors_group_by_key() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_service_a = 0;
@@ -657,6 +680,7 @@ fn dynamic_rate_honors_group_by_key() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_service_a = 0;
@@ -702,6 +726,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_low_ratio = 0;
@@ -751,6 +776,7 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
         default_max_groups(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_rate_2 = 0;

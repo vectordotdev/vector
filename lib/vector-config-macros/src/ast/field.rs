@@ -20,6 +20,7 @@ use super::{
 pub struct Field<'a> {
     original: &'a syn::Field,
     name: String,
+    aliases: Vec<String>,
     default_value: Option<ExprPath>,
     attrs: Attributes,
 }
@@ -33,6 +34,13 @@ impl<'a> Field<'a> {
         let original = serde.original;
 
         let name = serde.attrs.name().deserialize_name().to_string();
+        let aliases = serde
+            .attrs
+            .aliases()
+            .iter()
+            .map(ToString::to_string)
+            .filter(|alias| alias != &name)
+            .collect();
         let default_value = get_serde_default_value(&serde.ty, serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
@@ -40,9 +48,15 @@ impl<'a> Field<'a> {
             .map(|attrs| Field {
                 original,
                 name,
+                aliases,
                 default_value,
                 attrs,
             })
+    }
+
+    /// Alternative names accepted when deserializing this field.
+    pub fn aliases(&self) -> &[String] {
+        &self.aliases
     }
 
     /// Name of the field, if any.
@@ -202,7 +216,7 @@ impl<'a> Field<'a> {
     /// Whether or not this field is visible during either serialization or deserialization.
     ///
     /// This is derived from whether any of the `serde` visibility attributes are applied: `skip`,
-    /// `skip_serializing, and `skip_deserializing`. Unless the field is skipped entirely, it will
+    /// `skip_serializing`, and `skip_deserializing`. Unless the field is skipped entirely, it will
     /// be considered visible and part of the schema.
     pub fn visible(&self) -> bool {
         self.attrs.visible
@@ -248,7 +262,7 @@ impl<'a> Field<'a> {
 
 impl ToTokens for Field<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.original.to_tokens(tokens)
+        self.original.to_tokens(tokens);
     }
 }
 

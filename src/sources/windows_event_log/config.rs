@@ -76,9 +76,6 @@ pub struct WindowsEventLogConfig {
     ///
     /// Maps event field names to custom formatting options.
     #[serde(default)]
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual event data format override."
-    ))]
     pub event_data_format: HashMap<String, EventDataFormat>,
 
     /// Ignore specific event IDs.

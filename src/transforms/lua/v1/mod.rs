@@ -111,6 +111,7 @@ impl Lua {
     pub fn new(source: String, search_dirs: Vec<String>) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
+        // SAFETY: Native modules loaded by Lua must be trusted not to violate memory safety.
         let lua = unsafe {
             mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
         };

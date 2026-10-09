@@ -336,7 +336,7 @@ impl Aggregate {
     /// predicate so that metrics in still-open windows are emitted on
     /// shutdown or topology reload, matching system-time semantics where
     /// `flush_system_time` always empties `self.map`.
-    pub(crate) fn flush_final(&mut self, output: &mut Vec<Event>) {
+    pub fn flush_final(&mut self, output: &mut Vec<Event>) {
         if self.config.is_event_time() {
             self.flush_event_time_buckets(output, true);
         } else {

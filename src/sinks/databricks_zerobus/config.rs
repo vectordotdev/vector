@@ -255,7 +255,7 @@ impl ValidatedSink for ZerobusSinkConfig {
         validated: &ValidatedZerobus,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = ZerobusService::new(self.clone(), cx.proxy()).await?;
+        let service = ZerobusService::new(self.clone(), cx.proxy())?;
         let healthcheck_service = service.clone();
 
         let sink = ZerobusSink::new(

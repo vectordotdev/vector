@@ -20,6 +20,10 @@ fn is_default_buffer_utilization_ewma_half_life_seconds(value: &Option<f64>) -> 
     })
 }
 
+/// Idle time, in seconds, after which internal metrics expire when neither `expire_metrics_secs`
+/// nor the deprecated `expire_metrics` is set.
+const DEFAULT_EXPIRE_METRICS_SECS: f64 = 300.0;
+
 #[derive(Debug, Snafu)]
 pub(crate) enum DataDirError {
     #[snafu(display("data_dir option required, but not given here or globally"))]
@@ -240,6 +244,20 @@ impl GlobalOptions {
             .create(&data_subdir)
             .with_context(|_| CouldNotCreateSnafu { subdir, data_dir })?;
         Ok(data_subdir)
+    }
+
+    /// Returns the idle time, in seconds, after which internal metrics expire, or `None` when
+    /// they never expire.
+    ///
+    /// `expire_metrics_secs` takes precedence over the deprecated `expire_metrics`. Topology
+    /// startup rejects configs that set both.
+    pub fn effective_expire_metrics_secs(&self) -> Option<f64> {
+        let secs = match (self.expire_metrics_secs, self.expire_metrics) {
+            (Some(secs), _) => secs,
+            (None, Some(duration)) => duration.as_secs_f64(),
+            (None, None) => DEFAULT_EXPIRE_METRICS_SECS,
+        };
+        if secs < 0.0 { None } else { Some(secs) }
     }
 
     /// Merge a second global configuration into self, and return the new merged data.

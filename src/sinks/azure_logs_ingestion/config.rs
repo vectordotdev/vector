@@ -111,26 +111,26 @@ impl Default for AzureLogsIngestionConfig {
     fn default() -> Self {
         Self {
             endpoint: HttpEndpoint::parse("http://localhost:8080").unwrap(),
-            dcr_immutable_id: Default::default(),
-            stream_name: Default::default(),
-            auth: Default::default(),
+            dcr_immutable_id: String::new(),
+            stream_name: String::new(),
+            auth: AzureAuthentication::default(),
             token_scope: default_scope(),
             timestamp_field: default_timestamp_field(),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            retry_strategy: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            retry_strategy: RetryStrategy::default(),
         }
     }
 }
 
 impl AzureLogsIngestionConfig {
     #[allow(clippy::too_many_arguments)]
-    pub(super) async fn build_inner(
+    pub(super) fn build_inner(
         &self,
-        cx: SinkContext,
+        cx: &SinkContext,
         validated: &ValidatedAzureLogsIngestion,
         endpoint: HttpEndpoint,
         credential: Arc<dyn TokenCredential>,
@@ -220,16 +220,15 @@ impl ValidatedSink for AzureLogsIngestionConfig {
         validated: &ValidatedAzureLogsIngestion,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let credential: Arc<dyn TokenCredential> = self.auth.credential().await?;
+        let credential: Arc<dyn TokenCredential> = self.auth.credential()?;
 
         self.build_inner(
-            cx,
+            &cx,
             validated,
             self.endpoint.clone(),
             credential,
             self.token_scope.clone(),
             self.timestamp_field.clone(),
         )
-        .await
     }
 }

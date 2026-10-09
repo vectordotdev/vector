@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Shared protocol, payload, and HTTP helpers for Vector's Antithesis scenarios.
 //! Scenario binaries contain the property logic; reusable transport mechanics
 //! live here so every scenario speaks the same protocol to its oracle and SUT.

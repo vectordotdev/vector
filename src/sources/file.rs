@@ -605,7 +605,7 @@ pub fn file_source(
                 });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
-                    Some(d) => d.decode_to_utf8(line.text),
+                    Some(d) => d.decode_to_utf8(&line.text),
                     None => line.text,
                 };
                 line
@@ -1839,6 +1839,7 @@ mod tests {
             };
             let after_times = [after_time, after_time];
 
+            // SAFETY: The descriptors and both two-element arrays remain valid for these calls.
             unsafe {
                 libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
                 libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());

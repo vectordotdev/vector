@@ -8,6 +8,15 @@ use crate::common::{
     metric_into_vrl, metrics_vrl_typedef, resolve_tags, validate_tags, Error, MetricsStorage,
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn find_metrics(
     metrics_storage: &MetricsStorage,
     key: Value,

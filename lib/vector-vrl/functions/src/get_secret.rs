@@ -1,6 +1,15 @@
 use vector_vrl_category::Category;
 use vrl::prelude::*;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn get_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
     let key_str = key.as_str().expect("argument must be a string");
     let value = match ctx.target().get_secret(key_str.as_ref()) {

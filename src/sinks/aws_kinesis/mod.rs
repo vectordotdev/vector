@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub mod streams;
 

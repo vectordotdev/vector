@@ -64,7 +64,7 @@ pub struct DorisSinkClient {
 }
 
 impl DorisSinkClient {
-    pub async fn new(
+    pub fn new(
         http_client: HttpClient,
         base_url: Uri,
         auth: Option<Auth>,
@@ -118,7 +118,7 @@ impl DorisSinkClient {
     }
 
     /// Build a request for the Doris stream load
-    async fn build_request(
+    fn build_request(
         &self,
         database: &str,
         table: &str,
@@ -229,9 +229,7 @@ impl DorisSinkClient {
         let payload_ref = &payload;
 
         // Build and send initial request
-        let request = self
-            .build_request(&database, &table, payload_ref, None)
-            .await?;
+        let request = self.build_request(&database, &table, payload_ref, None)?;
         let endpoint = request.uri().to_string();
         let byte_size = payload.len();
 
@@ -267,9 +265,8 @@ impl DorisSinkClient {
                     }
 
                     // Build and send redirect request
-                    let redirect_req = self
-                        .build_request(&database, &table, payload_ref, Some(location_str))
-                        .await?;
+                    let redirect_req =
+                        self.build_request(&database, &table, payload_ref, Some(location_str))?;
 
                     response = self.http_client.send(redirect_req).await?;
                     status = response.status();
