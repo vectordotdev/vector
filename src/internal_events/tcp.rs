@@ -91,6 +91,7 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketTlsConnectionError {
     pub error: TlsError,
+    pub peer_addr: SocketAddr,
 }
 
 impl InternalEvent for TcpSocketTlsConnectionError {
@@ -106,12 +107,14 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                 debug!(
                     message = "Connection error, probably a healthcheck.",
                     error = %self.error,
+                    peer_addr = %self.peer_addr,
                 );
             }
             _ => {
                 error!(
                     message = "Connection error.",
                     error = %self.error,
+                    peer_addr = %self.peer_addr,
                     error_code = "connection_failed",
                     error_type = error_type::WRITER_FAILED,
                     stage = error_stage::SENDING,
@@ -166,6 +169,7 @@ impl InternalEvent for TcpSocketTlsHandshakeTimeout {
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,
+    pub peer_addr: SocketAddr,
 }
 
 impl InternalEvent for TcpSendAckError {
@@ -173,6 +177,7 @@ impl InternalEvent for TcpSendAckError {
         error!(
             message = "Error writing acknowledgement, dropping connection.",
             error = %self.error,
+            peer_addr = %self.peer_addr,
             error_code = "ack_failed",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
@@ -276,6 +281,7 @@ mod tests {
 
         TcpSendAckError {
             error: io::Error::from(io::ErrorKind::ConnectionReset),
+            peer_addr: "192.0.2.10:54321".parse().unwrap(),
         }
         .emit();
 

@@ -1108,9 +1108,8 @@ async fn nats_jetstream_messages_during_downtime() {
     assert_eq!(
         found.len(),
         5,
-        "Expected all 5 queued messages after recovery, got {}: {:?}",
-        found.len(),
-        found
+        "Expected all 5 queued messages after recovery, got {}: {found:?}",
+        found.len()
     );
 }
 
@@ -1175,7 +1174,6 @@ async fn nats_jetstream_backoff_resets_after_recovery() {
     let round2_elapsed = round2_start.elapsed();
     assert!(
         round2_elapsed < std::time::Duration::from_secs(15),
-        "Second recovery took {:?}, suggesting backoff did not reset",
-        round2_elapsed
+        "Second recovery took {round2_elapsed:?}, suggesting backoff did not reset"
     );
 }

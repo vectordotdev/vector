@@ -70,6 +70,7 @@ impl ValidatedSink for WebSocketSinkConfig {
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
         let transformer = self.encoding.transformer();
+        self.encoding.validate()?;
         Ok(ValidatedWebSocketSink { uri, transformer })
     }
 

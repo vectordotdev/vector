@@ -1,0 +1,88 @@
+name: Website Browser Tests
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Website browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DD_ENV: "ci"
+    defaults:
+      run:
+        shell: bash
+        working-directory: website
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: website/.nvmrc
+          cache: yarn
+          cache-dependency-path: website/yarn.lock
+
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          rust: true
+          protoc: true
+          cue: true
+          prettier: true
+          datadog-ci: true
+
+      - name: Install Hugo extended
+        run: |
+          version=$(sed -n 's/^ARG HUGO_VERSION=//p' Dockerfile)
+          curl -fsSL "https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_extended_${version}_linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin hugo
+
+      - name: Install website dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Playwright browsers and system dependencies
+        run: yarn playwright install --with-deps chromium firefox webkit
+
+      - uses: ./.github/actions/install-vrl-doc-builder
+
+      - name: Generate Vector VRL function documentation
+        working-directory: .
+        run: make generate-vector-vrl-docs
+
+      - name: Build website and run browser tests
+        run: make test
+
+      - uses: ./.github/actions/dd-token
+        if: ${{ !cancelled() && hashFiles('website/test-results/junit.xml') != '' }}
+        continue-on-error: true
+
+      - name: Upload test results to Datadog
+        if: ${{ !cancelled() && hashFiles('website/test-results/junit.xml') != '' }}
+        continue-on-error: true
+        working-directory: .
+        run: scripts/upload-test-results.sh website/test-results/junit.xml vector-website
+
+      - name: Upload browser test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: website-browser-tests
+          path: |
+            website/playwright-report/
+            website/test-results/

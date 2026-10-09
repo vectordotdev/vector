@@ -68,10 +68,6 @@ const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
-// prost emits some generated code that includes clones on `Arc`
-// objects, which causes a clippy ding on this block. We don't
-// directly control the generated code, so allow this lint here.
-#[allow(clippy::clone_on_ref_ptr)]
 // https://github.com/hyperium/tonic/issues/1350
 #[allow(clippy::missing_const_for_fn)]
 #[allow(warnings)]
@@ -622,7 +618,7 @@ impl PubsubSource {
         self.bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-        let (events, ids) = self.parse_messages(response.received_messages, batch).await;
+        let (events, ids) = self.parse_messages(response.received_messages, batch);
 
         let count = events.len();
         match self.out.send_batch(events).await {
@@ -643,7 +639,7 @@ impl PubsubSource {
         }
     }
 
-    async fn parse_messages(
+    fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
         batch: Option<BatchNotifier>,
@@ -870,7 +866,7 @@ mod integration_tests {
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: LazyLock<String> =
-        LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
+        LazyLock::new(|| format!("{}/v1/projects/{PROJECT}", *gcp::PUBSUB_ADDRESS));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
@@ -1051,7 +1047,7 @@ mod integration_tests {
             this.request(Method::PUT, "topics/{topic}", json!({})).await;
 
             let body = json!({
-                "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
+                "topic": format!("projects/{PROJECT}/topics/{}", this.topic),
                 "ackDeadlineSeconds": *ACK_DEADLINE,
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;

@@ -24,6 +24,7 @@ pub struct EncodingConfig {
 
 impl EncodingConfig {
     /// Creates a new `EncodingConfig` with the provided `SerializerConfig` and `Transformer`.
+    #[must_use]
     pub const fn new(encoding: SerializerConfig, transformer: Transformer) -> Self {
         Self {
             encoding,
@@ -32,18 +33,50 @@ impl EncodingConfig {
     }
 
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
+    #[must_use]
     pub fn transformer(&self) -> Transformer {
         self.transformer.clone()
     }
 
     /// Get the encoding configuration.
+    #[must_use]
     pub const fn config(&self) -> &SerializerConfig {
         &self.encoding
     }
 
     /// Build the `Serializer` for this config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> vector_common::Result<Serializer> {
         self.encoding.build()
+    }
+
+    /// Validate that the configured serializer can be built.
+    ///
+    /// Builds the serializer and discards it, surfacing unbuildable encodings
+    /// during pure config validation instead of at build time.
+    ///
+    /// The protobuf codec is skipped: building it reads the descriptor set
+    /// from `desc_file` on disk, and pure validation must stay
+    /// filesystem-free (it runs under `vector validate --no-environment`).
+    /// A protobuf descriptor that can't be loaded is caught by the
+    /// environment-dependent `build()` phase instead.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
+    pub fn validate(&self) -> vector_common::Result<()> {
+        match self.config() {
+            SerializerConfig::Protobuf(_) => Ok(()),
+            _ => self
+                .build()
+                .map(|_| ())
+                .map_err(|error| format!("failed to build encoding serializer: {error}").into()),
+        }
     }
 }
 
@@ -54,7 +87,7 @@ where
     fn from(encoding: T) -> Self {
         Self {
             encoding: encoding.into(),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
         }
     }
 }
@@ -72,6 +105,7 @@ pub struct EncodingConfigWithFraming {
 impl EncodingConfigWithFraming {
     /// Creates a new `EncodingConfigWithFraming` with the provided `FramingConfig`,
     /// `SerializerConfig` and `Transformer`.
+    #[must_use]
     pub const fn new(
         framing: Option<FramingConfig>,
         encoding: SerializerConfig,
@@ -87,18 +121,29 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
+    #[must_use]
     pub fn transformer(&self) -> Transformer {
         self.encoding.transformer.clone()
     }
 
     /// Get the encoding configuration.
+    #[must_use]
     pub const fn config(&self) -> (&Option<FramingConfig>, &SerializerConfig) {
         (&self.framing, &self.encoding.encoding)
     }
 
     /// Build the `Framer` and `Serializer` for this config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     pub fn build(&self, sink_type: SinkType) -> vector_common::Result<(Framer, Serializer)> {
-        let framer = self.framing.as_ref().map(|framing| framing.build());
+        let framer = self.framing.as_ref().map(FramingConfig::build);
         let serializer = self.encoding.build()?;
 
         let framer = match (framer, &serializer) {
@@ -139,6 +184,11 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build the `Transformer` and `EncoderKind` for this config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build_encoder(
         &self,
         sink_type: SinkType,
@@ -146,6 +196,23 @@ impl EncodingConfigWithFraming {
         let (framer, serializer) = self.build(sink_type)?;
         let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
         Ok((self.transformer(), encoder))
+    }
+
+    /// Validate that the configured serializer can be built.
+    ///
+    /// Delegates to [`EncodingConfig::validate`]: the serializer is built and
+    /// discarded to surface unbuildable codecs during pure config validation,
+    /// with the disk-bound protobuf codec assumed valid so validation stays
+    /// filesystem-free (it runs under `vector validate --no-environment`).
+    /// Building the framer is infallible, so there is nothing to validate on
+    /// the framing side.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
+    pub fn validate(&self) -> vector_common::Result<()> {
+        self.encoding.validate()
     }
 }
 
@@ -176,6 +243,10 @@ mod test {
 
     use super::*;
     use crate::encoding::TimestampFormat;
+    use crate::encoding::{
+        AvroSerializerOptions, JsonSerializerConfig, ProtobufSerializerConfig,
+        ProtobufSerializerOptions,
+    };
 
     #[test]
     fn deserialize_encoding_config() {
@@ -262,5 +333,94 @@ mod test {
         );
         assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
+    }
+
+    #[test]
+    fn validate_skips_protobuf_encoding_that_reads_disk() {
+        // Building a protobuf serializer reads `desc_file` from disk; pure
+        // validation must stay filesystem-free, so the codec is assumed valid
+        // here and actually built (and failed) in the build phase.
+        let encoding = EncodingConfig::new(
+            SerializerConfig::Protobuf(ProtobufSerializerConfig {
+                protobuf: ProtobufSerializerOptions {
+                    desc_file: "/nonexistent/protobuf.desc".into(),
+                    message_type: "package.Message".into(),
+                    use_json_names: false,
+                },
+            }),
+            Transformer::default(),
+        );
+
+        assert!(encoding.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_unbuildable_encoding() {
+        // Avro's schema is inline JSON, so building it is filesystem-free and
+        // pure validation catches a malformed schema.
+        let encoding = EncodingConfig::new(
+            SerializerConfig::Avro {
+                avro: AvroSerializerOptions {
+                    schema: "not a valid avro schema".into(),
+                },
+            },
+            Transformer::default(),
+        );
+
+        let error = encoding.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_buildable_encoding() {
+        let encoding = EncodingConfig::new(
+            SerializerConfig::Json(JsonSerializerConfig::default()),
+            Transformer::default(),
+        );
+
+        assert!(encoding.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_with_framing_rejects_unbuildable_encoding() {
+        let encoding = EncodingConfigWithFraming::new(
+            Some(FramingConfig::NewlineDelimited),
+            SerializerConfig::Avro {
+                avro: AvroSerializerOptions {
+                    schema: "not a valid avro schema".into(),
+                },
+            },
+            Transformer::default(),
+        );
+
+        let error = encoding.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_with_framing_skips_protobuf_encoding_that_reads_disk() {
+        let encoding = EncodingConfigWithFraming::new(
+            None,
+            SerializerConfig::Protobuf(ProtobufSerializerConfig {
+                protobuf: ProtobufSerializerOptions {
+                    desc_file: "/nonexistent/protobuf.desc".into(),
+                    message_type: "package.Message".into(),
+                    use_json_names: false,
+                },
+            }),
+            Transformer::default(),
+        );
+
+        assert!(encoding.validate().is_ok());
     }
 }

@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]
 
 use bytes::BytesMut;
@@ -11,6 +12,11 @@ use vector_core::{
     event::{Event, Metric, MetricKind, MetricValue},
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the existing owned-argument API during the lint rollout."
+)]
 fn assert_roundtrip(
     input_event: Event,
     serializer: &mut dyn Serializer<Error = vector_common::Error>,
@@ -86,7 +92,7 @@ fn histogram_metric_roundtrip() {
         &mut NativeJsonSerializerConfig.build(),
         &NativeJsonDeserializerConfig::default().build(),
         expected_json_value,
-    )
+    );
 }
 
 /// A histogram that reports no sum omits the key rather than emitting `"sum": null`, and an absent
@@ -131,5 +137,5 @@ fn histogram_without_sum_metric_roundtrip() {
         &mut NativeJsonSerializerConfig.build(),
         &NativeJsonDeserializerConfig::default().build(),
         expected_json_value,
-    )
+    );
 }

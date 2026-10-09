@@ -4,6 +4,7 @@ use lookup::lookup_v2::ConfigTargetPath;
 use serde_json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::str::FromStr;
 use strum::{EnumString, FromRepr, VariantNames};
 use tokio_util::codec::Encoder;
@@ -28,16 +29,19 @@ pub struct SyslogSerializerConfig {
 
 impl SyslogSerializerConfig {
     /// Build the `SyslogSerializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> SyslogSerializer {
         SyslogSerializer::new(self)
     }
 
     /// The data type of events that are accepted by `SyslogSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         schema::Requirement::empty()
     }
@@ -73,6 +77,7 @@ pub struct SyslogSerializer {
 
 impl SyslogSerializer {
     /// Creates a new `SyslogSerializer`.
+    #[must_use]
     pub fn new(conf: &SyslogSerializerConfig) -> Self {
         Self {
             config: conf.clone(),
@@ -105,17 +110,16 @@ impl<'a> ConfigDecanter<'a> {
 
     fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
         let mut app_name = self
-            .get_value(&config.app_name) // P1: Configured path
+            .get_value(config.app_name.as_ref()) // P1: Configured path
             .unwrap_or_else(|| {
-                // P2: Semantic Fallback: Check for the field designated as "service" in the schema
+                // P2: Semantic fallback to the field designated as "service" in the schema.
+                // P3: Fall back to "vector" when that field is absent.
                 self.log
                     .get_by_meaning("service")
-                    .map(|v| v.to_string_lossy().to_string())
-                    // P3: Hardcoded default
-                    .unwrap_or_else(|| "vector".to_owned())
+                    .map_or_else(|| "vector".to_owned(), |v| v.to_string_lossy().to_string())
             });
-        let mut proc_id = self.get_value(&config.proc_id);
-        let mut msg_id = self.get_value(&config.msg_id);
+        let mut proc_id = self.get_value(config.proc_id.as_ref());
+        let mut msg_id = self.get_value(config.msg_id.as_ref());
 
         match config.rfc {
             SyslogRFC::Rfc3164 => {
@@ -154,9 +158,8 @@ impl<'a> ConfigDecanter<'a> {
         }
     }
 
-    fn get_value(&self, path: &Option<ConfigTargetPath>) -> Option<String> {
-        path.as_ref()
-            .and_then(|p| self.log.get(p).cloned())
+    fn get_value(&self, path: Option<&ConfigTargetPath>) -> Option<String> {
+        path.and_then(|p| self.log.get(p).cloned())
             .map(|v| v.to_string_lossy().to_string())
     }
 
@@ -196,6 +199,15 @@ impl<'a> ConfigDecanter<'a> {
             })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric fallback behavior."
+    )]
     fn get_syslog_code<T>(
         &self,
         path: &ConfigTargetPath,
@@ -247,7 +259,7 @@ where
 }
 
 /// Sanitize a string to ASCII printable characters (space to tilde, ASCII 32-126)
-/// Used for RFC 3164 TAG field (app_name and proc_id)
+/// Used for RFC 3164 TAG field (`app_name` and `proc_id`)
 /// Invalid characters are replaced with '_'
 #[inline]
 fn sanitize_to_ascii(s: &str) -> Cow<'_, str> {
@@ -321,7 +333,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        result.push_str(&self.pri.encode().to_string());
+        result.push_str(&self.pri.encode());
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -330,7 +342,8 @@ impl SyslogMessage {
 
         match rfc {
             SyslogRFC::Rfc3164 => {
-                result.push_str(&format!("{} ", self.timestamp.format("%b %e %H:%M:%S")));
+                write!(result, "{} ", self.timestamp.format("%b %e %H:%M:%S"))
+                    .expect("writing to a String cannot fail");
             }
             SyslogRFC::Rfc5424 => {
                 result.push_str(
@@ -401,7 +414,7 @@ struct Tag {
 impl Tag {
     fn encode_rfc_3164(&self) -> String {
         let mut tag = if let Some(proc_id) = self.proc_id.as_deref() {
-            format!("{}[{}]:", self.app_name, proc_id)
+            format!("{}[{proc_id}]:", self.app_name)
         } else {
             format!("{}:", self.app_name)
         };
@@ -418,7 +431,7 @@ impl Tag {
     fn encode_rfc_5424(&self) -> String {
         let proc_id_str = self.proc_id.as_deref().unwrap_or(NIL_VALUE);
         let msg_id_str = self.msg_id.as_deref().unwrap_or(NIL_VALUE);
-        format!("{} {} {}", self.app_name, proc_id_str, msg_id_str)
+        format!("{} {proc_id_str} {msg_id_str}", self.app_name)
     }
 }
 
@@ -436,10 +449,11 @@ impl StructuredData {
             self.elements
                 .iter()
                 .fold(String::new(), |mut acc, (sd_id, sd_params)| {
-                    acc.push_str(&format!("[{sd_id}"));
+                    write!(acc, "[{sd_id}").expect("writing to a String cannot fail");
                     for (key, value) in sd_params {
                         let esc_val = escape_sd_value(value);
-                        acc.push_str(&format!(" {key}=\"{esc_val}\""));
+                        write!(acc, " {key}=\"{esc_val}\"")
+                            .expect("writing to a String cannot fail");
                     }
                     acc.push(']');
                     acc
@@ -482,6 +496,11 @@ impl From<ObjectMap> for StructuredData {
 }
 
 /// Helper function to flatten nested objects with dot notation
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the existing owned-argument API during the lint rollout."
+)]
 fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, String>) {
     for (key, value) in obj {
         let key_str: String = key.into();
@@ -502,7 +521,7 @@ fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, 
                 if let Ok(json) = serde_json::to_string(&arr) {
                     result.insert(full_key, json);
                 } else {
-                    result.insert(full_key, format!("{:?}", arr));
+                    result.insert(full_key, format!("{arr:?}"));
                 }
             }
             scalar => {
@@ -563,7 +582,7 @@ pub enum Facility {
     Security = 13,
     /// Console
     Console = 14,
-    /// SolarisCron
+    /// `SolarisCron`
     SolarisCron = 15,
     /// Local0
     Local0 = 16,
@@ -625,6 +644,11 @@ mod tests {
     use vrl::prelude::Kind;
     use vrl::{btreemap, event_path, value};
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     fn run_encode(config: SyslogSerializerConfig, event: Event) -> String {
         let mut serializer = SyslogSerializer::new(&config);
         let mut buffer = BytesMut::new();
@@ -638,7 +662,7 @@ mod tests {
             event_path!("timestamp"),
             NaiveDate::from_ymd_opt(2025, 8, 28)
                 .unwrap()
-                .and_hms_micro_opt(18, 30, 00, 123456)
+                .and_hms_micro_opt(18, 30, 00, 123_456)
                 .unwrap()
                 .and_local_timezone(Utc)
                 .unwrap(),
@@ -821,7 +845,7 @@ mod tests {
         let mut log = create_simple_log();
         log.insert(event_path!("long_app_name"), long_string.clone());
         log.insert(event_path!("long_proc_id"), long_string.clone());
-        log.insert(event_path!("long_msg_id"), long_string.clone());
+        log.insert(event_path!("long_msg_id"), long_string);
 
         let config = toml::from_str::<SyslogSerializerConfig>(
             r#"
@@ -968,9 +992,9 @@ mod tests {
     #[test]
     fn test_minimal_event() {
         let config = toml::from_str::<SyslogSerializerConfig>(
-            r#"
+            r"
         [syslog]
-    "#,
+    ",
         )
         .unwrap();
         let log = LogEvent::from("");
@@ -1144,7 +1168,7 @@ mod tests {
 
         let output = run_encode(config, Event::Log(log));
         // All invalid characters should be replaced with _
-        assert!(output.contains(r#"[my_id"#));
+        assert!(output.contains(r"[my_id"));
         assert!(output.contains(r#"foo_bar="value1""#));
         assert!(output.contains(r#"has_quote="value2""#));
         assert!(output.contains(r#"user_name="alice""#));
@@ -1172,7 +1196,7 @@ mod tests {
 
         let output = run_encode(config, Event::Log(log));
         let expected_id = "a".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_id)));
+        assert!(output.contains(&format!("[{expected_id}")));
         assert!(!output.contains(&format!("[{}", "a".repeat(50))));
     }
 
@@ -1214,7 +1238,7 @@ mod tests {
         assert!(output.contains("app_"));
 
         let expected_sd_id: String = "_".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_sd_id)));
+        assert!(output.contains(&format!("[{expected_sd_id}")));
     }
 
     #[test]

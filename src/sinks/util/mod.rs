@@ -9,6 +9,13 @@ pub mod compressor;
 pub mod datagram;
 pub mod encoding;
 pub mod http;
+#[cfg(any(
+    feature = "sinks-clickhouse",
+    feature = "sinks-gcp",
+    feature = "sinks-greptimedb_logs",
+    feature = "sinks-honeycomb",
+    feature = "sinks-keep",
+))]
 pub(crate) mod http_v1;
 pub mod metadata;
 pub mod normalizer;

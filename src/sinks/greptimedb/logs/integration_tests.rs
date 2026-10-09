@@ -113,8 +113,8 @@ impl GreptimeClient {
     async fn create_pipeline(&self, pipeline_name: &str, pipeline_content: &str) {
         self.client
             .post(format!(
-                "{}/v1/events/pipelines/{}",
-                self.endpoint, pipeline_name
+                "{}/v1/events/pipelines/{pipeline_name}",
+                self.endpoint
             ))
             .header("Content-Type", "application/x-yaml")
             .body(String::from(pipeline_content))

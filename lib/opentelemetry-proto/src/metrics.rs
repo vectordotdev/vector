@@ -40,18 +40,29 @@ impl ResourceMetrics {
                     let metric_name = metric.name;
                     match metric.data {
                         Some(Data::Gauge(g)) => {
-                            Self::convert_gauge(g, &resource, &scope, metric_name)
+                            Self::convert_gauge(g, resource.as_ref(), scope.as_ref(), metric_name)
                         }
-                        Some(Data::Sum(s)) => Self::convert_sum(s, &resource, &scope, metric_name),
-                        Some(Data::Histogram(h)) => {
-                            Self::convert_histogram(h, &resource, &scope, metric_name)
+                        Some(Data::Sum(s)) => {
+                            Self::convert_sum(s, resource.as_ref(), scope.as_ref(), metric_name)
                         }
-                        Some(Data::ExponentialHistogram(e)) => {
-                            Self::convert_exp_histogram(e, &resource, &scope, metric_name)
-                        }
-                        Some(Data::Summary(su)) => {
-                            Self::convert_summary(su, &resource, &scope, metric_name)
-                        }
+                        Some(Data::Histogram(h)) => Self::convert_histogram(
+                            h,
+                            resource.as_ref(),
+                            scope.as_ref(),
+                            metric_name,
+                        ),
+                        Some(Data::ExponentialHistogram(e)) => Self::convert_exp_histogram(
+                            e,
+                            resource.as_ref(),
+                            scope.as_ref(),
+                            metric_name,
+                        ),
+                        Some(Data::Summary(su)) => Self::convert_summary(
+                            su,
+                            resource.as_ref(),
+                            scope.as_ref(),
+                            metric_name,
+                        ),
                         _ => Vec::new(),
                     }
                 })
@@ -60,8 +71,8 @@ impl ResourceMetrics {
 
     fn convert_gauge(
         gauge: Gauge,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
+        resource: Option<&Resource>,
+        scope: Option<&InstrumentationScope>,
         metric_name: String,
     ) -> Vec<Event> {
         gauge
@@ -69,8 +80,8 @@ impl ResourceMetrics {
             .into_iter()
             .map(move |point| {
                 GaugeMetric {
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: resource.cloned(),
+                    scope: scope.cloned(),
                     point,
                 }
                 .into_metric(metric_name.clone())
@@ -80,8 +91,8 @@ impl ResourceMetrics {
 
     fn convert_sum(
         sum: Sum,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
+        resource: Option<&Resource>,
+        scope: Option<&InstrumentationScope>,
         metric_name: String,
     ) -> Vec<Event> {
         sum.data_points
@@ -89,8 +100,8 @@ impl ResourceMetrics {
             .map(move |point| {
                 SumMetric {
                     aggregation_temporality: sum.aggregation_temporality,
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: resource.cloned(),
+                    scope: scope.cloned(),
                     is_monotonic: sum.is_monotonic,
                     point,
                 }
@@ -101,8 +112,8 @@ impl ResourceMetrics {
 
     fn convert_histogram(
         histogram: Histogram,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
+        resource: Option<&Resource>,
+        scope: Option<&InstrumentationScope>,
         metric_name: String,
     ) -> Vec<Event> {
         histogram
@@ -111,8 +122,8 @@ impl ResourceMetrics {
             .map(move |point| {
                 HistogramMetric {
                     aggregation_temporality: histogram.aggregation_temporality,
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: resource.cloned(),
+                    scope: scope.cloned(),
                     point,
                 }
                 .into_metric(metric_name.clone())
@@ -122,8 +133,8 @@ impl ResourceMetrics {
 
     fn convert_exp_histogram(
         histogram: ExponentialHistogram,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
+        resource: Option<&Resource>,
+        scope: Option<&InstrumentationScope>,
         metric_name: String,
     ) -> Vec<Event> {
         histogram
@@ -132,8 +143,8 @@ impl ResourceMetrics {
             .map(move |point| {
                 ExpHistogramMetric {
                     aggregation_temporality: histogram.aggregation_temporality,
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: resource.cloned(),
+                    scope: scope.cloned(),
                     point,
                 }
                 .into_metric(metric_name.clone())
@@ -143,8 +154,8 @@ impl ResourceMetrics {
 
     fn convert_summary(
         summary: Summary,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
+        resource: Option<&Resource>,
+        scope: Option<&InstrumentationScope>,
         metric_name: String,
     ) -> Vec<Event> {
         summary
@@ -152,8 +163,8 @@ impl ResourceMetrics {
             .into_iter()
             .map(move |point| {
                 SummaryMetric {
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: resource.cloned(),
+                    scope: scope.cloned(),
                     point,
                 }
                 .into_metric(metric_name.clone())
@@ -196,6 +207,7 @@ struct ExpHistogramMetric {
     point: ExponentialHistogramDataPoint,
 }
 
+#[must_use]
 pub fn build_metric_tags(
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
@@ -236,6 +248,11 @@ pub fn build_metric_tags(
 
 impl SumMetric {
     fn into_metric(self, metric_name: String) -> Event {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let value = self.point.value.to_f64().unwrap_or(0.0);
         let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
@@ -261,6 +278,11 @@ impl SumMetric {
 
 impl GaugeMetric {
     fn into_metric(self, metric_name: String) -> Event {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let value = self.point.value.to_f64().unwrap_or(0.0);
         let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
@@ -278,6 +300,11 @@ impl GaugeMetric {
 
 impl HistogramMetric {
     fn into_metric(self, metric_name: String) -> Event {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
         let buckets = match self.point.bucket_counts.len() {
@@ -324,6 +351,11 @@ impl HistogramMetric {
 impl ExpHistogramMetric {
     fn into_metric(self, metric_name: String) -> Event {
         // we have to convert Exponential Histogram to agg histogram using scale and base
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
 
@@ -335,6 +367,12 @@ impl ExpHistogramMetric {
 
         if let Some(negative_buckets) = self.point.negative {
             for (i, &count) in negative_buckets.bucket_counts.iter().enumerate() {
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_possible_wrap,
+                    reason = "preserve existing exponential histogram index conversion; overflow handling is deferred"
+                )]
                 let index = negative_buckets.offset + i as i32;
                 let upper_limit = -base.powi(index);
                 buckets.push(Bucket { count, upper_limit });
@@ -350,6 +388,12 @@ impl ExpHistogramMetric {
 
         if let Some(positive_buckets) = self.point.positive {
             for (i, &count) in positive_buckets.bucket_counts.iter().enumerate() {
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_possible_wrap,
+                    reason = "preserve existing exponential histogram index conversion; overflow handling is deferred"
+                )]
                 let index = positive_buckets.offset + i as i32;
                 let upper_limit = base.powi(index + 1);
                 buckets.push(Bucket { count, upper_limit });
@@ -379,6 +423,11 @@ impl ExpHistogramMetric {
 
 impl SummaryMetric {
     fn into_metric(self, metric_name: String) -> Event {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_wrap,
+            reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
+        )]
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
 
@@ -412,6 +461,11 @@ pub trait ToF64 {
 }
 
 impl ToF64 for Option<NumberDataPointValue> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Vector numeric metrics use f64; preserve the existing integer conversion"
+    )]
     fn to_f64(self) -> Option<f64> {
         match self {
             Some(NumberDataPointValue::AsDouble(f)) => Some(f),
@@ -431,6 +485,7 @@ fn push_key_value(attributes: &mut Vec<KeyValue>, key: String, value: AnyValue) 
     });
 }
 
+#[must_use]
 pub fn split_metric_tags(tags: MetricTags) -> (Resource, InstrumentationScope, Vec<KeyValue>) {
     let mut resource_attributes = Vec::new();
     let mut scope_name = String::new();
@@ -780,6 +835,12 @@ fn metric_value_to_data(
     OTLPDataConverter::new(kind, timestamp_ns, start_time_ns, attrs).metric_value_to_data(value)
 }
 
+/// Convert a Vector metric into an OTLP export request.
+///
+/// # Errors
+///
+/// Returns an error for unrepresentable timestamps, unsupported metric kinds,
+/// or values that cannot be encoded as valid OTLP metrics.
 pub fn metric_event_to_export_request(
     metric: MetricEvent,
 ) -> Result<ExportMetricsServiceRequest, vector_common::Error> {
@@ -826,6 +887,7 @@ pub fn metric_event_to_export_request(
                     name,
                     description: String::new(),
                     unit: String::new(),
+                    metadata: vec![],
                     data: Some(data),
                 }],
                 schema_url: String::new(),
@@ -921,8 +983,11 @@ mod tests {
             .with_timestamp(Some(Utc.timestamp_nanos(time_ns)))
             .with_interval_ms(NonZeroU32::new(10)),
         );
-        assert_eq!(point.start_time_unix_nano, time_ns as u64);
-        assert_eq!(point.time_unix_nano, (time_ns + interval_ns) as u64);
+        assert_eq!(point.start_time_unix_nano, u64::try_from(time_ns).unwrap());
+        assert_eq!(
+            point.time_unix_nano,
+            u64::try_from(time_ns + interval_ns).unwrap()
+        );
 
         // Cumulative (Absolute) must NOT derive a start time even if an interval is present.
         let point = sum_point(
@@ -1377,7 +1442,8 @@ mod tests {
             Data::Summary(summary) => {
                 let point = summary.data_points.into_iter().next().unwrap();
                 assert_eq!(point.count, 100);
-                assert_eq!(point.sum, 1000.0);
+                // The sum is copied unchanged, so require identical bits.
+                assert_eq!(point.sum.to_bits(), 1000.0_f64.to_bits());
                 assert_eq!(
                     point.quantile_values,
                     vec![

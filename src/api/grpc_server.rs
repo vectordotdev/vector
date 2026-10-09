@@ -42,6 +42,19 @@ impl GrpcServer {
     /// is dropped.
     ///
     /// Returns an error if the server fails to bind to the configured address.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     pub async fn start(config: &Config, watch_rx: WatchRx) -> crate::Result<Self> {
         let addr = config.api.address.ok_or_else(|| {
             crate::Error::from("API address not configured in config.api.address")
@@ -50,14 +63,14 @@ impl GrpcServer {
         // Bind the TCP listener first to ensure the port is available
         // This will fail fast if the address is already in use
         let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
-            crate::Error::from(format!("Failed to bind gRPC API server to {}: {}", addr, e))
+            crate::Error::from(format!("Failed to bind gRPC API server to {addr}: {e}"))
         })?;
 
         let actual_addr = listener
             .local_addr()
-            .map_err(|e| crate::Error::from(format!("Failed to get local address: {}", e)))?;
+            .map_err(|e| crate::Error::from(format!("Failed to get local address: {e}")))?;
 
-        info!("GRPC API server bound to {}.", actual_addr);
+        info!("GRPC API server bound to {actual_addr}.");
 
         let service = ObservabilityService::new(watch_rx);
 
@@ -72,9 +85,9 @@ impl GrpcServer {
         // Convert the tokio TcpListener into a std listener for hyper's Server.
         let std_listener = listener
             .into_std()
-            .map_err(|e| crate::Error::from(format!("Failed to convert TCP listener: {}", e)))?;
+            .map_err(|e| crate::Error::from(format!("Failed to convert TCP listener: {e}")))?;
         std_listener.set_nonblocking(true).map_err(|e| {
-            crate::Error::from(format!("Failed to set TCP listener non-blocking: {}", e))
+            crate::Error::from(format!("Failed to set TCP listener non-blocking: {e}"))
         })?;
 
         let router_serving = Arc::clone(&serving);
@@ -120,7 +133,7 @@ impl GrpcServer {
             }
         });
 
-        info!("GRPC API server started on {}.", actual_addr);
+        info!("GRPC API server started on {actual_addr}.");
 
         Ok(Self {
             _shutdown,
@@ -143,6 +156,7 @@ impl GrpcServer {
     }
 
     /// Get the address the server is listening on
+    #[must_use]
     pub const fn addr(&self) -> SocketAddr {
         self.addr
     }

@@ -292,8 +292,11 @@ impl Filter<LogEvent> for EventFilter {
                             }
                         }
                         // Where the rhs is a string ref, the lhs is coerced into a string.
-                        (Some(Value::Bytes(v)), ComparisonValue::String(rhs)) => {
-                            let lhs = String::from_utf8_lossy(v);
+                        (
+                            Some(v @ (Value::Bytes(_) | Value::String(_))),
+                            ComparisonValue::String(rhs),
+                        ) => {
+                            let lhs = v.to_string_lossy();
                             let rhs = Cow::from(rhs);
 
                             match comparator {
@@ -304,8 +307,8 @@ impl Filter<LogEvent> for EventFilter {
                             }
                         }
                         // Otherwise, compare directly as strings.
-                        (Some(Value::Bytes(v)), _) => {
-                            let lhs = String::from_utf8_lossy(v);
+                        (Some(v @ (Value::Bytes(_) | Value::String(_))), _) => {
+                            let lhs = v.to_string_lossy();
 
                             match comparator {
                                 Comparison::Lt => lhs < rhs,
@@ -384,6 +387,7 @@ where
         match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
             Some(Value::Boolean(v)) => func(v.to_string().into()),
             Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
+            Some(Value::String(v)) => func(Cow::Borrowed(v.as_ref())),
             Some(Value::Integer(v)) => func(v.to_string().into()),
             Some(Value::Float(v)) => func(v.to_string().into()),
             _ => false,
@@ -403,6 +407,7 @@ where
     Run::boxed(move |log: &LogEvent| {
         match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
             Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
+            Some(Value::String(v)) => func(Cow::Borrowed(v.as_ref())),
             _ => false,
         }
     })
@@ -1646,15 +1651,13 @@ mod test {
 
             assert!(
                 cond.check_with_context(pass.clone()).0.is_ok(),
-                "should pass: {}\nevent: {}",
-                source,
+                "should pass: {source}\nevent: {}",
                 serde_json::to_string(&pass.as_log()).unwrap(),
             );
 
             assert!(
                 cond.check_with_context(fail.clone()).0.is_err(),
-                "should fail: {}\nevent: {}",
-                source,
+                "should fail: {source}\nevent: {}",
                 serde_json::to_string(&fail.as_log()).unwrap(),
             );
         }

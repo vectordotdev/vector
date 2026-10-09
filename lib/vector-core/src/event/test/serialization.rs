@@ -9,11 +9,11 @@ use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
 use vrl::event_path;
 
-use crate::event::event_exceeds_max_nesting_cost;
 use crate::event::ser::{
     ARRAY_FRAME_COST, MAX_VALUE_NESTING_FRAMES, OBJECT_FRAME_COST, TIMESTAMP_FRAME_COST,
     check_value_nesting_cost,
 };
+use crate::event::{TraceLayout, event_exceeds_max_nesting_cost};
 use vector_buffers::Bufferable;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
@@ -85,59 +85,34 @@ mod histogram_sum {
         }
     }
 
-    fn encode(sum: Option<f64>) -> proto::metric::Value {
-        proto::MetricValue::from(histogram(sum))
-    }
-
-    /// A histogram carrying a sum keeps encoding as `AggregatedHistogram3`, exactly as before this
-    /// field became optional. That is what leaves the checked-in native-encoding fixtures
-    /// byte-identical and lets an older peer keep decoding these.
-    #[test]
-    fn reported_sum_encodes_as_v3() {
-        assert!(
-            matches!(
-                encode(Some(12.5)),
-                proto::metric::Value::AggregatedHistogram3(_)
-            ),
-            "a histogram with a sum must still encode as AggregatedHistogram3"
-        );
-    }
-
-    /// Only the case that `AggregatedHistogram3` cannot represent reaches for the new message.
-    #[test]
-    fn unreported_sum_encodes_as_v4() {
-        assert!(
-            matches!(encode(None), proto::metric::Value::AggregatedHistogram4(_)),
-            "a histogram without a sum must encode as AggregatedHistogram4"
-        );
+    fn decode(value: proto::MetricValue) -> MetricValue {
+        MetricValue::try_from(value).expect("histogram should decode")
     }
 
     #[test]
     fn both_survive_a_round_trip() {
         for sum in [Some(12.5), Some(0.0), None] {
-            let decoded = MetricValue::from(encode(sum));
+            let decoded = decode(proto::MetricValue::from(histogram(sum)));
             assert_eq!(decoded, histogram(sum), "round-trip lost the sum {sum:?}");
         }
     }
 
-    /// Versions 1 through 3 have no way to say "no sum", so whatever they carry was reported --
-    /// including a zero, which proto3 implicit presence does not even write to the wire. Reading
-    /// those as `None` would silently reinterpret every previously encoded zero.
+    /// Payloads that do not set `sum_missing` carry a reported sum -- including a zero, which proto3
+    /// implicit presence does not even write to the wire. Versions 1 and 2 cannot set it at all.
     #[test]
-    fn legacy_versions_decode_as_a_reported_sum() {
-        let bucket3 = proto::HistogramBucket3 {
-            upper_limit: 1.0,
-            count: 3,
-        };
-
-        let v3 = proto::metric::Value::AggregatedHistogram3(proto::AggregatedHistogram3 {
-            buckets: vec![bucket3.clone()],
+    fn unmarked_payloads_decode_as_a_reported_sum() {
+        let v3 = proto::MetricValue::AggregatedHistogram3(proto::AggregatedHistogram3 {
+            buckets: vec![proto::HistogramBucket3 {
+                upper_limit: 1.0,
+                count: 3,
+            }],
             count: 3,
             sum: 0.0,
+            sum_missing: false,
         });
-        assert_eq!(MetricValue::from(v3), histogram(Some(0.0)));
+        assert_eq!(decode(v3), histogram(Some(0.0)));
 
-        let v2 = proto::metric::Value::AggregatedHistogram2(proto::AggregatedHistogram2 {
+        let v2 = proto::MetricValue::AggregatedHistogram2(proto::AggregatedHistogram2 {
             buckets: vec![proto::HistogramBucket {
                 upper_limit: 1.0,
                 count: 3,
@@ -145,15 +120,15 @@ mod histogram_sum {
             count: 3,
             sum: 0.0,
         });
-        assert_eq!(MetricValue::from(v2), histogram(Some(0.0)));
+        assert_eq!(decode(v2), histogram(Some(0.0)));
 
-        let v1 = proto::metric::Value::AggregatedHistogram1(proto::AggregatedHistogram1 {
+        let v1 = proto::MetricValue::AggregatedHistogram1(proto::AggregatedHistogram1 {
             buckets: vec![1.0],
             counts: vec![3],
             count: 3,
             sum: 0.0,
         });
-        assert_eq!(MetricValue::from(v1), histogram(Some(0.0)));
+        assert_eq!(decode(v1), histogram(Some(0.0)));
     }
 
     /// `PartialEq` has to keep these apart, or none of the above proves anything.
@@ -162,6 +137,46 @@ mod histogram_sum {
         assert_ne!(histogram(None), histogram(Some(0.0)));
         assert_eq!(histogram(None), histogram(None));
     }
+}
+
+#[test]
+fn disk_buffer_preserves_trace_layout_metadata() {
+    let mut trace = TraceEvent::default();
+    trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+    let expected = EventArray::from(Event::Trace(trace));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Traces(traces) = actual else {
+        panic!("expected a traces array");
+    };
+    assert_eq!(
+        traces[0].metadata().trace_layout(),
+        Some(TraceLayout::Datadog)
+    );
+}
+
+#[test]
+fn disk_buffer_preserves_unrecognized_trace_layout() {
+    let mut trace = TraceEvent::default();
+    trace
+        .metadata_mut()
+        .set_trace_layout(TraceLayout::Unrecognized(99));
+    let expected = EventArray::from(Event::Trace(trace));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Traces(traces) = actual else {
+        panic!("expected a traces array");
+    };
+    assert_eq!(
+        traces[0].metadata().trace_layout(),
+        Some(TraceLayout::Unrecognized(99))
+    );
 }
 
 #[test]
@@ -872,4 +887,61 @@ fn check_value_nesting_cost_with_mixed_variants() {
 
     assert!(check_value_nesting_cost(&value, 0, 7).is_ok());
     assert!(check_value_nesting_cost(&value, 0, 6).is_err());
+}
+
+#[test]
+fn truncated_protobuf_is_invalid_payload() {
+    let array = EventArray::Logs(vec![LogEvent::from("hello")]);
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(array, &mut buffer);
+    assert!(buffer.len() > 1);
+    buffer.truncate(buffer.len() - 1);
+
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            crate::event::DecodeError::InvalidProtobufPayload { .. }
+        ),
+        "truncated protobuf should be InvalidProtobufPayload, got {error:?}"
+    );
+    let message = error.to_string();
+    assert!(
+        message.contains("EventArray") && message.contains("EventWrapper"),
+        "invalid payload should report both decode attempts, got {message}"
+    );
+}
+
+#[test]
+fn unknown_event_array_variant_is_not_invalid_protobuf() {
+    // Field 4 is not a member of `EventArray.events`. Prost keeps it as an unknown
+    // field and leaves the oneof unset, which must not be reported as corrupt protobuf.
+    let buffer = bytes::Bytes::from_static(&[34, 0]);
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(error, crate::event::DecodeError::UnrecognizedEventVariant),
+        "unknown oneof tag should be UnrecognizedEventVariant, got {error:?}"
+    );
+}
+
+#[test]
+fn nan_float_is_rejected_by_encodable_decode() {
+    let proto_array = proto::EventArray {
+        events: Some(proto::event_array::Events::Logs(proto::LogArray {
+            logs: vec![proto::Log {
+                value: Some(proto::Value {
+                    kind: Some(proto::value::Kind::Float(f64::NAN)),
+                }),
+                ..proto::Log::default()
+            }],
+        })),
+    };
+    let mut buffer = BytesMut::with_capacity(64);
+    proto_array.encode(&mut buffer).unwrap();
+
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(error, crate::event::DecodeError::NanFloat),
+        "NaN float should be NanFloat, got {error:?}"
+    );
 }

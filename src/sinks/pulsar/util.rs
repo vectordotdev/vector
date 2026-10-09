@@ -76,7 +76,7 @@ pub(super) fn get_properties(
                     Value::Object(headers_map) => {
                         let mut property_map = HashMap::new();
                         for (key, value) in headers_map {
-                            if let Value::Bytes(value_bytes) = value {
+                            if let Some(value_bytes) = value.as_bytes() {
                                 property_map.insert(key.clone(), value_bytes.clone());
                             } else {
                                 emit!(PulsarPropertyExtractionError {

@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]
 
 use std::{num::NonZeroU32, sync::Arc};
@@ -348,6 +349,6 @@ fn native_json_decodes_events_without_metadata() {
     );
     assert_eq!(
         log.metadata().value(),
-        &vector_core::event::Value::Object(Default::default())
+        &vector_core::event::Value::Object(ObjectMap::default())
     );
 }

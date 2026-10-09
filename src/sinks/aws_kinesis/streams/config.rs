@@ -141,6 +141,7 @@ impl ValidatedSink for KinesisStreamsSinkConfig {
             .limit_max_bytes(MAX_PAYLOAD_SIZE)?
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
+        self.base.encoding.validate()?;
 
         Ok(ValidatedKinesisStreams { batch_settings })
     }

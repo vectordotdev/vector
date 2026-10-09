@@ -4,8 +4,8 @@ use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, DynValidatedSink, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
-    transform::get_transform_output_ids, validation,
+    Config, DynValidatedSink, OutputId, builder::ConfigBuilder, graph::Graph, graph_builder,
+    sink::SinkOuter, transform::get_transform_output_ids, validation,
 };
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -42,6 +42,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(alpha_errors);
     }
 
+    let nodes = graph_builder::expanded_nodes(&builder);
+
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]
@@ -58,38 +60,18 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         graceful_shutdown_duration,
         allow_empty: _,
     } = builder;
-    let all_sinks = sinks
-        .clone()
-        .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_sink(key)),
-        )
-        .collect::<IndexMap<_, _>>();
-    let sources_and_table_sources = sources
-        .clone()
-        .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_source(key)),
-        )
-        .collect::<IndexMap<_, _>>();
-
-    let graph = match Graph::new(
-        &sources_and_table_sources,
-        &transforms,
-        &all_sinks,
-        schema,
-        global.wildcard_matching.unwrap_or_default(),
-    ) {
+    let graph = match Graph::new(nodes, global.wildcard_matching.unwrap_or_default()) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
             return Err(errors);
         }
     };
+
+    if let Err(input_errors) = graph.check_inputs() {
+        errors.extend(input_errors);
+        return Err(errors);
+    }
 
     if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
@@ -104,27 +86,28 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     let sinks: IndexMap<ComponentKey, SinkOuter<OutputId>> = sinks
         .into_iter()
         .map(|(key, sink)| {
-            let inputs = graph.inputs_for(&key);
+            let inputs = graph.inputs_for_component(&key);
             (key, sink.with_inputs(inputs))
         })
         .collect();
     let transforms = transforms
         .into_iter()
         .map(|(key, transform)| {
-            let inputs = graph.inputs_for(&key);
+            let inputs = graph.inputs_for_component(&key);
             (key, transform.with_inputs(inputs))
         })
         .collect();
     let enrichment_tables = enrichment_tables
         .into_iter()
         .map(|(key, table)| {
-            let inputs = graph.inputs_for(&key);
+            let inputs = graph.inputs_for_component(&key);
             (key, table.with_inputs(inputs))
         })
         .collect();
+    let output_map = graph.output_map().expect("ambiguous outputs");
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph))
+        .map(|test| test.resolve_outputs(&output_map))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
@@ -205,7 +188,7 @@ fn validate_sinks(config: &mut Config) -> Vec<String> {
         let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
         match dyn_sink.validate_dyn() {
             Ok(state) => sink.validated = Some(Arc::from(state)),
-            Err(e) => errors.push(format!("Failed to validate sink \"{}\": {}", key, e)),
+            Err(e) => errors.push(format!("Failed to validate sink \"{key}\": {e}")),
         }
     }
 

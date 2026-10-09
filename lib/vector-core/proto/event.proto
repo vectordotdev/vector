@@ -90,6 +90,13 @@ message OutputId {
   optional string port = 2;
 }
 
+enum TraceLayout {
+  TRACE_LAYOUT_UNSPECIFIED = 0;
+  TRACE_LAYOUT_DATADOG = 1;
+  TRACE_LAYOUT_OTEL_FLATTENED = 2;
+  TRACE_LAYOUT_OTLP_RESOURCE_SPANS = 3;
+}
+
 message Metadata {
   Value value = 1;
   DatadogOriginMetadata datadog_origin_metadata = 2;
@@ -98,6 +105,7 @@ message Metadata {
   OutputId upstream_id = 5;
   Secrets secrets = 6;
   bytes source_event_id = 7;
+  optional TraceLayout trace_layout = 8;
 }
 
 message Metric {
@@ -124,7 +132,6 @@ message Metric {
     Sketch sketch = 15;
     AggregatedHistogram3 aggregated_histogram3 = 16;
     AggregatedSummary3 aggregated_summary3 = 17;
-    AggregatedHistogram4 aggregated_histogram4 = 22;
   }
   string namespace = 11;
   uint32 interval_ms = 18;
@@ -190,17 +197,10 @@ message AggregatedHistogram3 {
   repeated HistogramBucket3 buckets = 1;
   uint64 count = 2;
   double sum = 3;
-}
-
-// Identical to AggregatedHistogram3 except that `sum` carries explicit presence, so a histogram
-// from a source that reports no sum (OTLP, where the field is optional, and OpenMetrics, where the
-// `_sum` series is only recommended) can be distinguished from one whose sum is genuinely zero.
-// AggregatedHistogram3 cannot express that: proto3 implicit presence never writes a zero, so an
-// absent field and a zero are the same bytes.
-message AggregatedHistogram4 {
-  repeated HistogramBucket3 buckets = 1;
-  uint64 count = 2;
-  optional double sum = 3;
+  // Set when the source reported no sum; `sum` then carries no meaning.
+  // Negative on purpose: payloads without this field leave it false, so their
+  // `sum` keeps reading as reported, including a genuine zero.
+  bool sum_missing = 4;
 }
 
 message HistogramBucket {

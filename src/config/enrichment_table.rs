@@ -1,9 +1,7 @@
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{any::Any, sync::Arc};
 
-use derivative::Derivative;
 use enum_dispatch::enum_dispatch;
+use indexmap::IndexMap;
 use serde::Serialize;
 use vector_lib::{
     config::GlobalOptions,
@@ -16,8 +14,7 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct EnrichmentTableOuter<T>
 where
     T: Configurable + Serialize + 'static + ToValue + Clone,
@@ -38,7 +35,7 @@ where
     /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
     /// the derived `SinkOuter` without cloning the underlying value.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
@@ -123,6 +120,28 @@ where
             validated: self.validated,
         }
     }
+}
+
+/// Derives source components in table order, retaining their configured source keys.
+pub(crate) fn enrichment_table_sources<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SourceOuter)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+}
+
+/// Derives sink components in table order, retaining their inputs and validated state.
+pub(crate) fn enrichment_table_sinks<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SinkOuter<T>)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables.iter().filter_map(|(key, table)| table.as_sink(key))
 }
 
 /// Generalized interface for describing and building enrichment table components.

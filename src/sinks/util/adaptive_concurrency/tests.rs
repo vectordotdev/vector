@@ -670,8 +670,8 @@ async fn run_compare(input: TestInput) {
             FailureMode::ExceededMaximum => "maximum",
         };
         eprintln!(
-            "Comparison failed: {} = {}; {} = {}",
-            failure.stat_name, failure.value, mode, failure.reference
+            "Comparison failed: {} = {}; {mode} = {}",
+            failure.stat_name, failure.value, failure.reference
         );
     }
     assert!(failures.is_empty(), "{results:#?}");

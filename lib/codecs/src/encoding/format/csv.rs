@@ -46,11 +46,17 @@ pub struct CsvSerializerConfig {
 
 impl CsvSerializerConfig {
     /// Creates a new `CsvSerializerConfig`.
+    #[must_use]
     pub const fn new(csv: CsvSerializerOptions) -> Self {
         Self { csv }
     }
 
     /// Build the `CsvSerializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> Result<CsvSerializer, BuildError> {
         if self.csv.fields.is_empty() {
             Err("At least one CSV field must be specified".into())
@@ -60,11 +66,13 @@ impl CsvSerializerConfig {
     }
 
     /// The data type of events that are accepted by `CsvSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // CSV, we don't want to enforce that limitation to users yet.
@@ -190,6 +198,7 @@ pub struct CsvSerializer {
 
 impl CsvSerializer {
     /// Creates a new `CsvSerializer`.
+    #[must_use]
     pub fn new(config: CsvSerializerConfig) -> Self {
         // 'flexible' is not needed since every event is a single context free csv line
         let writer = Box::new(
@@ -248,16 +257,15 @@ impl Encoder<Event> for CsvSerializer {
             // get string value of current field
             let field_value = match field_value {
                 Some(Value::Bytes(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
+                Some(Value::String(string)) => string.to_string(),
                 Some(Value::Integer(int)) => int.to_string(),
                 Some(Value::Float(float)) => float.to_string(),
                 Some(Value::Boolean(bool)) => bool.to_string(),
                 Some(Value::Timestamp(timestamp)) => {
                     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
                 }
-                Some(Value::Null) => String::new(),
-                // Other value types: Array, Regex, Object are not supported by the CSV format.
-                Some(_) => String::new(),
-                None => String::new(),
+                // Null, missing, and unsupported values (Array, Regex, Object) render as empty.
+                _ => String::new(),
             };
 
             // mutable byte_slice so it can be written in chunks if internal_buffer fills up
@@ -319,7 +327,7 @@ mod tests {
         let mut fields: Vec<ConfigTargetPath> = std::vec::Vec::new();
         let mut tree = ObjectMap::new();
 
-        for (field_name, field_value) in field_data.into_iter() {
+        for (field_name, field_value) in field_data {
             let field = field_name.into();
             fields.push(field);
 
@@ -345,7 +353,7 @@ mod tests {
             "foo" => Value::from("bar"),
             "int" => Value::from(123),
             "comma" => Value::from("abc,bcd"),
-            "float" => Value::Float(NotNan::new(3.1415925).unwrap()),
+            "float" => Value::Float(NotNan::new(std::f64::consts::PI).unwrap()),
             "space" => Value::from("sp ace"),
             "time" => Value::Timestamp(DateTime::parse_from_rfc3339("2023-02-27T15:04:49.363+08:00").unwrap().into()),
             "quote" => Value::from("the \"quote\" should be escaped"),
@@ -376,7 +384,7 @@ mod tests {
 
         assert_eq!(
             bytes.freeze(),
-            b"bar,123,\"abc,bcd\",3.1415925,,sp ace,2023-02-27T07:04:49.363Z,\"the \"\"quote\"\" should be escaped\",true".as_slice()
+            b"bar,123,\"abc,bcd\",3.141592653589793,,sp ace,2023-02-27T07:04:49.363Z,\"the \"\"quote\"\" should be escaped\",true".as_slice()
         );
     }
 
@@ -462,13 +470,13 @@ mod tests {
         .unwrap();
 
         CsvSerializerConfig::new(CsvSerializerOptions {
-            fields: fields.clone(),
+            fields,
             quote_style: QuoteStyle::NonNumeric,
             ..Default::default()
         })
         .build()
         .unwrap()
-        .encode(event.clone(), &mut non_numeric_bytes)
+        .encode(event, &mut non_numeric_bytes)
         .unwrap();
 
         assert_eq!(

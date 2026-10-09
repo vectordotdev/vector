@@ -203,15 +203,18 @@ impl SourceConfig for PostgresqlMetricsConfig {
         );
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
-        let mut sources = try_join_all(self.endpoints.iter().map(|endpoint| {
-            PostgresqlMetrics::new(
-                endpoint.clone(),
-                datname_filter.clone(),
-                namespace.clone(),
-                self.tls.clone(),
-            )
-        }))
-        .await?;
+        let mut sources = self
+            .endpoints
+            .iter()
+            .map(|endpoint| {
+                PostgresqlMetrics::new(
+                    endpoint.clone(),
+                    datname_filter.clone(),
+                    namespace.clone(),
+                    self.tls.clone(),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
@@ -495,7 +498,7 @@ struct PostgresqlMetrics {
 }
 
 impl PostgresqlMetrics {
-    async fn new(
+    fn new(
         endpoint: String,
         datname_filter: DatnameFilter,
         namespace: Option<String>,

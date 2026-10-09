@@ -164,7 +164,7 @@ impl StaticMetrics {
                                 interval_ms: NonZeroU32::new(self.interval.as_millis() as u32),
                             },
                             kind,
-                            value: value.clone(),
+                            value,
                         },
                         EventMetadata::default(),
                     )

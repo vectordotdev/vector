@@ -144,6 +144,7 @@ pub struct Sample {
     dynamic_event_counters: HashMap<Option<String>, u64>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
+    include_group_tag: bool,
 }
 
 impl Sample {
@@ -157,6 +158,7 @@ impl Sample {
         group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
@@ -167,6 +169,7 @@ impl Sample {
             },
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
@@ -177,6 +180,7 @@ impl Sample {
         group_by: Option<UnconfinedTemplate>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
@@ -184,6 +188,7 @@ impl Sample {
             SampleKeySource::Dynamic { fields, group_by },
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
@@ -193,6 +198,7 @@ impl Sample {
         key_source: SampleKeySource,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self {
             name,
@@ -201,6 +207,7 @@ impl Sample {
             dynamic_event_counters: HashMap::default(),
             exclude,
             sample_rate_key,
+            include_group_tag,
         }
     }
 
@@ -244,6 +251,7 @@ impl Sample {
             Value::Integer(value) => *value as f64,
             Value::Float(value) => value.into_inner(),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<f64>().ok()?,
+            Value::String(string) => string.parse::<f64>().ok()?,
             _ => return None,
         };
 
@@ -261,6 +269,7 @@ impl Sample {
         match value {
             Value::Integer(value) => u64::try_from(*value).ok().and_then(NonZeroU64::new),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<NonZeroU64>().ok(),
+            Value::String(string) => string.parse::<NonZeroU64>().ok(),
             _ => None,
         }
     }
@@ -339,6 +348,10 @@ impl FunctionTransform for Sample {
         };
 
         let group_by_key = self.group_by_key(&event);
+        let discarded_group = self
+            .include_group_tag
+            .then(|| group_by_key.clone())
+            .flatten();
         let value = self.static_key_value(&event);
 
         let event_sample_mode = self.event_sample_mode(&event);
@@ -364,7 +377,7 @@ impl FunctionTransform for Sample {
                             event,
                             Some(LegacyKey::Overwrite(path)),
                             path,
-                            sample_rate.clone(),
+                            sample_rate,
                         );
                     }
                     Event::Trace(ref mut event) => {
@@ -375,7 +388,10 @@ impl FunctionTransform for Sample {
             }
             output.push(event);
         } else {
-            emit!(SampleEventDiscarded);
+            emit!(SampleEventDiscarded {
+                group: discarded_group,
+                include_group_tag: self.include_group_tag,
+            });
         }
     }
 }

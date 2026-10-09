@@ -37,7 +37,7 @@ fn benchmark_batch(c: &mut Criterion) {
         })
         .collect();
 
-    for (compression, batch_size) in cases.iter() {
+    for (compression, batch_size) in &cases {
         group.bench_function(format!("partitioned/{compression}_{batch_size}"), |b| {
             b.iter_batched(
                 || {
@@ -51,7 +51,7 @@ fn benchmark_batch(c: &mut Criterion) {
                         PartitionedBuffer::new(batch.size, *compression),
                         Duration::from_secs(1),
                     )
-                    .sink_map_err(|error| panic!("{}", error));
+                    .sink_map_err(|error| panic!("{error}"));
 
                     (
                         rt,
@@ -65,7 +65,7 @@ fn benchmark_batch(c: &mut Criterion) {
                 },
                 |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                 criterion::BatchSize::LargeInput,
-            )
+            );
         });
 
         group.bench_function(format!("unpartitioned/{compression}_{batch_size}"), |b| {
@@ -81,7 +81,7 @@ fn benchmark_batch(c: &mut Criterion) {
                         Buffer::new(batch.size, *compression),
                         Duration::from_secs(1),
                     )
-                    .sink_map_err(|error| panic!("{}", error));
+                    .sink_map_err(|error| panic!("{error}"));
 
                     (
                         rt,
@@ -92,7 +92,7 @@ fn benchmark_batch(c: &mut Criterion) {
                 },
                 |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                 criterion::BatchSize::LargeInput,
-            )
+            );
         });
     }
 }

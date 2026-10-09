@@ -278,6 +278,7 @@ impl ValidatedSink for LokiConfig {
                 settings
             }
         };
+        self.encoding.validate()?;
 
         let transformer = self.encoding.transformer();
 
