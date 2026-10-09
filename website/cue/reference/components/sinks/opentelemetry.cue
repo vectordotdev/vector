@@ -95,10 +95,12 @@ components: sinks: opentelemetry: {
 				- A record without `timeUnixNano` is sent with `timeUnixNano` set to the observed
 				  time, because the source uses the observed time as the event timestamp.
 				- Each log record is sent in its own `resourceLogs` and `scopeLogs` entry. Records
-				  that had the same resource and scope in the original request are not grouped again.
+				  that had the same resource and scope in the original request are not grouped again,
+				  so the resource and scope are repeated for each record and the request is larger.
 
-				To send OTLP logs from the source exactly as received, use `use_otlp_decoding` on the
-				source.
+				To send OTLP logs from the source exactly as received, with the original grouping, use
+				`use_otlp_decoding` on the source. With this option, the events have the OTLP structure
+				instead of the fields in the following table.
 
 				| Event field (Legacy namespace) | OTLP field |
 				| --- | --- |
