@@ -419,7 +419,7 @@ async fn extra_fields_are_ignored() {
     let expected_value = input_log_event
         .get_message()
         .unwrap()
-        .as_str()
+        .to_str_lossy()
         .unwrap()
         .into_owned();
 
