@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   validate-changelog:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: read
       pull-requests: none

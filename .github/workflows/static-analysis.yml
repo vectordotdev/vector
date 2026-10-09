@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   static-analysis:
+    # Requires Datadog OIDC credentials that aren't available on forks.
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-latest
     permissions:
       contents: read

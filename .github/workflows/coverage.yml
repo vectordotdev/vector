@@ -32,6 +32,7 @@ env:
 
 jobs:
   tests:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: read
       id-token: write
@@ -44,6 +45,7 @@ jobs:
       vector-api: true
 
   integration-tests:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: read
       packages: write
@@ -61,7 +63,7 @@ jobs:
     needs:
       - tests
       - integration-tests
-    if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: read
       id-token: write
