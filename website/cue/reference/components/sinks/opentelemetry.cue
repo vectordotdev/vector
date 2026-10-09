@@ -116,6 +116,11 @@ components: sinks: opentelemetry: {
 				| `severity_text`, `severity_number` | `severityText`, `severityNumber` |
 				| `flags`, `dropped_attributes_count` | `flags`, `droppedAttributesCount` |
 
+				If `log_schema.timestamp_key` is inside `log_schema.message_key`, the timestamp sets
+				`timeUnixNano` and also remains in the body. For example, this applies to `.payload`
+				as the message key and `.payload.timestamp` as the timestamp key. It also applies
+				when both keys point to metadata.
+
 				All other event fields are sent as log record attributes. This includes a mapped field
 				that does not have the type OTLP requires, for example a `trace_id` that is not 32 hex
 				characters. If a key is both in `attributes` and at the top level, the value from

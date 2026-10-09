@@ -32,7 +32,8 @@ The source type marker identifies the Vector source component type that produced
 `source_type: file`.
 
 With `log_namespace: false` (Legacy namespace), fields with no OTLP equivalent are sent as log record
-attributes. The marker's location is configured with `log_schema.source_type_key` (default:
+attributes. A timestamp inside the configured message field still sets `timeUnixNano` and remains in
+the body. The marker's location is configured with `log_schema.source_type_key` (default:
 `.source_type`). The codec omits this internal field. If the configured path points to metadata and
 that field exists (for example, `%source_type`), the matching payload field (`.source_type`) is kept as
 an attribute. Otherwise, the matching event field is omitted, because some Legacy sources still write
