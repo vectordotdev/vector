@@ -1,9 +1,14 @@
-use std::{collections::BTreeSet, fmt::Write as _, path::Path, process::Command};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use glob::glob;
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::generate_cue::{HIGHLIGHTS_DIR, RELEASES_DIR, find_existing_upgrade_guide};
 use crate::{
@@ -16,6 +21,10 @@ const RELEASE_CALENDAR_URL: &str = "https://calendar.vector.dev";
 
 /// Anchor of the release page's breaking-changes section.
 const BREAKING_ANCHOR: &str = "breaking-changes";
+
+/// Release notes template, relative to the repository root. It is read at runtime, not
+/// embedded, so that wording can be changed without recompiling `vdev`.
+const RELEASE_NOTES_TEMPLATE_PATH: &str = "vdev/src/commands/release/release_notes.hbs";
 
 /// Changelog groups in the order `website/layouts/releases/single.html` renders them, as
 /// `(type, singular noun, plural noun, section anchor)`. `chore` is omitted: changelog
@@ -40,14 +49,20 @@ pub struct Cli {
     /// Print the release description instead of creating the GitHub release
     #[arg(long)]
     dry_run: bool,
+
+    /// Path to the release notes Handlebars template. Relative paths resolve against the
+    /// repository root. Defaults to `vdev/src/commands/release/release_notes.hbs`.
+    #[arg(long, env = "VDEV_RELEASE_NOTES_TEMPLATE")]
+    template: Option<PathBuf>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        let repo_root = paths::find_repo_root()?;
         let version = cargo::get_version()?;
         let parsed_version = Version::parse(&version)
             .with_context(|| format!("Invalid release version {version:?}"))?;
-        let notes = release_notes(&paths::find_repo_root()?, &parsed_version)?;
+        let notes = release_notes(&repo_root, &parsed_version, self.template.as_deref())?;
 
         if self.dry_run {
             println!("{notes}");
@@ -97,7 +112,11 @@ struct ChangelogEntry {
 }
 
 /// Build the GitHub release description from the release CUE file and the upgrade guide.
-fn release_notes(repo_root: &Path, version: &Version) -> Result<String> {
+fn release_notes(
+    repo_root: &Path,
+    version: &Version,
+    template_path: Option<&Path>,
+) -> Result<String> {
     let changelog = read_changelog(repo_root, version)?;
     let upgrade_guide = find_existing_upgrade_guide(&repo_root.join(HIGHLIGHTS_DIR), version)?;
     let upgrade_guide_slug = upgrade_guide
@@ -108,7 +127,19 @@ fn release_notes(repo_root: &Path, version: &Version) -> Result<String> {
                 .ok_or_else(|| anyhow!("Bad upgrade guide filename: {}", path.display()))
         })
         .transpose()?;
-    Ok(render_notes(version, &changelog, upgrade_guide_slug))
+    let template = load_template(repo_root, template_path)?;
+    render_notes(version, &changelog, upgrade_guide_slug, &template)
+}
+
+/// Read the release notes template, defaulting to [`RELEASE_NOTES_TEMPLATE_PATH`] under the
+/// repository root. A relative `template_path` is resolved against the repository root too.
+fn load_template(repo_root: &Path, template_path: Option<&Path>) -> Result<String> {
+    let path = match template_path {
+        Some(path) if path.is_absolute() => path.to_path_buf(),
+        Some(path) => repo_root.join(path),
+        None => repo_root.join(RELEASE_NOTES_TEMPLATE_PATH),
+    };
+    fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))
 }
 
 fn read_changelog(repo_root: &Path, version: &Version) -> Result<Vec<ChangelogEntry>> {
@@ -138,87 +169,101 @@ fn read_changelog(repo_root: &Path, version: &Version) -> Result<Vec<ChangelogEn
         .with_context(|| format!("Failed to parse the changelog in {}", cue_path.display()))
 }
 
+/// Data injected into the release notes template (`release_notes.hbs`).
+#[derive(Serialize)]
+struct ReleaseNotes {
+    version: String,
+    major: u64,
+    minor: u64,
+    contributors: usize,
+    changes: usize,
+    one_contributor: bool,
+    one_change: bool,
+    breaking: Option<Section>,
+    sections: Vec<Section>,
+    upgrade_guide_url: Option<String>,
+    release_url: String,
+    release_calendar_url: &'static str,
+}
+
+/// A single `- [count noun](url)` line in the release notes.
+#[derive(Serialize)]
+struct Section {
+    count: usize,
+    noun: &'static str,
+    url: String,
+}
+
 fn render_notes(
     version: &Version,
     changelog: &[ChangelogEntry],
     upgrade_guide_slug: Option<&str>,
-) -> String {
+    template: &str,
+) -> Result<String> {
     let release_url = format!("{WEBSITE_URL}/releases/{version}/");
     let upgrade_guide_url =
         upgrade_guide_slug.map(|slug| format!("{WEBSITE_URL}/highlights/{slug}/"));
 
-    let mut out = format!(
-        "The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `{version}`! 🚀\n\nVector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.\n\n"
-    );
+    let changes = changelog.len();
+    let contributors = changelog
+        .iter()
+        .flat_map(|entry| &entry.contributors)
+        .collect::<BTreeSet<_>>()
+        .len();
 
-    if !changelog.is_empty() {
-        let total = changelog.len();
-        let contributors = changelog
-            .iter()
-            .flat_map(|entry| &entry.contributors)
-            .collect::<BTreeSet<_>>()
-            .len();
-        match contributors {
-            0 => {
-                let noun = if total == 1 { "change" } else { "changes" };
-                write!(out, "This release includes {total} {noun}:").unwrap();
-            }
-            1 => out.push_str("Thanks to the contributor who made "),
-            _ => write!(out, "Thanks to the {contributors} contributors who made ").unwrap(),
-        }
-        if contributors > 0 {
-            if total == 1 {
-                out.push_str("the change");
-            } else {
-                write!(out, "the {total} changes").unwrap();
-            }
-            out.push_str(" in this release:");
-        }
-        out.push_str("\n\n");
+    let breaking = changelog.iter().filter(|entry| entry.breaking).count();
+    // The release page renders its breaking-changes section only when the release has an
+    // upgrade guide.
+    let breaking = (breaking > 0).then(|| Section {
+        count: breaking,
+        noun: if breaking == 1 {
+            "breaking change"
+        } else {
+            "breaking changes"
+        },
+        url: if upgrade_guide_url.is_some() {
+            format!("{release_url}#{BREAKING_ANCHOR}")
+        } else {
+            release_url.clone()
+        },
+    });
 
-        let breaking = changelog.iter().filter(|entry| entry.breaking).count();
-        if breaking > 0 {
-            let noun = if breaking == 1 {
-                "breaking change"
-            } else {
-                "breaking changes"
-            };
-            // The release page renders its breaking-changes section only when the release
-            // has an upgrade guide.
-            let target = if upgrade_guide_url.is_some() {
-                format!("{release_url}#{BREAKING_ANCHOR}")
-            } else {
-                release_url.clone()
-            };
-            writeln!(out, "- [{breaking} {noun}]({target})").unwrap();
-        }
-
-        for (kind, singular, plural, anchor) in GROUPS {
+    let sections = GROUPS
+        .iter()
+        .filter_map(|(kind, singular, plural, anchor)| {
             let count = changelog.iter().filter(|entry| entry.kind == *kind).count();
-            if count == 0 {
-                continue;
-            }
-            let noun = if count == 1 { singular } else { plural };
-            writeln!(out, "- [{count} {noun}]({release_url}#{anchor})").unwrap();
-        }
-        out.push('\n');
-    }
+            (count > 0).then(|| Section {
+                count,
+                noun: if count == 1 { singular } else { plural },
+                url: format!("{release_url}#{anchor}"),
+            })
+        })
+        .collect();
 
-    if let Some(url) = &upgrade_guide_url {
-        writeln!(
-            out,
-            "Upgrading to {}.{}? Read the [upgrade guide]({url}).\n",
-            version.major, version.minor
-        )
-        .unwrap();
-    }
+    let data = ReleaseNotes {
+        version: version.to_string(),
+        major: version.major,
+        minor: version.minor,
+        contributors,
+        changes,
+        one_contributor: contributors == 1,
+        one_change: changes == 1,
+        breaking,
+        sections,
+        upgrade_guide_url,
+        release_url,
+        release_calendar_url: RELEASE_CALENDAR_URL,
+    };
 
-    write!(
-        out,
-        "[View the full release notes]({release_url}) · See upcoming releases on the [release calendar]({RELEASE_CALENDAR_URL})."
-    )
-    .unwrap();
-    out
+    let mut handlebars = handlebars::Handlebars::new();
+    // The notes are Markdown, not HTML: never escape the injected values.
+    handlebars.register_escape_fn(handlebars::no_escape);
+    handlebars.register_template_string("release_notes", template)?;
+    // The template file ends with a newline (editorconfig); the release body must not.
+    Ok(handlebars
+        .render("release_notes", &data)?
+        .trim_end()
+        .to_string())
 }
 
 #[cfg(test)]
@@ -233,15 +278,54 @@ mod tests {
         }
     }
 
+    /// Repository root, derived from the vdev crate location.
+    fn repo_root() -> &'static Path {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("the vdev crate is nested in the repository")
+    }
+
+    /// Exposes every injected field. Tests use it instead of `release_notes.hbs` so that
+    /// changing the prose there does not require touching this file.
+    const FIXTURE: &str = concat!(
+        "{{version}}|{{major}}.{{minor}}|{{contributors}}|{{changes}}|{{one_contributor}}|{{one_change}}|",
+        "{{#if breaking}}breaking:{{breaking.count}}/{{breaking.noun}}/{{breaking.url}}|{{/if}}",
+        "{{#each sections}}section:{{count}}/{{noun}}/{{url}}|{{/each}}",
+        "{{#if upgrade_guide_url}}upgrade:{{upgrade_guide_url}}|{{/if}}",
+        "release:{{release_url}}|calendar:{{release_calendar_url}}",
+    );
+
+    fn render(version: &Version, changelog: &[ChangelogEntry], slug: Option<&str>) -> String {
+        render_notes(version, changelog, slug, FIXTURE).unwrap()
+    }
+
     #[test]
-    fn thanks_unique_contributors_and_links_sections_and_upgrade_guide() {
+    fn resolves_template_override_absolute_and_relative() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let absolute = dir.path().join("notes.hbs");
+        fs::write(&absolute, "absolute").unwrap();
+        assert_eq!(
+            load_template(Path::new("/unused"), Some(&absolute)).unwrap(),
+            "absolute"
+        );
+
+        fs::write(dir.path().join("relative.hbs"), "relative").unwrap();
+        assert_eq!(
+            load_template(dir.path(), Some(Path::new("relative.hbs"))).unwrap(),
+            "relative"
+        );
+    }
+
+    #[test]
+    fn injects_counts_plural_nouns_and_section_links() {
         let changelog = [
             entry("chore", true, &["alice"]),
             entry("feat", false, &["bob", "alice"]),
             entry("fix", false, &["carol"]),
             entry("fix", false, &["bob"]),
         ];
-        let notes = render_notes(
+        let notes = render(
             &Version::new(0, 59, 0),
             &changelog,
             Some("2026-10-05-0-59-0-upgrade-guide"),
@@ -249,41 +333,87 @@ mod tests {
 
         assert_eq!(
             notes,
-            indoc::indoc! {"
-                The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.59.0`! 🚀
-
-                Vector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.
-
-                Thanks to the 3 contributors who made the 4 changes in this release:
-
-                - [1 breaking change](https://vector.dev/releases/0.59.0/#breaking-changes)
-                - [1 new feature](https://vector.dev/releases/0.59.0/#new-features)
-                - [2 bug fixes](https://vector.dev/releases/0.59.0/#bug-fixes)
-
-                Upgrading to 0.59? Read the [upgrade guide](https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/).
-
-                [View the full release notes](https://vector.dev/releases/0.59.0/) · See upcoming releases on the [release calendar](https://calendar.vector.dev)."}
+            "0.59.0|0.59|3|4|false|false|\
+             breaking:1/breaking change/https://vector.dev/releases/0.59.0/#breaking-changes|\
+             section:1/new feature/https://vector.dev/releases/0.59.0/#new-features|\
+             section:2/bug fixes/https://vector.dev/releases/0.59.0/#bug-fixes|\
+             upgrade:https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/|\
+             release:https://vector.dev/releases/0.59.0/|calendar:https://calendar.vector.dev"
         );
     }
 
     #[test]
-    fn falls_back_without_contributors_or_upgrade_guide() {
+    fn omits_contributor_summary_and_upgrade_guide_when_absent() {
         let changelog = [entry("chore", true, &[]), entry("fix", false, &[])];
-        let notes = render_notes(&Version::new(0, 59, 1), &changelog, None);
+        let notes = render(&Version::new(0, 59, 1), &changelog, None);
 
         assert_eq!(
             notes,
-            indoc::indoc! {"
-                The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.59.1`! 🚀
-
-                Vector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.
-
-                This release includes 2 changes:
-
-                - [1 breaking change](https://vector.dev/releases/0.59.1/)
-                - [1 bug fix](https://vector.dev/releases/0.59.1/#bug-fixes)
-
-                [View the full release notes](https://vector.dev/releases/0.59.1/) · See upcoming releases on the [release calendar](https://calendar.vector.dev)."}
+            "0.59.1|0.59|0|2|false|false|\
+             breaking:1/breaking change/https://vector.dev/releases/0.59.1/|\
+             section:1/bug fix/https://vector.dev/releases/0.59.1/#bug-fixes|\
+             release:https://vector.dev/releases/0.59.1/|calendar:https://calendar.vector.dev"
         );
+    }
+
+    #[test]
+    fn flags_single_contributor_and_single_change() {
+        let changelog = [entry("fix", false, &["alice"])];
+        let notes = render(&Version::new(0, 60, 0), &changelog, None);
+
+        assert_eq!(
+            notes,
+            "0.60.0|0.60|1|1|true|true|\
+             section:1/bug fix/https://vector.dev/releases/0.60.0/#bug-fixes|\
+             release:https://vector.dev/releases/0.60.0/|calendar:https://calendar.vector.dev"
+        );
+    }
+
+    #[test]
+    fn pluralizes_multiple_breaking_changes_without_sections() {
+        let changelog = [
+            entry("chore", true, &["alice"]),
+            entry("chore", true, &["alice"]),
+        ];
+        let notes = render(&Version::new(0, 60, 0), &changelog, None);
+
+        assert_eq!(
+            notes,
+            "0.60.0|0.60|1|2|true|false|\
+             breaking:2/breaking changes/https://vector.dev/releases/0.60.0/|\
+             release:https://vector.dev/releases/0.60.0/|calendar:https://calendar.vector.dev"
+        );
+    }
+
+    #[test]
+    fn production_template_loads_and_references_every_link() {
+        let changelog = [
+            entry("chore", true, &["alice"]),
+            entry("feat", false, &["bob", "alice"]),
+            entry("fix", false, &["carol"]),
+            entry("fix", false, &["bob"]),
+        ];
+        let template = load_template(repo_root(), None).unwrap();
+        let notes = render_notes(
+            &Version::new(0, 59, 0),
+            &changelog,
+            Some("2026-10-05-0-59-0-upgrade-guide"),
+            &template,
+        )
+        .unwrap();
+
+        for expected in [
+            "https://vector.dev/releases/0.59.0/#breaking-changes",
+            "https://vector.dev/releases/0.59.0/#new-features",
+            "https://vector.dev/releases/0.59.0/#bug-fixes",
+            "https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/",
+            "https://vector.dev/releases/0.59.0/",
+            "https://calendar.vector.dev",
+        ] {
+            assert!(
+                notes.contains(expected),
+                "missing {expected:?} in:\n{notes}"
+            );
+        }
     }
 }
