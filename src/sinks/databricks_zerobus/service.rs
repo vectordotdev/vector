@@ -6,9 +6,11 @@ use crate::http::HttpClient;
 use crate::sinks::util::retries::RetryLogic;
 use crate::tls::TlsSettings;
 use databricks_zerobus_ingest_sdk::{
-    ConnectorFactory, ProxyConnector, ZerobusArrowStream, ZerobusSdk,
+    ConnectorFactory, OffsetId, ProxyConnector, StatsExporter, StreamStat, ZerobusArrowStream,
+    ZerobusSdk,
 };
 use futures::future::BoxFuture;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell, RwLock};
 use tower::{Layer, Service};
@@ -84,13 +86,17 @@ pub struct ZerobusRequest {
 pub struct ZerobusResponse {
     pub events_byte_size: GroupedCountByteSize,
     pub status: vector_lib::event::EventStatus,
+    /// Approximate wire bytes of the acknowledged batch, as reported by the
+    /// SDK's stream stats. `None` when the SDK emitted no stats for the batch.
+    pub bytes_sent: Option<usize>,
 }
 
 impl ZerobusResponse {
-    const fn delivered(events_byte_size: GroupedCountByteSize) -> Self {
+    const fn delivered(events_byte_size: GroupedCountByteSize, bytes_sent: Option<usize>) -> Self {
         Self {
             events_byte_size,
             status: vector_lib::event::EventStatus::Delivered,
+            bytes_sent,
         }
     }
 
@@ -101,6 +107,7 @@ impl ZerobusResponse {
         Self {
             events_byte_size: vector_lib::config::telemetry().create_request_count_byte_size(),
             status: vector_lib::event::EventStatus::Errored,
+            bytes_sent: None,
         }
     }
 }
@@ -112,6 +119,46 @@ impl DriverResponse for ZerobusResponse {
 
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        self.bytes_sent
+    }
+}
+
+/// Collects each batch's approximate wire size from the SDK's stream stats so
+/// `ingest` can report it once the batch is acknowledged. The driver only
+/// emits `bytes_sent` for delivered responses, so failed batches aren't counted.
+///
+/// `record` runs inline on the SDK's IO tasks; it only does a map insert.
+#[derive(Default)]
+struct WireBytesExporter {
+    bytes_by_offset: std::sync::Mutex<HashMap<OffsetId, u64>>,
+}
+
+impl WireBytesExporter {
+    /// Remove and return the recorded wire bytes for `offset`.
+    fn take(&self, offset: OffsetId) -> Option<usize> {
+        self.bytes_by_offset
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&offset)
+            .map(|bytes| bytes as usize)
+    }
+}
+
+impl StatsExporter for WireBytesExporter {
+    fn record(&self, stat: StreamStat) {
+        if let StreamStat::BatchSent { offset, stats, .. } = stat {
+            // Keep the first transmission so a recovery replay isn't counted twice.
+            // If the first reported send is a partial retry (only the unacked
+            // suffix), the batch is undercounted.
+            self.bytes_by_offset
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .entry(offset)
+                .or_insert(stats.approximate_wire_bytes);
+        }
     }
 }
 
@@ -141,15 +188,18 @@ impl MetaDescriptive for ZerobusRequest {
 /// invoke `close()`, so the graceful path always runs — there is no
 /// `try_unwrap`/`get_mut` race.
 enum ActiveStream {
-    Arrow(RwLock<Option<Box<ZerobusArrowStream>>>),
+    Arrow(
+        RwLock<Option<Box<ZerobusArrowStream>>>,
+        Arc<WireBytesExporter>,
+    ),
     /// Test-only variant that returns a pre-configured error on ingest.
     #[cfg(test)]
     Mock(MockStream),
 }
 
 impl ActiveStream {
-    fn arrow(stream: ZerobusArrowStream) -> Self {
-        ActiveStream::Arrow(RwLock::new(Some(Box::new(stream))))
+    fn arrow(stream: ZerobusArrowStream, stats: Arc<WireBytesExporter>) -> Self {
+        ActiveStream::Arrow(RwLock::new(Some(Box::new(stream))), stats)
     }
 
     /// Gracefully flush and close the underlying SDK stream.
@@ -163,7 +213,7 @@ impl ActiveStream {
     /// The SDK's own `Drop` is also a no-op once close has run.
     async fn close(&self) {
         let result = match self {
-            ActiveStream::Arrow(lock) => {
+            ActiveStream::Arrow(lock, _) => {
                 let taken = lock.write().await.take();
                 match taken {
                     Some(mut stream) => stream.close().await,
@@ -445,6 +495,7 @@ impl ZerobusService {
             // own recovery budget is exhausted. Both layers are at-least-once, so
             // a reconnect may re-send unacknowledged batches.
             let stream_options = &self.config.stream_options;
+            let stats = Arc::new(WireBytesExporter::default());
             let builder = self
                 .sdk
                 .stream_builder()
@@ -453,13 +504,14 @@ impl ZerobusService {
                 .arrow(Arc::clone(&schema.arrow_schema))
                 .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
                 .flush_timeout_ms(stream_options.flush_timeout_ms)
-                .ipc_compression(stream_options.compression.into());
+                .ipc_compression(stream_options.compression.into())
+                .stats_exporter(Arc::clone(&stats));
             let stream = builder
                 .build_arrow()
                 .await
                 .map_err(|e| ZerobusSinkError::StreamInitError { source: e })?;
 
-            *stream_guard = Some(Arc::new(ActiveStream::arrow(stream)));
+            *stream_guard = Some(Arc::new(ActiveStream::arrow(stream, stats)));
         }
 
         Ok(Arc::clone(stream_guard.as_ref().unwrap()))
@@ -493,22 +545,27 @@ impl ZerobusService {
         // Slot lock is not held here — concurrent ingests acquire read guards
         // on the inner `RwLock` and run truly in parallel.
         let result = match stream.as_ref() {
-            ActiveStream::Arrow(lock) => {
+            ActiveStream::Arrow(lock, stats) => {
                 let guard = lock.read().await;
                 let Some(s) = guard.as_ref() else {
                     return Err(ZerobusSinkError::StreamClosed);
                 };
                 match s.ingest_batch(batch).await {
-                    Ok(offset) => s.wait_for_offset(offset).await.map(|_| ()),
+                    Ok(offset) => {
+                        let acked = s.wait_for_offset(offset).await;
+                        // Take on every outcome so failed offsets don't linger in the map.
+                        let bytes_sent = stats.take(offset);
+                        acked.map(|_| bytes_sent)
+                    }
                     Err(e) => Err(e),
                 }
             }
             #[cfg(test)]
-            ActiveStream::Mock(mock) => mock.try_ingest().await,
+            ActiveStream::Mock(mock) => mock.try_ingest().await.map(|_| None),
         };
 
         match result {
-            Ok(()) => Ok(ZerobusResponse::delivered(events_byte_size)),
+            Ok(bytes_sent) => Ok(ZerobusResponse::delivered(events_byte_size, bytes_sent)),
             Err(e) => {
                 if e.is_retryable() {
                     // Clear the slot so the next attempt creates a fresh stream,
@@ -740,6 +797,36 @@ mod tests {
 
     async fn current_stream(service: &ZerobusService) -> Arc<ActiveStream> {
         Arc::clone(service.stream.lock().await.as_ref().unwrap())
+    }
+
+    fn batch_sent(offset: OffsetId, attempt: u32, wire_bytes: u64) -> StreamStat {
+        StreamStat::BatchSent {
+            offset,
+            attempt,
+            stats: databricks_zerobus_ingest_sdk::BatchStats::new(10, wire_bytes, wire_bytes * 2),
+        }
+    }
+
+    #[test]
+    fn wire_bytes_exporter_keeps_first_send_per_offset() {
+        let exporter = WireBytesExporter::default();
+        exporter.record(batch_sent(1, 0, 100));
+        // A recovery replay of the same offset must not double count.
+        exporter.record(batch_sent(1, 1, 40));
+        exporter.record(batch_sent(2, 0, 7));
+        exporter.record(StreamStat::BatchAcked { offset: 1 });
+
+        assert_eq!(exporter.take(1), Some(100));
+        assert_eq!(exporter.take(1), None);
+        assert_eq!(exporter.take(2), Some(7));
+        assert_eq!(exporter.take(3), None);
+    }
+
+    #[test]
+    fn response_reports_bytes_sent() {
+        let resp = ZerobusResponse::delivered(GroupedCountByteSize::new_untagged(), Some(42));
+        assert_eq!(resp.bytes_sent(), Some(42));
+        assert_eq!(ZerobusResponse::errored().bytes_sent(), None);
     }
 
     #[tokio::test]
@@ -1002,6 +1089,7 @@ mod tests {
         let inner = tower::service_fn(|_req: ZerobusRequest| async move {
             Ok::<_, crate::Error>(ZerobusResponse::delivered(
                 GroupedCountByteSize::new_untagged(),
+                None,
             ))
         });
         let mut svc = RetryableErrorAsErrored { inner };
