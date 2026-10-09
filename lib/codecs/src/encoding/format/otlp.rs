@@ -1,5 +1,6 @@
 use crate::encoding::ProtobufSerializer;
 use bytes::BytesMut;
+use opentelemetry_proto::logs::log_event_to_export_request;
 use opentelemetry_proto::metrics::metric_event_to_export_request;
 use opentelemetry_proto::proto::{
     DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
@@ -51,14 +52,18 @@ impl OtlpSerializerConfig {
 ///
 /// # Implementation approach
 ///
-/// This serializer converts Vector's internal event representation to the appropriate OTLP message type
-/// based on the top-level field in the event:
+/// This serializer converts Vector's internal event representation to the appropriate OTLP message type.
+/// Events that already have the OTLP structure are encoded as they are, based on the top-level field:
 /// - `resourceLogs` → `ExportLogsServiceRequest`
 /// - `resourceMetrics` → `ExportMetricsServiceRequest`
 /// - `resourceSpans` → `ExportTraceServiceRequest`
 ///
-/// The implementation is the inverse of what the `opentelemetry` source does when decoding,
-/// ensuring round-trip compatibility.
+/// The first field in this list that the event has is used, and all other event fields are
+/// not encoded.
+///
+/// Native Vector logs and metrics are converted to `ExportLogsServiceRequest` and
+/// `ExportMetricsServiceRequest`. The conversions are the inverse of what the `opentelemetry`
+/// source does when decoding, ensuring round-trip compatibility.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Fields will be used once encoding is implemented
 pub struct OtlpSerializer {
@@ -119,11 +124,12 @@ impl Encoder<Event> for OtlpSerializer {
                 } else if log.contains(event_path!(RESOURCE_METRICS_JSON_FIELD)) {
                     // Currently the OTLP metrics are Vector logs (not metrics).
                     self.metrics_descriptor.encode(Event::Log(log), buffer)
+                } else if log.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
+                    // OTLP-structured traces can be log events, for example when read as JSON.
+                    self.traces_descriptor.encode(Event::Log(log), buffer)
                 } else {
-                    Err(format!(
-                        "Log event does not contain OTLP top-level fields ({RESOURCE_LOGS_JSON_FIELD} or {RESOURCE_METRICS_JSON_FIELD})",
-                    )
-                        .into())
+                    let request = log_event_to_export_request(log);
+                    request.encode(buffer).map_err(Into::into)
                 }
             }
             Event::Trace(trace) => {
@@ -192,6 +198,37 @@ mod tests {
         );
 
         assert_eq!(metric.clone(), round_trip_metric(metric));
+    }
+
+    #[test]
+    fn native_log_round_trips_through_otlp_source_decoding() {
+        use opentelemetry_proto::proto::collector::logs::v1::ExportLogsServiceRequest;
+        use vector_core::{config::LogNamespace, event::LogEvent};
+
+        let mut log = LogEvent::from("disk full");
+        log.insert(event_path!("host"), "web-1");
+        log.insert(event_path!("timestamp"), Utc.timestamp_nanos(1_000_000_000));
+
+        let mut buffer = BytesMut::new();
+        OtlpSerializer::new()
+            .unwrap()
+            .encode(Event::Log(log), &mut buffer)
+            .expect("native log must be converted, not rejected");
+
+        let request = ExportLogsServiceRequest::decode(buffer.freeze()).unwrap();
+        let mut events: Vec<Event> = request
+            .resource_logs
+            .into_iter()
+            .flat_map(|logs| logs.into_event_iter(LogNamespace::Legacy))
+            .collect();
+        assert_eq!(events.len(), 1);
+        let decoded = events.remove(0).into_log();
+        assert_eq!(decoded["message"], "disk full".into());
+        assert_eq!(decoded["attributes.host"], "web-1".into());
+        assert_eq!(
+            decoded["timestamp"],
+            Utc.timestamp_nanos(1_000_000_000).into()
+        );
     }
 
     #[test]
