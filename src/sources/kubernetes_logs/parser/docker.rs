@@ -117,7 +117,7 @@ fn normalize_event(
     if let Some(timestamp_key) = timestamp_key {
         let time = log.remove(&timestamp_key).context(TimeFieldMissingSnafu)?;
         let time = time
-            .as_str()
+            .to_str_lossy()
             .ok_or(NormalizationError::TimeValueUnexpectedType)?;
         let time = DateTime::parse_from_rfc3339(time.as_ref()).context(TimeParsingSnafu)?;
         log_namespace.insert_source_metadata(

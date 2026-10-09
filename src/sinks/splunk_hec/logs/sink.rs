@@ -268,7 +268,7 @@ impl Partitioner for EventPartitioner {
             log_schema().host_key_target_path(),
         )
         .and_then(|path| item.event.get(&path))
-        .and_then(|value| value.as_str().map(|s| s.to_string()));
+        .and_then(|value| value.to_str_lossy().map(|s| s.to_string()));
 
         Some(Partitioned {
             token: item.event.metadata().splunk_hec_token(),
