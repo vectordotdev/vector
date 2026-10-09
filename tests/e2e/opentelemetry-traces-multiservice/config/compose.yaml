@@ -24,7 +24,8 @@ services:
       options:
         max-file: "2"
         max-size: 5m
-    mem_limit: "314572800"
+    # The demo's 300 MiB limit caused OOM kills in CI.
+    mem_limit: "536870912"
     environment:
       - AD_PORT=9555
       - AD_PROMETHEUS_PORT=9465
@@ -656,7 +657,8 @@ services:
       options:
         max-file: "2"
         max-size: 5m
-    mem_limit: "20971520"
+    # The demo's 20 MiB limit caused OOM kills in CI.
+    mem_limit: "67108864"
     environment:
       - OTEL_BSP_SCHEDULE_DELAY=1000
       - OTEL_TRACES_SAMPLER=always_on
