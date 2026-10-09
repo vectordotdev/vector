@@ -175,9 +175,8 @@ struct ReleaseNotes {
     version: String,
     major: u64,
     minor: u64,
-    contributors: usize,
+    contributors: String,
     changes: usize,
-    one_contributor: bool,
     one_change: bool,
     breaking: Option<Section>,
     sections: Vec<Section>,
@@ -205,11 +204,16 @@ fn render_notes(
         upgrade_guide_slug.map(|slug| format!("{WEBSITE_URL}/highlights/{slug}/"));
 
     let changes = changelog.len();
-    let contributors = changelog
+    let contributors = match changelog
         .iter()
         .flat_map(|entry| &entry.contributors)
         .collect::<BTreeSet<_>>()
-        .len();
+        .len()
+    {
+        0 => String::new(),
+        1 => "contributor".to_string(),
+        count => format!("{count} contributors"),
+    };
 
     let breaking = changelog.iter().filter(|entry| entry.breaking).count();
     // The release page renders its breaking-changes section only when the release has an
@@ -246,7 +250,6 @@ fn render_notes(
         minor: version.minor,
         contributors,
         changes,
-        one_contributor: contributors == 1,
         one_change: changes == 1,
         breaking,
         sections,
@@ -281,7 +284,7 @@ mod tests {
     /// Exposes every injected field. Tests use it instead of `release_notes.hbs` so that
     /// changing the prose there does not require touching this file.
     const FIXTURE: &str = concat!(
-        "{{version}}|{{major}}.{{minor}}|{{contributors}}|{{changes}}|{{one_contributor}}|{{one_change}}|",
+        "{{version}}|{{major}}.{{minor}}|{{contributors}}|{{changes}}|{{one_change}}|",
         "{{#if breaking}}breaking:{{breaking.count}}/{{breaking.noun}}/{{breaking.url}}|{{/if}}",
         "{{#each sections}}section:{{count}}/{{noun}}/{{url}}|{{/each}}",
         "{{#if upgrade_guide_url}}upgrade:{{upgrade_guide_url}}|{{/if}}",
@@ -326,7 +329,7 @@ mod tests {
 
         assert_eq!(
             notes,
-            "0.59.0|0.59|3|4|false|false|\
+            "0.59.0|0.59|3 contributors|4|false|\
              breaking:1/breaking change/https://vector.dev/releases/0.59.0/#breaking-changes|\
              section:1/new feature/https://vector.dev/releases/0.59.0/#new-features|\
              section:2/bug fixes/https://vector.dev/releases/0.59.0/#bug-fixes|\
@@ -342,7 +345,7 @@ mod tests {
 
         assert_eq!(
             notes,
-            "0.59.1|0.59|0|2|false|false|\
+            "0.59.1|0.59||2|false|\
              breaking:1/breaking change/https://vector.dev/releases/0.59.1/|\
              section:1/bug fix/https://vector.dev/releases/0.59.1/#bug-fixes|\
              release:https://vector.dev/releases/0.59.1/|calendar:https://calendar.vector.dev"
@@ -356,7 +359,7 @@ mod tests {
 
         assert_eq!(
             notes,
-            "0.60.0|0.60|1|1|true|true|\
+            "0.60.0|0.60|contributor|1|true|\
              section:1/bug fix/https://vector.dev/releases/0.60.0/#bug-fixes|\
              release:https://vector.dev/releases/0.60.0/|calendar:https://calendar.vector.dev"
         );
@@ -372,7 +375,7 @@ mod tests {
 
         assert_eq!(
             notes,
-            "0.60.0|0.60|1|2|true|false|\
+            "0.60.0|0.60|contributor|2|false|\
              breaking:2/breaking changes/https://vector.dev/releases/0.60.0/|\
              release:https://vector.dev/releases/0.60.0/|calendar:https://calendar.vector.dev"
         );
