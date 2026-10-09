@@ -329,28 +329,36 @@ pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceReques
             let source_type_key = schema
                 .source_type_key_target_path()
                 .filter(|path| path.prefix == PathPrefix::Event || !log.contains(*path));
+            // Read timestamps before removing a message that may contain them. The
+            // opentelemetry source ignores the timestamp key's metadata prefix, so
+            // prefer metadata but retain the event-root fallback.
+            let metadata_time = schema
+                .timestamp_key_target_path()
+                .filter(|path| path.prefix == PathPrefix::Metadata)
+                .and_then(|path| log.get(path))
+                .and_then(Value::as_timestamp)
+                .and_then(timestamp_nanos);
+            let event_time = schema
+                .timestamp_key()
+                .filter(|_| metadata_time.is_none())
+                .and_then(|path| log.get((PathPrefix::Event, path)))
+                .and_then(Value::as_timestamp)
+                .and_then(timestamp_nanos);
             // The message key can point into metadata (for example `%message`), so remove it
             // with its full target path before the metadata is discarded.
             if let Some(path) = schema.message_key_target_path() {
                 record.body = log.remove_prune(path, true).and_then(into_body);
             }
-            // The timestamp key can also point into metadata. Many sources and decoders write it
-            // there with its full target path, but the `opentelemetry` source writes it to the
-            // event root, so read the metadata first and then the event root.
-            let metadata_time = schema
-                .timestamp_key_target_path()
-                .filter(|path| path.prefix == PathPrefix::Metadata)
-                .and_then(|path| log.remove(path))
-                .and_then(|value| into_timestamp_nanos(value).ok());
             let (mut fields, _) = log.into_parts();
             if let Some(path) = source_type_key {
                 fields.remove(&path.path, true);
             }
             record.time_unix_nano = metadata_time
                 .or_else(|| {
-                    schema
+                    let extracted_time = schema
                         .timestamp_key()
-                        .and_then(|path| take(&mut fields, path, into_timestamp_nanos))
+                        .and_then(|path| take(&mut fields, path, into_timestamp_nanos));
+                    event_time.or(extracted_time)
                 })
                 .unwrap_or_default();
             record.observed_time_unix_nano = take(
@@ -628,6 +636,79 @@ mod tests {
         init_log_schema(schema, true);
 
         round_trip(LogNamespace::Legacy);
+    }
+
+    #[test]
+    fn native_legacy_log_reads_timestamp_inside_event_message() {
+        let mut schema = LogSchema::default();
+        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!("payload"))));
+        schema.set_timestamp_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "payload",
+            "timestamp"
+        ))));
+        init_log_schema(schema, true);
+        let mut log = LogEvent::default();
+        log.insert(event_path!("payload", "message"), "hello");
+        log.insert(event_path!("payload", "timestamp"), Utc.timestamp_nanos(5));
+
+        let request = log_event_to_export_request(log);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(record.time_unix_nano, 5);
+        assert_eq!(
+            record.body,
+            Some(AnyValue {
+                value: Some(PBValue::KvlistValue(KeyValueList {
+                    values: vec![
+                        kv("message", string("hello")),
+                        kv("timestamp", string("1970-01-01T00:00:00.000000005Z")),
+                    ],
+                })),
+            })
+        );
+    }
+
+    #[test]
+    fn native_legacy_log_reads_timestamp_inside_metadata_message() {
+        let mut schema = LogSchema::default();
+        schema.set_message_key(Some(OwnedTargetPath::metadata(owned_value_path!(
+            "payload"
+        ))));
+        schema.set_timestamp_key(Some(OwnedTargetPath::metadata(owned_value_path!(
+            "payload",
+            "timestamp"
+        ))));
+        init_log_schema(schema, true);
+        let mut log = LogEvent::default();
+        log.insert((PathPrefix::Metadata, path!("payload", "message")), "hello");
+        log.insert(
+            log_schema().timestamp_key_target_path().unwrap(),
+            Utc.timestamp_nanos(5),
+        );
+        log.insert(event_path!("payload", "timestamp"), Utc.timestamp_nanos(9));
+
+        let request = log_event_to_export_request(log);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(record.time_unix_nano, 5);
+        assert_eq!(
+            record.body,
+            Some(AnyValue {
+                value: Some(PBValue::KvlistValue(KeyValueList {
+                    values: vec![
+                        kv("message", string("hello")),
+                        kv("timestamp", string("1970-01-01T00:00:00.000000005Z")),
+                    ],
+                })),
+            })
+        );
+        assert_eq!(
+            record.attributes,
+            vec![kv(
+                "payload",
+                PBValue::KvlistValue(KeyValueList {
+                    values: vec![kv("timestamp", string("1970-01-01T00:00:00.000000009Z"))],
+                }),
+            )]
+        );
     }
 
     fn init_metadata_timestamp_key() {
