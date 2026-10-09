@@ -1234,7 +1234,10 @@ mod test {
             config.max_length = 10;
             config.framing = Some(
                 CharacterDelimitedDecoderConfig {
-                    character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
+                    character_delimited: CharacterDelimitedDecoderOptions::new(
+                        vector_lib::serde::AsciiChar::new(','),
+                        None,
+                    ),
                 }
                 .into(),
             );

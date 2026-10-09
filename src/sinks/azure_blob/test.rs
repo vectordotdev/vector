@@ -11,6 +11,7 @@ use vector_lib::{
     },
     partition::Partitioner,
     request_metadata::GroupedCountByteSize,
+    serde::AsciiChar,
 };
 
 use super::{
@@ -856,7 +857,7 @@ fn azure_blob_append_blob_honors_explicit_framing() {
         blob_type: AzureBlobType::Append,
         ..default_config(
             (
-                Some(CharacterDelimitedEncoderConfig::new(b';')),
+                Some(CharacterDelimitedEncoderConfig::new(AsciiChar::new(';'))),
                 TextSerializerConfig::default(),
             )
                 .into(),
@@ -883,7 +884,7 @@ fn azure_blob_block_blob_allows_non_terminating_framing() {
         blob_type: AzureBlobType::Block,
         ..default_config(
             (
-                Some(CharacterDelimitedEncoderConfig::new(b';')),
+                Some(CharacterDelimitedEncoderConfig::new(AsciiChar::new(';'))),
                 TextSerializerConfig::default(),
             )
                 .into(),
