@@ -467,7 +467,7 @@ nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
 notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
 openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
-openssl-probe = { version = "0.1.6", default-features = false }
+openssl-probe = { version = "0.2.1", default-features = false }
 ordered-float.workspace = true
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.1", default-features = false, features = ["runtime"], optional = true }
