@@ -65,13 +65,21 @@ pub(super) struct BaseSSSinkConfig {
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "FIFO suffix is case-sensitive"
+)]
+pub(super) fn is_fifo(name: &str) -> bool {
+    name.ends_with(".fifo")
+}
+
 pub(super) fn message_group_id(
-    message_group_id: Option<String>,
+    message_group_id: Option<&str>,
     fifo: bool,
 ) -> crate::Result<Option<UnconfinedTemplate>> {
-    match (message_group_id.as_ref(), fifo) {
+    match (message_group_id, fifo) {
         (Some(value), true) => Ok(Some(
-            UnconfinedTemplate::try_from(value.clone()).context(TopicTemplateSnafu)?,
+            UnconfinedTemplate::try_from(value).context(TopicTemplateSnafu)?,
         )),
         (Some(_), false) => Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
         (None, true) => Err(Box::new(BuildError::MessageGroupIdMissing)),
