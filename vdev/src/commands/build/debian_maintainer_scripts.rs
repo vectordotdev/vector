@@ -42,6 +42,13 @@ fn generate(source: &Path, destination: &Path) -> Result<()> {
     let preinst = fs::read_to_string(source.join("scripts/preinst"))
         .context("Reading Debian preinst template")?;
     let rendered = render(&preinst, &stub)?;
+    // cargo-deb reads this directory directly, so scripts removed from the source
+    // must not survive a subsequent packaging run.
+    match fs::remove_dir_all(destination) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error).context("Clearing staged Debian maintainer scripts"),
+    }
     fs::create_dir_all(destination)?;
     for entry in fs::read_dir(source.join("scripts"))? {
         let entry = entry?;
@@ -107,5 +114,28 @@ mod tests {
                 0o755
             );
         }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn removes_obsolete_scripts_on_regeneration() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source");
+        let scripts = source.join("scripts");
+        let output = temp.path().join("output");
+        fs::create_dir_all(&scripts).unwrap();
+        fs::write(source.join("vector.yaml"), "# stub\n").unwrap();
+        fs::write(scripts.join("preinst"), "@VECTOR_CONFIG_STUB@\n").unwrap();
+        fs::write(scripts.join("prerm"), "#!/bin/sh\n").unwrap();
+        generate(&source, &output).unwrap();
+        assert!(output.join("prerm").exists());
+
+        fs::remove_file(scripts.join("prerm")).unwrap();
+        generate(&source, &output).unwrap();
+        assert!(!output.join("prerm").exists());
+        assert_eq!(
+            fs::read_to_string(output.join("preinst")).unwrap(),
+            "# stub\n"
+        );
     }
 }
