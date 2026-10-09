@@ -1,7 +1,9 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, VecDeque},
     net::SocketAddr,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use super::{
@@ -31,15 +33,22 @@ use futures::{
     StreamExt, TryStreamExt,
     channel::mpsc::{UnboundedSender, unbounded},
     future, pin_mut,
-    stream::BoxStream,
+    stream::{self, BoxStream},
 };
 use http::StatusCode;
-use tokio::net::TcpStream;
+use stream_cancel::Tripwire;
+use tokio::{
+    net::TcpStream,
+    task::{AbortHandle, JoinSet},
+    time,
+};
 use tokio_tungstenite::tungstenite::{
     Message,
     handshake::server::{ErrorResponse, Request, Response},
+    protocol::frame::{CloseFrame, coding::CloseCode},
 };
 use tokio_util::codec::Encoder as _;
+use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
@@ -52,6 +61,44 @@ use vector_lib::{
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
+
+const CONNECTION_SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(5);
+
+struct AbortOnDrop(AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        // Aborting an already completed task is harmless, so no separate completion state is needed.
+        self.0.abort();
+    }
+}
+
+struct PeerRegistration {
+    addr: SocketAddr,
+    peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
+    extra_tags: Vec<(String, String)>,
+}
+
+impl PeerRegistration {
+    fn stop_sending(&self) {
+        if let Some(sender) = self.peers.lock().expect("mutex poisoned").get(&self.addr) {
+            // Keep this connection counted until its task has actually finished.
+            sender.close_channel();
+        }
+    }
+}
+
+impl Drop for PeerRegistration {
+    fn drop(&mut self) {
+        let mut peers = self.peers.lock().expect("mutex poisoned");
+        peers.remove(&self.addr);
+        debug!(message = "WebSocket client disconnected.", address = %self.addr);
+        emit!(WebSocketListenerConnectionShutdown {
+            client_count: peers.len(),
+            extra_tags: self.extra_tags.clone()
+        });
+    }
+}
 
 pub struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
@@ -139,12 +186,46 @@ impl WebSocketListenerSink {
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
         client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
-        mut listener: MaybeTlsListener,
+        listener: MaybeTlsListener,
+        shutdown: Tripwire,
     ) {
         let open_gauge = OpenGauge::new();
+        let (client_shutdown_trigger, client_shutdown) = Tripwire::new();
+        let mut connections = JoinSet::new();
+        let mut listener = Some(listener);
+        pin_mut!(shutdown);
 
-        while let Ok(stream) = listener.accept().await {
-            crate::spawn_in_current_span(Self::handle_connection(
+        loop {
+            let stream = tokio::select! {
+                biased;
+
+                _ = shutdown.as_mut() => break,
+                result = connections.join_next(), if !connections.is_empty() => {
+                    if let Some(result) = result {
+                        Self::handle_connection_task_result(result);
+                    }
+                    continue;
+                }
+                accepted = async {
+                    match listener.as_mut() {
+                        Some(listener) => listener.accept().await,
+                        None => future::pending().await,
+                    }
+                } => match accepted {
+                    Ok(stream) => stream,
+                    Err(error) => {
+                        error!(
+                            message = "WebSocket listener failed to accept a connection.",
+                            %error
+                        );
+                        // Preserve existing behavior: stop accepting, but keep serving existing
+                        // clients until the sink shuts down rather than failing the whole topology.
+                        listener = None;
+                        continue;
+                    }
+                },
+            };
+            let connection = Self::handle_connection(
                 auth.clone(),
                 message_buffering.clone(),
                 subprotocol.clone(),
@@ -154,7 +235,46 @@ impl WebSocketListenerSink {
                 stream,
                 extra_tags_config.clone(),
                 open_gauge.clone(),
-            ));
+                client_shutdown.clone(),
+            )
+            .in_current_span();
+            connections.spawn(connection);
+        }
+
+        // Stop accepting before asking existing clients to close so a new connection cannot race
+        // with shutdown and escape the connection task set.
+        drop(listener);
+        client_shutdown_trigger.cancel();
+        Self::shutdown_connections(&mut connections).await;
+    }
+
+    fn handle_connection_task_result(result: Result<Result<(), ()>, tokio::task::JoinError>) {
+        if let Err(error) = result
+            && !error.is_cancelled()
+        {
+            error!(message = "WebSocket connection task failed.", %error);
+        }
+    }
+
+    async fn shutdown_connections(connections: &mut JoinSet<Result<(), ()>>) {
+        let graceful_shutdown = async {
+            while let Some(result) = connections.join_next().await {
+                Self::handle_connection_task_result(result);
+            }
+        };
+
+        if time::timeout(CONNECTION_SHUTDOWN_GRACE_PERIOD, graceful_shutdown)
+            .await
+            .is_err()
+        {
+            warn!(
+                message = "Timed out waiting for WebSocket connections to close.",
+                timeout_secs = CONNECTION_SHUTDOWN_GRACE_PERIOD.as_secs()
+            );
+            connections.abort_all();
+            while let Some(result) = connections.join_next().await {
+                Self::handle_connection_task_result(result);
+            }
         }
     }
 
@@ -169,6 +289,7 @@ impl WebSocketListenerSink {
         stream: MaybeTlsIncomingStream<TcpStream>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
         open_gauge: OpenGauge,
+        shutdown: Tripwire,
     ) -> Result<(), ()> {
         // Base url for parsing request URLs that may be relative
         let base_url = Url::parse("ws://localhost").ok();
@@ -261,15 +382,21 @@ impl WebSocketListenerSink {
             }
         };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {err}");
-                emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
-                    extra_tags: extra_tags.clone()
-                })
-            })?;
+        pin_mut!(shutdown);
+        let ws_stream = tokio::select! {
+            biased;
+
+            _ = shutdown.as_mut() => return Ok(()),
+            result = tokio_tungstenite::accept_hdr_async(stream, header_callback) => {
+                result.map_err(|error| {
+                    debug!(message = "Error during WebSocket handshake.", %error);
+                    emit!(WebSocketListenerConnectionFailedError {
+                        error: Box::new(error),
+                        extra_tags: extra_tags.clone()
+                    })
+                })?
+            }
+        };
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
 
@@ -298,6 +425,11 @@ impl WebSocketListenerSink {
             });
         }
 
+        let peer_registration = PeerRegistration {
+            addr,
+            peers,
+            extra_tags: extra_tags.clone(),
+        };
         let (outgoing, incoming) = ws_stream.split();
 
         let incoming_data_handler = incoming.try_for_each(|msg| {
@@ -327,26 +459,39 @@ impl WebSocketListenerSink {
                 });
                 Ok(message)
             })
+            .chain(stream::once(future::ready(Ok(Message::Close(Some(
+                CloseFrame {
+                    code: CloseCode::Away,
+                    reason: Cow::Borrowed("Server shutting down."),
+                },
+            ))))))
             .forward(outgoing);
 
         pin_mut!(forward_data_to_client, incoming_data_handler);
-        if let Err(error) = future::select(forward_data_to_client, incoming_data_handler)
-            .await
-            .factor_first()
-            .0
-        {
+        let transfer = future::select(forward_data_to_client, incoming_data_handler);
+        pin_mut!(transfer);
+        let result = tokio::select! {
+            biased;
+
+            _ = shutdown.as_mut() => {
+                // Closing the channel lets `forward` drain queued messages before sending Close.
+                // Keep polling both directions so backpressure never blocks incoming ACKs or Close.
+                peer_registration.stop_sending();
+                transfer.await
+            }
+            result = transfer.as_mut() => result,
+        };
+        let result = match result {
+            future::Either::Left((Ok(()), incoming_data_handler)) => {
+                // Wait for the peer's close response within the supervisor's shared deadline.
+                incoming_data_handler.await
+            }
+            future::Either::Left((Err(error), _)) => Err(error),
+            future::Either::Right((result, _)) => result,
+        };
+        if let Err(error) = result {
             emit!(WebSocketListenerSendError {
                 error: Box::new(error)
-            })
-        }
-
-        {
-            let mut peers = peers.lock().expect("mutex poisoned");
-            debug!("{} disconnected.", &addr);
-            peers.remove(&addr);
-            emit!(WebSocketListenerConnectionShutdown {
-                client_count: peers.len(),
-                extra_tags: extra_tags.clone()
             });
         }
 
@@ -356,10 +501,7 @@ impl WebSocketListenerSink {
 
 #[async_trait]
 impl StreamSink<Event> for WebSocketListenerSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let input = input.fuse().peekable();
-        pin_mut!(input);
-
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
@@ -371,8 +513,9 @@ impl StreamSink<Event> for WebSocketListenerSink {
             self.message_buffering.buffer_capacity(),
         )));
         let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
+        let (shutdown_trigger, shutdown) = Tripwire::new();
 
-        crate::spawn_in_current_span(Self::handle_connections(
+        let listener_task = crate::spawn_in_current_span(Self::handle_connections(
             self.auth,
             self.message_buffering.clone(),
             self.subprotocol.clone(),
@@ -381,10 +524,11 @@ impl StreamSink<Event> for WebSocketListenerSink {
             Arc::clone(&client_checkpoints),
             Arc::clone(&message_buffer),
             listener,
+            shutdown,
         ));
+        let _abort_on_drop = AbortOnDrop(listener_task.abort_handle());
 
-        while input.as_mut().peek().await.is_some() {
-            let mut event = input.next().await.unwrap();
+        while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();
 
             self.transformer.transform(&mut event);
@@ -435,18 +579,31 @@ impl StreamSink<Event> for WebSocketListenerSink {
             };
         }
 
-        Ok(())
+        shutdown_trigger.cancel();
+        listener_task.await.map_err(|error| {
+            error!(message = "WebSocket listener task failed during shutdown.", %error);
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{future::ready, num::NonZeroUsize};
+    use std::{
+        future::{pending, ready},
+        num::NonZeroUsize,
+    };
 
     use futures::{SinkExt, Stream, StreamExt, channel::mpsc::UnboundedReceiver};
     use futures_util::stream;
-    use tokio::{task::JoinHandle, time};
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+        task::{JoinHandle, JoinSet},
+        time,
+    };
+    use tokio_tungstenite::tungstenite::{
+        client::IntoClientRequest, protocol::frame::coding::CloseCode,
+    };
     use vector_lib::{
         codecs::{
             JsonDeserializerConfig,
@@ -478,6 +635,11 @@ mod tests {
         "websocket_messages_sent_total",
         "websocket_bytes_sent_total",
     ];
+    const SHUTDOWN_TEST_TIMEOUT: time::Duration = time::Duration::from_secs(2);
+    const SHARED_DEADLINE_TEST_TIMEOUT: time::Duration = time::Duration::from_secs(8);
+
+    type TestWebSocket =
+        tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
     #[tokio::test]
     async fn test_single_client() {
@@ -824,6 +986,261 @@ mod tests {
         websocket_sink.await.unwrap();
     }
 
+    #[tokio::test]
+    async fn shutdown_keeps_peer_registered_while_draining_messages() {
+        let (_guard, address) = next_addr();
+        let (sender, receiver) = unbounded();
+        let message = Message::text("queued message");
+        sender.unbounded_send(message.clone()).unwrap();
+        let peers = Arc::new(Mutex::new(HashMap::from([(address, sender)])));
+        let registration = PeerRegistration {
+            addr: address,
+            peers: Arc::clone(&peers),
+            extra_tags: Vec::new(),
+        };
+
+        registration.stop_sending();
+        assert_eq!(peers.lock().unwrap().len(), 1);
+        let messages = time::timeout(SHUTDOWN_TEST_TIMEOUT, receiver.collect::<Vec<_>>())
+            .await
+            .expect("the closed channel should drain without removing the peer");
+        assert_eq!(messages, vec![message]);
+        drop(registration);
+        assert!(peers.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn accept_error_keeps_supervisor_alive_until_shutdown() {
+        let (_guard, address) = next_addr();
+        // An empty allowlist deterministically rejects the accepted TCP stream.
+        let listener = MaybeTlsSettings::Raw(())
+            .bind_with_allowlist(&address, Vec::new())
+            .await
+            .unwrap();
+        let (trigger, shutdown) = Tripwire::new();
+        let supervisor = tokio::spawn(WebSocketListenerSink::handle_connections(
+            None,
+            None,
+            SubProtocolConfig::default(),
+            Arc::default(),
+            HashMap::new(),
+            Arc::default(),
+            Arc::default(),
+            listener,
+            shutdown,
+        ));
+        let mut client = TcpStream::connect(address).await.unwrap();
+        assert_stream_closed(&mut client).await;
+        let _listener = wait_for_listener_release(address).await;
+        assert!(!supervisor.is_finished());
+
+        trigger.cancel();
+        time::timeout(SHUTDOWN_TEST_TIMEOUT, supervisor)
+            .await
+            .expect("accept failure must not prevent shutdown")
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn shutdown_without_clients_releases_listener_before_returning() {
+        let (_guard, address) = next_addr();
+        let (sender, websocket_sink) = start_shutdown_test_sink(address).await;
+
+        drop(sender);
+        await_sink_shutdown(websocket_sink, SHUTDOWN_TEST_TIMEOUT).await;
+
+        let _listener = TcpListener::bind(address)
+            .await
+            .expect("the listener must be released before the sink returns");
+    }
+
+    #[tokio::test]
+    async fn shutdown_drains_messages_and_sends_going_away_close() {
+        let event = Event::Log(LogEvent::from("last message"));
+        let (_guard, address) = next_addr();
+        let (mut sender, websocket_sink) = start_shutdown_test_sink(address).await;
+        let mut client = connect_websocket(address).await;
+
+        sender.send(event).await.expect("Failed to send.");
+        drop(sender);
+
+        let message = time::timeout(SHUTDOWN_TEST_TIMEOUT, async {
+            let message = client
+                .next()
+                .await
+                .expect("server should send the queued message")
+                .expect("queued message should be valid");
+            assert_going_away_close(&mut client).await;
+            message
+        })
+        .await
+        .expect("server should drain and close promptly");
+
+        let message: serde_json::Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
+        assert_eq!(message["message"], "last message");
+        drop(client);
+        await_sink_shutdown(websocket_sink, SHUTDOWN_TEST_TIMEOUT).await;
+    }
+
+    #[tokio::test]
+    async fn shutdown_cancels_incomplete_handshake() {
+        let (_guard, address) = next_addr();
+        let (sender, websocket_sink) = start_shutdown_test_sink(address).await;
+        let mut partial_client = connect_partial_handshake(address).await;
+        // This second connection can only finish its handshake after the accept loop has already
+        // accepted and delegated the earlier partial handshake.
+        let mut websocket_client = connect_websocket(address).await;
+
+        drop(sender);
+        time::timeout(
+            SHUTDOWN_TEST_TIMEOUT,
+            assert_going_away_close(&mut websocket_client),
+        )
+        .await
+        .expect("established client should be closed promptly");
+        drop(websocket_client);
+        await_sink_shutdown(websocket_sink, SHUTDOWN_TEST_TIMEOUT).await;
+        assert_stream_closed(&mut partial_client).await;
+    }
+
+    #[tokio::test]
+    async fn cancelling_sink_aborts_listener_and_connection_tasks() {
+        let (_guard, address) = next_addr();
+        let (_sender, websocket_sink) = start_shutdown_test_sink(address).await;
+        let mut partial_client = connect_partial_handshake(address).await;
+        let mut websocket_client = connect_websocket(address).await;
+
+        websocket_sink.abort();
+        assert!(websocket_sink.await.unwrap_err().is_cancelled());
+        assert_stream_closed(&mut partial_client).await;
+        assert_websocket_closed(&mut websocket_client).await;
+        drop(partial_client);
+        drop(websocket_client);
+
+        let _listener = wait_for_listener_release(address).await;
+    }
+
+    #[tokio::test]
+    async fn shutdown_aborts_unresponsive_clients_after_shared_deadline() {
+        let (_guard, address) = next_addr();
+        let (sender, websocket_sink) = start_shutdown_test_sink(address).await;
+        let client_one = connect_websocket(address).await;
+        let client_two = connect_websocket(address).await;
+
+        drop(sender);
+        await_sink_shutdown(websocket_sink, SHARED_DEADLINE_TEST_TIMEOUT).await;
+
+        for mut client in [client_one, client_two] {
+            // Read the transport directly so tungstenite cannot acknowledge the Close frame.
+            let mut bytes = Vec::new();
+            if let Err(error) = time::timeout(
+                SHUTDOWN_TEST_TIMEOUT,
+                client.get_mut().read_to_end(&mut bytes),
+            )
+            .await
+            .expect("the sink must close both client sockets before returning")
+            {
+                assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);
+            }
+        }
+        let _listener = TcpListener::bind(address)
+            .await
+            .expect("the listener must be released before the sink returns");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn connection_shutdown_timeout_is_shared_by_all_clients() {
+        let mut connections = JoinSet::new();
+        connections.spawn(pending::<Result<(), ()>>());
+        connections.spawn(pending::<Result<(), ()>>());
+        let started = time::Instant::now();
+
+        WebSocketListenerSink::shutdown_connections(&mut connections).await;
+
+        assert_eq!(started.elapsed(), CONNECTION_SHUTDOWN_GRACE_PERIOD);
+        assert!(connections.is_empty());
+    }
+
+    async fn start_shutdown_test_sink(
+        address: SocketAddr,
+    ) -> (UnboundedSender<Event>, JoinHandle<Result<(), ()>>) {
+        crate::test_util::trace_init();
+        let (sender, events) = build_test_event_channel();
+        let config = WebSocketListenerSinkConfig {
+            address,
+            ..Default::default()
+        };
+        let sink = WebSocketListenerSink::new(config, SinkContext::default()).unwrap();
+        let sink = VectorSink::from_event_streamsink(sink);
+        let sink_task = tokio::spawn(async move { sink.run(events.map(Into::into)).await });
+
+        time::sleep(time::Duration::from_millis(100)).await;
+
+        (sender, sink_task)
+    }
+
+    async fn await_sink_shutdown(sink: JoinHandle<Result<(), ()>>, timeout: time::Duration) {
+        time::timeout(timeout, sink)
+            .await
+            .expect("sink should stop within the test timeout")
+            .unwrap()
+            .unwrap();
+    }
+
+    async fn connect_websocket(address: SocketAddr) -> TestWebSocket {
+        tokio_tungstenite::connect_async(localhost_with_port(address.port()))
+            .await
+            .expect("WebSocket client should connect")
+            .0
+    }
+
+    async fn connect_partial_handshake(address: SocketAddr) -> TcpStream {
+        let mut client = TcpStream::connect(address)
+            .await
+            .expect("TCP client should connect");
+        client
+            .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: web")
+            .await
+            .expect("partial handshake should be written");
+        client
+    }
+
+    async fn assert_going_away_close(client: &mut TestWebSocket) {
+        let Some(Ok(Message::Close(Some(frame)))) = client.next().await else {
+            panic!("server should send a valid close frame");
+        };
+        assert_eq!(frame.code, CloseCode::Away);
+        client
+            .flush()
+            .await
+            .expect("client should acknowledge close");
+    }
+
+    async fn assert_websocket_closed(client: &mut TestWebSocket) {
+        time::timeout(SHUTDOWN_TEST_TIMEOUT, async {
+            while let Some(Ok(message)) = client.next().await {
+                if matches!(message, Message::Close(_)) {
+                    client.flush().await.ok();
+                }
+            }
+        })
+        .await
+        .expect("cancelling the sink should close established clients");
+    }
+
+    async fn wait_for_listener_release(address: SocketAddr) -> TcpListener {
+        time::timeout(SHUTDOWN_TEST_TIMEOUT, async {
+            loop {
+                match TcpListener::bind(address).await {
+                    Ok(listener) => break listener,
+                    Err(_) => time::sleep(time::Duration::from_millis(10)).await,
+                }
+            }
+        })
+        .await
+        .expect("cancelling the sink should eventually release the listener")
+    }
+
     async fn start_websocket_server_sink<S>(
         config: WebSocketListenerSinkConfig,
         events: S,
@@ -842,6 +1259,17 @@ mod tests {
         time::sleep(time::Duration::from_millis(100)).await;
 
         compliance_assertion
+    }
+
+    async fn assert_stream_closed(stream: &mut TcpStream) {
+        let mut byte = [0];
+        let result = time::timeout(time::Duration::from_secs(2), stream.read(&mut byte))
+            .await
+            .expect("server side of TCP stream should close promptly");
+        match result {
+            Ok(0) | Err(_) => {}
+            Ok(count) => panic!("expected a closed TCP stream, read {count} bytes"),
+        }
     }
 
     fn localhost_with_port(port: u16) -> String {

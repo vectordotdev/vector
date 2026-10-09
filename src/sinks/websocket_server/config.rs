@@ -6,7 +6,7 @@ use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
     codecs::{EncodingConfig, Transformer},
     common::http::server_auth::HttpServerAuthConfig,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
+    config::{AcknowledgementsConfig, Input, Resource, SinkConfig, SinkContext, ValidatedSink},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -138,6 +138,10 @@ impl SinkConfig for WebSocketListenerSinkConfig {
         Input::new(self.encoding.config().input_type())
     }
 
+    fn resources(&self) -> Vec<Resource> {
+        vec![Resource::tcp(self.address)]
+    }
+
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
@@ -210,6 +214,24 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<WebSocketListenerSinkConfig>();
+    }
+
+    #[test]
+    fn reject_conflicting_listeners() {
+        let mut config = crate::config::Config::builder();
+        config.add_source("in", crate::test_util::mock::basic_source().1);
+        config.add_sink("first", &["in"], WebSocketListenerSinkConfig::default());
+        config.add_sink("second", &["in"], WebSocketListenerSinkConfig::default());
+
+        let errors = config
+            .build()
+            .expect_err("listeners cannot share a TCP port");
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("is claimed by multiple components")),
+            "{errors:?}"
+        );
     }
 
     #[test]
