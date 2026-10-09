@@ -278,13 +278,6 @@ mod tests {
         }
     }
 
-    /// Repository root, derived from the vdev crate location.
-    fn repo_root() -> &'static Path {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("the vdev crate is nested in the repository")
-    }
-
     /// Exposes every injected field. Tests use it instead of `release_notes.hbs` so that
     /// changing the prose there does not require touching this file.
     const FIXTURE: &str = concat!(
@@ -386,21 +379,20 @@ mod tests {
     }
 
     #[test]
-    fn production_template_loads_and_references_every_link() {
+    fn production_template_loads_and_references_every_link() -> Result<()> {
         let changelog = [
             entry("chore", true, &["alice"]),
             entry("feat", false, &["bob", "alice"]),
             entry("fix", false, &["carol"]),
             entry("fix", false, &["bob"]),
         ];
-        let template = load_template(repo_root(), None).unwrap();
+        let template = load_template(&paths::find_repo_root()?, None)?;
         let notes = render_notes(
             &Version::new(0, 59, 0),
             &changelog,
             Some("2026-10-05-0-59-0-upgrade-guide"),
             &template,
-        )
-        .unwrap();
+        )?;
 
         for expected in [
             "https://vector.dev/releases/0.59.0/#breaking-changes",
@@ -415,5 +407,7 @@ mod tests {
                 "missing {expected:?} in:\n{notes}"
             );
         }
+
+        Ok(())
     }
 }
