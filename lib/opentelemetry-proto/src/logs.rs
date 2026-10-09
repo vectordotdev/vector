@@ -265,6 +265,8 @@ impl ResourceLog {
 ///   both to the same Vector value.
 /// - A record without `time_unix_nano` gets the observed time, because the source uses the
 ///   observed time as the event timestamp.
+/// - The request has one `ResourceLogs` and one `ScopeLogs` for the one record, so records
+///   that shared a resource and scope in the original request are not grouped again.
 ///
 /// - Legacy namespace: the message field becomes the body and the timestamp field becomes
 ///   `time_unix_nano`. The fields written by the source (`attributes`, `resources`, `scope`,
