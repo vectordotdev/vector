@@ -178,6 +178,9 @@ pub struct IntegrationRunnerConfig {
     /// The set of volumes that need to be mounted into the runner.
     #[serde(default)]
     pub volumes: BTreeMap<String, String>,
+    /// Keep compiled artifacts in a separate volume so output cleanup preserves them.
+    #[serde(default)]
+    pub preserve_build_cache: bool,
     /// Does the test runner need access to the host's docker socket?
     #[serde(default)]
     pub needs_docker_socket: bool,

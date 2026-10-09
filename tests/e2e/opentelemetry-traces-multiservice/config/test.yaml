@@ -5,6 +5,8 @@ test: e2e
 test_filter: "opentelemetry::multiservice_traces::"
 
 runner:
+  # Reuse compiled tests between HTTP and gRPC runs. Captures are still cleared.
+  preserve_build_cache: true
   needs_docker_socket: true
   volumes:
     opentelemetry_traces_multiservice_evidence: /output/opentelemetry-traces-multiservice
