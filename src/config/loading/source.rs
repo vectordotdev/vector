@@ -1,7 +1,5 @@
-use std::io::Read;
-
 use super::{
-    ComponentHint, Loader, Process,
+    loader::{ConfigScope, ParsedInputs},
     representation::{ConfigMap, merge_into_map},
 };
 
@@ -16,6 +14,51 @@ impl SourceLoader {
             map: ConfigMap::new(),
         }
     }
+
+    /// Loads and merges configuration values from paths without interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading or parsing input, or merging
+    /// incompatible configuration values.
+    pub fn load_from_paths(self, paths: &[super::ConfigPath]) -> Result<ConfigMap, Vec<String>> {
+        self.load_prepared(&ParsedInputs::from_paths(paths))
+    }
+
+    /// Parses configuration values from a reader without interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading or parsing input, or merging
+    /// incompatible configuration values.
+    pub fn load_from_input(
+        self,
+        input: impl std::io::Read,
+        format: super::Format,
+    ) -> Result<ConfigMap, Vec<String>> {
+        self.load_prepared(&ParsedInputs::from_input(input, format))
+    }
+
+    fn load_prepared(mut self, inputs: &ParsedInputs) -> Result<ConfigMap, Vec<String>> {
+        inputs.assemble(
+            |_| {},
+            |map, scope| {
+                let map = if matches!(scope, ConfigScope::DirectoryRoot) {
+                    let mut root = ConfigMap::new();
+                    for value in map.into_values() {
+                        if let serde_json::Value::Object(map) = value {
+                            merge_into_map(&mut root, map)?;
+                        }
+                    }
+                    root
+                } else {
+                    map
+                };
+                merge_into_map(&mut self.map, map)
+            },
+        )?;
+        Ok(self.map)
+    }
 }
 
 impl Default for SourceLoader {
@@ -24,40 +67,12 @@ impl Default for SourceLoader {
     }
 }
 
-impl Process for SourceLoader {
-    /// Prepares input by simply reading bytes to a string. Unlike other loaders, there's no
-    /// interpolation of environment variables. This is on purpose to preserve the original config.
-    fn prepare<R: Read>(&mut self, mut input: R) -> Result<String, Vec<String>> {
-        let mut source_string = String::new();
-        input
-            .read_to_string(&mut source_string)
-            .map_err(|e| vec![e.to_string()])?;
-
-        Ok(source_string)
-    }
-
-    /// Merge values by combining with the internal configuration map.
-    fn merge(&mut self, map: ConfigMap, _hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        merge_into_map(&mut self.map, map)
-    }
-}
-
-impl Loader<ConfigMap> for SourceLoader {
-    /// Returns the resulting configuration map.
-    fn take(self) -> ConfigMap {
-        self.map
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
 
     use super::SourceLoader;
-    use crate::config::{
-        Format,
-        loading::{loader_from_input, representation::ConfigMap},
-    };
+    use crate::config::{Format, loading::representation::ConfigMap};
 
     #[test]
     fn preserves_explicit_json_and_yaml_null() {
@@ -65,8 +80,9 @@ mod tests {
             (r#"{"optional": null}"#, Format::Json),
             ("optional: null", Format::Yaml),
         ] {
-            let map: ConfigMap =
-                loader_from_input(SourceLoader::new(), input.as_bytes(), format).unwrap();
+            let map: ConfigMap = SourceLoader::new()
+                .load_from_input(input.as_bytes(), format)
+                .unwrap();
 
             assert_eq!(map.get("optional"), Some(&Value::Null));
             assert_eq!(Value::Object(map), json!({ "optional": null }));

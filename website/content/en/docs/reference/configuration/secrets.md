@@ -13,7 +13,9 @@ This is the recommended way to supply secrets to Vector, in preference to [envir
 
 ## Usage
 
-Configure one or more backends under the top-level `secret` option, then reference secrets from those backends anywhere in your configuration using the `SECRET[<backend name>.<secret name>]` syntax. Vector collects the referenced secret names and queries each required backend when it loads the configuration, including during configuration reloads. It substitutes the retrieved values before parsing the configuration. A secret value containing YAML or TOML syntax can therefore alter the parsed configuration, so only retrieve secrets from backends and paths you trust.
+Configure one or more backends under the top-level `secret` option, then reference secrets in string values using the `SECRET[<backend name>.<secret name>]` syntax. Vector parses the configuration first, collects references from string values, and queries each required backend when it loads the configuration, including during configuration reloads. References in comments and map keys are ignored.
+
+Retrieved values are substituted as literal strings and converted to the field's declared type before deserialization. In TOML and JSON, quote placeholders even in numeric and boolean fields. Quotes, newlines, and other configuration syntax in a secret cannot add keys or components. Secrets can still change the meaning of a field, such as a path or embedded VRL program, so only retrieve secrets from backends and paths you trust.
 
 You can reference the same backend from multiple places in your configuration, and you can configure multiple backends if you need to retrieve secrets from more than one source. Backend names support letters, digits, `_`, and `-`. Secret names additionally support `.` and `/`, allowing hierarchical keys such as `SECRET[backend_1.database/password]`.
 

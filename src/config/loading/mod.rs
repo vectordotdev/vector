@@ -8,8 +8,16 @@ pub mod schema_coercion;
 mod secret;
 mod source;
 
+#[cfg(test)]
+mod metric_tag_tests;
+
+#[cfg(all(test, feature = "sources-demo_logs"))]
+mod tests;
+
+#[cfg(all(test, feature = "sources-demo_logs"))]
+mod retained_tests;
+
 use std::{
-    collections::HashMap,
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
@@ -19,7 +27,7 @@ use std::{
 pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
 pub use interpolation::interpolate_config_map_with_env_vars;
-use loader::process::Process;
+pub(crate) use loader::ParsedInputs;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
@@ -172,8 +180,12 @@ pub async fn load_from_paths_with_provider_and_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    let mut builder =
-        load_builder_from_paths_with_secrets(config_paths, signal_handler, allow_empty).await?;
+    let mut builder = Box::pin(load_builder_from_paths_with_secrets(
+        config_paths,
+        signal_handler,
+        allow_empty,
+    ))
+    .await?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -194,16 +206,27 @@ pub(crate) async fn load_builder_from_paths_with_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
-    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
+    let mut inputs = ParsedInputs::from_paths(config_paths);
+    inputs.interpolate_environment(env_var_interpolation_enabled());
+    load_builder_from_prepared_with_secrets(inputs, signal_handler, allow_empty).await
+}
+
+/// Completes secret resolution without reopening or reparsing prepared inputs.
+pub(crate) async fn load_builder_from_prepared_with_secrets(
+    mut inputs: ParsedInputs,
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let secrets_backends_loader = SecretBackendLoader::default().load_prepared(&inputs)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
+    inputs.substitute_secrets(&secrets);
     ConfigBuilderLoader::default()
         .allow_empty(allow_empty)
-        .secrets(secrets)
-        .load_from_paths(config_paths)
+        .load_prepared(&inputs)
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
@@ -214,17 +237,10 @@ pub async fn load_from_str_with_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    let secrets_backends_loader =
-        loader_from_input(SecretBackendLoader::default(), input.as_bytes(), format)?;
-    let secrets = secrets_backends_loader
-        .retrieve_secrets(signal_handler)
-        .await
-        .map_err(|e| vec![e])?;
-
-    let builder = ConfigBuilderLoader::default()
-        .allow_empty(allow_empty)
-        .secrets(secrets)
-        .load_from_input(input.as_bytes(), format)?;
+    let mut inputs = ParsedInputs::from_input(input.as_bytes(), format);
+    inputs.interpolate_environment(env_var_interpolation_enabled());
+    let builder =
+        load_builder_from_prepared_with_secrets(inputs, signal_handler, allow_empty).await?;
     signal_handler.clear();
 
     finalize_config(builder).await
@@ -242,64 +258,13 @@ async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> 
     Ok(new_config)
 }
 
-pub(super) fn loader_from_input<T, L, R>(
-    mut loader: L,
-    input: R,
-    format: Format,
-) -> Result<T, Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-    L: Loader<T> + Process,
-    R: std::io::Read,
-{
-    loader.load_from_str(input, format).map(|()| loader.take())
-}
-
-/// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-pub(super) fn loader_from_paths<T, L>(
-    mut loader: L,
-    config_paths: &[ConfigPath],
-) -> Result<T, Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-    L: Loader<T> + Process,
-{
-    let mut errors = Vec::new();
-
-    for config_path in config_paths {
-        match config_path {
-            ConfigPath::File(path, format_hint) => {
-                match loader.load_from_file(
-                    path,
-                    format_hint
-                        .or_else(move || Format::from_path(&path).ok())
-                        .unwrap_or_default(),
-                ) {
-                    Ok(()) => {}
-                    Err(errs) => errors.extend(errs),
-                }
-            }
-            ConfigPath::Dir(path) => match loader.load_from_dir(path) {
-                Ok(()) => {}
-                Err(errs) => errors.extend(errs),
-            },
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(loader.take())
-    } else {
-        Err(errors)
-    }
-}
-
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a JSON object.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
-    loader_from_paths(SourceLoader::new(), config_paths)
+    SourceLoader::new().load_from_paths(config_paths)
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
@@ -322,7 +287,11 @@ fn load_from_inputs(
     let mut errors = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|n| config.append(n)) {
+        if let Err(errs) = ConfigBuilderLoader::default()
+            .interpolate_env(false)
+            .load_from_input(input, format)
+            .and_then(|n| config.append(n))
+        {
             // TODO: add back paths
             errors.extend(errs.iter().cloned());
         }
@@ -337,42 +306,12 @@ fn load_from_inputs(
 
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-pub fn prepare_input<R: std::io::Read>(
-    mut input: R,
-    interpolate_env: bool,
-) -> Result<String, Vec<String>> {
-    let mut source_string = String::new();
-    input
-        .read_to_string(&mut source_string)
-        .map_err(|e| vec![e.to_string()])?;
-
-    if interpolate_env {
-        let mut vars: HashMap<String, String> = std::env::vars_os()
-            .filter_map(|(k, v)| match (k.into_string(), v.into_string()) {
-                (Ok(k), Ok(v)) => Some((k, v)),
-                _ => None,
-            })
-            .collect();
-
-        if !vars.contains_key("HOSTNAME")
-            && let Ok(hostname) = crate::get_hostname()
-        {
-            vars.insert("HOSTNAME".into(), hostname);
-        }
-        interpolation::interpolate(&source_string, &vars)
-    } else {
-        Ok(source_string)
-    }
-}
-
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
 {
     // Via configurations that load from raw string, skip interpolation of env
-    let with_vars = prepare_input(input, false)?;
+    let with_vars = loader::string_from_input(input)?;
 
     representation::deserialize_config(&with_vars, format)
 }

@@ -1,4 +1,5 @@
 use bytes::{BufMut, BytesMut};
+use serde_with::serde_as;
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
 
@@ -29,12 +30,13 @@ impl CharacterDelimitedEncoderConfig {
 }
 
 /// Configuration for character-delimited framing.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CharacterDelimitedEncoderOptions {
     /// The ASCII (7-bit) character that delimits byte sequences.
     #[configurable(metadata(docs::type_override = "ascii_char"))]
-    #[serde(with = "vector_core::serde::ascii_char")]
+    #[serde_as(as = "vector_core::serde::ascii_char::AsciiChar")]
     pub delimiter: u8,
 }
 
@@ -65,6 +67,28 @@ impl Encoder<()> for CharacterDelimitedEncoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn delimiter_schema_matches_its_ascii_string_representation() {
+        let schema = serde_json::to_value(
+            vector_config::schema::generate_root_schema::<CharacterDelimitedEncoderOptions>()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(schema["properties"]["delimiter"]["type"], "string");
+
+        let input = serde_json::json!({"delimiter": "1"});
+        let options: CharacterDelimitedEncoderOptions =
+            serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(options.delimiter, b'1');
+        assert_eq!(serde_json::to_value(options).unwrap(), input);
+        assert!(
+            serde_json::from_value::<CharacterDelimitedEncoderOptions>(
+                serde_json::json!({"delimiter": 1})
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn encode() {
