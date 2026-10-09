@@ -1,7 +1,14 @@
 #![allow(clippy::print_stdout)]
-use async_nats::jetstream::stream::StorageType;
+use std::time::Duration;
+
+use async_nats::jetstream::{consumer::AckPolicy, stream::StorageType};
 use bytes::Bytes;
-use vector_lib::config::log_schema;
+use tokio::time::{sleep, timeout};
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::log_schema,
+    event::EventStatus,
+};
 
 use crate::{
     SourceSender,
@@ -48,10 +55,17 @@ fn generate_source_config(url: &str, subject: &str) -> NatsSourceConfig {
 /// Test runner for JetStream sources.
 /// This function sets up the required JetStream stream and consumer,
 /// publishes a message, and then runs the source to ensure it receives the message.
-async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> {
+async fn run_jetstream_test(
+    mut conf: NatsSourceConfig,
+    status: EventStatus,
+    expected_messages: usize,
+    expected_ack_pending: usize,
+    finalization_delay: Duration,
+) -> Result<(), crate::Error> {
     let js_config = conf.jetstream.clone().unwrap();
     let subject = conf.subject.clone();
     let msg = "my jetstream message";
+    conf.acknowledgements = true.into();
 
     // Connect to NATS and set up the JetStream stream and consumer.
     let client = async_nats::connect(conf.url.clone())
@@ -69,9 +83,11 @@ async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> 
     .expect("Failed to create stream");
 
     let stream = js.get_stream(js_config.stream).await.unwrap();
-    stream
+    let mut consumer = stream
         .create_consumer(async_nats::jetstream::consumer::pull::Config {
             durable_name: Some(js_config.consumer),
+            ack_wait: Duration::from_millis(100),
+            max_deliver: 2,
             ..Default::default()
         })
         .await
@@ -82,13 +98,15 @@ async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> 
 
     // Run the source and verify it receives the event.
     let events = assert_source_compliance(&SOURCE_TAGS, async move {
-        let (tx, rx) = SourceSender::new_test();
-        let cx = SourceContext::new_test(tx, None);
+        let (tx, rx) = SourceSender::new_test_finalize(status);
+        let mut cx = SourceContext::new_test(tx, None);
+        cx.acknowledgements = true;
         let source = conf.build(cx).await.unwrap();
 
         tokio::spawn(source);
 
-        collect_n(rx, 1).await
+        sleep(finalization_delay).await;
+        collect_n(rx, expected_messages).await
     })
     .await;
 
@@ -96,6 +114,24 @@ async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> 
         events[0].as_log()[log_schema().message_key().unwrap().to_string()],
         msg.into()
     );
+
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let info = consumer.info().await.unwrap();
+            if info.num_ack_pending == expected_ack_pending
+                && if expected_ack_pending == 0 {
+                    info.num_redelivered == 0
+                } else {
+                    info.num_redelivered > 0
+                }
+            {
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("JetStream consumer acknowledgement state did not reach the expected value.");
 
     Ok(())
 }
@@ -446,6 +482,48 @@ async fn nats_multiple_urls_invalid() {
 }
 
 #[tokio::test]
+async fn nats_core_preserves_valid_frames_after_decode_error() {
+    let subject = format!("test-core-decode-{}", random_string(10));
+    let url =
+        std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
+    let mut conf = generate_source_config(&url, &subject);
+    conf.framing = FramingConfig::NewlineDelimited(Default::default());
+    conf.decoding = DeserializerConfig::Json(Default::default());
+
+    let (client, subscription) = create_subscription(&conf).await.unwrap();
+    let publisher = client.clone();
+    let decoder = DecodingConfig::new(
+        conf.framing.clone(),
+        conf.decoding.clone(),
+        LogNamespace::Legacy,
+    )
+    .build()
+    .unwrap();
+    let (tx, rx) = SourceSender::new_test();
+    tokio::spawn(run_nats_core(
+        conf,
+        client,
+        subscription,
+        decoder,
+        LogNamespace::Legacy,
+        ShutdownSignal::noop(),
+        tx,
+    ));
+
+    publisher
+        .publish(
+            subject,
+            Bytes::from_static(b"{\"message\":\"first\"}\nnot-json\n{\"message\":\"last\"}\n"),
+        )
+        .await
+        .unwrap();
+
+    let events = collect_n(rx, 2).await;
+    assert_eq!(events[0].as_log()["message"], "first".into());
+    assert_eq!(events[1].as_log()["message"], "last".into());
+}
+
+#[tokio::test]
 async fn nats_jetstream_valid() {
     let (subject, stream_name, consumer_name) = random_jetstream_id("test_js");
     let url = std::env::var("NATS_JETSTREAM_ADDRESS")
@@ -458,8 +536,233 @@ async fn nats_jetstream_valid() {
         ..Default::default()
     });
 
-    let result = run_jetstream_test(conf).await;
+    let result = run_jetstream_test(conf, EventStatus::Delivered, 1, 0, Duration::ZERO).await;
     assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn nats_jetstream_extends_ack_wait_until_delivery() {
+    let (subject, stream_name, consumer_name) = random_jetstream_id("test_js_progress");
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: stream_name,
+        consumer: consumer_name,
+        ..Default::default()
+    });
+
+    let result = run_jetstream_test(
+        conf,
+        EventStatus::Delivered,
+        1,
+        0,
+        Duration::from_millis(250),
+    )
+    .await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn nats_jetstream_does_not_ack_errored_delivery() {
+    let subject = format!("test-js-{}", random_string(10));
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: format!("S_{}", subject.replace('.', "_")),
+        consumer: format!("C_{}", subject.replace('.', "_")),
+        ..Default::default()
+    });
+
+    let result = run_jetstream_test(conf, EventStatus::Errored, 2, 1, Duration::ZERO).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn nats_jetstream_keeps_ack_progress_while_output_is_blocked() {
+    let (subject, stream_name, consumer_name) = random_jetstream_id("test_js_backpressure");
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let client = async_nats::connect(&url).await.unwrap();
+    let js = async_nats::jetstream::new(client);
+    let stream = js
+        .get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let mut consumer = stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(consumer_name.clone()),
+            ack_wait: Duration::from_millis(100),
+            max_deliver: 2,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    for index in 0..101 {
+        js.publish(subject.clone(), format!("message {index}").into())
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    }
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: stream_name,
+        consumer: consumer_name,
+        ..Default::default()
+    });
+    conf.acknowledgements = true.into();
+
+    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let mut cx = SourceContext::new_test(tx, None);
+    cx.acknowledgements = true;
+    tokio::spawn(conf.build(cx).await.unwrap());
+
+    sleep(Duration::from_millis(250)).await;
+    let events = collect_n(rx, 101).await;
+    assert_eq!(events.len(), 101);
+
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let info = consumer.info().await.unwrap();
+            if info.num_ack_pending == 0 {
+                assert_eq!(info.num_redelivered, 0);
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("JetStream messages were not acknowledged without redelivery.");
+}
+
+#[tokio::test]
+async fn nats_jetstream_uses_consumer_backoff_for_ack_progress() {
+    let (subject, stream_name, consumer_name) = random_jetstream_id("test_js_backoff_progress");
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let client = async_nats::connect(&url).await.unwrap();
+    let js = async_nats::jetstream::new(client);
+    let stream = js
+        .get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let mut consumer = stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(consumer_name.clone()),
+            ack_wait: Duration::from_secs(30),
+            backoff: vec![Duration::from_millis(100)],
+            max_deliver: 2,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    js.publish(subject.clone(), "backoff progress".into())
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: stream_name,
+        consumer: consumer_name,
+        ..Default::default()
+    });
+    conf.acknowledgements = true.into();
+
+    let events = assert_source_compliance(&SOURCE_TAGS, async move {
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let mut cx = SourceContext::new_test(tx, None);
+        cx.acknowledgements = true;
+        tokio::spawn(conf.build(cx).await.unwrap());
+        sleep(Duration::from_millis(250)).await;
+        collect_n(rx, 1).await
+    })
+    .await;
+
+    assert_eq!(events.len(), 1);
+
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let info = consumer.info().await.unwrap();
+            if info.num_ack_pending == 0 {
+                assert_eq!(info.num_redelivered, 0);
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("JetStream message was redelivered despite progress acknowledgements.");
+}
+
+#[tokio::test]
+async fn nats_jetstream_requires_explicit_ack_policy() {
+    let (subject, stream_name, consumer_name) = random_jetstream_id("test_js_ack_policy");
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let client = async_nats::connect(&url).await.unwrap();
+    let js = async_nats::jetstream::new(client);
+    let stream = js
+        .get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(consumer_name.clone()),
+            ack_policy: AckPolicy::All,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: stream_name,
+        consumer: consumer_name,
+        ..Default::default()
+    });
+    conf.acknowledgements = true.into();
+
+    let (tx, _rx) = SourceSender::new_test();
+    let mut cx = SourceContext::new_test(tx, None);
+    cx.acknowledgements = true;
+    let error = match conf.build(cx).await {
+        Ok(_) => panic!("Expected acknowledgement policy validation to fail"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(
+        error.downcast_ref::<BuildError>(),
+        Some(BuildError::InvalidAckPolicy {
+            policy: AckPolicy::All
+        })
+    ));
 }
 
 #[tokio::test]
@@ -877,7 +1180,7 @@ async fn nats_jetstream_shutdown_during_recovery() {
 
     let connection = conf.connect().await.unwrap();
     let js_config = conf.jetstream.clone().unwrap();
-    let initial_messages = create_consumer_stream(&connection, &js_config)
+    let (initial_messages, ack_wait) = create_consumer_stream(&connection, &js_config, false)
         .await
         .unwrap();
 
@@ -895,10 +1198,12 @@ async fn nats_jetstream_shutdown_during_recovery() {
         conf.clone(),
         connection,
         initial_messages,
+        ack_wait,
         decoder,
         LogNamespace::Legacy,
         shutdown_signal,
         tx,
+        false,
     ));
 
     // Deliver one message to prove the source is running.
@@ -1006,7 +1311,7 @@ async fn nats_jetstream_shutdown_during_consumption() {
 
     let connection = conf.connect().await.unwrap();
     let js_config = conf.jetstream.clone().unwrap();
-    let initial_messages = create_consumer_stream(&connection, &js_config)
+    let (initial_messages, ack_wait) = create_consumer_stream(&connection, &js_config, false)
         .await
         .unwrap();
 
@@ -1024,10 +1329,12 @@ async fn nats_jetstream_shutdown_during_consumption() {
         conf.clone(),
         connection,
         initial_messages,
+        ack_wait,
         decoder,
         LogNamespace::Legacy,
         shutdown_signal,
         tx,
+        false,
     ));
 
     // Deliver one message to prove the source is actively consuming a healthy stream.
