@@ -55,6 +55,16 @@ pub struct ReduceConfig {
     /// The maximum number of events to group together.
     pub max_events: Option<NonZeroUsize>,
 
+    /// The maximum number of groups to keep in memory at any one time.
+    ///
+    /// When a new group would exceed this limit, the group that has gone the longest without
+    /// receiving an event is flushed early to make room, and the
+    /// `reduce_max_groups_exceeded_total` internal metric is incremented.
+    ///
+    /// This is a safeguard against unbounded memory growth when `group_by` contains
+    /// high-cardinality fields. When not specified, the number of groups is unbounded.
+    pub max_groups: Option<NonZeroUsize>,
+
     /// An ordered list of fields by which to group events.
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing

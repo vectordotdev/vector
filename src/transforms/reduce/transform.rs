@@ -16,7 +16,7 @@ use vrl::{
 use crate::{
     conditions::Condition,
     event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
-    internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
+    internal_events::{ReduceAddEventError, ReduceMaxGroupsExceeded, ReduceStaleEventFlushed},
     transforms::{
         TaskTransform,
         reduce::{
@@ -150,6 +150,7 @@ pub struct Reduce {
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
+    max_groups: Option<usize>,
 }
 
 fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
@@ -193,6 +194,7 @@ impl Reduce {
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
         let max_events = config.max_events.map(|max| max.into());
+        let max_groups = config.max_groups.map(|max| max.into());
 
         validate_merge_strategies(config.merge_strategies.clone())?;
 
@@ -219,6 +221,7 @@ impl Reduce {
             ends_when,
             starts_when,
             max_events,
+            max_groups,
         })
     }
 
@@ -250,7 +253,34 @@ impl Reduce {
             .for_each(|(_, s)| emitter.emit(Event::from(s.flush())));
     }
 
-    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
+    /// Flushes the group that has gone the longest without receiving an event, to
+    /// make room for a new group when the `max_groups` limit has been reached.
+    fn flush_least_recently_updated_into(&mut self, emitter: &mut Emitter<Event>) {
+        if let Some(discriminant) = self
+            .reduce_merge_states
+            .iter()
+            .min_by_key(|(_, state)| state.stale_since)
+            .map(|(discriminant, _)| discriminant.clone())
+            && let Some(state) = self.reduce_merge_states.remove(&discriminant)
+        {
+            emit!(ReduceMaxGroupsExceeded);
+            emitter.emit(Event::from(state.flush()));
+        }
+    }
+
+    fn push_or_new_reduce_state(
+        &mut self,
+        emitter: &mut Emitter<Event>,
+        event: LogEvent,
+        discriminant: Discriminant,
+    ) {
+        if let Some(max_groups) = self.max_groups
+            && self.reduce_merge_states.len() >= max_groups
+            && !self.reduce_merge_states.contains_key(&discriminant)
+        {
+            self.flush_least_recently_updated_into(emitter);
+        }
+
         match self.reduce_merge_states.entry(discriminant) {
             Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
@@ -293,7 +323,7 @@ impl Reduce {
                 emitter.emit(state.flush().into());
             }
 
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state(emitter, event, discriminant)
         } else if ends_here {
             emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
                 Some(mut state) => {
@@ -307,7 +337,7 @@ impl Reduce {
                 }
             });
         } else {
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state(emitter, event, discriminant)
         }
     }
 }
@@ -743,6 +773,85 @@ mod test {
             );
 
             drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn max_groups_0() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            max_groups: 0
+        "});
+
+        match reduce_config {
+            Ok(_conf) => unreachable!("max_groups=0 should be rejected."),
+            Err(err) => assert!(
+                err.to_string()
+                    .contains("invalid value: integer `0`, expected a nonzero usize")
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn max_groups() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - id
+            merge_strategies:
+              id: retain
+              message: array
+            max_groups: 2
+        "})
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("test 1");
+            e_1.insert(event_path!("id"), "1");
+
+            let mut e_2 = LogEvent::from("test 2");
+            e_2.insert(event_path!("id"), "2");
+
+            // Updates the existing group "1", so it must not trigger a flush and
+            // leaves group "2" as the least recently updated one.
+            let mut e_3 = LogEvent::from("test 3");
+            e_3.insert(event_path!("id"), "1");
+
+            // Creates a third group, exceeding `max_groups` and flushing group "2".
+            let mut e_4 = LogEvent::from("test 4");
+            e_4.insert(event_path!("id"), "3");
+
+            for event in [e_1.into(), e_2.into(), e_3.into(), e_4.into()] {
+                tx.send(event).await.unwrap();
+            }
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["id"], "2".into());
+            assert_eq!(output_1["message"], vec!["test 2"].into());
+
+            drop(tx);
+
+            // The remaining two groups are flushed on shutdown, in no particular order.
+            let mut remaining = Vec::new();
+            for _ in 0..2 {
+                let log = out.recv().await.unwrap().into_log();
+                remaining.push((log["id"].clone(), log["message"].clone()));
+            }
+            remaining.sort_by_key(|(id, _)| id.to_string_lossy().into_owned());
+            assert_eq!(
+                remaining,
+                vec![
+                    ("1".into(), vec!["test 1", "test 3"].into()),
+                    ("3".into(), vec!["test 4"].into()),
+                ]
+            );
+
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
