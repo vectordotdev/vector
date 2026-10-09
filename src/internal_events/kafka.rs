@@ -151,6 +151,9 @@ pub struct KafkaStatisticsReceived<'a> {
 }
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
+    #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn emit(self) {
         gauge!(GaugeName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
         gauge!(GaugeName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);
