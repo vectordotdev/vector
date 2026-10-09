@@ -1,24 +1,72 @@
+//! Storage backends for accepted tag values.
+//!
+//! Four variants, picked at construction time from `(Mode, ttl_secs)`:
+//!
+//! - `Set` — `HashSet`, no TTL. Original exact-mode behavior.
+//! - `Fingerprint` — `HashedSet<u64>`, no TTL. `ExactFingerprint` mode.
+//! - `Bloom` — single `BloomFilter`, no TTL. Original probabilistic-mode behavior.
+//! - `TtlSet` — `HashMap<value, last_seen>` with periodic sweep. Exact mode + TTL.
+//! - `RollingBloom` — `VecDeque<BloomFilter>` of `ttl_generations` shards, lazily
+//!   rotated. Probabilistic mode + TTL.
+//!
+//! Both TTL variants use "refresh on sighting" semantics: every `contains()` hit
+//! extends the value's lease, so continuously-observed values stay in the cache
+//! across rotation boundaries. Eviction is lazy — driven by `insert()` and
+//! `contains()` calls — so there's no background task.
+
 use std::{
-    collections::{HashSet, hash_map::RandomState},
+    collections::{HashMap, HashSet, VecDeque, hash_map::RandomState},
     fmt,
     hash::BuildHasher,
+    time::{Duration, Instant},
 };
 
 use bloomy::BloomFilter;
 use hash_hasher::HashedSet;
 
-use crate::{event::metric::TagValueSet, transforms::tag_cardinality_limit::config::Mode};
+use crate::{
+    event::metric::TagValueSet,
+    internal_events::TagCardinalityTtlExpired,
+    transforms::tag_cardinality_limit::config::{Mode, ttl_duration},
+};
+
+/// `Instant + Duration` panics outside the platform's representable range.
+/// On overflow, push the deadline `~136 years` into the future so rotation
+/// schedules degrade to a stable no-op rather than panicking or churning
+/// (returning `instant` here would leave `next_rotate <= now` on every call
+/// and force `generations` rotations per access).
+fn saturating_add(instant: Instant, duration: Duration) -> Instant {
+    if let Some(result) = instant.checked_add(duration) {
+        return result;
+    }
+    let mut fallback = Duration::from_secs(u32::MAX as u64);
+    while !fallback.is_zero() {
+        if let Some(result) = instant.checked_add(fallback) {
+            return result;
+        }
+        fallback = Duration::from_secs(fallback.as_secs() / 2);
+    }
+    instant
+}
+
+/// Compute time-slice count and duration so `slice * generations == ttl` exactly.
+///
+/// Caps `generations` to at most one slice per second of TTL (so each slice is
+/// `>= 1s` when `ttl >= 1s`) and to the caller's `ttl_generations` request.
+/// Uses `Duration` division for `slice` so non-divisible TTLs (e.g. 10s / 4)
+/// still sum to the configured window. `ttl.as_secs()` is kept in `u64` when
+/// deriving the per-second cap so values `>= 2^32` seconds are not truncated
+/// to zero by a premature `u32` cast.
+fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u32, Duration) {
+    let requested = u32::from(ttl_generations.max(1));
+    let ttl_secs = ttl.as_secs().max(1);
+    let max_for_ttl = ttl_secs.min(u32::MAX as u64) as u32;
+    let generations = requested.min(max_for_ttl).max(1);
+    let slice = ttl / generations;
+    (generations, slice)
+}
 
 /// Container for storing the set of accepted values for a given tag key.
-///
-/// # Storage backend selection
-///
-/// | `Mode`               | Storage                         |
-/// |----------------------|---------------------------------|
-/// | `Exact`              | `HashSet<TagValueSet>`          |
-/// | `ExactFingerprint`   | `HashSet<u64>` (fingerprints)   |
-/// | `Probabilistic`      | `BloomFilter                    |
-
 #[derive(Debug)]
 pub struct AcceptedTagValueSet {
     storage: TagValueSetStorage,
@@ -27,8 +75,10 @@ pub struct AcceptedTagValueSet {
 enum TagValueSetStorage {
     Set(HashSet<TagValueSet>),
     Bloom(BloomFilterStorage),
-    /// Stores 64-bit hash fingerprints of accepted tag values
+    /// Stores 64-bit hash fingerprints of accepted tag values.
     Fingerprint(FingerprintStorage),
+    TtlSet(TtlExactStorage),
+    RollingBloom(RollingBloomStorage),
 }
 
 /// A bloom filter that tracks the number of items inserted into it.
@@ -48,12 +98,17 @@ impl BloomFilterStorage {
         }
     }
 
-    fn insert(&mut self, value: &TagValueSet) {
-        // Only update the count if the value is not already in the bloom filter.
-        if !self.inner.contains(value) {
-            self.inner.insert(value);
+    /// Inserts `value` and returns whether this shard's cardinality increased.
+    fn insert(&mut self, value: &TagValueSet) -> bool {
+        // Write bits unconditionally so the rolling-bloom refresh path can
+        // not leave a value riding on another value's false-positive bits.
+        // Count tracks distinct first sightings only.
+        let was_already_present = self.inner.contains(value);
+        self.inner.insert(value);
+        if !was_already_present {
             self.count += 1;
         }
+        !was_already_present
     }
 
     fn contains(&self, value: &TagValueSet) -> bool {
@@ -91,45 +146,418 @@ impl FingerprintStorage {
     }
 }
 
+/// `HashMap`-backed exact cache with per-value last-seen timestamps.
+///
+/// At most once per `sweep_interval` (= `ttl / generations`, after capping),
+/// `retain` drops every entry whose `last_seen` is older than `ttl`. The
+/// sweep runs lazily inside `insert`/`contains`/`len` — no background task.
+///
+/// Reads never pay for that retain: `contains` inspects only the timestamp of
+/// the value it was asked about and drops that single entry when its lease has
+/// lapsed. Ordinary `len` checks also stay O(1) between sweeps (`maybe_sweep`);
+/// a full purge is reserved for capacity-recovery paths via
+/// [`Self::purge_expired`].
+struct TtlExactStorage {
+    map: HashMap<TagValueSet, Instant>,
+    ttl: Duration,
+    sweep_interval: Duration,
+    last_sweep: Instant,
+}
+
+impl TtlExactStorage {
+    fn new(ttl: Duration, generations: u8) -> Self {
+        // Cap generations so `sweep_interval >= 1s` and
+        // `sweep_interval * generations == ttl`. Eviction precision is then
+        // `[ttl, ttl + sweep_interval)`.
+        let (_generations, sweep_interval) = compute_ttl_slices(ttl, generations);
+        Self {
+            map: HashMap::new(),
+            ttl,
+            sweep_interval,
+            last_sweep: Instant::now(),
+        }
+    }
+
+    fn maybe_sweep(&mut self, now: Instant) {
+        if now.duration_since(self.last_sweep) < self.sweep_interval {
+            return;
+        }
+        self.sweep(now);
+    }
+
+    /// Drop every entry whose lease has lapsed and report the eviction volume.
+    fn sweep(&mut self, now: Instant) {
+        let ttl = self.ttl;
+        let before = self.map.len();
+        self.map
+            .retain(|_, last_seen| now.duration_since(*last_seen) <= ttl);
+        let expired = before.saturating_sub(self.map.len()) as u64;
+        self.last_sweep = now;
+        emit!(TagCardinalityTtlExpired { count: expired });
+    }
+
+    /// Drop a single lapsed entry found on a read path.
+    ///
+    /// Reads inspect only the value they were asked about, keeping a cache hit
+    /// `O(1)`; retaining over the whole bucket on every hit would make the
+    /// accept path `O(cached values)` per tag.
+    fn expire_one(&mut self, value: &TagValueSet) {
+        self.map.remove(value);
+        emit!(TagCardinalityTtlExpired { count: 1 });
+    }
+
+    fn contains(&mut self, value: &TagValueSet) -> bool {
+        self.contains_with_now(value, Instant::now())
+    }
+
+    fn contains_with_now(&mut self, value: &TagValueSet, now: Instant) -> bool {
+        self.maybe_sweep(now);
+        match self.map.get_mut(value) {
+            None => return false,
+            // Refresh the lease on every sighting so continuously-observed
+            // values don't blink out.
+            Some(last_seen) if now.duration_since(*last_seen) <= self.ttl => {
+                *last_seen = now;
+                return true;
+            }
+            Some(_) => {}
+        }
+        self.expire_one(value);
+        false
+    }
+
+    /// Read-only membership check: drops the value when its own lease has
+    /// lapsed, but never refreshes it. Used in `DropEvent` pre-check paths
+    /// where we must not extend the lease of an event that is about to be
+    /// dropped.
+    fn contains_no_refresh(&mut self, value: &TagValueSet) -> bool {
+        self.contains_no_refresh_with_now(value, Instant::now())
+    }
+
+    fn contains_no_refresh_with_now(&mut self, value: &TagValueSet, now: Instant) -> bool {
+        self.maybe_sweep(now);
+        match self.map.get(value) {
+            None => return false,
+            Some(last_seen) if now.duration_since(*last_seen) <= self.ttl => return true,
+            Some(_) => {}
+        }
+        self.expire_one(value);
+        false
+    }
+
+    fn insert(&mut self, value: TagValueSet) {
+        let now = Instant::now();
+        self.maybe_sweep(now);
+        self.map.insert(value, now);
+    }
+
+    /// Approximate live cardinality: runs the periodic sweep when due, then
+    /// returns `map.len()`. Between sweeps, recently-lapsed entries may still
+    /// inflate the count — callers that need to free capacity before rejecting
+    /// must call [`Self::purge_expired`] first.
+    ///
+    /// Keeping ordinary length checks O(1) matters: `try_accept_tag` and
+    /// `tag_limit_exceeded` hit `len` on every novel or rejected value, and
+    /// filling a large `value_limit` would otherwise become O(N²).
+    fn len(&mut self) -> usize {
+        let now = Instant::now();
+        self.maybe_sweep(now);
+        self.map.len()
+    }
+
+    /// Drop every lapsed entry now. Used when a capacity check has already
+    /// hit `value_limit` (or when reclaiming empty buckets) so expired slots
+    /// can be reused without scanning on every event.
+    fn purge_expired(&mut self) {
+        self.sweep(Instant::now());
+    }
+}
+
+/// Sliding-window bloom: for more than one generation, `generations` closed
+/// shards plus the open one being written. An **explicit** single generation is
+/// a tumbling window with one shard. Each shard is a full `cache_size_per_key`
+/// bloom filter. Front of the deque is the oldest shard; back is the current.
+/// On rotation, the front shard is dropped and a fresh empty one is pushed at
+/// the back. Membership is the OR across shards; refresh-on-sighting writes
+/// hits into the current shard so hot values survive future rotations.
+struct RollingBloomStorage {
+    shards: VecDeque<BloomFilterStorage>,
+    generations: u8,
+    /// For sliding windows, `generations + 1`: the closed shards spanning the
+    /// window, plus the open one currently accepting writes. An explicit
+    /// `ttl_generations: 0|1` uses one shard for the documented tumbling
+    /// behavior. When a higher request is clamped to one generation because
+    /// `ttl_secs` is too short for multi-slice windows (e.g. `ttl_secs: 1`
+    /// with the default of 4), we still keep two shards so retention stays in
+    /// `[ttl, 2·ttl)` rather than tumbling early.
+    ///
+    /// The open shard only covers part of a slice at any moment, so retiring at
+    /// `generations` shards would evict a value inserted just before a rotation
+    /// after only `ttl - slice` (45 minutes on a default 1h/4-generation
+    /// config). Carrying the extra shard keeps retention in `[ttl, ttl + slice)`,
+    /// erring towards over-retention like the exact backend does, so a
+    /// configured TTL is never cut short.
+    max_shards: usize,
+    slice: Duration,
+    cache_size_per_key: usize,
+    /// Boundary at which the next rotation is due. Advances by `slice` on
+    /// every rotation; storing the next tick (not the last) keeps the
+    /// catch-up loop in `rotate_if_needed` trivial.
+    next_rotate: Instant,
+}
+
+impl RollingBloomStorage {
+    fn new(cache_size_per_key: usize, generations: u8, ttl: Duration) -> Self {
+        // Cap generations so `slice >= 1s` and `slice * generations == ttl`.
+        let requested = generations;
+        let (generations, slice) = compute_ttl_slices(ttl, generations);
+        // Tumbling (one shard) only when the operator asked for a single
+        // generation. A clamp from a higher request must keep the extra shard
+        // so a short TTL cannot silently become a tumbling window.
+        let max_shards = if generations == 1 && requested <= 1 {
+            1
+        } else {
+            generations as usize + 1
+        };
+        let mut shards = VecDeque::with_capacity(max_shards);
+        shards.push_back(BloomFilterStorage::new(cache_size_per_key));
+        let now = Instant::now();
+        Self {
+            shards,
+            generations: generations as u8,
+            max_shards,
+            slice,
+            cache_size_per_key,
+            next_rotate: saturating_add(now, slice),
+        }
+    }
+
+    fn rotate_if_needed(&mut self, now: Instant) {
+        // Catch up if we've been idle for multiple slices. Capped to `max_shards`
+        // pops because every shard would have rotated out anyway.
+        let mut rotations = 0usize;
+        while now >= self.next_rotate && rotations < self.max_shards {
+            if self.shards.len() >= self.max_shards
+                && let Some(dropped) = self.shards.pop_front()
+            {
+                // Counted in reclaimed slots, not distinct values: a hot value
+                // refreshed into a newer shard is counted here even though it is
+                // still retained. This matches `len`, which sums the same
+                // per-shard counts to enforce `value_limit`.
+                emit!(TagCardinalityTtlExpired {
+                    count: dropped.count() as u64,
+                });
+            }
+            self.shards
+                .push_back(BloomFilterStorage::new(self.cache_size_per_key));
+            self.next_rotate = saturating_add(self.next_rotate, self.slice);
+            rotations += 1;
+        }
+        // If we needed more rotations than `max_shards`, the whole window is
+        // stale — fast-forward `next_rotate` to avoid a tight catch-up the next
+        // call after a long idle period.
+        if now >= self.next_rotate {
+            self.next_rotate = saturating_add(now, self.slice);
+        }
+    }
+
+    #[cfg(test)]
+    fn contains(&mut self, value: &TagValueSet) -> bool {
+        self.contains_and_refresh(value).0
+    }
+
+    /// Returns `(found, newest_shard_count_increased)`.
+    ///
+    /// The second result lets the caller detect the rare case where refreshing
+    /// a retained value consumes another slot in the summed shard budget,
+    /// without adding cardinality scans to ordinary cache hits.
+    fn contains_and_refresh(&mut self, value: &TagValueSet) -> (bool, bool) {
+        let now = Instant::now();
+        self.rotate_if_needed(now);
+        // Newest -> oldest short-circuits hot values; re-seed hits into the
+        // newest shard so they survive the next rotation.
+        let found = self.shards.iter().rev().any(|s| s.contains(value));
+        let count_increased = found
+            && self
+                .shards
+                .back_mut()
+                .is_some_and(|newest| newest.insert(value));
+        (found, count_increased)
+    }
+
+    /// Read-only membership check: triggers lazy rotation but does **not**
+    /// refresh the value's presence in the current shard. See
+    /// `TtlExactStorage::contains_no_refresh` for the rationale.
+    fn contains_no_refresh(&mut self, value: &TagValueSet) -> bool {
+        let now = Instant::now();
+        self.rotate_if_needed(now);
+        self.shards.iter().rev().any(|s| s.contains(value))
+    }
+
+    fn insert(&mut self, value: &TagValueSet) {
+        let now = Instant::now();
+        self.rotate_if_needed(now);
+        if let Some(newest) = self.shards.back_mut() {
+            newest.insert(value);
+        }
+    }
+
+    /// Strict upper bound on the number of distinct values currently retained.
+    ///
+    /// Bloom shards are not enumerable, so the true union cardinality is not
+    /// directly computable. Summing per-shard counts never under-counts; the
+    /// alternative — `max` — could let distinct values spread across shards
+    /// silently exceed `value_limit`. See the `ttl` section of the transform
+    /// documentation for the over-rejection trade-off.
+    fn len(&mut self) -> usize {
+        let now = Instant::now();
+        self.rotate_if_needed(now);
+        self.shards.iter().map(|s| s.count()).sum()
+    }
+}
+
 impl fmt::Debug for TagValueSetStorage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TagValueSetStorage::Set(set) => write!(f, "Set({set:?})"),
             TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
             TagValueSetStorage::Fingerprint(_) => write!(f, "Fingerprint"),
+            TagValueSetStorage::TtlSet(s) => {
+                write!(f, "TtlSet(len={}, ttl={:?})", s.map.len(), s.ttl)
+            }
+            TagValueSetStorage::RollingBloom(s) => {
+                write!(
+                    f,
+                    "RollingBloom(generations={}, slice={:?})",
+                    s.generations, s.slice
+                )
+            }
         }
     }
 }
 
 impl AcceptedTagValueSet {
-    /// Create a new `AcceptedTagValueSet` for the given mode.
-    pub fn new(mode: &Mode) -> Self {
-        let storage = match &mode {
-            Mode::Exact => TagValueSetStorage::Set(HashSet::new()),
-            Mode::ExactFingerprint => {
+    /// Construct the appropriate backend from `(mode, ttl_secs, ttl_generations)`.
+    ///
+    /// When `ttl_secs` is `None` or `0`, this is identical to the pre-TTL
+    /// behavior — `HashSet` for exact, single `BloomFilter` for probabilistic —
+    /// so existing configs see zero behavioral change.
+    pub fn new(mode: &Mode, ttl_secs: Option<u64>, ttl_generations: u8) -> Self {
+        let ttl = ttl_duration(ttl_secs);
+
+        let storage = match (mode, ttl) {
+            (Mode::Exact, None) => TagValueSetStorage::Set(HashSet::new()),
+            (Mode::Exact, Some(ttl)) => {
+                TagValueSetStorage::TtlSet(TtlExactStorage::new(ttl, ttl_generations))
+            }
+            // Fingerprints carry no last-seen timestamp, so there is nothing to
+            // expire against; `validate_structure` rejects TTL for this mode.
+            (Mode::ExactFingerprint, _) => {
                 TagValueSetStorage::Fingerprint(FingerprintStorage::default())
             }
-            Mode::Probabilistic(config) => {
+            (Mode::Probabilistic(config), None) => {
                 TagValueSetStorage::Bloom(BloomFilterStorage::new(config.cache_size_per_key))
             }
+            (Mode::Probabilistic(config), Some(ttl)) => TagValueSetStorage::RollingBloom(
+                RollingBloomStorage::new(config.cache_size_per_key, ttl_generations, ttl),
+            ),
         };
         Self { storage }
     }
 
-    pub fn contains(&self, value: &TagValueSet) -> bool {
-        match &self.storage {
+    /// Test helper for refreshing membership checks across all backends.
+    #[cfg(test)]
+    pub fn contains(&mut self, value: &TagValueSet) -> bool {
+        match &mut self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
             TagValueSetStorage::Fingerprint(fp) => fp.contains(value),
+            TagValueSetStorage::TtlSet(s) => s.contains(value),
+            TagValueSetStorage::RollingBloom(s) => s.contains(value),
         }
     }
 
-    pub fn len(&self) -> usize {
-        match &self.storage {
+    /// Returns `(found, reached_limit_during_refresh)`.
+    ///
+    /// Only rolling bloom refreshes can increase cardinality on a membership
+    /// hit. Other backends retain their original single-lookup hot path.
+    pub(crate) fn contains_with_limit_transition(
+        &mut self,
+        value: &TagValueSet,
+        value_limit: usize,
+    ) -> (bool, bool) {
+        match &mut self.storage {
+            TagValueSetStorage::Set(set) => (set.contains(value), false),
+            TagValueSetStorage::Bloom(bloom) => (bloom.contains(value), false),
+            TagValueSetStorage::Fingerprint(fp) => (fp.contains(value), false),
+            TagValueSetStorage::TtlSet(s) => (s.contains(value), false),
+            TagValueSetStorage::RollingBloom(s) => {
+                let (found, count_increased) = s.contains_and_refresh(value);
+                let reached_limit = count_increased
+                    && s.shards
+                        .iter()
+                        .map(BloomFilterStorage::count)
+                        .sum::<usize>()
+                        == value_limit;
+                (found, reached_limit)
+            }
+        }
+    }
+
+    /// Checks membership without refreshing the value's TTL lease.
+    ///
+    /// The `DropEvent` pre-check pass uses this so that an event rejected by a
+    /// later tag does not silently extend the leases of earlier-checked values.
+    /// The semantic of TTL eviction is "what's been *accepted* in the last N
+    /// seconds", not "what's been *seen* in the last N seconds".
+    pub fn contains_no_refresh(&mut self, value: &TagValueSet) -> bool {
+        match &mut self.storage {
+            TagValueSetStorage::Set(set) => set.contains(value),
+            TagValueSetStorage::Bloom(bloom) => bloom.contains(value),
+            TagValueSetStorage::Fingerprint(fp) => fp.contains(value),
+            TagValueSetStorage::TtlSet(s) => s.contains_no_refresh(value),
+            TagValueSetStorage::RollingBloom(s) => s.contains_no_refresh(value),
+        }
+    }
+
+    /// Number of distinct values currently retained.
+    ///
+    /// Exact TTL uses the periodic sweep only (`maybe_sweep`), so between
+    /// sweeps the count may still include recently-lapsed entries. Call
+    /// [`Self::purge_expired`] when a capacity decision needs a hard live
+    /// count. Probabilistic TTL still rotates shards here (O(1) per due
+    /// rotation).
+    pub fn len(&mut self) -> usize {
+        match &mut self.storage {
             TagValueSetStorage::Set(set) => set.len(),
             TagValueSetStorage::Bloom(bloom) => bloom.count(),
             TagValueSetStorage::Fingerprint(fp) => fp.len(),
+            TagValueSetStorage::TtlSet(s) => s.len(),
+            TagValueSetStorage::RollingBloom(s) => s.len(),
         }
+    }
+
+    /// Force expiry of lapsed exact-TTL entries (and rotate probabilistic
+    /// shards). Used on capacity-recovery paths: after an ordinary `len`
+    /// reports full, and when reclaiming empty `max_tracked_keys` buckets.
+    pub fn purge_expired(&mut self) {
+        match &mut self.storage {
+            TagValueSetStorage::TtlSet(s) => s.purge_expired(),
+            // `len` already drives rotation; calling it keeps reclaim consistent.
+            TagValueSetStorage::RollingBloom(s) => {
+                let _ = s.len();
+            }
+            TagValueSetStorage::Set(_)
+            | TagValueSetStorage::Bloom(_)
+            | TagValueSetStorage::Fingerprint(_) => {}
+        }
+    }
+
+    /// Live cardinality after forcing expiry. Prefer [`Self::len`] on the
+    /// hot path; use this only when deciding whether to reject at capacity.
+    pub fn len_reclaiming(&mut self) -> usize {
+        self.purge_expired();
+        self.len()
     }
 
     pub fn insert(&mut self, value: TagValueSet) {
@@ -137,9 +565,35 @@ impl AcceptedTagValueSet {
             TagValueSetStorage::Set(set) => {
                 set.insert(value);
             }
-            TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
+            TagValueSetStorage::Bloom(bloom) => {
+                bloom.insert(&value);
+            }
             TagValueSetStorage::Fingerprint(fp) => fp.insert(&value),
+            TagValueSetStorage::TtlSet(s) => s.insert(value),
+            TagValueSetStorage::RollingBloom(s) => {
+                s.insert(&value);
+            }
         };
+    }
+
+    /// Test-only accessor: true iff this set uses a TTL-enabled backend.
+    /// Lets tests pin backend selection without exposing the internal enum.
+    #[cfg(test)]
+    pub(crate) const fn ttl_enabled(&self) -> bool {
+        matches!(
+            self.storage,
+            TagValueSetStorage::TtlSet(_) | TagValueSetStorage::RollingBloom(_)
+        )
+    }
+
+    /// Test-only: advance a rolling-bloom window by one slice so a previously
+    /// inserted value sits only in the closed shard (refresh can then re-seed
+    /// it into the newest shard and bump the summed slot count).
+    #[cfg(test)]
+    pub(crate) fn force_rolling_bloom_rotate(&mut self) {
+        if let TagValueSetStorage::RollingBloom(s) = &mut self.storage {
+            s.rotate_if_needed(s.next_rotate);
+        }
     }
 }
 
@@ -148,53 +602,454 @@ mod tests {
     use super::*;
     use crate::{
         event::metric::TagValueSet,
-        transforms::tag_cardinality_limit::config::{BloomFilterConfig, Mode},
+        transforms::tag_cardinality_limit::config::{BloomFilterConfig, Mode, default_cache_size},
     };
 
-    #[test]
-    fn test_accepted_tag_value_set_exact() {
-        let mut accepted_tag_value_set = AcceptedTagValueSet::new(&Mode::Exact);
-
-        assert!(!accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
-        assert_eq!(accepted_tag_value_set.len(), 0);
-
-        accepted_tag_value_set.insert(TagValueSet::from(["value1".to_string()]));
-        assert_eq!(accepted_tag_value_set.len(), 1);
-        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
-
-        accepted_tag_value_set.insert(TagValueSet::from(["value2".to_string()]));
-        assert_eq!(accepted_tag_value_set.len(), 2);
-        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value2".to_string()])));
+    fn v(s: &str) -> TagValueSet {
+        TagValueSet::from([s.to_string()])
     }
 
     #[test]
-    fn test_accepted_tag_value_set_probabilistic() {
-        // Previously this test mistakenly constructed Mode::Exact; fixed to use Probabilistic.
-        let mut accepted_tag_value_set =
-            AcceptedTagValueSet::new(&Mode::Probabilistic(BloomFilterConfig {
-                cache_size_per_key: 5 * 1024,
-            }));
+    fn bloom_filter_storage_count_is_idempotent_per_value() {
+        let mut b = BloomFilterStorage::new(default_cache_size());
+        b.insert(&v("a"));
+        b.insert(&v("a"));
+        assert_eq!(b.count(), 1, "duplicate insert must not bump count");
+        b.insert(&v("b"));
+        assert_eq!(b.count(), 2);
+    }
 
-        assert!(!accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
-        assert_eq!(accepted_tag_value_set.len(), 0);
+    #[test]
+    fn exact_no_ttl_preserves_today_behavior() {
+        let mut set = AcceptedTagValueSet::new(&Mode::Exact, None, 4);
+        assert!(!set.contains(&v("a")));
+        assert_eq!(set.len(), 0);
+        set.insert(v("a"));
+        set.insert(v("b"));
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(&v("a")));
+        assert!(set.contains(&v("b")));
+    }
 
-        accepted_tag_value_set.insert(TagValueSet::from(["value1".to_string()]));
-        assert_eq!(accepted_tag_value_set.len(), 1);
-        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
+    #[test]
+    fn bloom_no_ttl_preserves_today_behavior() {
+        let mode = Mode::Probabilistic(BloomFilterConfig {
+            cache_size_per_key: default_cache_size(),
+        });
+        let mut set = AcceptedTagValueSet::new(&mode, None, 4);
+        set.insert(v("a"));
+        set.insert(v("a"));
+        assert_eq!(set.len(), 1, "duplicate insert must not bump count");
+        set.insert(v("b"));
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(&v("a")));
+        assert!(set.contains(&v("b")));
+    }
 
-        // Inserting the same value again should not increase the count.
-        accepted_tag_value_set.insert(TagValueSet::from(["value1".to_string()]));
-        assert_eq!(accepted_tag_value_set.len(), 1);
-        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value1".to_string()])));
+    // The storage types are exercised directly so we can drive
+    // `Instant`-typed parameters on private helpers; `AcceptedTagValueSet`
+    // itself calls `Instant::now()`, which can't be mocked cheaply.
 
-        accepted_tag_value_set.insert(TagValueSet::from(["value2".to_string()]));
-        assert_eq!(accepted_tag_value_set.len(), 2);
-        assert!(accepted_tag_value_set.contains(&TagValueSet::from(["value2".to_string()])));
+    #[test]
+    fn ttl_exact_expires_values_past_ttl() {
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        s.map.insert(v("a"), t0);
+        s.last_sweep = t0;
+        s.sweep(t0 + Duration::from_secs(30));
+        assert!(s.map.contains_key(&v("a")), "still alive within ttl");
+        s.sweep(t0 + Duration::from_secs(90));
+        assert!(!s.map.contains_key(&v("a")), "evicted past ttl");
+    }
+
+    #[test]
+    fn ttl_exact_contains_does_not_refresh_expired_entry() {
+        // Between sweeps, `contains` must not extend a value whose own
+        // `last_seen + ttl` has passed, even if `maybe_sweep` has not run yet.
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        s.map.insert(v("a"), t0);
+        s.last_sweep = t0;
+        let t50 = t0 + Duration::from_secs(50);
+        s.sweep(t50);
+        assert!(s.map.contains_key(&v("a")), "still within ttl at t=50");
+        let t61 = t0 + Duration::from_secs(61);
+        assert!(
+            !s.contains_with_now(&v("a"), t61),
+            "expired value must not be refreshed into the window"
+        );
+        assert!(
+            !s.map.contains_key(&v("a")),
+            "expired entry must be purged on access"
+        );
+    }
+
+    #[test]
+    fn ttl_exact_contains_and_len_do_not_scan_unrelated_entries() {
+        // Between sweeps, a cache hit and ordinary `len` must inspect only
+        // cheap paths — not a full-bucket retain (that made filling
+        // `value_limit` O(N²)). Seed directly so `insert`'s maybe_sweep cannot
+        // drop stale early.
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        s.map.insert(v("stale"), t0);
+        s.map.insert(v("hot"), t0 + Duration::from_secs(10));
+        let t70 = t0 + Duration::from_secs(70);
+        s.last_sweep = t70;
+
+        assert_eq!(s.len(), 2, "len alone must not reclaim between sweeps");
+        assert!(s.contains_with_now(&v("hot"), t70), "hot is within ttl");
+        assert!(
+            s.map.contains_key(&v("stale")),
+            "contains/len must not evict unrelated entries"
+        );
+
+        s.sweep(t70);
+        assert_eq!(s.map.len(), 1, "purge must drop only lapsed entries");
+        assert!(s.map.contains_key(&v("hot")), "hot was refreshed to t70");
+        assert!(!s.map.contains_key(&v("stale")));
+    }
+
+    #[test]
+    fn ttl_exact_refresh_on_contains_extends_lease() {
+        // Short sleep guarantees `Instant::now()` is strictly after `t_insert`
+        // on every platform.
+        let mut s = TtlExactStorage::new(Duration::from_secs(60), 4);
+        let t_insert = Instant::now();
+        s.map.insert(v("a"), t_insert);
+        s.last_sweep = t_insert;
+
+        std::thread::sleep(Duration::from_millis(2));
+
+        assert!(s.contains(&v("a")));
+        let after = *s.map.get(&v("a")).expect("entry should still be present");
+        assert!(
+            after > t_insert,
+            "contains() must refresh the stored Instant; was {t_insert:?}, still {after:?}"
+        );
+    }
+
+    #[test]
+    fn ttl_exact_contains_no_refresh_does_not_extend_lease() {
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        s.map.insert(v("a"), t0);
+        s.last_sweep = t0;
+        assert!(s.contains_no_refresh(&v("a")));
+        assert!(s.contains_no_refresh(&v("a")));
+        assert_eq!(
+            s.map.get(&v("a")).copied(),
+            Some(t0),
+            "timestamp must remain at t0 after no-refresh checks"
+        );
+        // Sanity: the refreshing variant must move the timestamp forward.
+        s.contains(&v("a"));
+        assert!(s.map.get(&v("a")).copied().unwrap() >= t0);
+    }
+
+    #[test]
+    fn rolling_bloom_contains_no_refresh_does_not_seed_newest_shard() {
+        let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
+        s.shards.back_mut().unwrap().insert(&v("a"));
+        // Drive a rotation so "a" sits in the (now older) front shard.
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.rotate_if_needed(t0 + Duration::from_secs(2));
+        let newest_before = s.shards.back().unwrap().count();
+        assert!(s.contains_no_refresh(&v("a")));
+        let newest_after = s.shards.back().unwrap().count();
+        assert_eq!(
+            newest_before, newest_after,
+            "contains_no_refresh must not seed the newest shard"
+        );
+        // Sanity: the refreshing variant must seed it.
+        assert!(s.contains(&v("a")));
+        assert!(s.shards.back().unwrap().contains(&v("a")));
+    }
+
+    #[test]
+    fn rolling_bloom_retains_values_for_at_least_ttl() {
+        // A value inserted just before a rotation is the worst case: it occupies
+        // the least of the shard it lands in. Retiring at `generations` shards
+        // would drop it after `ttl - slice`, cutting the configured window short.
+        let ttl = Duration::from_secs(3600);
+        let mut s = RollingBloomStorage::new(default_cache_size(), 4, ttl);
+        assert_eq!(s.slice, Duration::from_secs(900));
+
+        let t0 = Instant::now();
+        // Land `edge` in the open shard one second before the first rotation.
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.shards.back_mut().unwrap().insert(&v("edge"));
+
+        // One second short of the TTL it must still be there.
+        let almost = t0 + ttl - Duration::from_secs(1);
+        s.rotate_if_needed(almost);
+        assert!(
+            s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must survive the full configured ttl_secs"
+        );
+
+        // Its shard may only retire once it is entirely outside the window,
+        // which is one slice later.
+        s.rotate_if_needed(t0 + ttl + s.slice);
+        assert!(
+            !s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must not outlive ttl by more than one slice"
+        );
+    }
+
+    #[test]
+    fn rolling_bloom_catch_up_capped_to_generations() {
+        // After a long idle gap, `rotate_if_needed` must rotate at most
+        // `max_shards` times even if elapsed covers many windows.
+        let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.shards.back_mut().unwrap().insert(&v("stale"));
+        s.rotate_if_needed(t0 + Duration::from_secs(3600));
+        assert_eq!(
+            s.shards.len(),
+            s.max_shards,
+            "deque size capped at `max_shards`"
+        );
+        assert!(
+            !s.shards.iter().any(|sh| sh.contains(&v("stale"))),
+            "stale value flushed after long idle"
+        );
+    }
+
+    #[test]
+    fn rolling_bloom_clamped_short_ttl_keeps_extra_shard() {
+        // Default `ttl_generations: 4` with `ttl_secs: 1` clamps to one
+        // generation (slice must be ≥1s). That must still be a 2-shard sliding
+        // window — otherwise a value accepted just before the boundary tumbles
+        // out almost immediately instead of lasting the configured second.
+        let ttl = Duration::from_secs(1);
+        let mut s = RollingBloomStorage::new(default_cache_size(), 4, ttl);
+        assert_eq!(s.generations, 1);
+        assert_eq!(s.slice, ttl);
+        assert_eq!(s.max_shards, 2, "clamped configs must keep the extra shard");
+
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_millis(1);
+        s.shards.back_mut().unwrap().insert(&v("edge"));
+
+        // Immediately after the first rotation the closed shard still holds it.
+        s.rotate_if_needed(t0 + Duration::from_millis(2));
+        assert!(
+            s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must survive the first rotation of a clamped short TTL"
+        );
+
+        // Only the second rotation (past a full TTL past the first boundary)
+        // may drop it.
+        s.rotate_if_needed(t0 + ttl + Duration::from_millis(2));
+        assert!(
+            !s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must eventually expire after a full TTL plus one slice"
+        );
+    }
+
+    #[test]
+    fn rolling_bloom_single_generation_is_a_tumbling_window() {
+        let ttl = Duration::from_secs(60);
+        let mut s = RollingBloomStorage::new(default_cache_size(), 1, ttl);
+        let t0 = Instant::now();
+        s.shards.back_mut().unwrap().insert(&v("old"));
+        s.next_rotate = t0 + ttl;
+
+        s.rotate_if_needed(t0 + ttl);
+
+        assert_eq!(s.max_shards, 1);
+        assert_eq!(s.shards.len(), 1);
+        assert!(
+            !s.shards.back().unwrap().contains(&v("old")),
+            "a single generation must clear the complete window on rotation"
+        );
+    }
+
+    #[test]
+    fn rolling_bloom_refresh_after_rotation_increases_len() {
+        // `contains` re-seeds hits into the newest shard. After a rotation that
+        // can raise the summed per-shard count even though no novel value was
+        // admitted — the accept path must observe that transition for
+        // `value_limit_reached_total`.
+        let mut s = RollingBloomStorage::new(default_cache_size(), 2, Duration::from_secs(120));
+        let hot = v("hot");
+        s.shards.back_mut().unwrap().insert(&hot);
+        assert_eq!(s.len(), 1);
+
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.rotate_if_needed(t0 + Duration::from_secs(2));
+        assert_eq!(s.shards.len(), 2);
+        assert_eq!(s.len(), 1, "rotation alone must not duplicate the count");
+
+        let (found, count_increased) = s.contains_and_refresh(&hot);
+        assert!(found);
+        assert!(
+            count_increased,
+            "refresh into a new shard must report the slot transition"
+        );
+        assert_eq!(
+            s.len(),
+            2,
+            "refresh into the newest shard must bump the summed slot count"
+        );
+    }
+
+    #[test]
+    fn compute_ttl_slices_preserves_window_and_backend_wiring() {
+        // One table covers: generation caps when ttl < generations, fractional
+        // slices for non-divisible TTLs, and u64→u32 truncation avoidance.
+        // Also smoke-checks that both backends consume the helper.
+        for (ttl_secs, requested, expected_generations) in [
+            (1u64, 4u8, 1u32),
+            (2, 8, 2),
+            (10, 4, 4),
+            (60, 0, 1), // `generations: 0` must not divide by zero / empty deque
+            (3600, 4, 4),
+            (4294967296, 4, 4),
+        ] {
+            let ttl = Duration::from_secs(ttl_secs);
+            let (generations, slice) = compute_ttl_slices(ttl, requested);
+            assert_eq!(
+                generations, expected_generations,
+                "ttl_secs={ttl_secs}, requested={requested}"
+            );
+            assert_eq!(
+                slice * generations,
+                ttl,
+                "ttl_secs={ttl_secs}, requested={requested}: window must equal ttl"
+            );
+            assert!(
+                slice >= Duration::from_secs(1) || ttl < Duration::from_secs(1),
+                "ttl_secs={ttl_secs}: slice must be >= 1s when ttl allows"
+            );
+
+            let rolling = RollingBloomStorage::new(default_cache_size(), requested, ttl);
+            assert_eq!(rolling.generations, expected_generations as u8);
+            assert_eq!(rolling.slice, slice);
+            let expected_shards = if expected_generations == 1 && requested <= 1 {
+                1
+            } else {
+                expected_generations as usize + 1
+            };
+            assert_eq!(
+                rolling.max_shards, expected_shards,
+                "ttl_secs={ttl_secs}, requested={requested}: shard count"
+            );
+
+            let exact = TtlExactStorage::new(ttl, requested);
+            assert_eq!(exact.sweep_interval, slice);
+        }
+
+        // Explicit fractional-slice pin: 10/4 must not become 2s integer slices.
+        let (_, slice) = compute_ttl_slices(Duration::from_secs(10), 4);
+        assert_eq!(slice, Duration::from_millis(2500));
+    }
+
+    #[test]
+    fn rolling_bloom_hot_value_survives_rotation_after_contains_refresh() {
+        // If refresh skipped insert when the newest shard already matched via
+        // false positive, the value could vanish once the older shard rotated
+        // out. Pollute the newest shard heavily so FP hits are likely, then
+        // verify a front-shard-only value survives rotation after `contains()`
+        // refresh.
+        const TINY: usize = 128;
+        let mut s = RollingBloomStorage::new(TINY, 2, Duration::from_secs(120));
+        let hot = v("hot-value-survivor");
+        s.shards.back_mut().unwrap().insert(&hot);
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.rotate_if_needed(t0 + Duration::from_secs(2));
+        assert!(
+            s.shards.front().unwrap().contains(&hot),
+            "after one rotation hot must live in the front shard"
+        );
+        for i in 0..512 {
+            s.shards
+                .back_mut()
+                .unwrap()
+                .insert(&v(&format!("pollute-{i}")));
+        }
+        assert!(s.contains(&hot), "must hit the front shard and refresh");
+        assert!(
+            s.shards.back().unwrap().contains(&hot),
+            "refresh must unconditionally seed the newest shard"
+        );
+        s.rotate_if_needed(t0 + Duration::from_secs(62));
+        assert!(
+            s.contains_no_refresh(&hot),
+            "hot must survive after the front shard carrying the original copy rotates out"
+        );
+    }
+
+    #[test]
+    fn saturating_add_overflow_pushes_deadline_far_into_future() {
+        // The fallback must advance `instant` by a non-trivial amount —
+        // returning `instant` itself would leave `next_rotate <= now` on
+        // every access and force `generations` rotations per call.
+        let now = Instant::now();
+        let advanced = saturating_add(now, Duration::from_secs(u64::MAX));
+        let gain = advanced.duration_since(now);
+        assert!(
+            gain >= Duration::from_secs(60 * 60 * 24 * 365),
+            "saturating_add must push the deadline at least a year out on \
+             overflow; got {gain:?}",
+        );
+    }
+
+    #[test]
+    fn rolling_bloom_overflow_does_not_churn_on_repeated_access() {
+        // Repeated reads with an overflowing TTL must not silently rotate
+        // out values inserted between them; the rotation deadline has to
+        // sit far enough in the future that `rotate_if_needed` is a no-op.
+        let mut s =
+            RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(u64::MAX));
+        s.insert(&v("a"));
+        for _ in 0..16 {
+            assert!(s.contains(&v("a")));
+        }
+        assert_eq!(s.len(), 1);
+    }
+
+    #[test]
+    fn rolling_bloom_len_sums_shards_to_enforce_value_limit() {
+        // Distinct values spread across shards must contribute to `len()` so
+        // `try_accept_tag` cannot silently exceed `value_limit`. Far
+        // `next_rotate` keeps `len()` from lazily rotating the fixture.
+        let value_limit = 8usize;
+        let generations = 4u8;
+        let mut s =
+            RollingBloomStorage::new(default_cache_size(), generations, Duration::from_secs(4));
+        s.shards.clear();
+        let per_shard = value_limit / generations as usize;
+        let mut next = 0usize;
+        for _ in 0..generations {
+            let mut shard = BloomFilterStorage::new(default_cache_size());
+            for _ in 0..per_shard {
+                shard.insert(&v(&format!("v{next}")));
+                next += 1;
+            }
+            s.shards.push_back(shard);
+        }
+        s.next_rotate = Instant::now() + Duration::from_secs(3600);
+        assert_eq!(
+            s.len(),
+            value_limit,
+            "len() must sum per-shard counts; got {} for {value_limit} distinct values",
+            s.len(),
+        );
     }
 
     #[test]
     fn test_accepted_tag_value_set_fingerprint() {
-        let mut set = AcceptedTagValueSet::new(&Mode::ExactFingerprint);
+        let mut set = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
 
         assert!(!set.contains(&TagValueSet::from(["value1".to_string()])));
         assert_eq!(set.len(), 0);
@@ -203,19 +1058,15 @@ mod tests {
         assert_eq!(set.len(), 1);
         assert!(set.contains(&TagValueSet::from(["value1".to_string()])));
 
-        // Inserting the same value again must not increase the count.
         set.insert(TagValueSet::from(["value1".to_string()]));
         assert_eq!(set.len(), 1);
 
         set.insert(TagValueSet::from(["value2".to_string()]));
         assert_eq!(set.len(), 2);
         assert!(set.contains(&TagValueSet::from(["value2".to_string()])));
-
-        // An un-inserted value must not appear to be contained.
         assert!(!set.contains(&TagValueSet::from(["value3".to_string()])));
 
-        // Within-instance consistency: a value inserted into a set is found in that same set.
-        let mut set2 = AcceptedTagValueSet::new(&Mode::ExactFingerprint);
+        let mut set2 = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
         set2.insert(TagValueSet::from(["value1".to_string()]));
         assert!(set2.contains(&TagValueSet::from(["value1".to_string()])));
         assert!(!set2.contains(&TagValueSet::from(["value3".to_string()])));
@@ -223,17 +1074,9 @@ mod tests {
 
     #[test]
     fn test_fingerprint_storage_uses_independent_seeds() {
-        // Two fresh FingerprintStorage instances must normally produce different fingerprints
-        // for the same value, proving that the per-instance random seed is active and no
-        // shared fixed seed exists that an attacker could exploit.
-        //
-        // Collision probability across two independent instances is ~2^-64; a failure here
-        // would indicate the seed is not being randomised.
         let probe = TagValueSet::from(["probe-value".to_string()]);
-        let s1 = AcceptedTagValueSet::new(&Mode::ExactFingerprint);
-        let s2 = AcceptedTagValueSet::new(&Mode::ExactFingerprint);
-        // Insert into s1, must NOT appear in s2 (different seed → different fingerprint)
-        let mut s1 = s1;
+        let mut s1 = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
+        let mut s2 = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
         s1.insert(probe.clone());
         assert!(
             !s2.contains(&probe),
@@ -243,11 +1086,7 @@ mod tests {
 
     #[test]
     fn test_fingerprint_distribution_no_collisions() {
-        // Empirically guards the "good distribution" claim: inserting many distinct values
-        // must yield an equal number of distinct fingerprints. At 64 bits the birthday
-        // collision probability for 100k values is ~2.7e-10, so any collision here would
-        // indicate a badly-distributed hash rather than bad luck.
-        let mut set = AcceptedTagValueSet::new(&Mode::ExactFingerprint);
+        let mut set = AcceptedTagValueSet::new(&Mode::ExactFingerprint, None, 4);
         let n = 100_000;
         for i in 0..n {
             set.insert(TagValueSet::from([format!("tag-value-{i}")]));
