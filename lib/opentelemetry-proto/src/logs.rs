@@ -257,7 +257,9 @@ impl ResourceLog {
 /// Convert a native Vector log event into an OTLP export request.
 ///
 /// This is the inverse of the `opentelemetry` source decoding, so a log record decoded by
-/// that source encodes back to an equivalent OTLP log record.
+/// that source encodes back to an equivalent OTLP log record. The source does not keep the
+/// resource and scope `schema_url` or the resource `dropped_attributes_count`, so these
+/// fields are empty.
 ///
 /// - Legacy namespace: the message field becomes the body and the timestamp field becomes
 ///   `time_unix_nano`. The fields written by the source (`attributes`, `resources`, `scope`,
