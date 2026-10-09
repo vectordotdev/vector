@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 mod renderer;
 
 use std::collections::HashMap;

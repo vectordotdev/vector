@@ -426,7 +426,8 @@ where
 }
 
 pub trait VrlRunner {
-    fn new() -> Self;
+    /// Creates a runner. Pass the transform build context for runner implementations that require it.
+    fn new(context: &TransformContext) -> Self;
 
     fn run(
         &mut self,
@@ -450,7 +451,7 @@ impl Clone for AstRunner {
 }
 
 impl VrlRunner for AstRunner {
-    fn new() -> Self {
+    fn new(_context: &TransformContext) -> Self {
         Self {
             runtime: Runtime::default(),
         }
@@ -488,7 +489,7 @@ where
             context.merged_schema_definition.clone(),
         )?;
 
-        let runner = Runner::new();
+        let runner = Runner::new(context);
 
         Ok((
             Remap {
@@ -752,7 +753,7 @@ mod tests {
     struct InterruptingRunner;
 
     impl VrlRunner for InterruptingRunner {
-        fn new() -> Self {
+        fn new(_context: &TransformContext) -> Self {
             Self
         }
 

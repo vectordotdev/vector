@@ -15,6 +15,7 @@ pub struct CharacterDelimitedEncoderConfig {
 
 impl CharacterDelimitedEncoderConfig {
     /// Creates a `CharacterDelimitedEncoderConfig` with the specified delimiter.
+    #[must_use]
     pub const fn new(delimiter: u8) -> Self {
         Self {
             character_delimited: CharacterDelimitedEncoderOptions { delimiter },
@@ -22,6 +23,7 @@ impl CharacterDelimitedEncoderConfig {
     }
 
     /// Build the `CharacterDelimitedEncoder` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> CharacterDelimitedEncoder {
         CharacterDelimitedEncoder::new(self.character_delimited.delimiter)
     }
@@ -47,6 +49,7 @@ pub struct CharacterDelimitedEncoder {
 
 impl CharacterDelimitedEncoder {
     /// Creates a `CharacterDelimitedEncoder` with the specified delimiter.
+    #[must_use]
     pub const fn new(delimiter: u8) -> Self {
         Self { delimiter }
     }
@@ -55,7 +58,7 @@ impl CharacterDelimitedEncoder {
 impl Encoder<()> for CharacterDelimitedEncoder {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
+    fn encode(&mut self, (): (), buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
         buffer.put_u8(self.delimiter);
         Ok(())
     }

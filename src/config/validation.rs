@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{collections::HashMap, path::PathBuf};
 
 use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
@@ -6,8 +8,8 @@ use indexmap::IndexMap;
 use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
-    transform::get_transform_output_ids,
+    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder, enrichment_table_sinks,
+    enrichment_table_sources, transform::get_transform_output_ids,
 };
 
 /// Minimum value (exclusive) for EWMA alpha options.
@@ -88,6 +90,8 @@ pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::items_after_statements, reason = "Helper relocation deferred")]
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
@@ -214,7 +218,7 @@ pub fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 /// does not have a named output with the name [`DEFAULT_OUTPUT`]
 pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
-    for (key, source) in config.sources.iter() {
+    for (key, source) in &config.sources {
         let outputs = source.inner.outputs(config.schema.log_namespace());
         if outputs
             .iter()
@@ -227,7 +231,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         }
     }
 
-    for (key, transform) in config.transforms.iter() {
+    for (key, transform) in &config.transforms {
         // Structural validation: reserved names, duplicate routes, invalid sample rates.
         // These checks run during config compilation. Transforms that need the schema/enrichment
         // context must implement validate_with_context(), called later in validate.rs.
@@ -345,7 +349,10 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
     let mut errors = Vec::new();
 
     for (mountpoint, buffers) in mountpoint_buffer_mapping {
-        let buffer_max_size_total: u64 = buffers.iter().map(|usage| usage.max_size()).sum();
+        let buffer_max_size_total: u64 = buffers
+            .iter()
+            .map(vector_lib::buffers::config::DiskUsage::max_size)
+            .sum();
         let mountpoint_total_capacity = mountpoints
             .get(&mountpoint)
             .copied()
@@ -383,14 +390,11 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
         .await
 }
 
+#[must_use]
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
-    let table_sources = config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_source(key))
-        .collect::<Vec<_>>();
+    let table_sources = enrichment_table_sources(&config.enrichment_tables).collect::<Vec<_>>();
     let source_ids = config
         .sources
         .iter()
@@ -419,11 +423,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
         .collect::<Vec<_>>()
     });
 
-    let table_sinks = config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_sink(key))
-        .collect::<Vec<_>>();
+    let table_sinks = enrichment_table_sinks(&config.enrichment_tables).collect::<Vec<_>>();
     for (input_type, id) in transform_ids.chain(source_ids) {
         if !config
             .transforms

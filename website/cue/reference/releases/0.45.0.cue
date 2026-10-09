@@ -31,13 +31,13 @@ releases: "0.45.0": {
 			description: """
 				VRL was updated to v0.22.0. This includes the following changes:
 
-				#### Breaking Changes & Upgrade Guide
+				#### Breaking Changes & Upgrade Guide {#vrl-breaking-changes--upgrade-guide}
 
 				- Removed deprecated `ellipsis` argument from the `truncate` function. Use `suffix` instead. (https://github.com/vectordotdev/vrl/pull/1188)
 				- Fixed `slice` type definition. This is a breaking change because it might change the fallibility of the `slice` function. VRL scripts will
 				  need to be updated accordingly. (https://github.com/vectordotdev/vrl/pull/1246)
 
-				#### New Features
+				#### New Features {#vrl-new-features}
 
 				- Added new `to_syslog_facility_code` function to convert syslog facility keyword to syslog facility code. (https://github.com/vectordotdev/vrl/pull/1221)
 				- Downgraded the "can't abort infallible function" error to a warning. (https://github.com/vectordotdev/vrl/pull/1247)
@@ -45,7 +45,7 @@ releases: "0.45.0": {
 				- Faster bytes to Unicode string conversions by using SIMD instructions provided by simdutf8 crate. (https://github.com/vectordotdev/vrl/pull/1249)
 				- Added `shannon_entropy` function to generate [entropy](https://en.wikipedia.org/wiki/Entropy_(information_theory)) from a string. (https://github.com/vectordotdev/vrl/pull/1267)
 
-				#### Fixes
+				#### Fixes {#vrl-fixes}
 
 				- Fix decimals parsing in parse_duration function (https://github.com/vectordotdev/vrl/pull/1223)
 				- Fix `parse_nginx_log` function when a format is set to error and an error message contains a comma. (https://github.com/vectordotdev/vrl/pull/1280)

@@ -15,7 +15,7 @@ pub enum Error {
 }
 
 /// The cache is used whilst building up the topology.
-/// TODO: Describe more, especially why we have a bool in the key.
+/// The key includes whether schema tracking is enabled and the ordered inputs.
 type Cache = HashMap<(bool, Vec<OutputId>), Vec<(OutputId, Definition)>>;
 
 pub fn possible_definitions(
@@ -90,6 +90,11 @@ pub fn possible_definitions(
             definitions.append(&mut transform_definition);
         }
     }
+
+    cache.insert(
+        (config.schema_enabled(), inputs.to_vec()),
+        definitions.clone(),
+    );
 
     Ok(definitions)
 }
@@ -284,6 +289,11 @@ pub(crate) fn input_definitions(
         }
     }
 
+    cache.insert(
+        (config.schema_enabled(), inputs.to_vec()),
+        definitions.clone(),
+    );
+
     Ok(definitions)
 }
 
@@ -440,17 +450,208 @@ impl ComponentContainer for Config {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
 
+    use async_trait::async_trait;
     use indexmap::IndexMap;
     use similar_asserts::assert_eq;
     use vector_lib::{
-        config::{DataType, SourceOutput, TransformOutput},
+        config::{DataType, Input, SourceOutput, TransformOutput},
+        configurable::configurable_component,
+        enrichment::TableRegistry,
         lookup::owned_value_path,
+        transform::Transform,
     };
     use vrl::value::Kind;
 
     use super::*;
+    use crate::{
+        config::TransformConfig,
+        test_util::mock::{basic_sink, basic_source, basic_transform, error_definition_transform},
+    };
+
+    /// A passthrough transform that counts output-schema calculations.
+    #[configurable_component(transform("test_schema_counter", "Test schema counter"))]
+    #[derive(Clone, Debug, Default)]
+    struct SchemaCounterConfig {
+        #[serde(skip)]
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl_generate_config_from_default!(SchemaCounterConfig);
+
+    #[async_trait]
+    #[typetag::serde(name = "test_schema_counter")]
+    impl TransformConfig for SchemaCounterConfig {
+        async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+            basic_transform("", 0.0).build(context).await
+        }
+
+        fn input(&self) -> Input {
+            Input::all()
+        }
+
+        fn outputs(
+            &self,
+            context: &TransformContext,
+            definitions: &[(OutputId, Definition)],
+        ) -> Vec<TransformOutput> {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            let mut outputs = basic_transform("", 0.0).outputs(context, definitions);
+            outputs.push(
+                TransformOutput::new(
+                    DataType::all_bits(),
+                    definitions
+                        .iter()
+                        .map(|(id, definition)| {
+                            (
+                                id.clone(),
+                                definition.clone().with_event_field(
+                                    &owned_value_path!("alternate"),
+                                    Kind::boolean(),
+                                    None,
+                                ),
+                            )
+                        })
+                        .collect(),
+                )
+                .with_port("alternate"),
+            );
+            outputs
+        }
+    }
+
+    type DefinitionWalker = fn(
+        &[OutputId],
+        &Config,
+        TableRegistry,
+        &mut Cache,
+    ) -> Result<Vec<(OutputId, Definition)>, Error>;
+
+    const DEFINITION_WALKERS: [DefinitionWalker; 2] = [
+        |inputs, config, tables, cache| possible_definitions(inputs, config, tables, cache),
+        input_definitions,
+    ];
+
+    fn diamond_config(schema_enabled: bool) -> (Config, Arc<AtomicUsize>) {
+        let mut builder = Config::builder();
+        builder.schema.enabled = schema_enabled;
+        let counter = SchemaCounterConfig::default();
+        let calls = Arc::clone(&counter.calls);
+        builder.add_source("source", basic_source().1);
+        builder.add_transform("shared", &["source"], counter);
+        builder.add_transform("left", &["shared"], basic_transform("", 0.0));
+        builder.add_transform("right", &["shared"], basic_transform("", 0.0));
+        builder.add_sink(
+            "sink",
+            &["left", "right", "shared.alternate"],
+            basic_sink(1).1,
+        );
+        let config = builder.build().unwrap();
+        // Config compilation also discovers output ports; count only the schema walk.
+        calls.store(0, Ordering::Relaxed);
+        (config, calls)
+    }
+
+    #[test]
+    fn schema_walk_reuses_shared_upstream_definitions() {
+        for walk in DEFINITION_WALKERS {
+            for schema_enabled in [false, true] {
+                let (config, calls) = diamond_config(schema_enabled);
+                let inputs = vec!["left".into(), "right".into()];
+                let mut cache = HashMap::new();
+                let tables = TableRegistry::default();
+
+                let definitions = walk(&inputs, &config, tables.clone(), &mut cache).unwrap();
+                assert_eq!(calls.load(Ordering::Relaxed), 1);
+                assert_eq!(
+                    definitions,
+                    vec![
+                        ("left".into(), Definition::default_legacy_namespace()),
+                        ("right".into(), Definition::default_legacy_namespace()),
+                    ]
+                );
+
+                let repeated = walk(&inputs, &config, tables, &mut cache).unwrap();
+                assert_eq!(repeated, definitions);
+                assert_eq!(calls.load(Ordering::Relaxed), 1);
+            }
+        }
+    }
+
+    #[test]
+    fn schema_cache_preserves_ports_input_order_and_schema_mode() {
+        for walk in DEFINITION_WALKERS {
+            let (mut config, calls) = diamond_config(true);
+            let mut cache = HashMap::new();
+            let tables = TableRegistry::default();
+            let default = OutputId::from("shared");
+            let alternate = OutputId {
+                component: "shared".into(),
+                port: Some("alternate".into()),
+            };
+
+            let defaults = walk(
+                std::slice::from_ref(&default),
+                &config,
+                tables.clone(),
+                &mut cache,
+            )
+            .unwrap();
+            let alternates = walk(
+                std::slice::from_ref(&alternate),
+                &config,
+                tables.clone(),
+                &mut cache,
+            )
+            .unwrap();
+            assert_ne!(defaults[0].1, alternates[0].1);
+            assert_eq!(calls.load(Ordering::Relaxed), 2);
+
+            let ordered = walk(
+                &[alternate.clone(), default, alternate],
+                &config,
+                tables.clone(),
+                &mut cache,
+            )
+            .unwrap();
+            assert_eq!(
+                ordered,
+                [alternates.clone(), defaults, alternates.clone()].concat()
+            );
+
+            config.schema.enabled = false;
+            let disabled = walk(&[alternates[0].0.clone()], &config, tables, &mut cache).unwrap();
+            assert_ne!(disabled[0].1, alternates[0].1);
+        }
+    }
+
+    #[test]
+    fn schema_cache_does_not_hide_invalid_upstream_definitions() {
+        for walk in DEFINITION_WALKERS {
+            let mut builder = Config::builder();
+            builder.schema.enabled = true;
+            builder.add_source("source", basic_source().1);
+            builder.add_transform("invalid", &["source"], error_definition_transform());
+            builder.add_sink("sink", &["invalid"], basic_sink(1).1);
+            let config = builder.build().unwrap();
+            let mut cache = HashMap::new();
+            let inputs = vec!["invalid".into()];
+
+            for _ in 0..2 {
+                assert!(matches!(
+                    walk(&inputs, &config, TableRegistry::default(), &mut cache),
+                    Err(Error::ContainsNever)
+                ));
+            }
+        }
+    }
 
     #[test]
     fn test_expanded_definition() {

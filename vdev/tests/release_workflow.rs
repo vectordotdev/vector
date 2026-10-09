@@ -454,20 +454,14 @@ mod housekeeping {
         repo: TempDir,
         _remote: TempDir,
         release: String,
+        /// VRL main revision locked by the development base before preparation.
+        vrl_revision: String,
     }
 
     impl Fixture {
         fn new() -> Self {
-            let (repo, _) = preparation();
-            let release = git(repo.path(), &["rev-parse", "HEAD"]);
-            git(repo.path(), &["tag", "v0.59.0"]);
-            let remote = tempdir().unwrap();
-            git(remote.path(), &["init", "--bare"]);
-            git(
-                repo.path(),
-                &["remote", "add", "origin", remote.path().to_str().unwrap()],
-            );
-            git(repo.path(), &["push", "origin", "HEAD:refs/heads/master"]);
+            let (repo, base) = preparation();
+            let prepared = git(repo.path(), &["rev-parse", "HEAD"]);
 
             // Real Cargo git resolution, redirected to a tiny local VRL repository.
             let vrl = repo.path().join(".git/vrl-source");
@@ -486,7 +480,7 @@ mod housekeeping {
             ] {
                 git(&vrl, &["config", key, value]);
             }
-            commit(&vrl);
+            let vrl_revision = commit(&vrl);
             git(
                 repo.path(),
                 &[
@@ -497,6 +491,45 @@ mod housekeeping {
                     "https://github.com/vectordotdev/vrl.git",
                 ],
             );
+
+            // Like master, the development base locks VRL main; preparation then
+            // pins the registry release on top of it.
+            git(repo.path(), &["switch", "--detach", &base]);
+            write(
+                repo.path(),
+                "Cargo.lock",
+                &format!(
+                    "version = 4\n[[package]]\nname = \"vector\"\nversion = \"0.59.0-dev\"\ndependencies = [\"vrl\"]\n[[package]]\nname = \"vrl\"\nversion = \"0.28.0\"\nsource = \"git+https://github.com/vectordotdev/vrl.git?branch=main#{vrl_revision}\"\n"
+                ),
+            );
+            let base = commit(repo.path());
+            let release = git(
+                repo.path(),
+                &[
+                    "commit-tree",
+                    &format!("{prepared}^{{tree}}"),
+                    "-p",
+                    &base,
+                    "-m",
+                    "fixture",
+                ],
+            );
+            git(
+                repo.path(),
+                &["switch", "-C", "prepare-v-0-59-0-website", &release],
+            );
+            // VRL main moves on after the release; housekeeping must not adopt it.
+            write(&vrl, "src/lib.rs", "pub fn unadopted() {}\n");
+            commit(&vrl);
+
+            git(repo.path(), &["tag", "v0.59.0"]);
+            let remote = tempdir().unwrap();
+            git(remote.path(), &["init", "--bare"]);
+            git(
+                repo.path(),
+                &["remote", "add", "origin", remote.path().to_str().unwrap()],
+            );
+            git(repo.path(), &["push", "origin", "HEAD:refs/heads/master"]);
             write(repo.path(), ".git/associated-prs.json", &json!([[{
                 "merged_at": "2026-09-21T12:00:00Z",
                 "merge_commit_sha": release,
@@ -519,6 +552,7 @@ mod housekeeping {
                 repo,
                 _remote: remote,
                 release,
+                vrl_revision,
             }
         }
 
@@ -572,26 +606,17 @@ mod housekeeping {
         }
 
         fn prepare(&self) {
-            self.run(
-                &[
-                    "housekeeping-prepare",
-                    "--version",
-                    "0.59.0",
-                    "--release-commit",
-                    &self.release,
-                ],
-                true,
-            );
+            self.run(&["housekeeping-prepare", "--version", "0.59.0"], true);
         }
 
         fn validate(&self, success: bool) -> String {
             let output = self.run(
                 &[
-                    "pr-check",
+                    "housekeeping-validate",
+                    "--version",
+                    "0.59.0",
                     "--base-sha",
                     &self.release,
-                    "--head-ref",
-                    "release/housekeeping-v0.59.0",
                 ],
                 success,
             );
@@ -609,7 +634,10 @@ mod housekeeping {
         assert!(manifest.contains("git = \"https://github.com/vectordotdev/vrl.git\""));
         assert!(manifest.contains("branch = \"main\""));
         let lock = fs::read_to_string(repo.join("Cargo.lock")).unwrap();
-        assert!(lock.contains("git+https://github.com/vectordotdev/vrl.git?branch=main#"));
+        assert!(lock.contains(&format!(
+            "git+https://github.com/vectordotdev/vrl.git?branch=main#{}",
+            fixture.vrl_revision
+        )));
         write(repo, "LICENSE-3rdparty.csv", "Refreshed licenses\n");
         write(repo, "docs/generated/vrl.json", "{}\n");
         commit(repo);
@@ -641,36 +669,24 @@ mod housekeeping {
     }
 
     #[test]
-    fn retries_reuse_the_published_branch_and_skip_open_or_completed_prs() {
+    fn skips_once_master_has_advanced_without_branch_or_resume_state() {
         let fixture = Fixture::new();
-        let output = fixture.state(true);
-        assert!(output.contains("branch=release/housekeeping-v0.59.0\n"));
-        assert!(output.contains("resume=false\nskip=false\n"));
         let repo = fixture.repo.path();
+        let output = fixture.state(true);
+        assert!(output.contains("version=0.59.0\n"));
+        assert!(output.contains("skip=false\n"));
+        // Housekeeping commits directly to master, so there is no branch or
+        // resume state, and once master begins the next development version a
+        // retry of the workflow is a no-op.
+        assert!(!output.contains("branch="));
+        assert!(!output.contains("resume="));
         fixture.prepare();
-        let housekeeping = commit(repo);
-        git(
-            repo,
-            &[
-                "push",
-                "origin",
-                "HEAD:refs/heads/release/housekeeping-v0.59.0",
-            ],
-        );
-        git(repo, &["switch", "--detach", &fixture.release]);
-        assert!(fixture.state(true).contains("resume=true\nskip=false\n"));
-        write(
-            repo,
-            ".git/pr-list.json",
-            r#"[{"isCrossRepository":false,"url":"https://example.invalid/pr/1"}]"#,
-        );
-        assert!(fixture.state(true).contains("skip=true\n"));
-        git(repo, &["switch", "--detach", &housekeeping]);
+        commit(repo);
         assert!(fixture.state(true).contains("skip=true\n"));
     }
 
     #[test]
-    fn requires_the_published_tag_and_frozen_release_commit() {
+    fn requires_the_published_tag_and_tolerates_release_time_pushes() {
         let fixture = Fixture::new();
         let repo = fixture.repo.path();
         write(repo, ".git/associated-prs.json", "[[]]");
@@ -679,12 +695,32 @@ mod housekeeping {
                 .state(false)
                 .contains("expected one merged bot preparation PR")
         );
+        // Restore the merged preparation PR the check accepts; the freeze-time
+        // commit below is then authorized release automation on top of it.
+        write(
+            repo,
+            ".git/associated-prs.json",
+            &json!([[{
+                "merged_at": "2026-09-21T12:00:00Z",
+                "merge_commit_sha": fixture.release,
+                "user": {"login": "vectordotdev-bot[bot]"},
+                "base": {"ref": "master", "repo": {"full_name": "vectordotdev/vector"}},
+                "head": {"ref": "prepare-v-0-59-0-website", "repo": {"full_name": "vectordotdev/vector"}}
+            }]]).to_string(),
+        );
+        // Authorized release-time pushes (e.g. the Kubernetes manifests
+        // refresh) may land on top of the release commit during the freeze;
+        // housekeeping must still succeed so a re-run after such a push can
+        // complete instead of deadlocking on the moved master.
         write(repo, "README.md", "A commit during the freeze\n");
+        commit(repo);
+        assert!(fixture.state(true).contains("skip=false\n"));
+        version(repo, "0.60.0-dev");
         commit(repo);
         assert!(
             fixture
-                .state(false)
-                .contains("master must still match the published release commit")
+                .state(true)
+                .contains("Master has advanced beyond 0.59.0")
         );
         git(repo, &["-c", "tag.gpgsign=false", "tag", "-f", "v0.59.0"]);
         assert!(
@@ -695,7 +731,7 @@ mod housekeeping {
     }
 
     #[test]
-    fn skips_non_minor_releases_and_rejects_generation_from_the_wrong_commit() {
+    fn skips_non_minor_releases_and_rejects_generation_from_the_wrong_version() {
         let fixture = Fixture::new();
         for tag in ["v0.59.1", "v0.60.0-rc.1", "v0.59.0+build"] {
             let output = fixture.run(
@@ -712,17 +748,12 @@ mod housekeeping {
             );
             assert_eq!(String::from_utf8(output.stdout).unwrap(), "skip=true\n");
         }
-        let before = git(fixture.repo.path(), &["rev-parse", "HEAD^"]);
-        fixture.run(
-            &[
-                "housekeeping-prepare",
-                "--version",
-                "0.59.0",
-                "--release-commit",
-                &before,
-            ],
-            false,
-        );
+        // Master no longer carrying the released version is the only state
+        // that can block generation; release-time pushes that keep the
+        // version are tolerated.
+        version(fixture.repo.path(), "0.58.0");
+        commit(fixture.repo.path());
+        fixture.run(&["housekeeping-prepare", "--version", "0.59.0"], false);
         assert!(git(fixture.repo.path(), &["status", "--porcelain"]).is_empty());
     }
 }

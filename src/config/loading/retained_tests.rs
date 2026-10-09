@@ -12,7 +12,7 @@ fn write_yaml(path: &Path, value: &Value) {
     std::fs::write(path, serde_yaml::to_string(value).unwrap()).unwrap();
 }
 
-fn demo_config(count: Value) -> Value {
+fn demo_config(count: &Value) -> Value {
     json!({"sources": {"demo": {"type": "demo_logs", "format": "json", "count": count}}})
 }
 
@@ -26,7 +26,7 @@ async fn secret_discovery_and_loading_use_the_same_file_and_directory_snapshot()
         let config_path = config_dir.join("vector.yaml");
         let secrets_path = temp.path().join("secrets.json");
         std::fs::write(&secrets_path, r#"{"original":"41","replacement":"42"}"#).unwrap();
-        let mut original = demo_config(json!("SECRET[local.original]"));
+        let mut original = demo_config(&json!("SECRET[local.original]"));
         original["secret"] = json!({"local": {"type": "file", "path": secrets_path}});
         write_yaml(&config_path, &original);
         let paths = [if directory {
@@ -142,7 +142,7 @@ async fn secret_discovery_includes_overwritten_directory_references() {
     let secrets_path = temp.path().join("secrets.json");
     std::fs::write(&secrets_path, r#"{"first":"43","second":"43"}"#).unwrap();
     for key in ["first", "second"] {
-        let mut config = demo_config(json!(format!("SECRET[local.{key}]")));
+        let mut config = demo_config(&json!(format!("SECRET[local.{key}]")));
         if key == "first" {
             config["secret"] = json!({"local": {"type": "file", "path": secrets_path}});
         }
@@ -232,7 +232,7 @@ fn retained_inputs_collect_parse_interpolation_and_deserialization_errors() {
     std::fs::create_dir(&directory).unwrap();
     write_yaml(
         &directory.join("invalid-count.yaml"),
-        &demo_config(json!("definitely_not_a_count")),
+        &demo_config(&json!("definitely_not_a_count")),
     );
 
     let mut prepared = ParsedInputs::from_paths(&[
@@ -305,7 +305,7 @@ fn retained_inputs_preserve_file_and_directory_append_boundaries() {
         let first = temp.path().join("first.yaml");
         let second = temp.path().join("second.yaml");
         for path in [&first, &second] {
-            write_yaml(path, &demo_config(json!(43)));
+            write_yaml(path, &demo_config(&json!(43)));
         }
         let prepared = ParsedInputs::from_paths(&(case.paths)(&first, &second));
         let result = ConfigBuilderLoader::default().load_prepared(&prepared);

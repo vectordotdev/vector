@@ -5,6 +5,7 @@ use chrono::Utc;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
 use tonic_health::server::health_reporter;
+use tower::layer::util::Identity;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::NativeDeserializerConfig,
@@ -229,6 +230,7 @@ impl SourceConfig for VectorConfig {
             builder.routes(),
             self.keepalive.clone(),
             cx.shutdown,
+            Identity::new(),
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);

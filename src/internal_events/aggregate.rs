@@ -74,6 +74,8 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::float_cmp, reason = "Counters are exact integers")]
     fn emits_total_and_legacy_counters() {
         let metrics = capture_metrics(|| AggregateUpdateFailed.emit());
 

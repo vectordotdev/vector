@@ -52,9 +52,9 @@ impl Configurable for TimeZone {
 
         let mut tz_metadata = Metadata::with_title("A named timezone.");
         tz_metadata.set_description(
-            r#"Must be a valid name in the [TZ database][tzdb].
+            r"Must be a valid name in the [TZ database][tzdb].
 
-[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#,
+[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
         );
         tz_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Named"));
         let tz_schema =

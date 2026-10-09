@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use vector_lib::{config::LogNamespace, configurable::configurable_component};
 
 pub(crate) use crate::schema::Definition;
@@ -49,6 +51,7 @@ pub struct Options {
 
 impl Options {
     /// Gets the value of the globally configured log namespace, or the default if it wasn't set.
+    #[must_use]
     pub fn log_namespace(self) -> LogNamespace {
         self.log_namespace
             .map_or(LogNamespace::Legacy, |use_vector_namespace| {

@@ -8,16 +8,29 @@ pub struct SourceLoader {
 }
 
 impl SourceLoader {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: ConfigMap::new(),
         }
     }
 
+    /// Loads and merges configuration values from paths without interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading or parsing input, or merging
+    /// incompatible configuration values.
     pub fn load_from_paths(self, paths: &[super::ConfigPath]) -> Result<ConfigMap, Vec<String>> {
         self.load_prepared(&ParsedInputs::from_paths(paths))
     }
 
+    /// Parses configuration values from a reader without interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading or parsing input, or merging
+    /// incompatible configuration values.
     pub fn load_from_input(
         self,
         input: impl std::io::Read,

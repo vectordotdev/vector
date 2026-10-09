@@ -44,6 +44,7 @@ impl ComponentHint {
 
     /// Joins a component sub-folder to a provided path, for traversal. Since `Self` is a
     /// `Copy`, this is more efficient to pass by value than ref.
+    #[must_use]
     pub fn join_path(self, path: &Path) -> PathBuf {
         path.join(self.as_component_field())
     }
@@ -426,6 +427,11 @@ impl InputReader {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_debug_formatting,
+        reason = "Preserve diagnostic text and escaping"
+    )]
     fn directory(&mut self, path: &Path, recurse: bool, initial: &ConfigMap) -> DirectoryId {
         let directory = self.parsed.directories.len();
         self.parsed.directories.push(Ok(ParsedDirectory::default()));
@@ -527,6 +533,11 @@ impl InputReader {
         Ok(directory)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_debug_formatting,
+        reason = "Preserve diagnostic text and escaping"
+    )]
     fn list_directory(path: &Path) -> Result<DirectoryListing, Vec<String>> {
         let mut listing = DirectoryListing::default();
         for entry in read_dir(path)? {
@@ -715,7 +726,7 @@ pub(super) fn deserialize_component_map<T: serde::de::DeserializeOwned>(
     hint: ComponentHint,
 ) -> Result<indexmap::IndexMap<crate::config::ComponentKey, T>, Vec<String>> {
     let key = hint.as_component_field();
-    let mut value = serde_json::json!({key: map});
+    let mut value = Value::Object(ConfigMap::from_iter([(key.to_owned(), Value::Object(map))]));
     coerce_config(&mut value)?;
     deserialize_config_value(value[key].take())
 }

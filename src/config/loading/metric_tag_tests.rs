@@ -38,6 +38,11 @@ fn load_tag(value: &Value, secrets: HashMap<String, String>) -> Result<MetricTag
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the metric tag acceptance table and its shared assertions together"
+)]
 fn native_metric_tags_keep_serde_acceptance_and_normalization() {
     struct Case {
         name: &'static str,

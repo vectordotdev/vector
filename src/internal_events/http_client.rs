@@ -296,7 +296,7 @@ fn remove_sensitive(
         HeaderName::from_static("x-api-key"),
         HeaderName::from_static("api-key"),
     ];
-    for (name, value) in headers.iter_mut() {
+    for (name, value) in &mut headers {
         if sensitive.contains(name) || extra.contains(name) {
             value.set_sensitive(true);
         }

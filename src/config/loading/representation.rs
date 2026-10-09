@@ -217,11 +217,11 @@ pub(super) fn resolve_merge_conflicts(
     let mut merged = uncoerced.clone();
     coerce(&mut merged)?;
     for conflict in conflicts {
-        let pointer: String = conflict
-            .path
-            .iter()
-            .map(|key| format!("/{}", key.replace('~', "~0").replace('/', "~1")))
-            .collect();
+        let mut pointer = String::new();
+        for key in &conflict.path {
+            pointer.push('/');
+            pointer.push_str(&key.replace('~', "~0").replace('/', "~1"));
+        }
         // Use the assembled component (including its type tag and required fields),
         // not the incomplete file that supplied each value. Check both sides: even
         // the replacement may have been overwritten again by a later file.
@@ -412,6 +412,11 @@ mod tests {
         _count: u64,
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve return type and caller contracts"
+    )]
     fn default_optional_value() -> Option<String> {
         Some("default".to_string())
     }
@@ -674,6 +679,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep related merge cases together in one table-driven test"
+    )]
     fn deferred_scalar_conflicts_preserve_merge_semantics() {
         struct Case {
             name: &'static str,
