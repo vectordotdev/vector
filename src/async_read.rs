@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use std::{
     future::Future,
@@ -24,7 +25,7 @@ pub trait VecAsyncReadExt: AsyncRead {
 
 impl<S> VecAsyncReadExt for S where S: AsyncRead {}
 
-/// A AsyncRead combinator which reads from a reader until a future resolves.
+/// A `AsyncRead` combinator which reads from a reader until a future resolves.
 #[pin_project]
 #[derive(Clone, Debug)]
 pub struct AllowReadUntil<S, F> {
@@ -56,7 +57,7 @@ where
     ) -> Poll<IoResult<()>> {
         let this = self.project();
         match this.until.poll(cx) {
-            Poll::Ready(_) => Poll::Ready(Ok(())),
+            Poll::Ready(()) => Poll::Ready(Ok(())),
             Poll::Pending => this.reader.poll_read(cx, buf),
         }
     }
