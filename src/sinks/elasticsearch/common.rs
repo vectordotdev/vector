@@ -245,7 +245,7 @@ impl ElasticsearchCommon {
             }
             Some(ElasticsearchAuthConfig::ApiKey { api_key }) => {
                 if uri.auth.is_some() {
-                    return Err("Two authorization credentials was provided.".into());
+                    return Err("Two authorization credentials were provided.".into());
                 }
                 HeaderValue::from_str(&format!("ApiKey {}", api_key.inner()))?;
                 Some(Auth::ApiKey(api_key.clone()))

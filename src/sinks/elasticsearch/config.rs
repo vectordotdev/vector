@@ -783,7 +783,7 @@ impl ValidatedSink for ElasticsearchConfig {
             for endpoint in self.endpoint.iter().chain(&self.endpoints) {
                 let uri = UriSerde::try_from(endpoint.as_uri().clone())?;
                 if uri.auth.is_some() {
-                    return Err("Two authorization credentials was provided.".into());
+                    return Err("Two authorization credentials were provided.".into());
                 }
             }
 
@@ -1118,7 +1118,7 @@ mod tests {
             .expect_err("endpoint credentials with api_key auth should fail validation");
         assert_eq!(
             err.to_string(),
-            "Two authorization credentials was provided."
+            "Two authorization credentials were provided."
         );
     }
 
@@ -1139,7 +1139,7 @@ mod tests {
             .expect_err("endpoint credentials with api_key auth should fail validation");
         assert_eq!(
             err.to_string(),
-            "Two authorization credentials was provided."
+            "Two authorization credentials were provided."
         );
     }
 
@@ -1162,7 +1162,7 @@ mod tests {
             .expect_err("endpoint credentials on later endpoint should fail validation");
         assert_eq!(
             err.to_string(),
-            "Two authorization credentials was provided."
+            "Two authorization credentials were provided."
         );
     }
 

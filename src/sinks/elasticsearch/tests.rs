@@ -844,7 +844,7 @@ async fn test_parse_config_with_conflicting_api_key_and_uri_auth() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err().to_string(),
-        "Two authorization credentials was provided."
+        "Two authorization credentials were provided."
     );
 }
 
