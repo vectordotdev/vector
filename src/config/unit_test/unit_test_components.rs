@@ -240,9 +240,9 @@ impl StreamSink<Event> for UnitTestSink {
                         let mut check_errors = Vec::new();
                         for (j, condition) in check.iter().enumerate() {
                             let mut condition_errors = Vec::new();
-                            for event in output_events.iter() {
+                            for event in &output_events {
                                 match condition.check_with_context(event.clone()).0 {
-                                    Ok(_) => {
+                                    Ok(()) => {
                                         condition_errors.clear();
                                         break;
                                     }

@@ -48,6 +48,8 @@ on:
         value: ${{ jobs.source.outputs.scripts }}
       website_only:
         value: ${{ jobs.source.outputs.website_only }}
+      website_tests:
+        value: ${{ jobs.source.outputs.website_tests }}
       install:
         value: ${{ jobs.source.outputs.install }}
       actionlint:
@@ -187,6 +189,7 @@ jobs:
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
+      website_tests: ${{ steps.website_filter.outputs.website_tests }}
       actionlint: ${{ steps.filter.outputs.actionlint }}
       prettier: ${{ steps.filter.outputs.prettier }}
       test-yml: ${{ steps.filter.outputs.test-yml }}
@@ -339,6 +342,22 @@ jobs:
               - ".github/actions/setup/**"
             unit_windows-yml:
               - ".github/workflows/unit_windows.yml"
+              - ".github/workflows/changes.yml"
+
+      # Separate step because `predicate-quantifier` applies to every filter, and
+      # `some-with-excludes` would make negation-only filters like `not_website` never match.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: website_filter
+        with:
+          base: ${{ env.BASE_SHA }}
+          ref: ${{ env.HEAD_SHA }}
+          predicate-quantifier: some-with-excludes
+          filters: |
+            website_tests:
+              - "website/**"
+              - "!website/cue/**"
+              - ".github/workflows/website-tests.yml"
+              - ".github/actions/install-vrl-doc-builder/**"
               - ".github/workflows/changes.yml"
 
   # Detects changes that are specific to integration tests
