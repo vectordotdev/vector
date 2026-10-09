@@ -110,9 +110,11 @@ generated: components: sources: kafka: configuration: {
 			consumer group rebalance.
 
 			When Vector shuts down or the Kafka consumer group revokes partitions from this
-			consumer, wait a maximum of `drain_timeout_ms` for the source to
-			process pending acknowledgements. Must be less than `session_timeout_ms`
-			to ensure the consumer is not excluded from the group during a rebalance.
+			consumer, wait up to `drain_timeout_ms` for the source to process pending
+			acknowledgements. Partitions that have not drained by then are stopped, and any
+			of their acknowledgements still in flight are dropped. Must be less than
+			`session_timeout_ms` to ensure the consumer is not excluded from the group
+			during a rebalance.
 
 			Default value is half of `session_timeout_ms`.
 			"""
