@@ -27,14 +27,19 @@ impl From<PBValue> for Value {
     }
 }
 
-/// Inverse of `From<PBValue> for Value`. Strings and byte strings that are valid UTF-8 become
-/// `string_value`; other byte strings become `bytes_value`. Timestamps and regexes have no
+/// Inverse of `From<PBValue> for Value`. Strings become `string_value`; byte strings become
+/// `string_value` with a lossy UTF-8 decode. Timestamps and regexes have no
 /// OTLP equivalent and are encoded as strings. `Null` becomes an empty `AnyValue`.
 impl From<Value> for AnyValue {
     fn from(value: Value) -> Self {
         let value = match value {
-            Value::Bytes(bytes) => string_or_bytes(bytes),
-            Value::String(string) => string_or_bytes(string.into_bytes()),
+            Value::Bytes(_) => PBValue::StringValue(
+                value
+                    .to_str_lossy()
+                    .expect("`Value::Bytes` always converts to a string")
+                    .into_owned(),
+            ),
+            Value::String(string) => PBValue::StringValue(string.into()),
             Value::Regex(regex) => PBValue::StringValue(regex.as_str().to_owned()),
             Value::Integer(int) => PBValue::IntValue(int),
             Value::Float(float) => PBValue::DoubleValue(float.into_inner()),
@@ -51,13 +56,6 @@ impl From<Value> for AnyValue {
             Value::Null => return Self { value: None },
         };
         Self { value: Some(value) }
-    }
-}
-
-fn string_or_bytes(bytes: Bytes) -> PBValue {
-    match String::from_utf8(Vec::from(bytes)) {
-        Ok(string) => PBValue::StringValue(string),
-        Err(error) => PBValue::BytesValue(error.into_bytes()),
     }
 }
 
