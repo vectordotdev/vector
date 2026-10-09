@@ -467,7 +467,7 @@ pub trait MaybeAuth: Sized {
 impl MaybeAuth for Option<Auth> {
     fn choose_one(&self, other: &Self) -> crate::Result<Self> {
         if self.is_some() && other.is_some() {
-            Err("Two authorization credentials was provided.".into())
+            Err("Two authorization credentials were provided.".into())
         } else {
             Ok(self.clone().or_else(|| other.clone()))
         }

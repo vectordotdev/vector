@@ -23,7 +23,7 @@ use crate::{
         elasticsearch::{encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder},
         util::{
             Compression, ElementCount,
-            auth::Auth,
+            auth::{Auth, apply_api_key},
             http::{HttpBatchService, RequestConfig},
         },
     },
@@ -114,6 +114,7 @@ impl HttpRequestBuilder {
         }
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn build_request(
         &self,
         es_req: ElasticsearchRequest,
@@ -142,6 +143,9 @@ impl HttpRequestBuilder {
             match auth {
                 Auth::Basic(auth) => {
                     auth.apply(&mut request);
+                }
+                Auth::ApiKey(api_key) => {
+                    apply_api_key(api_key, &mut request)?;
                 }
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
