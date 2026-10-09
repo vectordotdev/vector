@@ -6,18 +6,18 @@ It extracts only the fields we need and composes container/blob URLs suitable
 for the newer `azure_storage_blob` crate (>= 0.7).
 
 Supported keys (case-insensitive):
-- AccountName
-- AccountKey
-- SharedAccessSignature
-- DefaultEndpointsProtocol
-- EndpointSuffix
-- BlobEndpoint
-- UseDevelopmentStorage
-- DevelopmentStorageProxyUri
+- `AccountName`
+- `AccountKey`
+- `SharedAccessSignature`
+- `DefaultEndpointsProtocol`
+- `EndpointSuffix`
+- `BlobEndpoint`
+- `UseDevelopmentStorage`
+- `DevelopmentStorageProxyUri`
 
 Behavior
 - If `BlobEndpoint` is present, it is used as the base for container/blob URLs.
-  It may already include the account segment (e.g., Azurite: http://127.0.0.1:10000/devstoreaccount1).
+  It may already include the account segment (e.g., Azurite: <http://127.0.0.1:10000/devstoreaccount1>).
 - Otherwise, if `UseDevelopmentStorage=true`, we synthesize a dev endpoint:
   `{protocol}://127.0.0.1:10000/{account_name}`, with `protocol` default `http` if unspecified.
   If `DevelopmentStorageProxyUri` is present, it replaces the host/port while still appending
@@ -32,17 +32,17 @@ SAS handling
 
 Examples:
 - Access key connection string:
-  "DefaultEndpointsProtocol=https;AccountName=myacct;AccountKey=base64key==;EndpointSuffix=core.windows.net"
+  `DefaultEndpointsProtocol=https;AccountName=myacct;AccountKey=base64key==;EndpointSuffix=core.windows.net`
   Container URL: <https://myacct.blob.core.windows.net/logs>
   Blob URL: <https://myacct.blob.core.windows.net/logs/file.txt>
 
 - SAS connection string:
-  "BlobEndpoint=<https://myacct.blob.core.windows.net/>;SharedAccessSignature=sv=2022-11-02&ss=b&..."
+  `BlobEndpoint=https://myacct.blob.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=b&...`
   Container URL (with SAS): <https://myacct.blob.core.windows.net/logs?sv=2022-11-02&ss=b&...>
   Blob URL (with SAS): <https://myacct.blob.core.windows.net/logs/file.txt?sv=2022-11-02&ss=b&...>
 
 - Azurite/dev storage:
-  "UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1"
+  `UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1`
   Container URL: <http://127.0.0.1:10000/devstoreaccount1/logs>
 */
 
@@ -103,6 +103,9 @@ impl ParsedConnectionString {
     /// Parse a connection string into a `ParsedConnectionString`.
     ///
     /// The parser is case-insensitive for keys and ignores empty segments.
+    ///
+    /// # Errors
+    /// Returns an error if a nonempty segment is missing `=`.
     pub fn parse(s: &str) -> Result<Self, ConnectionStringError> {
         let mut map: HashMap<String, String> = HashMap::new();
 
@@ -133,8 +136,7 @@ impl ParsedConnectionString {
             blob_endpoint: map.get("blobendpoint").cloned(),
             use_development_storage: map
                 .get("usedevelopmentstorage")
-                .map(|v| v.eq_ignore_ascii_case("true"))
-                .unwrap_or(false),
+                .is_some_and(|v| v.eq_ignore_ascii_case("true")),
             development_storage_proxy_uri: map.get("developmentstorageproxyuri").cloned(),
         };
 
@@ -142,6 +144,7 @@ impl ParsedConnectionString {
     }
 
     /// Determine the authentication method present in this connection string.
+    #[must_use]
     pub fn auth(&self) -> Auth {
         if let (Some(name), Some(key)) = (self.account_name.as_ref(), self.account_key.as_ref()) {
             return Auth::SharedKey {
@@ -158,6 +161,7 @@ impl ParsedConnectionString {
     /// Get the normalized default protocol, defaulting to:
     /// - http for development storage
     /// - https otherwise
+    #[must_use]
     pub fn default_protocol(&self) -> String {
         if let Some(p) = self.default_endpoints_protocol.as_deref() {
             match p {
@@ -179,6 +183,7 @@ impl ParsedConnectionString {
     }
 
     /// Get the normalized endpoint suffix, defaulting to "core.windows.net".
+    #[must_use]
     pub fn endpoint_suffix(&self) -> String {
         self.endpoint_suffix
             .clone()
@@ -188,10 +193,13 @@ impl ParsedConnectionString {
     /// Build the base Blob endpoint URL (no container/blob path).
     ///
     /// Resolution order:
-    /// 1. BlobEndpoint (as-is, without trailing slash normalization)
+    /// 1. `BlobEndpoint` (as-is, without trailing slash normalization)
     /// 2. Development storage synthesized URL: `{proto}://127.0.0.1:10000/{account}`
-    ///    If DevelopmentStorageProxyUri is present, it will be used instead of 127.0.0.1:10000.
+    ///    If `DevelopmentStorageProxyUri` is present, it will be used instead of 127.0.0.1:10000.
     /// 3. Public cloud synthesized URL: `{proto}://{account}.blob.{suffix}`
+    ///
+    /// # Errors
+    /// Returns an error if neither a blob endpoint nor an account name is set.
     pub fn blob_account_endpoint(&self) -> Result<String, ConnectionStringError> {
         if let Some(explicit) = self.blob_endpoint.as_ref() {
             return Ok(explicit.clone());
@@ -206,11 +214,10 @@ impl ParsedConnectionString {
 
         if self.use_development_storage {
             // If the proxy URI is provided, use it. Otherwise default to 127.0.0.1:10000
-            let host = self
-                .development_storage_proxy_uri
-                .as_deref()
-                .map(|s| s.trim_end_matches('/').to_string())
-                .unwrap_or_else(|| "127.0.0.1:10000".to_string());
+            let host = self.development_storage_proxy_uri.as_deref().map_or_else(
+                || "127.0.0.1:10000".to_string(),
+                |s| s.trim_end_matches('/').to_string(),
+            );
 
             let base = if host.starts_with("http://") || host.starts_with("https://") {
                 format!("{}/{account_name}", trim_trailing_slash(&host))
@@ -226,6 +233,9 @@ impl ParsedConnectionString {
     }
 
     /// Build a container URL, optionally appending SAS if present.
+    ///
+    /// # Errors
+    /// Returns an error if neither a blob endpoint nor an account name is set.
     pub fn container_url(&self, container: &str) -> Result<String, ConnectionStringError> {
         let base = self.blob_account_endpoint()?;
         Ok(append_query_segment(
@@ -235,6 +245,9 @@ impl ParsedConnectionString {
     }
 
     /// Build a blob URL, optionally appending SAS if present.
+    ///
+    /// # Errors
+    /// Returns an error if neither a blob endpoint nor an account name is set.
     pub fn blob_url(&self, container: &str, blob: &str) -> Result<String, ConnectionStringError> {
         // Build the base container URL without SAS, then append the blob path,
         // and finally append the SAS so it appears after the full path.
@@ -260,8 +273,7 @@ fn normalize_sas(s: &str) -> String {
 /// Append a query segment `sas` to `base_url`, respecting whether `base_url` already has a query.
 fn append_query_segment(base_url: &str, sas: Option<&str>) -> String {
     match sas {
-        None => base_url.to_string(),
-        Some("") => base_url.to_string(),
+        None | Some("") => base_url.to_string(),
         Some(q) => {
             let sep = if base_url.contains('?') { '&' } else { '?' };
             format!("{base_url}{sep}{q}")
@@ -398,7 +410,7 @@ mod tests {
         let err = ParsedConnectionString::parse(cs).unwrap_err();
         match err {
             ConnectionStringError::InvalidPair(p) => {
-                assert!(p == "AccountName" || p == "AccountKey=noequals")
+                assert!(p == "AccountName" || p == "AccountKey=noequals");
             }
             _ => panic!("unexpected error: {err}"),
         }
