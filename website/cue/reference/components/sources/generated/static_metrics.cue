@@ -76,8 +76,8 @@ generated: components: sources: static_metrics: configuration: {
 								}
 								sum: {
 									description: "The sum of all observations contained within this histogram."
-									required:    true
-									type: float: {}
+									required:    false
+									type: float: default: 0.0
 								}
 							}
 						}

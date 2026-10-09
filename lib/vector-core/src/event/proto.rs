@@ -189,7 +189,8 @@ impl TryFrom<MetricValue> for super::MetricValue {
             MetricValue::AggregatedHistogram3(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
-                sum: hist.sum,
+                // `f64` cannot express an unreported sum, so it reads as zero.
+                sum: if hist.sum_missing { 0.0 } else { hist.sum },
             },
             MetricValue::AggregatedSummary1(summary) => Self::AggregatedSummary {
                 quantiles: super::metric::zip_quantiles(summary.quantiles, summary.values),
@@ -389,6 +390,7 @@ impl From<super::MetricValue> for MetricValue {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
                 sum,
+                sum_missing: false,
             }),
             super::MetricValue::AggregatedSummary {
                 quantiles,
@@ -946,6 +948,51 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(decoded, expected);
+    }
+
+    /// Newer encoders set `sum_missing` on a histogram that reported no sum. `f64` cannot hold an
+    /// absent sum, so it must decode as zero whatever `sum` carries.
+    #[test]
+    fn decodes_histogram_marked_sum_missing_as_zero() {
+        let value = MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
+            buckets: vec![HistogramBucket3 {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum: 7.0,
+            sum_missing: true,
+        });
+
+        assert_eq!(
+            EventMetricValue::try_from(value).expect("marked histogram should decode"),
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
+                    count: 2,
+                }],
+                count: 2,
+                sum: 0.0,
+            }
+        );
+    }
+
+    /// A reported sum of zero must not be mistaken for a missing one.
+    #[test]
+    fn encodes_reported_zero_sum_without_marker() {
+        let value = MetricValue::from(EventMetricValue::AggregatedHistogram {
+            buckets: vec![metric::Bucket {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum: 0.0,
+        });
+
+        let MetricValue::AggregatedHistogram3(hist) = value else {
+            panic!("expected AggregatedHistogram3, got {value:?}");
+        };
+        assert!(!hist.sum_missing);
     }
 
     #[test]
