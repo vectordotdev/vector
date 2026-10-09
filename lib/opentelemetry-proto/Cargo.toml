@@ -17,9 +17,20 @@ glob.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 hex = { version = "0.4.3", default-features = false, features = ["std"] }
+indexmap = { workspace = true, optional = true }
 ordered-float.workspace = true
 prost.workspace = true
 tonic.workspace = true
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-core = { path = "../vector-core", default-features = false }
+
+[features]
+default = []
+# Internal typed trace event (RFC 25329). Off by default until a source, transform, or sink consumes it.
+typed-trace = ["dep:indexmap", "vector-core/typed-trace"]
+
+[dev-dependencies]
+proptest.workspace = true
+similar-asserts.workspace = true
+vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
