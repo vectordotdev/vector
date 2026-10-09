@@ -266,8 +266,8 @@ impl ResourceLog {
 ///
 /// - The source does not keep the resource and scope `schema_url` or the resource
 ///   `dropped_attributes_count`, so these fields are empty.
-/// - A `bytes_value` that is valid UTF-8 becomes a `string_value`, because the source decodes
-///   both to the same Vector value.
+/// - A `bytes_value` becomes a `string_value`, because the source decodes both to the same
+///   Vector value. Bytes that are not valid UTF-8 are replaced with U+FFFD.
 /// - A record without `time_unix_nano` gets the observed time, because the source uses the
 ///   observed time as the event timestamp.
 /// - The request has one `ResourceLogs` and one `ScopeLogs` for the one record, so records
