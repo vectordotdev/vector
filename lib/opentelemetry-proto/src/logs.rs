@@ -285,7 +285,10 @@ impl ResourceLog {
 /// A field that does not have the type OTLP requires (for example a `trace_id` that is not
 /// 32 hex characters) is not dropped: it is sent as a log record attribute. All other event
 /// fields are also sent as log record attributes; when a key is in both, the value from
-/// `attributes` is used. The `source_type` field is internal to Vector and is not sent.
+/// `attributes` is used. Vector's source type marker is not sent. In the Legacy namespace,
+/// a marker at the configured metadata path takes precedence over the matching event field.
+/// If that metadata is absent, the event field is treated as the marker for sources that
+/// write it there.
 #[must_use]
 pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceRequest {
     let mut record = LogRecord::default();
@@ -321,6 +324,11 @@ pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceReques
         }
         LogNamespace::Legacy => {
             let schema = log_schema();
+            // A marker at the configured metadata path leaves the event field as user data.
+            // Otherwise, remove the root marker for Legacy sources that ignore the prefix.
+            let source_type_key = schema
+                .source_type_key_target_path()
+                .filter(|path| path.prefix == PathPrefix::Event || !log.contains(*path));
             // The message key can point into metadata (for example `%message`), so remove it
             // with its full target path before the metadata is discarded.
             if let Some(path) = schema.message_key_target_path() {
@@ -335,8 +343,8 @@ pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceReques
                 .and_then(|path| log.remove(path))
                 .and_then(|value| into_timestamp_nanos(value).ok());
             let (mut fields, _) = log.into_parts();
-            if let Some(path) = schema.source_type_key() {
-                fields.remove(path, true);
+            if let Some(path) = source_type_key {
+                fields.remove(&path.path, true);
             }
             record.time_unix_nano = metadata_time
                 .or_else(|| {
@@ -654,6 +662,34 @@ mod tests {
     fn decoded_legacy_log_with_metadata_timestamp_key_round_trips() {
         // The source writes the timestamp to the event root even with a metadata key.
         init_metadata_timestamp_key();
+        round_trip(LogNamespace::Legacy);
+    }
+
+    fn init_metadata_source_type_key() {
+        let mut schema = LogSchema::default();
+        schema.set_source_type_key(Some(OwnedTargetPath::metadata(owned_value_path!(
+            "source_type"
+        ))));
+        init_log_schema(schema, true);
+    }
+
+    #[test]
+    fn native_legacy_log_preserves_payload_with_metadata_source_type() {
+        init_metadata_source_type_key();
+        let mut log = LogEvent::from("disk full");
+        log.insert(log_schema().source_type_key_target_path().unwrap(), "kafka");
+        // Even when the values match, the event field is not the metadata marker.
+        log.insert(event_path!("source_type"), "kafka");
+
+        let request = log_event_to_export_request(log);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(record.attributes, vec![kv("source_type", string("kafka"))]);
+    }
+
+    #[test]
+    fn decoded_legacy_log_with_metadata_source_type_key_round_trips() {
+        // The source writes the marker to the event root even with a metadata key.
+        init_metadata_source_type_key();
         round_trip(LogNamespace::Legacy);
     }
 
