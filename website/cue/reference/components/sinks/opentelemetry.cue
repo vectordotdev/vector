@@ -57,7 +57,9 @@ components: sinks: opentelemetry: {
 				With `encoding.codec: otlp`, a log event without a `resourceLogs` field is converted
 				to one OTLP log record. The conversion is the inverse of the `opentelemetry` source
 				decoding, so logs that the source decodes without `use_otlp_decoding` are sent back
-				unchanged.
+				with the same log record, resource attributes, and scope. The source does not keep the
+				resource and scope `schemaUrl` or the resource `droppedAttributesCount`, so these fields
+				are empty. To keep all OTLP fields, use `use_otlp_decoding` on the source.
 
 				| Event field (Legacy namespace) | OTLP field |
 				| --- | --- |
