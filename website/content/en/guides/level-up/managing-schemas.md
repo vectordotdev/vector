@@ -73,7 +73,7 @@ log_schema:
 
 sources:
   my_naming_confused_source:
-    type: "logplex"
+    type: "heroku_logs"
     address: "0.0.0.0:8088"
 ```
 
@@ -98,10 +98,11 @@ transforms:
     type: "remap"
     inputs: ["my-source-id"]
     source: |
-      del(.email, .passport_number)
+      del(.email)
+      del(.passport_number)
 ```
 
-The `remap` transform has a wealth of mapping functions, and in cases where we wish to flip this concept and drop all fields except for a list of exceptions we can do that with the `only_fields` function:
+The `remap` transform has a wealth of mapping functions, and in cases where we wish to flip this concept and drop all fields except for a list of exceptions we can do that with the `filter` function:
 
 ```yaml title="vector.yaml"
 transforms:
@@ -109,7 +110,9 @@ transforms:
     type: "remap"
     inputs: ["my-source-id"]
     source: |
-      only_fields(.timestamp, .message, .host, .user_id)
+      . = filter(object!(.)) -> |key, _value| {
+        includes(["timestamp", "message", "host", "user_id"], key)
+      }
 ```
 
 ### Example: Filtering data for GDPR compliance
@@ -130,7 +133,6 @@ We can build a config that will do the first part of this, but we'll just output
 
 ```yaml title="vector.yaml"
 data_dir: "./data"
-dns_servers: []
 
 sources:
   application:
@@ -175,16 +177,14 @@ sinks:
 Let's have a look:
 
 ```bash
-$ cat <<-EOF | cargo run -- --config test.yaml
+$ cat <<-EOF | vector --quiet --config vector.yaml
 { "id": "user1", "gdpr": false, "email": "us-user1@datadoghq.com" }
 { "id": "user2", "gdpr": false, "email": "us-user2@datadoghq.com" }
 { "id": "user3", "gdpr": true, "email": "eu-user3@datadoghq.com" }
 EOF
-Feb 05 16:13:59.241  INFO source{name=application type=stdin}: vector::sources::stdin: finished sending
-{"id":"user1","timestamp":"2020-02-06T00:13:59.241801798Z","host":"obsidian","email":"us-user1@datadoghq.com","gdpr":false}
-{"gdpr":false,"host":"obsidian","email":"us-user2@datadoghq.com","timestamp":"2020-02-06T00:13:59.241815255Z","id":"user2"}
-{"id":"user3","gdpr":true,"host":"obsidian","timestamp":"2020-02-06T00:13:59.241816010Z"}
-Feb 05 16:15:27.945  INFO vector: Shutting down.
+{"email":"us-user1@datadoghq.com","gdpr":false,"id":"user1"}
+{"email":"us-user2@datadoghq.com","gdpr":false,"id":"user2"}
+{"gdpr":true,"id":"user3"}
 ```
 
 Don't know where events are coming from? You can do a geo ip lookup using VRL [enrichment functions][docs.enrichment_functions] to transform an `ipv4` field and get a grip on that!
@@ -213,8 +213,9 @@ sinks:
     type: "kafka"
 
     # Put events in the host specific topic.
-    topic: "{{service}}"
+    topic: "logs-{{service}}"
     encoding:
+      codec: "json"
       except_fields: ["service"] # Remove this field now and save some bytes
     # ...
 ```
@@ -258,8 +259,9 @@ transforms:
     type: "remap"
     inputs: ["source0"]
     source: |
-      .name = .first_name + " " + .last_name
-      del(.first_name, .last_name)
+      .name = string!(.first_name) + " " + string!(.last_name)
+      del(.first_name)
+      del(.last_name)
 ```
 
 ## Coercing Data Types
@@ -275,11 +277,11 @@ transforms:
     type: "remap"
     inputs: ["source0"]
     source: |
-      .count = int(.count)
-      .date = timestamp(.date, "%F")
+      .count = to_int!(.count)
+      .date = parse_timestamp!(.date, "%F")
 ```
 
-Remember that you can follow the coercion mappings with `del` or `only_fields` functions, empowering it to drop
+Remember that you can follow the coercion mappings with `del` or `filter` functions, empowering it to drop
 fields you've not specified. Coercer? More like enforcer.
 
 ### Example: Coercing into a specific format
@@ -288,7 +290,7 @@ There are a lot of ways to represent time. In the US folks tend to use `MM/DD/YY
 `YYYY/MM/DD` which Canada and China like. In the EU, South America, and Africa they prefer `DD/MM/YYYY`. Like personal
 identities, all are valid. Vector lets us take in timestamps and output specific formats easily.
 
-To do this we'll use the `timestamp` function with a format string argument. To build a format string, we can reference the
+To do this we'll use the `format_timestamp` function with a format string argument. To build a format string, we can reference the
 [`strftime`](https://docs.rs/chrono/0.4.10/chrono/format/strftime/index.html) documentation. Let's ship some Canadian
 friendly logs up to the great white north!
 
@@ -296,8 +298,9 @@ friendly logs up to the great white north!
 transforms:
   format_timestamp:
     type: "remap"
+    inputs: ["source0"]
     source: |
-      .timestamp = timestamp(.timestamp, "%Y/%m/%d:%H:%M:%S %z")
+      .timestamp = format_timestamp!(.timestamp, "%Y/%m/%d:%H:%M:%S %z")
 ```
 
 ## Working with data formats
