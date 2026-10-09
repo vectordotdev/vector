@@ -1,0 +1,811 @@
+# Adapted from OpenTelemetry Demo 3.1.0 compose.yaml and compose.full.yaml.
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+services:
+  ad:
+    image: ghcr.io/open-telemetry/demo:3.1.0-ad
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c 'echo > /dev/tcp/localhost/9555'
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 20s
+    depends_on:
+      flagd:
+        condition: service_started
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    # The demo's 300 MiB limit caused OOM kills in CI.
+    mem_limit: "536870912"
+    environment:
+      - AD_PORT=9555
+      - AD_PROMETHEUS_PORT=9465
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=medium
+      - OTEL_SERVICE_NAME=ad
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  cart:
+    image: ghcr.io/open-telemetry/demo:3.1.0-cart
+    depends_on:
+      flagd:
+        condition: service_started
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+      valkey-cart:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "167772160"
+    environment:
+      - ASPNETCORE_URLS=http://*:7070
+      - CART_PORT=7070
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=high
+      - OTEL_SERVICE_NAME=cart
+      - VALKEY_ADDR=valkey-cart:6379
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  checkout:
+    image: ghcr.io/open-telemetry/demo:3.1.0-checkout
+    healthcheck:
+      test:
+        - CMD
+        - "/bin/grpc_health_probe"
+        - "-addr=:5050"
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      cart:
+        condition: service_started
+        required: true
+      currency:
+        condition: service_healthy
+        required: true
+      email:
+        condition: service_healthy
+        required: true
+      flagd:
+        condition: service_started
+        required: true
+      kafka:
+        condition: service_healthy
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+      payment:
+        condition: service_healthy
+        required: true
+      product-catalog:
+        condition: service_started
+        required: true
+      shipping:
+        condition: service_started
+        required: true
+    read_only: true
+    tmpfs:
+      - "/tmp"
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: 128M
+    environment:
+      - CART_ADDR=cart:7070
+      - CHECKOUT_PORT=5050
+      - CURRENCY_ADDR=currency:7001
+      - EMAIL_ADDR=http://email:6060
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - GOMEMLIMIT=100MiB
+      - KAFKA_ADDR=kafka:9092
+      - KAFKA_TOPIC=orders
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_GO_X_OBSERVABILITY=true
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=critical
+      - OTEL_SERVICE_NAME=checkout
+      - PAYMENT_ADDR=payment:50051
+      - PRODUCT_CATALOG_ADDR=product-catalog:3550
+      - SHIPPING_ADDR=http://shipping:50050
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  currency:
+    image: ghcr.io/open-telemetry/demo:3.1.0-currency
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nc -z localhost 7001
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: 128M
+    environment:
+      - CURRENCY_PORT=7001
+      - IPV6_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=high
+      - OTEL_SERVICE_NAME=currency
+      - VERSION=3.0.0
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  email:
+    image: ghcr.io/open-telemetry/demo:3.1.0-email
+    healthcheck:
+      test:
+        - CMD
+        - ruby
+        - "-e"
+        - require 'socket'; TCPSocket.new('localhost', 6060).close
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "104857600"
+    environment:
+      - APP_ENV=production
+      - EMAIL_PORT=6060
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=medium
+      - OTEL_SERVICE_NAME=email
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  frontend:
+    image: ghcr.io/open-telemetry/demo:3.1.0-frontend
+    healthcheck:
+      test:
+        - CMD
+        - "/nodejs/bin/node"
+        - "-e"
+        - require('net').connect(8080,require('os').hostname(),function(){process.exit(0)}).on('error',function(){process.exit(1)})
+      timeout: 10s
+      interval: 10s
+      retries: 5
+      start_period: 1m0s
+    depends_on:
+      ad:
+        condition: service_healthy
+        required: true
+      cart:
+        condition: service_started
+        required: true
+      checkout:
+        condition: service_started
+        required: true
+      currency:
+        condition: service_healthy
+        required: true
+      flagd:
+        condition: service_started
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+      product-catalog:
+        condition: service_started
+        required: true
+      quote:
+        condition: service_healthy
+        required: true
+      recommendation:
+        condition: service_healthy
+        required: true
+      shipping:
+        condition: service_started
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "262144000"
+    environment:
+      - AD_ADDR=ad:9555
+      - CART_ADDR=cart:7070
+      - CHECKOUT_ADDR=checkout:5050
+      - CURRENCY_ADDR=currency:7001
+      - ENV_PLATFORM=local
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - FRONTEND_ADDR=frontend:8080
+      - OTEL_COLLECTOR_HOST=otel-collector
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=critical
+      - OTEL_SERVICE_NAME=frontend
+      - PORT=8080
+      - PRODUCT_CATALOG_ADDR=product-catalog:3550
+      - PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:8080/otlp-http/v1/traces
+      - RECOMMENDATION_ADDR=recommendation:9001
+      - SHIPPING_ADDR=http://shipping:50050
+      - WEB_OTEL_SERVICE_NAME=frontend-web
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  payment:
+    image: ghcr.io/open-telemetry/demo:3.1.0-payment
+    healthcheck:
+      test:
+        - CMD
+        - "/nodejs/bin/node"
+        - "-e"
+        - const net=require('net');const c=new net.Socket(); c.setTimeout(2000); c.connect(50051,'127.0.0.1',()=>{c.destroy();process.exit(0)});
+          c.on('error',()=>process.exit(1)); c.on('timeout',()=>process.exit(1))
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      flagd:
+        condition: service_started
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "146800640"
+    environment:
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - IPV6_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=critical
+      - OTEL_SERVICE_NAME=payment
+      - PAYMENT_PORT=50051
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  product-catalog:
+    image: ghcr.io/open-telemetry/demo:3.1.0-product-catalog
+    healthcheck:
+      test:
+        - CMD
+        - "/bin/grpc_health_probe"
+        - "-addr=:3550"
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      astronomy-db:
+        condition: service_healthy
+        required: true
+      flagd:
+        condition: service_started
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+    read_only: true
+    tmpfs:
+      - "/tmp"
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: 128M
+    environment:
+      - DB_CONNECTION_STRING=postgres://astronomy_user:astronomy_password@astronomy-db/astronomy_db?sslmode=disable
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - GOMEMLIMIT=100MiB
+      - OTEL_CONFIG_FILE=/otel-config.yml
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_GO_X_OBSERVABILITY=true
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=high
+      - OTEL_SEMCONV_STABILITY_OPT_IN=database
+      - OTEL_SERVICE_NAME=product-catalog
+      - PRODUCT_CATALOG_PORT=3550
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+    volumes:
+      - "../data/otel-config.yml:/otel-config.yml:ro"
+  quote:
+    image: ghcr.io/open-telemetry/demo:3.1.0-quote
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - "-r"
+        - fsockopen('localhost', 8090) or exit(1);
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "41943040"
+    environment:
+      - IPV6_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_PHP_AUTOLOAD_ENABLED=true
+      - OTEL_PHP_INTERNAL_METRICS_ENABLED=true
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=low
+      - OTEL_SERVICE_NAME=quote
+      - QUOTE_PORT=8090
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  recommendation:
+    image: ghcr.io/open-telemetry/demo:3.1.0-recommendation
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nc -z localhost 9001
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      flagd:
+        condition: service_started
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+      product-catalog:
+        condition: service_started
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "524288000"
+    environment:
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_PYTHON_LOG_CORRELATION=true
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=medium
+      - OTEL_SERVICE_NAME=recommendation
+      - PRODUCT_CATALOG_ADDR=product-catalog:3550
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+      - RECOMMENDATION_PORT=9001
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  shipping:
+    image: ghcr.io/open-telemetry/demo:3.1.0-shipping
+    healthcheck:
+      test:
+        - CMD
+        - "/app/healthcheck"
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      flagd:
+        condition: service_started
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+    read_only: true
+    tmpfs:
+      - "/tmp"
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: 128M
+    environment:
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - IPV6_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=high
+      - OTEL_SERVICE_NAME=shipping
+      - QUOTE_ADDR=http://quote:8090
+      - SHIPPING_PORT=50050
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  accounting:
+    image: ghcr.io/open-telemetry/demo:3.1.0-accounting
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "167772160"
+    environment:
+      - DB_CONNECTION_STRING=Host=astronomy-db;Username=astronomy_user;Password=astronomy_password;Database=astronomy_db
+      - KAFKA_ADDR=kafka:9092
+      - KAFKA_TOPIC=orders
+      - OTEL_DOTNET_AUTO_TRACES_ENTITYFRAMEWORKCORE_INSTRUMENTATION_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=low
+      - OTEL_SERVICE_NAME=accounting
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  fraud-detection:
+    image: ghcr.io/open-telemetry/demo:3.1.0-fraud-detection
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: true
+      otel-collector:
+        condition: service_healthy
+        required: true
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "314572800"
+    environment:
+      - FLAGD_HOST=flagd
+      - FLAGD_PORT=8013
+      - KAFKA_ADDR=kafka:9092
+      - KAFKA_TOPIC=orders
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_INSTRUMENTATION_KAFKA_EXPERIMENTAL_SPAN_ATTRIBUTES=true
+      - OTEL_INSTRUMENTATION_MESSAGING_EXPERIMENTAL_RECEIVE_TELEMETRY_ENABLED=true
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=low
+      - OTEL_SERVICE_NAME=fraud-detection
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  kafka:
+    image: ghcr.io/open-telemetry/demo:3.1.0-kafka
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nc -z kafka 9092
+      timeout: 10s
+      interval: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "650117120"
+    environment:
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_HEAP_OPTS=-Xmx400m -Xms400m
+      - KAFKA_LISTENERS=PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=low
+      - OTEL_SERVICE_NAME=kafka
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  flagd:
+    image: ghcr.io/open-feature/flagd:v0.16.0
+    command:
+      - start
+      - "--uri"
+      - file:./etc/flagd/demo.flagd.json
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "78643200"
+    environment:
+      - GOMEMLIMIT=100MiB
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=low
+      - OTEL_SERVICE_NAME=flagd
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+    volumes:
+      - "../data/demo.flagd.json:/etc/flagd/demo.flagd.json:ro"
+  astronomy-db:
+    image: postgres:18.4
+    command:
+      - postgres
+      - "-c"
+      - shared_preload_libraries=pg_stat_statements
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready
+      timeout: 5s
+      interval: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "83886080"
+    environment:
+      - POSTGRES_PASSWORD=changeit
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+    volumes:
+      - "../data/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"
+  valkey-cart:
+    image: ghcr.io/valkey-io/valkey:9.0.4-alpine3.23
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - valkey-cli ping
+      timeout: 3s
+      interval: 5s
+      retries: 10
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    # The demo's 20 MiB limit caused OOM kills in CI.
+    mem_limit: "67108864"
+    environment:
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+  load-generator:
+    image: ghcr.io/open-telemetry/demo:3.1.0-load-generator
+    depends_on:
+      flagd:
+        condition: service_started
+        required: true
+      frontend:
+        condition: service_healthy
+        required: true
+      accounting:
+        condition: service_started
+      fraud-detection:
+        condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-file: "2"
+        max-size: 5m
+    mem_limit: "1572864000"
+    environment:
+      - CONFIG_INGRESS_EXPORTER=${CONFIG_INGRESS_EXPORTER}
+      - FLAGD_HOST=flagd
+      - FLAGD_OFREP_PORT=8016
+      - FLAGD_PORT=8013
+      - LOCUST_AUTOSTART=false
+      - LOCUST_BROWSER_TRAFFIC_ENABLED=false
+      - LOCUST_BROWSER_USER_WEIGHT=1
+      - LOCUST_HEADLESS=true
+      - LOCUST_HOST=http://frontend:8080
+      - LOCUST_HTTP_USER_WEIGHT=9
+      - LOCUST_USERS=5
+      - LOCUST_WEB_HOST=0.0.0.0
+      - LOCUST_WEB_PORT=8089
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION=explicit_bucket_histogram
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=opentelemetry-demo,service.version=3.1.0,service.criticality=low
+      - OTEL_SERVICE_NAME=load-generator
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+      - OTEL_BSP_SCHEDULE_DELAY=1000
+      - OTEL_TRACES_SAMPLER=always_on
+    labels:
+      vector.otel-traces-multiservice.producer: "true"
+    command:
+      - "-f"
+      - "/usr/src/app/scenario.py"
+      - "--headless"
+      - "--users=1"
+      - "--spawn-rate=1"
+      # Safety limit. The scenario exits after three shopping rounds.
+      - "--run-time=15m"
+      - "--stop-timeout=15"
+      - DemoUser
+    volumes:
+      - "../data/scenario.py:/usr/src/app/scenario.py:ro"
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+  prepare-output:
+    image: alpine:3.20
+    command:
+      - sh
+      - "-c"
+      - rm -rf /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER} && mkdir -p /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}
+    volumes:
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+  otel-collector:
+    build:
+      context: "../../../.."
+      dockerfile: tests/e2e/opentelemetry-common/collector.Dockerfile
+      args:
+        CONFIG_COLLECTOR_VERSION: "${CONFIG_COLLECTOR_VERSION}"
+    environment:
+      - CONFIG_INGRESS_EXPORTER=${CONFIG_INGRESS_EXPORTER}
+    command:
+      - "--config=/etc/otelcol-contrib/config.yaml"
+    depends_on:
+      prepare-output:
+        condition: service_completed_successfully
+      vector:
+        condition: service_started
+    volumes:
+      - "../data/collector-source.yaml:/etc/otelcol-contrib/config.yaml:ro"
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://localhost:13133/
+      interval: 1s
+      timeout: 1s
+      retries: 120
+  otel-collector-sink:
+    build:
+      context: "../../../.."
+      dockerfile: tests/e2e/opentelemetry-common/collector.Dockerfile
+      args:
+        CONFIG_COLLECTOR_VERSION: "${CONFIG_COLLECTOR_VERSION}"
+    environment:
+      - CONFIG_INGRESS_EXPORTER=${CONFIG_INGRESS_EXPORTER}
+    command:
+      - "--config=/etc/otelcol-contrib/config.yaml"
+    depends_on:
+      prepare-output:
+        condition: service_completed_successfully
+    volumes:
+      - "../data/collector-sink.yaml:/etc/otelcol-contrib/config.yaml:ro"
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://localhost:13133/
+      interval: 1s
+      timeout: 1s
+      retries: 120
+  vector:
+    image: "${CONFIG_VECTOR_IMAGE}"
+    command:
+      - vector
+      - "--config"
+      - "/etc/vector/vector.yaml"
+    environment:
+      - VECTOR_LOG=${VECTOR_LOG:-info}
+    depends_on:
+      prepare-output:
+        condition: service_completed_successfully
+      otel-collector-sink:
+        condition: service_healthy
+    volumes:
+      - "../data/vector.yaml:/etc/vector/vector.yaml:ro"
+  demo-ready:
+    image: alpine:3.20
+    command:
+      - sh
+      - "-c"
+      - test -f /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}/workload-complete
+    depends_on:
+      load-generator:
+        condition: service_completed_successfully
+    volumes:
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+volumes:
+  opentelemetry_traces_multiservice_evidence:
+    external: true
+networks:
+  default:
+    name: "${VECTOR_NETWORK}"
+    external: true

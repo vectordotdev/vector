@@ -1,0 +1,19 @@
+features:
+  - e2e-tests-opentelemetry
+
+test: e2e
+test_filter: "opentelemetry::multiservice_traces::"
+
+runner:
+  # Reuse compiled tests between HTTP and gRPC runs. Captures are still cleared.
+  preserve_build_cache: true
+  needs_docker_socket: true
+  volumes:
+    opentelemetry_traces_multiservice_evidence: /output/opentelemetry-traces-multiservice
+
+matrix:
+  collector_version: ["0.159.0"]
+  ingress_exporter: ["otlphttp", "otlp"] # HTTP and gRPC into Vector, respectively.
+
+
+# Intentionally absent from the automatic CI matrices and changed-file filters.
