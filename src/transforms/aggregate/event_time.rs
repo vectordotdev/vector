@@ -412,7 +412,6 @@ impl Aggregate {
             .collect();
 
         for bucket_key in buckets_to_flush {
-            let bucket_output_start = output.len();
             if let Some(bucket_map) = self.event_time_buckets.remove(&bucket_key) {
                 // Diff mode must retain `bucket_map` to subtract against the
                 // next flush, so it iterates by reference and per-entry clones
@@ -508,7 +507,6 @@ impl Aggregate {
                     }
                 }
             }
-            self.set_bucket_start_timestamps(&mut output[bucket_output_start..], bucket_key);
 
             // Advance the watermark to the *exclusive end* of the highest
             // flushed bucket so subsequent events for that window (or any
@@ -521,23 +519,6 @@ impl Aggregate {
 
         if !output.is_empty() {
             emit!(AggregateFlushed);
-        }
-    }
-
-    /// With `set_interval_ms`, an incremental bucket metric describes the window
-    /// `[bucket_key, bucket_key + interval_ms)`, so its timestamp must be the window start.
-    fn set_bucket_start_timestamps(&self, flushed: &mut [Event], bucket_key: BucketKey) {
-        if self.output_interval_ms.is_none() {
-            return;
-        }
-        let Some(bucket_start) = DateTime::<Utc>::from_timestamp_millis(bucket_key) else {
-            return;
-        };
-        for event in flushed {
-            let metric = event.as_mut_metric();
-            if metric.kind() == MetricKind::Incremental {
-                metric.data_mut().time.timestamp = Some(bucket_start);
-            }
         }
     }
 }

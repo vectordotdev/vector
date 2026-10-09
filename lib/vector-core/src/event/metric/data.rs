@@ -108,19 +108,16 @@ impl MetricData {
                     return false;
                 };
 
-                let (start, end_interval) = if t1 > t2 {
+                if t1 > t2 {
                     // The interval window starts from the beginning of `other` (aka `t2`)
                     // and goes to the end of `self` (which is `t1 + i1`).
-                    (t2, i1)
+                    (Some(t2), NonZeroU32::new(delta_t + i1.get()))
                 } else {
                     // The interval window starts from the beginning of `self` (aka `t1`)
                     // and goes to the end of `other` (which is `t2 + i2`).
-                    (t1, i2)
-                };
-                let Some(interval) = delta_t.checked_add(end_interval.get()) else {
-                    return false;
-                };
-                (Some(start), NonZeroU32::new(interval))
+
+                    (Some(t1), NonZeroU32::new(delta_t + i2.get()))
+                }
             }
             (Some(t), _, None, _) | (None, _, Some(t), _) => (Some(t), None),
             (Some(t1), _, Some(t2), _) => (Some(t1.max(t2)), None),

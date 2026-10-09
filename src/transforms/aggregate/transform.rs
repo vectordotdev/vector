@@ -8,7 +8,6 @@ use std::{
 };
 
 use async_stream::stream;
-use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt};
 use vector_lib::event::{
     MetricValue,
@@ -98,9 +97,7 @@ pub struct Aggregate {
     pub(crate) watermark: Option<BucketKey>,
     pub(crate) config: AggregateConfig,
     /// Interval to set on flushed incremental metrics; `Some` only when `set_interval_ms` is enabled.
-    pub(crate) output_interval_ms: Option<NonZeroU32>,
-    /// Start of the current system-time window: creation time, then the time of each flush.
-    window_start: DateTime<Utc>,
+    output_interval_ms: Option<NonZeroU32>,
 }
 
 /// Upper bound for any millisecond-valued duration field that is later cast
@@ -136,6 +133,14 @@ impl Aggregate {
             }
         }
         let output_interval_ms = if config.set_interval_ms {
+            // Sinks such as `datadog_metrics` send the interval as whole seconds.
+            if !config.interval_ms.is_multiple_of(1000) {
+                return Err(format!(
+                    "`interval_ms` ({}) must be a whole number of seconds (a multiple of 1000) when `set_interval_ms` is enabled",
+                    config.interval_ms
+                )
+                .into());
+            }
             let interval_ms = u32::try_from(config.interval_ms).map_err(|_| {
                 format!(
                     "`interval_ms` ({}) exceeds the maximum supported value of {} ms when `set_interval_ms` is enabled",
@@ -159,7 +164,6 @@ impl Aggregate {
             watermark: None,
             config: *config,
             output_interval_ms,
-            window_start: Utc::now(),
         })
     }
 
@@ -350,7 +354,6 @@ impl Aggregate {
             self.flush_event_time_buckets(output, false);
         } else {
             self.flush_system_time(output);
-            self.set_window_start_timestamps(&mut output[start..]);
         }
         self.set_output_interval(&mut output[start..]);
     }
@@ -366,24 +369,8 @@ impl Aggregate {
             self.flush_event_time_buckets(output, true);
         } else {
             self.flush_system_time(output);
-            self.set_window_start_timestamps(&mut output[start..]);
         }
         self.set_output_interval(&mut output[start..]);
-    }
-
-    /// With `set_interval_ms`, a system-time flush emits the window since the previous flush, so
-    /// its incremental metrics get the window start as their timestamp.
-    fn set_window_start_timestamps(&mut self, flushed: &mut [Event]) {
-        let window_start = std::mem::replace(&mut self.window_start, Utc::now());
-        if self.output_interval_ms.is_none() {
-            return;
-        }
-        for event in flushed {
-            let metric = event.as_mut_metric();
-            if metric.kind() == MetricKind::Incremental {
-                metric.data_mut().time.timestamp = Some(window_start);
-            }
-        }
     }
 
     /// Overwrites `interval_ms` on flushed incremental metrics with the flush interval, so a

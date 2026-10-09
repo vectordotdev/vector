@@ -40,11 +40,8 @@ pub struct AggregateConfig {
     /// interval. For example, the `datadog_metrics` sink sends counters that have an interval
     /// as rates. Absolute metrics and metrics that pass through unchanged are not modified.
     ///
-    /// The timestamp of these metrics is also set to the start of their window, so the timestamp
-    /// and the interval describe the same window. The window start is the bucket start with
-    /// `event_time`, and the time of the previous flush otherwise.
-    ///
-    /// When enabled, `interval_ms` must not be greater than 4294967295 (about 49.7 days).
+    /// When enabled, `interval_ms` must be a whole number of seconds (a multiple of 1000) and
+    /// must not be greater than 4294967295 (about 49.7 days).
     #[serde(default)]
     pub set_interval_ms: bool,
 }

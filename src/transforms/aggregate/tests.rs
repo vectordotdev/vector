@@ -1742,7 +1742,8 @@ fn set_interval_ms_parses_and_defaults_to_false() {
 
 #[test]
 fn set_interval_ms_rejects_interval_above_u32() {
-    let too_large = u64::from(u32::MAX) + 1;
+    // The smallest whole-second interval above `u32::MAX` milliseconds.
+    let too_large = 4_294_968_000;
 
     let err = Aggregate::new(&with_set_interval_ms(event_time_config(
         too_large,
@@ -1750,17 +1751,43 @@ fn set_interval_ms_rejects_interval_above_u32() {
     )))
     .expect_err("interval_ms above u32::MAX must be rejected with set_interval_ms");
     assert!(
-        err.to_string().contains("set_interval_ms"),
-        "error should mention set_interval_ms, got: {err}"
+        err.to_string().contains("maximum supported value"),
+        "error should mention the maximum, got: {err}"
     );
 
     Aggregate::new(&event_time_config(too_large, AggregationMode::Auto))
         .expect("the u32 limit only applies when set_interval_ms is enabled");
     Aggregate::new(&with_set_interval_ms(event_time_config(
-        u64::from(u32::MAX),
+        4_294_967_000,
         AggregationMode::Auto,
     )))
-    .expect("u32::MAX is the largest accepted interval with set_interval_ms");
+    .expect("the largest whole-second interval within u32::MAX is accepted");
+}
+
+#[test]
+fn set_interval_ms_requires_whole_seconds() {
+    for interval_ms in [1, 500, 1_500, 10_001] {
+        let config = AggregateConfig {
+            interval_ms,
+            ..system_time_config(AggregationMode::Auto)
+        };
+        let err = Aggregate::new(&with_set_interval_ms(config))
+            .expect_err("a fractional-second interval must be rejected with set_interval_ms");
+        assert!(
+            err.to_string().contains("whole number of seconds"),
+            "interval_ms = {interval_ms}, got: {err}"
+        );
+        Aggregate::new(&config)
+            .expect("fractional-second intervals are allowed without set_interval_ms");
+    }
+    for interval_ms in [1_000, 2_000, 60_000] {
+        let config = AggregateConfig {
+            interval_ms,
+            ..system_time_config(AggregationMode::Auto)
+        };
+        Aggregate::new(&with_set_interval_ms(config))
+            .expect("whole-second intervals are accepted with set_interval_ms");
+    }
 }
 
 #[test]
@@ -1833,49 +1860,6 @@ fn set_interval_ms_sets_interval_on_flushed_incremental_metrics() {
 }
 
 #[test]
-fn set_interval_ms_stamps_system_time_window_start() {
-    let sample_ts = Utc.timestamp_opt(1_600_000_000, 0).single().unwrap();
-    let counter = || {
-        make_metric_with_timestamp(
-            "counter_a",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
-            sample_ts,
-        )
-    };
-    let timestamp_of = |event: &Event| event.as_metric().timestamp().unwrap();
-
-    let before_new = Utc::now();
-    let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
-        AggregationMode::Auto,
-    )))
-    .unwrap();
-    let after_new = Utc::now();
-
-    // The first window starts when the transform is created.
-    agg.record(counter());
-    let mut out = vec![];
-    agg.flush_into(&mut out);
-    let after_first_flush = Utc::now();
-    assert_eq!(1, out.len());
-    let first = timestamp_of(&out[0]);
-    assert!(before_new <= first && first <= after_new);
-
-    // Each later window starts at the previous flush.
-    agg.record(counter());
-    let out = flush_final(&mut agg);
-    assert_eq!(1, out.len());
-    let second = timestamp_of(&out[0]);
-    assert!(after_new <= second && second <= after_first_flush);
-
-    // Flag off: the latest sample timestamp is kept, as before.
-    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
-    agg.record(counter());
-    let out = flush_final(&mut agg);
-    assert_eq!(timestamp_of(&out[0]), sample_ts);
-}
-
-#[test]
 fn set_interval_ms_overwrites_input_interval() {
     let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
         AggregationMode::Sum,
@@ -1944,49 +1928,4 @@ fn set_interval_ms_sets_interval_on_event_time_buckets() {
     assert_eq!(1, out.len());
     assert_counter(&out[0], 5.0);
     assert_eq!(interval_ms_of(&out[0]), Some(10_000));
-    let bucket_start = Utc
-        .timestamp_millis_opt(agg.bucket_key(base_time))
-        .single()
-        .unwrap();
-    assert_eq!(out[0].as_metric().timestamp(), Some(bucket_start));
-}
-
-#[test]
-fn set_interval_ms_keeps_event_time_timestamps_when_not_stamped() {
-    let interval_ms = 10_000;
-    let base_time = open_bucket_timestamp(interval_ms);
-    let last_sample = base_time + chrono::Duration::milliseconds(100);
-    let counter = |value, timestamp| {
-        make_metric_with_timestamp(
-            "counter_a",
-            MetricKind::Incremental,
-            MetricValue::Counter { value },
-            timestamp,
-        )
-    };
-
-    // Flag off: the bucket keeps the latest sample timestamp, as before.
-    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
-    agg.record(counter(2.0, base_time));
-    agg.record(counter(3.0, last_sample));
-    let out = flush_final(&mut agg);
-    assert_eq!(1, out.len());
-    assert_eq!(out[0].as_metric().timestamp(), Some(last_sample));
-
-    // Flag on: absolute metrics get no interval and keep their timestamp.
-    let mut agg = Aggregate::new(&with_set_interval_ms(event_time_config(
-        interval_ms,
-        AggregationMode::Latest,
-    )))
-    .unwrap();
-    agg.record(make_metric_with_timestamp(
-        "gauge_a",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 7.0 },
-        last_sample,
-    ));
-    let out = flush_final(&mut agg);
-    assert_eq!(1, out.len());
-    assert_eq!(interval_ms_of(&out[0]), None);
-    assert_eq!(out[0].as_metric().timestamp(), Some(last_sample));
 }
