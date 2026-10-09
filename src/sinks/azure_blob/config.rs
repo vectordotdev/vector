@@ -454,7 +454,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
         {
             SharedKeyAuthorizationPolicy::new(
                 account_name,
-                account_key,
+                &account_key,
                 // Use an Azurite-supported storage service version
                 String::from("2025-11-05"),
             )
@@ -1103,7 +1103,7 @@ pub fn build_client(
 
             let policy = SharedKeyAuthorizationPolicy::new(
                 account_name,
-                account_key,
+                &account_key,
                 // Use an Azurite-supported storage service version
                 String::from("2025-11-05"),
             )
