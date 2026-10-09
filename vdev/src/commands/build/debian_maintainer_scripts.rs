@@ -78,7 +78,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn stages_scripts_and_regenerates_stub() {
+        use std::os::unix::fs::PermissionsExt as _;
+
         let temp = tempfile::tempdir().unwrap();
         let source = temp.path().join("source");
         let scripts = source.join("scripts");
@@ -86,12 +89,7 @@ mod tests {
         fs::create_dir_all(&scripts).unwrap();
         fs::write(scripts.join("preinst"), "@VECTOR_CONFIG_STUB@\n").unwrap();
         fs::write(scripts.join("postinst"), "#!/bin/sh\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt as _;
-            fs::set_permissions(scripts.join("preinst"), fs::Permissions::from_mode(0o755))
-                .unwrap();
-        }
+        fs::set_permissions(scripts.join("preinst"), fs::Permissions::from_mode(0o755)).unwrap();
         for stub in ["# first\n", "# changed\n"] {
             fs::write(source.join("vector.yaml"), stub).unwrap();
             generate(&source, &output).unwrap();
@@ -100,18 +98,14 @@ mod tests {
                 fs::read(output.join("postinst")).unwrap(),
                 fs::read(scripts.join("postinst")).unwrap()
             );
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt as _;
-                assert_eq!(
-                    fs::metadata(output.join("preinst"))
-                        .unwrap()
-                        .permissions()
-                        .mode()
-                        & 0o777,
-                    0o755
-                );
-            }
+            assert_eq!(
+                fs::metadata(output.join("preinst"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o755
+            );
         }
     }
 }
