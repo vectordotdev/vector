@@ -809,7 +809,7 @@ impl From<FluentEvent<'_>> for LogEvent {
             &mut log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(FluentConfig::NAME.as_bytes()),
+            Value::from_static_str(FluentConfig::NAME),
         );
 
         match log_namespace {
