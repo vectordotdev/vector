@@ -97,7 +97,7 @@ pub struct Aggregate {
     pub(crate) watermark: Option<BucketKey>,
     pub(crate) config: AggregateConfig,
     /// Interval to set on flushed incremental metrics; `Some` only when `set_interval_ms` is enabled.
-    output_interval_ms: Option<NonZeroU32>,
+    pub(crate) output_interval_ms: Option<NonZeroU32>,
 }
 
 /// Upper bound for any millisecond-valued duration field that is later cast

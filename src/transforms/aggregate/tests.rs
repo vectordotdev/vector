@@ -1898,4 +1898,49 @@ fn set_interval_ms_sets_interval_on_event_time_buckets() {
     assert_eq!(1, out.len());
     assert_counter(&out[0], 5.0);
     assert_eq!(interval_ms_of(&out[0]), Some(10_000));
+    let bucket_start = Utc
+        .timestamp_millis_opt(agg.bucket_key(base_time))
+        .single()
+        .unwrap();
+    assert_eq!(out[0].as_metric().timestamp(), Some(bucket_start));
+}
+
+#[test]
+fn set_interval_ms_keeps_event_time_timestamps_when_not_stamped() {
+    let interval_ms = 10_000;
+    let base_time = open_bucket_timestamp(interval_ms);
+    let last_sample = base_time + chrono::Duration::milliseconds(100);
+    let counter = |value, timestamp| {
+        make_metric_with_timestamp(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value },
+            timestamp,
+        )
+    };
+
+    // Flag off: the bucket keeps the latest sample timestamp, as before.
+    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+    agg.record(counter(2.0, base_time));
+    agg.record(counter(3.0, last_sample));
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    assert_eq!(out[0].as_metric().timestamp(), Some(last_sample));
+
+    // Flag on: absolute metrics get no interval and keep their timestamp.
+    let mut agg = Aggregate::new(&with_set_interval_ms(event_time_config(
+        interval_ms,
+        AggregationMode::Latest,
+    )))
+    .unwrap();
+    agg.record(make_metric_with_timestamp(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 7.0 },
+        last_sample,
+    ));
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    assert_eq!(interval_ms_of(&out[0]), None);
+    assert_eq!(out[0].as_metric().timestamp(), Some(last_sample));
 }

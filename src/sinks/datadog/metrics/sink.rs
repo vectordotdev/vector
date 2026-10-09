@@ -239,22 +239,39 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
         }
 
         // Only aggregate counters. All other types can be skipped.
-        if let (
-            MetricValue::Counter { value: left_value },
-            MetricValue::Counter { value: right_value },
-        ) = (left.value(), right.value_mut())
-        {
-            // NOTE: The docs for `dedup_by` specify that if `left`/`right` are equal, then
-            // `left` is the element that gets removed.
-            *right_value += left_value;
-            right
-                .metadata_mut()
-                .merge_finalizers(left.metadata_mut().take_finalizers());
+        let (MetricValue::Counter { value: left_value }, MetricValue::Counter { .. }) =
+            (left.value(), right.value())
+        else {
+            return false;
+        };
+        let left_value = *left_value;
 
-            true
-        } else {
-            false
+        // NOTE: The docs for `dedup_by` specify that if `left`/`right` are equal, then
+        // `left` is the element that gets removed.
+        match (left.interval_ms(), right.interval_ms()) {
+            // Rates are scaled by their interval, so the collapsed counter must also cover both
+            // windows. `update` merges the windows from the timestamps and sums the values.
+            (Some(_), Some(_)) if left.timestamp().is_some() && right.timestamp().is_some() => {
+                if !right.data_mut().update(left.data()) {
+                    return false;
+                }
+            }
+            (left_interval, right_interval) => {
+                if let MetricValue::Counter { value } = right.value_mut() {
+                    *value += left_value;
+                }
+                if let (Some(left_interval), Some(right_interval)) = (left_interval, right_interval)
+                {
+                    right.data_mut().time.interval_ms =
+                        Some(right_interval.saturating_add(left_interval.get()));
+                }
+            }
         }
+        right
+            .metadata_mut()
+            .merge_finalizers(left.metadata_mut().take_finalizers());
+
+        true
     });
 
     metrics
@@ -262,7 +279,7 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, time::Duration};
+    use std::{collections::HashSet, num::NonZeroU32, time::Duration};
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
@@ -364,6 +381,45 @@ mod tests {
         let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
 
         assert_eq!(expected, actual);
+    }
+
+    fn create_rate_counter(
+        value: f64,
+        interval_ms: u32,
+        timestamp: Option<DateTime<Utc>>,
+    ) -> Metric {
+        create_counter("rate", value)
+            .with_interval_ms(NonZeroU32::new(interval_ms))
+            .with_timestamp(timestamp)
+    }
+
+    #[test]
+    fn collapse_rate_counters_merges_their_windows() {
+        let start = DateTime::from_timestamp_millis(1_700_000_000_000);
+        let half_second_later = DateTime::from_timestamp_millis(1_700_000_000_500);
+        for input in [
+            vec![
+                create_rate_counter(1.0, 500, start),
+                create_rate_counter(3.0, 500, half_second_later),
+            ],
+            vec![
+                create_rate_counter(3.0, 500, half_second_later),
+                create_rate_counter(1.0, 500, start),
+            ],
+        ] {
+            let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
+            assert_eq!(vec![create_rate_counter(4.0, 1_000, start)], actual);
+        }
+    }
+
+    #[test]
+    fn collapse_rate_counters_without_timestamps_sums_their_intervals() {
+        let input = vec![
+            create_rate_counter(1.0, 500, None),
+            create_rate_counter(3.0, 500, None),
+        ];
+        let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
+        assert_eq!(vec![create_rate_counter(4.0, 1_000, None)], actual);
     }
 
     #[test]

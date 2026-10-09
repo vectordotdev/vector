@@ -6,3 +6,4 @@ transforms:
     interval_ms: 10000
     measure_cpu_usage: false
     mode: Auto
+    set_interval_ms: false
