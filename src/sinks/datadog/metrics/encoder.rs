@@ -570,10 +570,11 @@ pub(super) struct SeriesInterval {
 /// Converts a metric's millisecond `interval_ms`, if any, into a [`SeriesInterval`].
 pub(super) fn series_interval(metric: &Metric) -> Option<SeriesInterval> {
     metric.interval_ms().map(|interval_ms| {
-        let exact_secs = f64::from(interval_ms.get()) / 1000.0;
+        let ms = interval_ms.get();
+        let rounded_secs = ms / 1000 + u32::from(ms % 1000 >= 500);
         SeriesInterval {
-            whole_secs: (exact_secs.round() as u32).max(1),
-            exact_secs,
+            whole_secs: rounded_secs.max(1),
+            exact_secs: f64::from(ms) / 1000.0,
         }
     })
 }

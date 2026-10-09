@@ -1711,7 +1711,10 @@ fn with_set_interval_ms(config: AggregateConfig) -> AggregateConfig {
 }
 
 fn interval_ms_of(event: &Event) -> Option<u32> {
-    event.as_metric().interval_ms().map(|i| i.get())
+    event
+        .as_metric()
+        .interval_ms()
+        .map(std::num::NonZeroU32::get)
 }
 
 #[test]
@@ -1728,10 +1731,10 @@ fn set_interval_ms_parses_and_defaults_to_false() {
     assert!(!cfg.set_interval_ms);
 
     let cfg: AggregateConfig = toml::from_str(
-        r#"
+        r"
         interval_ms = 5000
         set_interval_ms = true
-    "#,
+    ",
     )
     .unwrap();
     assert!(cfg.set_interval_ms);

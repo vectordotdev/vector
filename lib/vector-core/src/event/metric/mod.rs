@@ -1203,4 +1203,23 @@ mod test {
         assert!(gauge.data.add(&delta.data));
         assert_eq!(gauge, expected);
     }
+
+    #[test]
+    fn merge_interval_overflow_is_rejected() {
+        let mut counter = Metric::new(
+            "counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_timestamp(Some(ts()))
+        .with_interval_ms(std::num::NonZeroU32::new(u32::MAX));
+
+        let delta = counter
+            .clone()
+            .with_timestamp(Some(ts() + chrono::Duration::milliseconds(1)));
+
+        let before = counter.clone();
+        assert!(!counter.data.add(&delta.data));
+        assert_eq!(counter, before);
+    }
 }
