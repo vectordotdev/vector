@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::de::{DeserializeOwned, IntoDeserializer};
 use serde_json::{Map, Number, Value};
 
@@ -169,25 +171,44 @@ pub(super) fn merge_into_map(map: &mut ConfigMap, other: ConfigMap) -> Result<()
     merge_into_map_at_path(map, other, &mut Vec::new(), None).map_err(|error| vec![error])
 }
 
-struct DeferredConflict {
-    pointer: String,
+pub(super) struct DeferredConflict {
+    pub(super) path: Vec<String>,
     values: [Value; 2],
     error: String,
+    requires_coercion: bool,
 }
 
-/// Assemble partial configurations before checking string/scalar conflicts against their schema.
-/// Keep overwritten values so an invalid value cannot be hidden by a later override.
-pub(super) fn merge_maps_with_coercion(
+/// Retains overwritten string/scalar conflicts until the full configuration is assembled.
+pub(super) fn merge_maps_deferred(
     maps: impl IntoIterator<Item = ConfigMap>,
-    mut coerce: impl FnMut(&mut Value) -> Result<(), Vec<String>>,
-) -> Result<ConfigMap, Vec<String>> {
+) -> Result<(ConfigMap, Vec<DeferredConflict>), Vec<String>> {
     let mut merged = ConfigMap::new();
     let mut conflicts = Vec::new();
     for map in maps {
         merge_into_map_at_path(&mut merged, map, &mut Vec::new(), Some(&mut conflicts))
             .map_err(|error| vec![error])?;
     }
+    Ok((merged, conflicts))
+}
 
+pub(super) fn resolve_merge_conflicts(
+    merged: ConfigMap,
+    conflicts: Vec<DeferredConflict>,
+    mut coerce: impl FnMut(&mut Value) -> Result<(), Vec<String>>,
+) -> Result<ConfigMap, Vec<String>> {
+    let incompatible: HashMap<_, _> = conflicts
+        .iter()
+        .filter(|conflict| conflict.requires_coercion)
+        .map(|conflict| (conflict.path.clone(), conflict.error.clone()))
+        .collect();
+    let conflicts: Vec<_> = conflicts
+        .into_iter()
+        .filter_map(|mut conflict| {
+            let error = incompatible.get(&conflict.path)?;
+            conflict.error.clone_from(error);
+            Some(conflict)
+        })
+        .collect();
     if conflicts.is_empty() {
         return Ok(merged);
     }
@@ -196,24 +217,30 @@ pub(super) fn merge_maps_with_coercion(
     let mut merged = uncoerced.clone();
     coerce(&mut merged)?;
     for conflict in conflicts {
+        let pointer: String = conflict
+            .path
+            .iter()
+            .map(|key| format!("/{}", key.replace('~', "~0").replace('/', "~1")))
+            .collect();
         // Use the assembled component (including its type tag and required fields),
         // not the incomplete file that supplied each value. Check both sides: even
         // the replacement may have been overwritten again by a later file.
         for value in conflict.values {
+            let was_string = value.is_string();
             let mut candidate = uncoerced.clone();
-            let Some(field) = candidate.pointer_mut(&conflict.pointer) else {
+            let Some(field) = candidate.pointer_mut(&pointer) else {
                 return Err(vec![conflict.error]);
             };
             *field = value;
             coerce(&mut candidate)?;
 
-            match (
-                candidate.pointer(&conflict.pointer),
-                merged.pointer(&conflict.pointer),
-            ) {
+            match (candidate.pointer(&pointer), merged.pointer(&pointer)) {
                 (Some(previous), Some(current))
                     if !previous.is_array()
                         && !previous.is_object()
+                        // A native number/bool was never a valid replacement for a
+                        // string field. Deferral only enables string-to-scalar input.
+                        && (was_string || !previous.is_string())
                         && value_type(previous) == value_type(current) => {}
                 _ => return Err(vec![conflict.error]),
             }
@@ -247,6 +274,15 @@ pub(super) fn merge_values(value: Value, other: Value) -> Result<Value, Vec<Stri
     merge_values_at_path(value, other, &mut Vec::new(), None).map_err(|error| vec![error])
 }
 
+pub(super) fn merge_values_deferred(
+    value: Value,
+    other: Value,
+    conflicts: &mut Vec<DeferredConflict>,
+) -> Result<Value, Vec<String>> {
+    merge_values_at_path(value, other, &mut Vec::new(), Some(conflicts))
+        .map_err(|error| vec![error])
+}
+
 fn merge_values_at_path(
     value: Value,
     other: Value,
@@ -256,7 +292,21 @@ fn merge_values_at_path(
     match (value, other) {
         (Value::Null, Value::Null) => Ok(Value::Null),
         (Value::Bool(_), Value::Bool(other)) => Ok(Value::Bool(other)),
-        (Value::String(_), Value::String(other)) => Ok(Value::String(other)),
+        (Value::String(value), Value::String(other)) => {
+            // Preserve string history in case a later native scalar exposes a type
+            // conflict. Ordinary string-only overrides never need validation.
+            if value != other
+                && let Some(conflicts) = conflicts
+            {
+                conflicts.push(DeferredConflict {
+                    path: path.clone(),
+                    values: [Value::String(value), Value::String(other.clone())],
+                    error: String::new(),
+                    requires_coercion: false,
+                });
+            }
+            Ok(Value::String(other))
+        }
         (Value::Number(value), Value::Number(other))
             if number_type(&value) == number_type(&other) =>
         {
@@ -288,14 +338,11 @@ fn merge_values_at_path(
                 && !other.is_object()
                 && let Some(conflicts) = conflicts
             {
-                let pointer = path
-                    .iter()
-                    .map(|key| format!("/{}", key.replace('~', "~0").replace('/', "~1")))
-                    .collect();
                 conflicts.push(DeferredConflict {
-                    pointer,
+                    path: path.clone(),
                     values: [value, other.clone()],
                     error,
+                    requires_coercion: true,
                 });
                 Ok(other)
             } else {
@@ -331,7 +378,8 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::{
-        ConfigMap, deserialize_config, merge_maps_with_coercion, merge_values, parse_config_value,
+        ConfigMap, deserialize_config, merge_maps_deferred, merge_values, parse_config_value,
+        resolve_merge_conflicts,
     };
     use crate::config::{Format, loading::schema_coercion::ValueCoercer};
 
@@ -639,7 +687,9 @@ mod tests {
                 "enabled": {"type": "boolean"},
                 "a/b~c": {"type": "integer"},
                 "items": {"type": "array", "items": {"type": "integer"}},
-                "untyped": {}
+                "untyped": {},
+                "string": {"type": "string"},
+                "choice": {"enum": ["final"]}
             }
         });
         for case in [
@@ -694,15 +744,27 @@ mod tests {
                 fragments: vec![json!({"items": "1"}), json!({"items": 2})],
                 expected: Err("Incompatible types"),
             },
+            Case {
+                name: "ordinary string overrides do not validate overwritten values",
+                fragments: vec![json!({"choice": "obsolete"}), json!({"choice": "final"})],
+                expected: Ok(json!({"choice": "final"})),
+            },
+            Case {
+                name: "native scalars cannot become string-field overrides",
+                fragments: vec![json!({"string": "42"}), json!({"string": 43})],
+                expected: Err("Incompatible types"),
+            },
         ] {
             let maps = case
                 .fragments
                 .into_iter()
                 .map(|value| serde_json::from_value::<ConfigMap>(value).unwrap());
-            let result = merge_maps_with_coercion(maps, |value| {
-                ValueCoercer::new(&schema)
-                    .coerce(value)
-                    .map_err(|error| vec![error.to_string()])
+            let result = merge_maps_deferred(maps).and_then(|(merged, conflicts)| {
+                resolve_merge_conflicts(merged, conflicts, |value| {
+                    ValueCoercer::new(&schema)
+                        .coerce(value)
+                        .map_err(|error| vec![error.to_string()])
+                })
             });
             match case.expected {
                 Ok(expected) => assert_eq!(

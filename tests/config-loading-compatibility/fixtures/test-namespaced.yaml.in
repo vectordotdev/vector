@@ -1,0 +1,12 @@
+name: a single event is preserved
+input:
+  insert_at: stable
+  type: log
+  log_fields:
+    message: test-message
+outputs:
+  - extract_from: stable
+    expected_event_count: ${COMPAT_COUNT}
+    conditions:
+      - type: vrl
+        source: '.message == "test-message"'

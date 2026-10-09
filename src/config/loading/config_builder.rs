@@ -1,8 +1,9 @@
 use std::{collections::HashMap, io::Read};
 
 use super::{
-    ComponentHint, Process, deserialize_component_map, deserialize_config_map,
-    interpolate_config_map_with_secrets, loader, representation::ConfigMap,
+    ComponentHint, deserialize_component_map, deserialize_config_map,
+    loader::{CoercionScope, ConfigScope, ParsedInputs, merge_root_config},
+    representation::ConfigMap,
 };
 use crate::config::ConfigBuilder;
 
@@ -37,7 +38,7 @@ impl ConfigBuilderLoader {
         self,
         config_paths: &[super::ConfigPath],
     ) -> Result<ConfigBuilder, Vec<String>> {
-        super::loader_from_paths(self, config_paths)
+        self.load(ParsedInputs::from_paths(config_paths))
     }
 
     /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
@@ -46,61 +47,51 @@ impl ConfigBuilderLoader {
         input: R,
         format: super::Format,
     ) -> Result<ConfigBuilder, Vec<String>> {
-        super::loader_from_input(self, input, format)
-    }
-}
-
-impl Default for ConfigBuilderLoader {
-    fn default() -> Self {
-        Self {
-            builder: ConfigBuilder::default(),
-            secrets: HashMap::new(),
-            interpolate_env: super::env_var_interpolation_enabled(),
-        }
-    }
-}
-
-impl Process for ConfigBuilderLoader {
-    fn should_interpolate_env(&self) -> bool {
-        self.interpolate_env
+        self.load(ParsedInputs::from_input(input, format))
     }
 
-    fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
-        if self.secrets.is_empty() {
-            Ok(map)
-        } else {
-            interpolate_config_map_with_secrets(&map, &self.secrets)
-        }
+    fn load(self, mut inputs: ParsedInputs) -> Result<ConfigBuilder, Vec<String>> {
+        inputs.interpolate_environment(self.interpolate_env);
+        inputs.substitute_secrets(&self.secrets);
+        self.load_prepared(&inputs)
     }
 
-    fn merge_root(&mut self, files: ConfigMap) -> Result<(), Vec<String>> {
-        self.merge(loader::merge_root_config(files)?, None)
+    /// Builds from a retained input snapshot whose substitutions are already complete.
+    pub(crate) fn load_prepared(
+        mut self,
+        inputs: &ParsedInputs,
+    ) -> Result<ConfigBuilder, Vec<String>> {
+        inputs.assemble_coerced(
+            CoercionScope::Configuration,
+            |_| {},
+            |map, scope| self.merge(map, scope),
+        )?;
+        Ok(self.builder)
     }
 
-    /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
-    fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        match hint {
-            Some(hint @ ComponentHint::Source) => {
+    fn merge(&mut self, map: ConfigMap, scope: ConfigScope) -> Result<(), Vec<String>> {
+        match scope {
+            ConfigScope::Component(hint @ ComponentHint::Source) => {
                 self.builder
                     .sources
                     .extend(deserialize_component_map(map, hint)?);
             }
-            Some(hint @ ComponentHint::Sink) => {
+            ConfigScope::Component(hint @ ComponentHint::Sink) => {
                 self.builder
                     .sinks
                     .extend(deserialize_component_map(map, hint)?);
             }
-            Some(hint @ ComponentHint::Transform) => {
+            ConfigScope::Component(hint @ ComponentHint::Transform) => {
                 self.builder
                     .transforms
                     .extend(deserialize_component_map(map, hint)?);
             }
-            Some(hint @ ComponentHint::EnrichmentTable) => {
+            ConfigScope::Component(hint @ ComponentHint::EnrichmentTable) => {
                 self.builder
                     .enrichment_tables
                     .extend(deserialize_component_map(map, hint)?);
             }
-            Some(hint @ ComponentHint::Test) => {
+            ConfigScope::Component(hint @ ComponentHint::Test) => {
                 // Tests use a root array, not a component map. Discard filenames while
                 // preserving their order, then use the same coercion as top-level tests.
                 let map = ConfigMap::from_iter([(
@@ -111,8 +102,12 @@ impl Process for ConfigBuilderLoader {
                     .tests
                     .extend(deserialize_config_map::<ConfigBuilder>(map)?.tests);
             }
-            None => {
+            ConfigScope::Root => {
                 self.builder.append(deserialize_config_map(map)?)?;
+            }
+            ConfigScope::DirectoryRoot => {
+                self.builder
+                    .append(deserialize_config_map(merge_root_config(map)?)?)?;
             }
         };
 
@@ -120,10 +115,13 @@ impl Process for ConfigBuilderLoader {
     }
 }
 
-impl loader::Loader<ConfigBuilder> for ConfigBuilderLoader {
-    /// Returns the resulting `ConfigBuilder`.
-    fn take(self) -> ConfigBuilder {
-        self.builder
+impl Default for ConfigBuilderLoader {
+    fn default() -> Self {
+        Self {
+            builder: ConfigBuilder::default(),
+            secrets: HashMap::new(),
+            interpolate_env: super::env_var_interpolation_enabled(),
+        }
     }
 }
 

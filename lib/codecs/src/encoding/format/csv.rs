@@ -2,6 +2,7 @@ use bytes::BytesMut;
 use chrono::SecondsFormat;
 use csv_core::{WriteResult, Writer, WriterBuilder};
 use lookup::lookup_v2::ConfigTargetPath;
+use serde_with::serde_as;
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -73,14 +74,15 @@ impl CsvSerializerConfig {
 }
 
 /// Config used to build a `CsvSerializer`.
+#[serde_as]
 #[configurable_component]
 #[derive(Debug, Clone)]
 pub struct CsvSerializerOptions {
     /// The field delimiter to use when writing CSV.
     #[configurable(metadata(docs::type_override = "ascii_char"))]
+    #[serde_as(as = "vector_core::serde::ascii_char::AsciiChar")]
     #[serde(
         default = "default_delimiter",
-        with = "vector_core::serde::ascii_char",
         skip_serializing_if = "vector_core::serde::is_default"
     )]
     pub delimiter: u8,
@@ -102,18 +104,18 @@ pub struct CsvSerializerOptions {
     ///
     /// To use this, `double_quotes` needs to be disabled as well; otherwise, this setting is ignored.
     #[configurable(metadata(docs::type_override = "ascii_char"))]
+    #[serde_as(as = "vector_core::serde::ascii_char::AsciiChar")]
     #[serde(
         default = "default_escape",
-        with = "vector_core::serde::ascii_char",
         skip_serializing_if = "vector_core::serde::is_default"
     )]
     pub escape: u8,
 
     /// The quote character to use when writing CSV.
     #[configurable(metadata(docs::type_override = "ascii_char"))]
+    #[serde_as(as = "vector_core::serde::ascii_char::AsciiChar")]
     #[serde(
         default = "default_escape",
-        with = "vector_core::serde::ascii_char",
         skip_serializing_if = "vector_core::serde::is_default"
     )]
     quote: u8,
@@ -314,6 +316,35 @@ mod tests {
     use vector_core::event::{LogEvent, ObjectMap, Value};
 
     use super::*;
+
+    #[test]
+    fn ascii_field_schemas_match_their_serialized_values_and_defaults() {
+        let schema = serde_json::to_value(
+            vector_config::schema::generate_root_schema::<CsvSerializerOptions>().unwrap(),
+        )
+        .unwrap();
+        for (field, default) in [("delimiter", ","), ("escape", "\""), ("quote", "\"")] {
+            assert_eq!(schema["properties"][field]["type"], "string", "{field}");
+            assert_eq!(schema["properties"][field]["default"], default, "{field}");
+        }
+
+        for field in ["delimiter", "escape", "quote"] {
+            let mut input = serde_json::json!({"fields": ["message"]});
+            input[field] = serde_json::json!("1");
+            let options: CsvSerializerOptions = serde_json::from_value(input.clone()).unwrap();
+            assert_eq!(
+                serde_json::to_value(options).unwrap()[field],
+                "1",
+                "{field}"
+            );
+
+            input[field] = serde_json::json!(1);
+            assert!(
+                serde_json::from_value::<CsvSerializerOptions>(input).is_err(),
+                "{field}"
+            );
+        }
+    }
 
     fn make_event_with_fields(field_data: Vec<(&str, &str)>) -> (Vec<ConfigTargetPath>, Event) {
         let mut fields: Vec<ConfigTargetPath> = std::vec::Vec::new();

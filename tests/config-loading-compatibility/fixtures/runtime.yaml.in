@@ -1,0 +1,25 @@
+data_dir: '@DATA_DIR@'
+@SECRET_CONFIG@
+sources:
+  demo:
+    type: demo_logs
+    format: shuffle
+    lines: [@VALUE@]
+    count: @COUNT@
+    interval: @INTERVAL@
+    sequence: @SEQUENCE@
+transforms:
+  stable:
+    type: remap
+    inputs: [demo]
+    source: '. = {"message": string!(.message)}'
+sinks:
+  console:
+    type: console
+    inputs: [stable]
+    target: stdout
+    healthcheck: @HEALTHCHECK@
+    framing:
+      @FRAMING@
+    encoding:
+      codec: json

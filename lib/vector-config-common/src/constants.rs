@@ -29,6 +29,8 @@ pub const DOCS_META_TYPE_UNIT: &str = "docs::type_unit";
 pub const LOGICAL_NAME: &str = "logical_name";
 pub const METADATA: &str = "_metadata";
 pub const SERDE_ALIASES: &str = "serde::aliases";
+/// The custom deserializer requires a string; do not stringify other scalar types.
+pub const SERDE_STRING_ONLY: &str = "serde::string_only";
 pub const SERDE_VARIANT_ALIASES: &str = "serde::variant_aliases";
 
 /// Well-known component types.

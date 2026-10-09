@@ -1,0 +1,12 @@
+data_dir: '@DATA_DIR@'
+sources:
+  demo:
+    type: demo_logs
+    format: json
+    count: 1
+sinks:
+  console:
+    type: console
+    inputs: [${COMPAT_INPUTS}]
+    encoding:
+      codec: json

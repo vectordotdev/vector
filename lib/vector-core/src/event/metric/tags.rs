@@ -2,6 +2,7 @@
 use std::borrow::Borrow;
 use std::{
     borrow::Cow,
+    cell::RefCell,
     cmp::Ordering,
     collections::{BTreeMap, hash_map::DefaultHasher},
     fmt::Display,
@@ -12,7 +13,13 @@ use std::{
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_config::{Configurable, configurable_component};
+use vector_config::{
+    Configurable, GenerateError, Metadata, ToValue,
+    attributes::CustomAttribute,
+    configurable_component,
+    constants::DOCS_META_ENUM_TAGGING,
+    schema::{SchemaGenerator, SchemaObject, generate_one_of_schema, get_or_generate_schema},
+};
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -22,6 +29,7 @@ pub enum TagValue {
     Bare,
 
     /// Tag value containing a string.
+    #[configurable(metadata(serde::string_only))]
     Value(String),
 }
 
@@ -94,7 +102,7 @@ type TagValueRef<'a> = Option<&'a str>;
 
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
-#[derive(Clone, Configurable, Debug, Eq, PartialEq, Default)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub enum TagValueSet {
     /// This represents a set containing no value.
     #[default]
@@ -110,6 +118,38 @@ pub enum TagValueSet {
     /// elements. This allows us to retrieve the last element inserted which in turn allows us to
     /// emulate the set having a single value.
     Set(IndexSet<TagValue>),
+}
+
+impl Configurable for TagValueSet {
+    fn referenceable_name() -> Option<&'static str> {
+        Some(concat!(module_path!(), "::TagValueSet"))
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::with_description(
+            "Tag values for a metric series: a string, null, or an array of strings and nulls.",
+        );
+        metadata.add_custom_attribute(CustomAttribute::kv(DOCS_META_ENUM_TAGGING, "untagged"));
+        metadata
+    }
+
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        // Describe the existing deserializer, not the optimized storage variants.
+        // It accepts a Vec and deduplicates afterward, so the input schema must
+        // not impose the uniqueness constraint of IndexSet.
+        let single = get_or_generate_schema(&TagValue::as_configurable_ref(), generator, None)?;
+        let multiple =
+            get_or_generate_schema(&Vec::<TagValue>::as_configurable_ref(), generator, None)?;
+        Ok(generate_one_of_schema(&[single, multiple]))
+    }
+}
+
+impl ToValue for TagValueSet {
+    fn to_value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("Could not convert value to JSON")
+    }
 }
 
 impl Display for TagValueSet {
@@ -651,6 +691,8 @@ mod test_support {
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;
+    use serde_json::{Value, json};
+    use vector_config::{constants::SERDE_STRING_ONLY, schema::generate_root_schema};
 
     use super::*;
 
@@ -690,6 +732,92 @@ mod tests {
 
         assert_eq!(encoded, "null");
         assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn tag_value_set_schema_describes_scalar_or_array_inputs_without_uniqueness() {
+        let schema = serde_json::to_value(generate_root_schema::<MetricTags>().unwrap()).unwrap();
+        let set = &schema["additionalProperties"];
+        let variants = set["oneOf"]
+            .as_array()
+            .unwrap_or_else(|| panic!("missing tag set alternatives in {schema:#}"));
+        assert_eq!(variants.len(), 2);
+        assert_eq!(set["_metadata"][DOCS_META_ENUM_TAGGING], "untagged");
+
+        let single = &variants[0];
+        let array = &variants[1];
+        assert_eq!(array["type"], "array");
+        assert_eq!(array["items"]["$ref"], single["$ref"]);
+        assert_ne!(array.get("uniqueItems"), Some(&Value::Bool(true)));
+
+        let tag = &schema["definitions"][TagValue::referenceable_name().unwrap()];
+        let values = tag["oneOf"].as_array().unwrap();
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0]["type"], "null");
+        assert_eq!(values[1]["type"], "string");
+        assert_eq!(values[1]["_metadata"][SERDE_STRING_ONLY], true);
+    }
+
+    #[test]
+    fn tag_value_set_schema_defaults_preserve_existing_serialization() {
+        struct Case {
+            name: &'static str,
+            input: Value,
+            serialized: Value,
+        }
+
+        for case in [
+            Case {
+                name: "string",
+                input: json!("hello"),
+                serialized: json!("hello"),
+            },
+            Case {
+                name: "null-looking string",
+                input: json!("null"),
+                serialized: json!("null"),
+            },
+            Case {
+                name: "storage variant name",
+                input: json!("Empty"),
+                serialized: json!("Empty"),
+            },
+            Case {
+                name: "bare tag",
+                input: Value::Null,
+                serialized: Value::Null,
+            },
+            Case {
+                name: "empty set",
+                input: json!([]),
+                serialized: json!([]),
+            },
+            Case {
+                name: "singleton array",
+                input: json!(["hello"]),
+                serialized: json!("hello"),
+            },
+            Case {
+                name: "duplicate values",
+                input: json!(["hello", "hello", null, null]),
+                serialized: json!(["hello", null]),
+            },
+        ] {
+            let tags: TagValueSet = serde_json::from_value(case.input).unwrap();
+            assert_eq!(tags.to_value(), case.serialized, "{}", case.name);
+            assert_eq!(
+                serde_json::to_value(&tags).unwrap(),
+                case.serialized,
+                "{}",
+                case.name
+            );
+            assert_eq!(
+                serde_json::from_value::<TagValueSet>(case.serialized).unwrap(),
+                tags,
+                "{}",
+                case.name
+            );
+        }
     }
 
     proptest! {

@@ -1,5 +1,6 @@
 use super::{Error, ValueCoercer};
 use serde_json::{Value, json};
+use vector_config::constants::{METADATA, SERDE_STRING_ONLY};
 
 struct CoercionCase {
     name: &'static str,
@@ -53,6 +54,42 @@ impl RejectionCase {
             "{}: input changed on rejection",
             self.name
         );
+    }
+}
+
+#[test]
+fn string_only_deserializers_do_not_stringify_native_scalars() {
+    let schema = json!({
+        "type": "object",
+        "properties": {"delimiter": {
+            "type": "string",
+            METADATA: {SERDE_STRING_ONLY: true}
+        }}
+    });
+    for input in ["1", ",", "\n", "true"] {
+        CoercionCase {
+            name: "native or substituted strings stay unchanged",
+            schema: schema.clone(),
+            input: json!({"delimiter": input}),
+            expected: json!({"delimiter": input}),
+        }
+        .check();
+    }
+    for (name, input, actual) in [
+        ("integer", json!(1), "number"),
+        ("boolean", json!(true), "boolean"),
+        ("null", Value::Null, "null"),
+    ] {
+        RejectionCase {
+            name,
+            schema: schema.clone(),
+            input: json!({"delimiter": input}),
+            expected_error: Error::ExpectedString {
+                path: "delimiter".into(),
+                actual,
+            },
+        }
+        .check();
     }
 }
 

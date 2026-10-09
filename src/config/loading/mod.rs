@@ -6,8 +6,14 @@ pub mod schema_coercion;
 mod secret;
 mod source;
 
+#[cfg(test)]
+mod metric_tag_tests;
+
 #[cfg(all(test, feature = "sources-demo_logs"))]
 mod tests;
+
+#[cfg(all(test, feature = "sources-demo_logs"))]
+mod retained_tests;
 
 use std::{
     fmt::Debug,
@@ -19,7 +25,7 @@ use std::{
 pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
 pub use interpolation::interpolate_config_map_with_env_vars;
-use loader::process::Process;
+pub(crate) use loader::ParsedInputs;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
@@ -186,16 +192,27 @@ pub(crate) async fn load_builder_from_paths_with_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
-    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
+    let mut inputs = ParsedInputs::from_paths(config_paths);
+    inputs.interpolate_environment(env_var_interpolation_enabled());
+    load_builder_from_prepared_with_secrets(inputs, signal_handler, allow_empty).await
+}
+
+/// Completes secret resolution without reopening or reparsing prepared inputs.
+pub(crate) async fn load_builder_from_prepared_with_secrets(
+    mut inputs: ParsedInputs,
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let secrets_backends_loader = SecretBackendLoader::default().load_prepared(&inputs)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
+    inputs.substitute_secrets(&secrets);
     ConfigBuilderLoader::default()
         .allow_empty(allow_empty)
-        .secrets(secrets)
-        .load_from_paths(config_paths)
+        .load_prepared(&inputs)
 }
 
 pub async fn load_from_str_with_secrets(
@@ -204,17 +221,10 @@ pub async fn load_from_str_with_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    let secrets_backends_loader =
-        loader_from_input(SecretBackendLoader::default(), input.as_bytes(), format)?;
-    let secrets = secrets_backends_loader
-        .retrieve_secrets(signal_handler)
-        .await
-        .map_err(|e| vec![e])?;
-
-    let builder = ConfigBuilderLoader::default()
-        .allow_empty(allow_empty)
-        .secrets(secrets)
-        .load_from_input(input.as_bytes(), format)?;
+    let mut inputs = ParsedInputs::from_input(input.as_bytes(), format);
+    inputs.interpolate_environment(env_var_interpolation_enabled());
+    let builder =
+        load_builder_from_prepared_with_secrets(inputs, signal_handler, allow_empty).await?;
     signal_handler.clear();
 
     finalize_config(builder).await
@@ -232,64 +242,11 @@ async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> 
     Ok(new_config)
 }
 
-pub(super) fn loader_from_input<T, L, R>(
-    mut loader: L,
-    input: R,
-    format: Format,
-) -> Result<T, Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-    L: Loader<T> + Process,
-    R: std::io::Read,
-{
-    loader.load_from_str(input, format).map(|_| loader.take())
-}
-
-/// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-pub(super) fn loader_from_paths<T, L>(
-    mut loader: L,
-    config_paths: &[ConfigPath],
-) -> Result<T, Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-    L: Loader<T> + Process,
-{
-    let mut errors = Vec::new();
-
-    for config_path in config_paths {
-        match config_path {
-            ConfigPath::File(path, format_hint) => {
-                match loader.load_from_file(
-                    path,
-                    format_hint
-                        .or_else(move || Format::from_path(&path).ok())
-                        .unwrap_or_default(),
-                ) {
-                    Ok(()) => {}
-                    Err(errs) => errors.extend(errs),
-                };
-            }
-            ConfigPath::Dir(path) => {
-                match loader.load_from_dir(path) {
-                    Ok(()) => {}
-                    Err(errs) => errors.extend(errs),
-                };
-            }
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(loader.take())
-    } else {
-        Err(errors)
-    }
-}
-
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a JSON object.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
-    loader_from_paths(SourceLoader::new(), config_paths)
+    SourceLoader::new().load_from_paths(config_paths)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {

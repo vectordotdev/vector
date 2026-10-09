@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use indoc::indoc;
 use serde_json::{Value, json};
 
-use super::{
-    ConfigBuilderLoader, SecretBackendLoader, SourceLoader, loader_from_input, loader_from_paths,
-};
+use super::{ConfigBuilderLoader, SecretBackendLoader, SourceLoader};
 use crate::config::{ConfigPath, Format};
 
 struct ScalarCase {
@@ -13,6 +11,94 @@ struct ScalarCase {
     format: Format,
     input: &'static str,
     expected: Value,
+}
+
+#[cfg(feature = "sinks-console")]
+#[test]
+fn healthchecks_accept_boolean_shorthand_and_objects() {
+    struct Case {
+        name: &'static str,
+        input: Value,
+        enabled: Option<bool>,
+    }
+
+    for case in [
+        Case {
+            name: "native false",
+            input: json!(false),
+            enabled: Some(false),
+        },
+        Case {
+            name: "native true",
+            input: json!(true),
+            enabled: Some(true),
+        },
+        Case {
+            name: "object false",
+            input: json!({"enabled": false}),
+            enabled: Some(false),
+        },
+        Case {
+            name: "default object",
+            input: json!({}),
+            enabled: Some(true),
+        },
+        Case {
+            name: "environment boolean shorthand",
+            input: json!("${VECTOR_TEST_HEALTHCHECK_ENABLED:-false}"),
+            enabled: Some(false),
+        },
+        Case {
+            name: "secret boolean shorthand",
+            input: json!("SECRET[backend.healthcheck]"),
+            enabled: Some(false),
+        },
+        Case {
+            name: "integer is not shorthand",
+            input: json!(1),
+            enabled: None,
+        },
+        Case {
+            name: "null is not shorthand",
+            input: Value::Null,
+            enabled: None,
+        },
+        Case {
+            name: "invalid string",
+            input: json!("disabled"),
+            enabled: None,
+        },
+        Case {
+            name: "array is not shorthand",
+            input: json!([false]),
+            enabled: None,
+        },
+    ] {
+        let input = json!({"sinks": {"console": {
+            "type": "console", "inputs": [], "encoding": {"codec": "json"},
+            "healthcheck": case.input
+        }}})
+        .to_string();
+        let result = ConfigBuilderLoader::default()
+            .interpolate_env(true)
+            .secrets(HashMap::from([(
+                "backend.healthcheck".into(),
+                "false".into(),
+            )]))
+            .load_from_input(input.as_bytes(), Format::Json);
+        match case.enabled {
+            Some(enabled) => {
+                let builder = result.unwrap_or_else(|error| panic!("{}: {error:?}", case.name));
+                let value = serde_json::to_value(builder).unwrap();
+                assert_eq!(
+                    value["sinks"]["console"]["healthcheck"]["enabled"], enabled,
+                    "{}",
+                    case.name
+                );
+            }
+            None => assert!(result.is_err(), "{}", case.name),
+        }
+    }
 }
 
 #[test]
@@ -361,8 +447,10 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
     }
 
     let paths = [ConfigPath::Dir(dir.path().to_owned())];
-    let loader =
-        loader_from_paths(SecretBackendLoader::default().interpolate_env(true), &paths).unwrap();
+    let loader = SecretBackendLoader::default()
+        .interpolate_env(true)
+        .load_from_paths(&paths)
+        .unwrap();
     let (mut signal_handler, _receiver) = crate::signal::SignalHandler::new();
     let secrets = loader.retrieve_secrets(&mut signal_handler).await.unwrap();
     assert_eq!(
@@ -434,7 +522,9 @@ fn invalid_unquoted_placeholders_include_migration_guidance() {
 #[test]
 fn source_loader_preserves_placeholders_and_types() {
     let input = "# ${VECTOR_TEST_PARSE_FIRST_UNSET:?ignored}\n${KEY}: '${VALUE}'\ncount: '42'\nsecret: 'SECRET[backend.key]'\n";
-    let map = loader_from_input(SourceLoader::new(), input.as_bytes(), Format::Yaml).unwrap();
+    let map = SourceLoader::new()
+        .load_from_input(input.as_bytes(), Format::Yaml)
+        .unwrap();
     assert_eq!(
         Value::Object(map),
         json!({"${KEY}": "${VALUE}", "count": "42", "secret": "SECRET[backend.key]"})
@@ -453,12 +543,9 @@ async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() 
     }))
     .unwrap();
     let input = format!("# SECRET[missing.comment]\n{input}");
-    let loader: SecretBackendLoader = loader_from_input(
-        SecretBackendLoader::default(),
-        input.as_bytes(),
-        Format::Yaml,
-    )
-    .unwrap();
+    let loader = SecretBackendLoader::default()
+        .load_from_input(input.as_bytes(), Format::Yaml)
+        .unwrap();
     let (mut signal_handler, _receiver) = crate::signal::SignalHandler::new();
     let secrets = loader.retrieve_secrets(&mut signal_handler).await.unwrap();
     assert_eq!(

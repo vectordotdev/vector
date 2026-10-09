@@ -1,0 +1,9 @@
+data_dir = '@DATA_DIR@'
+[sources.demo]
+type = 'demo_logs'
+format = 'json'
+count = ${COMPAT_COUNT}
+[sinks.console]
+type = 'console'
+inputs = ['demo']
+encoding.codec = 'json'
