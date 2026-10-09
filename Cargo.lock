@@ -2916,6 +2916,7 @@ dependencies = [
  "apache-avro",
  "arrow 59.2.0",
  "async-trait",
+ "base64 0.23.1",
  "bytes",
  "chrono",
  "criterion",
