@@ -15,7 +15,7 @@ use vector_lib::{
 use vrl::core::Value;
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
+use super::{DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
 use crate::{
     common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
@@ -29,31 +29,18 @@ pub(super) fn build_warp_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp_path!("v1" / "input" / ..).or(warp_path!("api" / "v2" / "logs" / ..)))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then(
             move |_,
                   path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
-                    .and_then(|body| {
-                        decode_log_body(
-                            body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
-                            &source,
-                        )
-                    });
+                    .and_then(|body| decode_log_body(body, api_key, &source));
                 handler.clone().handle_request(events, super::LOGS)
             },
         )
