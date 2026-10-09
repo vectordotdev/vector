@@ -17,7 +17,6 @@ use crate::{
 };
 
 const WEBSITE_URL: &str = "https://vector.dev";
-const RELEASE_CALENDAR_URL: &str = "https://calendar.vector.dev";
 
 /// Anchor of the release page's breaking-changes section.
 const BREAKING_ANCHOR: &str = "breaking-changes";
@@ -182,7 +181,6 @@ struct ReleaseNotes {
     sections: Vec<Section>,
     upgrade_guide_url: Option<String>,
     release_url: String,
-    release_calendar_url: &'static str,
 }
 
 /// A single `- [count noun](url)` line in the release notes.
@@ -255,7 +253,6 @@ fn render_notes(
         sections,
         upgrade_guide_url,
         release_url,
-        release_calendar_url: RELEASE_CALENDAR_URL,
     };
 
     let mut handlebars = handlebars::Handlebars::new();
@@ -288,7 +285,7 @@ mod tests {
         "{{#if breaking}}breaking:{{breaking.count}}/{{breaking.noun}}/{{breaking.url}}|{{/if}}",
         "{{#each sections}}section:{{count}}/{{noun}}/{{url}}|{{/each}}",
         "{{#if upgrade_guide_url}}upgrade:{{upgrade_guide_url}}|{{/if}}",
-        "release:{{release_url}}|calendar:{{release_calendar_url}}",
+        "release:{{release_url}}",
     );
 
     fn render(version: &Version, changelog: &[ChangelogEntry], slug: Option<&str>) -> String {
@@ -334,7 +331,7 @@ mod tests {
              section:1/new feature/https://vector.dev/releases/0.59.0/#new-features|\
              section:2/bug fixes/https://vector.dev/releases/0.59.0/#bug-fixes|\
              upgrade:https://vector.dev/highlights/2026-10-05-0-59-0-upgrade-guide/|\
-             release:https://vector.dev/releases/0.59.0/|calendar:https://calendar.vector.dev"
+             release:https://vector.dev/releases/0.59.0/"
         );
     }
 
@@ -348,7 +345,7 @@ mod tests {
             "0.59.1|0.59||2|false|\
              breaking:1/breaking change/https://vector.dev/releases/0.59.1/|\
              section:1/bug fix/https://vector.dev/releases/0.59.1/#bug-fixes|\
-             release:https://vector.dev/releases/0.59.1/|calendar:https://calendar.vector.dev"
+             release:https://vector.dev/releases/0.59.1/"
         );
     }
 
@@ -361,7 +358,7 @@ mod tests {
             notes,
             "0.60.0|0.60|contributor|1|true|\
              section:1/bug fix/https://vector.dev/releases/0.60.0/#bug-fixes|\
-             release:https://vector.dev/releases/0.60.0/|calendar:https://calendar.vector.dev"
+             release:https://vector.dev/releases/0.60.0/"
         );
     }
 
@@ -377,7 +374,7 @@ mod tests {
             notes,
             "0.60.0|0.60|contributor|2|false|\
              breaking:2/breaking changes/https://vector.dev/releases/0.60.0/|\
-             release:https://vector.dev/releases/0.60.0/|calendar:https://calendar.vector.dev"
+             release:https://vector.dev/releases/0.60.0/"
         );
     }
 
