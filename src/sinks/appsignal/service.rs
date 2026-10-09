@@ -45,9 +45,9 @@ impl AppsignalService {
                 .header(AUTHORIZATION, format!("Bearer {}", push_api_key.inner()))
                 .header("Content-Length", req.payload.len());
             if let Some(ce) = compression.content_encoding() {
-                request = request.header("Content-Encoding", ce)
+                request = request.header("Content-Encoding", ce);
             }
-            let result = request.body(req.payload).map_err(|x| x.into());
+            let result = request.body(req.payload).map_err(Into::into);
             future::ready(result)
         });
         Self { batch_service }
