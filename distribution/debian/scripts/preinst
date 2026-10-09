@@ -34,7 +34,7 @@ case "$1" in
         # postinst (or postrm if installation aborts).
         # The packaging step embeds distribution/debian/vector.yaml here.
         cat > /etc/vector/vector.yaml <<'VECTOR_CONFIG_STUB'
-@VECTOR_CONFIG_STUB@
+{{config_stub~}}
 VECTOR_CONFIG_STUB
       fi
     fi
