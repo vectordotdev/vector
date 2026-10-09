@@ -161,10 +161,13 @@ impl From<FluentValue> for Value {
                 // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
                 NotNan::new(f).map(Value::Float).unwrap_or(Value::Null)
             }
-            rmpv::Value::String(s) => match s.as_str() {
-                Some(s) => Value::from(s),
-                None => Value::Bytes(s.into_bytes().into()),
-            },
+            rmpv::Value::String(s) => {
+                if s.is_str() {
+                    Value::from(s.into_str().expect("string is valid UTF-8"))
+                } else {
+                    Value::Bytes(s.into_bytes().into())
+                }
+            }
             rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
             rmpv::Value::Array(values) => Value::Array(
                 values
