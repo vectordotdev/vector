@@ -1,18 +1,107 @@
+use std::net::{TcpListener, UdpSocket};
+
 use futures_util::StreamExt;
-use tokio::time::{Duration, sleep};
+use tokio::time::{Duration, sleep, timeout};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     config::Config,
+    signal::ShutdownError,
     sinks::socket::SocketSinkConfig,
-    sources::socket::SocketConfig,
+    sources::socket::{SocketConfig, udp::UdpConfig},
     test_util::{
         CountReceiver,
         addr::next_addr,
-        mock::{error_sink, error_source, panic_sink, panic_source},
+        mock::{basic_sink, error_sink, error_source, panic_sink, panic_source},
         random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
     },
 };
+
+#[cfg(feature = "sources-syslog")]
+use crate::sources::syslog::{Mode as SyslogMode, SyslogConfig};
+
+#[tokio::test]
+async fn test_tcp_socket_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _listener = TcpListener::bind(address).unwrap();
+    let expected_error = TcpListener::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source("in", SocketConfig::make_basic_tcp_config(address));
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("source error timed out")
+        .expect("source error missing");
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. }
+            if error.contains("TCP bind failed") && error.contains(&expected_error)
+    ));
+    topology.stop().await;
+}
+
+#[tokio::test]
+async fn test_udp_socket_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _socket = UdpSocket::bind(address).unwrap();
+    let expected_error = UdpSocket::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source(
+        "in",
+        SocketConfig::from(UdpConfig::from_address(address.into())),
+    );
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("source error timed out")
+        .expect("source error missing");
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. } if error == expected_error
+    ));
+    topology.stop().await;
+}
+
+#[cfg(feature = "sources-syslog")]
+#[tokio::test]
+async fn test_udp_syslog_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _socket = UdpSocket::bind(address).unwrap();
+    let expected_error = UdpSocket::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source(
+        "in",
+        SyslogConfig::from_mode(SyslogMode::Udp {
+            address: address.into(),
+            receive_buffer_bytes: None,
+        }),
+    );
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("source error timed out")
+        .expect("source error missing");
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. } if error == expected_error
+    ));
+    topology.stop().await;
+}
 
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]

@@ -205,7 +205,7 @@ impl SourceConfig for PulsarSourceConfig {
                 .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
-        Ok(Box::pin(pulsar_source(
+        Ok(crate::sources::opaque_source(pulsar_source(
             consumer,
             decoder,
             cx.shutdown,

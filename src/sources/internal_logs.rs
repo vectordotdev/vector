@@ -113,7 +113,7 @@ impl SourceConfig for InternalLogsConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(run(
+        Ok(crate::sources::opaque_source(run(
             host_key,
             pid_key,
             subscription,

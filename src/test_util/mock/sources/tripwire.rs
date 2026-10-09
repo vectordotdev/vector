@@ -61,7 +61,8 @@ impl SourceConfig for TripwireSourceConfig {
                     .boxed(),
             )
             .map(|_| drop(out))
-            .unit_error(),
+            .unit_error()
+            .map(|result| result.map_err(|_| crate::sources::SourceError::Opaque)),
         ))
     }
 

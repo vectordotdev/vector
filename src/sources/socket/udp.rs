@@ -28,6 +28,7 @@ use crate::{
     net,
     serde::default_decoding,
     shutdown::ShutdownSignal,
+    sources::SourceError,
     sources::{
         Source,
         socket::SocketConfig,
@@ -180,8 +181,9 @@ pub(super) fn udp(
             .map_err(|error| {
                 emit!(SocketBindError {
                     mode: SocketMode::Udp,
-                    error,
-                })
+                    error: &error,
+                });
+                SourceError::from(error)
             })?;
 
         if !config.multicast_groups.is_empty() {
@@ -204,10 +206,11 @@ pub(super) fn udp(
                     .join_multicast_v4(group_addr, interface)
                     .map_err(|error| {
                         emit!(SocketMulticastGroupJoinError {
-                            error,
+                            error: &error,
                             group_addr,
                             interface,
-                        })
+                        });
+                        SourceError::from(error)
                     })?;
                 info!(message = "Joined multicast group.", group = %group_addr);
             }
@@ -249,10 +252,11 @@ pub(super) fn udp(
                                 }
                             }
 
-                            return Err(emit!(SocketReceiveError {
+                            emit!(SocketReceiveError {
                                 mode: SocketMode::Udp,
-                                error
-                            }));
+                                error: &error
+                            });
+                            return Err(SourceError::from(error));
                        }
                     };
 

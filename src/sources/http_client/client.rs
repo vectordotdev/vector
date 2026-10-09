@@ -5,7 +5,6 @@ use std::{collections::HashMap, time::Duration};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use futures_util::FutureExt;
 use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
@@ -377,7 +376,12 @@ impl SourceConfig for HttpClientConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(call(inputs, context, cx.out, self.method).boxed())
+        Ok(crate::sources::opaque_source(call(
+            inputs,
+            context,
+            cx.out,
+            self.method,
+        )))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

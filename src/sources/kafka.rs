@@ -350,7 +350,7 @@ impl SourceConfig for KafkaSourceConfig {
 
         let (consumer, callback_rx) = create_consumer(self, acknowledgements)?;
 
-        Ok(Box::pin(kafka_source(
+        Ok(crate::sources::opaque_source(kafka_source(
             self.clone(),
             consumer,
             callback_rx,

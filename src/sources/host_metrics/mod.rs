@@ -304,7 +304,9 @@ impl SourceConfig for HostMetricsConfig {
         let mut config = self.clone();
         config.namespace = config.namespace.filter(|namespace| !namespace.is_empty());
 
-        Ok(Box::pin(config.run(cx.out, cx.shutdown)))
+        Ok(crate::sources::opaque_source(
+            config.run(cx.out, cx.shutdown),
+        ))
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

@@ -35,6 +35,7 @@ use vector_lib::{
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
+    source::SourceError,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
@@ -457,7 +458,10 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|_| TaskError::Opaque),
+                result = server => result.map_err(|error| match error {
+                    SourceError::Opaque => TaskError::Opaque,
+                    SourceError::Detailed(error) => TaskError::wrapped(error),
+                }),
             };
 
             // Even though we already tried to receive any pump task error above, we may have exited

@@ -364,6 +364,7 @@ impl SourceConfig for Config {
                 .map(|result| {
                     result.map_err(|error| {
                         error!(message = "Source future failed.", %error);
+                        crate::sources::SourceError::Detailed(error)
                     })
                 }),
         ))

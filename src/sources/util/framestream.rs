@@ -427,7 +427,8 @@ pub fn build_framestream_tcp_source(
             emit!(SocketBindError {
                 mode: SocketMode::Tcp,
                 error: &error,
-            })
+            });
+            crate::sources::SourceError::Detailed(error)
         })?;
 
         info!(
@@ -1240,7 +1241,10 @@ mod test {
         addr: &SocketAddr,
         frame_handler: impl TcpFrameHandler + Send + Sync + Clone + 'static,
         pipeline: SourceSender,
-    ) -> (JoinHandle<Result<(), ()>>, SourceShutdownCoordinator) {
+    ) -> (
+        JoinHandle<Result<(), crate::sources::SourceError>>,
+        SourceShutdownCoordinator,
+    ) {
         let source_id = ComponentKey::from(source_id);
         let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(&source_id, false);
@@ -1262,7 +1266,7 @@ mod test {
         pipeline: SourceSender,
     ) -> (
         PathBuf,
-        JoinHandle<Result<(), ()>>,
+        JoinHandle<Result<(), crate::sources::SourceError>>,
         SourceShutdownCoordinator,
     ) {
         let source_id = ComponentKey::from(source_id);
@@ -1387,7 +1391,7 @@ mod test {
         mut sock_stream: U,
         rx: V,
         mut shutdown: SourceShutdownCoordinator,
-        source_handle: JoinHandle<Result<(), ()>>,
+        source_handle: JoinHandle<Result<(), crate::sources::SourceError>>,
     ) {
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
@@ -1442,7 +1446,7 @@ mod test {
         mut sock_sink: T,
         mut sock_stream: U,
         mut shutdown: SourceShutdownCoordinator,
-        source_handle: JoinHandle<Result<(), ()>>,
+        source_handle: JoinHandle<Result<(), crate::sources::SourceError>>,
     ) {
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);

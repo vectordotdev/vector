@@ -395,7 +395,7 @@ impl SourceConfig for JournaldConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(
+        Ok(crate::sources::opaque_source(
             JournaldSource {
                 include_matches,
                 exclude_matches,
