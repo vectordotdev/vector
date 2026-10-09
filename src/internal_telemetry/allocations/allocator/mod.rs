@@ -19,9 +19,11 @@ pub use self::{
 /// avoids reentrantly tracing (de)allocations, this method provides a way to do so from _outside_
 /// of the `GlobalAlloc` codepath.
 #[inline(always)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::inline_always, reason = "Retain hot-path inlining")]
 pub fn without_allocation_tracing<F>(f: F)
 where
     F: FnOnce(),
 {
-    with_suspended_allocation_group(f)
+    with_suspended_allocation_group(f);
 }
