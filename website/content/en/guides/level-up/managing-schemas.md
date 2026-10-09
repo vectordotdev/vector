@@ -278,7 +278,7 @@ transforms:
     inputs: ["source0"]
     source: |
       .count = to_int!(.count)
-      .date = parse_timestamp!(.date, "%F")
+      .date = parse_timestamp!(string!(.date) + " 00:00:00", "%F %T")
 ```
 
 Remember that you can follow the coercion mappings with `del` or `filter` functions, empowering it to drop
