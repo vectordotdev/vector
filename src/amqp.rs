@@ -58,6 +58,16 @@ pub(crate) async fn await_connection(connection: &AmqpConfig) {
 }
 
 impl AmqpConfig {
+    pub(crate) fn warn_unenforceable_protocol_versions(&self) {
+        if self
+            .tls
+            .as_ref()
+            .is_some_and(crate::tls::TlsConfig::has_protocol_version_bounds)
+        {
+            vector_lib::tls::warn_unenforceable_protocol_versions("lapin");
+        }
+    }
+
     pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {
