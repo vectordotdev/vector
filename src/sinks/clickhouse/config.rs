@@ -42,16 +42,16 @@ use crate::{
 #[allow(clippy::enum_variant_names)]
 pub enum Format {
     #[default]
-    /// JSONEachRow.
+    /// `JSONEachRow`.
     JsonEachRow,
 
-    /// JSONAsObject.
+    /// `JSONAsObject`.
     JsonAsObject,
 
-    /// JSONAsString.
+    /// `JSONAsString`.
     JsonAsString,
 
-    /// ArrowStream (beta).
+    /// `ArrowStream` (beta).
     #[configurable(metadata(status = "beta"))]
     ArrowStream,
 }
@@ -184,7 +184,7 @@ pub struct AsyncInsertSettingsConfig {
     #[serde(default)]
     pub wait_for_processing: Option<bool>,
 
-    /// Sets 'wait_for_processing_timeout`, to control the timeout for waiting for processing asynchronous insertion.
+    /// Sets `wait_for_processing_timeout`, to control the timeout for waiting for processing asynchronous insertion.
     ///
     /// If left unspecified, use the default provided by the `ClickHouse` server.
     #[serde(default)]
@@ -431,11 +431,7 @@ impl ClickhouseConfig {
 
         debug!(
             "Successfully fetched Arrow schema with {} fields.",
-            config
-                .schema
-                .as_ref()
-                .map(|s| s.fields().len())
-                .unwrap_or(0)
+            config.schema.as_ref().map_or(0, |s| s.fields().len())
         );
 
         Ok(())
@@ -547,12 +543,12 @@ mod tests {
     #[test]
     fn batch_encoding_rejects_unsupported_codec() {
         let err = serde_yaml::from_str::<ClickhouseConfig>(
-            r#"
+            r"
             endpoint: http://localhost:8123
             table: test_table
             batch_encoding:
               codec: parquet
-            "#,
+            ",
         )
         .unwrap_err();
 
@@ -562,7 +558,7 @@ mod tests {
         );
     }
 
-    /// Helper to create a minimal ClickhouseConfig for testing
+    /// Helper to create a minimal `ClickhouseConfig` for testing
     fn create_test_config(
         format: Format,
         batch_encoding: Option<ClickhouseBatchEncoding>,
