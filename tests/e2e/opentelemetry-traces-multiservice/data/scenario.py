@@ -7,6 +7,7 @@ rounds and writes a completion marker so trace validation can start.
 import os
 from pathlib import Path
 
+import gevent
 from locust import task
 from locustfile import WebsiteUser
 from opentelemetry import trace
@@ -24,7 +25,8 @@ class DemoUser(WebsiteUser):
         trace.get_tracer_provider().shutdown()
         directory = Path("/output/opentelemetry-traces-multiservice") / os.environ["CONFIG_INGRESS_EXPORTER"]
         (directory / "workload-complete").touch()
-        self.environment.runner.quit()
+        # Quit outside this user's task so stopping users can complete.
+        gevent.spawn(self.environment.runner.quit)
 
 
 # Locust adds inherited tasks during class creation, even when tasks = [].

@@ -711,8 +711,8 @@ services:
       - "--headless"
       - "--users=1"
       - "--spawn-rate=1"
-      # The CI workload took about 5.5 minutes. Leave room for slower cartFailure retries.
-      - "--run-time=8m"
+      # Safety limit. The scenario exits after three shopping rounds.
+      - "--run-time=15m"
       - "--stop-timeout=15"
       - DemoUser
     volumes:
