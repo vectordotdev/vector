@@ -330,7 +330,8 @@ impl GcsSinkConfig {
     ) -> crate::Result<VectorSink> {
         let request = self.request.into_settings();
 
-        let partitioner = KeyPartitioner::new(validated.key_prefix_template.clone(), None);
+        let partitioner =
+            self.key_partitioner(validated.key_prefix_template.clone(), cx.globals.timezone);
 
         let protocol = get_http_scheme_from_uri(base_url.as_uri());
 
@@ -351,10 +352,15 @@ impl GcsSinkConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    #[cfg(test)]
-    fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        let tpl = self.key_prefix_template()?;
-        Ok(KeyPartitioner::new(tpl, None))
+    fn key_partitioner(
+        &self,
+        template: ConfinedTemplate,
+        global_timezone: Option<TimeZone>,
+    ) -> KeyPartitioner {
+        KeyPartitioner::new(
+            template.with_timezone(self.timezone.or(global_timezone)),
+            None,
+        )
     }
 
     fn key_prefix_template(&self) -> crate::Result<ConfinedTemplate> {
@@ -617,12 +623,78 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
         let key = sink_config
-            .key_partitioner()
-            .unwrap()
+            .key_partitioner(sink_config.key_prefix_template().unwrap(), None)
             .partition(&Event::Log(event))
             .expect("key wasn't provided");
 
         assert_eq!(key, "key: value");
+    }
+
+    #[test]
+    fn gcs_key_prefix_uses_event_time_for_daylight_saving() {
+        let config = GcsSinkConfig {
+            key_prefix: Some("date=%F/%H-%M-%z/".into()),
+            timezone: TimeZone::parse("America/Los_Angeles"),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        let validated = config.validate().unwrap();
+        // The sink-specific zone takes precedence over the global zone.
+        let partitioner = config.key_partitioner(
+            validated.key_prefix_template,
+            TimeZone::parse("Asia/Taipei"),
+        );
+        for (timestamp, expected) in [
+            ("2026-12-01T07:30:00Z", "date=2026-11-30/23-30--0800/"),
+            ("2026-07-01T07:30:00Z", "date=2026-07-01/00-30--0700/"),
+            ("2026-03-08T09:59:00Z", "date=2026-03-08/01-59--0800/"),
+            ("2026-03-08T10:00:00Z", "date=2026-03-08/03-00--0700/"),
+            ("2026-11-01T08:30:00Z", "date=2026-11-01/01-30--0700/"),
+            ("2026-11-01T09:30:00Z", "date=2026-11-01/01-30--0800/"),
+        ] {
+            let mut event = LogEvent::from("message");
+            event.insert(
+                vrl::event_path!("timestamp"),
+                timestamp.parse::<chrono::DateTime<Utc>>().unwrap(),
+            );
+            assert_eq!(
+                partitioner.partition(&Event::Log(event)),
+                Some(expected.to_owned()),
+            );
+        }
+    }
+
+    #[test]
+    fn gcs_key_prefix_uses_global_timezone_or_utc() {
+        let config = GcsSinkConfig {
+            key_prefix: Some("date=%F/%H-%M-%z/".into()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        let validated = config.validate().unwrap();
+        let mut event = LogEvent::from("message");
+        event.insert(
+            vrl::event_path!("timestamp"),
+            "2026-12-01T07:30:00Z"
+                .parse::<chrono::DateTime<Utc>>()
+                .unwrap(),
+        );
+        for (timezone, expected) in [
+            (
+                TimeZone::parse("America/Los_Angeles"),
+                "date=2026-11-30/23-30--0800/",
+            ),
+            (
+                TimeZone::parse("Asia/Taipei"),
+                "date=2026-12-01/15-30-+0800/",
+            ),
+            (None, "date=2026-12-01/07-30-+0000/"),
+        ] {
+            let partitioner =
+                config.key_partitioner(validated.key_prefix_template.clone(), timezone);
+            assert_eq!(
+                partitioner.partition(&Event::Log(event.clone())),
+                Some(expected.to_owned()),
+            );
+        }
     }
 
     fn request_settings(sink_config: &GcsSinkConfig, context: SinkContext) -> RequestSettings {
@@ -647,8 +719,7 @@ mod tests {
         };
         let log = LogEvent::default().into();
         let key = sink_config
-            .key_partitioner()
-            .unwrap()
+            .key_partitioner(sink_config.key_prefix_template().unwrap(), None)
             .partition(&log)
             .expect("key wasn't provided");
 
@@ -853,7 +924,7 @@ mod tests {
             key_prefix: Some("{{ tenant }}".into()),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
-        match config.key_partitioner() {
+        match config.key_prefix_template() {
             Err(err) => assert!(
                 err.to_string().contains("no literal string prefix"),
                 "unexpected error: {err}"
@@ -871,7 +942,7 @@ mod tests {
             },
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
-        assert!(config.key_partitioner().is_ok());
+        assert!(config.key_prefix_template().is_ok());
     }
 
     #[test]

@@ -103,6 +103,22 @@ pub fn confined_preview(rendered: &str) -> String {
     rendered.get(..end).unwrap_or("").to_string()
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum TemplateTimeZone {
+    Offset(FixedOffset),
+    Local,
+    Named(chrono_tz::Tz),
+}
+
+impl TemplateTimeZone {
+    const fn from_offset(offset: Option<FixedOffset>) -> Option<Self> {
+        match offset {
+            Some(offset) => Some(Self::Offset(offset)),
+            None => None,
+        }
+    }
+}
+
 /// A templated field.
 ///
 /// In many cases, components can be configured so that part of the component's functionality can be
@@ -127,7 +143,7 @@ pub struct UnconfinedTemplate {
     reserve_size: usize,
 
     #[serde(skip)]
-    tz_offset: Option<FixedOffset>,
+    time_zone: Option<TemplateTimeZone>,
 }
 
 /// A template that has passed through confinement via [`Template::confine`].
