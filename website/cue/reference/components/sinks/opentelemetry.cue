@@ -51,13 +51,43 @@ components: sinks: opentelemetry: {
 
 	configuration: generated.components.sinks.opentelemetry.configuration
 	how_it_works: {
+		otlp_root_fields: {
+			title: "Events with the OTLP structure"
+			body: """
+				With `encoding.codec: otlp`, the root fields `resourceLogs`, `resourceMetrics`, and
+				`resourceSpans` are reserved. A log event with one of these fields is treated as an
+				OTLP request that is already built:
+
+				| Root field | Encoded as |
+				| --- | --- |
+				| `resourceLogs` | `ExportLogsServiceRequest` |
+				| `resourceMetrics` | `ExportMetricsServiceRequest` |
+				| `resourceSpans` | `ExportTraceServiceRequest` |
+
+				If an event has more than one of these fields, the first field in the table is used.
+				Only the fields of that request are encoded, and all other event fields are not sent.
+				If the value does not have the OTLP structure, the encoding fails.
+
+				Vector does not examine the value to find if it is OTLP data. For example, this event
+				is sent as an empty OTLP logs request, and `message` is not sent:
+
+				```yaml
+				message: finished checking resources
+				resourceLogs: []
+				```
+
+				To send an event like this as a log record, rename the field before the sink, for
+				example with a `remap` transform.
+				"""
+		}
 		native_log_conversion: {
 			title: "Native log conversion"
 			body: """
-				With `encoding.codec: otlp`, a log event without a `resourceLogs` field is converted
-				to one OTLP log record. The conversion is the inverse of the `opentelemetry` source
-				decoding, so logs that the source decodes without `use_otlp_decoding` are sent back
-				with the same log record, resource attributes, and scope, with these exceptions:
+				With `encoding.codec: otlp`, a log event without a `resourceLogs`, `resourceMetrics`,
+				or `resourceSpans` root field is converted to one OTLP log record. The conversion is
+				the inverse of the `opentelemetry` source decoding, so logs that the source decodes
+				without `use_otlp_decoding` are sent back with the same log record, resource
+				attributes, and scope, with these exceptions:
 
 				- The source does not keep the resource and scope `schemaUrl` or the resource
 				  `droppedAttributesCount`, so these fields are empty.

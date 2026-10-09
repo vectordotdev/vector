@@ -58,6 +58,9 @@ impl OtlpSerializerConfig {
 /// - `resourceMetrics` → `ExportMetricsServiceRequest`
 /// - `resourceSpans` → `ExportTraceServiceRequest`
 ///
+/// The first field in this list that the event has is used, and all other event fields are
+/// not encoded.
+///
 /// Native Vector logs and metrics are converted to `ExportLogsServiceRequest` and
 /// `ExportMetricsServiceRequest`. The conversions are the inverse of what the `opentelemetry`
 /// source does when decoding, ensuring round-trip compatibility.
