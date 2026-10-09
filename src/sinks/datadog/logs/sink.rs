@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
-use bytes::Bytes;
 use itertools::Itertools;
 use snafu::Snafu;
 use tracing::Instrument;
@@ -496,12 +495,18 @@ fn set_truncated_message(
     body_len: usize,
     conforms_as_agent: bool,
 ) {
-    let marker = TRUNCATION_MARKER.as_bytes();
-    let mut truncated = Vec::with_capacity(body_len + marker.len());
-    truncated.extend_from_slice(&message.as_bytes()[..body_len]);
-    truncated.extend_from_slice(marker);
+    // The current caller supplies a character boundary because `select_message_body_len`
+    // advances via `char_indices`; keep the clamp as a defensive guard for future callers.
+    let body_len = message.floor_char_boundary(body_len);
+    let mut truncated = String::with_capacity(body_len + TRUNCATION_MARKER.len());
+    #[expect(
+        clippy::string_slice,
+        reason = "floor_char_boundary guarantees a valid char boundary"
+    )]
+    truncated.push_str(&message[..body_len]);
+    truncated.push_str(TRUNCATION_MARKER);
     *message_value_mut(log, conforms_as_agent).expect("the message was previously found") =
-        Value::Bytes(Bytes::from(truncated));
+        Value::from(truncated);
 }
 
 fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<usize> {
