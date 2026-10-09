@@ -1,0 +1,6 @@
+sources:
+  demo:
+    type: demo_logs
+    format: shuffle
+    lines: [fixture-message]
+    interval: 0.01

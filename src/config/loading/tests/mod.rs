@@ -1,3 +1,6 @@
+#[cfg(feature = "sources-demo_logs")]
+mod parse_first;
+
 mod compatibility;
 mod metric_tags;
 

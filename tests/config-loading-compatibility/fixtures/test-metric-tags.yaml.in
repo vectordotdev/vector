@@ -1,0 +1,26 @@
+data_dir: '@DATA_DIR@'
+transforms:
+  inspect_tags:
+    type: remap
+    inputs: []
+    metric_tag_values: full
+    source: |
+      assert_eq!(.tags, @EXPECTED_TAGS@)
+      .name = "tags-checked"
+tests:
+  - name: metric tags retain their exact values
+    inputs:
+      - insert_at: inspect_tags
+        type: metric
+        metric:
+          name: count
+          kind: absolute
+          tags: @TAGS@
+          counter:
+            value: 1
+    outputs:
+      - extract_from: inspect_tags
+        expected_event_count: 1
+        conditions:
+          - type: vrl
+            source: '.name == "tags-checked" && .kind == "absolute"'

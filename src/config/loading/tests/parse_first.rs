@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use indoc::indoc;
 use serde_json::{Value, json};
 
-use super::{
-    ConfigBuilderLoader, SecretBackendLoader, SourceLoader, loader_from_input, loader_from_paths,
-};
+use super::super::{ConfigBuilderLoader, SecretBackendLoader, SourceLoader};
 use crate::config::{ConfigPath, Format};
 
 struct ScalarCase {
@@ -15,13 +13,101 @@ struct ScalarCase {
     expected: Value,
 }
 
+#[cfg(feature = "sinks-console")]
+#[test]
+fn healthchecks_accept_boolean_shorthand_and_objects() {
+    struct Case {
+        name: &'static str,
+        input: Value,
+        enabled: Option<bool>,
+    }
+
+    for case in [
+        Case {
+            name: "native false",
+            input: json!(false),
+            enabled: Some(false),
+        },
+        Case {
+            name: "native true",
+            input: json!(true),
+            enabled: Some(true),
+        },
+        Case {
+            name: "object false",
+            input: json!({"enabled": false}),
+            enabled: Some(false),
+        },
+        Case {
+            name: "default object",
+            input: json!({}),
+            enabled: Some(true),
+        },
+        Case {
+            name: "environment boolean shorthand",
+            input: json!("${VECTOR_TEST_HEALTHCHECK_ENABLED:-false}"),
+            enabled: Some(false),
+        },
+        Case {
+            name: "secret boolean shorthand",
+            input: json!("SECRET[backend.healthcheck]"),
+            enabled: Some(false),
+        },
+        Case {
+            name: "integer is not shorthand",
+            input: json!(1),
+            enabled: None,
+        },
+        Case {
+            name: "null is not shorthand",
+            input: Value::Null,
+            enabled: None,
+        },
+        Case {
+            name: "invalid string",
+            input: json!("disabled"),
+            enabled: None,
+        },
+        Case {
+            name: "array is not shorthand",
+            input: json!([false]),
+            enabled: None,
+        },
+    ] {
+        let input = json!({"sinks": {"console": {
+            "type": "console", "inputs": [], "encoding": {"codec": "json"},
+            "healthcheck": case.input
+        }}})
+        .to_string();
+        let result = ConfigBuilderLoader::default()
+            .interpolate_env(true)
+            .secrets(HashMap::from([(
+                "backend.healthcheck".into(),
+                "false".into(),
+            )]))
+            .load_from_input(input.as_bytes(), Format::Json);
+        match case.enabled {
+            Some(enabled) => {
+                let builder = result.unwrap_or_else(|error| panic!("{}: {error:?}", case.name));
+                let value = serde_json::to_value(builder).unwrap();
+                assert_eq!(
+                    value["sinks"]["console"]["healthcheck"]["enabled"], enabled,
+                    "{}",
+                    case.name
+                );
+            }
+            None => assert!(result.is_err(), "{}", case.name),
+        }
+    }
+}
+
 #[test]
 fn interpolated_scalars_use_the_component_schema() {
     for case in [
         ScalarCase {
             name: "YAML plain placeholders and a field alias",
             format: Format::Yaml,
-            input: indoc! {r#"
+            input: indoc! {r"
                 sources:
                   demo:
                     type: demo_logs
@@ -29,20 +115,20 @@ fn interpolated_scalars_use_the_component_schema() {
                     count: ${VECTOR_TEST_PARSE_FIRST_COUNT:-42}
                     batch_interval: ${VECTOR_TEST_PARSE_FIRST_INTERVAL:-1.5}
                     log_namespace: ${VECTOR_TEST_PARSE_FIRST_BOOL:-true}
-            "#},
+            "},
             expected: json!({"count": 42, "interval": 1.5, "log_namespace": true}),
         },
         ScalarCase {
             name: "TOML quoted placeholders",
             format: Format::Toml,
-            input: indoc! {r#"
+            input: indoc! {r"
                 [sources.demo]
                 type = 'demo_logs'
                 format = 'json'
                 count = '${VECTOR_TEST_PARSE_FIRST_COUNT:-42}'
                 interval = '${VECTOR_TEST_PARSE_FIRST_INTERVAL:-1.5}'
                 log_namespace = '${VECTOR_TEST_PARSE_FIRST_BOOL:-true}'
-            "#},
+            "},
             expected: json!({"count": 42, "interval": 1.5, "log_namespace": true}),
         },
         ScalarCase {
@@ -81,7 +167,7 @@ fn interpolated_scalars_use_the_component_schema() {
 
 #[test]
 fn comments_are_not_interpolated_and_disabled_interpolation_preserves_strings() {
-    let input = indoc! {r#"
+    let input = indoc! {r"
         # ${VECTOR_TEST_PARSE_FIRST_UNSET:?must not be read}
         sources:
           demo:
@@ -89,7 +175,7 @@ fn comments_are_not_interpolated_and_disabled_interpolation_preserves_strings() 
             format: shuffle
             lines: ['${VECTOR_TEST_PARSE_FIRST_UNSET:?must not be read}']
             count: '42'
-    "#};
+    "};
     let builder = ConfigBuilderLoader::default()
         .interpolate_env(false)
         .load_from_input(input.as_bytes(), Format::Yaml)
@@ -111,14 +197,14 @@ fn comments_are_not_interpolated_and_disabled_interpolation_preserves_strings() 
 #[test]
 fn secrets_cannot_inject_configuration_structure() {
     let secret = "\"\ncount: 999\ninjected: [a, b]\n";
-    let input = indoc! {r#"
+    let input = indoc! {r"
         sources:
           demo:
             type: demo_logs
             format: shuffle
             lines: ['SECRET[backend.line]']
             count: 'SECRET[backend.count]'
-    "#};
+    "};
     let builder = ConfigBuilderLoader::default()
         .secrets(HashMap::from([
             ("backend.line".into(), secret.into()),
@@ -138,11 +224,11 @@ fn namespaced_files_are_coerced_under_their_component_field() {
     std::fs::create_dir(dir.path().join("sources")).unwrap();
     std::fs::write(
         dir.path().join("sources/demo.yaml"),
-        indoc! {r#"
+        indoc! {r"
             type: demo_logs
             format: json
             count: ${VECTOR_TEST_PARSE_FIRST_COUNT:-42}
-        "#},
+        "},
     )
     .unwrap();
     let builder = ConfigBuilderLoader::default()
@@ -194,6 +280,11 @@ fn namespaced_tests_coerce_interpolated_event_counts() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the directory merge cases and their shared assertions together"
+)]
 fn directory_fragments_merge_interpolated_scalars() {
     struct Case {
         name: &'static str,
@@ -361,8 +452,10 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
     }
 
     let paths = [ConfigPath::Dir(dir.path().to_owned())];
-    let loader =
-        loader_from_paths(SecretBackendLoader::default().interpolate_env(true), &paths).unwrap();
+    let loader = SecretBackendLoader::default()
+        .interpolate_env(true)
+        .load_from_paths(&paths)
+        .unwrap();
     let (mut signal_handler, _receiver) = crate::signal::SignalHandler::new();
     let secrets = loader.retrieve_secrets(&mut signal_handler).await.unwrap();
     assert_eq!(
@@ -382,13 +475,13 @@ async fn directory_secret_discovery_defers_unresolved_component_values() {
 
 #[test]
 fn coercion_errors_include_the_component_field_path() {
-    let input = indoc! {r#"
+    let input = indoc! {r"
         sources:
           demo:
             type: demo_logs
             format: json
             count: ${VECTOR_TEST_PARSE_FIRST_BAD_COUNT:-invalid}
-    "#};
+    "};
     let errors = ConfigBuilderLoader::default()
         .interpolate_env(true)
         .load_from_input(input.as_bytes(), Format::Yaml)
@@ -406,12 +499,12 @@ fn invalid_unquoted_placeholders_include_migration_guidance() {
     for (format, input) in [
         (
             Format::Toml,
-            indoc! {r#"
+            indoc! {r"
                 [sources.demo]
                 type = 'demo_logs'
                 format = 'json'
                 count = ${VECTOR_TEST_PARSE_FIRST_COUNT:-42}
-            "#},
+            "},
         ),
         (
             Format::Json,
@@ -434,7 +527,9 @@ fn invalid_unquoted_placeholders_include_migration_guidance() {
 #[test]
 fn source_loader_preserves_placeholders_and_types() {
     let input = "# ${VECTOR_TEST_PARSE_FIRST_UNSET:?ignored}\n${KEY}: '${VALUE}'\ncount: '42'\nsecret: 'SECRET[backend.key]'\n";
-    let map = loader_from_input(SourceLoader::new(), input.as_bytes(), Format::Yaml).unwrap();
+    let map = SourceLoader::new()
+        .load_from_input(input.as_bytes(), Format::Yaml)
+        .unwrap();
     assert_eq!(
         Value::Object(map),
         json!({"${KEY}": "${VALUE}", "count": "42", "secret": "SECRET[backend.key]"})
@@ -453,12 +548,9 @@ async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() 
     }))
     .unwrap();
     let input = format!("# SECRET[missing.comment]\n{input}");
-    let loader: SecretBackendLoader = loader_from_input(
-        SecretBackendLoader::default(),
-        input.as_bytes(),
-        Format::Yaml,
-    )
-    .unwrap();
+    let loader = SecretBackendLoader::default()
+        .load_from_input(input.as_bytes(), Format::Yaml)
+        .unwrap();
     let (mut signal_handler, _receiver) = crate::signal::SignalHandler::new();
     let secrets = loader.retrieve_secrets(&mut signal_handler).await.unwrap();
     assert_eq!(
@@ -469,13 +561,13 @@ async fn backend_loading_defers_component_coercion_until_secrets_are_resolved() 
         ])
     );
 
-    let input = indoc! {r#"
+    let input = indoc! {r"
         sources:
           demo:
             type: SECRET[local.type]
             format: json
             count: SECRET[local.count]
-    "#};
+    "};
     let builder = ConfigBuilderLoader::default()
         .secrets(secrets)
         .load_from_input(input.as_bytes(), Format::Yaml)

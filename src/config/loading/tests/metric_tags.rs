@@ -173,12 +173,11 @@ fn native_metric_tags_keep_serde_acceptance_and_normalization() {
 }
 
 #[test]
-fn metric_tag_interpolation_matches_current_loading_behavior() {
+fn metric_tag_interpolation_preserves_literal_strings() {
     struct Case {
         name: &'static str,
         value: &'static str,
         secret: &'static str,
-        secret_accepted: bool,
     }
 
     for case in [
@@ -186,83 +185,64 @@ fn metric_tag_interpolation_matches_current_loading_behavior() {
             name: "ordinary text",
             value: "tag value",
             secret: "tag value",
-            secret_accepted: true,
         },
         Case {
             name: "empty text",
             value: "",
             secret: "",
-            secret_accepted: true,
         },
         Case {
             name: "null text",
             value: "null",
             secret: "null",
-            secret_accepted: true,
         },
         Case {
             name: "integer text",
             value: "42",
             secret: "42",
-            secret_accepted: true,
         },
         Case {
             name: "boolean text",
             value: "false",
             secret: "false",
-            secret_accepted: true,
         },
         Case {
-            name: "unescaped quotes in a secret invalidate JSON",
+            name: "unescaped quotes in a secret remain literal",
             value: r#"["first", "second"]"#,
             secret: r#"["first", "second"]"#,
-            secret_accepted: false,
         },
         Case {
-            name: "JSON-escaped quotes in a secret preserve text",
+            name: "JSON escapes in a secret remain literal",
             value: r#"["first", "second"]"#,
             secret: r#"[\"first\", \"second\"]"#,
-            secret_accepted: true,
         },
     ] {
         let environment = format!("${{VECTOR_TEST_COMPAT_UNSET:-{}}}", case.value);
-        for (source, input, accepted) in [
-            ("environment", environment, true),
-            (
-                "secret",
-                "SECRET[backend.tag]".to_owned(),
-                case.secret_accepted,
-            ),
+        for (source, input, value) in [
+            ("environment", environment, case.value),
+            ("secret", "SECRET[backend.tag]".to_owned(), case.secret),
         ] {
             for (position, input, expected) in [
-                ("scalar", json!(input), json!(case.value)),
+                ("scalar", json!(input), json!(value)),
                 (
                     "array member",
                     json!([input, null, "neighbor"]),
-                    json!([case.value, null, "neighbor"]),
+                    json!([value, null, "neighbor"]),
                 ),
             ] {
                 let result = load_metric_tag(
                     &input,
                     HashMap::from([("backend.tag".into(), case.secret.into())]),
                 );
-                if accepted {
-                    assert_eq!(
-                        result.unwrap_or_else(|errors| panic!(
-                            "{} / {source} / {position}: {errors:?}",
-                            case.name
-                        )),
-                        expected,
-                        "{} / {source} / {position}",
+                assert_eq!(
+                    result.unwrap_or_else(|errors| panic!(
+                        "{} / {source} / {position}: {errors:?}",
                         case.name
-                    );
-                } else {
-                    assert!(
-                        result.is_err(),
-                        "{} / {source} / {position}: {result:?}",
-                        case.name
-                    );
-                }
+                    )),
+                    expected,
+                    "{} / {source} / {position}",
+                    case.name
+                );
             }
         }
     }
