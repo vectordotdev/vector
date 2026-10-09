@@ -148,7 +148,7 @@ fn render_notes(
         upgrade_guide_slug.map(|slug| format!("{WEBSITE_URL}/highlights/{slug}/"));
 
     let mut out = format!(
-        "The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `{version}`! 🚀 Vector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.\n\n"
+        "The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `{version}`! 🚀\n\nVector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.\n\n"
     );
 
     if !changelog.is_empty() {
@@ -172,7 +172,7 @@ fn render_notes(
             } else {
                 write!(out, "the {total} changes").unwrap();
             }
-            out.push_str(" in this release!");
+            out.push_str(" in this release:");
         }
         out.push_str("\n\n");
 
@@ -250,9 +250,11 @@ mod tests {
         assert_eq!(
             notes,
             indoc::indoc! {"
-                The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.59.0`! 🚀 Vector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.
+                The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.59.0`! 🚀
 
-                Thanks to the 3 contributors who made the 4 changes in this release!
+                Vector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.
+
+                Thanks to the 3 contributors who made the 4 changes in this release:
 
                 - [1 breaking change](https://vector.dev/releases/0.59.0/#breaking-changes)
                 - [1 new feature](https://vector.dev/releases/0.59.0/#new-features)
@@ -272,7 +274,9 @@ mod tests {
         assert_eq!(
             notes,
             indoc::indoc! {"
-                The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.59.1`! 🚀 Vector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.
+                The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is happy to announce Vector `0.59.1`! 🚀
+
+                Vector is a lightweight, ultra-fast tool for building observability pipelines that puts you in control of your data.
 
                 This release includes 2 changes:
 
