@@ -53,10 +53,11 @@ workspace = true
 [package.metadata.deb]
 name = "vector"
 section = "admin"
-maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/default/vector"]
+maintainer-scripts = "target/debian-maintainer-scripts/"
+conf-files = ["/etc/default/vector", "/etc/vector/vector.yaml"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
+  ["distribution/debian/vector.yaml", "/etc/vector/vector.yaml", "644"],
   ["config/vector.yaml", "/usr/share/vector/examples/vector.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],

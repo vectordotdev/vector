@@ -981,7 +981,7 @@ mod tests {
         let source_type_key_value = log
             .get((PathPrefix::Event, log_schema().source_type_key().unwrap()))
             .unwrap()
-            .as_str()
+            .to_str_lossy()
             .unwrap();
         assert_eq!(source_type_key_value, SimpleHttpConfig::NAME);
         assert_eq!(log["http_path"], "/".into());

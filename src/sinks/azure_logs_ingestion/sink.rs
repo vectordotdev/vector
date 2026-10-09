@@ -106,7 +106,7 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
         mut input: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
-        for event in input.iter_mut() {
+        for event in &mut input {
             let log = event.as_mut_log();
 
             // `.remove_timestamp()` will return the `timestamp` value regardless of location in Event or

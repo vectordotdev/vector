@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 //! Vector `generate-schema` command implementation.
 
 use std::{fs, path::PathBuf};
@@ -17,7 +18,16 @@ pub struct Opts {
 }
 
 /// Execute the `generate-schema` command.
+///
+/// # Panics
+/// Panics if the generated schema cannot be serialized to JSON.
 #[allow(clippy::print_stdout, clippy::print_stderr)]
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve path escaping"
+)]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match generate_root_schema::<ConfigBuilder>() {
         Ok(schema) => {
@@ -31,7 +41,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 }
 
                 return match fs::write(output_path, json) {
-                    Ok(_) => {
+                    Ok(()) => {
                         println!("Schema successfully written to {output_path:?}");
                         exitcode::OK
                     }
@@ -40,9 +50,8 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                         exitcode::IOERR
                     }
                 };
-            } else {
-                println!("{json}");
             }
+            println!("{json}");
             exitcode::OK
         }
         Err(e) => {

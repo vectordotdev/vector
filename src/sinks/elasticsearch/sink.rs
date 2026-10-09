@@ -120,7 +120,7 @@ pub(super) fn process_log(
 
     let id = id_key_field
         .and_then(|key| log.remove((PathPrefix::Event, key)))
-        .and_then(|id| id.as_str().map(Into::into));
+        .and_then(|id| id.to_str_lossy().map(Into::into));
     let document_metadata = match (id, mode.version_type(), mode.version(&log)) {
         (None, _, _) => DocumentMetadata::WithoutId,
         (Some(id), None, None) | (Some(id), None, Some(_)) | (Some(id), Some(_), None) => {

@@ -91,7 +91,7 @@ pub async fn fetch_table_schema(
     parse_schema_from_response(&body_bytes)
 }
 
-/// Parses the JSONEachRow response from ClickHouse and builds an Arrow schema.
+/// Parses the `JSONEachRow` response from ClickHouse and builds an Arrow schema.
 fn parse_schema_from_response(response: &[u8]) -> crate::Result<Schema> {
     let fields = serde_json::Deserializer::from_slice(response)
         .into_iter::<ColumnInfo>()

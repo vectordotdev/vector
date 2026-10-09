@@ -11,7 +11,7 @@ use vrl::prelude::*;
     reason = "Keep the fallible return convention used by VRL runtime helpers."
 )]
 fn get_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("argument must be a string");
+    let key_str = key.to_str_lossy().expect("argument must be a string");
     let value = match ctx.target().get_secret(key_str.as_ref()) {
         Some(secret) => secret.into(),
         None => Value::Null,
