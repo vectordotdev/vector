@@ -58,9 +58,7 @@ jobs:
           path: ${{ env.ASSET }}
           if-no-files-found: error
 
-  # Create and publish the release from one job. When each matrix job ran the
-  # release action, they raced: each could create its own draft (leaving orphans)
-  # and each finalized the release, so GitHub emitted `published` more than once.
+  # Create and publish the release from one job to avoid races.
   release:
     runs-on: ubuntu-24.04
     needs: build
