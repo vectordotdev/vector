@@ -1,6 +1,5 @@
 use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 
-use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
@@ -18,7 +17,7 @@ use vector_lib::{
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
-use vrl::event_path;
+use vrl::{event_path, value::Value};
 
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
@@ -265,7 +264,12 @@ impl SourceConfig for SyslogConfig {
                             config.socket_file_mode,
                             decoder,
                             move |events, host| {
-                                handle_events(events, &host_key, host, log_namespace)
+                                handle_events(
+                                    events,
+                                    &host_key,
+                                    host.map(Value::from),
+                                    log_namespace,
+                                )
                             },
                             shutdown,
                             out,
@@ -325,7 +329,7 @@ impl TcpSource for SyslogTcpSource {
         handle_events(
             events,
             &self.host_key,
-            Some(host.ip().to_string().into()),
+            Some(Value::from(host.ip().to_string())),
             self.log_namespace,
         );
     }
@@ -390,7 +394,7 @@ pub fn udp(
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
-                        let received_from = received_from.ip().to_string().into();
+                        let received_from = Value::from(received_from.ip().to_string());
                         handle_events(&mut events, &host_key, Some(received_from), log_namespace);
                         Some(events.remove(0))
                     }
@@ -423,7 +427,7 @@ pub fn udp(
 fn handle_events(
     events: &mut [Event],
     host_key: &Option<OwnedValuePath>,
-    default_host: Option<Bytes>,
+    default_host: Option<Value>,
     log_namespace: LogNamespace,
 ) {
     for event in events {
@@ -434,7 +438,7 @@ fn handle_events(
 fn enrich_syslog_event(
     event: &mut Event,
     host_key: &Option<OwnedValuePath>,
-    default_host: Option<Bytes>,
+    default_host: Option<Value>,
     log_namespace: LogNamespace,
 ) {
     let log = event.as_mut_log();
@@ -451,7 +455,7 @@ fn enrich_syslog_event(
 
     let parsed_hostname = log
         .get(event_path!("hostname"))
-        .map(|hostname| hostname.coerce_to_bytes());
+        .map(|hostname| Value::from(hostname.coerce_to_bytes()));
 
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
         let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
@@ -485,6 +489,7 @@ fn enrich_syslog_event(
 mod test {
     use std::{collections::HashMap, fmt, str::FromStr};
 
+    use bytes::Bytes;
     use chrono::prelude::*;
     use indoc::indoc;
     use rand::{RngExt, rng};
@@ -514,7 +519,7 @@ mod test {
 
     fn event_from_bytes(
         host_key: &str,
-        default_host: Option<Bytes>,
+        default_host: Option<Value>,
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> Option<Event> {
@@ -886,7 +891,7 @@ mod test {
         assert_event_data_eq!(
             event_from_bytes(
                 "host",
-                Some(Bytes::from("192.168.0.254")),
+                Some(Value::from("192.168.0.254")),
                 raw.into(),
                 LogNamespace::Legacy
             )
@@ -931,7 +936,7 @@ mod test {
 
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
@@ -945,7 +950,7 @@ mod test {
 
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
@@ -1034,7 +1039,7 @@ mod test {
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}"#);
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
@@ -1083,7 +1088,7 @@ mod test {
         );
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
