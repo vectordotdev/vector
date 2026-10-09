@@ -4,7 +4,12 @@ use vector_core::{
     config::{LegacyKey, LogNamespace, log_schema},
     event::{Event, LogEvent},
 };
-use vrl::{core::Value, path, path::ValuePath, value::ObjectMap};
+use vrl::{
+    core::Value,
+    path,
+    path::{PathPrefix, ValuePath},
+    value::ObjectMap,
+};
 
 use super::common::{kv_list_into_value, object_into_kv_list, to_hex};
 use crate::proto::{
@@ -321,14 +326,25 @@ pub fn log_event_to_export_request(mut log: LogEvent) -> ExportLogsServiceReques
             if let Some(path) = schema.message_key_target_path() {
                 record.body = log.remove_prune(path, true).and_then(into_body);
             }
+            // The timestamp key can also point into metadata. Many sources and decoders write it
+            // there with its full target path, but the `opentelemetry` source writes it to the
+            // event root, so read the metadata first and then the event root.
+            let metadata_time = schema
+                .timestamp_key_target_path()
+                .filter(|path| path.prefix == PathPrefix::Metadata)
+                .and_then(|path| log.remove(path))
+                .and_then(|value| into_timestamp_nanos(value).ok());
             let (mut fields, _) = log.into_parts();
             if let Some(path) = schema.source_type_key() {
                 fields.remove(path, true);
             }
-            if let Some(path) = schema.timestamp_key() {
-                record.time_unix_nano =
-                    take(&mut fields, path, into_timestamp_nanos).unwrap_or_default();
-            }
+            record.time_unix_nano = metadata_time
+                .or_else(|| {
+                    schema
+                        .timestamp_key()
+                        .and_then(|path| take(&mut fields, path, into_timestamp_nanos))
+                })
+                .unwrap_or_default();
             record.observed_time_unix_nano = take(
                 &mut fields,
                 path!(OBSERVED_TIMESTAMP_KEY),
@@ -603,6 +619,41 @@ mod tests {
         ))));
         init_log_schema(schema, true);
 
+        round_trip(LogNamespace::Legacy);
+    }
+
+    fn init_metadata_timestamp_key() {
+        let mut schema = LogSchema::default();
+        schema.set_timestamp_key(Some(OwnedTargetPath::metadata(owned_value_path!(
+            "timestamp"
+        ))));
+        init_log_schema(schema, true);
+    }
+
+    #[test]
+    fn native_legacy_log_reads_metadata_timestamp_key() {
+        init_metadata_timestamp_key();
+        let mut log = LogEvent::from("disk full");
+        log.insert(
+            log_schema().timestamp_key_target_path().unwrap(),
+            Utc.timestamp_nanos(1_700_000_000_000_000_000),
+        );
+        log.insert(event_path!("timestamp"), "root field");
+
+        let request = log_event_to_export_request(log);
+        let record = &request.resource_logs[0].scope_logs[0].log_records[0];
+        assert_eq!(record.time_unix_nano, 1_700_000_000_000_000_000);
+        // With a metadata timestamp key, a `timestamp` event field is an ordinary field.
+        assert_eq!(
+            record.attributes,
+            vec![kv("timestamp", string("root field"))]
+        );
+    }
+
+    #[test]
+    fn decoded_legacy_log_with_metadata_timestamp_key_round_trips() {
+        // The source writes the timestamp to the event root even with a metadata key.
+        init_metadata_timestamp_key();
         round_trip(LogNamespace::Legacy);
     }
 
