@@ -94,6 +94,8 @@ components: sinks: opentelemetry: {
 				- A `bytesValue` body or attribute that is valid UTF-8 is sent as a `stringValue`.
 				- A record without `timeUnixNano` is sent with `timeUnixNano` set to the observed
 				  time, because the source uses the observed time as the event timestamp.
+				- Each log record is sent in its own `resourceLogs` and `scopeLogs` entry. Records
+				  that had the same resource and scope in the original request are not grouped again.
 
 				To send OTLP logs from the source exactly as received, use `use_otlp_decoding` on the
 				source.
