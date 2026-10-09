@@ -4,6 +4,7 @@ use vector_lib::{
     codecs::BytesDeserializerConfig,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
@@ -150,16 +151,27 @@ async fn run(
     let pid = std::process::id();
 
     // Chain any log events that were captured during early buffering to the front,
-    // and then continue with the normal stream of internal log events.
+    // and then continue with the normal stream of internal log events. Each item carries the
+    // number of events dropped just before it due to broadcast lag; buffered events have none.
     let buffered_events = subscription.buffered_events().await;
-    let mut rx = stream::iter(buffered_events.into_iter().flatten())
+    let mut rx = stream::iter(buffered_events.into_iter().flatten().map(|log| (log, 0)))
         .chain(subscription.into_stream())
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
-    // infinite loop since it receives all such logs.
-    while let Some(mut log) = rx.next().await {
+    // infinite loop since it receives all such logs. The one exception is
+    // `ComponentEventsDropped` below. It is only emitted after an event has
+    // been received following a lag (see `TraceSubscription::into_stream`),
+    // so its log cannot lag the receiver again, and it adds at most one log
+    // per received event.
+    while let Some((mut log, dropped)) = rx.next().await {
+        if dropped > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: dropped as usize,
+                reason: "Internal logs broadcast receiver lagged.",
+            });
+        }
         // TODO: Should this actually be in memory size?
         let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();
@@ -501,5 +513,100 @@ mod tests {
         );
 
         assert_eq!(definitions, Some(expected_definition))
+    }
+
+    // Verify that broadcast lag is surfaced via `component_discarded_events_total` rather
+    // than being silently swallowed.
+    //
+    // Strategy: run inside a single-threaded tokio runtime (the default for `#[tokio::test]`).
+    // While the current task holds the CPU without yielding, no other tokio tasks are scheduled.
+    // We flood the broadcast channel (capacity 99) with more events than it can hold. The source
+    // task cannot poll between emits, so the broadcast overflows and records a lag count. After
+    // we yield, the source observes the lag and emits `ComponentEventsDropped`.
+    #[tokio::test]
+    #[serial]
+    async fn broadcast_lag_increments_discarded_metric() {
+        trace::init(false, false, "error", 10, None);
+        vector_lib::metrics::init_test();
+        trace::reset_early_buffer();
+
+        // The downstream receiver is kept alive but never polled, so the source does not stop
+        // on a closed output and no events are consumed downstream before we check the metric.
+        let (tx, _rx) = SourceSender::new_test();
+        let source = InternalLogsConfig::default()
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+
+        // Yield so the source task subscribes and starts polling the broadcast, then stop early
+        // buffering so new events go to the live broadcast.
+        tokio::task::yield_now().await;
+        trace::stop_early_buffering();
+        tokio::task::yield_now().await;
+
+        let controller =
+            vector_lib::metrics::Controller::get().expect("metrics controller must be initialized");
+        controller.reset();
+
+        // Emit more events than the broadcast capacity (99) without yielding. In a
+        // single-threaded runtime this guarantees the source task cannot poll between emits,
+        // so the broadcast overflows and accumulates a lag count.
+        for i in 0usize..200 {
+            error!(message = "Broadcast lag test.", i);
+        }
+
+        // Yield enough times for the source task to observe the lag and emit
+        // `ComponentEventsDropped`.
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+
+        let discarded_any = controller
+            .capture_metrics()
+            .into_iter()
+            .any(|m| m.name() == "component_discarded_events_total");
+
+        assert!(
+            discarded_any,
+            "expected component_discarded_events_total to be emitted when broadcast lags"
+        );
+    }
+
+    // After a lag, the broadcast receiver points at the oldest slot of a full buffer. Any log
+    // emitted before the next receive, such as the `ComponentEventsDropped` error, overwrites
+    // that slot and lags the receiver again. Verify the source still delivers the newest event of
+    // the burst instead of repeating that cycle.
+    #[tokio::test]
+    #[serial]
+    async fn recovers_after_broadcast_lag() {
+        trace::init(false, false, "error", 10, None);
+        trace::reset_early_buffer();
+
+        let mut rx = start_source().await;
+
+        // Overflow the broadcast (capacity 99) without yielding, so the source lags on its next
+        // receive. The last event is the newest one retained by the broadcast.
+        for i in 0usize..200 {
+            error!(message = "Broadcast lag test.", i);
+        }
+        error!(message = "Last event after lag.");
+
+        let last = Value::from("Last event after lag.");
+        let delivered = tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(event) = rx.next().await {
+                if event.as_log().get(event_path!("message")) == Some(&last) {
+                    return true;
+                }
+            }
+            false
+        })
+        .await
+        .unwrap_or(false);
+
+        assert!(
+            delivered,
+            "source did not deliver events after broadcast lag"
+        );
     }
 }

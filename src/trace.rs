@@ -15,7 +15,7 @@ use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
 };
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
@@ -303,10 +303,26 @@ impl TraceSubscription {
     }
 
     /// Converts this subscription into a raw stream of log events.
-    pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
-        // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actually do about that so there's no reason to force callers to even deal with it.
-        BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
+    ///
+    /// Each item pairs a log event with the number of events dropped just before it because the
+    /// underlying broadcast receiver lagged. The count is reported with the next received event,
+    /// not when the lag is detected. After a lag, the receiver points at the oldest slot of a
+    /// full buffer, so any log emitted before the next receive (for example the
+    /// `ComponentEventsDropped` error for the lag itself) overwrites that slot and lags the
+    /// receiver again, indefinitely. Once an event has been received, that slot is consumed and
+    /// callers can log about the drop.
+    pub fn into_stream(self) -> impl Stream<Item = (LogEvent, u64)> + Unpin {
+        BroadcastStream::new(self.trace_rx)
+            .scan(0u64, |dropped, event| {
+                ready(Some(match event {
+                    Ok(log) => Some((log, std::mem::take(dropped))),
+                    Err(BroadcastStreamRecvError::Lagged(n)) => {
+                        *dropped += n;
+                        None
+                    }
+                }))
+            })
+            .filter_map(ready)
     }
 }
 
@@ -480,7 +496,7 @@ mod tests {
         let messages: Vec<String> = tokio::time::timeout(Duration::from_secs(5), async {
             let mut collected = Vec::with_capacity(EXPECTED);
             loop {
-                let event = stream
+                let (event, _dropped) = stream
                     .next()
                     .await
                     .expect("broadcast stream ended unexpectedly");
