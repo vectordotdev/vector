@@ -150,7 +150,7 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
                                 Value::Array(
                                     v.iter()
                                     .filter_map(|v| {
-                                        v.map(ToString::to_string).map(Into::into).map(Value::Bytes)
+                                        v.map(ToString::to_string).map(Value::from)
                                     })
                                     .collect(),
                                 ),

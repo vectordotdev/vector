@@ -70,12 +70,12 @@ impl EventLogParser {
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.try_insert(message_key, Value::Bytes(message.into()));
+            log_event.try_insert(message_key, Value::from(message));
         }
 
         // Set source/host
         if let Some(host_key) = log_schema.host_key_target_path() {
-            log_event.try_insert(host_key, Value::Bytes(event.computer.clone().into()));
+            log_event.try_insert(host_key, Value::from(event.computer.clone()));
         }
 
         // Set Windows-specific fields
@@ -104,11 +104,11 @@ impl EventLogParser {
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.try_insert(message_key, Value::Bytes(message.into()));
+            log_event.try_insert(message_key, Value::from(message));
         }
 
         if let Some(host_key) = log_schema.host_key_target_path() {
-            log_event.try_insert(host_key, Value::Bytes(event.computer.clone().into()));
+            log_event.try_insert(host_key, Value::from(event.computer.clone()));
         }
 
         // Set Windows-specific fields at root level
@@ -133,47 +133,35 @@ impl EventLogParser {
             Value::Integer(event.record_id as i64),
         );
 
-        log_event.insert(
-            event_path!("level"),
-            Value::Bytes(event.level_name().into()),
-        );
+        log_event.insert(event_path!("level"), Value::from(event.level_name()));
 
         log_event.insert(
             event_path!("level_value"),
             Value::Integer(event.level as i64),
         );
 
-        log_event.insert(
-            event_path!("channel"),
-            Value::Bytes(event.channel.clone().into()),
-        );
+        log_event.insert(event_path!("channel"), Value::from(event.channel.clone()));
 
         log_event.insert(
             event_path!("provider_name"),
-            Value::Bytes(event.provider_name.clone().into()),
+            Value::from(event.provider_name.clone()),
         );
 
         if let Some(ref provider_guid) = event.provider_guid {
             log_event.insert(
                 event_path!("provider_guid"),
-                Value::Bytes(provider_guid.clone().into()),
+                Value::from(provider_guid.clone()),
             );
         }
 
-        log_event.insert(
-            event_path!("computer"),
-            Value::Bytes(event.computer.clone().into()),
-        );
+        log_event.insert(event_path!("computer"), Value::from(event.computer.clone()));
 
         if let Some(ref user_id) = event.user_id {
-            log_event.insert(event_path!("user_id"), Value::Bytes(user_id.clone().into()));
+            log_event.insert(event_path!("user_id"), Value::from(user_id.clone()));
         }
 
         if let Some(ref user_name) = event.user_name {
-            log_event.insert(
-                event_path!("user_name"),
-                Value::Bytes(user_name.clone().into()),
-            );
+            log_event.insert(event_path!("user_name"), Value::from(user_name.clone()));
         }
 
         log_event.insert(
@@ -190,10 +178,7 @@ impl EventLogParser {
             log_event.insert(event_path!("task"), Value::Integer(event.task as i64));
 
             if let Some(ref task_name) = event.task_name {
-                log_event.insert(
-                    event_path!("task_name"),
-                    Value::Bytes(task_name.clone().into()),
-                );
+                log_event.insert(event_path!("task_name"), Value::from(task_name.clone()));
             }
         }
 
@@ -201,40 +186,34 @@ impl EventLogParser {
             log_event.insert(event_path!("opcode"), Value::Integer(event.opcode as i64));
 
             if let Some(ref opcode_name) = event.opcode_name {
-                log_event.insert(
-                    event_path!("opcode_name"),
-                    Value::Bytes(opcode_name.clone().into()),
-                );
+                log_event.insert(event_path!("opcode_name"), Value::from(opcode_name.clone()));
             }
         }
 
         if event.keywords != 0 {
             log_event.insert(
                 event_path!("keywords"),
-                Value::Bytes(format!("0x{:016X}", event.keywords).into()),
+                Value::from(format!("0x{:016X}", event.keywords)),
             );
 
             if !event.keyword_names.is_empty() {
                 let kw_values: Vec<Value> = event
                     .keyword_names
                     .iter()
-                    .map(|s| Value::Bytes(s.clone().into()))
+                    .map(|s| Value::from(s.clone()))
                     .collect();
                 log_event.insert(event_path!("keyword_names"), Value::Array(kw_values));
             }
         }
 
         if let Some(ref activity_id) = event.activity_id {
-            log_event.insert(
-                event_path!("activity_id"),
-                Value::Bytes(activity_id.clone().into()),
-            );
+            log_event.insert(event_path!("activity_id"), Value::from(activity_id.clone()));
         }
 
         if let Some(ref related_activity_id) = event.related_activity_id {
             log_event.insert(
                 event_path!("related_activity_id"),
-                Value::Bytes(related_activity_id.clone().into()),
+                Value::from(related_activity_id.clone()),
             );
         }
 
@@ -252,17 +231,14 @@ impl EventLogParser {
             let string_inserts: Vec<Value> = event
                 .string_inserts
                 .iter()
-                .map(|s| Value::Bytes(s.clone().into()))
+                .map(|s| Value::from(s.clone()))
                 .collect();
             log_event.insert(event_path!("string_inserts"), Value::Array(string_inserts));
         }
 
         // Include raw XML if requested
         if self.config.include_xml && !event.raw_xml.is_empty() {
-            log_event.insert(
-                event_path!("xml"),
-                Value::Bytes(event.raw_xml.clone().into()),
-            );
+            log_event.insert(event_path!("xml"), Value::from(event.raw_xml.clone()));
         }
 
         // Include event data if configured
@@ -297,29 +273,29 @@ impl EventLogParser {
     /// Use `event_data_format` config entries to opt in to typed coercion
     /// for specific fields.
     fn coerce_field_value(&self, key: &str, value: &str) -> Value {
-        let as_bytes = || Value::Bytes(value.to_string().into());
+        let as_string = || Value::from(value);
 
         if let Some(fmt) = self.config.event_data_format.get(key) {
             return match fmt {
                 EventDataFormat::Integer => value
                     .parse::<i64>()
                     .map(Value::Integer)
-                    .unwrap_or_else(|_| as_bytes()),
+                    .unwrap_or_else(|_| as_string()),
                 EventDataFormat::Float => value
                     .parse::<f64>()
                     .ok()
                     .and_then(|f| ordered_float::NotNan::new(f).ok())
                     .map(Value::Float)
-                    .unwrap_or_else(as_bytes),
+                    .unwrap_or_else(as_string),
                 EventDataFormat::Boolean => {
                     let lower = value.to_lowercase();
                     Value::Boolean(matches!(lower.as_str(), "true" | "1" | "yes" | "on"))
                 }
-                EventDataFormat::String | EventDataFormat::Auto => as_bytes(),
+                EventDataFormat::String | EventDataFormat::Auto => as_string(),
             };
         }
 
-        as_bytes()
+        as_string()
     }
 
     fn extract_message_from_event_data(&self, event: &WindowsEvent) -> String {
@@ -412,7 +388,7 @@ impl EventLogParser {
         format: &EventDataFormat,
     ) -> Result<Value, WindowsEventLogError> {
         match format {
-            EventDataFormat::String => Ok(Value::Bytes(value.to_string().into())),
+            EventDataFormat::String => Ok(Value::from(value.to_string())),
             EventDataFormat::Integer => {
                 let int_value = match value {
                     Value::Integer(i) => *i,
@@ -555,31 +531,31 @@ mod tests {
         );
         assert_eq!(
             log_event.get(event_path!("level")).unwrap(),
-            &Value::Bytes("Information".into())
+            &Value::from("Information")
         );
         assert_eq!(
             log_event.get(event_path!("channel")).unwrap(),
-            &Value::Bytes("TestChannel".into())
+            &Value::from("TestChannel")
         );
         assert_eq!(
             log_event.get(event_path!("provider_name")).unwrap(),
-            &Value::Bytes("TestProvider".into())
+            &Value::from("TestProvider")
         );
         assert_eq!(
             log_event.get(event_path!("computer")).unwrap(),
-            &Value::Bytes("TEST-PC".into())
+            &Value::from("TEST-PC")
         );
 
         // Enriched fields from the new resolution methods
         // opcode=2 -> "Stop"
         assert_eq!(
             log_event.get(event_path!("opcode_name")).unwrap(),
-            &Value::Bytes("Stop".into())
+            &Value::from("Stop")
         );
         // keywords=0x8000000000000000 -> ["Classic"]
         assert_eq!(
             log_event.get(event_path!("keyword_names")).unwrap(),
-            &Value::Array(vec![Value::Bytes("Classic".into())])
+            &Value::Array(vec![Value::from("Classic")])
         );
         // task=1 with provider "TestProvider" has no known mapping
         assert!(log_event.get(event_path!("task_name")).is_none());
@@ -625,7 +601,7 @@ mod tests {
         // Level 0 should map to "Information" (not "Unknown")
         assert_eq!(
             log_event.get(event_path!("level")).unwrap(),
-            &Value::Bytes("Information".into())
+            &Value::from("Information")
         );
         assert_eq!(
             log_event.get(event_path!("level_value")).unwrap(),
@@ -635,13 +611,13 @@ mod tests {
         // Task 12544 -> "Logon"
         assert_eq!(
             log_event.get(event_path!("task_name")).unwrap(),
-            &Value::Bytes("Logon".into())
+            &Value::from("Logon")
         );
 
         // keywords=Audit Success
         assert_eq!(
             log_event.get(event_path!("keyword_names")).unwrap(),
-            &Value::Array(vec![Value::Bytes("Audit Success".into())])
+            &Value::Array(vec![Value::from("Audit Success")])
         );
 
         // opcode=0 is not emitted since the condition is `if event.opcode != 0`
@@ -662,7 +638,7 @@ mod tests {
         assert!(log_event.get(event_path!("xml")).is_some());
         assert_eq!(
             log_event.get(event_path!("xml")).unwrap(),
-            &Value::Bytes(event.raw_xml.into())
+            &Value::from(event.raw_xml)
         );
     }
 
@@ -677,8 +653,8 @@ mod tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         if let Some(Value::Object(event_data)) = log_event.get(event_path!("event_data")) {
-            assert_eq!(event_data.get("key1"), Some(&Value::Bytes("value1".into())));
-            assert_eq!(event_data.get("key2"), Some(&Value::Bytes("value2".into())));
+            assert_eq!(event_data.get("key1"), Some(&Value::from("value1")));
+            assert_eq!(event_data.get("key2"), Some(&Value::from("value2")));
         } else {
             panic!("event_data should be present");
         }
@@ -699,7 +675,7 @@ mod tests {
         // event_id should be converted to string
         assert_eq!(
             log_event.get(event_path!("event_id")).unwrap(),
-            &Value::Bytes("1000".into())
+            &Value::from("1000")
         );
     }
 
@@ -764,17 +740,17 @@ mod tests {
         let result = parser
             .format_value(&value, &EventDataFormat::String)
             .unwrap();
-        assert_eq!(result, Value::Bytes("123".into()));
+        assert_eq!(result, Value::from("123"));
 
         // Test integer conversion
-        let value = Value::Bytes("456".into());
+        let value = Value::from("456");
         let result = parser
             .format_value(&value, &EventDataFormat::Integer)
             .unwrap();
         assert_eq!(result, Value::Integer(456));
 
         // Test float conversion
-        let value = Value::Bytes("123.45".into());
+        let value = Value::from("123.45");
         let result = parser
             .format_value(&value, &EventDataFormat::Float)
             .unwrap();
@@ -785,7 +761,7 @@ mod tests {
         }
 
         // Test boolean conversion
-        let value = Value::Bytes("true".into());
+        let value = Value::from("true");
         let result = parser
             .format_value(&value, &EventDataFormat::Boolean)
             .unwrap();

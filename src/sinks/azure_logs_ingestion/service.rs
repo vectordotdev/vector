@@ -54,9 +54,10 @@ pub struct AzureLogsIngestionResponse {
 
 impl DriverResponse for AzureLogsIngestionResponse {
     fn event_status(&self) -> EventStatus {
-        match self.http_status.is_success() {
-            true => EventStatus::Delivered,
-            false => EventStatus::Rejected,
+        if self.http_status.is_success() {
+            EventStatus::Delivered
+        } else {
+            EventStatus::Rejected
         }
     }
 

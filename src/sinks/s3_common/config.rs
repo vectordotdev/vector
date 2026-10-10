@@ -397,7 +397,8 @@ pub enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
-pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Healthcheck> {
+#[must_use]
+pub fn build_healthcheck(bucket: String, client: S3Client) -> Healthcheck {
     let healthcheck = async move {
         let req = client
             .head_bucket()
@@ -422,7 +423,7 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         }
     };
 
-    Ok(healthcheck.boxed())
+    healthcheck.boxed()
 }
 
 pub async fn create_service(

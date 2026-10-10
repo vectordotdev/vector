@@ -82,7 +82,7 @@ where
     }
 }
 
-/// PartitionKey used to partition events by (database, table) pair.
+/// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub database: String,
@@ -90,7 +90,7 @@ pub struct PartitionKey {
     pub format: Format,
 }
 
-/// KeyPartitioner that partitions events by (database, table) pair.
+/// `KeyPartitioner` that partitions events by (database, table) pair.
 struct KeyPartitioner {
     database: ConfinedTemplate,
     table: ConfinedTemplate,

@@ -1,6 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
+use vector_core::serde::AsciiChar;
 
 use super::BoxedFramingError;
 
@@ -15,7 +16,7 @@ pub struct CharacterDelimitedEncoderConfig {
 impl CharacterDelimitedEncoderConfig {
     /// Creates a `CharacterDelimitedEncoderConfig` with the specified delimiter.
     #[must_use]
-    pub const fn new(delimiter: u8) -> Self {
+    pub const fn new(delimiter: AsciiChar) -> Self {
         Self {
             character_delimited: CharacterDelimitedEncoderOptions { delimiter },
         }
@@ -24,7 +25,7 @@ impl CharacterDelimitedEncoderConfig {
     /// Build the `CharacterDelimitedEncoder` from this configuration.
     #[must_use]
     pub const fn build(&self) -> CharacterDelimitedEncoder {
-        CharacterDelimitedEncoder::new(self.character_delimited.delimiter)
+        CharacterDelimitedEncoder::new(self.character_delimited.delimiter.as_byte())
     }
 }
 
@@ -33,9 +34,7 @@ impl CharacterDelimitedEncoderConfig {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CharacterDelimitedEncoderOptions {
     /// The ASCII (7-bit) character that delimits byte sequences.
-    #[configurable(metadata(docs::type_override = "ascii_char"))]
-    #[serde(with = "vector_core::serde::ascii_char")]
-    pub delimiter: u8,
+    pub delimiter: AsciiChar,
 }
 
 /// An encoder for handling bytes that are delimited by (a) chosen character(s).

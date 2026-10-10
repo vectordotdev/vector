@@ -297,7 +297,7 @@ impl Deserializer for SyslogDeserializer {
             syslog_loose::parse_message_with_year_exact(line, resolve_year, Variant::Either)?;
 
         let log = if let (Some(source), LogNamespace::Vector) = (self.source, log_namespace) {
-            let mut log = LogEvent::from(Value::Bytes(Bytes::from(parsed.msg.to_string())));
+            let mut log = LogEvent::from(Value::from(parsed.msg));
             insert_metadata_fields_from_syslog(&mut log, source, parsed, log_namespace);
             log
         } else {
