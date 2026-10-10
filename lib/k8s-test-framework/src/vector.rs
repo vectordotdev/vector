@@ -66,6 +66,10 @@ pub struct Config<'a> {
 /// Takes care of deploying Vector into the Kubernetes cluster.
 ///
 /// Manages the config file secret accordingly, accept additional env var
+///
+/// # Errors
+///
+/// Returns an error if temporary Helm values or resource files cannot be created or written.
 pub fn manager(
     interface_command: &str,
     namespace: &str,

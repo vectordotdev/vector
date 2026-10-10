@@ -1367,3 +1367,45 @@ async fn expected_event_count_zero_split_with_conditions_rejected() {
         "expected config error about zero count with conditions after merge, got: {errs:?}"
     );
 }
+#[tokio::test]
+async fn ambiguous_output_names_are_reported_as_build_errors() {
+    crate::test_util::trace_init();
+
+    let config: ConfigBuilder = serde_yaml::from_str(indoc! {r#"
+        transforms:
+          foo:
+            inputs: []
+            type: route
+            route:
+              bar: true == true
+          foo.bar:
+            inputs: []
+            type: remap
+            source: . = .
+        tests:
+          - name: "ambiguity panic"
+            input:
+              insert_at: foo
+              value: "test"
+            outputs:
+              - extract_from: foo.bar
+                conditions:
+                  - type: vrl
+                    source: "true"
+    "#})
+    .unwrap();
+
+    let errs = build_unit_tests(config).await.err().unwrap();
+
+    assert_eq!(errs.len(), 1);
+    assert!(
+        errs[0].starts_with("Failed to build test 'ambiguity panic':"),
+        "unexpected error prefix: {}",
+        errs[0]
+    );
+    assert!(
+        errs[0].contains("Input specifier foo.bar is ambiguous"),
+        "unexpected ambiguity error: {}",
+        errs[0]
+    );
+}

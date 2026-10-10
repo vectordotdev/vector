@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 //! Functionality supporting both the `[crate::sources::amqp]` source and `[crate::sinks::amqp]` sink.
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use vector_lib::configurable::configurable_component;
@@ -73,11 +74,7 @@ impl AmqpConfig {
                     let der = tokio::fs::read(identity.to_owned()).await?;
                     Some(OwnedIdentity::PKCS12 {
                         der,
-                        password: tls
-                            .key_pass
-                            .as_ref()
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(String::default),
+                        password: tls.key_pass.clone().unwrap_or_else(String::default),
                     })
                 } else {
                     None

@@ -4,6 +4,9 @@
   "scripts": {
     "pagefind": "pagefind",
     "pagefind:watch": "chokidar 'public/**/*.html' -c 'make pagefind' --debounce 1000 --silent",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
     "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
   },
   "dependencies": {
@@ -46,6 +49,7 @@
     "not op_mini all"
   ],
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "chokidar-cli": "^3.0.0",
     "concurrently": "^10.0.5",
     "pagefind": "1.5.2",

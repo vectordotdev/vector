@@ -66,7 +66,7 @@ impl GenerateConfig for ConsoleSinkConfig {
         serde_json::to_value(Self {
             target: Target::Stdout,
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }

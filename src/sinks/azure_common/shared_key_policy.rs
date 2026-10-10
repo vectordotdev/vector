@@ -17,6 +17,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 /// content-length) if missing and adds the `Authorization: SharedKey {account}:{signature}` header. The signature
 /// is computed according to the "Authorize with Shared Key" rules for the Blob service:
 ///
+/// ```text
 /// StringToSign =
 ///   VERB + "\n" +
 ///   Content-Encoding + "\n" +
@@ -32,6 +33,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 ///   Range + "\n" +
 ///   CanonicalizedHeaders +
 ///   CanonicalizedResource
+/// ```
 ///
 /// Notes:
 /// - We set x-ms-date, leaving the standard Date field empty in the signature.
@@ -52,9 +54,12 @@ impl SharedKeyAuthorizationPolicy {
     /// - `account_name`: The storage account name.
     /// - `account_key_b64`: Base64-encoded storage account key.
     /// - `storage_version`: x-ms-version value to send (e.g. "2025-11-05").
+    ///
+    /// # Errors
+    /// Returns an error if the account key is not valid base64.
     pub fn new(
         account_name: String,
-        account_key_b64: String,
+        account_key_b64: &str,
         storage_version: String,
     ) -> AzureResult<Self> {
         let account_key = base64::decode(account_key_b64.as_bytes()).map_err(|e| {
@@ -70,7 +75,7 @@ impl SharedKeyAuthorizationPolicy {
         })
     }
 
-    fn ensure_signing_headers(&self, request: &mut Request) -> AzureResult<(String, String)> {
+    fn ensure_signing_headers(&self, request: &mut Request) -> (String, String) {
         // Always set x-ms-date and x-ms-version explicitly to known values for signing.
         let now = OffsetDateTime::now_utc();
         let ms_date = to_rfc7231(&now);
@@ -88,15 +93,10 @@ impl SharedKeyAuthorizationPolicy {
             request.insert_header("content-length", content_length.to_string());
         }
 
-        Ok((ms_date, ms_version))
+        (ms_date, ms_version)
     }
 
-    fn build_string_to_sign(
-        &self,
-        req: &Request,
-        ms_date: &str,
-        ms_version: &str,
-    ) -> AzureResult<String> {
+    fn build_string_to_sign(&self, req: &Request, ms_date: &str, ms_version: &str) -> String {
         let method = req.method().as_str();
         let url = req.url();
 
@@ -209,9 +209,9 @@ impl SharedKeyAuthorizationPolicy {
         }
 
         // CanonicalizedResource
-        append_canonicalized_resource(&mut s, &self.account_name, url)?;
+        append_canonicalized_resource(&mut s, &self.account_name, url);
 
-        Ok(s)
+        s
     }
 
     fn sign(&self, string_to_sign: &str) -> AzureResult<String> {
@@ -253,9 +253,9 @@ impl Policy for SharedKeyAuthorizationPolicy {
         next: &[Arc<dyn Policy>],
     ) -> PolicyResult {
         // Ensure required signing headers are present
-        let (ms_date, ms_version) = self.ensure_signing_headers(request)?;
+        let (ms_date, ms_version) = self.ensure_signing_headers(request);
         // Build string to sign
-        let sts = self.build_string_to_sign(request, &ms_date, &ms_version)?;
+        let sts = self.build_string_to_sign(request, &ms_date, &ms_version);
         let signature = self.sign(&sts)?;
 
         // Authorization: SharedKey {account}:{signature}
@@ -271,7 +271,7 @@ impl Policy for SharedKeyAuthorizationPolicy {
 
 // ---------- Helpers ----------
 
-fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> AzureResult<()> {
+fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) {
     // "/{account_name}{path}\n"
     s.push('/');
     s.push_str(account);
@@ -299,8 +299,6 @@ fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> Az
             s.push_str(&line);
         }
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -312,7 +310,7 @@ mod tests {
     fn policy() -> SharedKeyAuthorizationPolicy {
         SharedKeyAuthorizationPolicy::new(
             "account".to_owned(),
-            "ZmFrZS10ZXN0LWFjY291bnQta2V5".to_owned(),
+            "ZmFrZS10ZXN0LWFjY291bnQta2V5",
             "2025-11-05".to_owned(),
         )
         .expect("test key should be valid base64")
@@ -328,12 +326,9 @@ mod tests {
 
     fn content_length_field(request: &mut Request) -> String {
         let policy = policy();
-        policy
-            .ensure_signing_headers(request)
-            .expect("signing headers should be added");
+        policy.ensure_signing_headers(request);
         policy
             .build_string_to_sign(request, "Thu, 30 Jul 2026 16:02:25 GMT", "2025-11-05")
-            .expect("request should be signed")
             .lines()
             .nth(3)
             .expect("string to sign should contain content length")

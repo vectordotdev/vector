@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 //! Per-component CPU-time measurement primitives.
 //!
 //! This module provides the building blocks for attributing CPU time to
@@ -60,12 +61,14 @@ pub struct ThreadTime(Inner);
 impl ThreadTime {
     /// Captures the current thread CPU time.
     #[inline]
+    #[must_use]
     pub fn now() -> Self {
         ThreadTime(Inner::now())
     }
 
     /// Returns the CPU time elapsed since this snapshot was taken.
     #[inline]
+    #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.0.elapsed()
     }
@@ -78,6 +81,12 @@ struct Inner(Duration);
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 impl Inner {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve clock conversions"
+    )]
+    #[allow(clippy::cast_sign_loss, reason = "Preserve clock conversions")]
     fn now() -> Self {
         let mut ts = libc::timespec {
             tv_sec: 0,
@@ -140,10 +149,10 @@ impl Inner {
         unsafe {
             GetThreadTimes(
                 GetCurrentThread(),
-                &mut creation,
-                &mut exit,
-                &mut kernel,
-                &mut user,
+                &raw mut creation,
+                &raw mut exit,
+                &raw mut kernel,
+                &raw mut user,
             );
         }
 
@@ -163,7 +172,7 @@ impl Inner {
 #[cfg(target_os = "windows")]
 #[inline]
 fn filetime_to_nanos(ft: windows_sys::Win32::Foundation::FILETIME) -> u64 {
-    let ticks = ((ft.dwHighDateTime as u64) << 32) | (ft.dwLowDateTime as u64);
+    let ticks = (u64::from(ft.dwHighDateTime) << 32) | u64::from(ft.dwLowDateTime);
     ticks * 100 // convert 100ns intervals to nanoseconds
 }
 
@@ -256,6 +265,11 @@ pub struct CpuTimedFuture<F> {
 impl<F: Future> Future for CpuTimedFuture<F> {
     type Output = F::Output;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve nanosecond accounting"
+    )]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
         let t0 = ThreadTime::now();
         let this = self.project();

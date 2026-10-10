@@ -3,6 +3,7 @@ use memchr::memchr;
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
 use vector_config::configurable_component;
+use vector_core::serde::AsciiChar;
 
 use super::BoxedFramingError;
 
@@ -31,22 +32,24 @@ pub struct CharacterDelimitedDecoderConfig {
 
 impl CharacterDelimitedDecoderConfig {
     /// Creates a `CharacterDelimitedDecoderConfig` with the specified delimiter and default max length.
-    pub const fn new(delimiter: u8) -> Self {
+    #[must_use]
+    pub const fn new(delimiter: AsciiChar) -> Self {
         Self {
             character_delimited: CharacterDelimitedDecoderOptions::new(delimiter, None),
         }
     }
     /// Build the `CharacterDelimitedDecoder` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> CharacterDelimitedDecoder {
         let oversized_action = self.character_delimited.oversized_action;
         if let Some(max_length) = self.character_delimited.max_length {
             CharacterDelimitedDecoder::new_with_max_length(
-                self.character_delimited.delimiter,
+                self.character_delimited.delimiter.as_byte(),
                 max_length,
             )
             .with_oversized_action(oversized_action)
         } else {
-            CharacterDelimitedDecoder::new(self.character_delimited.delimiter)
+            CharacterDelimitedDecoder::new(self.character_delimited.delimiter.as_byte())
         }
     }
 }
@@ -56,9 +59,7 @@ impl CharacterDelimitedDecoderConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
-    #[configurable(metadata(docs::type_override = "ascii_char"))]
-    #[serde(with = "vector_core::serde::ascii_char")]
-    pub delimiter: u8,
+    pub delimiter: AsciiChar,
 
     /// The maximum length of the byte buffer.
     ///
@@ -86,8 +87,9 @@ pub struct CharacterDelimitedDecoderOptions {
 }
 
 impl CharacterDelimitedDecoderOptions {
-    /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional max_length.
-    pub const fn new(delimiter: u8, max_length: Option<usize>) -> Self {
+    /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional `max_length`.
+    #[must_use]
+    pub const fn new(delimiter: AsciiChar, max_length: Option<usize>) -> Self {
         Self {
             delimiter,
             max_length,
@@ -109,6 +111,7 @@ pub struct CharacterDelimitedDecoder {
 
 impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with the specified delimiter.
+    #[must_use]
     pub const fn new(delimiter: u8) -> Self {
         CharacterDelimitedDecoder {
             delimiter,
@@ -120,6 +123,7 @@ impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
+    #[must_use]
     pub const fn new_with_max_length(delimiter: u8, max_length: usize) -> Self {
         CharacterDelimitedDecoder {
             max_length,
@@ -128,12 +132,14 @@ impl CharacterDelimitedDecoder {
     }
 
     /// Sets the behavior when a frame exceeds `max_length`.
+    #[must_use]
     pub const fn with_oversized_action(mut self, action: OversizedAction) -> Self {
         self.oversized_action = action;
         self
     }
 
     /// Returns the maximum frame length when decoding.
+    #[must_use]
     pub const fn max_length(&self) -> usize {
         self.max_length
     }

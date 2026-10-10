@@ -792,9 +792,9 @@ impl From<&tracing::Event<'_>> for LogEvent {
         log.insert(
             &TRACING_TARGET_PATHS.kind,
             if meta.is_event() {
-                Value::Bytes("event".to_string().into())
+                Value::from_static_str("event")
             } else if meta.is_span() {
-                Value::Bytes("span".to_string().into())
+                Value::from_static_str("span")
             } else {
                 Value::Null
             },
@@ -803,7 +803,7 @@ impl From<&tracing::Event<'_>> for LogEvent {
         log.insert(
             &TRACING_TARGET_PATHS.module_path,
             meta.module_path()
-                .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
+                .map_or(Value::Null, |mp| Value::from(mp.to_string())),
         );
         log.insert(&TRACING_TARGET_PATHS.target, meta.target().to_string());
         log
