@@ -481,6 +481,7 @@ cli: {
 			} & _core_flags
 
 			options: {
+				"data-dir": _core_config_options["data-dir"]
 				"config-yaml": {
 					description: """
 						Any number of Vector config files to validate.
