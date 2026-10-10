@@ -24,7 +24,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         HttpSource,
-        http::{HttpMethod, add_headers, add_query_parameters},
+        http::{HttpMethod, UnixSocketConfig, add_headers, add_query_parameters},
     },
     tls::TlsEnableableConfig,
 };
@@ -33,12 +33,19 @@ use crate::{
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
-    /// The socket address to listen for connections on.
+    /// The TCP socket address to listen for connections on.
     ///
-    /// It _must_ include a port.
+    /// It _must_ include a port. This is mutually exclusive with `socket`.
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
-    address: SocketAddr,
+    #[serde(default)]
+    address: Option<SocketAddr>,
+
+    /// Unix domain socket to listen for connections on.
+    ///
+    /// This is mutually exclusive with `address`.
+    #[serde(default)]
+    socket: Option<UnixSocketConfig>,
 
     /// A list of HTTP headers to include in the log event.
     ///
@@ -134,6 +141,24 @@ pub struct SimpleHttpConfig {
 }
 
 impl SimpleHttpConfig {
+    fn validate_address(&self) -> crate::Result<()> {
+        if self.socket.is_some() && self.keepalive != KeepaliveConfig::default() {
+            return Err("`keepalive` configuration is not supported for Unix sockets.".into());
+        }
+
+        match (&self.address, &self.socket) {
+            (Some(_), Some(_)) => Err("`address` and `socket` are mutually exclusive.".into()),
+            (None, Some(_)) => {
+                #[cfg(not(unix))]
+                return Err("`socket` is only supported on Unix platforms.".into());
+                #[cfg(unix)]
+                Ok(())
+            }
+            (Some(_), None) => Ok(()),
+            (None, None) => Err("Must specify either `address` or `socket`.".into()),
+        }
+    }
+
     /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
         let mut schema_definition = self
@@ -206,7 +231,8 @@ impl SimpleHttpConfig {
 impl Default for SimpleHttpConfig {
     fn default() -> Self {
         Self {
-            address: "0.0.0.0:8080".parse().unwrap(),
+            address: Some(default_address()),
+            socket: None,
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
@@ -227,6 +253,10 @@ impl Default for SimpleHttpConfig {
 }
 
 impl_generate_config_from_default!(SimpleHttpConfig);
+
+fn default_address() -> SocketAddr {
+    "0.0.0.0:8080".parse().unwrap()
+}
 
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Post
@@ -309,8 +339,12 @@ impl SourceConfig for SimpleHttpConfig {
             decoder,
             log_namespace,
         };
+        self.validate_address()?;
+
         source.run(
             self.address,
+            #[cfg(unix)]
+            self.socket.as_ref(),
             self.path.as_str(),
             self.method,
             self.response_code,
@@ -340,7 +374,12 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![Resource::tcp(self.address)]
+        match (&self.address, &self.socket) {
+            (Some(address), None) => vec![Resource::tcp(*address)],
+            (None, Some(socket)) => vec![Resource::unix_socket(socket.path.clone())],
+            (None, None) => vec![Resource::tcp(default_address())],
+            _ => vec![],
+        }
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -468,6 +507,7 @@ impl HttpSource for SimpleHttpSource {
 
 #[cfg(test)]
 mod tests {
+
     use std::{io::Write, net::SocketAddr, str::FromStr};
 
     use flate2::{
@@ -478,6 +518,8 @@ mod tests {
     use headers::{Authorization, authorization::Credentials};
     use http::{HeaderMap, Method, StatusCode, Uri, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
+    #[cfg(unix)]
+    use tokio::net::UnixStream;
     use vector_lib::{
         codecs::{
             BytesDecoderConfig, JsonDeserializerConfig,
@@ -497,6 +539,8 @@ mod tests {
     };
 
     use super::{SimpleHttpConfig, remove_duplicates};
+    #[cfg(unix)]
+    use crate::sources::util::http::UnixSocketConfig;
     use crate::{
         SourceSender,
         common::http::server_auth::HttpServerAuthConfig,
@@ -546,7 +590,8 @@ mod tests {
 
         tokio::spawn(async move {
             SimpleHttpConfig {
-                address,
+                address: Some(address),
+                socket: None,
                 headers,
                 query_parameters,
                 response_code,
@@ -642,12 +687,125 @@ mod tests {
             .as_u16()
     }
 
+    #[cfg(unix)]
+    async fn send_unix(path: std::path::PathBuf, body: &str) -> u16 {
+        let stream = UnixStream::connect(&path).await.unwrap();
+        let (mut sender, connection) = hyper::client::conn::http1::handshake(stream).await.unwrap();
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                panic!("Unix HTTP connection failed: {error}");
+            }
+        });
+
+        sender
+            .send_request(
+                hyper::Request::post("/")
+                    .header(hyper::header::HOST, "localhost")
+                    .body(hyper::Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
     async fn spawn_ok_collect_n(
         send: impl std::future::Future<Output = u16> + Send + 'static,
         rx: impl Stream<Item = Event> + Unpin,
         n: usize,
     ) -> Vec<Event> {
         spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_socket_config_validation() {
+        // Valid config
+        let config: SimpleHttpConfig = serde_yaml::from_str(
+            "socket:\n  path: /tmp/vector-http.sock\n  file_mode: 432\n  file_uid: 1000\n  file_gid: 1001",
+        )
+        .unwrap();
+        assert_eq!(
+            config.socket,
+            Some(UnixSocketConfig {
+                path: "/tmp/vector-http.sock".into(),
+                file_mode: Some(0o660),
+                file_uid: Some(1000),
+                file_gid: Some(1001),
+            })
+        );
+        assert!(config.validate_address().is_ok());
+
+        // Invalid: Both address and socket provided
+        let config: SimpleHttpConfig =
+            serde_yaml::from_str("address: 127.0.0.1:8080\nsocket:\n  path: /tmp/vector-http.sock")
+                .unwrap();
+        assert!(config.validate_address().is_err());
+
+        // Invalid: socket without a path
+        assert!(serde_yaml::from_str::<SimpleHttpConfig>("socket:\n  file_mode: 432").is_err());
+
+        // Invalid: unknown option inside socket
+        assert!(
+            serde_yaml::from_str::<SimpleHttpConfig>(
+                "socket:\n  path: /tmp/vector-http.sock\n  mode: 432"
+            )
+            .is_err()
+        );
+
+        // Invalid: keepalive configured with socket
+        let config: SimpleHttpConfig = serde_yaml::from_str(
+            "socket:\n  path: /tmp/vector-http.sock\nkeepalive:\n  max_connection_age_secs: 100",
+        )
+        .unwrap();
+        assert!(config.validate_address().is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_socket_receives_events_and_cleans_up() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let socket_path = tempdir.path().join("http-server.sock");
+        let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (trigger_shutdown, shutdown, _) = crate::shutdown::ShutdownSignal::new_wired();
+        let mut context = SourceContext::new_test(sender, None);
+        context.shutdown = shutdown;
+
+        let source = SimpleHttpConfig {
+            address: None,
+            socket: Some(UnixSocketConfig {
+                path: socket_path.clone(),
+                file_mode: Some(0o660),
+                file_uid: None,
+                file_gid: None,
+            }),
+            ..Default::default()
+        }
+        .build(context)
+        .await
+        .unwrap();
+
+        let handle = tokio::spawn(async move { source.await.unwrap() });
+
+        crate::test_util::wait_for({
+            let path = socket_path.clone();
+            move || {
+                let path = path.clone();
+                async move { path.exists() }
+            }
+        })
+        .await;
+
+        let mut events = spawn_ok_collect_n(send_unix(socket_path.clone(), "test"), recv, 1).await;
+        assert_eq!(
+            *events.remove(0).as_log().get_message().unwrap(),
+            "test".into()
+        );
+
+        drop(trigger_shutdown);
+        handle.await.unwrap();
+        assert!(!socket_path.exists());
     }
 
     #[tokio::test]
@@ -1968,7 +2126,12 @@ mod tests {
 
             let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
 
-            let listen_addr_http = format!("http://{}/", config.address);
+            let listen_addr_http = format!(
+                "http://{}/",
+                config
+                    .address
+                    .expect("default config should have a TCP address")
+            );
             let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
             let external_resource = ExternalResource::new(
