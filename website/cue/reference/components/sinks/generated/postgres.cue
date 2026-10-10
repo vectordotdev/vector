@@ -52,7 +52,7 @@ generated: components: sinks: postgres: configuration: {
 					as intentionally discarded events.
 
 					PostgreSQL rejects this statement on a table that has a `DEFERRABLE` unique or exclusion
-					constraint, even when no row conflicts. Keep the default behavior for tables with this constraint.
+					constraint, even when no row conflicts. Keep the default for such tables.
 					"""
 				error: "Fail the whole batch when any row conflicts with an existing row."
 			}
