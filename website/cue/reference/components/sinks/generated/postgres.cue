@@ -50,6 +50,9 @@ generated: components: sinks: postgres: configuration: {
 
 					This appends `ON CONFLICT DO NOTHING` to the insert statement. Skipped rows are reported
 					as intentionally discarded events.
+
+					PostgreSQL rejects this statement on a table that has a `DEFERRABLE` unique or exclusion
+					constraint, even when no row conflicts. Keep the default behavior for tables with this constraint.
 					"""
 				error: "Fail the whole batch when any row conflicts with an existing row."
 			}

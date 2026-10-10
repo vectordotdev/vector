@@ -45,6 +45,9 @@ pub enum OnConflict {
     ///
     /// This appends `ON CONFLICT DO NOTHING` to the insert statement. Skipped rows are reported
     /// as intentionally discarded events.
+    ///
+    /// PostgreSQL rejects this statement on a table that has a `DEFERRABLE` unique or exclusion
+    /// constraint, even when no row conflicts. Keep the default for such tables.
     DoNothing,
 }
 

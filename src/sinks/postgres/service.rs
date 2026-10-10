@@ -175,7 +175,8 @@ impl Service<PostgresRequest> for PostgresService {
             .context(PostgresSnafu)?;
 
             if service.on_conflict == OnConflict::DoNothing {
-                let skipped = event_count.saturating_sub(result.rows_affected() as usize);
+                let inserted = usize::try_from(result.rows_affected()).unwrap_or(usize::MAX);
+                let skipped = event_count.saturating_sub(inserted);
                 if skipped > 0 {
                     emit!(ComponentEventsDropped::<INTENTIONAL> {
                         count: skipped,
