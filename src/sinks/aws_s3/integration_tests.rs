@@ -7,18 +7,34 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "codecs-parquet")]
+use bytes::Bytes;
+#[cfg(feature = "codecs-parquet")]
+use parquet::{
+    file::reader::{FileReader, SerializedFileReader},
+    record::reader::RowIter,
+};
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::format::{
+    ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
+};
+#[cfg(feature = "codecs-parquet")]
+use vrl::event_path;
+
 use super::S3SinkConfig;
 #[cfg(feature = "codecs-parquet")]
 use super::config::S3BatchEncoding;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     common::s3::S3ClientBuilder,
-    config::{Config, SinkContext, ValidatedSink},
+    config::{AcknowledgementsConfig, Config, SinkContext, ValidatedSink},
+    extra_context::ExtraContext,
     sinks::{
         aws_s3::config::default_filename_time_format,
-        s3_common::config::{S3Options, S3ServerSideEncryption},
+        s3_common::config::{RetryStrategy, S3Options, S3ServerSideEncryption},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
+    template::ConfinementConfig,
     test_util::{
         self,
         components::{
@@ -51,6 +67,14 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
 };
 
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Object keys are case-sensitive"
+)]
+fn assert_log_suffix(key: &str) {
+    assert!(key.ends_with(".log"), "Unexpected object key: {key}");
+}
+
 fn s3_address() -> String {
     std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
 }
@@ -65,12 +89,12 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
 
     let config = S3SinkConfig {
         key_prefix: "test-prefix".to_string(),
-        ..config(&bucket, 1000000, 5.0)
+        ..config(&bucket, 1_000_000, 5.0)
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -83,7 +107,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
     let key_parts = key.split('/');
     assert!(key_parts.count() == 1);
     assert!(key.starts_with("test-prefix"));
-    assert!(key.ends_with(".log"));
+    assert_log_suffix(&key);
 
     let obj = get_object(&bucket, key).await;
     assert_eq!(obj.content_encoding, None);
@@ -102,12 +126,12 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
 
     let config = S3SinkConfig {
         key_prefix: "test-prefix/".to_string(),
-        ..config(&bucket, 1000000, 5.0)
+        ..config(&bucket, 1_000_000, 5.0)
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -120,7 +144,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     let key_parts = key.split('/').collect::<Vec<_>>();
     assert!(key_parts.len() == 2);
     assert!(*key_parts.first().unwrap() == "test-prefix");
-    assert!(key.ends_with(".log"));
+    assert_log_suffix(&key);
 
     let obj = get_object(&bucket, key).await;
     assert_eq!(obj.content_encoding, None);
@@ -144,13 +168,13 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
             ssekms_key_id: Some("alias/aws/s3".to_string()),
             ..S3Options::default()
         },
-        ..config(&bucket, 1000000, 5.0)
+        ..config(&bucket, 1_000_000, 5.0)
     };
     let prefix = config.key_prefix.clone();
 
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -163,7 +187,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
     let key_parts = key.split('/');
     assert!(key_parts.count() == 1);
     assert!(key.starts_with("test-prefix"));
-    assert!(key.ends_with(".log"));
+    assert_log_suffix(&key);
 
     let obj = get_object(&bucket, key).await;
     assert_eq!(obj.content_encoding, None);
@@ -189,7 +213,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -249,7 +273,7 @@ async fn s3_gzip() {
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -295,7 +319,7 @@ async fn s3_zstd() {
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -333,7 +357,7 @@ async fn s3_insert_message_into_object_lock() {
     client()
         .await
         .put_object_lock_configuration()
-        .bucket(bucket.to_string())
+        .bucket(bucket.clone())
         .object_lock_configuration(
             ObjectLockConfiguration::builder()
                 .object_lock_enabled(ObjectLockEnabled::Enabled)
@@ -354,11 +378,11 @@ async fn s3_insert_message_into_object_lock() {
         .await
         .unwrap();
 
-    let config = config(&bucket, 1000000, 5.0);
+    let config = config(&bucket, 1_000_000, 5.0);
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -368,7 +392,7 @@ async fn s3_insert_message_into_object_lock() {
     assert_eq!(keys.len(), 1);
 
     let key = keys[0].clone();
-    assert!(key.ends_with(".log"));
+    assert_log_suffix(&key);
 
     let obj = get_object(&bucket, key).await;
     assert_eq!(obj.content_encoding, None);
@@ -392,7 +416,7 @@ async fn acknowledges_failures() {
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (_lines, events, receiver) = make_events_batch(1, 1);
     run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
@@ -413,11 +437,7 @@ async fn s3_healthchecks() {
         .create_service(&ProxyConfig::from_env())
         .await
         .unwrap();
-    config
-        .build_healthcheck(service.client())
-        .unwrap()
-        .await
-        .unwrap();
+    config.build_healthcheck(service.client()).await.unwrap();
 }
 
 #[tokio::test]
@@ -427,13 +447,7 @@ async fn s3_healthchecks_invalid_bucket() {
         .create_service(&ProxyConfig::from_env())
         .await
         .unwrap();
-    assert!(
-        config
-            .build_healthcheck(service.client())
-            .unwrap()
-            .await
-            .is_err()
-    );
+    assert!(config.build_healthcheck(service.client()).await.is_err());
 }
 
 #[tokio::test]
@@ -448,7 +462,7 @@ async fn s3_flush_on_exhaustion() {
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 2, None); // only generate two events (less than batch size)
 
@@ -495,11 +509,6 @@ async fn s3_flush_on_exhaustion() {
 #[cfg(feature = "codecs-parquet")]
 #[tokio::test]
 async fn s3_parquet_insert_message() {
-    use vector_lib::codecs::encoding::format::{
-        ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
-    };
-    use vrl::event_path;
-
     let cx = SinkContext::default();
     let bucket = uuid::Uuid::new_v4().to_string();
     create_bucket(&bucket, false).await;
@@ -518,7 +527,7 @@ async fn s3_parquet_insert_message() {
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
     let validated = config.validate().unwrap();
-    let sink = config.build_processor(service, cx, &validated).unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (batch_notifier, receiver) = BatchNotifier::new_with_receiver();
     let events: Vec<Event> = (0..10)
@@ -551,10 +560,6 @@ async fn s3_parquet_insert_message() {
     assert_eq!(&body[..4], b"PAR1", "Missing Parquet magic bytes");
 
     // Verify we can read rows from the Parquet file
-    use bytes::Bytes;
-    use parquet::file::reader::{FileReader, SerializedFileReader};
-    use parquet::record::reader::RowIter;
-
     let reader =
         SerializedFileReader::new(Bytes::copy_from_slice(&body)).expect("Invalid Parquet file");
     let row_count = RowIter::from_file_into(Box::new(reader)).count();
@@ -597,14 +602,14 @@ async fn s3_disk_buffer_reload_delivers_all_events() {
 
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(268435488).unwrap(),
+        max_size: NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::Block,
     });
 
     // Clone config before building so we can create the reload config.
     let mut new_config = old_config.clone();
     new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: NonZeroU64::new(536870912).unwrap(),
+        max_size: NonZeroU64::new(536_870_912).unwrap(),
         when_full: WhenFull::Block,
     });
 
@@ -647,7 +652,7 @@ async fn s3_disk_buffer_reload_delivers_all_events() {
 
     let reload_result = tokio::time::timeout(
         Duration::from_secs(5),
-        topology.reload_config_and_respawn(new_config.build().unwrap(), Default::default()),
+        topology.reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default()),
     )
     .await;
 
@@ -739,13 +744,13 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
         compression: Compression::None,
         batch,
         request: TowerRequestConfig::default(),
-        tls: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        timezone: Default::default(),
+        tls: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        timezone: None,
         force_path_style: true,
-        retry_strategy: Default::default(),
-        confinement: Default::default(),
+        retry_strategy: RetryStrategy::default(),
+        confinement: ConfinementConfig::default(),
     }
 }
 

@@ -14,7 +14,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use cuckoo_clock::{
     CuckooFilter, ExportableRandomState, InsertValues, LookupValues,
     config::{CounterConfig, CuckooConfiguration, LruAgingStrategy, LruConfig, TtlConfig},
@@ -646,16 +645,10 @@ impl Table for CuckooMemoryTable {
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
                     });
                     let mut result = ObjectMap::from([
-                        (
-                            KeyString::from("key"),
-                            Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
-                        ),
+                        (KeyString::from("key"), Value::from(key)),
                         (
                             KeyString::from("fingerprint"),
-                            Value::Bytes(Bytes::from(format!(
-                                "{:X}",
-                                associated_data.get_fingerprint()
-                            ))),
+                            Value::from(format!("{:X}", associated_data.get_fingerprint())),
                         ),
                         (KeyString::from("value"), Value::Null),
                     ]);

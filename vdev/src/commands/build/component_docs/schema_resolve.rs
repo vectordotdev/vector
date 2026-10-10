@@ -28,7 +28,9 @@ impl SchemaContext {
             get_schema_metadata(&expanded, "docs::type_override").and_then(|t| t.as_str())
         {
             let mut resolved = if type_override == "ascii_char" {
-                if let Some(Value::Number(n)) = expanded.get("default") {
+                if let Some(Value::String(character)) = expanded.get("default") {
+                    json!({ "type": { type_override: { "default": character } } })
+                } else if let Some(Value::Number(n)) = expanded.get("default") {
                     if let Some(c) = n.as_u64() {
                         #[allow(clippy::cast_possible_truncation)]
                         let c_char = (c as u8) as char;

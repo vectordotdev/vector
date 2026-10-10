@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 //! A reusable line aggregation implementation.
 
 #![deny(missing_docs)]
@@ -72,6 +73,7 @@ pub struct Config {
 impl Config {
     /// Build `Config` from legacy `file` source line aggregator configuration
     /// params.
+    #[must_use]
     pub fn for_legacy(marker: Regex, timeout_ms: u64) -> Self {
         let start_pattern = marker;
         let condition_pattern = start_pattern.clone();
@@ -129,6 +131,7 @@ pub struct Logic<K, C> {
 
 impl<K, C> Logic<K, C> {
     /// Create a new `Logic` using the specified `Config`.
+    #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -231,7 +234,7 @@ where
 
                     return Poll::Pending;
                 }
-            };
+            }
         }
     }
 }
@@ -301,6 +304,8 @@ where
     K: Hash + Eq + Clone,
 {
     /// Handle line, if we have something to output - return it.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Keep mode-specific branches")]
     pub fn handle_line(
         &mut self,
         src: K,
@@ -623,7 +628,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    /// https://github.com/vectordotdev/vector/issues/3237
+    /// <https://github.com/vectordotdev/vector/issues/3237>
     #[tokio::test]
     async fn two_lines_emit_with_continue_through() {
         let lines = vec![
@@ -736,8 +741,8 @@ mod tests {
                 10,
             )),
         );
-        let results = line_agg.collect().await;
-        assert_results(results, &expected);
+        let results = line_agg.collect::<Vec<_>>().await;
+        assert_results(&results, &expected);
     }
 
     #[tokio::test]
@@ -771,7 +776,7 @@ mod tests {
 
         let logic = Logic::new(config);
         let line_agg = LineAgg::new(recv, logic);
-        let results = tokio::spawn(line_agg.collect());
+        let results = tokio::spawn(line_agg.collect::<Vec<_>>());
 
         for (index, line) in lines.iter().enumerate() {
             let data = (
@@ -785,7 +790,7 @@ mod tests {
         drop(send);
 
         assert_results(
-            results.await.unwrap(),
+            &results.await.unwrap(),
             &[(expected.as_str(), 0, Some(lines.len() - 1))],
         );
     }
@@ -809,7 +814,7 @@ mod tests {
 
     /// Compare actual output to expected; expected is a list of the expected strings and context
     fn assert_results(
-        actual: Vec<(Filename, Bytes, usize, Option<usize>)>,
+        actual: &[(Filename, Bytes, usize, Option<usize>)],
         expected: &[(&str, usize, Option<usize>)],
     ) {
         let expected_mapped: Vec<(Filename, Bytes, usize, Option<usize>)> = expected
@@ -838,7 +843,7 @@ mod tests {
         let stream = stream_from_lines(lines);
         let logic = Logic::new(config);
         let line_agg = LineAgg::new(stream, logic);
-        let results = line_agg.collect().await;
-        assert_results(results, expected);
+        let results = line_agg.collect::<Vec<_>>().await;
+        assert_results(&results, expected);
     }
 }
