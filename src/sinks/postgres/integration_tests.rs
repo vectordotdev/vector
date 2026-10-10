@@ -514,3 +514,55 @@ async fn insertion_fails_primary_key_violation() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn insertion_skips_conflicting_rows_with_on_conflict_do_nothing() {
+    trace_init();
+
+    let table = random_table_name();
+    let endpoint = pg_url();
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+            on_conflict = "do_nothing"
+        "#,
+    );
+    let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
+    let mut connection = PgConnection::connect(endpoint.as_str())
+        .await
+        .expect("Failed to connect to Postgres");
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+    let insert_existing_sql = format!("INSERT INTO {table} (id, host) VALUES (1, 'existing')");
+    sqlx::query(&insert_existing_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let mut events = [0, 1, 2, 2].map(create_event).to_vec();
+    let mut receiver = BatchNotifier::apply_to(&mut events);
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &POSTGRES_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_sql = format!("SELECT id, host FROM {table} ORDER BY id");
+    let rows: Vec<(i64, Option<String>)> = sqlx::query_as(&select_sql)
+        .fetch_all(&mut connection)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows,
+        vec![
+            (0, Some("example.com".to_owned())),
+            (1, Some("existing".to_owned())),
+            (2, Some("example.com".to_owned())),
+        ]
+    );
+}
