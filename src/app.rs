@@ -6,7 +6,7 @@ use std::os::unix::process::ExitStatusExt;
 use std::os::windows::process::ExitStatusExt;
 use std::{
     num::{NonZeroU64, NonZeroUsize},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitStatus,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -90,6 +90,7 @@ impl ApplicationConfig {
             &config_paths,
             watcher_conf,
             opts.require_healthy,
+            opts.data_dir.clone(),
             opts.allow_empty_config,
             graceful_shutdown_duration,
             signal_handler,
@@ -267,7 +268,11 @@ impl Application {
                 opts.root.dangerously_allow_env_var_interpolation
                     || sub_command.dangerously_allow_env_var_interpolation(),
             );
-            return Err(runtime.block_on(sub_command.execute(signals, color)));
+            return Err(runtime.block_on(sub_command.execute(
+                signals,
+                color,
+                opts.root.data_dir.as_deref(),
+            )));
         }
 
         config::set_env_var_interpolation(opts.root.dangerously_allow_env_var_interpolation);
@@ -323,6 +328,7 @@ impl Application {
             signals,
             topology_controller,
             allow_empty_config: root_opts.allow_empty_config,
+            data_dir: root_opts.data_dir,
         })
     }
 }
@@ -334,6 +340,7 @@ pub struct StartedApplication {
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub allow_empty_config: bool,
+    pub data_dir: Option<PathBuf>,
 }
 
 impl StartedApplication {
@@ -353,6 +360,7 @@ impl StartedApplication {
             topology_controller,
             internal_topologies,
             allow_empty_config,
+            data_dir,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -369,6 +377,7 @@ impl StartedApplication {
                     &config_paths,
                     &mut signal_handler,
                     allow_empty_config,
+                    data_dir.as_deref(),
                 ).await {
                     break signal;
                 },
@@ -399,6 +408,7 @@ async fn handle_signal(
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
     allow_empty_config: bool,
+    data_dir: Option<&Path>,
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadComponents(components_to_reload)) => {
@@ -417,12 +427,16 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
+                data_dir,
             )
             .await;
 
             reload_config_from_result(topology_controller, new_config).await
         }
-        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
+        Ok(SignalTo::ReloadFromConfigBuilder(mut config_builder)) => {
+            if let Some(data_dir) = data_dir {
+                config_builder.set_data_dir(data_dir);
+            }
             let topology_controller = topology_controller.lock().await;
             reload_config_from_result(topology_controller, config_builder.build()).await
         }
@@ -439,6 +453,7 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
+                data_dir,
             )
             .await;
 
@@ -645,10 +660,12 @@ pub fn build_runtime(
 /// Returns a configuration exit code if paths, configuration loading, or watcher setup fail.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
+#[allow(clippy::too_many_arguments)]
 pub async fn load_configs(
     config_paths: &[ConfigPath],
     watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
+    data_dir: Option<PathBuf>,
     allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
@@ -669,6 +686,7 @@ pub async fn load_configs(
         &config_paths,
         signal_handler,
         allow_empty_config,
+        data_dir.as_deref(),
     )
     .await
     .map_err(handle_config_errors)?;
@@ -774,5 +792,144 @@ pub fn watcher_config(
     match method {
         WatchConfigMethod::Recommended => config::watcher::WatcherConfig::RecommendedWatcher,
         WatchConfigMethod::Poll => config::watcher::WatcherConfig::PollWatcher(interval.into()),
+    }
+}
+
+#[cfg(all(test, feature = "sources-demo_logs", feature = "sinks-blackhole"))]
+mod data_dir_tests {
+    use clap::Parser;
+
+    use super::*;
+
+    fn config_text(data_dir: &Path, sink: &str) -> String {
+        let data_dir = serde_json::to_string(data_dir).unwrap();
+        format!(
+            "data_dir: {data_dir}\nsources:\n  input:\n    type: demo_logs\n    format: shuffle\n    lines: [\"log\"]\nsinks:\n  {sink}:\n    type: blackhole\n    inputs: [input]\n"
+        )
+    }
+
+    fn run_reload_test_in_subprocess() -> bool {
+        const CHILD: &str = "VECTOR_TEST_DATA_DIR_RELOAD_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            return false;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .env(CHILD, "1")
+            .env_remove("VECTOR_DATA_DIR")
+            .args([
+                "--exact",
+                "app::data_dir_tests::cli_data_dir_survives_topology_reload_signals",
+                "--nocapture",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout)
+                .contains("topology reload assertions completed")
+        );
+        true
+    }
+
+    #[tokio::test]
+    async fn cli_data_dir_survives_topology_reload_signals() {
+        if run_reload_test_in_subprocess() {
+            return;
+        }
+
+        crate::test_util::trace_init();
+        let directory = tempfile::tempdir().unwrap();
+        let config_file = directory.path().join("vector.yaml");
+        let override_dir = directory.path().join("override-state");
+        std::fs::create_dir(&override_dir).unwrap();
+        std::fs::write(
+            &config_file,
+            config_text(&directory.path().join("configured-state"), "initial"),
+        )
+        .unwrap();
+        let opts = RootOpts::try_parse_from([
+            "vector",
+            "--config",
+            config_file.to_str().unwrap(),
+            "--data-dir",
+            override_dir.to_str().unwrap(),
+        ])
+        .unwrap();
+        let (mut signals, _receiver) = SignalHandler::new();
+        let application =
+            ApplicationConfig::from_opts(&opts, &mut signals, ExtraContext::default())
+                .await
+                .unwrap();
+        let paths = application.config_paths.clone();
+        let controller = SharedTopologyController::new(TopologyController {
+            topology: application.topology,
+            config_paths: paths.clone(),
+            require_healthy: opts.require_healthy,
+            #[cfg(feature = "api")]
+            api_server: None,
+            extra_context: ExtraContext::default(),
+        });
+
+        for replacement in ["disk", "provider", "components"] {
+            let text = config_text(&directory.path().join(replacement), replacement);
+            let signal = if replacement == "provider" {
+                let builder = config::loading::ConfigBuilderLoader::default()
+                    .load_from_input(text.as_bytes(), config::Format::Yaml)
+                    .unwrap();
+                SignalTo::ReloadFromConfigBuilder(builder)
+            } else {
+                std::fs::write(&config_file, text).unwrap();
+                if replacement == "disk" {
+                    SignalTo::ReloadFromDisk
+                } else {
+                    SignalTo::ReloadComponents(std::collections::HashSet::new())
+                }
+            };
+            let outcome = tokio::time::timeout(
+                Duration::from_secs(10),
+                handle_signal(
+                    Ok(signal),
+                    &controller,
+                    &paths,
+                    &mut signals,
+                    false,
+                    opts.data_dir.as_deref(),
+                ),
+            )
+            .await
+            .expect("topology reload timed out");
+            assert!(outcome.is_none());
+            let current = controller.lock().await;
+            // A retained data_dir alone is insufficient: the new topology must actually
+            // have replaced the old one, rather than rolling back a rejected reload.
+            assert!(
+                current
+                    .topology
+                    .config
+                    .sink(&config::ComponentKey::from(replacement))
+                    .is_some()
+            );
+            assert_eq!(
+                current.topology.config.global.data_dir.as_ref(),
+                Some(&override_dir)
+            );
+        }
+        let controller = controller
+            .try_into_inner()
+            .expect("no other controller owner")
+            .into_inner();
+        assert!(controller.stop().await);
+        #[allow(
+            clippy::print_stdout,
+            reason = "The parent verifies the isolated reload assertions ran."
+        )]
+        {
+            println!("topology reload assertions completed");
+        }
     }
 }

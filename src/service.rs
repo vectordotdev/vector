@@ -1,9 +1,13 @@
 #![allow(missing_docs)]
-use std::{ffi::OsString, path::PathBuf, time::Duration};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use clap::Parser;
 
-use crate::{cli::handle_config_errors, config};
+use crate::{config, service_arguments::create_service_arguments};
 
 const DEFAULT_SERVICE_NAME: &str = crate::built_info::PKG_NAME;
 
@@ -75,14 +79,14 @@ struct InstallOpts {
 }
 
 impl InstallOpts {
-    fn service_info(&self) -> ServiceInfo {
+    fn service_info(&self, data_dir: Option<&Path>) -> ServiceInfo {
         let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
         let display_name = self.display_name.as_deref().unwrap_or("Vector Service");
         let description = crate::built_info::PKG_DESCRIPTION;
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments = create_service_arguments(&config_paths).unwrap();
+        let arguments = create_service_arguments(&config_paths, data_dir).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -241,12 +245,12 @@ enum ControlAction {
     Restart { stop_timeout: Duration },
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub fn cmd(opts: &Opts, data_dir: Option<&Path>) -> exitcode::ExitCode {
     let sub_command = &opts.sub_command;
     match sub_command {
         Some(s) => match s {
             SubCommand::Install(opts) => {
-                control_service(&opts.service_info(), ControlAction::Install)
+                control_service(&opts.service_info(data_dir), ControlAction::Install)
             }
             SubCommand::Uninstall(opts) => {
                 let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
@@ -316,39 +320,6 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
         Err(error) => {
             error!(message = "Error controlling service.", %error);
             exitcode::SOFTWARE
-        }
-    }
-}
-
-fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
-    let config_paths = config::process_paths(config_paths)?;
-    match config::load_from_paths(&config_paths) {
-        Ok(_) => {
-            let mut args: Vec<OsString> = config_paths
-                .iter()
-                .flat_map(|config_path| match config_path {
-                    config::ConfigPath::File(path, format) => {
-                        let key = match format {
-                            None => "--config",
-                            Some(config::Format::Toml) => "--config-toml",
-                            Some(config::Format::Json) => "--config-json",
-                            Some(config::Format::Yaml) => "--config-yaml",
-                        };
-                        vec![OsString::from(key), path.as_os_str().into()]
-                    }
-                    config::ConfigPath::Dir(path) => {
-                        vec![OsString::from("--config-dir"), path.as_os_str().into()]
-                    }
-                })
-                .collect();
-            if config::env_var_interpolation_enabled() {
-                args.push(OsString::from("--dangerously-allow-env-var-interpolation"));
-            }
-            Some(args)
-        }
-        Err(errs) => {
-            handle_config_errors(errs);
-            None
         }
     }
 }

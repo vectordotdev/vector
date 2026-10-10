@@ -2,7 +2,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write as _,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use clap::Parser;
@@ -115,13 +115,13 @@ fn edge_attributes_to_string(attributes: &EdgeAttributes, default_label: Option<
     attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
-pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub(crate) fn cmd(opts: &Opts, data_dir: Option<&Path>) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let Some(paths) = config::process_paths(&paths) else {
         return exitcode::CONFIG;
     };
 
-    let config = match config::load_from_paths(&paths) {
+    let config = match config::loading::load_from_paths_with_data_dir(&paths, data_dir) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]
