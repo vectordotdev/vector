@@ -103,7 +103,17 @@ pub struct HistogramBucket {
 #[derive(Debug, Default, PartialEq)]
 pub struct HistogramMetric {
     pub buckets: Vec<HistogramBucket>,
-    pub sum: f64,
+    /// `None` when the exposition carried no `_sum` series.
+    ///
+    /// The [OpenMetrics histogram specification][spec] only recommends that series ("SHOULD contain
+    /// Sum"), and forbids it outright once negative bucket thresholds are in play, so its absence is
+    /// legitimate and must stay distinguishable from a reported sum of zero. Summaries are the
+    /// opposite case: a missing `_sum` there is [specified to mean zero][otel-compat], which is why
+    /// [`SummaryMetric::sum`] is not optional.
+    ///
+    /// [spec]: https://prometheus.io/docs/specs/om/open_metrics_spec/#histogram
+    /// [otel-compat]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/compatibility/prometheus_and_openmetrics.md#summaries
+    pub sum: Option<f64>,
     pub count: u64,
 }
 
@@ -194,7 +204,7 @@ impl GroupKind {
                 }
                 "_sum" => {
                     let sum = metric.value;
-                    matching_group(metrics, key).sum = sum;
+                    matching_group(metrics, key).sum = Some(sum);
                 }
                 "_count" => {
                     let count = try_f64_to_u64(metric.value)?;
@@ -625,7 +635,7 @@ mod test {
                         HistogramBucket { bucket: f64::INFINITY, count: 144_320 },
                     ],
                     count: 144_320,
-                    sum: 53423.0,
+                    sum: Some(53423.0),
                 },
             ));
         });
@@ -641,7 +651,7 @@ mod test {
                         HistogramBucket { bucket: 24.999_999_999_999_996, count: 18_939_392_877},
                     ],
                     count: 10,
-                    sum: 5.0,
+                    sum: Some(5.0),
                 },
             ));
         });
@@ -984,13 +994,87 @@ mod test {
                             HistogramBucket { bucket: f64::INFINITY, count: 19 },
                         ],
                         count: 19,
-                        sum: 12.0,
+                        sum: Some(12.0),
                     })
             );
         });
         match_group!(parsed[1], "one_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1_395_066_367_700), labels!(), 24.0));
+        });
+    }
+
+    /// `OpenMetrics` only recommends the `_sum` series for histograms, and forbids it once negative
+    /// bucket thresholds are used, so an exposition can legitimately omit it. Both the
+    /// OpenTelemetry Collector's remote-write exporter and the Prometheus server's own OTLP
+    /// receiver drop it when an OTLP histogram carries no sum. That has to stay distinguishable
+    /// from a reported sum of zero.
+    #[test]
+    fn parse_request_histogram_without_sum() {
+        let parsed = parse_request(
+            write_request!(
+                ["one" = Histogram],
+                [
+                    [__name__ => "one_bucket", le => "1"] => [ 15 @ 1_395_066_367_700 ],
+                    [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1_395_066_367_700 ],
+                    [__name__ => "one_count"] => [ 19 @ 1_395_066_367_700 ]
+                ]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "one", Histogram => |metrics: &MetricMap<HistogramMetric>| {
+            assert_eq!(metrics.len(), 1);
+            let (_, metric) = metrics.get_index(0).unwrap();
+            assert_eq!(metric.sum, None, "an absent `_sum` series must not read as a sum of zero");
+            assert_eq!(metric.count, 19);
+        });
+    }
+
+    #[test]
+    fn parse_text_histogram_without_sum() {
+        let parsed = parse_text(
+            r#"
+            # TYPE latency histogram
+            latency_bucket{le="1"} 15
+            latency_bucket{le="+Inf"} 19
+            latency_count 19
+            "#,
+        )
+        .unwrap();
+
+        match_group!(parsed[0], "latency", Histogram => |metrics: &MetricMap<HistogramMetric>| {
+            let (_, metric) = metrics.get_index(0).unwrap();
+            assert_eq!(metric.sum, None);
+        });
+    }
+
+    /// The inverse case, and the reason [`SummaryMetric::sum`] stays non-optional: the
+    /// OpenTelemetry Prometheus compatibility specification requires a summary with no `_sum`
+    /// series to be read as a sum of zero, where a histogram's must be left unset.
+    #[test]
+    fn parse_text_summary_without_sum_is_zero() {
+        let parsed = parse_text(
+            r#"
+            # TYPE latency summary
+            latency{quantile="0.5"} 4.0
+            latency_count 19
+            "#,
+        )
+        .unwrap();
+
+        match_group!(parsed[0], "latency", Summary => |metrics: &MetricMap<SummaryMetric>| {
+            let (_, metric) = metrics.get_index(0).unwrap();
+            assert_eq!(
+                metric,
+                &SummaryMetric {
+                    quantiles: vec![SummaryQuantile { quantile: 0.5, value: 4.0 }],
+                    sum: 0.0,
+                    count: 19,
+                }
+            );
         });
     }
 

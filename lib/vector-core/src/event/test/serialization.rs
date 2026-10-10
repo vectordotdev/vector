@@ -69,6 +69,76 @@ fn back_and_forth_through_bytes() {
         .quickcheck(inner as fn(EventArray) -> TestResult);
 }
 
+mod histogram_sum {
+    use crate::event::metric::{Bucket, MetricValue};
+    use crate::event::proto;
+    use similar_asserts::assert_eq;
+
+    fn histogram(sum: Option<f64>) -> MetricValue {
+        MetricValue::AggregatedHistogram {
+            buckets: vec![Bucket {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum,
+        }
+    }
+
+    fn decode(value: proto::MetricValue) -> MetricValue {
+        MetricValue::try_from(value).expect("histogram should decode")
+    }
+
+    #[test]
+    fn both_survive_a_round_trip() {
+        for sum in [Some(12.5), Some(0.0), None] {
+            let decoded = decode(proto::MetricValue::from(histogram(sum)));
+            assert_eq!(decoded, histogram(sum), "round-trip lost the sum {sum:?}");
+        }
+    }
+
+    /// Payloads that do not set `sum_missing` carry a reported sum -- including a zero, which proto3
+    /// implicit presence does not even write to the wire. Versions 1 and 2 cannot set it at all.
+    #[test]
+    fn unmarked_payloads_decode_as_a_reported_sum() {
+        let v3 = proto::MetricValue::AggregatedHistogram3(proto::AggregatedHistogram3 {
+            buckets: vec![proto::HistogramBucket3 {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum: 0.0,
+            sum_missing: false,
+        });
+        assert_eq!(decode(v3), histogram(Some(0.0)));
+
+        let v2 = proto::MetricValue::AggregatedHistogram2(proto::AggregatedHistogram2 {
+            buckets: vec![proto::HistogramBucket {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum: 0.0,
+        });
+        assert_eq!(decode(v2), histogram(Some(0.0)));
+
+        let v1 = proto::MetricValue::AggregatedHistogram1(proto::AggregatedHistogram1 {
+            buckets: vec![1.0],
+            counts: vec![3],
+            count: 3,
+            sum: 0.0,
+        });
+        assert_eq!(decode(v1), histogram(Some(0.0)));
+    }
+
+    /// `PartialEq` has to keep these apart, or none of the above proves anything.
+    #[test]
+    fn an_unreported_sum_differs_from_zero() {
+        assert_ne!(histogram(None), histogram(Some(0.0)));
+        assert_eq!(histogram(None), histogram(None));
+    }
+}
+
 #[test]
 fn disk_buffer_preserves_trace_layout_metadata() {
     let mut trace = TraceEvent::default();

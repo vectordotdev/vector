@@ -193,7 +193,7 @@ mod tests {
                     4.0f64.powf(bpower) => cfactor * 4
                 ],
                 count: 7 * cfactor,
-                sum,
+                sum: Some(sum),
             },
         )
     }

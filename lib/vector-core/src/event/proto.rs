@@ -173,23 +173,25 @@ impl TryFrom<MetricValue> for super::MetricValue {
                 statistic: dist.statistic().into(),
                 samples: dist.samples.into_iter().map(Into::into).collect(),
             },
+            // Versions 1 and 2 have no way to encode an absent sum, so whatever they carry was
+            // reported by the source.
             MetricValue::AggregatedHistogram1(hist) => Self::AggregatedHistogram {
                 buckets: super::metric::zip_buckets(
                     hist.buckets,
                     hist.counts.iter().map(|h| u64::from(*h)),
                 ),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram2(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram3(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
-                sum: hist.sum,
+                sum: (!hist.sum_missing).then_some(hist.sum),
             },
             MetricValue::AggregatedSummary1(summary) => Self::AggregatedSummary {
                 quantiles: super::metric::zip_quantiles(summary.quantiles, summary.values),
@@ -388,7 +390,9 @@ impl From<super::MetricValue> for MetricValue {
             } => Self::AggregatedHistogram3(AggregatedHistogram3 {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
-                sum,
+                // Readers that predate `sum_missing` ignore it and see zero.
+                sum: sum.unwrap_or(0.0),
+                sum_missing: sum.is_none(),
             }),
             super::MetricValue::AggregatedSummary {
                 quantiles,
@@ -904,7 +908,7 @@ mod tests {
                     count: 2,
                 }],
                 count: 2,
-                sum: 3.0,
+                sum: Some(3.0),
             },
             EventMetricValue::AggregatedHistogram {
                 buckets: vec![metric::Bucket {
@@ -912,7 +916,7 @@ mod tests {
                     count: 2,
                 }],
                 count: 2,
-                sum: 3.0,
+                sum: Some(3.0),
             },
             EventMetricValue::AggregatedSummary {
                 quantiles: vec![metric::Quantile {
@@ -946,6 +950,64 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(decoded, expected);
+    }
+
+    /// A histogram marked `sum_missing` reported no sum, whatever `sum` carries.
+    #[test]
+    fn decodes_histogram_marked_sum_missing_as_absent() {
+        let value = MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
+            buckets: vec![HistogramBucket3 {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum: 7.0,
+            sum_missing: true,
+        });
+
+        assert_eq!(
+            EventMetricValue::try_from(value).expect("marked histogram should decode"),
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
+                    count: 2,
+                }],
+                count: 2,
+                sum: None,
+            }
+        );
+    }
+
+    fn encode_histogram(sum: Option<f64>) -> AggregatedHistogram3 {
+        let value = MetricValue::from(EventMetricValue::AggregatedHistogram {
+            buckets: vec![metric::Bucket {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum,
+        });
+
+        let MetricValue::AggregatedHistogram3(hist) = value else {
+            panic!("expected AggregatedHistogram3, got {value:?}");
+        };
+        hist
+    }
+
+    /// A reported sum of zero must not be mistaken for a missing one.
+    #[test]
+    fn encodes_reported_zero_sum_without_marker() {
+        let hist = encode_histogram(Some(0.0));
+        assert!(!hist.sum_missing);
+        assert_eq!(hist.sum, 0.0);
+    }
+
+    /// Readers that predate `sum_missing` skip it, so the zero in `sum` is what they see.
+    #[test]
+    fn encodes_unreported_sum_as_marked_zero() {
+        let hist = encode_histogram(None);
+        assert!(hist.sum_missing);
+        assert_eq!(hist.sum, 0.0);
     }
 
     #[test]
