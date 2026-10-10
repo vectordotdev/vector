@@ -2001,6 +2001,73 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
     }
 }
 
+/// Sends a request to the OTLP/HTTP endpoint and returns the status code with the decoded
+/// `google.rpc.Status` message from the response body.
+async fn send_http_request(request: reqwest::RequestBuilder) -> (reqwest::StatusCode, String) {
+    let response = request.send().await.expect("Failed to send request.");
+    let status = response.status();
+    let body = response
+        .bytes()
+        .await
+        .expect("Failed to read response body.");
+    let message = super::status::Status::decode(body)
+        .expect("Response body should be a protobuf `Status`.")
+        .message;
+    (status, message)
+}
+
+#[tokio::test]
+async fn http_rejections_return_client_error_status_codes() {
+    let env = build_otlp_test_env(LOGS, None).await;
+    let http_addr = env.config.http.address;
+    test_util::wait_for_tcp(http_addr).await;
+    let client = reqwest::Client::new();
+    let logs_url = format!("http://{http_addr}/v1/logs");
+
+    // JSON is not supported, so the request should be rejected as an unsupported media type.
+    let (status, message) = send_http_request(
+        client
+            .post(&logs_url)
+            .header("Content-Type", "application/json")
+            .body(r#"{"resourceLogs":[]}"#),
+    )
+    .await;
+    assert_eq!(status, reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    assert!(message.contains("application/x-protobuf"), "{message}");
+
+    // A missing content type is treated the same as an unsupported one.
+    let (status, _) = send_http_request(client.post(&logs_url)).await;
+    assert_eq!(status, reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+    // Other rejections are mapped by warp, which replies with a plain-text body.
+    // Only `POST` is routed.
+    let response = client
+        .get(&logs_url)
+        .send()
+        .await
+        .expect("Failed to send request.");
+    assert_eq!(response.status(), reqwest::StatusCode::METHOD_NOT_ALLOWED);
+
+    // Unknown paths are not found.
+    let response = client
+        .post(format!("http://{http_addr}/v1/unknown"))
+        .header("Content-Type", "application/x-protobuf")
+        .send()
+        .await
+        .expect("Failed to send request.");
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+
+    // The supported content type is still accepted.
+    let response = client
+        .post(&logs_url)
+        .header("Content-Type", "application/x-protobuf")
+        .body(ExportLogsServiceRequest::default().encode_to_vec())
+        .send()
+        .await
+        .expect("Failed to send request.");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+}
+
 #[cfg(test)]
 mod otlp_decoding_config_tests {
     use indoc::indoc;
