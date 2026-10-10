@@ -608,8 +608,10 @@ cli: {
 				`vector validate --data-dir ./state vector.yaml` or
 				`VECTOR_DATA_DIR=./state vector validate vector.yaml` uses `./state` without
 				editing the configuration. The override is retained through configuration reloads
-				and Windows service installation. Validation still checks whether the directory
-				is usable unless the relevant environment checks are disabled.
+				and Windows service installation. When installing a Windows service, relative
+				overrides are resolved against the installer's working directory and stored as
+				absolute paths. Validation still checks whether the directory is usable unless
+				the relevant environment checks are disabled.
 				"""
 			type: string: default: null
 		}

@@ -7,7 +7,7 @@ use std::{
 
 use clap::Parser;
 
-use crate::{cli::handle_config_errors, config};
+use crate::{config, service_arguments::create_service_arguments};
 
 const DEFAULT_SERVICE_NAME: &str = crate::built_info::PKG_NAME;
 
@@ -321,117 +321,5 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
             error!(message = "Error controlling service.", %error);
             exitcode::SOFTWARE
         }
-    }
-}
-
-fn create_service_arguments(
-    config_paths: &[config::ConfigPath],
-    data_dir: Option<&Path>,
-) -> Option<Vec<OsString>> {
-    let config_paths = config::process_paths(config_paths)?;
-    match config::loading::load_from_paths_with_data_dir(&config_paths, data_dir) {
-        Ok(_) => {
-            let mut args: Vec<OsString> = config_paths
-                .iter()
-                .flat_map(|config_path| match config_path {
-                    config::ConfigPath::File(path, format) => {
-                        let key = match format {
-                            None => "--config",
-                            Some(config::Format::Toml) => "--config-toml",
-                            Some(config::Format::Json) => "--config-json",
-                            Some(config::Format::Yaml) => "--config-yaml",
-                        };
-                        vec![OsString::from(key), path.as_os_str().into()]
-                    }
-                    config::ConfigPath::Dir(path) => {
-                        vec![OsString::from("--config-dir"), path.as_os_str().into()]
-                    }
-                })
-                .collect();
-            if config::env_var_interpolation_enabled() {
-                args.push(OsString::from("--dangerously-allow-env-var-interpolation"));
-            }
-            if let Some(data_dir) = data_dir {
-                // Keep option and path as separate arguments. The service library owns
-                // Windows command-line quoting, including spaces and trailing backslashes.
-                args.push(OsString::from("--data-dir"));
-                args.push(data_dir.as_os_str().to_owned());
-            }
-            Some(args)
-        }
-        Err(errs) => {
-            handle_config_errors(errs);
-            None
-        }
-    }
-}
-
-#[cfg(all(
-    test,
-    windows,
-    feature = "sources-demo_logs",
-    feature = "sinks-blackhole"
-))]
-mod tests {
-    use super::*;
-
-    fn write_config(path: &Path, data_dir: &Path, include_components: bool) {
-        let data_dir = serde_json::to_string(data_dir).unwrap();
-        let mut text = format!("data_dir: {data_dir}\n");
-        if include_components {
-            text.push_str("sources:\n  input:\n    type: demo_logs\n    format: shuffle\n    lines: [\"log\"]\nsinks:\n  output:\n    type: blackhole\n    inputs: [input]\n");
-        }
-        std::fs::write(path, text).unwrap();
-    }
-
-    #[test]
-    fn service_arguments_leave_unset_data_dir_unchanged() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("vector config.yaml");
-        write_config(&path, &directory.path().join("configured-state"), true);
-        let args = create_service_arguments(&[config::ConfigPath::File(path.clone(), None)], None)
-            .unwrap();
-        let mut expected = vec![OsString::from("--config"), path.into_os_string()];
-        if config::env_var_interpolation_enabled() {
-            expected.push(OsString::from("--dangerously-allow-env-var-interpolation"));
-        }
-        assert_eq!(args, expected);
-    }
-
-    #[test]
-    fn service_data_dir_keeps_spaces_and_backslashes_in_one_argument() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("vector config.yaml");
-        write_config(&path, &directory.path().join("configured-state"), true);
-        let mut data_dir = directory.path().join("state with spaces");
-        std::fs::create_dir(&data_dir).unwrap();
-        data_dir.as_mut_os_string().push("\\");
-        let args =
-            create_service_arguments(&[config::ConfigPath::File(path, None)], Some(&data_dir))
-                .unwrap();
-        assert_eq!(args[args.len() - 2], "--data-dir");
-        assert_eq!(args.last().unwrap().as_os_str(), data_dir.as_os_str());
-        let parsed = crate::cli::RootOpts::try_parse_from(
-            std::iter::once(OsString::from("vector")).chain(args),
-        )
-        .unwrap();
-        assert_eq!(parsed.data_dir, Some(data_dir));
-    }
-
-    #[test]
-    fn service_data_dir_override_precedes_split_config_merge() {
-        let directory = tempfile::tempdir().unwrap();
-        let first = directory.path().join("first.yaml");
-        let second = directory.path().join("second.yaml");
-        write_config(&first, &directory.path().join("first-state"), true);
-        write_config(&second, &directory.path().join("second-state"), false);
-        let paths = [
-            config::ConfigPath::File(first, None),
-            config::ConfigPath::File(second, None),
-        ];
-        assert!(create_service_arguments(&paths, None).is_none());
-        let data_dir = directory.path().join("override-state");
-        let args = create_service_arguments(&paths, Some(&data_dir)).unwrap();
-        assert_eq!(args.last().unwrap().as_os_str(), data_dir.as_os_str());
     }
 }
