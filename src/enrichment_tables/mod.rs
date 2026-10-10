@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Functionality to handle enrichment tables.
 use std::path::PathBuf;
 
@@ -83,6 +85,11 @@ impl vector_lib::configurable::NamedComponent for EnrichmentTables {
 }
 
 impl GenerateConfig for EnrichmentTables {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self::File(file::FileConfig {
             file: file::FileSettings {
@@ -97,6 +104,7 @@ impl GenerateConfig for EnrichmentTables {
 
 impl EnrichmentTables {
     /// Gets the files to watch to trigger reload
+    #[must_use]
     pub fn files_to_watch(&self) -> Vec<&PathBuf> {
         match self {
             EnrichmentTables::File(file_config) => vec![&file_config.file.path],

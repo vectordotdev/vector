@@ -197,6 +197,14 @@ jobs:
           rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
+  test-website:
+    if: ${{ github.event_name == 'merge_group' && (needs.changes.outputs.website_tests == 'true' || needs.changes.outputs.test-yml == 'true') }}
+    needs: changes
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/website-tests.yml
+
   all-checks:
     name: Test Suite
     runs-on: ubuntu-24.04
@@ -215,6 +223,7 @@ jobs:
       - check-generated-docs
       - test-vrl
       - build-vrl-playground
+      - test-website
     steps:
       - name: Check all jobs status
         run: |

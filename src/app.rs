@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
@@ -62,6 +63,10 @@ pub struct Application {
 }
 
 impl ApplicationConfig {
+    /// # Errors
+    /// Returns an exit code if configuration loading, watching, or topology startup fails.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
     pub async fn from_opts(
         opts: &RootOpts,
         signal_handler: &mut SignalHandler,
@@ -95,6 +100,8 @@ impl ApplicationConfig {
         Self::from_config(config_paths, config, extra_context).await
     }
 
+    /// # Errors
+    /// Returns a configuration exit code if the topology cannot start.
     pub async fn from_config(
         config_paths: Vec<ConfigPath>,
         config: Config,
@@ -119,6 +126,8 @@ impl ApplicationConfig {
         })
     }
 
+    /// # Errors
+    /// Returns a configuration exit code if the internal topology cannot start.
     pub async fn add_internal_config(
         &mut self,
         config: Config,
@@ -175,6 +184,7 @@ impl ApplicationConfig {
 }
 
 impl Application {
+    #[must_use]
     pub fn run(extra_context: ExtraContext) -> ExitStatus {
         let (runtime, app) =
             Self::prepare_start(extra_context).unwrap_or_else(|code| std::process::exit(code));
@@ -182,6 +192,9 @@ impl Application {
         runtime.block_on(app.run())
     }
 
+    /// # Errors
+    /// Returns the exit code from argument parsing, initialization, configuration loading,
+    /// or a completed subcommand.
     pub fn prepare_start(
         extra_context: ExtraContext,
     ) -> Result<(Runtime, StartedApplication), ExitCode> {
@@ -189,6 +202,9 @@ impl Application {
             .and_then(|(runtime, app)| app.start(runtime.handle()).map(|app| (runtime, app)))
     }
 
+    /// # Errors
+    /// Returns the exit code from argument parsing, initialization, configuration loading,
+    /// or a completed subcommand.
     pub fn prepare(extra_context: ExtraContext) -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
@@ -199,6 +215,9 @@ impl Application {
         Self::prepare_from_opts(opts, extra_context)
     }
 
+    /// # Errors
+    /// Returns an exit code if initialization or configuration loading fails, or when a
+    /// subcommand finishes.
     pub fn prepare_from_opts(
         opts: Opts,
         extra_context: ExtraContext,
@@ -274,6 +293,8 @@ impl Application {
         ))
     }
 
+    /// # Errors
+    /// Currently always returns `Ok`.
     pub fn start(self, handle: &Handle) -> Result<StartedApplication, ExitCode> {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
@@ -323,10 +344,14 @@ pub struct StartedApplication {
 }
 
 impl StartedApplication {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
     pub async fn run(self) -> ExitStatus {
         self.main().await.shutdown().await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
     pub async fn main(self) -> FinishedApplication {
         let Self {
             config_paths,
@@ -358,7 +383,7 @@ impl StartedApplication {
                 },
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 error = graceful_crash.next() => break SignalTo::Shutdown(error),
-                _ = TopologyController::sources_finished(topology_controller.clone()), if has_sources => {
+                () = TopologyController::sources_finished(topology_controller.clone()), if has_sources => {
                     info!("All sources have finished.");
                     break SignalTo::Shutdown(None)
                 } ,
@@ -375,6 +400,8 @@ impl StartedApplication {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::large_futures, reason = "Boxing needs profiling")]
 async fn handle_signal(
     signal: Result<SignalTo, RecvError>,
     topology_controller: &SharedTopologyController,
@@ -491,6 +518,8 @@ pub struct FinishedApplication {
 }
 
 impl FinishedApplication {
+    /// # Panics
+    /// Panics if the topology controller is still shared or the signal is not shutdown or quit.
     pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
             signal,
@@ -573,6 +602,11 @@ fn get_log_levels(default: &str) -> String {
         .unwrap_or_else(|_| default.into())
 }
 
+/// # Errors
+/// Returns a configuration exit code for zero threads or buffer-size overflow.
+///
+/// # Panics
+/// Panics if global runtime settings are already initialized or the runtime cannot be created.
 pub fn build_runtime(
     threads: Option<usize>,
     chunk_size_events: Option<NonZeroUsize>,
@@ -592,9 +626,10 @@ pub fn build_runtime(
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    let chunk_size_events = chunk_size_events
-        .map(NonZeroUsize::get)
-        .unwrap_or(vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS);
+    let chunk_size_events = chunk_size_events.map_or(
+        vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS,
+        NonZeroUsize::get,
+    );
 
     let Some(source_sender_buffer_size) = threads.checked_mul(chunk_size_events) else {
         error!(
@@ -621,6 +656,10 @@ pub fn build_runtime(
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
+/// # Errors
+/// Returns a configuration exit code if paths, configuration loading, or watcher setup fail.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::large_futures, reason = "Boxing needs profiling")]
 #[allow(clippy::too_many_arguments)]
 pub async fn load_configs(
     config_paths: &[ConfigPath],
@@ -745,6 +784,7 @@ pub fn init_logging(
     info!(message = "Log level is enabled.", ?level);
 }
 
+#[must_use]
 pub fn watcher_config(
     method: WatchConfigMethod,
     interval: NonZeroU64,
@@ -768,30 +808,37 @@ mod data_dir_tests {
         )
     }
 
+    fn run_reload_test_in_subprocess() -> bool {
+        const CHILD: &str = "VECTOR_TEST_DATA_DIR_RELOAD_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            return false;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .env(CHILD, "1")
+            .env_remove("VECTOR_DATA_DIR")
+            .args([
+                "--exact",
+                "app::data_dir_tests::cli_data_dir_survives_topology_reload_signals",
+                "--nocapture",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout)
+                .contains("topology reload assertions completed")
+        );
+        true
+    }
+
     #[tokio::test]
     async fn cli_data_dir_survives_topology_reload_signals() {
-        const CHILD: &str = "VECTOR_TEST_DATA_DIR_RELOAD_CHILD";
-        if std::env::var_os(CHILD).is_none() {
-            let output = std::process::Command::new(std::env::current_exe().unwrap())
-                .env(CHILD, "1")
-                .env_remove("VECTOR_DATA_DIR")
-                .args([
-                    "--exact",
-                    "app::data_dir_tests::cli_data_dir_survives_topology_reload_signals",
-                    "--nocapture",
-                ])
-                .output()
-                .unwrap();
-            assert!(
-                output.status.success(),
-                "{}\n{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr),
-            );
-            assert!(
-                String::from_utf8_lossy(&output.stdout)
-                    .contains("topology reload assertions completed")
-            );
+        if run_reload_test_in_subprocess() {
             return;
         }
 

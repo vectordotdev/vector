@@ -25,6 +25,7 @@ pub struct ConfigBuilderLoader {
 
 impl ConfigBuilderLoader {
     /// Override the data directory before merging individual configuration files.
+    #[must_use]
     pub fn data_dir(mut self, data_dir: Option<&Path>) -> Self {
         self.data_dir = data_dir.map(Path::to_path_buf);
         if let Some(data_dir) = data_dir {
@@ -34,24 +35,29 @@ impl ConfigBuilderLoader {
     }
 
     /// Sets whether to interpolate environment variables in the config.
+    #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
     }
 
     /// Sets the secrets map for secret interpolation.
+    #[must_use]
     pub fn secrets(mut self, secrets: HashMap<String, String>) -> Self {
         self.secrets = secrets;
         self
     }
 
     /// Sets whether to allow empty configuration.
+    #[must_use]
     pub const fn allow_empty(mut self, allow_empty: bool) -> Self {
         self.builder.allow_empty = allow_empty;
         self
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -59,7 +65,9 @@ impl ConfigBuilderLoader {
         super::loader_from_paths(self, config_paths)
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn load_from_input<R: Read>(
         self,
         input: R,
@@ -132,7 +140,7 @@ impl Process for ConfigBuilderLoader {
                 }
                 self.builder.append(builder)?;
             }
-        };
+        }
 
         Ok(())
     }

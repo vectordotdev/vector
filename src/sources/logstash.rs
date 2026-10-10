@@ -222,7 +222,7 @@ impl TcpSource for LogstashSource {
                 log,
                 log_schema().source_type_key(),
                 path!("source_type"),
-                Bytes::from_static(LogstashConfig::NAME.as_bytes()),
+                Value::from_static_str(LogstashConfig::NAME),
             );
 
             let log_timestamp = log.get(event_path!("@timestamp")).and_then(|timestamp| {

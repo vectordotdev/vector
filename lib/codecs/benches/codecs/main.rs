@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use criterion::criterion_main;
 
 mod character_delimited_bytes;

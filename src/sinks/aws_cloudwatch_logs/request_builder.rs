@@ -123,7 +123,7 @@ impl CloudwatchRequestBuilder {
     }
 }
 
-/// ByteSizeOf is being abused to represent the encoded size of a request for the Partitioned Batcher
+/// `ByteSizeOf` is being abused to represent the encoded size of a request for the Partitioned Batcher
 ///
 /// The maximum batch size is 1,048,576 bytes. This size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
 /// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
@@ -143,7 +143,10 @@ mod tests {
     use vector_lib::{config::log_schema, event::LogEvent};
 
     use super::{CloudwatchRequestBuilder, MAX_MESSAGE_SIZE};
-    use crate::template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate};
+    use crate::{
+        codecs::{Encoder, Transformer},
+        template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
+    };
 
     fn confined(src: &str, field: &'static str) -> ConfinedTemplate {
         Template::try_from(src)
@@ -161,8 +164,8 @@ mod tests {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),
             stream_template: unconfined("stream"),
-            transformer: Default::default(),
-            encoder: Default::default(),
+            transformer: Transformer::default(),
+            encoder: Encoder::default(),
         };
         let timestamp = Utc::now();
         let message = "event message";
@@ -179,8 +182,8 @@ mod tests {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),
             stream_template: unconfined("stream"),
-            transformer: Default::default(),
-            encoder: Default::default(),
+            transformer: Transformer::default(),
+            encoder: Encoder::default(),
         };
 
         let timestamp = Utc::now();

@@ -255,6 +255,50 @@
   }
 }
 
+/* Copy buttons added by below.js: code on the left, button in its own column on the right.
+   In the prose layer so these override Tailwind Typography's pre margins while the
+   .no-prose spacing rules above still apply. */
+@layer prose {
+
+.has-copy-button {
+  @apply flex items-start rounded-md bg-black;
+}
+
+/* Move Tailwind Typography's pre margin to the container (:where keeps .no-prose rules winning) */
+.prose .has-copy-button:where(:has(> pre)) {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+/* The code: a pre, or a div.chroma wrapping a table when line numbers are in a table */
+.has-copy-button > :first-child {
+  @apply m-0 min-w-0 flex-1 overflow-x-auto;
+}
+
+.code-copy-button {
+  @apply mt-2.5 mr-2.5 flex-none rounded p-1.5 font-sans text-xs font-medium text-gray-400 cursor-pointer;
+}
+
+.code-copy-button:hover {
+  @apply bg-gray-800 text-white;
+}
+
+.code-copy-button svg {
+  @apply block h-4 w-4;
+}
+
+}
+
+/* Focus outlines for copy buttons and code blocks (Hugo makes each pre focusable for keyboard
+   scrolling). Unlayered and more specific than toc.sass's `.prose *:focus { outline: none }`. */
+.prose .code-copy-button:focus-visible {
+  @apply outline-2 outline-offset-2 outline-secondary text-white;
+}
+
+.prose .has-copy-button pre:focus-visible {
+  @apply outline-2 -outline-offset-2 outline-secondary;
+}
+
 .hover\:underline {
   border-bottom: 1px solid transparent;
 }

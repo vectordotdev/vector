@@ -250,7 +250,7 @@ async fn correct_request() {
     let validated = config.validate().unwrap();
     let (sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
@@ -361,7 +361,7 @@ async fn mock_healthcheck_with_400_response() {
     let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
@@ -425,7 +425,7 @@ async fn mock_healthcheck_with_403_response() {
     let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,

@@ -1182,7 +1182,7 @@ impl ContainerLogInfo {
             &mut log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
+            Value::from_static_str(DockerLogsConfig::NAME),
         );
 
         // This handles the transition from the original timestamp logic. Originally the

@@ -241,6 +241,19 @@ div#output-section {
   width: 100%;
 }
 
+/* Keep Monaco's inherited light/dark colors, borders and shadows for documentation. */
+.monaco-editor .monaco-hover {
+  border-radius: 6px;
+}
+
+.monaco-editor .monaco-hover .hover-contents {
+  padding: 12px 16px;
+}
+
+.monaco-editor .monaco-hover p + p {
+  margin-top: 8px;
+}
+
 .gutter {
   background-color: var(--datadog-purple-light);
   transition: background-color 0.2s ease;

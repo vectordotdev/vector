@@ -148,34 +148,30 @@ pub enum ExecFailedToSignalChild {
 
 impl ExecFailedToSignalChild {
     fn to_error_code(&self) -> String {
-        use ExecFailedToSignalChild::*;
-
         match self {
             #[cfg(unix)]
-            SignalError(err) => format!("errno_{err}"),
+            Self::SignalError(err) => format!("errno_{err}"),
             #[cfg(unix)]
-            FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
+            Self::FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
             #[cfg(unix)]
-            NoPid => String::from("no_pid"),
+            Self::NoPid => String::from("no_pid"),
             #[cfg(windows)]
-            IoError(err) => err.to_string(),
+            Self::IoError(err) => err.to_string(),
         }
     }
 }
 
 impl std::fmt::Display for ExecFailedToSignalChild {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use ExecFailedToSignalChild::*;
-
         match self {
             #[cfg(unix)]
-            SignalError(err) => write!(f, "errno: {err}"),
+            Self::SignalError(err) => write!(f, "errno: {err}"),
             #[cfg(unix)]
-            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {err}"),
+            Self::FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {err}"),
             #[cfg(unix)]
-            NoPid => write!(f, "child had no pid"),
+            Self::NoPid => write!(f, "child had no pid"),
             #[cfg(windows)]
-            IoError(err) => write!(f, "io error: {err}"),
+            Self::IoError(err) => write!(f, "io error: {err}"),
         }
     }
 }

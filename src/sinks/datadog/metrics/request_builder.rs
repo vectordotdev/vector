@@ -94,24 +94,24 @@ impl MetricsEncoder for DatadogMetricsV3Encoder {
     }
 }
 
-/// Series encoder dispatch: either V1/V2 incremental or V3 batch, picked from the
-/// configured `SeriesApiVersion`. Sketches always use the V1/V2 encoder.
+/// Series encoder dispatch: either V2 incremental or V3 batch, picked from the
+/// configured `SeriesApiVersion`. Sketches always use the V2 encoder.
 enum EncoderKind {
-    V1V2(Box<DatadogMetricsEncoder>),
+    V2(Box<DatadogMetricsEncoder>),
     V3(Box<DatadogMetricsV3Encoder>),
 }
 
 impl MetricsEncoder for EncoderKind {
     fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
         match self {
-            Self::V1V2(enc) => enc.try_encode(metric),
+            Self::V2(enc) => enc.try_encode(metric),
             Self::V3(enc) => enc.try_encode(metric),
         }
     }
 
     fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         match self {
-            Self::V1V2(enc) => enc.finish(),
+            Self::V2(enc) => enc.finish(),
             Self::V3(enc) => enc.finish(),
         }
     }
@@ -136,14 +136,14 @@ impl DatadogMetricsRequestBuilder {
                 default_namespace.clone(),
             )))
         } else {
-            EncoderKind::V1V2(Box::new(DatadogMetricsEncoder::new(
+            EncoderKind::V2(Box::new(DatadogMetricsEncoder::new(
                 DatadogMetricsEndpoint::Series(series_api_version),
                 default_namespace.clone(),
             )))
         };
 
         // Sketches are unaffected by `series_api_version`: the V3 intake has no sketches route,
-        // so they always go to `/api/beta/sketches` with the V1/V2 encoder.
+        // so they always go to `/api/beta/sketches` with the V2 encoder.
         let sketches_encoder =
             DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, default_namespace);
 
@@ -194,8 +194,8 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             api_key: ddmetrics_metadata.api_key,
             payload,
             uri,
-            content_type: ddmetrics_metadata.endpoint.content_type(),
-            content_encoding: ddmetrics_metadata.endpoint.compression().content_encoding(),
+            content_type: "application/x-protobuf",
+            content_encoding: "zstd",
             finalizers: ddmetrics_metadata.finalizers,
             metadata: request_metadata,
         }
@@ -230,7 +230,7 @@ type EncodedResults =
 
 // ── Encoding ────────────────────────────────────────────────────────────────────
 //
-// One code path drives both wire formats. V1/V2's `try_encode` returns `Ok(Some(metric))`
+// One code path drives both wire formats. V2's `try_encode` returns `Ok(Some(metric))`
 // when a metric doesn't fit, signalling "flush what you have and retry me" — the inner loop
 // below handles that by stashing the metric in `pending` and finishing early. V3's
 // `try_encode` always returns `Ok(None)` (it can only detect overflow at `finish()` time), so
@@ -348,7 +348,7 @@ enum ChunkError {
 /// leave one chunk over the limit — and that chunk was then discarded whole, even though
 /// smaller subdivisions of it would have fit. That matters most for V3, where overflow is the
 /// ordinary path rather than an edge case: V3 accumulates the whole batch and only learns the
-/// payload size at `finish()` time, so it cannot stop before the limit the way V1/V2 do.
+/// payload size at `finish()` time, so it cannot stop before the limit the way V2 does.
 ///
 /// Halving is driven by what the encoder actually produced rather than by an estimate, so it
 /// terminates: every iteration either emits a request, drops a single metric, or strictly
@@ -415,7 +415,7 @@ fn encode_chunk(
     for metric in remaining.by_ref() {
         match encoder.try_encode(metric) {
             Ok(None) => {}
-            // A V1/V2 encoder hands a metric back when it won't fit alongside what's already
+            // A V2 encoder hands a metric back when it won't fit alongside what's already
             // buffered, which means this chunk can't be a single payload — the same conclusion
             // as a `TooLarge` at `finish()`. Stop here and let the caller split. (V3 never
             // takes this path: it accepts everything and only checks size at `finish()`.)

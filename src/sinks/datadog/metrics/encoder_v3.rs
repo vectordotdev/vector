@@ -1,7 +1,7 @@
 //! V3 columnar protobuf encoder for the Datadog metrics sink.
 //!
 //! Translates Vector's [`Metric`] events into the V3 columnar format produced by
-//! [`datadog_agent_metrics_v3`].  Unlike V1/V2 (incremental per-metric serialization),
+//! [`datadog_agent_metrics_v3`]. Unlike V2 (incremental per-metric serialization),
 //! V3 accumulates all metrics into a [`V3Writer`] and serializes the entire batch
 //! in a single call when [`DatadogMetricsV3Encoder::finish`] is invoked.  This is
 //! required because delta encoding applies across the whole payload.
@@ -188,7 +188,7 @@ fn encode_metric_to_v3(
         MetricValue::Gauge { .. } => V3MetricType::Gauge,
         MetricValue::Set { .. } => V3MetricType::Gauge,
         // Sketch-valued metrics are routed to the sketches endpoint (see `sink.rs`), which
-        // always uses the V1/V2 encoder, so they never reach this encoder. `AggregatedSummary`
+        // always uses the V2 encoder, so they never reach this encoder. `AggregatedSummary`
         // is split into counters/gauges, and `Distribution`/`AggregatedHistogram` are converted
         // into `Sketch(AgentDDSketch)`, by the shared `DatadogMetricsNormalizer` before metrics
         // ever reach either encoder. None of these should happen — mirrors V2's
@@ -216,7 +216,7 @@ fn encode_metric_to_v3(
 
     // ── Tags, resources & source type ───────────────────────────────────────
     //
-    // Delegated wholesale to the V1/V2 encoder's splitter so both protocols send the same
+    // Delegated wholesale to the V2 encoder's splitter so both protocols send the same
     // tags and resources for the same metric. Notably this is what restores the
     // `resource.<type>` tags that the `datadog_agent` source produces from an upstream V2
     // payload's resources back into structured resources.
@@ -525,7 +525,7 @@ mod tests {
         // `AggregatedSummary` is split into counters/gauges, and `Distribution`/
         // `AggregatedHistogram` are converted into `Sketch(AgentDDSketch)`, by the shared
         // `DatadogMetricsNormalizer`, whose sketch output is then routed to the sketches
-        // endpoint and its V1/V2 encoder (see `sink.rs`) — so none of these values, sketches
+        // endpoint and its V2 encoder (see `sink.rs`) — so none of these values, sketches
         // included, can reach the V3 encoder. Mirror V2 and error rather than guess.
         use vector_lib::event::metric::{Bucket, Quantile, Sample};
 

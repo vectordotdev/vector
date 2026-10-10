@@ -7,7 +7,6 @@ use std::{
 
 use async_trait::async_trait;
 use bloomy::{BloomFilter, bloom};
-use bytes::Bytes;
 use futures::{
     Stream, StreamExt,
     stream::{self, BoxStream},
@@ -34,7 +33,7 @@ use crate::enrichment_tables::memory::{
     },
 };
 
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a bloom table.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a bloom table.
 #[derive(Clone)]
 pub(super) struct BloomMemoryTable {
     filter: Arc<RwLock<BloomFilter<String>>>,
@@ -60,7 +59,7 @@ impl BloomMemoryConfig {
 }
 
 impl BloomMemoryTable {
-    /// Creates a new [BloomMemoryTable] based on the provided config.
+    /// Creates a new [`BloomMemoryTable`] based on the provided config.
     pub(super) fn new(
         config: MemoryConfig,
         bloom_config: BloomMemoryConfig,
@@ -76,13 +75,13 @@ impl BloomMemoryTable {
         )));
 
         Ok(Self {
-            config,
             filter,
+            config,
             bloom_config,
         })
     }
 
-    /// Creates a new [BloomMemoryTable] based on the provided config and previous state.
+    /// Creates a new [`BloomMemoryTable`] based on the provided config and previous state.
     pub(super) fn from_previous_state(
         config: MemoryConfig,
         bloom_config: BloomMemoryConfig,
@@ -109,8 +108,13 @@ impl BloomMemoryTable {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn handle_value(&self, value: ObjectMap) {
-        for (k, _) in value.iter() {
+        for k in value.keys() {
             self.filter
                 .write()
                 .expect("rwlock poisoned")
@@ -159,10 +163,7 @@ impl Table for BloomMemoryTable {
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
                     });
                     let result = ObjectMap::from([
-                        (
-                            KeyString::from("key"),
-                            Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
-                        ),
+                        (KeyString::from("key"), Value::from(key)),
                         (KeyString::from("value"), Value::Null),
                     ]);
                     Ok(vec![result])
@@ -171,7 +172,7 @@ impl Table for BloomMemoryTable {
                         key: &key,
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
                     });
-                    Ok(Default::default())
+                    Ok(Vec::default())
                 }
             }
             Some(_) => Err(Error::OnlyEqualityConditionAllowed),
@@ -210,6 +211,11 @@ impl std::fmt::Debug for BloomMemoryTable {
 
 #[async_trait]
 impl StreamSink<Event> for BloomMemoryTable {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
@@ -218,10 +224,10 @@ impl StreamSink<Event> for BloomMemoryTable {
             .flush_interval
             .map(NonZeroU64::get)
             .map(Duration::from_secs)
-            .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
-                Box::pin(IntervalStream::new(interval(d)))
-            })
-            .unwrap_or(Box::pin(stream::empty()));
+            .map_or::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(
+                Box::pin(stream::empty()),
+                |d| Box::pin(IntervalStream::new(interval(d))),
+            );
 
         loop {
             tokio::select! {
@@ -239,8 +245,8 @@ impl StreamSink<Event> for BloomMemoryTable {
                     let log = event.into_log();
 
                     if let (Value::Object(map), _) = log.into_parts() {
-                        self.handle_value(map)
-                    };
+                        self.handle_value(map);
+                    }
 
                     finalizers.update_status(EventStatus::Delivered);
                     events_sent.emit(CountByteSize(1, event_byte_size));
@@ -280,7 +286,7 @@ mod tests {
 
     #[test]
     fn finds_row() {
-        let memory = BloomMemoryTable::new(Default::default(), build_bloom_config(|_| {}))
+        let memory = BloomMemoryTable::new(MemoryConfig::default(), build_bloom_config(|_| {}))
             .expect("default bloom memory table should build correctly");
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -302,7 +308,7 @@ mod tests {
             Value::from(5),
         )])));
 
-        let memory = BloomMemoryTable::new(Default::default(), build_bloom_config(|_| {}))
+        let memory = BloomMemoryTable::new(MemoryConfig::default(), build_bloom_config(|_| {}))
             .expect("default bloom memory table should build correctly");
 
         run_and_assert_sink_compliance(
@@ -315,7 +321,7 @@ mod tests {
 
     #[test]
     fn missing_key() {
-        let memory = BloomMemoryTable::new(Default::default(), build_bloom_config(|_| {}))
+        let memory = BloomMemoryTable::new(MemoryConfig::default(), build_bloom_config(|_| {}))
             .expect("default bloom memory table should build correctly");
 
         let condition = Condition::Equals {
@@ -334,7 +340,7 @@ mod tests {
 
     #[test]
     fn restores_state() {
-        let memory = BloomMemoryTable::new(Default::default(), build_bloom_config(|_| {}))
+        let memory = BloomMemoryTable::new(MemoryConfig::default(), build_bloom_config(|_| {}))
             .expect("default bloom memory table should build correctly");
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -355,7 +361,7 @@ mod tests {
         assert_eq!(result.get("key").unwrap(), &Value::from("test_key"));
 
         let restored_memory = BloomMemoryTable::from_previous_state(
-            Default::default(),
+            MemoryConfig::default(),
             build_bloom_config(|_| {}),
             memory
                 .extract_state()
