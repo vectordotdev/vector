@@ -3729,15 +3729,16 @@ dependencies = [
 
 [[package]]
 name = "databricks-zerobus-ingest-sdk"
-version = "2.7.1"
+version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b3fe4dfbe632ff6aa4c5a23ad8adb3d4caa04e86d05fdcd4d94ed30cdcd1f66"
+checksum = "051dd1829fad9870f40f7d718cbe1995c1615f8f5bb2b5c84dade7cacad2a3bf"
 dependencies = [
  "arrow-array 59.2.0",
  "arrow-flight 59.2.0",
  "arrow-ipc 59.2.0",
  "arrow-schema 59.2.0",
  "async-trait",
+ "base64 0.22.1",
  "bytes",
  "futures",
  "hyper-http-proxy",
@@ -3747,6 +3748,7 @@ dependencies = [
  "prost-reflect 0.16.5",
  "prost-types 0.14.3",
  "protoc-bin-vendored",
+ "rand 0.9.4",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
