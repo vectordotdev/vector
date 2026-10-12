@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels:
+    - ubuntu-24.04-8core
+    - ubuntu-24.04-8core-arm
+    - release-builder-linux
+    - windows-2025-8core

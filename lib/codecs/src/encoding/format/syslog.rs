@@ -28,16 +28,19 @@ pub struct SyslogSerializerConfig {
 
 impl SyslogSerializerConfig {
     /// Build the `SyslogSerializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> SyslogSerializer {
         SyslogSerializer::new(self)
     }
 
     /// The data type of events that are accepted by `SyslogSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         schema::Requirement::empty()
     }
@@ -73,6 +76,7 @@ pub struct SyslogSerializer {
 
 impl SyslogSerializer {
     /// Creates a new `SyslogSerializer`.
+    #[must_use]
     pub fn new(conf: &SyslogSerializerConfig) -> Self {
         Self {
             config: conf.clone(),
@@ -106,14 +110,13 @@ impl<'a> ConfigDecanter<'a> {
     }
 
     fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
-        let mut app_name = self.get_value(&config.app_name).unwrap_or_else(|| {
+        let mut app_name = self.get_value(config.app_name.as_ref()).unwrap_or_else(|| {
             self.log
                 .get_by_meaning("service")
-                .map(|v| v.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "vector".to_owned())
+                .map_or_else(|| "vector".to_owned(), |v| v.to_string_lossy().into_owned())
         });
-        let mut proc_id = self.get_value(&config.proc_id);
-        let mut msg_id = self.get_value(&config.msg_id);
+        let mut proc_id = self.get_value(config.proc_id.as_ref());
+        let mut msg_id = self.get_value(config.msg_id.as_ref());
         let hostname = self
             .log
             .get_host()
@@ -158,9 +161,8 @@ impl<'a> ConfigDecanter<'a> {
         }
     }
 
-    fn get_value(&self, path: &Option<ConfigTargetPath>) -> Option<String> {
-        path.as_ref()
-            .and_then(|p| self.log.get(p))
+    fn get_value(&self, path: Option<&ConfigTargetPath>) -> Option<String> {
+        path.and_then(|p| self.log.get(p))
             .map(|v| v.to_string_lossy().into_owned())
     }
 
@@ -645,6 +647,11 @@ impl From<ObjectMap> for StructuredData {
 }
 
 /// Helper function to flatten nested objects with dot notation
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the existing owned-argument API during the lint rollout."
+)]
 fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, String>) {
     for (key, value) in obj {
         let key_str: String = key.into();
@@ -726,7 +733,7 @@ pub enum Facility {
     Security = 13,
     /// Log alert
     LogAlert = 14,
-    /// SolarisCron
+    /// `SolarisCron`
     SolarisCron = 15,
     /// Local0
     Local0 = 16,
@@ -787,6 +794,11 @@ mod tests {
     use vrl::prelude::Kind;
     use vrl::{btreemap, event_path, value};
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     fn run_encode(config: SyslogSerializerConfig, event: Event) -> String {
         let mut serializer = SyslogSerializer::new(&config);
         let mut buffer = BytesMut::new();
@@ -808,7 +820,7 @@ mod tests {
             event_path!("timestamp"),
             NaiveDate::from_ymd_opt(2025, 8, 28)
                 .unwrap()
-                .and_hms_micro_opt(18, 30, 00, 123456)
+                .and_hms_micro_opt(18, 30, 00, 123_456)
                 .unwrap()
                 .and_local_timezone(Utc)
                 .unwrap(),
@@ -1339,9 +1351,9 @@ mod tests {
     #[test]
     fn test_minimal_event() {
         let config = toml::from_str::<SyslogSerializerConfig>(
-            r#"
+            r"
         [syslog]
-    "#,
+    ",
         )
         .unwrap();
         let log = LogEvent::from("");
@@ -1515,7 +1527,7 @@ mod tests {
 
         let output = run_encode(config, Event::Log(log));
         // All invalid characters should be replaced with _
-        assert!(output.contains(r#"[my_id"#));
+        assert!(output.contains("[my_id"));
         assert!(output.contains(r#"foo_bar="value1""#));
         assert!(output.contains(r#"has_quote="value2""#));
         assert!(output.contains(r#"user_name="alice""#));

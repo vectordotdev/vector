@@ -98,21 +98,13 @@ generated: components: sinks: datadog_metrics: configuration: {
 		description: """
 			Controls which Datadog series API endpoint is used to submit metrics.
 
-			Defaults to `v3` (`/api/intake/metrics/v3/series`). Set to `v2` (`/api/v2/series`) or
-			to `v1` (`/api/v1/series`) only if you need to fall back to the legacy endpoint.
+			Defaults to `v3` (`/api/intake/metrics/v3/series`). Set to `v2` (`/api/v2/series`)
+			if you need to use the v2 endpoint.
 			"""
 		required: false
 		type: string: {
 			default: "v3"
 			enum: {
-				v1: {
-					deprecated: true
-					description: """
-						Use the v1 series endpoint (`/api/v1/series`).
-
-						This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
-						"""
-				}
 				v2: "Use the v2 series endpoint (`/api/v2/series`)."
 				v3: """
 					Use the v3 series endpoint (`/api/intake/metrics/v3/series`).

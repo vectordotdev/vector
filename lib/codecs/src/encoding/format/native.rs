@@ -14,16 +14,19 @@ pub struct NativeSerializerConfig;
 
 impl NativeSerializerConfig {
     /// Build the `NativeSerializer` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> NativeSerializer {
         NativeSerializer
     }
 
     /// The data type of events that are accepted by `NativeSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::all_bits()
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         schema::Requirement::empty()
     }

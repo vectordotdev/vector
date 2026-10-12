@@ -62,6 +62,7 @@ fn assert_fields_match(
         // Convert event value to string
         let event_str = match &event_value {
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).to_string(),
+            Value::String(string) => string.to_string(),
             other => other.to_string(),
         };
         // Database value already has Display implementation, use directly

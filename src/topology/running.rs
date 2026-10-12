@@ -29,7 +29,10 @@ use super::{
     task::{Task, TaskOutput},
 };
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
+        enrichment_table_sinks,
+    },
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -311,11 +314,8 @@ impl RunningTopology {
         // spawning the new version of the component.
         //
         // We also shutdown any component that is simply being removed entirely.
-        let diff = if let Some(components) = &self.pending_reload {
-            ConfigDiff::new(&self.config, &new_config, components.clone())
-        } else {
-            ConfigDiff::new(&self.config, &new_config, HashSet::new())
-        };
+        let components_to_reload = self.pending_reload.take().unwrap_or_default();
+        let diff = ConfigDiff::new(&self.config, &new_config, components_to_reload);
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
@@ -1060,10 +1060,7 @@ impl RunningTopology {
             }
         }
 
-        let unchanged_table_sinks = self
-            .config
-            .enrichment_tables()
-            .filter_map(|(key, table)| table.as_sink(key))
+        let unchanged_table_sinks = enrichment_table_sinks(&self.config.enrichment_tables)
             .filter(|(key, _)| !diff.enrichment_tables.sinks.contains(key))
             .collect::<Vec<_>>();
         let unchanged_sinks = self
@@ -1368,36 +1365,19 @@ impl RunningTopology {
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
-        let expire_metrics = match (
-            config.global.expire_metrics,
-            config.global.expire_metrics_secs,
-        ) {
-            (Some(e), None) => {
-                warn!(
-                    "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-                );
-                if e < Duration::from_secs(0) {
-                    None
-                } else {
-                    Some(e.as_secs_f64())
-                }
-            }
-            (Some(_), Some(_)) => {
+        if config.global.expire_metrics.is_some() {
+            if config.global.expire_metrics_secs.is_some() {
                 error!(
                     message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
                     internal_log_rate_limit = false
                 );
                 return None;
             }
-            (None, Some(e)) => {
-                if e < 0f64 {
-                    None
-                } else {
-                    Some(e)
-                }
-            }
-            (None, None) => Some(300f64),
-        };
+            warn!(
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+            );
+        }
+        let expire_metrics = config.global.effective_expire_metrics_secs();
 
         if let Err(error) = crate::metrics::Controller::get()
             .expect("Metrics must be initialized")
@@ -1504,9 +1484,7 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<O
 }
 
 fn enrichment_table_sink_resources(config: &Config, sink_key: &ComponentKey) -> Vec<Resource> {
-    config
-        .enrichment_tables()
-        .filter_map(|(table_key, table)| table.as_sink(table_key))
+    enrichment_table_sinks(&config.enrichment_tables)
         .find(|(key, _)| key == sink_key)
         .map(|(key, sink)| sink.resources(&key))
         .unwrap_or_default()
@@ -1516,9 +1494,76 @@ fn enrichment_table_sink_buffer(
     config: &Config,
     sink_key: &ComponentKey,
 ) -> Option<vector_lib::buffers::BufferConfig> {
-    config
-        .enrichment_tables()
-        .filter_map(|(table_key, table)| table.as_sink(table_key))
+    enrichment_table_sinks(&config.enrichment_tables)
         .find(|(key, _)| key == sink_key)
         .map(|(_, sink)| sink.buffer)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use vector_lib::config::ComponentKey;
+
+    use crate::{
+        config::Config,
+        test_util::{
+            mock::{basic_sink, basic_source, basic_transform},
+            start_topology, trace_init,
+        },
+    };
+
+    #[tokio::test]
+    async fn pending_component_reloads_are_consumed_after_reload() {
+        trace_init();
+        let config = || {
+            let mut config = Config::builder();
+            config.add_source("in", basic_source().1);
+            config.add_transform("normalize_logs", &["in"], basic_transform("", 0.0));
+            config.add_sink("output", &["normalize_logs"], basic_sink(1).1);
+            config.build().unwrap()
+        };
+        let transform = ComponentKey::from("normalize_logs");
+        let sink = ComponentKey::from("output");
+        let (mut topology, _) = start_topology(config(), false).await;
+        let initial_transform_task = topology.tasks[&transform].id();
+        let initial_sink_task = topology.tasks[&sink].id();
+
+        topology.extend_reload_set(HashSet::from([transform.clone()]));
+        topology
+            .reload_config_and_respawn(config(), Default::default())
+            .await
+            .unwrap();
+        let transform_task_after_transform_reload = topology.tasks[&transform].id();
+        let sink_task_after_transform_reload = topology.tasks[&sink].id();
+        assert_ne!(
+            transform_task_after_transform_reload,
+            initial_transform_task
+        );
+        assert_eq!(sink_task_after_transform_reload, initial_sink_task);
+
+        topology.extend_reload_set(HashSet::from([sink.clone()]));
+        topology
+            .reload_config_and_respawn(config(), Default::default())
+            .await
+            .unwrap();
+        assert_eq!(
+            topology.tasks[&transform].id(),
+            transform_task_after_transform_reload,
+            "the transform was rebuilt by the later sink reload"
+        );
+        assert_ne!(topology.tasks[&sink].id(), sink_task_after_transform_reload);
+
+        topology.extend_reload_set(HashSet::from([transform.clone()]));
+        topology
+            .reload_config_and_respawn(config(), Default::default())
+            .await
+            .unwrap();
+        assert_ne!(
+            topology.tasks[&transform].id(),
+            transform_task_after_transform_reload
+        );
+
+        topology.stop().await;
+    }
 }

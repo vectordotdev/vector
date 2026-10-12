@@ -22,6 +22,24 @@ generated: components: transforms: sample: configuration: {
 			syntax: "template"
 		}
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for the Sample transform."
+		required:    false
+		type: object: options: include_group_tag: {
+			description: """
+				Whether or not to include the `group` tag on the `component_discarded_events_total`
+				internal metric.
+
+				When enabled, adds a `group` tag containing the rendered `group_by` value.
+				Missing or unrenderable values use `None`.
+
+				Note that this defaults to false because the `group` tag has potentially unbounded
+				cardinality. Only set this to true if you know that the number of unique groups is bounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	key_field: {
 		description: """
 			The name of the field whose value is hashed to determine if the event should be

@@ -1,4 +1,8 @@
-use std::{convert::Infallible, future::Future, net::SocketAddr};
+use std::{
+    convert::Infallible,
+    future::{Future, Ready, ready},
+    net::SocketAddr,
+};
 
 use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header, uri::Scheme};
 use hyper::{
@@ -48,8 +52,8 @@ where
 }
 
 /// Responds to every request with a 200 OK response.
-pub async fn always_200_response(_: Request<Body>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new(Body::empty()))
+pub fn always_200_response(_: Request<Body>) -> Ready<Result<Response<Body>, Infallible>> {
+    ready(Ok(Response::new(Body::empty())))
 }
 
 const PROXY_AUTHORIZATION: &str = "Basic cHJveHktdXNlcjpwcm94eS1wYXNz";

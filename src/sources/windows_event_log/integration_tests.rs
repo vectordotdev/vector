@@ -844,7 +844,7 @@ async fn test_event_data_format_coercion() {
     let log = events[0].as_log();
     if let Some(eid) = log.get(event_path!("event_id")) {
         assert!(
-            matches!(eid, vrl::value::Value::Bytes(_)),
+            matches!(eid, vrl::value::Value::String(_)),
             "event_data_format set event_id to String but got {eid:?}. \
              Check apply_custom_formatting in parser."
         );
