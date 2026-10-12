@@ -395,7 +395,7 @@ impl SourceConfig for JournaldConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(crate::sources::opaque_source(
+        Ok(Box::pin(
             JournaldSource {
                 include_matches,
                 exclude_matches,
@@ -441,18 +441,22 @@ struct JournaldSource {
 }
 
 impl JournaldSource {
-    async fn run_shutdown(self, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run_shutdown(
+        self,
+        shutdown: ShutdownSignal,
+    ) -> Result<(), crate::sources::SourceError> {
         let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
                 emit!(JournaldCheckpointFileOpenError {
-                    error,
+                    error: &error,
                     path: self
                         .checkpoint_path
                         .to_str()
                         .unwrap_or("unknown")
                         .to_string(),
                 });
+                crate::sources::SourceError::from(error)
             })?;
 
         let checkpointer = SharedCheckpointer::new(checkpointer);

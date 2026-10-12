@@ -29,6 +29,7 @@ use vector_lib::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
         Registered,
     },
+    sink::SinkError,
 };
 
 use super::collector::{MetricCollector, StringCollector, metric_identifiers_have_no_line_breaks};
@@ -219,7 +220,10 @@ impl ValidatedSink for PrometheusExporterConfig {
         let sink = PrometheusExporter::new(self.clone());
         let healthcheck = future::ok(()).boxed();
 
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+        Ok((
+            VectorSink::from_detailed_event_streamsink(sink),
+            healthcheck,
+        ))
     }
 }
 
@@ -540,11 +544,12 @@ impl PrometheusExporter {
 }
 
 #[async_trait]
-impl StreamSink<Event> for PrometheusExporter {
-    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.start_server_if_needed()
-            .await
-            .map_err(|error| error!("Failed to start Prometheus exporter: {error}."))?;
+impl StreamSink<Event, SinkError> for PrometheusExporter {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), SinkError> {
+        self.start_server_if_needed().await.map_err(|error| {
+            error!("Failed to start Prometheus exporter: {error}.");
+            SinkError::Detailed(error)
+        })?;
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
@@ -1187,7 +1192,7 @@ mod tests {
 
         let sink = PrometheusExporter::new(config);
         let metrics_handle = Arc::clone(&sink.metrics);
-        let sink = VectorSink::from_event_streamsink(sink);
+        let sink = VectorSink::from_detailed_event_streamsink(sink);
         sink.run(stream::iter(events).map(Into::into))
             .await
             .unwrap();
@@ -1227,7 +1232,7 @@ mod tests {
 
         let metrics_handle = Arc::clone(&sink.metrics);
 
-        let sink = VectorSink::from_event_streamsink(sink);
+        let sink = VectorSink::from_detailed_event_streamsink(sink);
         let input_events = stream::iter(events).map(Into::into);
         sink.run(input_events).await.unwrap();
 
@@ -1340,7 +1345,7 @@ mod tests {
             .map(Event::Metric)
             .collect::<Vec<_>>();
 
-        let sink = VectorSink::from_event_streamsink(sink);
+        let sink = VectorSink::from_detailed_event_streamsink(sink);
         let input_events = stream::iter(events).map(Into::into);
         sink.run(input_events).await.unwrap();
 
@@ -1457,7 +1462,7 @@ mod tests {
             .map(Event::Metric)
             .collect::<Vec<_>>();
 
-        let sink = VectorSink::from_event_streamsink(sink);
+        let sink = VectorSink::from_detailed_event_streamsink(sink);
         let input_events = stream::iter(events).map(Into::into);
         sink.run(input_events).await.unwrap();
 
@@ -1526,7 +1531,7 @@ mod tests {
             .map(Event::Metric)
             .collect::<Vec<_>>();
 
-        let sink = VectorSink::from_event_streamsink(sink);
+        let sink = VectorSink::from_detailed_event_streamsink(sink);
         let input_events = stream::iter(events).map(Into::into);
         sink.run(input_events).await.unwrap();
 

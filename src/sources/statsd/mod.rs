@@ -6,7 +6,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{SmallVec, smallvec};
@@ -216,11 +216,9 @@ impl GenerateConfig for StatsdConfig {
 impl SourceConfig for StatsdConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {
-            StatsdConfig::Udp(config) => Ok(crate::sources::opaque_source(statsd_udp(
-                config.clone(),
-                cx.shutdown,
-                cx.out,
-            ))),
+            StatsdConfig::Udp(config) => {
+                Ok(Box::pin(statsd_udp(config.clone(), cx.shutdown, cx.out)))
+            }
             StatsdConfig::Tcp(config) => {
                 let tls_config = config.tls.as_ref().map(|tls| tls.tls_config.clone());
                 let tls_client_metadata_key = config
@@ -349,16 +347,17 @@ async fn statsd_udp(
     config: UdpConfig,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), super::SourceError> {
     let listenfd = ListenFd::from_env();
     let socket = try_bind_udp_socket(config.address, listenfd)
+        .await
         .map_err(|error| {
             emit!(SocketBindError {
                 mode: SocketMode::Udp,
-                error
-            })
-        })
-        .await?;
+                error: &error,
+            });
+            super::SourceError::from(error)
+        })?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
         && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)

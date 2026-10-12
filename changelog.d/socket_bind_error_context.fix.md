@@ -1,3 +1,3 @@
-Preserve source errors in topology task failures, including socket bind errors that previously appeared as generic task failures.
+Retain underlying errors from several sources and sinks in topology task failures, including bind, subscription, checkpoint, AMQP consumer, and console errors. Include component panic payloads in a structured `panic` field.
 
 authors: gwenaskell

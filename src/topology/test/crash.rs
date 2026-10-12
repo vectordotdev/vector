@@ -17,10 +17,16 @@ use crate::{
     },
 };
 
+#[cfg(feature = "sinks-prometheus")]
+use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
 #[cfg(feature = "sinks-websocket_server")]
 use crate::sinks::websocket_server::WebSocketListenerSinkConfig;
+#[cfg(feature = "sources-statsd")]
+use crate::sources::statsd::{StatsdConfig, UdpConfig as StatsdUdpConfig};
 #[cfg(feature = "sources-syslog")]
 use crate::sources::syslog::{Mode as SyslogMode, SyslogConfig};
+#[cfg(feature = "sinks-prometheus")]
+use crate::test_util::mock::basic_source;
 
 #[cfg(feature = "sinks-websocket_server")]
 #[tokio::test]
@@ -38,6 +44,36 @@ async fn test_websocket_sink_bind_error_is_reported() {
     };
     let mut config = Config::builder();
     config.add_source("in", SocketConfig::make_basic_tcp_config(source_address));
+    config.add_sink("out", &["in"], sink);
+
+    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("sink error timed out")
+        .expect("sink error missing");
+    assert!(matches!(
+        error,
+        ShutdownError::SinkAborted { error, .. } if error.contains(&expected_error)
+    ));
+    topology.stop().await;
+}
+
+#[cfg(feature = "sinks-prometheus")]
+#[tokio::test]
+async fn test_prometheus_exporter_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _listener = TcpListener::bind(address).unwrap();
+    let expected_error = TcpListener::bind(address).unwrap_err().to_string();
+    let (_input, source) = basic_source();
+
+    let sink = PrometheusExporterConfig {
+        address,
+        ..Default::default()
+    };
+    let mut config = Config::builder();
+    config.add_source("in", source);
     config.add_sink("out", &["in"], sink);
 
     let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
@@ -120,6 +156,34 @@ async fn test_udp_syslog_bind_error_is_reported() {
             address: address.into(),
             receive_buffer_bytes: None,
         }),
+    );
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("source error timed out")
+        .expect("source error missing");
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. } if error == expected_error
+    ));
+    topology.stop().await;
+}
+
+#[cfg(feature = "sources-statsd")]
+#[tokio::test]
+async fn test_udp_statsd_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _socket = UdpSocket::bind(address).unwrap();
+    let expected_error = UdpSocket::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source(
+        "in",
+        StatsdConfig::Udp(StatsdUdpConfig::from_address(address.into())),
     );
     config.add_sink("out", &["in"], basic_sink(1).1);
 

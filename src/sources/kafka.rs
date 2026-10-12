@@ -350,7 +350,7 @@ impl SourceConfig for KafkaSourceConfig {
 
         let (consumer, callback_rx) = create_consumer(self, acknowledgements)?;
 
-        Ok(crate::sources::opaque_source(kafka_source(
+        Ok(Box::pin(kafka_source(
             self.clone(),
             consumer,
             callback_rx,
@@ -436,7 +436,7 @@ async fn kafka_source(
     shutdown: ShutdownSignal,
     eof: bool,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let span = info_span!("kafka_source");
     let consumer = Arc::new(consumer);
 
@@ -452,7 +452,7 @@ async fn kafka_source(
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     if let Err(e) = consumer.subscribe(&topics).context(SubscribeSnafu) {
         error!("{e}");
-        return Err(());
+        return Err(crate::sources::SourceError::from(e));
     }
 
     let coordination_task = {
