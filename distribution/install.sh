@@ -11,7 +11,7 @@
 set -u
 
 # If VECTOR_VERSION is unset or empty, default it.
-VECTOR_VERSION="${VECTOR_VERSION:-"0.58.0"}"
+VECTOR_VERSION="${VECTOR_VERSION:-"0.59.0"}"
 # Accept either a bare release number or a Git tag name.
 VECTOR_VERSION="${VECTOR_VERSION#v}"
 
@@ -220,7 +220,7 @@ install_from_archive() {
     fi
 
     printf "%s Install succeeded! 🚀\n" "$_prompt"
-    printf "%s To start Vector:\n" "$_prompt"
+    printf "%s To try a demo pipeline (prints sample logs, press Ctrl+C to stop):\n" "$_prompt"
     printf "\n"
     printf "%s vector --config $prefix/config/vector.yaml\n" "$_indent"
     printf "\n"

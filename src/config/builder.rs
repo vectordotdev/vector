@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{path::Path, time::Duration};
 
 use indexmap::IndexMap;
@@ -132,6 +134,8 @@ impl From<Config> for ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
@@ -142,6 +146,8 @@ impl ConfigBuilder {
         Ok(config)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
         compiler::compile(self)
     }
@@ -154,7 +160,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| value.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<_>>();
         self.enrichment_tables.insert(
             ComponentKey::from(key.into()),
@@ -175,7 +181,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| value.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, sink);
         self.add_sink_outer(key, sink);
@@ -195,7 +201,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| value.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<_>>();
         let transform = TransformOuter::new(inputs, transform);
 
@@ -207,6 +213,8 @@ impl ConfigBuilder {
         self.global.data_dir = Some(path.to_owned());
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
@@ -273,11 +281,17 @@ impl ConfigBuilder {
     }
 
     #[cfg(test)]
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn from_toml(input: &str) -> Self {
         crate::config::format::deserialize(input, crate::config::format::Format::Toml).unwrap()
     }
 
     #[cfg(test)]
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn from_json(input: &str) -> Self {
         crate::config::format::deserialize(input, crate::config::format::Format::Json).unwrap()
     }

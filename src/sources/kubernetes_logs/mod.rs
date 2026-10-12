@@ -40,7 +40,7 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use crate::{
     SourceSender,
@@ -424,6 +424,17 @@ impl SourceConfig for Config {
                     .clone()
                     .map(|x| LegacyKey::Overwrite(x.path)),
                 &owned_value_path!("namespace_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.namespace_annotation_fields
+                    .namespace_annotations
+                    .path
+                    .clone()
+                    .map(|x| LegacyKey::Overwrite(x.path)),
+                &owned_value_path!("namespace_annotations"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
@@ -1108,7 +1119,7 @@ fn create_event(
         &mut log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from(Config::NAME),
+        Value::from_static_str(Config::NAME),
     );
     match (log_namespace, ingestion_timestamp_field) {
         // When using LogNamespace::Vector always set the ingest_timestamp.
@@ -1563,6 +1574,12 @@ mod tests {
                         None
                     )
                     .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "namespace_annotations"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "node_labels"),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
@@ -1683,6 +1700,11 @@ mod tests {
                 )
                 .with_event_field(
                     &owned_value_path!("kubernetes", "namespace_labels"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
+                )
+                .with_event_field(
+                    &owned_value_path!("kubernetes", "namespace_annotations"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None
                 )

@@ -1,6 +1,9 @@
 large-error-threshold = 256  # in bytes
 allow-unwrap-in-tests = true
 
+# Preserve the product name in prose.
+doc-valid-idents = ["ClickHouse", ".."]
+
 # for `disallowed_method`:
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method
 disallowed-methods = [

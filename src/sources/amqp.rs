@@ -22,7 +22,7 @@ use vector_lib::{
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
     lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use crate::{
     SourceSender,
@@ -286,7 +286,7 @@ fn populate_log_event(
         log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
+        Value::from_static_str(AmqpSourceConfig::NAME),
     );
 
     // This handles the transition from the original timestamp logic. Originally the

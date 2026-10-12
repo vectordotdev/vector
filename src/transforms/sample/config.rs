@@ -48,6 +48,23 @@ pub enum SampleError {
     InvalidKeyFieldDynamicCombination,
 }
 
+/// Configuration of internal metrics for the Sample transform.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct SampleInternalMetricsConfig {
+    /// Whether or not to include the `group` tag on the `component_discarded_events_total`
+    /// internal metric.
+    ///
+    /// When enabled, adds a `group` tag containing the rendered `group_by` value.
+    /// Missing or unrenderable values use `None`.
+    ///
+    /// Note that this defaults to false because the `group` tag has potentially unbounded
+    /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
+    #[serde(default)]
+    pub include_group_tag: bool,
+}
+
 /// Configuration for the `sample` transform.
 #[configurable_component(transform(
     "sample",
@@ -125,6 +142,10 @@ pub struct SampleConfig {
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
+
+    /// Configuration of internal metrics for the Sample transform.
+    #[serde(default)]
+    pub internal_metrics: SampleInternalMetricsConfig,
 }
 
 impl SampleConfig {
@@ -173,6 +194,7 @@ impl GenerateConfig for SampleConfig {
             group_by: None,
             exclude: None::<AnyCondition>,
             sample_rate_key: default_sample_rate_key(),
+            internal_metrics: Default::default(),
         })
         .unwrap()
     }
@@ -200,6 +222,7 @@ impl TransformConfig for SampleConfig {
                 self.group_by.clone(),
                 exclude,
                 self.sample_rate_key.clone(),
+                self.internal_metrics.include_group_tag,
             )
         } else {
             Sample::new(
@@ -209,6 +232,7 @@ impl TransformConfig for SampleConfig {
                 self.group_by.clone(),
                 exclude,
                 self.sample_rate_key.clone(),
+                self.internal_metrics.include_group_tag,
             )
         };
 
@@ -280,6 +304,22 @@ mod tests {
     }
 
     #[test]
+    fn internal_metrics_include_group_tag_defaults_to_false() {
+        let config =
+            serde_yaml::from_str::<SampleConfig>("ratio: 0.5\ninternal_metrics: {}\n").unwrap();
+        assert!(!config.internal_metrics.include_group_tag);
+    }
+
+    #[test]
+    fn internal_metrics_include_group_tag_can_be_enabled() {
+        let config = serde_yaml::from_str::<SampleConfig>(
+            "ratio: 0.5\ninternal_metrics:\n  include_group_tag: true\n",
+        )
+        .unwrap();
+        assert!(config.internal_metrics.include_group_tag);
+    }
+
+    #[test]
     fn rejects_dynamic_ratio_only_configuration() {
         let config = SampleConfig {
             rate: None,
@@ -290,6 +330,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
+            internal_metrics: Default::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -307,6 +348,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
+            internal_metrics: Default::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -324,6 +366,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
+            internal_metrics: Default::default(),
         };
 
         assert!(config.validate_structure().is_ok());
@@ -340,6 +383,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
+            internal_metrics: Default::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -357,6 +401,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
+            internal_metrics: Default::default(),
         };
 
         let err = config.sample_rate().unwrap_err();

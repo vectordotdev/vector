@@ -360,6 +360,11 @@ struct HttpProxyConnectorV1 {
 }
 
 impl HttpProxyConnectorV1 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     fn new(tls: MaybeTlsSettings, routes: Arc<RoutePlanner>) -> Result<Self, BoxError> {
         let tls_settings = tls.tls().cloned();
         let direct = https_connector(&tls, false)?;

@@ -3470,7 +3470,7 @@ impl ValidatableComponent for DatadogAgentConfig {
             store_api_key: false,
             framing: CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
-                    delimiter: b',',
+                    delimiter: vector_lib::serde::AsciiChar::new(','),
                     max_length: Some(usize::MAX),
                     oversized_action: Default::default(),
                 },

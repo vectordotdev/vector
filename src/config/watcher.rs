@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use notify::{EventKind, RecursiveMode, recommended_watcher};
 use std::{
     collections::{HashMap, HashSet},
@@ -64,10 +66,13 @@ impl Watcher {
     }
 }
 
-/// Sends a ReloadFromDisk or ReloadEnrichmentTables on config_path changes.
+/// Sends a `ReloadFromDisk` or `ReloadEnrichmentTables` on `config_path` changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+#[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
 pub fn spawn_thread<'a>(
     watcher_conf: WatcherConfig,
     signal_tx: crate::signal::SignalTx,
@@ -124,7 +129,7 @@ pub fn spawn_thread<'a>(
                         let changed_components: HashMap<_, _> = component_configs
                             .clone()
                             .into_iter()
-                            .flat_map(|p| p.contains(&changed_paths))
+                            .filter_map(|p| p.contains(&changed_paths))
                             .collect();
 
                         // We need to read paths to resolve any inode changes that may have happened.
@@ -137,7 +142,17 @@ pub fn spawn_thread<'a>(
                         debug!(message = "Reloaded paths.");
 
                         info!("Configuration file changed.");
-                        if !changed_components.is_empty() {
+                        if changed_components.is_empty() {
+                            _ = signal_tx
+                                .send(crate::signal::SignalTo::ReloadFromDisk)
+                                .map_err(|error| {
+                                    error!(
+                                        message = "Unable to reload configuration file. Restart Vector to reload it.",
+                                        cause = %error,
+                                        internal_log_rate_limit = false,
+                                    );
+                                });
+                        } else {
                             info!(
                                 "Component {:?} configuration changed.",
                                 changed_components.keys()
@@ -154,7 +169,7 @@ pub fn spawn_thread<'a>(
                                             message = "Unable to reload enrichment tables.",
                                             cause = %error,
                                             internal_log_rate_limit = false,
-                                        )
+                                        );
                                     });
                             } else {
                                 _ = signal_tx
@@ -166,22 +181,12 @@ pub fn spawn_thread<'a>(
                                             message = "Unable to reload component configuration. Restart Vector to reload it.",
                                             cause = %error,
                                             internal_log_rate_limit = false,
-                                        )
+                                        );
                                     });
                             }
-                        } else {
-                            _ = signal_tx
-                                .send(crate::signal::SignalTo::ReloadFromDisk)
-                                .map_err(|error| {
-                                    error!(
-                                        message = "Unable to reload configuration file. Restart Vector to reload it.",
-                                        cause = %error,
-                                        internal_log_rate_limit = false,
-                                    )
-                                });
                         }
                     } else {
-                        debug!(message = "Ignoring event.", event = ?event)
+                        debug!(message = "Ignoring event.", event = ?event);
                     }
                 }
             }
@@ -198,7 +203,7 @@ pub fn spawn_thread<'a>(
                 // determine if anything changed.
                 info!("Speculating that configuration files have changed.");
                 _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk).map_err(|error| {
-                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
+                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error);
             });
             }
         }
@@ -263,7 +268,7 @@ mod tests {
         trace_init();
 
         let delay = Duration::from_secs(3);
-        let dir = temp_dir().to_path_buf();
+        let dir = temp_dir().clone();
         let watcher_conf = WatcherConfig::RecommendedWatcher;
         let component_file_path = vec![dir.join("tls.cert"), dir.join("tls.key")];
         let http_component = ComponentKey::from("http");
@@ -324,7 +329,7 @@ mod tests {
         trace_init();
 
         let delay = Duration::from_secs(3);
-        let dir = temp_dir().to_path_buf();
+        let dir = temp_dir().clone();
         let file_path = dir.join("vector.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;
 
@@ -403,7 +408,7 @@ mod tests {
         trace_init();
 
         let delay = Duration::from_secs(3);
-        let dir = temp_dir().to_path_buf();
+        let dir = temp_dir().clone();
         let sub_dir = dir.join("sources");
         let file_path = sub_dir.join("input.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;

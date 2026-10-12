@@ -1522,7 +1522,7 @@ fn decode_payload(
                             log,
                             log_schema().source_type_key(),
                             lookup::path!("source_type"),
-                            Bytes::from_static(SplunkConfig::NAME.as_bytes()),
+                            Value::from_static_str(SplunkConfig::NAME),
                         );
                         match log_namespace {
                             LogNamespace::Vector => {

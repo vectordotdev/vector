@@ -8,7 +8,7 @@ use super::proto::common::v1::{AnyValue, ArrayValue, KeyValue, any_value::Value 
 impl From<PBValue> for Value {
     fn from(av: PBValue) -> Self {
         match av {
-            PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
+            PBValue::StringValue(v) => Value::from(v),
             PBValue::BoolValue(v) => Value::Boolean(v),
             PBValue::IntValue(v) => Value::Integer(v),
             PBValue::DoubleValue(v) => NotNan::new(v).map_or(Value::Null, Value::Float),

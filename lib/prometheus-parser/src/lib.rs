@@ -421,7 +421,17 @@ impl MetricGroupSet {
     fn finish(self) -> Vec<MetricGroup> {
         self.0
             .into_iter()
-            .map(|(name, metrics)| MetricGroup { name, metrics })
+            .map(|(name, metrics)| {
+                // Remote write carries no type for untyped/unknown series, so infer
+                // counters from the conventional `_total` suffix.
+                let metrics = match metrics {
+                    GroupKind::Untyped(metrics) if name.ends_with("_total") => {
+                        GroupKind::Counter(metrics)
+                    }
+                    metrics => metrics,
+                };
+                MetricGroup { name, metrics }
+            })
             .collect()
     }
 }
@@ -876,6 +886,73 @@ mod test {
     }
 
     #[test]
+    fn parse_request_counter() {
+        let request = write_request!(
+            ["requests_total" = Counter],
+            [[__name__ => "requests_total"] => [12 @ 1_395_066_367_600]]
+        );
+        assert_eq!(request.metadata.len(), 1);
+        assert_eq!(request.metadata[0].metric_family_name, "requests_total");
+        assert_eq!(
+            request.metadata[0].r#type,
+            proto::MetricType::Counter as i32
+        );
+
+        let parsed = parse_request(request, MetadataConflictStrategy::Ignore).unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1_395_066_367_600), labels!(), 12.0)
+            );
+        });
+    }
+
+    #[test]
+    fn parse_request_counter_from_total_suffix() {
+        let parsed = parse_request(
+            write_request!(
+                [],
+                [[__name__ => "requests_total"] => [12 @ 1_395_066_367_600]]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1_395_066_367_600), labels!(), 12.0)
+            );
+        });
+    }
+
+    #[test]
+    fn parse_request_counter_from_total_suffix_with_unknown_metadata() {
+        let parsed = parse_request(
+            write_request!(
+                ["requests_total" = Unknown],
+                [[__name__ => "requests_total"] => [12 @ 1_395_066_367_600]]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1_395_066_367_600), labels!(), 12.0)
+            );
+        });
+    }
+
+    #[test]
     fn parse_request_histogram() {
         let parsed = parse_request(
             write_request!(
@@ -911,7 +988,7 @@ mod test {
                     })
             );
         });
-        match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+        match_group!(parsed[1], "one_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1_395_066_367_700), labels!(), 24.0));
         });
@@ -953,7 +1030,7 @@ mod test {
                     })
             );
         });
-        match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+        match_group!(parsed[1], "one_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1_395_066_367_700), labels!(), 24.0));
         });

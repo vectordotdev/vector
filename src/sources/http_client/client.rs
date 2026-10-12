@@ -24,6 +24,7 @@ use vector_lib::{
 use vrl::{
     compiler::{CompileConfig, Function, Program, runtime::Runtime},
     prelude::TypeState,
+    value::Value,
 };
 
 use crate::{
@@ -579,7 +580,7 @@ impl http_client::HttpClientContext for HttpClientContext {
                 }
                 Event::Trace(trace) => {
                     trace.maybe_insert(log_schema().source_type_key_target_path(), || {
-                        Bytes::from(HttpClientConfig::NAME).into()
+                        Value::from_static_str(HttpClientConfig::NAME)
                     });
                 }
             }
