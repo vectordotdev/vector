@@ -35,7 +35,6 @@ use vector_lib::{
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
-    source::SourceError,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
@@ -458,20 +457,12 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|error| match error {
-                    SourceError::Opaque => TaskError::Opaque,
-                    SourceError::Detailed(error) => TaskError::wrapped(error),
-                }),
+                result = server => result.map_err(Into::into),
             };
 
-            // Even though we already tried to receive any pump task error above, we may have exited
-            // on the source itself returning an error due to task scheduling, where the pump task
-            // encountered an error, sent it over the oneshot, but we were polling the source
-            // already and hit an error trying to send to the now-shutdown pump task.
-            //
-            // Since the error from the source is opaque at the moment (i.e. `()`), we try a final
-            // time to see if the pump task encountered an error, using _that_ instead if so, to
-            // propagate the true error that caused the source to have to stop.
+            // The pump may fail while the source is being polled, before its error is received
+            // above. Prefer the pump error if both tasks fail: a source send error can be a
+            // consequence of the pump stopping, even when the source reports its cause.
             if let Ok(e) = pump_error_rx.try_recv() {
                 result = Err(e);
             }
@@ -765,13 +756,8 @@ impl<'a> Builder<'a> {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .map_err(|error| {
-                debug!("Sink finished with an error.");
-                match error {
-                    vector_lib::sink::SinkError::Opaque => TaskError::Opaque,
-                    vector_lib::sink::SinkError::Detailed(error) => TaskError::wrapped(error),
-                }
-            })
+            .inspect_err(|_| debug!("Sink finished with an error."))
+            .map_err(Into::into)
         };
 
         let task = Task::new(key.clone(), typetag, sink);

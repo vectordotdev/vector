@@ -25,8 +25,18 @@ use crate::sinks::websocket_server::WebSocketListenerSinkConfig;
 use crate::sources::statsd::{StatsdConfig, UdpConfig as StatsdUdpConfig};
 #[cfg(feature = "sources-syslog")]
 use crate::sources::syslog::{Mode as SyslogMode, SyslogConfig};
-#[cfg(feature = "sinks-prometheus")]
+#[cfg(any(feature = "sinks-prometheus", feature = "sinks-websocket_server"))]
 use crate::test_util::mock::basic_source;
+
+async fn first_shutdown_error(config: Config) -> ShutdownError {
+    let (topology, mut errors) = start_topology(config, false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("component error timed out")
+        .expect("component error missing");
+    topology.stop().await;
+    error
+}
 
 #[cfg(feature = "sinks-websocket_server")]
 #[tokio::test]
@@ -36,26 +46,21 @@ async fn test_websocket_sink_bind_error_is_reported() {
     let (_guard, address) = next_addr();
     let _listener = TcpListener::bind(address).unwrap();
     let expected_error = TcpListener::bind(address).unwrap_err().to_string();
-    let (_source_guard, source_address) = next_addr();
+    let (_input, source) = basic_source();
 
     let sink = WebSocketListenerSinkConfig {
         address,
         ..Default::default()
     };
     let mut config = Config::builder();
-    config.add_source("in", SocketConfig::make_basic_tcp_config(source_address));
+    config.add_source("in", source);
     config.add_sink("out", &["in"], sink);
 
-    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
-    let error = timeout(Duration::from_secs(5), errors.recv())
-        .await
-        .expect("sink error timed out")
-        .expect("sink error missing");
+    let error = first_shutdown_error(config.build().unwrap()).await;
     assert!(matches!(
         error,
         ShutdownError::SinkAborted { error, .. } if error.contains(&expected_error)
     ));
-    topology.stop().await;
 }
 
 #[cfg(feature = "sinks-prometheus")]
@@ -76,16 +81,11 @@ async fn test_prometheus_exporter_bind_error_is_reported() {
     config.add_source("in", source);
     config.add_sink("out", &["in"], sink);
 
-    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
-    let error = timeout(Duration::from_secs(5), errors.recv())
-        .await
-        .expect("sink error timed out")
-        .expect("sink error missing");
+    let error = first_shutdown_error(config.build().unwrap()).await;
     assert!(matches!(
         error,
         ShutdownError::SinkAborted { error, .. } if error.contains(&expected_error)
     ));
-    topology.stop().await;
 }
 
 #[tokio::test]
@@ -100,17 +100,12 @@ async fn test_tcp_socket_bind_error_is_reported() {
     config.add_source("in", SocketConfig::make_basic_tcp_config(address));
     config.add_sink("out", &["in"], basic_sink(1).1);
 
-    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
-    let error = timeout(Duration::from_secs(5), errors.recv())
-        .await
-        .expect("source error timed out")
-        .expect("source error missing");
+    let error = first_shutdown_error(config.build().unwrap()).await;
     assert!(matches!(
         error,
         ShutdownError::SourceAborted { error, .. }
             if error.contains("TCP bind failed") && error.contains(&expected_error)
     ));
-    topology.stop().await;
 }
 
 #[tokio::test]
@@ -128,16 +123,11 @@ async fn test_udp_socket_bind_error_is_reported() {
     );
     config.add_sink("out", &["in"], basic_sink(1).1);
 
-    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
-    let error = timeout(Duration::from_secs(5), errors.recv())
-        .await
-        .expect("source error timed out")
-        .expect("source error missing");
+    let error = first_shutdown_error(config.build().unwrap()).await;
     assert!(matches!(
         error,
         ShutdownError::SourceAborted { error, .. } if error == expected_error
     ));
-    topology.stop().await;
 }
 
 #[cfg(feature = "sources-syslog")]
@@ -159,16 +149,11 @@ async fn test_udp_syslog_bind_error_is_reported() {
     );
     config.add_sink("out", &["in"], basic_sink(1).1);
 
-    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
-    let error = timeout(Duration::from_secs(5), errors.recv())
-        .await
-        .expect("source error timed out")
-        .expect("source error missing");
+    let error = first_shutdown_error(config.build().unwrap()).await;
     assert!(matches!(
         error,
         ShutdownError::SourceAborted { error, .. } if error == expected_error
     ));
-    topology.stop().await;
 }
 
 #[cfg(feature = "sources-statsd")]
@@ -187,16 +172,11 @@ async fn test_udp_statsd_bind_error_is_reported() {
     );
     config.add_sink("out", &["in"], basic_sink(1).1);
 
-    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
-    let error = timeout(Duration::from_secs(5), errors.recv())
-        .await
-        .expect("source error timed out")
-        .expect("source error missing");
+    let error = first_shutdown_error(config.build().unwrap()).await;
     assert!(matches!(
         error,
         ShutdownError::SourceAborted { error, .. } if error == expected_error
     ));
-    topology.stop().await;
 }
 
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.

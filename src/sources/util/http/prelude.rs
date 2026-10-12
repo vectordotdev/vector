@@ -272,20 +272,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let listener = tls
                 .bind(&address)
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                    err
-                })?
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?
                 .with_keepalive(keepalive_settings.tcp_keepalive);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(make_svc)
                 .with_graceful_shutdown(cx.shutdown.map(|_| ()))
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                    err
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))

@@ -68,14 +68,11 @@ async fn handle_errors(
         .map_err(TaskError::panicked)
         .and_then(|res| res)
         .map_err(|e| {
-            if let TaskError::Panicked { panic } = &e {
-                error!(
-                    panic = panic.as_str(),
-                    "An error occurred that Vector couldn't handle: {e}."
-                );
-            } else {
-                error!("An error occurred that Vector couldn't handle: {e}.");
-            }
+            let panic = match &e {
+                TaskError::Panicked { panic } => Some(panic.as_str()),
+                _ => None,
+            };
+            error!(panic, "An error occurred that Vector couldn't handle: {e}.");
             _ = abort_tx.send(error(e.to_string()));
             e
         })

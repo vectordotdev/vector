@@ -10,7 +10,10 @@ use futures::{FutureExt, future::BoxFuture};
 use pin_project::pin_project;
 use snafu::Snafu;
 use tokio::task::JoinError;
-use vector_lib::{buffers::topology::channel::BufferReceiverStream, event::EventArray};
+use vector_lib::{
+    buffers::topology::channel::BufferReceiverStream, event::EventArray, sink::SinkError,
+    source::SourceError,
+};
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
@@ -48,6 +51,24 @@ impl TaskError {
             .unwrap_or("non-string panic payload")
             .to_owned();
         Self::Panicked { panic }
+    }
+}
+
+impl From<SourceError> for TaskError {
+    fn from(error: SourceError) -> Self {
+        match error {
+            SourceError::Opaque => Self::Opaque,
+            SourceError::Detailed(error) => Self::wrapped(error),
+        }
+    }
+}
+
+impl From<SinkError> for TaskError {
+    fn from(error: SinkError) -> Self {
+        match error {
+            SinkError::Opaque => Self::Opaque,
+            SinkError::Detailed(error) => Self::wrapped(error),
+        }
     }
 }
 
