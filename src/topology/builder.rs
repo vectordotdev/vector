@@ -1368,7 +1368,8 @@ impl Runner {
                             self.send_outputs(&mut outputs_buf).await
                                 .map_err(TaskError::wrapped)?;
                         }
-                        _ => unreachable!("join error or bad poll"),
+                        Some(Err(error)) => return Err(TaskError::from(error)),
+                        None => unreachable!("bad poll"),
                     }
                 }
 

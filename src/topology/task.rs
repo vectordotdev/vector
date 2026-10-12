@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     fmt,
     future::Future,
     pin::Pin,
@@ -27,7 +28,7 @@ pub(crate) enum TaskError {
     #[snafu(display("the task was cancelled before it completed"))]
     Cancelled,
     #[snafu(display("the task panicked and was aborted"))]
-    Panicked,
+    Panicked { panic: String },
     #[snafu(display("the task completed with an error"))]
     Opaque,
     #[snafu(display("{}", source))]
@@ -38,6 +39,16 @@ impl TaskError {
     pub fn wrapped(e: crate::Error) -> Self {
         Self::Wrapped { source: e }
     }
+
+    pub fn panicked(payload: Box<dyn Any + Send>) -> Self {
+        let panic = payload
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| payload.downcast_ref::<&str>().copied())
+            .unwrap_or("non-string panic payload")
+            .to_owned();
+        Self::Panicked { panic }
+    }
 }
 
 impl From<JoinError> for TaskError {
@@ -45,7 +56,7 @@ impl From<JoinError> for TaskError {
         if e.is_cancelled() {
             Self::Cancelled
         } else {
-            Self::Panicked
+            Self::panicked(e.into_panic())
         }
     }
 }
