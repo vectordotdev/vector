@@ -7,9 +7,28 @@ use futures::{
 
 use crate::event::{Event, EventArray, EventContainer, into_event_stream};
 
+/// Error returned by a running sink.
+#[derive(Debug)]
+pub enum SinkError {
+    /// The sink did not retain its failure reason.
+    Opaque,
+    /// The error that stopped the sink.
+    Detailed(vector_common::Error),
+}
+
+impl<E> From<E> for SinkError
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    fn from(error: E) -> Self {
+        Self::Detailed(Box::new(error))
+    }
+}
+
 pub enum VectorSink {
     Sink(Box<dyn Sink<EventArray, Error = ()> + Send + Unpin>),
     Stream(Box<dyn StreamSink<EventArray> + Send>),
+    DetailedStream(Box<dyn StreamSink<EventArray, SinkError> + Send>),
 }
 
 impl VectorSink {
@@ -17,11 +36,16 @@ impl VectorSink {
     ///
     /// # Errors
     ///
-    /// It is unclear under what conditions this function will error.
-    pub async fn run(self, input: impl Stream<Item = EventArray> + Send) -> Result<(), ()> {
+    /// Returns an error if the sink reports a failure.
+    pub async fn run(self, input: impl Stream<Item = EventArray> + Send) -> Result<(), SinkError> {
         match self {
-            Self::Sink(sink) => input.map(Ok).forward(sink).await,
-            Self::Stream(s) => s.run(Box::pin(input)).await,
+            Self::Sink(sink) => input
+                .map(Ok)
+                .forward(sink)
+                .await
+                .map_err(|()| SinkError::Opaque),
+            Self::Stream(s) => s.run(Box::pin(input)).await.map_err(|()| SinkError::Opaque),
+            Self::DetailedStream(s) => s.run(Box::pin(input)).await,
         }
     }
 
@@ -30,7 +54,7 @@ impl VectorSink {
     /// # Errors
     ///
     /// See `VectorSink::run` for errors.
-    pub async fn run_events<I>(self, input: I) -> Result<(), ()>
+    pub async fn run_events<I>(self, input: I) -> Result<(), SinkError>
     where
         I: IntoIterator<Item = Event> + Send,
         I::IntoIter: Send,
@@ -78,6 +102,14 @@ impl VectorSink {
         let sink = Box::new(sink);
         VectorSink::Stream(Box::new(EventStream { sink }))
     }
+
+    /// Converts a sink that retains its runtime errors into a `VectorSink`.
+    pub fn from_detailed_event_streamsink(
+        sink: impl StreamSink<Event, SinkError> + Send + 'static,
+    ) -> Self {
+        let sink = Box::new(sink);
+        VectorSink::DetailedStream(Box::new(EventStream { sink }))
+    }
 }
 
 impl fmt::Debug for VectorSink {
@@ -89,8 +121,8 @@ impl fmt::Debug for VectorSink {
 // === StreamSink ===
 
 #[async_trait::async_trait]
-pub trait StreamSink<T> {
-    async fn run(self: Box<Self>, input: stream::BoxStream<'_, T>) -> Result<(), ()>;
+pub trait StreamSink<T, E = ()> {
+    async fn run(self: Box<Self>, input: stream::BoxStream<'_, T>) -> Result<(), E>;
 }
 
 /// Wrapper for sinks implementing `Sink<Event>` to implement
@@ -175,8 +207,12 @@ struct EventStream<T> {
 }
 
 #[async_trait::async_trait]
-impl<T: StreamSink<Event> + Send> StreamSink<EventArray> for EventStream<T> {
-    async fn run(self: Box<Self>, input: stream::BoxStream<'_, EventArray>) -> Result<(), ()> {
+impl<T, E> StreamSink<EventArray, E> for EventStream<T>
+where
+    T: StreamSink<Event, E> + Send,
+    E: Send,
+{
+    async fn run(self: Box<Self>, input: stream::BoxStream<'_, EventArray>) -> Result<(), E> {
         let input = Box::pin(input.flat_map(into_event_stream));
         self.sink.run(input).await
     }

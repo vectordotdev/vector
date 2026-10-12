@@ -17,8 +17,40 @@ use crate::{
     },
 };
 
+#[cfg(feature = "sinks-websocket_server")]
+use crate::sinks::websocket_server::WebSocketListenerSinkConfig;
 #[cfg(feature = "sources-syslog")]
 use crate::sources::syslog::{Mode as SyslogMode, SyslogConfig};
+
+#[cfg(feature = "sinks-websocket_server")]
+#[tokio::test]
+async fn test_websocket_sink_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _listener = TcpListener::bind(address).unwrap();
+    let expected_error = TcpListener::bind(address).unwrap_err().to_string();
+    let (_source_guard, source_address) = next_addr();
+
+    let sink = WebSocketListenerSinkConfig {
+        address,
+        ..Default::default()
+    };
+    let mut config = Config::builder();
+    config.add_source("in", SocketConfig::make_basic_tcp_config(source_address));
+    config.add_sink("out", &["in"], sink);
+
+    let (topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("sink error timed out")
+        .expect("sink error missing");
+    assert!(matches!(
+        error,
+        ShutdownError::SinkAborted { error, .. } if error.contains(&expected_error)
+    ));
+    topology.stop().await;
+}
 
 #[tokio::test]
 async fn test_tcp_socket_bind_error_is_reported() {

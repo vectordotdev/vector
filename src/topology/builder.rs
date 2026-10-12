@@ -765,9 +765,12 @@ impl<'a> Builder<'a> {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .map_err(|_| {
+            .map_err(|error| {
                 debug!("Sink finished with an error.");
-                TaskError::Opaque
+                match error {
+                    vector_lib::sink::SinkError::Opaque => TaskError::Opaque,
+                    vector_lib::sink::SinkError::Detailed(error) => TaskError::wrapped(error),
+                }
             })
         };
 
