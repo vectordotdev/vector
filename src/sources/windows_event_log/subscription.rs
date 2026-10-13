@@ -576,6 +576,8 @@ impl EventLogSubscription {
             // Whether Windows signalled new matching events since the last pull. Read
             // before the reset below; a signalled channel bypasses the re-subscribe
             // backoff so a real event is never delayed by it.
+            // SAFETY: `signal_event` is a valid event handle owned by this subscription; a zero
+            // timeout only polls its state.
             let signalled =
                 unsafe { WaitForSingleObject(channel_sub.signal_event, 0) } == WAIT_OBJECT_0;
 
@@ -1034,8 +1036,10 @@ impl EventLogSubscription {
         .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?;
 
         // Replacement is in place — only now is the stale handle safe to release.
-        unsafe {
-            let _ = EvtClose(old_handle);
+        // SAFETY: `old_handle` is the previous subscription handle; it is no longer stored
+        // anywhere and is not used after this call.
+        if let Err(error) = unsafe { EvtClose(old_handle) } {
+            debug!(message = "Failed to close replaced subscription handle.", %error);
         }
 
         channel_sub.subscription_handle = new_handle;
