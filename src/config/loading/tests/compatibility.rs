@@ -4,8 +4,10 @@ use std::{collections::HashMap, path::Path};
 use indoc::indoc;
 use serde_json::{Value, json};
 
-use super::{ConfigBuilderLoader, load_source_from_paths};
-use crate::config::{ConfigPath, Format};
+use crate::config::{
+    ConfigPath, Format,
+    loading::{ConfigBuilderLoader, load_source_from_paths},
+};
 
 fn write_files(root: &Path, files: &[(&str, &str)]) {
     for (name, content) in files {

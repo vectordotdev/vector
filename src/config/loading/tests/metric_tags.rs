@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::{Value, json};
 
-use super::ConfigBuilderLoader;
-use crate::config::Format;
+use crate::config::{Format, loading::ConfigBuilderLoader};
 
 fn load_metric_tag(tag: &Value, secrets: HashMap<String, String>) -> Result<Value, Vec<String>> {
     let input = json!({"tests": [{
