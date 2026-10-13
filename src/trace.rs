@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use std::{
     collections::{HashMap, HashSet},
@@ -40,7 +41,7 @@ use crate::event::LogEvent;
 /// when it has started doing, or waiting, for input.
 static BUFFER: Mutex<Option<Vec<LogEvent>>> = Mutex::new(Some(Vec::new()));
 
-/// SHOULD_BUFFER controls whether or not internal log events should be buffered or sent directly to the trace broadcast
+/// `SHOULD_BUFFER` controls whether or not internal log events should be buffered or sent directly to the trace broadcast
 /// channel.
 static SHOULD_BUFFER: AtomicBool = AtomicBool::new(true);
 
@@ -57,6 +58,8 @@ fn metrics_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
+/// # Panics
+/// Panics if `levels` contains invalid logging targets or levels.
 pub fn init(
     color: bool,
     json: bool,
@@ -142,6 +145,7 @@ pub fn init(
 }
 
 #[cfg(test)]
+#[expect(clippy::must_use_candidate, reason = "Previous contents are optional")]
 pub fn reset_early_buffer() -> Option<Vec<LogEvent>> {
     get_early_buffer().replace(Vec::new())
 }
@@ -278,6 +282,7 @@ pub struct TraceSubscription {
 
 impl TraceSubscription {
     /// Registers a subscription to the internal log event stream.
+    #[must_use]
     pub fn subscribe() -> TraceSubscription {
         let buffered_events_rx = try_register_for_early_events();
         let trace_rx = get_trace_receiver();
@@ -440,6 +445,8 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn broadcast_rate_limits_repeated_messages() {
+        const EXPECTED: usize = 4;
+
         let trace_sub = TraceSubscription::subscribe();
         // Disable early buffering so events flow directly to the broadcast channel
         // rather than being held in the startup buffer.
@@ -475,7 +482,6 @@ mod tests {
         //
         // Limitation: the "suppressed N times" summary fires on the *next* arriving
         // event after the window expires, not at window expiry itself.
-        const EXPECTED: usize = 4;
         let mut stream = trace_sub.into_stream();
         let messages: Vec<String> = tokio::time::timeout(Duration::from_secs(5), async {
             let mut collected = Vec::with_capacity(EXPECTED);
