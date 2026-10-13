@@ -15,7 +15,7 @@ jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       CARGO_INCREMENTAL: 0
       CARGO_PROFILE_RELEASE_LTO: thin # fat LTO OOMs/timeouts on standard 16GB runners; thin is sufficient to verify linking
@@ -32,11 +32,11 @@ jobs:
           - arm-unknown-linux-musleabi
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         name: Cache Cargo registry + index
         with:
           path: |

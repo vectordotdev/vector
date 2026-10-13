@@ -46,6 +46,13 @@ To build Vector on your own host will require a fairly complete development envi
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
+  - To skip compiling bundled librdkafka during local Kafka builds, developers with `pkg-config` and `librdkafka >= 2.12.1` may explicitly opt in:
+
+    ```bash
+    FEATURES="default,rdkafka/dynamic-linking" make build
+    ```
+
+    Plain `cargo build`, `make build`, and CI continue to use bundled librdkafka.
   - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no extra system prerequisites beyond the C build tools above.
   - To enable GSSAPI for kafka, choose one of:
     - `gssapi`: dynamically links against system `libsasl2`. Requires `libsasl2-dev` (Ubuntu: `sudo apt-get install -y libsasl2-dev`) or `cyrus-sasl` (macOS: `brew install cyrus-sasl`) installed.

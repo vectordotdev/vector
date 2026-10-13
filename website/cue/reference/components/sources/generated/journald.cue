@@ -16,11 +16,7 @@ generated: components: sources: journald: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: "Whether or not end-to-end acknowledgements are enabled for this source."
-			required:    false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	batch_size: {
 		description: """

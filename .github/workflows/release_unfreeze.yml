@@ -1,0 +1,193 @@
+# Close the release freeze window opened by "Prepare release". The window stays
+# open until the release workflow has finished its housekeeping push and the
+# Kubernetes manifests push has landed, so this runs when "Refresh Kubernetes
+# manifests" completes, and waits for the other stages that may still be
+# pending. It revokes the temporary vectordotdev-bot direct-push bypasses before
+# disabling the freeze, matching the order in the release checklists: disabling
+# the freeze first would leave master writable directly by the bot.
+# Dispatch this manually when a release never starts the manifests workflow, or
+# to retry a failed run. A manual run still checks the release state unless the
+# force input is set, which is the way out when a release stage cannot finish.
+name: Unfreeze master
+
+on:
+  workflow_run:
+    workflows: ["Refresh Kubernetes manifests"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Close the window even if a release stage still looks pending
+        type: boolean
+        default: false
+
+permissions:
+  contents: read # Restrictive default
+
+# One group for both freeze transitions: a closeout that overlaps an activation
+# could end with a disabled freeze and a restored bypass.
+concurrency:
+  group: release-freeze
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  unfreeze:
+    name: Close the release freeze window
+    # Only the Helm chart release closes the window automatically: it
+    # dispatches the manifests refresh with the release bot's token. A human
+    # running that workflow manually can succeed before the chart-triggered
+    # refresh lands, so their run must not close the window; they keep the
+    # deliberate manual dispatch of this workflow, which still checks the
+    # release state (and has the force input).
+    if: >-
+      github.repository == 'vectordotdev/vector' &&
+      (github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.actor.login == 'vectordotdev-bot[bot]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Wait for the release to finish
+        # A manual run is the escape hatch, but it still checks the release state
+        # unless force is set: closing the window under a release that still needs
+        # it breaks the next stage's freeze check.
+        if: github.event_name == 'workflow_run' || !inputs.force
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The freeze outlives the manifests push: the release workflow also
+          # pushes its housekeeping commit during the window. Failing on a
+          # transient state would leave the closeout to a manual dispatch, so
+          # wait instead.
+          DEADLINE_SECONDS: 600
+          # The automatic path must also survive a failed preparation: the
+          # next window's retry needs its freeze, so a failed Prepare release
+          # run blocks the automatic closeout. A manual dispatch is the
+          # documented cleanup path for a preparation that cannot finish.
+          AUTOMATIC: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          deadline=$((SECONDS + DEADLINE_SECONDS))
+          idle=0
+          while :; do
+            pending=''
+            latest=''
+            open=''
+            failed=0
+            # Query each release workflow server-side: --limit applies before any
+            # client-side filter, and this repository creates about a hundred runs
+            # an hour, so one repository-wide list can hide an older run that is
+            # still active. "Prepare post-release housekeeping" and the website
+            # reset have no runs of their own; they execute inside "Release Suite".
+            # "Tag approved release" bridges the merged preparation PR to the tagged
+            # release, and "Prepare release" opens the next window.
+            for workflow in release.yml release_manifests.yml release_prepare.yml release_autotag.yml; do
+              if ! runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 100 \
+                  --json status,workflowName,url --jq '.[] | select(.status != "completed")
+                    | "\(.workflowName) \(.url)"'); then
+                echo "Could not query ${workflow} runs; the freeze stays active." >&2
+                failed=1
+                break
+              fi
+              pending+="$runs"
+            done
+            if (( failed == 0 )); then
+              # A finished release stage that failed must keep the freeze
+              # active: its retry needs the freeze, so wait for a human
+              # instead of closing the window under an incomplete release.
+              latest=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"') || failed=1
+            fi
+            if (( failed == 0 )); then
+              # The same holds for a failed manifests run: its retry needs the
+              # freeze to republish the chart manifests.
+              latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_manifests.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"')" || failed=1
+            fi
+            if (( failed == 0 )); then
+              # The same holds for a failed "Tag approved release": its retry
+              # needs the freeze to recreate the release tag, and until it
+              # succeeds no Release Suite run exists to check instead.
+              latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_autotag.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"')" || failed=1
+            fi
+            if (( failed == 0 )) && [[ "$AUTOMATIC" == "true" ]]; then
+              # A failed "Prepare release" run also keeps the freeze: it
+              # activated a window whose retry re-enters release_prepare.yml,
+              # which is the documented cleanup path, not this workflow. Only
+              # the automatic closeout is blocked by it; a manual dispatch
+              # remains the escape hatch for an unfinished preparation.
+              latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_prepare.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"')" || failed=1
+            fi
+            if (( failed == 0 )); then
+              # Correlate the manifests run with the release whose freeze this
+              # is: the Helm chart for the latest stable release must already
+              # be published on helm.vector.dev. A rerun of an older chart
+              # release dispatches a legitimate-looking refresh that changes
+              # nothing, and the real chart refresh for this release would then
+              # fail its active-freeze check, so keep waiting until the index
+              # carries this release's chart.
+              chart=$(curl -sSL --max-time 30 https://helm.vector.dev/index.yaml \
+                | awk '/^  vector:/{in_vector=1} in_vector && /^    version:/{print; exit}' \
+                | sed -nE 's/^    version: "?([0-9]+\.[0-9]+\.[0-9]+)"?$/\1/p')
+              if [[ -z "$chart" ]]; then
+                echo "Could not read the published chart version from helm.vector.dev." >&2
+                failed=1
+              else
+                release=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 30 \
+                  --json tagName,isPrerelease --jq '[.[] | select((.isPrerelease | not)
+                    and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))) | .tagName] | .[0]
+                    | ltrimstr("v")') || failed=1
+                if (( failed == 0 )) && [[ "$chart" != "$release" ]]; then
+                  latest+="chart $chart is not the latest release $release"
+                fi
+              fi
+            fi
+            if (( failed == 0 )); then
+              open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --app vectordotdev-bot \
+                --state open --limit 100 --json number,title --jq '.[] | "PR #\(.number): \(.title)"') || failed=1
+            fi
+            if (( failed == 0 )) && [[ -z "$pending" && -z "$latest" && -z "$open" ]]; then
+              # Require a stable idle state: a poll can land between the tag
+              # workflow completing and GitHub listing the release run it
+              # triggered, and that handoff race would otherwise close the
+              # window the new release needs. A second idle poll after a full
+              # sleep interval confirms the release is really finished.
+              idle=$((idle + 1))
+              if (( idle >= 2 )); then
+                echo "No release workflow is pending and no vectordotdev-bot PR is open." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            else
+              idle=0
+            fi
+            if (( SECONDS >= deadline )); then
+              printf '%s\n' "$pending" "$latest" "$open" >&2
+              echo "Still waiting after ${DEADLINE_SECONDS}s; the freeze stays active." >&2
+              exit 1
+            fi
+            printf '%s\n' "$pending" "$latest" "$open"
+            sleep 30
+          done
+
+      - name: Revoke bypasses and unfreeze master
+        uses: ./.github/actions/unfreeze-release
+        with:
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          freeze-ruleset-id: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+          bot-bypass-ruleset-ids: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}

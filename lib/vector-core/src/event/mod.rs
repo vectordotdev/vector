@@ -7,9 +7,12 @@ pub use finalization::{
     EventFinalizers, EventStatus, Finalizable, GroupedFinalizable, MergeFinalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
+pub use metadata::{
+    DatadogMetricOriginMetadata, EventMetadata, Secrets, TraceLayout, WithMetadata,
+};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
+pub use ser::{DecodeError, MAX_VALUE_NESTING_FRAMES, event_exceeds_max_nesting_cost};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
@@ -18,11 +21,12 @@ use vector_common::{
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
 pub use vrl::value::{KeyString, ObjectMap, Value};
+pub use vrl_target::MetricTagMode;
 pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
 
-#[cfg(any(test, feature = "generate-fixtures"))]
+#[cfg(test)]
 pub(crate) mod arbitrary_impl;
 pub mod array;
 pub mod discriminant;
@@ -40,6 +44,8 @@ mod ser;
 #[cfg(test)]
 mod test;
 mod trace;
+#[cfg(any(test, feature = "typed-trace"))]
+pub mod typed_trace;
 pub mod util;
 mod vrl_target;
 

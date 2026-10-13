@@ -205,7 +205,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         let name = uuid::Uuid::new_v4().to_string();
         let extension = self.compression.extension();
 
-        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, name, extension);
+        metadata.partition_key = format!("{}{name}.{extension}", metadata.partition_key);
 
         OpenDalRequest {
             metadata,

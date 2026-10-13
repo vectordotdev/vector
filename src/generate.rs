@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use std::{
     fs::{File, create_dir_all},
@@ -6,7 +7,7 @@ use std::{
 };
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 use indexmap::IndexMap;
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -91,22 +92,6 @@ pub struct Config {
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
-/// Controls how the resulting transform topology is wired up. This is not
-/// user-configurable.
-pub(crate) enum TransformInputsStrategy {
-    /// Default.
-    ///
-    /// The first transform generated will consume from all sources and
-    /// subsequent transforms will consume from their predecessor.
-    Auto,
-    /// Used for property testing `vector config`.
-    ///
-    /// All transforms use a list of all sources as inputs.
-    #[cfg(test)]
-    #[allow(dead_code)]
-    All,
-}
-
 #[derive(Serialize, Default)]
 struct FullConfig {
     #[serde(flatten)]
@@ -128,10 +113,13 @@ pub(crate) fn strip_nulls(value: Value) -> Value {
     }
 }
 
-pub(crate) fn generate_example(
-    opts: &Opts,
-    transform_inputs_strategy: TransformInputsStrategy,
-) -> Result<String, Vec<String>> {
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::too_many_lines, reason = "Keep command flow")]
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve path escaping"
+)]
+pub(crate) fn generate_example(opts: &Opts) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
         .split(['|', '/'])
@@ -179,7 +167,7 @@ pub(crate) fn generate_example(
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(source_type.to_owned()));
+                .insert("type".to_string(), Value::String(source_type.clone()));
 
             sources.insert(name, example);
         }
@@ -211,21 +199,15 @@ pub(crate) fn generate_example(
             };
             transform_names.push(name.clone());
 
-            let targets = match transform_inputs_strategy {
-                TransformInputsStrategy::Auto => {
-                    if i == 0 {
-                        source_names.clone()
-                    } else {
-                        vec![
-                            transform_names
-                                .get(i - 1)
-                                .unwrap_or(&"component-id".to_owned())
-                                .to_owned(),
-                        ]
-                    }
-                }
-                #[cfg(test)]
-                TransformInputsStrategy::All => source_names.clone(),
+            let targets = if i == 0 {
+                source_names.clone()
+            } else {
+                vec![
+                    transform_names
+                        .get(i - 1)
+                        .unwrap_or(&"component-id".to_owned())
+                        .to_owned(),
+                ]
             };
 
             let mut example = match TransformDescription::example(&transform_type) {
@@ -240,7 +222,7 @@ pub(crate) fn generate_example(
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(transform_type.to_owned()));
+                .insert("type".to_string(), Value::String(transform_type.clone()));
 
             transforms.insert(
                 name,
@@ -286,7 +268,7 @@ pub(crate) fn generate_example(
             example
                 .as_object_mut()
                 .expect("examples are always tables")
-                .insert("type".to_string(), Value::String(sink_type.to_owned()));
+                .insert("type".to_string(), Value::String(sink_type.clone()));
 
             sinks.insert(
                 name,
@@ -295,10 +277,10 @@ pub(crate) fn generate_example(
                         .last()
                         .map(|s| vec![s.to_owned()])
                         .or_else(|| {
-                            if !source_names.is_empty() {
-                                Some(source_names.clone())
-                            } else {
+                            if source_names.is_empty() {
                                 None
+                            } else {
+                                Some(source_names.clone())
                             }
                         })
                         .unwrap_or_else(|| vec!["component-id".to_owned()]),
@@ -319,13 +301,13 @@ pub(crate) fn generate_example(
     }
 
     let full_config = FullConfig {
-        global_options: if !opts.fragment {
+        global_options: if opts.fragment {
+            None
+        } else {
             Some(GlobalOptions {
                 data_dir: default_data_dir(),
                 ..Default::default()
             })
-        } else {
-            None
         },
         config,
     };
@@ -342,25 +324,26 @@ pub(crate) fn generate_example(
     if let Some(path) = file {
         match write_config(path, &builder) {
             #[allow(clippy::print_stdout)]
-            Ok(_) => {
+            Ok(()) => {
                 println!(
                     "Config file written to {:?}",
                     &file.as_ref().unwrap().join("\n")
-                )
+                );
             }
             Err(e) => errs.push(format!("failed to write to file: {e}")),
-        };
-    };
+        }
+    }
 
-    if !errs.is_empty() {
-        Err(errs)
-    } else {
+    if errs.is_empty() {
         Ok(builder)
+    } else {
+        Err(errs)
     }
 }
 
+#[must_use]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    match generate_example(opts, TransformInputsStrategy::Auto) {
+    match generate_example(opts) {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
             {
@@ -371,13 +354,20 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Err(errs) => {
             #[allow(clippy::print_stderr)]
             {
-                errs.iter().for_each(|e| eprintln!("{}", e.red()));
+                for error in errs {
+                    eprintln!("{}", error.red());
+                }
             }
             exitcode::SOFTWARE
         }
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve path escaping"
+)]
 fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
     if filepath.exists() {
         // If the file exists, we don't want to overwrite, that's just rude.
@@ -406,7 +396,7 @@ mod tests {
             file: None,
             format,
         };
-        let cfg_string = generate_example(&opts, TransformInputsStrategy::Auto).unwrap();
+        let cfg_string = generate_example(&opts).unwrap();
         if let Err(error) = format::deserialize::<ConfigBuilder>(&cfg_string, opts.format) {
             panic!(
                 "Failed to generate example for {} with error: {error:?})",
@@ -450,17 +440,19 @@ mod tests {
             format: Format::Toml,
         };
 
-        let cfg = generate_example(&opts, TransformInputsStrategy::Auto);
+        let cfg = generate_example(&opts);
         let filecontents = fs::read_to_string(
             fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
         )
         .expect("Could not read config file");
         fs::remove_file(filepath).expect("Could not cleanup config file!");
-        assert_eq!(cfg.unwrap(), filecontents)
+        assert_eq!(cfg.unwrap(), filecontents);
     }
 
     #[cfg(all(feature = "sources-stdin", feature = "sinks-console"))]
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep test scenario")]
     fn generate_basic_toml() {
         let mut opts = Opts {
             fragment: false,
@@ -470,7 +462,7 @@ mod tests {
         };
 
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -510,7 +502,7 @@ mod tests {
 
         opts.expression = "stdin|test_basic|console".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -550,7 +542,7 @@ mod tests {
 
         opts.expression = "stdin//console".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -584,7 +576,7 @@ mod tests {
 
         opts.expression = "//console".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
@@ -611,7 +603,7 @@ mod tests {
 
         opts.expression = "/test_basic,test_basic,test_basic".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [transforms.transform0]
@@ -638,7 +630,7 @@ mod tests {
         opts.fragment = true;
         opts.expression = "/test_basic,test_basic,test_basic".to_string();
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto),
+            generate_example(&opts),
             Ok(indoc::indoc! {r#"
                 [transforms.transform0]
                 inputs = []
@@ -677,7 +669,7 @@ mod tests {
         };
 
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
+            generate_example(&opts).unwrap(),
             indoc::indoc! {r"
             data_dir: /var/lib/vector/
             sources:
@@ -736,7 +728,7 @@ mod tests {
         };
 
         assert_eq!(
-            generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
+            generate_example(&opts).unwrap(),
             indoc::indoc! {r#"
             {
               "data_dir": "/var/lib/vector/",

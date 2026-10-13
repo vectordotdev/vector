@@ -7,6 +7,7 @@ pub mod config;
 mod grpc;
 mod http;
 mod reply;
+mod request_control;
 mod status;
 
 use vector_lib::{

@@ -26,7 +26,6 @@ components: sources: static_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}

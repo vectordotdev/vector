@@ -54,7 +54,10 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
         .clone()
         .confine(&conf.confinement, "nats", "subject")
         .expect("subject should confine");
-    let sink = NatsSink::new(conf.clone(), confined_subject).await?;
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses.clone()).await?;
     let sink = VectorSink::from_event_streamsink(sink);
 
     // Establish the consumer subscription.
@@ -62,7 +65,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     let options: async_nats::ConnectOptions = (&conf).try_into().context(ConfigSnafu)?;
     let consumer = conf
         .clone()
-        .connect(options)
+        .connect(options, server_addresses)
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer
@@ -478,7 +481,12 @@ async fn nats_jetstream_message_id_valid() {
         .clone()
         .confine(&conf.confinement, "nats", "subject")
         .expect("subject should confine");
-    let sink = NatsSink::new(conf.clone(), confined_subject).await.unwrap();
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses)
+        .await
+        .unwrap();
     let sink = VectorSink::from_event_streamsink(sink);
 
     let event_id = "123";

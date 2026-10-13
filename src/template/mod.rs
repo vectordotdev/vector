@@ -13,6 +13,7 @@ use chrono::{
     FixedOffset, Utc,
     format::{Item, strftime::StrftimeItems},
 };
+use derive_more::Display;
 use http::Uri;
 use regex::Regex;
 
@@ -110,7 +111,8 @@ pub fn confined_preview(rendered: &str) -> String {
 /// event that is used as the input data when rendering the template.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
-#[derive(Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, Display, PartialEq, Eq, Hash)]
+#[display("{src}")]
 #[serde(try_from = "String", into = "String")]
 pub struct UnconfinedTemplate {
     src: String,
@@ -137,31 +139,53 @@ pub struct UnconfinedTemplate {
 ///
 /// Both fields are private to this module, so a `ConfinedTemplate` can
 /// never be constructed (or deserialized) without going through confinement.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Display, PartialEq, Eq, Hash)]
+#[display("{inner}")]
 pub struct ConfinedTemplate {
     inner: UnconfinedTemplate,
     checker: Option<ConfinementChecker>,
 }
 
-/// The templated field type stored in sink config structs.
+/// A template confined via [`UriTemplate::confine`], for HTTP/HTTPS URI fields.
+///
+/// Distinct from [`ConfinedTemplate`] so a prefix-confined template can never be
+/// wired into a URI field. Not deserializable; the sole way to obtain one is
+/// [`UriTemplate::confine`]. See [`ConfinedTemplate`] for the rendering contract.
+pub use confined::ConfinedUriTemplate;
+
+/// The templated field type stored in sink config structs for non-URI fields.
 ///
 /// `Template` is serde-able and appears as a plain string in generated configuration schemas, but
 /// it exposes **no** `render` method. To render it a sink must first call [`Template::confine`] in
-/// its `build()`, which yields a [`ConfinedTemplate`] that enforces the confinement invariant at
-/// render time. This makes confinement unavoidable: there is no way to render a sink's configured
-/// template without going through confinement first.
+/// its `build()`, which yields a [`ConfinedTemplate`] that enforces prefix confinement
+/// (operator-controlled literal prefix + `..`-segment rejection) at render time. This makes
+/// confinement unavoidable: there is no way to render a sink's configured template without going
+/// through confinement first.
 ///
-/// Transforms and sources, which have no confinement boundary, should store
-/// [`UnconfinedTemplate`] directly instead.
+/// For HTTP/HTTPS URI fields, use [`UriTemplate`] instead. Transforms and sources, which have no
+/// confinement boundary, should store [`UnconfinedTemplate`] directly instead.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, Display, PartialEq, Eq, Hash)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
-    /// Inner template
-    #[serde(skip)]
     inner: UnconfinedTemplate,
 }
+
+/// The templated field type for HTTP/HTTPS URI config fields (e.g., the HTTP sink's `uri`).
+///
+/// A wrapper around [`Template`] that selects **URI-specific confinement**: [`UriTemplate::confine`]
+/// returns a [`ConfinedUriTemplate`], never a [`ConfinedTemplate`], so a URI field can never be
+/// wired to a prefix-confined template and vice versa. It appears as a plain string in generated
+/// configuration schemas, referencing `Template`'s schema definition.
+///
+/// There is deliberately no conversion from `Template`: a `UriTemplate` originates only from
+/// string parsing, `Default`, or deserialization, so the URI-ness of a field is fixed by its
+/// declared config type.
+#[derive(Clone, Debug, Default, Display, PartialEq, Eq, Hash)]
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
+pub struct UriTemplate(Template);
 
 /// Unsigned integer template.
 #[configurable_component]
@@ -185,7 +209,8 @@ pub struct UnsignedIntTemplate {
 ///
 /// Embed this in a component config with `#[serde(flatten)]` to get the
 /// `dangerously_allow_unconfined_template_resolution` field. Pass it to
-/// [`Template::confine`] on each template the component owns.
+/// [`Template::confine`] on each template the component owns, or to
+/// [`UriTemplate::confine`] for HTTP/HTTPS URI fields.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct ConfinementConfig {

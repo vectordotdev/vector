@@ -126,6 +126,7 @@ jobs:
             "mqtt",
             "nats",
             "nginx",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",
@@ -160,7 +161,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
@@ -189,8 +190,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} int ${{ matrix.service }}
+          command: vdev integration run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()
@@ -219,7 +219,8 @@ jobs:
             "datadog-metrics",
             "opentelemetry-logs",
             "opentelemetry-metrics",
-            "opentelemetry-metrics-native"
+            "opentelemetry-metrics-native",
+            "opentelemetry-traces"
           ]
     timeout-minutes: 90
 
@@ -248,7 +249,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
@@ -277,8 +278,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/run-integration-test.sh ${{ inputs.coverage && '-c' || '' }} e2e ${{ matrix.service }}
+          command: vdev e2e run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
       - name: Upload coverage artifact
         if: inputs.coverage && always()

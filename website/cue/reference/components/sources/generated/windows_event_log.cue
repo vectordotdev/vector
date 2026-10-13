@@ -16,11 +16,7 @@ generated: components: sources: windows_event_log: configuration: {
 			delivered to sinks.
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: "Whether or not end-to-end acknowledgements are enabled for this source."
-			required:    false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	batch_size: {
 		description: """
@@ -90,8 +86,13 @@ generated: components: sources: windows_event_log: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: "An individual event data format override."
-			required:    true
+			description: """
+				Event data formatting options for custom field type conversion.
+
+				These options control how specific event fields are formatted in the output.
+				Use `event_data_format` config to map field names to their desired format.
+				"""
+			required: true
 			type: string: enum: {
 				auto: """
 					Keep the original format unchanged (passthrough).

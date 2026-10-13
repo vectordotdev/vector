@@ -1,5 +1,8 @@
+#![warn(clippy::pedantic)]
+
 mod config;
 mod encoder;
+mod encoder_v3;
 mod normalizer;
 mod request_builder;
 mod service;

@@ -50,10 +50,10 @@ pub(crate) enum CacheEntry {
     Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
 }
 
-/// Assigns a unique number to each of the types supported by Event::Value.
+/// Assigns a unique number to each logical value type, treating strings as bytes.
 const fn type_id_for_value(val: &Value) -> TypeId {
     match val {
-        Value::Bytes(_) => 0,
+        Value::Bytes(_) | Value::String(_) => 0,
         Value::Timestamp(_) => 1,
         Value::Integer(_) => 2,
         Value::Float(_) => 3,
@@ -130,5 +130,30 @@ impl TaskTransform<Event> for Dedupe {
     {
         let mut inner = self;
         Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::LogEvent;
+    use vrl::event_path;
+
+    #[test]
+    fn dedupes_strings_and_bytes() {
+        for fields in [
+            FieldMatchConfig::MatchFields(vec!["message".into()]),
+            FieldMatchConfig::IgnoreFields(vec![]),
+        ] {
+            let mut transform = Dedupe::new(NonZeroUsize::new(2).unwrap(), fields);
+            let mut event = Event::Log(LogEvent::default());
+            event.as_mut_log().insert(event_path!("message"), "café");
+            let mut duplicate = event.clone();
+            duplicate
+                .as_mut_log()
+                .insert(event_path!("message"), Value::Bytes("café".into()));
+            assert!(transform.transform_one(event).is_some());
+            assert!(transform.transform_one(duplicate).is_none());
+        }
     }
 }

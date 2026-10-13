@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: postgresql_metrics
+    endpoints:
+      - postgresql://postgres:vector@localhost:5432/postgres

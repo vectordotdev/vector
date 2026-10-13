@@ -18,6 +18,7 @@ pub struct OctetCountingDecoderConfig {
 
 impl OctetCountingDecoderConfig {
     /// Build the `OctetCountingDecoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> OctetCountingDecoder {
         if let Some(max_length) = self.octet_counting.max_length {
             OctetCountingDecoder::new_with_max_length(max_length)
@@ -53,6 +54,7 @@ pub enum State {
 
 impl OctetCountingDecoder {
     /// Creates a new `OctetCountingDecoder`.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             other: LinesCodec::new(),
@@ -61,6 +63,7 @@ impl OctetCountingDecoder {
     }
 
     /// Creates a `OctetCountingDecoder` with a maximum frame length limit.
+    #[must_use]
     pub fn new_with_max_length(max_length: usize) -> Self {
         Self {
             other: LinesCodec::new_with_max_length(max_length),
@@ -135,23 +138,22 @@ impl OctetCountingDecoder {
                 // We aren't discarding, we have a space that is not beyond our
                 // maximum length. Attempt to parse the bytes as a number which
                 // will hopefully give us a sensible length for our message.
-                let len: usize = match std::str::from_utf8(&src[..space_pos])
+                let len: usize = if let Ok(len) = std::str::from_utf8(&src[..space_pos])
                     .map_err(|_| ())
                     .and_then(|num| num.parse().map_err(|_| ()))
                 {
-                    Ok(len) => len,
-                    Err(_) => {
-                        // It was not a sensible number.
-                        //
-                        // Advance the buffer past the erroneous bytes to
-                        // prevent us getting stuck in an infinite loop.
-                        src.advance(space_pos + 1);
-                        self.octet_decoding = None;
-                        return Err(LinesCodecError::Io(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unable to decode message len as number",
-                        )));
-                    }
+                    len
+                } else {
+                    // It was not a sensible number.
+                    //
+                    // Advance the buffer past the erroneous bytes to
+                    // prevent us getting stuck in an infinite loop.
+                    src.advance(space_pos + 1);
+                    self.octet_decoding = None;
+                    return Err(LinesCodecError::Io(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unable to decode message len as number",
+                    )));
                 };
 
                 let from = space_pos + 1;
@@ -166,20 +168,19 @@ impl OctetCountingDecoder {
 
                     Ok(None)
                 } else if let Some(msg) = src.get(from..to) {
-                    let bytes = match std::str::from_utf8(msg) {
-                        Ok(_) => Bytes::copy_from_slice(msg),
-                        Err(_) => {
-                            // The data was not valid UTF8 :-(.
-                            //
-                            // Advance the buffer past the erroneous bytes to
-                            // prevent us getting stuck in an infinite loop.
-                            src.advance(to);
-                            self.octet_decoding = None;
-                            return Err(LinesCodecError::Io(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Unable to decode message as UTF8",
-                            )));
-                        }
+                    let bytes = if std::str::from_utf8(msg).is_ok() {
+                        Bytes::copy_from_slice(msg)
+                    } else {
+                        // The data was not valid UTF8 :-(.
+                        //
+                        // Advance the buffer past the erroneous bytes to
+                        // prevent us getting stuck in an infinite loop.
+                        src.advance(to);
+                        self.octet_decoding = None;
+                        return Err(LinesCodecError::Io(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Unable to decode message as UTF8",
+                        )));
                     };
 
                     // We have managed to read the entire message as valid UTF8!
@@ -259,9 +260,7 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
             ret
         } else {
             // Octet counting isn't used so fallback to newline codec.
-            self.other
-                .decode(src)
-                .map(|line| line.map(|line| line.into()))
+            self.other.decode(src).map(|line| line.map(Into::into))
         }
         .map_err(Into::into)
     }
@@ -271,9 +270,7 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
             ret
         } else {
             // Octet counting isn't used so fallback to newline codec.
-            self.other
-                .decode_eof(buf)
-                .map(|line| line.map(|line| line.into()))
+            self.other.decode_eof(buf).map(|line| line.map(Into::into))
         }
         .map_err(Into::into)
     }

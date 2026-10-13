@@ -92,7 +92,6 @@ pub struct Unmerged;
 // defaults, since that is satisfied here.
 #[serde_as]
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BatchConfig<D: SinkBatchSettings + Clone, S = Unmerged>
 where
@@ -475,7 +474,6 @@ impl<B> StatefulBatch<B> {
         self.was_full
     }
 
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_inner(self) -> B {
         self.inner
     }

@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt, stream};
@@ -84,14 +81,13 @@ impl LuaConfig {
 // after each transform would have significant footprint on the performance.
 const GC_INTERVAL: usize = 16;
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(derive_more::Debug)]
 pub struct Lua {
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     source: String,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     search_dirs: Vec<String>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     lua: mlua::Lua,
     vector_func: mlua::RegistryKey,
     invocations_after_gc: usize,
@@ -115,6 +111,7 @@ impl Lua {
     pub fn new(source: String, search_dirs: Vec<String>) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
+        // SAFETY: Native modules loaded by Lua must be trusted not to violate memory safety.
         let lua = unsafe {
             mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
         };
@@ -470,8 +467,7 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
     }
 
@@ -491,8 +487,7 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
     }
 
@@ -510,7 +505,7 @@ mod tests {
 
         let err = transform.process(LogEvent::default().into()).unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("this is an error"), "{}", err);
+        assert!(err.contains("this is an error"), "{err}");
     }
 
     #[test]
@@ -527,7 +522,7 @@ mod tests {
         .unwrap_err()
         .to_string();
 
-        assert!(err.contains("syntax error:"), "{}", err);
+        assert!(err.contains("syntax error:"), "{err}");
     }
 
     #[test]

@@ -626,7 +626,7 @@ mod integration_tests {
     }
 
     fn ecs_url(version: &str) -> String {
-        format!("{}/{}", ecs_address(), version)
+        format!("{}/{version}", ecs_address())
     }
 
     async fn scrape_metrics(endpoint: String, version: Version) {

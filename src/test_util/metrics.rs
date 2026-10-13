@@ -226,8 +226,8 @@ pub fn assert_distribution(
     for (i, (bound, count)) in expected_bounds.iter().enumerate() {
         assert_eq!(
             actual_bounds[i], *count,
-            "expected {} samples less than or equal to {} for '{}', found {} instead",
-            count, bound, series, actual_bounds[i]
+            "expected {count} samples less than or equal to {bound} for '{series}', found {} instead",
+            actual_bounds[i]
         );
     }
 }

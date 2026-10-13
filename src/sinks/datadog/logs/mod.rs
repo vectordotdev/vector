@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! The Datadog Logs [`vector_lib::sink::VectorSink`]
 //!
 //! This module contains the [`vector_lib::sink::VectorSink`] instance that is responsible for
@@ -5,9 +7,12 @@
 //! Datadog Log API. The log API is relatively generous in terms of its
 //! constraints, except that:
 //!
+//!   * an individual log over 1 MB is accepted but truncated
 //!   * a 'payload' is comprised of no more than 1,000 array members
 //!   * a 'payload' may not be more than 5Mb in size, uncompressed and
 //!   * a 'payload' may not mix API keys
+//!
+//! The sink can optionally perform per-log truncation before sending.
 //!
 //! Otherwise per [the
 //! docs](https://docs.datadoghq.com/api/latest/logs/#send-logs) there aren't

@@ -1,15 +1,15 @@
 use std::{collections::HashMap, path::Path};
 
 use procfs::net::{TcpNetEntry, TcpState};
-use vector_lib::event::MetricTags;
+use vector_lib::{event::MetricTags, internal_event::GaugeName};
 
 use super::HostMetrics;
 use crate::sources::host_metrics::HostMetricsScrapeDetailError;
 
 const PROC_IPV6_FILE: &str = "/proc/net/if_inet6";
-const TCP_CONNS_TOTAL: &str = "tcp_connections_total";
-const TCP_TX_QUEUED_BYTES_TOTAL: &str = "tcp_tx_queued_bytes_total";
-const TCP_RX_QUEUED_BYTES_TOTAL: &str = "tcp_rx_queued_bytes_total";
+const TCP_CONNS_TOTAL: GaugeName = GaugeName::TcpConnectionsTotal;
+const TCP_TX_QUEUED_BYTES_TOTAL: GaugeName = GaugeName::TcpTxQueuedBytesTotal;
+const TCP_RX_QUEUED_BYTES_TOTAL: GaugeName = GaugeName::TcpRxQueuedBytesTotal;
 const STATE: &str = "state";
 
 impl HostMetrics {
@@ -19,8 +19,7 @@ impl HostMetrics {
             .await
             .unwrap_or_else(|join_error| {
                 Err(procfs::ProcError::Other(format!(
-                    "Failed to join blocking task: {}",
-                    join_error
+                    "Failed to join blocking task: {join_error}"
                 )))
             });
 
@@ -177,7 +176,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .tcp_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
 
         assert!(!metrics.is_empty());
 
@@ -185,7 +184,7 @@ mod tests {
         let mut n_rx_queued_bytes_metric = 0;
 
         for metric in &metrics {
-            if metric.name() == TCP_CONNS_TOTAL {
+            if metric.name() == TCP_CONNS_TOTAL.as_str() {
                 let tags = metric.tags();
                 assert!(
                     tags.is_some(),
@@ -196,9 +195,9 @@ mod tests {
                     tags.contains_key(STATE),
                     "Metric tcp_connections_total must have a state tag"
                 );
-            } else if metric.name() == TCP_TX_QUEUED_BYTES_TOTAL {
+            } else if metric.name() == TCP_TX_QUEUED_BYTES_TOTAL.as_str() {
                 n_tx_queued_bytes_metric += 1;
-            } else if metric.name() == TCP_RX_QUEUED_BYTES_TOTAL {
+            } else if metric.name() == TCP_RX_QUEUED_BYTES_TOTAL.as_str() {
                 n_rx_queued_bytes_metric += 1;
             } else {
                 panic!("unrecognized metric name: {}", metric.name());
@@ -219,7 +218,7 @@ mod tests {
         // In minimal test environments, there may be zero connections, which is valid
         // Each connection state present should have the correct tag structure
         for metric in metrics {
-            if metric.name() == TCP_CONNS_TOTAL {
+            if metric.name() == TCP_CONNS_TOTAL.as_str() {
                 let tags = metric.tags();
                 assert!(
                     tags.is_some(),

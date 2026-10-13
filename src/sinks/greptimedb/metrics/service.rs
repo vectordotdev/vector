@@ -14,7 +14,7 @@ use crate::sinks::{
     greptimedb::{
         GrpcCompression,
         metrics::{
-            config::GreptimeDBMetricsConfig,
+            config::{GreptimeDBMetricsConfig, validate_tls_all_or_none},
             request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
         },
     },
@@ -64,6 +64,7 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
 
         // The greptimedb ingester requires all three TLS paths (ca_file, crt_file,
         // key_file) to be set. Refuse a partial config rather than downgrading to plaintext.
+        validate_tls_all_or_none(tls_config)?;
         match (ca_file, crt_file, key_file) {
             (Some(ca), Some(crt), Some(key)) => {
                 channel_config.client_tls = Some(ClientTlsOption {
@@ -73,11 +74,7 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
                 });
                 ChannelManager::with_tls_config(channel_config).map_err(Box::new)?
             }
-            _ => {
-                return Err(
-                    "GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set.".into(),
-                );
-            }
+            _ => unreachable!("TLS all-or-none validated by validate_tls_all_or_none"),
         }
     } else {
         ChannelManager::with_config(channel_config)

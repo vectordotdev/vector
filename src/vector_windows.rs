@@ -121,7 +121,7 @@ pub mod service_control {
                 "stop" => Ok(ControlAction::Stop {
                     stop_timeout: Duration::from_secs(10),
                 }),
-                _ => Err(format!("invalid option {} for ControlAction", s)),
+                _ => Err(format!("invalid option {s} for ControlAction")),
             }
         }
     }

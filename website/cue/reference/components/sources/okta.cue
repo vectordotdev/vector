@@ -21,7 +21,6 @@ components: sources: okta: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

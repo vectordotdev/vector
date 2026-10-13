@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use http::Uri;
+use http::{Method, Uri, header};
 use tokio::time::Duration;
 use vector_lib::{
     codecs::{
@@ -9,6 +9,7 @@ use vector_lib::{
     },
     config::LogNamespace,
     event::Event,
+    serde::AsciiChar,
 };
 use vrl::event_path;
 use warp::{Filter, http::HeaderMap};
@@ -16,12 +17,17 @@ use warp::{Filter, http::HeaderMap};
 use super::HttpClientConfig;
 use crate::{
     components::validation::prelude::*,
+    config::{ProxyConfig, SourceContext},
     http::{ParamType, ParameterValue, QueryParameterValue},
     serde::{default_decoding, default_framing_message_based},
     sources::util::http::{HttpMethod, capped_body},
     test_util::{
         addr::next_addr,
-        components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+        components::{
+            HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+            run_and_assert_source_compliance_advanced,
+        },
+        http::spawn_authenticated_http_proxy,
         test_generate_config, wait_for_tcp,
     },
 };
@@ -159,8 +165,9 @@ async fn json_decoding_character_delimited() {
         decoding: DeserializerConfig::Json(Default::default()),
         framing: FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
             character_delimited: CharacterDelimitedDecoderOptions {
-                delimiter: b',',
+                delimiter: AsciiChar::new(','),
                 max_length: Some(usize::MAX),
+                oversized_action: Default::default(),
             },
         }),
         headers: HashMap::new(),
@@ -553,7 +560,7 @@ async fn post_with_body() {
     // Verify the body was echoed back correctly
     for log in logs {
         assert_eq!(
-            log.get(event_path!("key")).unwrap().as_str().unwrap(),
+            log.get(event_path!("key")).unwrap().to_str_lossy().unwrap(),
             "value"
         );
         let number = log.get(event_path!("number")).unwrap();
@@ -664,7 +671,10 @@ async fn post_with_vrl_body() {
     // Verify VRL was evaluated correctly
     for log in logs {
         assert_eq!(
-            log.get(event_path!("message")).unwrap().as_str().unwrap(),
+            log.get(event_path!("message"))
+                .unwrap()
+                .to_str_lossy()
+                .unwrap(),
             "HELLO"
         );
         let value = log.get(event_path!("value")).unwrap();
@@ -713,8 +723,7 @@ async fn query_vrl_compilation_error() {
             let err_msg = err.to_string();
             assert!(
                 err_msg.contains("VRL compilation failed"),
-                "Expected VRL compilation error, got: {}",
-                err_msg
+                "Expected VRL compilation error, got: {err_msg}"
             );
         }
         Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),
@@ -756,10 +765,83 @@ async fn body_vrl_compilation_error() {
             let err_msg = err.to_string();
             assert!(
                 err_msg.contains("VRL compilation failed"),
-                "Expected VRL compilation error, got: {}",
-                err_msg
+                "Expected VRL compilation error, got: {err_msg}"
             );
         }
         Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),
     }
+}
+
+/// Requests should be routed through the configured authenticated HTTP proxy,
+/// which forwards them to the origin without leaking the proxy credentials.
+#[tokio::test]
+async fn requests_through_authenticated_proxy() {
+    let (_guard, in_addr) = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::header::headers_cloned().map(|headers: HeaderMap| {
+            // The proxy credentials must not reach the origin.
+            assert!(!headers.contains_key("Proxy-Authorization"));
+        }))
+        .map(move |()| r#"{"data" : "foo"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    let mut proxy = spawn_authenticated_http_proxy();
+    let proxy_config = ProxyConfig {
+        enabled: true,
+        http: Some(proxy.url().to_owned()),
+        https: None,
+        no_proxy: Default::default(),
+    };
+
+    let events = run_and_assert_source_compliance_advanced(
+        HttpClientConfig {
+            endpoint: format!("http://{in_addr}/endpoint"),
+            interval: INTERVAL,
+            timeout: TIMEOUT,
+            query: HashMap::new(),
+            decoding: DeserializerConfig::Json(Default::default()),
+            framing: default_framing_message_based(),
+            headers: HashMap::new(),
+            method: HttpMethod::Get,
+            body: None,
+            tls: None,
+            auth: None,
+            log_namespace: None,
+        },
+        move |context: &mut SourceContext| {
+            context.proxy = proxy_config;
+        },
+        Some(Duration::from_secs(3)),
+        None,
+        &HTTP_PULL_SOURCE_TAGS,
+    )
+    .await;
+
+    assert!(!events.is_empty());
+    for event in events {
+        assert_eq!(
+            event
+                .into_log()
+                .get(event_path!("data"))
+                .unwrap()
+                .to_str_lossy()
+                .unwrap(),
+            "foo"
+        );
+    }
+
+    let observation = proxy.next_request().await;
+    assert_eq!(observation.method, Method::GET);
+    assert_eq!(
+        observation.uri.to_string(),
+        format!("http://{in_addr}/endpoint")
+    );
+    assert!(
+        observation
+            .headers
+            .contains_key(header::PROXY_AUTHORIZATION)
+    );
 }

@@ -64,10 +64,8 @@ pub struct TcpSinkConfig {
     #[configurable(metadata(docs::examples = "https://somehost:5000"))]
     address: String,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     /// The size of the socket's send buffer.
@@ -102,6 +100,18 @@ impl TcpSinkConfig {
         }
     }
 
+    /// Parse and validate the configured address, returning the host and port.
+    ///
+    /// This performs only pure parsing — no DNS resolution and no TLS setup —
+    /// so it can run during validation. TLS resolution remains in
+    /// [`Self::build`].
+    pub fn parse_address(&self) -> crate::Result<(String, u16)> {
+        let uri = self.address.parse::<http::Uri>()?;
+        let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
+        let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
+        Ok((host, port))
+    }
+
     pub fn build(
         &self,
         transformer: Transformer,
@@ -111,9 +121,26 @@ impl TcpSinkConfig {
         + Sync
         + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let uri = self.address.parse::<http::Uri>()?;
-        let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
-        let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
+        let (host, port) = self.parse_address()?;
+        self.build_with_address(host, port, transformer, encoder)
+    }
+
+    /// Build the sink from an already-parsed host and port.
+    ///
+    /// Used by sinks whose `validate` already parsed the address, so the
+    /// parsed value is plumbed through the validated state rather than
+    /// re-parsed here. TLS resolution still happens in this method.
+    pub fn build_with_address(
+        &self,
+        host: String,
+        port: u16,
+        transformer: Transformer,
+        encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
         let sink = TcpSink::new(connector.clone(), transformer, encoder);

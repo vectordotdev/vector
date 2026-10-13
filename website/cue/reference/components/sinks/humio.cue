@@ -14,7 +14,6 @@ components: sinks: _humio: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	features: {
@@ -24,7 +23,6 @@ components: sinks: _humio: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -72,7 +70,6 @@ components: sinks: _humio: {
 
 	configuration: {
 		endpoint: {
-			common:      false
 			description: "The base URL of the Humio instance."
 			required:    false
 			type: string: {
@@ -81,7 +78,6 @@ components: sinks: _humio: {
 			}
 		}
 		event_type: {
-			common: false
 			description: """
 				The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the
 				data.
@@ -96,7 +92,6 @@ components: sinks: _humio: {
 			}
 		}
 		host_key: {
-			common:      true
 			description: """
 				The name of the log field to be used as the hostname sent to Humio. This overrides the
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
@@ -108,7 +103,6 @@ components: sinks: _humio: {
 			}
 		}
 		index: {
-			common:      false
 			description: "Optional name of the repository to ingest into. In public-facing APIs this must - if present - be equal to the repository used to create the ingest token used for authentication. In private cluster setups, humio can be configured to allow these to be different. For more information, see [Humio's Format of Data](\(urls.humio_hec_format_of_data))."
 			required:    false
 			type: string: {
@@ -118,7 +112,6 @@ components: sinks: _humio: {
 			}
 		}
 		indexed_fields: {
-			common:      true
 			description: "Event fields to be added to Humio's extra fields. Can be used to tag events by specifying fields starting with `#`. For more information, see [Humio's Format of Data](\(urls.humio_hec_format_of_data))."
 			required:    false
 			type: array: {
@@ -129,7 +122,6 @@ components: sinks: _humio: {
 			}
 		}
 		source: {
-			common: false
 			description: """
 				The source of events sent to this sink. Typically the filename the logs originated from. Maps to
 				`@source` in Humio.

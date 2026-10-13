@@ -1,9 +1,21 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    reason = "Prost generates these types and documentation"
+)]
 pub mod stats {
     include!(concat!(env!("OUT_DIR"), "/stats.rs"));
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    clippy::must_use_candidate,
+    reason = "Prost generates these types and documentation"
+)]
 pub mod logproto {
     include!(concat!(env!("OUT_DIR"), "/logproto.rs"));
 }
@@ -34,7 +46,7 @@ pub mod util {
         fn from(entry: Entry) -> Self {
             let line = entry.1;
             let structured_metadata: Vec<logproto::LabelPairAdapter> =
-                entry.2.into_iter().map(|entry| entry.into()).collect();
+                entry.2.into_iter().map(Into::into).collect();
 
             logproto::EntryAdapter {
                 timestamp: Some(prost_types::Timestamp {
@@ -56,7 +68,7 @@ pub mod util {
         fn from(batch: Stream) -> Self {
             let labels = encode_labels_map_to_string(&batch.0);
             let entries: Vec<logproto::EntryAdapter> =
-                batch.1.into_iter().map(|entry| entry.into()).collect();
+                batch.1.into_iter().map(Into::into).collect();
 
             logproto::StreamAdapter {
                 labels,
@@ -69,9 +81,10 @@ pub mod util {
     pub struct Batch(pub Vec<Stream>);
 
     impl Batch {
+        #[must_use]
         pub fn encode(self) -> Vec<u8> {
             let streams: Vec<logproto::StreamAdapter> =
-                self.0.into_iter().map(|stream| stream.into()).collect();
+                self.0.into_iter().map(Into::into).collect();
             let push_request = logproto::PushRequest { streams };
             push_request.encode_to_vec()
         }
@@ -81,7 +94,9 @@ pub mod util {
     const RESERVED_LABELS: [&str; 1] = [RESERVED_LABEL_TENANT_ID];
 
     // ref: https://github.com/grafana/loki/blob/65c6e254bd22151ab7fc84ec46e13eee2e354aa0/clients/pkg/promtail/client/batch.go#L61-L75
-    pub fn encode_labels_map_to_string(labels: &HashMap<String, String>) -> String {
+    pub fn encode_labels_map_to_string<S: std::hash::BuildHasher>(
+        labels: &HashMap<String, String, S>,
+    ) -> String {
         let mut labels: Vec<String> = labels
             .iter()
             .filter(|(k, _)| !RESERVED_LABELS.contains(&k.as_str()))
@@ -119,7 +134,7 @@ mod tests {
     #[test]
     fn encode_batch() {
         let ts1 = Utc
-            .timestamp_opt(1640244790, 0)
+            .timestamp_opt(1_640_244_790, 0)
             .single()
             .expect("invalid timestamp");
         let entry1 = Entry(
@@ -128,7 +143,7 @@ mod tests {
             vec![],
         );
         let ts2 = Utc
-            .timestamp_opt(1640244791, 0)
+            .timestamp_opt(1_640_244_791, 0)
             .single()
             .expect("invalid timestamp");
         let entry2 = Entry(

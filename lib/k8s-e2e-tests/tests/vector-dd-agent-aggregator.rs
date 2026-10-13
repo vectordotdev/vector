@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::await_holding_lock)]
 
 use indoc::indoc;
@@ -8,6 +9,11 @@ use serde_json::Value;
 /// This test validates that vector-aggregator can deploy with the default
 /// settings and a dummy topology.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the scenario setup and assertions together; splitting is deferred"
+)]
 async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
@@ -132,11 +138,8 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["message"], "MARKER");
         assert_eq!(val["source_type"], "datadog_agent");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;

@@ -1,0 +1,13 @@
+sinks:
+  my_sink_id:
+    type: influxdb_metrics
+    inputs:
+      - my-source-or-transform-id
+    bucket: vector-bucket
+    default_namespace: service
+    endpoint: http://localhost:8086/
+    org: my-org
+    tags:
+      region: us-west-1
+    token: ${INFLUXDB_TOKEN}
+    version: "2"

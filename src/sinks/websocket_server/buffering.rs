@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, net::SocketAddr, num::NonZeroUsize};
 
-use bytes::Bytes;
 use derivative::Derivative;
 use tokio_tungstenite::tungstenite::{Message, handshake::server::Request};
 use url::Url;
@@ -11,7 +10,7 @@ use vector_lib::{
     event::{Event, MaybeAsLogMut},
     lookup::lookup_v2::ConfigValuePath,
 };
-use vrl::prelude::VrlValueConvert;
+use vrl::{prelude::VrlValueConvert, value::Value};
 
 use crate::serde::default_decoding;
 
@@ -33,7 +32,6 @@ pub struct MessageBufferingConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub message_id_path: Option<ConfigValuePath>,
 
-    #[configurable(derived)]
     pub client_ack_config: Option<BufferingAckConfig>,
 }
 
@@ -44,7 +42,6 @@ pub struct MessageBufferingConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 pub struct BufferingAckConfig {
-    #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     #[serde(default = "default_decoding")]
     pub ack_decoding: DeserializerConfig,
@@ -53,7 +50,6 @@ pub struct BufferingAckConfig {
     /// the message.
     pub message_id_path: ConfigValuePath,
 
-    #[configurable(derived)]
     #[serde(default = "default_client_key_config")]
     pub client_key: ClientKeyConfig,
 }
@@ -242,7 +238,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             let mut buffer = [0; 36];
             let uuid = message_id.hyphenated().encode_lower(&mut buffer);
             log.value_mut()
-                .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
+                .insert(message_id_path, Value::from(uuid as &str));
         }
         message_id
     }

@@ -53,7 +53,6 @@ components: sinks: prometheus_exporter: {
 				to protect against this.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.prometheus_exporter.configuration

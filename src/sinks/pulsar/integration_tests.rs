@@ -24,7 +24,7 @@ fn pulsar_host() -> String {
 }
 
 fn pulsar_address(scheme: &str, port: u16) -> String {
-    format!("{}://{}:{}", scheme, pulsar_host(), port)
+    format!("{scheme}://{}:{port}", pulsar_host())
 }
 
 async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {

@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: kafka
+    inputs:
+      - my-source-or-transform-id
+    bootstrap_servers: 10.14.22.123:9092,10.14.23.332:9092
+    encoding:
+      codec: json
+    topic: topic-1234

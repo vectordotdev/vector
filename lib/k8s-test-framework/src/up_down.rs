@@ -36,24 +36,40 @@ where
     }
 
     /// Bring up the resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn up(&mut self) -> Result<()> {
         self.needs_drop = true;
         self.exec(CommandToBuild::Up).await
     }
 
     /// Shut down the resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub async fn down(&mut self) -> Result<()> {
         self.needs_drop = false;
         self.exec(CommandToBuild::Down).await
     }
 
     /// Bring up the resource, blocking execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub fn up_blocking(&mut self) -> Result<()> {
         self.needs_drop = true;
         self.exec_blocking(CommandToBuild::Up)
     }
 
     /// Shut down the resource, blocking execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
     pub fn down_blocking(&mut self) -> Result<()> {
         self.needs_drop = false;
         self.exec_blocking(CommandToBuild::Down)

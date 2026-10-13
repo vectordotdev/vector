@@ -11,7 +11,6 @@ use crate::{dns, net};
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UdpConnectorConfig {
-    #[configurable(derived)]
     address: HostAndPort,
 
     /// The size of the socket's send buffer.

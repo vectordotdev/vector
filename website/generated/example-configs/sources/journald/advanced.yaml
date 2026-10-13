@@ -1,0 +1,27 @@
+sources:
+  my_source_id:
+    type: journald
+    batch_size: 16
+    current_boot_only: true
+    data_dir: /var/lib/vector
+    emit_cursor: false
+    exclude_matches:
+      _SYSTEMD_UNIT:
+        - sshd.service
+        - ntpd.service
+      _TRANSPORT:
+        - kernel
+    exclude_units:
+      - badservice
+    extra_args:
+      - --merge
+    include_matches:
+      _SYSTEMD_UNIT:
+        - sshd.service
+        - ntpd.service
+      _TRANSPORT:
+        - kernel
+    include_units:
+      - ntpd
+    remap_priority: false
+    since_now: false

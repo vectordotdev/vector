@@ -93,9 +93,7 @@ impl Function for SetSemanticMeaning {
             .expect("meaning not bytes")
             .into_owned();
 
-        let path = if let Some(path) = query.external_path() {
-            path
-        } else {
+        let Some(path) = query.external_path() else {
             // Semantic meaning can only be assigned to external fields.
             let mut labels = vec![Label::primary(
                 "this path must point to an event or metadata",
@@ -174,7 +172,7 @@ impl Function for SetSemanticMeaning {
             }
 
             list.insert(meaning, path);
-        };
+        }
 
         Ok(SetSemanticMeaningFn.as_expr())
     }

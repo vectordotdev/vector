@@ -3,7 +3,7 @@
 {{ $latest := index $versions 0 }}
 <div x-data="{ open: false }" @click.away="open = false" class="relative inline-block text-left">
   <div>
-    <button @click="open = !open" type="button" class="flex items-center space-x-3 justify-center w-full rounded-md border dark:text-gray-200 text:gray-700 border-gray-300 dark:border-gray-700 shadow-sm px-4 py-2.5 bg-white dark:bg-dark text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none dark:hover:border-secondary" id="menu-button" aria-expanded="true" aria-haspopup="true">
+    <button @click="open = !open" type="button" class="flex items-center space-x-3 justify-center w-full rounded-md border dark:text-gray-200 text:gray-700 border-gray-300 dark:border-gray-700 shadow-sm px-4 py-2.5 bg-white dark:bg-dark text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden dark:hover:border-secondary" id="menu-button" aria-expanded="true" aria-haspopup="true">
       <span class="flex items-center space-x-3">
         <span class="flex text-xl space-x-2.5">
           <span>
@@ -34,7 +34,7 @@
     x-transition:leave="transition ease-in duration-75"
     x-transition:leave-start="transform opacity-100 scale-100"
     x-transition:leave-end="transform opacity-0 scale-95"
-    class="origin-top-right absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-dark ring-1 ring-black ring-opacity-5 focus:outline-none"
+    class="origin-top-right absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-dark ring-1 ring-black/5 focus:outline-hidden"
     role="menu"
     aria-orientation="vertical"
     aria-labelledby="menu-button"

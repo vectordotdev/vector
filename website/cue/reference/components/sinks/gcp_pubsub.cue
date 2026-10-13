@@ -18,7 +18,6 @@ components: sinks: gcp_pubsub: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				max_events:   1000
 				timeout_secs: 1.0
@@ -64,7 +63,6 @@ components: sinks: gcp_pubsub: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_pubsub.configuration

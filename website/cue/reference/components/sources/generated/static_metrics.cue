@@ -30,7 +30,7 @@ generated: components: sources: static_metrics: configuration: {
 				}
 				tags: {
 					description: "Key-value pairs representing tags and their values to add to the metric."
-					required:    false
+					required:    true
 					type: object: options: "*": {
 						description: "An individual tag - value pair."
 						required:    true
@@ -76,8 +76,8 @@ generated: components: sources: static_metrics: configuration: {
 								}
 								sum: {
 									description: "The sum of all observations contained within this histogram."
-									required:    true
-									type: float: {}
+									required:    false
+									type: float: default: 0.0
 								}
 							}
 						}

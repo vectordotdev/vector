@@ -1,0 +1,15 @@
+transforms:
+  my_transform_id:
+    type: lua
+    inputs:
+      - my-source-or-transform-id
+    hooks:
+      process: |-
+        function (event, emit)
+          event.log.field = "value" -- set value of a field
+          event.log.another_field = nil -- remove field
+          event.log.first, event.log.second = nil, event.log.first -- rename field
+          -- Very important! Emit the processed event.
+          emit(event)
+        end
+    version: "2"

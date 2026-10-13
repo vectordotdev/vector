@@ -18,7 +18,6 @@ components: sources: [Name=string]: {
 			if features.collect != _|_ {
 				if features.collect.checkpoint.enabled {
 					data_dir: {
-						common:      false
 						description: "The directory used to persist file checkpoint positions. By default, the global `data_dir` option is used. Please make sure the Vector project has write permissions to this dir."
 						required:    false
 						type: string: {
@@ -32,7 +31,6 @@ components: sources: [Name=string]: {
 
 			if features.multiline.enabled {
 				multiline: {
-					common:      false
 					description: "Multiline parsing configuration. If not specified, multiline parsing is disabled."
 					required:    false
 					type: object: options: {
@@ -83,14 +81,12 @@ components: sources: [Name=string]: {
 			if features.codecs != _|_ {
 				if features.codecs.enabled {
 					framing: {
-						common:      false
 						description: "Configures in which way incoming byte sequences are split up into byte frames."
 						required:    false
 						type: object: options: {
 							method: {
 								description: "The framing method."
 								required:    false
-								common:      true
 								type: string: {
 									default: features.codecs.default_framing
 									enum: {
@@ -117,7 +113,6 @@ components: sources: [Name=string]: {
 									max_length: {
 										description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
 										required:    false
-										common:      false
 										type: uint: {
 											default: null
 											examples: [65535, 102400]
@@ -129,13 +124,11 @@ components: sources: [Name=string]: {
 							newline_delimited: {
 								description:   "Options for `newline_delimited` framing."
 								required:      false
-								common:        false
 								relevant_when: "method = `newline_delimited`"
 								type: object: options: {
 									max_length: {
 										description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
 										required:    false
-										common:      false
 										type: uint: {
 											default: null
 											examples: [65535, 102400]
@@ -147,13 +140,11 @@ components: sources: [Name=string]: {
 							octet_counting: {
 								description:   "Options for `octet_counting` framing."
 								required:      false
-								common:        false
 								relevant_when: "method = `octet_counting`"
 								type: object: options: {
 									max_length: {
 										description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
 										required:    false
-										common:      false
 										type: uint: {
 											default: null
 											examples: [65535, 102400]
@@ -165,14 +156,12 @@ components: sources: [Name=string]: {
 						}
 					}
 					decoding: {
-						common:      false
 						description: "Configures how events are decoded from raw bytes."
 						required:    false
 						type: object: options: {
 							codec: {
 								description: "The codec to use for decoding events."
 								required:    false
-								common:      true
 								type: string: {
 									default: "bytes"
 									enum: {
@@ -228,12 +217,10 @@ components: sources: [Name=string]: {
 			if features.encoding != _|_ {
 				if features.encoding.enabled {
 					encoding: {
-						common:      false
 						description: "Configures the encoding specific source behavior."
 						required:    false
 						type: object: options: {
 							charset: {
-								common:      false
 								description: "Encoding of the source messages. Takes one of the encoding [label strings](\(urls.encoding_charset_labels)) defined as part of the [Encoding Standard](\(urls.encoding_standard)). When set, the messages are transcoded from the specified encoding to UTF-8, which is the encoding vector assumes internally for string-like data. Enable this transcoding operation if you need your data to be in UTF-8 for further processing. At the time of transcoding, any malformed sequences (that can't be mapped to UTF-8) will be replaced with [replacement character](\(urls.unicode_replacement_character)) and warnings will be logged."
 								required:    false
 								type: string: {
@@ -262,7 +249,6 @@ components: sources: [Name=string]: {
 			if features.receive != _|_ {
 				if features.receive.receive_buffer_bytes != _|_ {
 					receive_buffer_bytes: {
-						common:      false
 						description: "Configures the receive buffer size using the `SO_RCVBUF` option on the socket."
 						required:    false
 						type: uint: {
@@ -278,14 +264,12 @@ components: sources: [Name=string]: {
 
 				if features.receive.keepalive != _|_ {
 					keepalive: {
-						common:      false
 						description: "Configures the TCP keepalive behavior for the connection to the source."
 						required:    false
 						type: object: {
 							examples: []
 							options: {
 								time_secs: {
-									common:      false
 									description: "The time a connection needs to be idle before sending TCP keepalive probes."
 									required:    false
 									type: uint: {
@@ -336,13 +320,11 @@ components: sources: [Name=string]: {
 				}
 
 				_client_metadata: {
-					common:      false
 					description: "Client TLS metadata."
 					required:    false
 					type: object: {
 						options: {
 							subject: {
-								common:      true
 								description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
 								required:    false
 								type: string: {

@@ -6,19 +6,20 @@ use vector_lib::{
     configurable::{component::GenerateConfig, configurable_component},
     internal_event::Protocol,
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink::StatsdSink};
-#[cfg(unix)]
-use crate::sinks::util::service::net::UnixConnectorConfig;
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, UnixOnly, ValidatedSink},
     internal_events::SocketMode,
     sinks::{
         Healthcheck,
         util::{
             BatchConfig, SinkBatchSettings,
-            service::net::{NetworkConnector, TcpConnectorConfig, UdpConnectorConfig},
+            service::net::{
+                NetworkConnector, TcpConnectorConfig, UdpConnectorConfig, UnixConnectorConfig,
+            },
         },
     },
 };
@@ -47,11 +48,9 @@ pub struct StatsdSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -73,8 +72,7 @@ pub enum Mode {
     Udp(UdpConnectorConfig),
 
     /// Send over a Unix domain socket (UDS).
-    #[cfg(unix)]
-    Unix(UnixConnectorConfig),
+    Unix(UnixOnly<UnixConnectorConfig>),
 }
 
 impl Mode {
@@ -82,17 +80,19 @@ impl Mode {
         match self {
             Self::Tcp(_) => SocketMode::Tcp,
             Self::Udp(_) => SocketMode::Udp,
-            #[cfg(unix)]
             Self::Unix(_) => SocketMode::Unix,
         }
     }
 
-    fn as_connector(&self) -> NetworkConnector {
+    fn as_connector(&self) -> crate::Result<NetworkConnector> {
         match self {
-            Self::Tcp(config) => config.as_connector(),
-            Self::Udp(config) => config.as_connector(),
-            #[cfg(unix)]
-            Self::Unix(config) => config.as_connector(),
+            Self::Tcp(config) => Ok(config.as_connector()),
+            Self::Udp(config) => Ok(config.as_connector()),
+            Self::Unix(config) => config.as_ref().on_unix(
+                (),
+                #[cfg(unix)]
+                |config, ()| config.as_connector().map_err(Into::into),
+            ),
         }
     }
 }
@@ -121,27 +121,6 @@ impl GenerateConfig for StatsdSinkConfig {
 #[async_trait]
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batcher_settings = self.batch.into_batcher_settings()?;
-
-        let socket_mode = self.mode.as_socket_mode();
-        let request_builder =
-            StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode);
-        let protocol = Protocol::from(socket_mode.as_str());
-
-        let connector = self.mode.as_connector();
-        let service = connector.service();
-        let healthcheck = connector.healthcheck();
-
-        let sink = StatsdSink::new(
-            StatsdService::from_transport(service),
-            batcher_settings,
-            request_builder,
-            protocol,
-        );
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -151,12 +130,80 @@ impl SinkConfig for StatsdSinkConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedStatsd {
+    batcher_settings: BatcherSettings,
+}
+
+#[async_trait]
+impl ValidatedSink for StatsdSinkConfig {
+    type Validated = ValidatedStatsd;
+
+    fn validate(&self) -> crate::Result<ValidatedStatsd> {
+        let batcher_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedStatsd { batcher_settings })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedStatsd,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let socket_mode = self.mode.as_socket_mode();
+        let request_builder =
+            StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode);
+        let protocol = Protocol::from(socket_mode.as_str());
+
+        let connector = self.mode.as_connector()?;
+        let service = connector.service();
+        let healthcheck = connector.healthcheck();
+
+        let sink = StatsdSink::new(
+            StatsdService::from_transport(service),
+            validated.batcher_settings,
+            request_builder,
+            protocol,
+        );
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::StatsdSinkConfig;
+    use super::{Mode, SocketMode, StatsdSinkConfig, UdpConnectorConfig};
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StatsdSinkConfig>();
+    }
+
+    #[test]
+    fn unix_mode_deserializes_on_all_platforms() {
+        let config: StatsdSinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            mode: unix
+            path: /tmp/vector-statsd.sock
+            unix_mode: Datagram
+        "#})
+        .unwrap();
+
+        assert!(matches!(config.mode, Mode::Unix(_)));
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = StatsdSinkConfig {
+            default_namespace: Some("service".to_string()),
+            mode: Mode::Udp(UdpConnectorConfig::from_address(
+                "127.0.0.1".to_string(),
+                8125,
+            )),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        config.validate().expect("validation should succeed");
+        assert!(matches!(config.mode.as_socket_mode(), SocketMode::Udp));
     }
 }

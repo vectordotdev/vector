@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: console
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json

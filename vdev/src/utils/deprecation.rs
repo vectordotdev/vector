@@ -312,8 +312,24 @@ pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
     } else {
         data.deprecations_enacted.push(entry);
     }
+    sort_enacted(&mut data.deprecations_enacted);
     data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     write_json(repo_root, &data)
+}
+
+/// Sort enacted deprecations so generated output has a stable order.
+///
+/// Entries are grouped by the release that removed them, then by the release
+/// that announced them. `what` makes the order deterministic for entries
+/// announced and removed in the same releases.
+fn sort_enacted(entries: &mut [EnactedEntry]) {
+    entries.sort_by_cached_key(|entry| {
+        (
+            parse_strict_release(&entry.removed_in).ok(),
+            parse_strict_release(&entry.deprecated_since).ok(),
+            entry.what.clone(),
+        )
+    });
 }
 
 /// Filter pending fragments so they exclude any `what` already in `enacted`.
@@ -402,6 +418,7 @@ pub fn rendered_json(repo_root: &Path) -> Result<String> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
     let mut data = read_json(repo_root)?;
+    sort_enacted(&mut data.deprecations_enacted);
     data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     Ok(serde_json::to_string_pretty(&data)? + "\n")
 }
@@ -412,6 +429,7 @@ pub fn sync_deprecations_cue(repo_root: &Path) -> Result<()> {
     let dir = repo_root.join(DEPRECATION_DIR);
     let pending = read_deprecation_fragments(&dir)?;
     let mut data = read_json(repo_root)?;
+    sort_enacted(&mut data.deprecations_enacted);
     data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
     write_json(repo_root, &data)
 }

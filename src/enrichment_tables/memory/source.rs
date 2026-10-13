@@ -43,10 +43,7 @@ impl MemorySource {
             .clone()
             .expect("Unexpected missing source config in memory table used as a source.");
         let mut interval = IntervalStream::new(interval(Duration::from_secs(
-            source_config
-                .export_interval
-                .map(Into::into)
-                .unwrap_or(u64::MAX),
+            source_config.export_interval.map_or(u64::MAX, Into::into),
         )))
         .take_until(self.shutdown.clone());
         let mut expired_receiver = self.memory.subscribe_to_expired_items();
@@ -69,6 +66,11 @@ impl MemorySource {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     async fn export_table_items(
         &mut self,
         source_config: &MemorySourceConfig,

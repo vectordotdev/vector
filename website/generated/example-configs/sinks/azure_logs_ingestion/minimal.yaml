@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: azure_logs_ingestion
+    inputs:
+      - my-source-or-transform-id
+    auth:
+      azure_credential_kind: azure_cli
+    dcr_immutable_id: dcr-000a00a000a00000a000000aa000a0aa
+    endpoint: https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com
+    stream_name: Custom-MyTable

@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 // High-level list of TODOS.
 //
 // TODO: `serde` supports defining a default at the struct level to fill in fields when no value is
@@ -133,7 +134,7 @@ mod str;
 // The crate exists so that both `vector_config_macros` and `vector_config` can import the types and work with them
 // natively, but from a codegen and usage perspective, it's much cleaner to export everything needed to use
 // `Configurable` from `vector_config` itself, and not leak out the crate arrangement as an impl detail.
-pub use vector_config_common::{attributes, validation};
+pub use vector_config_common::{attributes, constants, validation};
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 

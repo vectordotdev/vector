@@ -18,7 +18,6 @@ components: sinks: greptimedb_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   20
 				timeout_secs: 1.0
 			}
@@ -59,7 +58,6 @@ components: sinks: greptimedb_logs: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.greptimedb_logs.configuration

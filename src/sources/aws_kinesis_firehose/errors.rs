@@ -69,20 +69,19 @@ impl RequestError {
         }
     }
 
-    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
-    pub fn request_id(&self) -> Option<&str> {
+    pub const fn request_id(&self) -> Option<&str> {
         use RequestError::*;
-        match *self {
-            AccessKeyMissing { ref request_id, .. } => Some(request_id),
-            AccessKeyInvalid { ref request_id, .. } => Some(request_id),
-            Parse { ref request_id, .. } => Some(request_id),
-            UnsupportedEncoding { ref request_id, .. } => Some(request_id),
-            ParseRecords { ref request_id, .. } => Some(request_id),
-            Decode { ref request_id, .. } => Some(request_id),
-            ShuttingDown { ref request_id, .. } => Some(request_id),
+        match self {
+            AccessKeyMissing { request_id, .. }
+            | AccessKeyInvalid { request_id, .. }
+            | Parse { request_id, .. }
+            | UnsupportedEncoding { request_id, .. }
+            | ParseRecords { request_id, .. }
+            | Decode { request_id, .. }
+            | ShuttingDown { request_id, .. }
+            | DeliveryErrored { request_id }
+            | DeliveryFailed { request_id } => Some(request_id.as_str()),
             UnsupportedProtocolVersion { .. } => None,
-            DeliveryErrored { ref request_id } => Some(request_id),
-            DeliveryFailed { ref request_id } => Some(request_id),
         }
     }
 }

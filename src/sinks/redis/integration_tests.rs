@@ -1,5 +1,5 @@
 use futures::stream;
-use rand::Rng;
+use rand::RngExt;
 use redis::AsyncCommands;
 use vector_lib::{
     codecs::JsonSerializerConfig,

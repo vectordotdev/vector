@@ -28,10 +28,8 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
@@ -50,10 +48,8 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     pub port_key: OptionalValuePath,
 
-    #[configurable(derived)]
     permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
@@ -182,7 +178,7 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
      * Function to pass into util::framestream::build_framestream_unix_source
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
-    fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+    fn handle_event(&self, received_from: Option<String>, frame: Bytes) -> Option<Event> {
         self.frame_handler
             .handle_event(received_from, frame)
             .map(|mut event| {

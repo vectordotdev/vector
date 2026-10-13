@@ -44,7 +44,6 @@ components: sources: http_client: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -82,7 +81,6 @@ components: sources: http_client: {
 				description: "An individual line from an `application/json` request"
 				fields: {
 					"*": {
-						common:        false
 						description:   "Any field contained in your JSON payload"
 						relevant_when: "encoding == \"json\""
 						required:      false

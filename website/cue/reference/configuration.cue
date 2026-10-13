@@ -18,7 +18,6 @@ configuration: {
 		// expire_metrics's type is a little bit tricky, we could not generate `uint` from `docs::type_override` metadata macro easily.
 		// So we have to define it manually, which is okay because it is already deprecated and it will be deleted soon.
 		expire_metrics: {
-			common: false
 			description: """
 				If set, Vector will configure the internal metrics system to automatically
 				remove all metrics that have not been updated in the given time.
@@ -30,7 +29,6 @@ configuration: {
 			group: "global_options"
 			type: object: options: {
 				secs: {
-					common:      true
 					required:    false
 					description: "The whole number of seconds after which to expire metrics."
 					type: uint: {
@@ -40,7 +38,6 @@ configuration: {
 					}
 				}
 				nsecs: {
-					common:      true
 					required:    false
 					description: "The fractional number of seconds after which to expire metrics."
 					type: uint: {

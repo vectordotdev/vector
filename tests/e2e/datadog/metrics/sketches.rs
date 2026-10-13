@@ -1,10 +1,6 @@
 use std::collections::BTreeMap;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
+use datadog_proto::agentpayload as ddmetric_proto;
 use ddmetric_proto::{
     SketchPayload,
     sketch_payload::sketch::{Distribution, Dogsketch},
@@ -106,7 +102,7 @@ async fn get_sketches_from_pipeline(address: String) -> SketchIntake {
 
     common_sketch_assertions(&sketches);
 
-    info!("{:?}", sketches);
+    info!("{sketches:?}");
 
     sketches
 }
