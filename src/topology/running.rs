@@ -1761,7 +1761,7 @@ mod disk_buffer_drain_tests {
         path::PathBuf,
         sync::{
             Arc,
-            atomic::{AtomicBool, Ordering},
+            atomic::{AtomicBool, AtomicUsize, Ordering},
         },
     };
 
@@ -1888,6 +1888,9 @@ mod disk_buffer_drain_tests {
     fn runtime_shutdown_does_not_wait_for_drain_path_resolution() {
         let (started_tx, started_rx) = std::sync::mpsc::channel();
         let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let (resolver_done_tx, resolver_done_rx) = std::sync::mpsc::channel();
+        let resolved_paths = Arc::new(AtomicUsize::new(0));
+        let resolver_paths = Arc::clone(&resolved_paths);
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -1905,6 +1908,9 @@ mod disk_buffer_drain_tests {
                     move |path| {
                         started_tx.send(()).unwrap();
                         release_rx.recv().unwrap();
+                        if resolver_paths.fetch_add(1, Ordering::SeqCst) == 1 {
+                            resolver_done_tx.send(()).unwrap();
+                        }
                         Ok(path.to_path_buf())
                     },
                 )
@@ -1916,11 +1922,19 @@ mod disk_buffer_drain_tests {
                 .unwrap();
         });
 
-        let started = std::time::Instant::now();
-        drop(runtime);
-        assert!(started.elapsed() < std::time::Duration::from_millis(250));
+        let (runtime_dropped_tx, runtime_dropped_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            drop(runtime);
+            runtime_dropped_tx.send(()).unwrap();
+        });
+        runtime_dropped_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("runtime shutdown waited for detached path resolution");
         release_tx.send(()).unwrap();
         release_tx.send(()).unwrap();
+        resolver_done_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("detached path resolution did not finish");
     }
 
     #[tokio::test]

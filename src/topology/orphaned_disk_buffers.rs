@@ -604,9 +604,14 @@ mod tests {
             drop(scanner);
         });
 
-        let started = std::time::Instant::now();
-        drop(runtime);
-        assert!(started.elapsed() < Duration::from_millis(250));
+        let (runtime_dropped_tx, runtime_dropped_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            drop(runtime);
+            runtime_dropped_tx.send(()).unwrap();
+        });
+        runtime_dropped_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("runtime shutdown waited for the detached scan");
         release_tx.send(()).unwrap();
     }
 
