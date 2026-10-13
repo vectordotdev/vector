@@ -21,7 +21,7 @@ generated: components: transforms: sample: configuration: {
 			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
 			syntax: "template"
 		}
-		warnings: ["Prefer grouping by fields with a small, stable set of values, such as `service` or `host`. When the template interpolates event content (for example `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new group: exceeding `max_groups` then evicts the least recently used groups' sampling state, and the retained group values consume memory in proportion to their size."]
+		warnings: ["Prefer grouping by fields with a small, stable set of values, such as `service` or `host`. When the template interpolates event content (for example `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new group: exceeding `max_state_bytes` then evicts the least recently used groups' sampling state."]
 	}
 	internal_metrics: {
 		description: "Configuration of internal metrics for the Sample transform."
@@ -60,15 +60,20 @@ generated: components: transforms: sample: configuration: {
 		required: false
 		type: string: examples: ["message"]
 	}
-	max_groups: {
+	max_state_bytes: {
 		description: """
-			The maximum number of distinct group values whose sampling state is retained.
+			The maximum number of bytes of per-group sampling state that is retained.
 
-			When this limit is reached, the least recently used group's state is evicted. If
-			`group_by` is not configured, only one group is retained.
+			Each group is counted by the size of its rendered `group_by` value plus a fixed per-group
+			overhead for its sampling state and cache bookkeeping. When this limit is reached, the least
+			recently used groups' state is evicted. A group whose state alone exceeds this limit is
+			sampled but not retained.
 			"""
 		required: false
-		type: uint: default: 5000
+		type: uint: {
+			default: 10485760
+			unit:    "bytes"
+		}
 	}
 	rate: {
 		description: """

@@ -1,10 +1,8 @@
-use std::{
-    fmt,
-    num::{NonZeroU64, NonZeroUsize},
-};
+use std::{fmt, mem, num::NonZeroU64};
 
 use lru::LruCache;
 use vector_lib::{
+    ByteSizeOf,
     config::LegacyKey,
     lookup::{OwnedTargetPath, lookup_v2::OptionalValuePath},
     sampling::RatioSampler,
@@ -21,6 +19,12 @@ use crate::{
 
 fn hash_ratio_threshold(ratio: f64) -> u64 {
     (ratio * (u64::MAX as u128) as f64) as u64
+}
+
+/// Approximate bytes retained for one cached group: the key (including its heap allocation), the
+/// sampling state, the LRU node's previous/next pointers, and the hash table slot pointing at it.
+pub(super) fn group_state_entry_bytes(group_by_key: &Option<String>) -> usize {
+    group_by_key.size_of() + mem::size_of::<GroupState>() + 4 * mem::size_of::<usize>()
 }
 
 /// Exists only for backwards compatibility purposes so that the value of sample_rate_key is
@@ -183,6 +187,8 @@ pub struct Sample {
     key_source: SampleKeySource,
     next_group_state: GroupState,
     group_states: LruCache<Option<String>, GroupState>,
+    group_state_bytes: usize,
+    max_state_bytes: usize,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
     include_group_tag: bool,
@@ -198,7 +204,7 @@ impl Sample {
         static_mode: SampleMode,
         key_field: Option<String>,
         group_by: Option<UnconfinedTemplate>,
-        max_groups: NonZeroUsize,
+        max_state_bytes: usize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
         include_group_tag: bool,
@@ -210,7 +216,7 @@ impl Sample {
                 key_field,
                 group_by,
             },
-            max_groups,
+            max_state_bytes,
             exclude,
             sample_rate_key,
             include_group_tag,
@@ -223,7 +229,7 @@ impl Sample {
         static_mode: SampleMode,
         fields: DynamicSampleFields,
         group_by: Option<UnconfinedTemplate>,
-        max_groups: NonZeroUsize,
+        max_state_bytes: usize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
         include_group_tag: bool,
@@ -232,7 +238,7 @@ impl Sample {
             name,
             static_mode,
             SampleKeySource::Dynamic { fields, group_by },
-            max_groups,
+            max_state_bytes,
             exclude,
             sample_rate_key,
             include_group_tag,
@@ -243,7 +249,7 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         key_source: SampleKeySource,
-        max_groups: NonZeroUsize,
+        max_state_bytes: usize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
         include_group_tag: bool,
@@ -252,29 +258,55 @@ impl Sample {
             static_state: static_mode.new_state(),
             dynamic_event_counter: 0,
         };
-        let group_capacity = if key_source.group_by().is_some() {
-            max_groups
-        } else {
-            NonZeroUsize::MIN
-        };
-        let mut group_states = LruCache::unbounded();
-        group_states.resize(group_capacity);
         Self {
             name,
             static_mode,
             key_source,
             next_group_state,
-            group_states,
+            group_states: LruCache::unbounded(),
+            group_state_bytes: 0,
+            max_state_bytes,
             exclude,
             sample_rate_key,
             include_group_tag,
         }
     }
 
-    fn group_state(&mut self, group_by_key: Option<String>) -> &mut GroupState {
-        let next_group_state = &mut self.next_group_state;
-        self.group_states
-            .get_or_insert_mut(group_by_key, || next_group_state.take_next())
+    /// Runs `sample` against the group's state, admitting unknown groups from the shared
+    /// admission state and evicting least recently used groups to stay within `max_state_bytes`.
+    ///
+    /// A group whose entry alone exceeds the limit is sampled but not retained, so each of its
+    /// events is admitted like a new group.
+    fn sample_group(
+        &mut self,
+        group_by_key: Option<String>,
+        sample: impl FnOnce(&mut GroupState) -> bool,
+    ) -> bool {
+        if let Some(state) = self.group_states.get_mut(&group_by_key) {
+            return sample(state);
+        }
+
+        let mut state = self.next_group_state.take_next();
+        let should_sample = sample(&mut state);
+
+        let entry_bytes = group_state_entry_bytes(&group_by_key);
+        if entry_bytes <= self.max_state_bytes {
+            while self.group_state_bytes + entry_bytes > self.max_state_bytes {
+                let Some((evicted_key, _)) = self.group_states.pop_lru() else {
+                    break;
+                };
+                self.group_state_bytes -= group_state_entry_bytes(&evicted_key);
+            }
+            self.group_states.put(group_by_key, state);
+            self.group_state_bytes += entry_bytes;
+        }
+
+        should_sample
+    }
+
+    #[cfg(test)]
+    pub const fn retained_state_bytes(&self) -> usize {
+        self.group_state_bytes
     }
 
     #[cfg(test)]
@@ -393,14 +425,14 @@ impl FunctionTransform for Sample {
             .map(EventSampleMode::sample_rate_label)
             .unwrap_or_else(|| self.static_mode.to_string());
 
-        let group_state = self.group_state(group_by_key);
-        let should_sample = match event_sample_mode {
-            Some(mode) => mode.sample(&mut group_state.dynamic_event_counter),
-            None => {
-                let threshold_exceeded = group_state.static_state.sample();
-                static_key_sample.unwrap_or(threshold_exceeded)
-            }
-        };
+        let should_sample =
+            self.sample_group(group_by_key, |group_state| match event_sample_mode {
+                Some(mode) => mode.sample(&mut group_state.dynamic_event_counter),
+                None => {
+                    let threshold_exceeded = group_state.static_state.sample();
+                    static_key_sample.unwrap_or(threshold_exceeded)
+                }
+            });
 
         if should_sample {
             if let Some(path) = &self.sample_rate_key.path {
