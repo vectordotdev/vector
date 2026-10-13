@@ -103,6 +103,7 @@ impl<'de> Deserialize<'de> for AsciiChar {
 
 #[cfg(test)]
 mod tests {
+    use serde::{Deserialize, Serialize};
     use serde_json::{Value, json};
     use vector_config::{configurable_component, schema::generate_root_schema};
 
@@ -161,5 +162,120 @@ mod tests {
         assert_eq!(property["minLength"], 1);
         assert_eq!(property["maxLength"], 1);
         assert_eq!(property["pattern"], r"^[\x00-\x7F]$");
+    }
+
+    #[derive(Debug, Deserialize, Serialize)]
+    #[serde(default)]
+    struct Options {
+        enabled: bool,
+        timeout: u64,
+    }
+
+    impl Default for Options {
+        fn default() -> Self {
+            Self {
+                enabled: true,
+                timeout: 10,
+            }
+        }
+    }
+
+    impl From<bool> for Options {
+        fn from(enabled: bool) -> Self {
+            Self {
+                enabled,
+                ..Self::default()
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize, Serialize)]
+    struct BoolOrStructConfig {
+        #[serde(default, deserialize_with = "super::bool_or_struct")]
+        options: Options,
+    }
+
+    #[test]
+    fn bool_or_struct_preserves_serde_contract() {
+        struct Case {
+            name: &'static str,
+            input: Value,
+            expected: Option<Value>,
+        }
+
+        for case in [
+            Case {
+                name: "false keeps other defaults",
+                input: json!({"options": false}),
+                expected: Some(json!({"enabled": false, "timeout": 10})),
+            },
+            Case {
+                name: "true keeps other defaults",
+                input: json!({"options": true}),
+                expected: Some(json!({"enabled": true, "timeout": 10})),
+            },
+            Case {
+                name: "struct sets both fields",
+                input: json!({"options": {"enabled": false, "timeout": 7}}),
+                expected: Some(json!({"enabled": false, "timeout": 7})),
+            },
+            Case {
+                name: "partial struct retains defaults",
+                input: json!({"options": {"timeout": 7}}),
+                expected: Some(json!({"enabled": true, "timeout": 7})),
+            },
+            Case {
+                name: "missing field retains defaults",
+                input: json!({}),
+                expected: Some(json!({"enabled": true, "timeout": 10})),
+            },
+            Case {
+                name: "integer",
+                input: json!({"options": 1}),
+                expected: None,
+            },
+            Case {
+                name: "float",
+                input: json!({"options": 1.5}),
+                expected: None,
+            },
+            Case {
+                name: "boolean-looking string",
+                input: json!({"options": "false"}),
+                expected: None,
+            },
+            Case {
+                name: "arbitrary string",
+                input: json!({"options": "invalid"}),
+                expected: None,
+            },
+            Case {
+                name: "null",
+                input: json!({"options": null}),
+                expected: None,
+            },
+            Case {
+                name: "array",
+                input: json!({"options": [false]}),
+                expected: None,
+            },
+        ] {
+            let result = serde_json::from_value::<BoolOrStructConfig>(case.input);
+            if let Some(expected) = case.expected {
+                let config = result.unwrap_or_else(|error| panic!("{}: {error}", case.name));
+                let serialized = serde_json::to_value(config).unwrap();
+                assert_eq!(serialized, json!({"options": expected}), "{}", case.name);
+                let roundtrip: BoolOrStructConfig =
+                    serde_json::from_value(serialized.clone()).unwrap();
+                assert_eq!(
+                    serde_json::to_value(roundtrip).unwrap(),
+                    serialized,
+                    "{}",
+                    case.name
+                );
+            } else {
+                assert!(result.is_err(), "{}: {result:?}", case.name);
+            }
+        }
     }
 }
