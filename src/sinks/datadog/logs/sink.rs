@@ -71,11 +71,13 @@ impl<S> LogSinkBuilder<S> {
         }
     }
 
+    #[must_use]
     pub const fn compression(mut self, compression: Compression) -> Self {
         self.compression = Some(compression);
         self
     }
 
+    #[must_use]
     pub const fn truncation(mut self, truncation: Option<DatadogLogsTruncationConfig>) -> Self {
         self.truncation = truncation;
         self
@@ -235,6 +237,7 @@ pub fn position_reserved_attr_event_root(
 // `PartialEq<BorrowedTargetPath<'_>>`. The alternative is doing a comparison against another
 // `OwnedTargetPath`, but the naïve implementation of that requires multiple allocations and copies
 // just to test equality.
+#[must_use]
 pub fn path_is_field(path: &OwnedTargetPath, field: &str) -> bool {
     path.prefix == PathPrefix::Event
         && matches!(&path.path.segments[..], [OwnedSegment::Field(f)] if f.as_str() == field)
@@ -272,6 +275,11 @@ struct LogRequestBuilder {
 }
 
 impl LogRequestBuilder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Retain ownership of the API key while building and returning its requests."
+    )]
     pub fn build_request(
         &self,
         events: Vec<Event>,
@@ -354,6 +362,11 @@ impl LogRequestBuilder {
         Ok((events_serialized, buf, byte_size))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Release the uncompressed request buffer before returning the encoded request."
+    )]
     fn finish_request(
         &self,
         buf: Vec<u8>,
@@ -661,6 +674,7 @@ mod tests {
         simdutf_bytes_utf8_lossy,
     };
     use crate::{
+        codecs::Transformer,
         common::datadog::DD_RESERVED_SEMANTIC_ATTRS,
         sinks::{
             datadog::logs::config::{
@@ -733,7 +747,7 @@ mod tests {
     ) -> Vec<super::LogApiRequest> {
         LogRequestBuilder {
             default_api_key: Arc::from("unused"),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             compression: Compression::None,
             conforms_as_agent,
             max_payload_bytes,
@@ -902,6 +916,11 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "A metric counter is integer-valued, so exact zero proves no events were dropped."
+    )]
     #[test]
     fn does_not_count_best_effort_log_as_dropped() {
         vector_lib::metrics::init_test();
