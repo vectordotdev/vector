@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -10,10 +11,12 @@ use vector_lib::{
     configurable::configurable_component,
 };
 
+#[must_use]
 pub const fn default_true() -> bool {
     true
 }
 
+#[must_use]
 pub const fn default_false() -> bool {
     false
 }
@@ -21,14 +24,17 @@ pub const fn default_false() -> bool {
 /// The default max length of the input buffer.
 ///
 /// Any input exceeding this limit will be discarded.
-pub fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
+#[must_use]
+pub const fn default_max_length() -> usize {
+    100 * 1024
 }
 
+#[must_use]
 pub fn default_framing_message_based() -> FramingConfig {
     BytesDecoderConfig::new().into()
 }
 
+#[must_use]
 pub fn default_decoding() -> DeserializerConfig {
     BytesDeserializerConfig::new().into()
 }
