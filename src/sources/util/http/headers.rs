@@ -83,7 +83,7 @@ mod tests {
     use chrono::{DateTime, Utc};
     use std::time::SystemTime;
     use vector_lib::config::LogNamespace;
-    use vrl::{path, value};
+    use vrl::{path, value, value::ObjectMap};
     use warp::http::HeaderMap;
 
     use crate::event::{Event, MetricKind, MetricTags, MetricValue};
@@ -147,12 +147,12 @@ mod tests {
             "test",
         );
 
-        let mut trace = [TraceEvent::from(btreemap! {
+        let mut trace = [TraceEvent::from(ObjectMap::from(btreemap! {
             "span_id" => "abc123",
             "trace_id" => "xyz789",
             "span_name" => "test-span",
             "service" => "my-service",
-        })
+        }))
         .into()];
 
         add_headers(
@@ -268,12 +268,12 @@ mod tests {
             "Checking metric contains Content-Encoding header"
         );
 
-        let mut trace = [TraceEvent::from(btreemap! {
+        let mut trace = [TraceEvent::from(ObjectMap::from(btreemap! {
             "span_id" => "abc123",
             "trace_id" => "xyz789",
             "span_name" => "test-span",
             "service" => "my-service",
-        })
+        }))
         .into()];
 
         add_headers(
