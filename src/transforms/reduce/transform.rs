@@ -15,7 +15,7 @@ use vrl::{
 
 use crate::{
     conditions::Condition,
-    event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
+    event::{Event, EventMetadata, LogEvent, TraceEvent, discriminant::Discriminant},
     internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
     transforms::{
         TaskTransform,
@@ -139,6 +139,15 @@ impl ReduceState {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum EventType {
+    Log,
+    Trace,
+}
+
+// Qualified by event type so that logs and traces are never reduced together.
+type TypedDiscriminant = (EventType, Discriminant);
+
 #[derive(Clone, Debug)]
 pub struct Reduce {
     expire_after: Duration,
@@ -146,7 +155,7 @@ pub struct Reduce {
     end_every_period: Option<Duration>,
     group_by: Vec<String>,
     merge_strategies: IndexMap<OwnedTargetPath, MergeStrategy>,
-    reduce_merge_states: HashMap<Discriminant, ReduceState>,
+    reduce_merge_states: HashMap<TypedDiscriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
@@ -239,7 +248,7 @@ impl Reduce {
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
                 emit!(ReduceStaleEventFlushed);
-                emitter.emit(Event::from(t.flush()));
+                emitter.emit(wrap_flushed(t.flush(), k.0));
             }
         }
     }
@@ -247,10 +256,10 @@ impl Reduce {
     fn flush_all_into(&mut self, emitter: &mut Emitter<Event>) {
         self.reduce_merge_states
             .drain()
-            .for_each(|(_, s)| emitter.emit(Event::from(s.flush())));
+            .for_each(|((event_type, _), s)| emitter.emit(wrap_flushed(s.flush(), event_type)));
     }
 
-    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
+    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: TypedDiscriminant) {
         match self.reduce_merge_states.entry(discriminant) {
             Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
@@ -274,8 +283,16 @@ impl Reduce {
             None => (false, event),
         };
 
-        let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
+        // `TraceEvent` is a newtype around `LogEvent`, so reduce over the inner one.
+        let (event_type, event) = match event {
+            Event::Log(log) => (EventType::Log, log),
+            Event::Trace(trace) => (EventType::Trace, LogEvent::from(trace)),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        };
+        let discriminant = (
+            event_type,
+            Discriminant::from_log_event(&event, &self.group_by),
+        );
 
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
@@ -290,25 +307,35 @@ impl Reduce {
 
         if starts_here {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
-                emitter.emit(state.flush().into());
+                emitter.emit(wrap_flushed(state.flush(), event_type));
             }
 
             self.push_or_new_reduce_state(event, discriminant)
         } else if ends_here {
-            emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
-                Some(mut state) => {
-                    state.add_event(event, &self.merge_strategies);
-                    state.flush().into()
-                }
-                None => {
-                    let mut state = ReduceState::new();
-                    state.add_event(event, &self.merge_strategies);
-                    state.flush().into()
-                }
-            });
+            emitter.emit(wrap_flushed(
+                match self.reduce_merge_states.remove(&discriminant) {
+                    Some(mut state) => {
+                        state.add_event(event, &self.merge_strategies);
+                        state.flush()
+                    }
+                    None => {
+                        let mut state = ReduceState::new();
+                        state.add_event(event, &self.merge_strategies);
+                        state.flush()
+                    }
+                },
+                event_type,
+            ));
         } else {
             self.push_or_new_reduce_state(event, discriminant)
         }
+    }
+}
+
+fn wrap_flushed(log: LogEvent, event_type: EventType) -> Event {
+    match event_type {
+        EventType::Log => Event::Log(log),
+        EventType::Trace => Event::Trace(TraceEvent::from(log)),
     }
 }
 
@@ -368,7 +395,7 @@ mod test {
     use super::*;
     use crate::{
         config::{OutputId, TransformConfig, schema, schema::Definition},
-        event::{LogEvent, Value},
+        event::{LogEvent, TraceEvent, Value},
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
@@ -1033,5 +1060,184 @@ mod test {
             assert_eq!(out.recv().await, None);
         })
         .await
+    }
+
+    #[tokio::test]
+    async fn reduce_trace_events() {
+        // Mirror of `reduce_from_condition`, but fed `Event::Trace` inputs.
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("trace message 1");
+            e_1.insert(event_path!("counter"), 1);
+            e_1.insert(event_path!("request_id"), "1");
+
+            let mut e_2 = LogEvent::from("trace message 2");
+            e_2.insert(event_path!("counter"), 2);
+            e_2.insert(event_path!("request_id"), "1");
+
+            let mut e_3 = LogEvent::from("trace message 3");
+            e_3.insert(event_path!("counter"), 3);
+            e_3.insert(event_path!("request_id"), "1");
+            e_3.insert(event_path!("test_end"), "yep");
+
+            for log in [e_1, e_2, e_3] {
+                tx.send(Event::Trace(TraceEvent::from(log))).await.unwrap();
+            }
+
+            let output = out.recv().await.unwrap();
+            let trace = match output {
+                Event::Trace(t) => t,
+                other => panic!("expected Event::Trace, got {other:?}"),
+            };
+            assert_eq!(
+                trace.get(event_path!("message")),
+                Some(&"trace message 1".into())
+            );
+            assert_eq!(trace.get(event_path!("counter")), Some(&Value::from(6)));
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn reduce_trace_merge_strategies() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            merge_strategies:
+              foo: concat
+              bar: array
+              baz: max
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("trace message 1");
+            e_1.insert(event_path!("foo"), "first foo");
+            e_1.insert(event_path!("bar"), "first bar");
+            e_1.insert(event_path!("baz"), 2);
+            e_1.insert(event_path!("request_id"), "1");
+            tx.send(Event::Trace(TraceEvent::from(e_1))).await.unwrap();
+
+            let mut e_2 = LogEvent::from("trace message 2");
+            e_2.insert(event_path!("foo"), "second foo");
+            e_2.insert(event_path!("bar"), 2);
+            e_2.insert(event_path!("baz"), "not number");
+            e_2.insert(event_path!("request_id"), "1");
+            tx.send(Event::Trace(TraceEvent::from(e_2))).await.unwrap();
+
+            let mut e_3 = LogEvent::from("trace message 3");
+            e_3.insert(event_path!("foo"), 10);
+            e_3.insert(event_path!("bar"), "third bar");
+            e_3.insert(event_path!("baz"), 3);
+            e_3.insert(event_path!("request_id"), "1");
+            e_3.insert(event_path!("test_end"), "yep");
+            tx.send(Event::Trace(TraceEvent::from(e_3))).await.unwrap();
+
+            let trace = match out.recv().await.unwrap() {
+                Event::Trace(t) => t,
+                other => panic!("expected Event::Trace, got {other:?}"),
+            };
+            assert_eq!(
+                trace.get(event_path!("message")),
+                Some(&"trace message 1".into())
+            );
+            assert_eq!(
+                trace.get(event_path!("foo")),
+                Some(&"first foo second foo".into())
+            );
+            assert_eq!(
+                trace.get(event_path!("bar")),
+                Some(&Value::Array(vec![
+                    "first bar".into(),
+                    2.into(),
+                    "third bar".into(),
+                ])),
+            );
+            assert_eq!(trace.get(event_path!("baz")), Some(&3.into()));
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn does_not_merge_logs_with_traces() {
+        let reduce_config = serde_yaml::from_str::<ReduceConfig>(indoc! {"
+            group_by:
+              - request_id
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "})
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let make = |msg: &str, counter: i64, end: bool| {
+                let mut e = LogEvent::from(msg);
+                e.insert(event_path!("counter"), counter);
+                e.insert(event_path!("request_id"), "1");
+                if end {
+                    e.insert(event_path!("test_end"), "yep");
+                }
+                e
+            };
+
+            tx.send(Event::Log(make("log 1", 1, false))).await.unwrap();
+            tx.send(Event::Trace(TraceEvent::from(make("trace 1", 10, false))))
+                .await
+                .unwrap();
+            tx.send(Event::Log(make("log 2", 2, true))).await.unwrap();
+
+            match out.recv().await.unwrap() {
+                Event::Log(log) => {
+                    assert_eq!(log.get(event_path!("message")), Some(&"log 1".into()));
+                    assert_eq!(log.get(event_path!("counter")), Some(&Value::from(3)));
+                }
+                other => panic!("expected Event::Log, got {other:?}"),
+            }
+
+            tx.send(Event::Trace(TraceEvent::from(make("trace 2", 20, true))))
+                .await
+                .unwrap();
+
+            match out.recv().await.unwrap() {
+                Event::Trace(trace) => {
+                    assert_eq!(trace.get(event_path!("message")), Some(&"trace 1".into()));
+                    assert_eq!(trace.get(event_path!("counter")), Some(&Value::from(30)));
+                }
+                other => panic!("expected Event::Trace, got {other:?}"),
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }
