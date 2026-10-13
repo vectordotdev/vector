@@ -3,7 +3,7 @@ use http::{HeaderValue, Request, header::AUTHORIZATION};
 use hyper::Body;
 use tower::ServiceBuilder;
 use vector_lib::{
-    config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
+    config::{AcknowledgementsConfig, DataType, Input},
     configurable::configurable_component,
     sensitive_string::SensitiveString,
     stream::BatcherSettings,
@@ -35,6 +35,7 @@ use crate::{
 #[derivative(Default)]
 pub(super) struct AppsignalConfig {
     /// The URI for the AppSignal API to send data to.
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
     #[derivative(Default(value = "default_endpoint()"))]
@@ -42,6 +43,7 @@ pub(super) struct AppsignalConfig {
     pub(super) endpoint: HttpEndpoint,
 
     /// A valid app-level AppSignal Push API key.
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
     #[configurable(metadata(docs::examples = "${APPSIGNAL_PUSH_API_KEY}"))]
     push_api_key: SensitiveString,
@@ -85,21 +87,12 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 }
 
 impl AppsignalConfig {
-    pub(super) fn build_client(
-        &self,
-        proxy: &ProxyConfig,
-        tls: &MaybeTlsSettings,
-    ) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(tls.clone(), proxy)?;
-        Ok(client)
-    }
-
     pub(super) fn build_sink(
         &self,
         http_client: HttpClient,
         batch_settings: BatcherSettings,
         endpoint: HttpEndpoint,
-    ) -> crate::Result<VectorSink> {
+    ) -> VectorSink {
         let push_api_key = self.push_api_key.clone();
         let compression = self.compression;
         let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
@@ -123,7 +116,7 @@ impl AppsignalConfig {
             batch_settings,
         };
 
-        Ok(VectorSink::from_event_streamsink(sink))
+        VectorSink::from_event_streamsink(sink)
     }
 }
 
@@ -185,9 +178,9 @@ impl ValidatedSink for AppsignalConfig {
         // TLS settings may read certificate files from disk, so they are
         // resolved at build time rather than during pure validation.
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let client = self.build_client(cx.proxy(), &tls)?;
+        let client = HttpClient::new(tls, cx.proxy())?;
         let healthcheck = healthcheck(healthcheck_endpoint, authorization, client.clone()).boxed();
-        let sink = self.build_sink(client, batch_settings, endpoint)?;
+        let sink = self.build_sink(client, batch_settings, endpoint);
 
         Ok((sink, healthcheck))
     }

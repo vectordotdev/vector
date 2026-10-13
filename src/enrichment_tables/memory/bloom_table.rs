@@ -7,7 +7,6 @@ use std::{
 
 use async_trait::async_trait;
 use bloomy::{BloomFilter, bloom};
-use bytes::Bytes;
 use futures::{
     Stream, StreamExt,
     stream::{self, BoxStream},
@@ -164,10 +163,7 @@ impl Table for BloomMemoryTable {
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
                     });
                     let result = ObjectMap::from([
-                        (
-                            KeyString::from("key"),
-                            Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
-                        ),
+                        (KeyString::from("key"), Value::from(key)),
                         (KeyString::from("value"), Value::Null),
                     ]);
                     Ok(vec![result])

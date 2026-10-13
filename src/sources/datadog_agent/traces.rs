@@ -141,7 +141,7 @@ fn handle_dd_trace_payload_v1(
             }
             trace_event.insert(
                 &source.log_schema_source_type_key,
-                Bytes::from("datadog_agent"),
+                Value::from_static_str("datadog_agent"),
             );
             trace_event.insert(event_path!("payload_version"), "v2".to_string());
             trace_event.insert(&source.log_schema_host_key, hostname.clone());

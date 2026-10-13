@@ -40,7 +40,7 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use crate::{
     SourceSender,
@@ -1119,7 +1119,7 @@ fn create_event(
         &mut log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from(Config::NAME),
+        Value::from_static_str(Config::NAME),
     );
     match (log_namespace, ingestion_timestamp_field) {
         // When using LogNamespace::Vector always set the ingest_timestamp.

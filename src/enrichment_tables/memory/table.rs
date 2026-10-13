@@ -8,7 +8,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use evmap::{
     shallow_copy::CopyValue,
     {self},
@@ -70,10 +69,7 @@ impl MemoryEntry {
             .ttl
             .saturating_sub(now.duration_since(*self.update_time).as_secs());
         Ok(ObjectMap::from([
-            (
-                KeyString::from("key"),
-                Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
-            ),
+            (KeyString::from("key"), Value::from(key)),
             (
                 KeyString::from("value"),
                 // Unreachable in normal operation: `value` was serialized by `handle_value`.

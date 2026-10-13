@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::{
     config::{LegacyKey, LogNamespace, log_schema},
@@ -147,7 +146,7 @@ impl ResourceLog {
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(TRACE_ID_KEY))),
                 path!(TRACE_ID_KEY),
-                Bytes::from(to_hex(&self.log_record.trace_id)),
+                Value::from(to_hex(&self.log_record.trace_id)),
             );
         }
         if !self.log_record.span_id.is_empty() {
@@ -156,7 +155,7 @@ impl ResourceLog {
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(SPAN_ID_KEY))),
                 path!(SPAN_ID_KEY),
-                Bytes::from(to_hex(&self.log_record.span_id)),
+                Value::from(to_hex(&self.log_record.span_id)),
             );
         }
         if !self.log_record.severity_text.is_empty() {
@@ -240,7 +239,7 @@ impl ResourceLog {
             &mut log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(SOURCE_NAME.as_bytes()),
+            Value::from_static_str(SOURCE_NAME),
         );
         if log_namespace == LogNamespace::Vector {
             log.metadata_mut()

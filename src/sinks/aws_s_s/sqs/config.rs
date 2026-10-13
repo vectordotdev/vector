@@ -4,7 +4,7 @@ use aws_sdk_sqs::Client as SqsClient;
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SqsMessagePublisher,
+    BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SqsMessagePublisher, is_fifo,
     message_deduplication_id, message_group_id,
 };
 use crate::{
@@ -42,10 +42,10 @@ pub(super) struct SqsSinkConfig {
 impl GenerateConfig for SqsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
+            r"queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
             region: us-east-2
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -96,8 +96,8 @@ impl ValidatedSink for SqsSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedSqsSink> {
         let message_group_id = message_group_id(
-            self.base_config.message_group_id.clone(),
-            self.queue_url.ends_with(".fifo"),
+            self.base_config.message_group_id.as_deref(),
+            is_fifo(&self.queue_url),
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
@@ -121,9 +121,9 @@ impl ValidatedSink for SqsSinkConfig {
         let request_builder = SSRequestBuilder::new(
             validated.message_group_id.clone(),
             validated.message_deduplication_id.clone(),
-            self.base_config.encoding.clone(),
+            &self.base_config.encoding,
         )?;
-        let sink = SSSink::new(request_builder, self.base_config.request, publisher)?;
+        let sink = SSSink::new(request_builder, self.base_config.request, publisher);
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
             healthcheck,
@@ -144,6 +144,7 @@ pub(super) async fn healthcheck(client: SqsClient, queue_url: String) -> crate::
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
     use vector_lib::codecs::TextSerializerConfig;
 
     fn test_config(queue_url: &str) -> SqsSinkConfig {
@@ -154,11 +155,11 @@ mod tests {
                 encoding: TextSerializerConfig::default().into(),
                 message_group_id: None,
                 message_deduplication_id: None,
-                request: Default::default(),
-                tls: Default::default(),
+                request: TowerRequestConfig::default(),
+                tls: None,
                 assume_role: None,
-                auth: Default::default(),
-                acknowledgements: Default::default(),
+                auth: AwsAuthentication::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
             },
         }
     }

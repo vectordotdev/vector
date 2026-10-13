@@ -1,6 +1,5 @@
 use std::{collections::VecDeque, net::SocketAddr, num::NonZeroUsize};
 
-use bytes::Bytes;
 use derivative::Derivative;
 use tokio_tungstenite::tungstenite::{Message, handshake::server::Request};
 use url::Url;
@@ -11,7 +10,7 @@ use vector_lib::{
     event::{Event, MaybeAsLogMut},
     lookup::lookup_v2::ConfigValuePath,
 };
-use vrl::prelude::VrlValueConvert;
+use vrl::{prelude::VrlValueConvert, value::Value};
 
 use crate::serde::default_decoding;
 
@@ -239,7 +238,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             let mut buffer = [0; 36];
             let uuid = message_id.hyphenated().encode_lower(&mut buffer);
             log.value_mut()
-                .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
+                .insert(message_id_path, Value::from(uuid as &str));
         }
         message_id
     }
