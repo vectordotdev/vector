@@ -170,14 +170,9 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		]
 	}
 	version: {
-		description: """
-			The InfluxDB API version to use.
-
-			Omitting this option is deprecated and it will be required in a future release. When
-			unset, the version is temporarily inferred from the configured settings.
-			"""
-		minimal:  true
-		required: false
+		description: "The InfluxDB API version to use."
+		minimal:     true
+		required:    true
 		type: string: {
 			enum: {
 				"1": "InfluxDB v0.x/v1.x."

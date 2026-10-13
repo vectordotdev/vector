@@ -71,13 +71,10 @@ pub struct InfluxDbLogsConfig {
     pub tags: Vec<KeyString>,
 
     /// The InfluxDB API version to use.
-    ///
-    /// Omitting this option is deprecated and it will be required in a future release. When
-    /// unset, the version is temporarily inferred from the configured settings.
     #[configurable(metadata(docs::examples = "2"))]
     #[configurable(metadata(docs::examples = "1"))]
     #[configurable(metadata(docs::minimal = true))]
-    pub version: Option<InfluxDbVersion>,
+    pub version: InfluxDbVersion,
 
     /// The name of the database to write into.
     ///
@@ -453,20 +450,8 @@ impl HttpSink for InfluxDbLogsSink {
 
 impl InfluxDbLogsConfig {
     fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        let version = match self.version {
-            Some(version) => {
-                self.validate_version(version)?;
-                version
-            }
-            None => {
-                warn!(
-                    "The `version` option is currently optional but will be required in a future release. \
-                     Please set it to `1` or `2` to match your InfluxDB settings."
-                );
-                self.infer_version()?
-            }
-        };
-        match version {
+        self.validate_version(self.version)?;
+        match self.version {
             InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
                 database: self
                     .database
@@ -502,19 +487,6 @@ impl InfluxDbLogsConfig {
             || self.password.is_some();
         let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
         (has_v1, has_v2)
-    }
-
-    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
-        let (has_v1, has_v2) = self.settings_present();
-        match (has_v1, has_v2) {
-            (true, true) => Err(
-                "Unclear settings. Both InfluxDB v1 and v2 settings are configured; configure only one version."
-                    .into(),
-            ),
-            (false, false) => Err("InfluxDB v1 or v2 should be configured as endpoint.".into()),
-            (true, false) => Ok(InfluxDbVersion::V1),
-            (false, true) => Ok(InfluxDbVersion::V2),
-        }
     }
 
     /// Rejects settings that belong to the version that was not selected, so that
@@ -624,6 +596,56 @@ mod tests {
     }
 
     #[test]
+    fn test_config_version_required() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
+        "#};
+
+        let error = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap_err();
+        assert!(error.to_string().contains("version"), "{error}");
+    }
+
+    #[test]
+    fn test_config_v1_rejects_v2_settings() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+            token: "my-token"
+        "#};
+
+        let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        let Err(error) = sink_config.validate() else {
+            panic!("validation should fail");
+        };
+        assert!(error.to_string().contains("v2 settings were also provided"));
+    }
+
+    #[test]
+    fn test_config_v2_rejects_v1_settings() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
+            database: "my-database"
+        "#};
+
+        let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        let Err(error) = sink_config.validate() else {
+            panic!("validation should fail");
+        };
+        assert!(error.to_string().contains("v1 settings were also provided"));
+    }
+
+    #[test]
     fn prepares_valid_config() {
         let config = InfluxDbLogsConfig {
             measurement: Some("vector".to_string()),
@@ -632,7 +654,7 @@ mod tests {
             bucket: Some("my-bucket".to_string()),
             token: Some("my-token".to_string().into()),
             tags: vec![],
-            version: Some(InfluxDbVersion::V2),
+            version: InfluxDbVersion::V2,
             database: None,
             consistency: None,
             retention_policy_name: None,
@@ -667,7 +689,7 @@ mod tests {
             token: Some("my-token".to_string().into()),
             host_key: Some(OptionalValuePath::new("custom_host")),
             tags: vec![],
-            version: Some(InfluxDbVersion::V2),
+            version: InfluxDbVersion::V2,
             database: None,
             consistency: None,
             retention_policy_name: None,
@@ -1178,7 +1200,7 @@ mod integration_tests {
             measurement: Some(measure.clone()),
             endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             tags: Default::default(),
-            version: Some(InfluxDbVersion::V2),
+            version: InfluxDbVersion::V2,
             database: None,
             consistency: None,
             retention_policy_name: None,
