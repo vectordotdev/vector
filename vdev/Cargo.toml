@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.3.30"
+version = "0.3.31"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
@@ -57,4 +57,4 @@ proc-macro2 = { workspace = true, features = ["span-locations"] }
 quote.workspace = true
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"
+pkg-url = "https://install.datadoghq.com/vector/vdev/{ version }/{ name }-{ target }-v{ version }.tgz"
