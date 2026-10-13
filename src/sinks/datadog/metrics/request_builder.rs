@@ -237,6 +237,15 @@ type EncodedResults =
 // for V3 the inner loop simply drains every metric before finishing once, matching its
 // batch-then-split semantics.
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing signed conversion until its input bounds are audited."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn encode_batch(
     encoder: &mut dyn MetricsEncoder,
     api_key: Option<Arc<str>>,
@@ -316,7 +325,7 @@ fn encode_batch(
                     results.push(Err(RequestBuilderError::Unexpected {
                         error_type: suberr.as_error_type(),
                         dropped_events: n as u64,
-                    }))
+                    }));
                 }
             }
         }
@@ -353,6 +362,11 @@ enum ChunkError {
 /// Halving is driven by what the encoder actually produced rather than by an estimate, so it
 /// terminates: every iteration either emits a request, drops a single metric, or strictly
 /// shrinks the pieces on the queue.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn split_and_encode(
     encoder: &mut dyn MetricsEncoder,
     api_key: &Option<Arc<str>>,
@@ -742,7 +756,10 @@ mod tests {
 
         let stamped = stamp_missing_timestamps(metrics);
 
-        let stamps: Vec<_> = stamped.iter().map(|m| m.timestamp()).collect();
+        let stamps: Vec<_> = stamped
+            .iter()
+            .map(vector_lib::event::Metric::timestamp)
+            .collect();
         assert!(
             stamps.iter().all(Option::is_some),
             "every metric must end up with a timestamp"
