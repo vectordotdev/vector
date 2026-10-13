@@ -4,8 +4,11 @@ use std::{collections::HashMap, path::Path};
 use indoc::indoc;
 use serde_json::{Value, json};
 
+use super::with_absent_env_var;
+#[cfg(any(feature = "sources-demo_logs", feature = "sinks-console"))]
+use crate::config::Format;
 use crate::config::{
-    ConfigPath, Format,
+    ConfigPath,
     loading::{ConfigBuilderLoader, load_source_from_paths},
 };
 
@@ -13,7 +16,7 @@ fn write_files(root: &Path, files: &[(&str, &str)]) {
     for (name, content) in files {
         let path = root.join(name);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, content).unwrap();
+        std::fs::write(path, with_absent_env_var(content)).unwrap();
     }
 }
 
@@ -49,7 +52,7 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
         },
         Case {
             name: "quoted environment boolean is a string",
-            input: json!("${VECTOR_TEST_COMPAT_HEALTHCHECK_UNSET:-false}"),
+            input: json!("${VECTOR_TEST_COMPAT_UNSET:-false}"),
             enabled: None,
         },
         Case {
@@ -81,6 +84,7 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
         let input = json!({"sinks": {"console": {
             "type": "console", "inputs": [], "encoding": {"codec": "json"}, "healthcheck": case.input
         }}}).to_string();
+        let input = with_absent_env_var(&input);
         let result = ConfigBuilderLoader::default()
             .interpolate_env(true)
             .secrets(HashMap::from([(
@@ -113,9 +117,9 @@ fn namespaced_files_load_interpolated_scalars() {
             indoc! {"
         type: demo_logs
         format: json
-        count: ${VECTOR_TEST_COMPAT_COUNT_UNSET:-42}
-        batch_interval: ${VECTOR_TEST_COMPAT_INTERVAL_UNSET:-1.5}
-        log_namespace: ${VECTOR_TEST_COMPAT_BOOL_UNSET:-true}
+        count: ${VECTOR_TEST_COMPAT_UNSET:-42}
+        batch_interval: ${VECTOR_TEST_COMPAT_UNSET:-1.5}
+        log_namespace: ${VECTOR_TEST_COMPAT_UNSET:-true}
     "},
         )],
     );
@@ -133,7 +137,7 @@ fn namespaced_files_load_interpolated_scalars() {
 #[test]
 fn namespaced_tests_load_interpolated_event_counts() {
     for (name, count) in [
-        ("environment", "${VECTOR_TEST_COMPAT_COUNT_UNSET:-42}"),
+        ("environment", "${VECTOR_TEST_COMPAT_UNSET:-42}"),
         ("secret", "SECRET[backend.count]"),
     ] {
         let directory = tempfile::tempdir().unwrap();
@@ -183,7 +187,7 @@ fn directory_fragments_preserve_merge_semantics() {
             name: "environment integer merges with literal",
             field: "count",
             first: "43",
-            second: "${VECTOR_TEST_COMPAT_COUNT_UNSET:-43}",
+            second: "${VECTOR_TEST_COMPAT_UNSET:-43}",
             expected: Some(json!(43)),
         },
         Case {
@@ -197,14 +201,14 @@ fn directory_fragments_preserve_merge_semantics() {
             name: "environment float merges with literal",
             field: "interval",
             first: "2.5",
-            second: "${VECTOR_TEST_COMPAT_INTERVAL_UNSET:-2.5}",
+            second: "${VECTOR_TEST_COMPAT_UNSET:-2.5}",
             expected: Some(json!(2.5)),
         },
         Case {
             name: "environment boolean merges with literal",
             field: "log_namespace",
             first: "true",
-            second: "${VECTOR_TEST_COMPAT_BOOL_UNSET:-true}",
+            second: "${VECTOR_TEST_COMPAT_UNSET:-true}",
             expected: Some(json!(true)),
         },
         Case {
@@ -231,14 +235,14 @@ fn directory_fragments_preserve_merge_semantics() {
         Case {
             name: "invalid interpolation cannot be hidden",
             field: "count",
-            first: "${VECTOR_TEST_COMPAT_COUNT_UNSET:-invalid}",
+            first: "${VECTOR_TEST_COMPAT_UNSET:-invalid}",
             second: "43",
             expected: None,
         },
         Case {
             name: "quoted interpolation conflicts with integer",
             field: "count",
-            first: "'${VECTOR_TEST_COMPAT_COUNT_UNSET:-43}'",
+            first: "'${VECTOR_TEST_COMPAT_UNSET:-43}'",
             second: "43",
             expected: None,
         },
@@ -392,7 +396,7 @@ fn inline_fields_shadow_matching_directories_but_not_files() {
         Case {
             name: "required environment in shadowed folder",
             nested_path: "inline/ignored.yaml",
-            content: "value: ${VECTOR_TEST_COMPAT_SHADOW_UNSET:?must not be read}",
+            content: "value: ${VECTOR_TEST_COMPAT_UNSET:?must not be read}",
             expected: json!({"retained": true}),
         },
         Case {
@@ -496,9 +500,9 @@ fn interpolated_scalars_follow_format_quoting() {
         for (source, count, interval, boolean) in [
             (
                 "environment",
-                "${VECTOR_TEST_COMPAT_COUNT_UNSET:-42}",
-                "${VECTOR_TEST_COMPAT_INTERVAL_UNSET:-1.5}",
-                "${VECTOR_TEST_COMPAT_BOOL_UNSET:-true}",
+                "${VECTOR_TEST_COMPAT_UNSET:-42}",
+                "${VECTOR_TEST_COMPAT_UNSET:-1.5}",
+                "${VECTOR_TEST_COMPAT_UNSET:-true}",
             ),
             (
                 "secret",
@@ -512,6 +516,7 @@ fn interpolated_scalars_follow_format_quoting() {
                 .replace("@COUNT@", count)
                 .replace("@INTERVAL@", interval)
                 .replace("@BOOL@", boolean);
+            let input = with_absent_env_var(&input);
             let result = ConfigBuilderLoader::default()
                 .interpolate_env(true)
                 .secrets(HashMap::from([

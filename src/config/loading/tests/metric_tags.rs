@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::{Value, json};
 
+use super::with_absent_env_var;
 use crate::config::{Format, loading::ConfigBuilderLoader};
 
 fn load_metric_tag(tag: &Value, secrets: HashMap<String, String>) -> Result<Value, Vec<String>> {
@@ -17,6 +18,7 @@ fn load_metric_tag(tag: &Value, secrets: HashMap<String, String>) -> Result<Valu
         }]
     }]})
     .to_string();
+    let input = with_absent_env_var(&input);
     ConfigBuilderLoader::default()
         .interpolate_env(true)
         .secrets(secrets)
@@ -223,7 +225,7 @@ fn metric_tag_interpolation_matches_current_loading_behavior() {
             secret_accepted: true,
         },
     ] {
-        let environment = format!("${{VECTOR_TEST_COMPAT_TAG_UNSET:-{}}}", case.value);
+        let environment = format!("${{VECTOR_TEST_COMPAT_UNSET:-{}}}", case.value);
         for (source, input, accepted) in [
             ("environment", environment, true),
             (
