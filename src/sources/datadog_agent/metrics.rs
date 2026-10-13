@@ -23,7 +23,10 @@ use super::ddmetric_v3_proto::{
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
-        datadog::{DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogSeriesMetric},
+        datadog::{
+            DATADOG_METRIC_RESOURCE_TAG_PREFIX, DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX,
+            DatadogMetricType, DatadogSeriesMetric,
+        },
         http::ErrorMessage,
     },
     config::log_schema,
@@ -53,10 +56,6 @@ const V3_VALUE_TYPE_ZERO: u64 = 0;
 const V3_VALUE_TYPE_SINT64: u64 = 0x10;
 const V3_VALUE_TYPE_FLOAT32: u64 = 0x20;
 const V3_VALUE_TYPE_FLOAT64: u64 = 0x30;
-
-// Datadog's origin metric-type value for metrics excluded from indexing. This is event metadata,
-// not the metric kind encoded in the low bits of `MetricData.types`.
-const DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX: i32 = 9;
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {
