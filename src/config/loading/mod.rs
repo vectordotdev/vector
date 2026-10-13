@@ -8,6 +8,9 @@ pub mod schema_coercion;
 mod secret;
 mod source;
 
+#[cfg(test)]
+mod tests;
+
 use std::{
     collections::HashMap,
     fmt::Debug,
