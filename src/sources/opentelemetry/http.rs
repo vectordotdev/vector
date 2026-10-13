@@ -485,14 +485,28 @@ fn acknowledgement_failure_response(status: AcknowledgementFailure) -> Response 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Rejection> {
     let (message, status) = if let Some(err_msg) = err.find::<ErrorMessage>() {
         (err_msg.message().into(), err_msg.status_code())
-    } else if is_content_type_rejection(&err) {
-        // The route only matches `Content-Type: application/x-protobuf`, so any other (or a
-        // missing) content type is a client error rather than an internal one. warp would
-        // report this as `400 Bad Request`, so it is handled here.
+    } else if let Some(name) = rejected_header_name(&err) {
+        if name.eq_ignore_ascii_case(http::header::CONTENT_TYPE.as_str()) {
+            // The route only matches `Content-Type: application/x-protobuf`, so any other (or a
+            // missing) content type is a client error rather than an internal one. warp would
+            // report this as `400 Bad Request`, so it is handled here.
+            (
+                "Unsupported content type; this endpoint requires `application/x-protobuf`.".into(),
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            )
+        } else {
+            (
+                format!("Invalid request header `{name}`."),
+                StatusCode::BAD_REQUEST,
+            )
+        }
+    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
         (
-            "Unsupported content type; this endpoint requires `application/x-protobuf`.".into(),
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "Method not allowed; this endpoint requires `POST`.".into(),
+            StatusCode::METHOD_NOT_ALLOWED,
         )
+    } else if err.is_not_found() {
+        ("Not found.".into(), StatusCode::NOT_FOUND)
     } else if err.find::<ApiError>().is_some() {
         (format!("{err:?}"), StatusCode::INTERNAL_SERVER_ERROR)
     } else {
@@ -508,16 +522,14 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Rejection> {
     Ok(warp::reply::with_status(reply, status))
 }
 
-/// Returns true if the request was rejected because of its `Content-Type` header.
+/// Returns the name of the header that caused the request to be rejected, if any.
 ///
 /// `warp::header::exact_ignore_case` rejects with `InvalidHeader` both when the header has a
-/// different value and when it is absent; `MissingHeader` is checked as well for robustness.
-fn is_content_type_rejection(err: &Rejection) -> bool {
-    let is_content_type =
-        |name: &str| name.eq_ignore_ascii_case(http::header::CONTENT_TYPE.as_str());
+/// different value and when it is absent, and `warp::header::optional` rejects with
+/// `InvalidHeader` when the value cannot be parsed; `MissingHeader` is checked as well for
+/// robustness.
+fn rejected_header_name(err: &Rejection) -> Option<&str> {
     err.find::<warp::reject::InvalidHeader>()
-        .is_some_and(|e| is_content_type(e.name()))
-        || err
-            .find::<warp::reject::MissingHeader>()
-            .is_some_and(|e| is_content_type(e.name()))
+        .map(|e| e.name())
+        .or_else(|| err.find::<warp::reject::MissingHeader>().map(|e| e.name()))
 }

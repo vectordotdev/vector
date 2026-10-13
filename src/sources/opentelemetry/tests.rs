@@ -2039,23 +2039,32 @@ async fn http_rejections_return_client_error_status_codes() {
     let (status, _) = send_http_request(client.post(&logs_url)).await;
     assert_eq!(status, reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE);
 
-    // Other rejections are mapped by warp, which replies with a plain-text body.
     // Only `POST` is routed.
-    let response = client
-        .get(&logs_url)
-        .send()
-        .await
-        .expect("Failed to send request.");
-    assert_eq!(response.status(), reqwest::StatusCode::METHOD_NOT_ALLOWED);
+    let (status, message) = send_http_request(client.get(&logs_url)).await;
+    assert_eq!(status, reqwest::StatusCode::METHOD_NOT_ALLOWED);
+    assert!(message.contains("POST"), "{message}");
 
     // Unknown paths are not found.
-    let response = client
-        .post(format!("http://{http_addr}/v1/unknown"))
-        .header("Content-Type", "application/x-protobuf")
-        .send()
-        .await
-        .expect("Failed to send request.");
-    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+    let (status, _) = send_http_request(
+        client
+            .post(format!("http://{http_addr}/v1/unknown"))
+            .header("Content-Type", "application/x-protobuf"),
+    )
+    .await;
+    assert_eq!(status, reqwest::StatusCode::NOT_FOUND);
+
+    // A header value that can't be parsed is a bad request.
+    let invalid_encoding = reqwest::header::HeaderValue::from_bytes(b"gzip\xff")
+        .expect("Header value should be valid.");
+    let (status, message) = send_http_request(
+        client
+            .post(&logs_url)
+            .header("Content-Type", "application/x-protobuf")
+            .header("Content-Encoding", invalid_encoding),
+    )
+    .await;
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+    assert!(message.contains("content-encoding"), "{message}");
 
     // The supported content type is still accepted.
     let response = client
