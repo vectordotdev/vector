@@ -118,7 +118,7 @@ pub(super) struct Inner {
 
     /// Datadog metric unit received from an upstream Agent payload.
     #[serde(default)]
-    pub(crate) datadog_metric_unit: Option<String>,
+    pub(crate) datadog_metric_unit: Option<Arc<str>>,
 
     /// Which legacy trace key layout produced this event. `None` means unmarked.
     /// Meaningful only on traces; always `None` for logs and metrics.
@@ -329,8 +329,8 @@ impl EventMetadata {
     }
 
     /// Sets the Datadog metric unit.
-    pub fn set_datadog_metric_unit(&mut self, unit: String) {
-        self.get_mut().datadog_metric_unit = Some(unit);
+    pub fn set_datadog_metric_unit(&mut self, unit: impl Into<Arc<str>>) {
+        self.get_mut().datadog_metric_unit = Some(unit.into());
     }
 
     /// Returns a reference to the event id.
@@ -447,8 +447,8 @@ impl EventMetadata {
 
     /// Sets the Datadog metric unit.
     #[must_use]
-    pub fn with_datadog_metric_unit(mut self, unit: String) -> Self {
-        self.get_mut().datadog_metric_unit = Some(unit);
+    pub fn with_datadog_metric_unit(mut self, unit: impl Into<Arc<str>>) -> Self {
+        self.get_mut().datadog_metric_unit = Some(unit.into());
         self
     }
 
@@ -702,6 +702,18 @@ mod test {
         metadata.set_splunk_hec_token(Arc::from(SECRET2));
         assert_eq!(metadata.datadog_api_key().unwrap().as_ref(), SECRET);
         assert_eq!(metadata.splunk_hec_token().unwrap().as_ref(), SECRET2);
+    }
+
+    #[test]
+    fn metadata_copy_on_write_keeps_datadog_metric_unit_shared() {
+        let metadata = EventMetadata::default().with_datadog_metric_unit("byte");
+        let mut cloned = metadata.clone();
+
+        cloned.set_datadog_api_key(Arc::from(SECRET));
+
+        let original_unit = metadata.inner.datadog_metric_unit.as_ref().unwrap();
+        let cloned_unit = cloned.inner.datadog_metric_unit.as_ref().unwrap();
+        assert!(Arc::ptr_eq(original_unit, cloned_unit));
     }
 
     #[test]

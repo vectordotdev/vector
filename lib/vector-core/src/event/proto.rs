@@ -654,7 +654,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
-            datadog_metric_unit,
+            datadog_metric_unit: datadog_metric_unit.map(|unit| unit.to_string()),
             trace_layout: encode_trace_layout(trace_layout),
         }
     }
@@ -712,7 +712,7 @@ impl TryFrom<Metadata> for EventMetadata {
                 schema_definition: default_schema_definition(),
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
-                datadog_metric_unit,
+                datadog_metric_unit: datadog_metric_unit.map(Arc::from),
                 trace_layout: decode_trace_layout(trace_layout),
                 source_event_id,
             }),
