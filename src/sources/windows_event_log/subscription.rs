@@ -19,7 +19,7 @@ use windows::Win32::System::EventLog::{
     EvtSubscribeToFutureEvents,
 };
 use windows::Win32::System::Threading::{
-    CreateEventW, ResetEvent, SetEvent, WaitForMultipleObjects,
+    CreateEventW, ResetEvent, SetEvent, WaitForMultipleObjects, WaitForSingleObject,
 };
 use windows::core::HSTRING;
 
@@ -88,6 +88,26 @@ const ERROR_EVT_SUBSCRIPTION_TO_DIRECT_CHANNEL: u32 = 15009; // 0x3AA1
 const ERROR_EVT_QUERY_RESULT_STALE: u32 = 15011; // 0x3AA3
 const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 15012; // 0x3AA4
 
+/// Backoff for rebuilding a subscription whose handle keeps reporting itself unusable
+/// while the channel delivers nothing (5 s, doubling, capped at 10 min).
+///
+/// A disabled or empty channel (observed: `Microsoft-Windows-Dhcp-Client/Operational`
+/// disabled, `.../Admin` empty on a domain controller) can return a stale result on every
+/// pull. Each successful rebuild counted as a healthy cycle, so the speculative pull every
+/// `event_timeout_ms` rebuilt it again: ~10 000 rebuilds and warnings per day per host.
+/// The backoff is skipped as soon as Windows signals the channel, so a real event is never
+/// held back by it.
+const RESUBSCRIBE_BACKOFF_BASE: std::time::Duration = std::time::Duration::from_secs(5);
+const RESUBSCRIBE_BACKOFF_MAX: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// Wait before rebuild number `attempt` (1-based) of an idle channel.
+fn resubscribe_backoff(attempt: u32) -> std::time::Duration {
+    let shift = attempt.saturating_sub(1).min(16);
+    RESUBSCRIBE_BACKOFF_BASE
+        .saturating_mul(1u32 << shift)
+        .min(RESUBSCRIBE_BACKOFF_MAX)
+}
+
 /// Per-channel subscription state for pull model.
 struct ChannelSubscription {
     channel: String,
@@ -112,6 +132,10 @@ struct ChannelSubscription {
     /// Gauge tracking total record count in the channel log.
     /// SOC teams use `rate(events_read_total)` vs this gauge to detect ingestion lag.
     channel_records_gauge: Gauge,
+    /// Rebuilds since this channel last delivered an event (see `RESUBSCRIBE_BACKOFF_BASE`).
+    idle_resubscribes: u32,
+    /// Earliest time for the next rebuild while `idle_resubscribes > 0`.
+    next_resubscribe_at: Option<std::time::Instant>,
 }
 
 // SAFETY: Same rationale as EventLogSubscription - Windows kernel handles are thread-safe.
@@ -376,6 +400,8 @@ impl EventLogSubscription {
                         subscription_handle,
                         signal_event,
                         bookmark,
+                        idle_resubscribes: 0,
+                        next_resubscribe_at: None,
                     });
                 }
                 Err(e) => {
@@ -541,6 +567,12 @@ impl EventLogSubscription {
             let mut bookmark_failed = false;
             let mut channel_count = 0usize;
 
+            // Whether Windows signalled new matching events since the last pull. Read
+            // before the reset below; a signalled channel bypasses the re-subscribe
+            // backoff so a real event is never delayed by it.
+            let signalled =
+                unsafe { WaitForSingleObject(channel_sub.signal_event, 0) } == WAIT_OBJECT_0;
+
             // Reset the signal BEFORE draining to avoid a lost-wakeup race
             // (see vectordotdev/vector#25194). The Windows Event Log service
             // signals this manual-reset event via SetEvent each time a new
@@ -608,17 +640,52 @@ impl EventLogSubscription {
                         || code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION
                         || code == ERROR_INVALID_OPERATION
                     {
-                        warn!(
-                            message = "Subscription handle no longer usable (stale result, invalidated position, or invalid operation), attempting re-subscription.",
-                            error_code = code,
-                            channel = %channel_sub.channel
-                        );
+                        let now = std::time::Instant::now();
+                        let backed_off =
+                            channel_sub.next_resubscribe_at.is_some_and(|at| now < at);
+                        if !signalled && backed_off {
+                            // Still unusable, nothing new signalled, backoff not over: leave
+                            // the handle as it is. The speculative pull in mod.rs brings us
+                            // back here; a signal ends the wait immediately.
+                            debug!(
+                                message = "Re-subscription backed off, channel idle.",
+                                error_code = code,
+                                channel = %channel_sub.channel,
+                                idle_resubscribes = channel_sub.idle_resubscribes
+                            );
+                            channel_drained = true;
+                            break;
+                        }
+                        channel_sub.idle_resubscribes =
+                            channel_sub.idle_resubscribes.saturating_add(1);
+                        channel_sub.next_resubscribe_at =
+                            Some(now + resubscribe_backoff(channel_sub.idle_resubscribes));
+                        // Loud on the first rebuild and then on powers of two, so a channel
+                        // that never recovers stays visible without flooding the log.
+                        let loud = channel_sub.idle_resubscribes.is_power_of_two();
+                        if loud {
+                            warn!(
+                                message = "Subscription handle no longer usable (stale result, invalidated position, or invalid operation), attempting re-subscription.",
+                                error_code = code,
+                                channel = %channel_sub.channel,
+                                idle_resubscribes = channel_sub.idle_resubscribes
+                            );
+                        } else {
+                            debug!(
+                                message = "Subscription handle no longer usable, attempting re-subscription.",
+                                error_code = code,
+                                channel = %channel_sub.channel,
+                                idle_resubscribes = channel_sub.idle_resubscribes
+                            );
+                        }
                         match Self::resubscribe_channel(channel_sub, &self.config) {
                             Ok(()) => {
-                                info!(
-                                    message = "Re-subscription succeeded after stale query.",
-                                    channel = %channel_sub.channel
-                                );
+                                if loud {
+                                    info!(
+                                        message = "Re-subscription succeeded after stale query.",
+                                        channel = %channel_sub.channel
+                                    );
+                                }
                                 // Retry from fresh subscription — the signal will fire again.
                                 // Speculative pull on timeout in mod.rs is a safety net if
                                 // the new subscription does not immediately re-signal.
@@ -661,6 +728,10 @@ impl EventLogSubscription {
                     channel_drained = true;
                     break;
                 }
+
+                // The channel delivers again: the next unusable handle is rebuilt at once.
+                channel_sub.idle_resubscribes = 0;
+                channel_sub.next_resubscribe_at = None;
 
                 channel_sub.events_read_counter.increment(returned as u64);
                 channel_sub
@@ -1145,6 +1216,19 @@ mod tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let checkpointer = Arc::new(Checkpointer::new(temp_dir.path()).await.unwrap());
         (checkpointer, temp_dir)
+    }
+
+    #[test]
+    fn test_resubscribe_backoff_doubles_and_caps() {
+        use std::time::Duration;
+        assert_eq!(resubscribe_backoff(1), Duration::from_secs(5));
+        assert_eq!(resubscribe_backoff(2), Duration::from_secs(10));
+        assert_eq!(resubscribe_backoff(3), Duration::from_secs(20));
+        assert_eq!(resubscribe_backoff(7), Duration::from_secs(320));
+        assert_eq!(resubscribe_backoff(8), Duration::from_secs(600));
+        assert_eq!(resubscribe_backoff(u32::MAX), Duration::from_secs(600));
+        // Defensive: 0 is never passed (the counter is incremented first), but must not panic.
+        assert_eq!(resubscribe_backoff(0), Duration::from_secs(5));
     }
 
     #[test]
