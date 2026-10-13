@@ -114,6 +114,22 @@ fn resubscribe_backoff(attempt: u32) -> std::time::Duration {
         .min(RESUBSCRIBE_BACKOFF_MAX)
 }
 
+/// Wait before the next rebuild attempt after rebuild number `attempt` (1-based).
+///
+/// The doubling backoff is meant for a channel whose rebuilt subscription works but still
+/// delivers nothing. A rebuild that *failed* (for example because the Event Log service is
+/// still restarting) leaves the old handle in place, and a handle of a stopped service never
+/// signals again. Backing that off exponentially would delay recovery by up to
+/// `RESUBSCRIBE_BACKOFF_MAX` once the service is back, so a failed rebuild is retried on the
+/// base interval instead.
+fn resubscribe_retry_after(attempt: u32, rebuild_failed: bool) -> std::time::Duration {
+    if rebuild_failed {
+        RESUBSCRIBE_BACKOFF_BASE
+    } else {
+        resubscribe_backoff(attempt)
+    }
+}
+
 /// Per-channel subscription state for pull model.
 struct ChannelSubscription {
     channel: String,
@@ -667,8 +683,9 @@ impl EventLogSubscription {
                         }
                         channel_sub.idle_resubscribes =
                             channel_sub.idle_resubscribes.saturating_add(1);
-                        channel_sub.next_resubscribe_at =
-                            Some(now + resubscribe_backoff(channel_sub.idle_resubscribes));
+                        channel_sub.next_resubscribe_at = Some(
+                            now + resubscribe_retry_after(channel_sub.idle_resubscribes, false),
+                        );
 
                         // Root cause of the idle-channel loop: on a disabled or empty channel
                         // `EvtNext` answers ERROR_INVALID_OPERATION simply because there is
@@ -742,11 +759,30 @@ impl EventLogSubscription {
                                 break;
                             }
                             Err(e) => {
-                                warn!(
-                                    message = "Re-subscription failed, will retry next cycle.",
-                                    channel = %channel_sub.channel,
-                                    error = %e
+                                // The old handle stays in place and can never signal again
+                                // (e.g. its Event Log service instance is gone), so retry on
+                                // the base interval rather than the idle-channel backoff.
+                                channel_sub.next_resubscribe_at = Some(
+                                    now + resubscribe_retry_after(
+                                        channel_sub.idle_resubscribes,
+                                        true,
+                                    ),
                                 );
+                                if loud {
+                                    warn!(
+                                        message = "Re-subscription failed, will retry.",
+                                        channel = %channel_sub.channel,
+                                        idle_resubscribes = channel_sub.idle_resubscribes,
+                                        error = %e
+                                    );
+                                } else {
+                                    debug!(
+                                        message = "Re-subscription failed, will retry.",
+                                        channel = %channel_sub.channel,
+                                        idle_resubscribes = channel_sub.idle_resubscribes,
+                                        error = %e
+                                    );
+                                }
                                 channel_sub.subscription_active = false;
                                 channel_sub.subscription_active_gauge.set(0.0);
                                 channel_drained = true;
@@ -1280,6 +1316,18 @@ mod tests {
         assert_eq!(resubscribe_backoff(u32::MAX), Duration::from_secs(600));
         // Defensive: 0 is never passed (the counter is incremented first), but must not panic.
         assert_eq!(resubscribe_backoff(0), Duration::from_secs(5));
+    }
+
+    #[test]
+    fn test_failed_rebuild_is_retried_on_base_interval() {
+        use std::time::Duration;
+        // A rebuild that worked but delivers nothing backs off exponentially ...
+        assert_eq!(resubscribe_retry_after(8, false), Duration::from_secs(600));
+        // ... a failed rebuild (old handle of a stopped Event Log service, which never signals
+        // again) is retried on the base interval, however often it failed before.
+        for attempt in [1, 2, 8, 100, u32::MAX] {
+            assert_eq!(resubscribe_retry_after(attempt, true), Duration::from_secs(5));
+        }
     }
 
     #[test]
