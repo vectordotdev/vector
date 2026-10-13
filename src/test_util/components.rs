@@ -711,13 +711,6 @@ where
                 .await
                 .expect("Sending event stream to sink failed");
         }
-        VectorSink::DetailedStream(stream) => {
-            let events = events.filter_map(|x| async move { x.ok() }).boxed();
-            stream
-                .run(events)
-                .await
-                .expect("Sending event stream to sink failed");
-        }
     }
     SINK_TESTS.assert(tags);
 }

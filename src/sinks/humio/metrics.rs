@@ -207,7 +207,7 @@ impl ValidatedSink for HumioMetricsConfig {
             inner: sink,
             transform,
         };
-        Ok((VectorSink::DetailedStream(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 }
 
