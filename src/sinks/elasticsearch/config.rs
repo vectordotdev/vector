@@ -30,7 +30,7 @@ use crate::{
         },
         util::{
             BatchConfig, Compression, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
-            TowerRequestSettings, http::RequestConfig, service::HealthConfig,
+            TowerRequestSettings, UriSerde, http::RequestConfig, service::HealthConfig,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
@@ -775,6 +775,21 @@ impl ValidatedSink for ElasticsearchConfig {
             return Err(ParseError::RegionRequired.into());
         }
 
+        // Mirror the pure duplicate-auth and header syntax checks from
+        // `ElasticsearchCommon::extract_auth` so API-key configs that fail
+        // deterministically are rejected during validation instead of failing
+        // at build time.
+        if let Some(ElasticsearchAuthConfig::ApiKey { api_key }) = &self.auth {
+            for endpoint in self.endpoint.iter().chain(&self.endpoints) {
+                let uri = UriSerde::try_from(endpoint.as_uri().clone())?;
+                if uri.auth.is_some() {
+                    return Err("Two authorization credentials were provided.".into());
+                }
+            }
+
+            http::HeaderValue::from_str(&format!("ApiKey {}", api_key.inner()))?;
+        }
+
         // Run the pure routing-template confinement check for the active mode
         // so unconfined `bulk.index` / `data_stream.*` templates are rejected
         // here. The confined mode itself is reconstructed during build (inside
@@ -1068,6 +1083,89 @@ mod tests {
         );
     }
 
+    #[test]
+    fn validate_rejects_invalid_api_key() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            auth:
+              strategy: api_key
+              api_key: "invalid\nkey"
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("an invalid api_key header character should be rejected");
+        assert!(!err.to_string().contains("invalid\nkey"));
+    }
+
+    #[test]
+    fn validate_rejects_api_key_with_endpoint_credentials() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://user:pass@localhost:9200"]
+            auth:
+              strategy: api_key
+              api_key: "dGVzdDprZXk="
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("endpoint credentials with api_key auth should fail validation");
+        assert_eq!(
+            err.to_string(),
+            "Two authorization credentials were provided."
+        );
+    }
+
+    #[test]
+    fn validate_rejects_api_key_with_deprecated_endpoint_credentials() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "http://user:pass@localhost:9200"
+            auth:
+              strategy: api_key
+              api_key: "dGVzdDprZXk="
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("endpoint credentials with api_key auth should fail validation");
+        assert_eq!(
+            err.to_string(),
+            "Two authorization credentials were provided."
+        );
+    }
+
+    #[test]
+    fn validate_rejects_api_key_when_any_endpoint_has_credentials() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints:
+              - "http://localhost:9200"
+              - "http://user:pass@localhost:9201"
+            auth:
+              strategy: api_key
+              api_key: "dGVzdDprZXk="
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("endpoint credentials on later endpoint should fail validation");
+        assert_eq!(
+            err.to_string(),
+            "Two authorization credentials were provided."
+        );
+    }
+
     #[cfg(feature = "aws-core")]
     #[test]
     fn validate_accepts_serverless_with_aws_auth_and_auto_api_version() {
@@ -1219,6 +1317,7 @@ mod tests {
         assert!(validated.health_config.retry_initial_backoff_secs > 0);
     }
 
+    #[cfg(feature = "aws-core")]
     #[test]
     fn parse_aws_auth() {
         serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
@@ -1235,6 +1334,22 @@ mod tests {
               strategy: aws
         "#})
         .unwrap();
+    }
+
+    #[test]
+    fn parse_api_key_auth() {
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: ["http://localhost:9200"]
+            auth:
+              strategy: api_key
+              api_key: "dGVzdDprZXk="
+        "#})
+        .unwrap();
+
+        assert!(matches!(
+            config.auth,
+            Some(ElasticsearchAuthConfig::ApiKey { ref api_key }) if api_key.inner() == "dGVzdDprZXk="
+        ));
     }
 
     #[test]
@@ -1303,6 +1418,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "aws-core")]
     #[test]
     fn parse_opensearch_service_type_serverless() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"

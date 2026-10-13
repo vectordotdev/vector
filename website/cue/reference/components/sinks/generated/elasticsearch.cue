@@ -49,6 +49,12 @@ generated: components: sinks: elasticsearch: configuration: {
 				required:      true
 				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
+			api_key: {
+				description:   "Base64-encoded Elasticsearch API key (the `encoded` value returned when creating the key)."
+				relevant_when: "strategy = \"api_key\""
+				required:      true
+				type: string: examples: ["${ELASTICSEARCH_API_KEY}", "dGVzdDp0ZXN0"]
+			}
 			assume_role: {
 				description: """
 					The ARN of an [IAM role][iam_role] to assume.
@@ -162,6 +168,11 @@ generated: components: sinks: elasticsearch: configuration: {
 					"""
 				required: true
 				type: string: enum: {
+					api_key: """
+						API key authentication.
+
+						The encoded API key is sent in the `Authorization` header as `ApiKey <api_key>`.
+						"""
 					aws:   "Amazon OpenSearch Service-specific authentication."
 					basic: "HTTP Basic Authentication."
 				}

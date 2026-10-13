@@ -1,5 +1,5 @@
 use bytes::{Buf, Bytes};
-use http::{Response, StatusCode, Uri};
+use http::{HeaderValue, Response, StatusCode, Uri};
 use http_body::Body as _;
 use hyper::Body;
 use serde::Deserialize;
@@ -17,7 +17,11 @@ use crate::{
             ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig,
             OpenSearchServiceType, ParseError,
         },
-        util::{HttpEndpoint, UriSerde, auth::Auth, http::RequestConfig},
+        util::{
+            HttpEndpoint, UriSerde,
+            auth::{Auth, apply_api_key},
+            http::RequestConfig,
+        },
     },
     tls::TlsSettings,
     transforms::metric_to_log::MetricToLog,
@@ -223,6 +227,7 @@ impl ElasticsearchCommon {
     }
 
     // extract the authentication from config or endpoint
+    #[allow(clippy::unused_async)]
     async fn extract_auth(
         config: &ElasticsearchConfig,
         #[cfg_attr(not(feature = "aws-core"), allow(unused_variables))] proxy_config: &ProxyConfig,
@@ -237,6 +242,13 @@ impl ElasticsearchCommon {
                 // get whichever auth is provided between config and uri, prevent duplicate auth.
                 let auth = auth.choose_one(&uri.auth)?.unwrap();
                 Some(Auth::Basic(auth))
+            }
+            Some(ElasticsearchAuthConfig::ApiKey { api_key }) => {
+                if uri.auth.is_some() {
+                    return Err("Two authorization credentials were provided.".into());
+                }
+                HeaderValue::from_str(&format!("ApiKey {}", api_key.inner()))?;
+                Some(Auth::ApiKey(api_key.clone()))
             }
             #[cfg(feature = "aws-core")]
             Some(ElasticsearchAuthConfig::Aws(aws)) => {
@@ -419,6 +431,9 @@ async fn get(
         match auth {
             Auth::Basic(http_auth) => {
                 http_auth.apply(&mut request);
+            }
+            Auth::ApiKey(api_key) => {
+                apply_api_key(api_key, &mut request)?;
             }
             #[cfg(feature = "aws-core")]
             Auth::Aws {

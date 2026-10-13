@@ -19,7 +19,10 @@ use crate::{
     http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
         HealthcheckError,
-        util::{BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, auth::Auth},
+        util::{
+            BatchConfig, Compression, HttpEndpoint, SinkBatchSettings,
+            auth::{Auth, apply_api_key},
+        },
     },
     template::Template,
     test_util::{
@@ -101,6 +104,7 @@ impl ElasticsearchCommon {
         if let Some(auth) = &self.auth {
             match auth {
                 Auth::Basic(http_auth) => http_auth.apply(&mut request),
+                Auth::ApiKey(api_key) => apply_api_key(api_key, &mut request)?,
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
                     credentials_provider: provider,
