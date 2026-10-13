@@ -30,7 +30,7 @@ pub(super) struct OrphanedDiskBufferScanner {
 
 impl OrphanedDiskBufferScanner {
     pub(super) fn new() -> Self {
-        Self::spawn(scan_orphaned_disk_buffers, report_orphaned_disk_buffers)
+        Self::spawn(discover_disk_buffers, report_orphaned_disk_buffers)
     }
 
     fn spawn<S, R>(scan: S, report: R) -> Self
@@ -75,31 +75,21 @@ where
     R: Fn(&ScanRequest, io::Result<Vec<DiscoveredDiskBuffer>>),
 {
     while executor::block_on(receiver.changed()).is_ok() {
-        let Some(mut request) = receiver.borrow_and_update().clone() else {
+        let Some(request) = receiver.borrow_and_update().clone() else {
             continue;
         };
-
-        loop {
-            let scanned_data_dir = request.data_dir.clone();
-            let result = scan(&scanned_data_dir);
-            if receiver.has_changed().is_err() {
-                return;
-            }
-            request = receiver
-                .borrow_and_update()
-                .clone()
-                .expect("scan request cannot be cleared");
-            if request.data_dir != scanned_data_dir {
-                continue;
-            }
-            report(&request, result);
-            break;
+        let result = scan(&request.data_dir);
+        if receiver.has_changed().is_err() {
+            return;
         }
+        // Reload rejects global option changes, so data_dir is fixed for this scanner. Applying the
+        // completed discovery to the newest request lets reloads share one active traversal.
+        let request = receiver
+            .borrow_and_update()
+            .clone()
+            .expect("scan request cannot be cleared");
+        report(&request, result);
     }
-}
-
-fn scan_orphaned_disk_buffers(data_dir: &Path) -> io::Result<Vec<DiscoveredDiskBuffer>> {
-    discover_disk_buffers(data_dir)
 }
 
 fn report_orphaned_disk_buffers(
@@ -404,36 +394,6 @@ mod tests {
             started_rx.recv_timeout(Duration::from_millis(100)),
             Err(mpsc::RecvTimeoutError::Timeout)
         ));
-    }
-
-    #[test]
-    fn changed_root_discards_old_discovery_and_scans_newest_root() {
-        let (started_tx, started_rx) = mpsc::channel();
-        let (release_tx, release_rx) = mpsc::channel();
-        let release_rx = Arc::new(Mutex::new(release_rx));
-        let (reported_tx, reported_rx) = mpsc::channel();
-        let scanner = OrphanedDiskBufferScanner::spawn(
-            move |data_dir| {
-                started_tx.send(data_dir.to_path_buf()).unwrap();
-                release_rx.lock().unwrap().recv().unwrap();
-                Ok(Vec::new())
-            },
-            move |request, _| {
-                reported_tx.send(request.data_dir.clone()).unwrap();
-            },
-        );
-
-        scanner.schedule("first".into(), HashSet::new());
-        assert_eq!(recv(&started_rx), PathBuf::from("first"));
-        scanner.schedule("first".into(), HashSet::from([PathBuf::from("updated")]));
-        scanner.schedule("latest".into(), HashSet::new());
-        release_tx.send(()).unwrap();
-
-        assert_eq!(recv(&started_rx), PathBuf::from("latest"));
-        assert!(reported_rx.try_recv().is_err());
-        release_tx.send(()).unwrap();
-        assert_eq!(recv(&reported_rx), PathBuf::from("latest"));
-        assert!(started_rx.try_recv().is_err());
     }
 
     #[test]
