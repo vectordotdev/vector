@@ -357,9 +357,15 @@ fn compare_intakes(agent_intake: &SeriesIntake, vector_intake: &SeriesIntake) {
 pub(super) async fn validate() {
     let api_version = std::env::var("CONFIG_SERIES_API_VERSION")
         .expect("CONFIG_SERIES_API_VERSION must be set ('v2' or 'v3')");
+    let agent_version = std::env::var("CONFIG_AGENT_VERSION")
+        .expect("CONFIG_AGENT_VERSION must be set ('7.80.4', '7', or '6')");
 
     info!("==== getting series data from agent-only pipeline ==== ");
-    let agent_intake = get_v2_series_from_pipeline(fake_intake_agent_address()).await;
+    let agent_intake = match agent_version.as_str() {
+        "7" => get_v3_series_from_pipeline(fake_intake_agent_address()).await,
+        "7.80.4" | "6" => get_v2_series_from_pipeline(fake_intake_agent_address()).await,
+        version => panic!("Unknown CONFIG_AGENT_VERSION: {version}"),
+    };
 
     info!("==== getting series data from agent-vector pipeline ({api_version}) ====");
     let vector_intake = match api_version.as_str() {

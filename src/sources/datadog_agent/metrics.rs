@@ -1219,6 +1219,9 @@ fn decode_ddseries(
             if !serie.unit.is_empty() {
                 event_metadata.set_datadog_metric_unit(serie.unit.clone());
             }
+            if let Some(api_key) = api_key {
+                event_metadata.set_datadog_api_key(Arc::clone(api_key));
+            }
 
             // It is possible to receive non-rate metrics from the Agent with an interval set.
             // That interval can be applied with the `as_rate` function in the Datadog UI.
@@ -1345,12 +1348,7 @@ fn decode_ddseries(
                 }
             }
         })
-        .map(|mut metric| {
-            if let Some(k) = &api_key {
-                metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
-            }
-            metric.into()
-        })
+        .map(Event::from)
         .collect();
 
     Ok(decoded_metrics)
@@ -1418,6 +1416,10 @@ fn into_vector_metric(
     if let Some(unit) = dd_metric.unit.filter(|unit| !unit.is_empty()) {
         event_metadata.set_datadog_metric_unit(unit);
     }
+    if let Some(api_key) = api_key {
+        event_metadata.set_datadog_api_key(api_key);
+    }
+    event_metadata.set_schema_definition(schema_definition);
 
     if let Some(key) = log_schema().host_key() {
         dd_metric
@@ -1505,17 +1507,7 @@ fn into_vector_metric(
             .collect::<Vec<_>>(),
     }
     .into_iter()
-    .map(|mut metric| {
-        if let Some(k) = &api_key {
-            metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
-        }
-
-        metric
-            .metadata_mut()
-            .set_schema_definition(schema_definition);
-
-        metric.into()
-    })
+    .map(Event::from)
     .collect()
 }
 
