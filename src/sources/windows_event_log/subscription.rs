@@ -660,6 +660,46 @@ impl EventLogSubscription {
                             channel_sub.idle_resubscribes.saturating_add(1);
                         channel_sub.next_resubscribe_at =
                             Some(now + resubscribe_backoff(channel_sub.idle_resubscribes));
+
+                        // Root cause of the idle-channel loop: on a disabled or empty channel
+                        // `EvtNext` answers ERROR_INVALID_OPERATION simply because there is
+                        // nothing to read, and a rebuilt subscription answers the same. Only a
+                        // channel that has records needs the rebuild (the case this branch was
+                        // written for: a healthy channel going silent). The metadata check runs
+                        // at most once per backoff step, so idle hosts see no steady
+                        // EvtOpenLog/EvtGetLogInfo churn.
+                        if code == ERROR_INVALID_OPERATION && !signalled {
+                            let channel = &channel_sub.channel;
+                            let disabled = super::render::channel_enabled(channel) == Some(false);
+                            let empty = !disabled
+                                && super::render::channel_record_count(channel) == Some(0);
+                            let idle_reason = if disabled {
+                                Some("disabled")
+                            } else if empty {
+                                Some("empty")
+                            } else {
+                                None
+                            };
+                            if let Some(reason) = idle_reason {
+                                if channel_sub.idle_resubscribes == 1 {
+                                    info!(
+                                        message = "Channel has nothing to read, keeping the subscription instead of rebuilding it.",
+                                        channel = %channel_sub.channel,
+                                        reason = reason
+                                    );
+                                } else {
+                                    debug!(
+                                        message = "Channel still has nothing to read.",
+                                        channel = %channel_sub.channel,
+                                        reason = reason,
+                                        idle_resubscribes = channel_sub.idle_resubscribes
+                                    );
+                                }
+                                channel_drained = true;
+                                break;
+                            }
+                        }
+
                         // Loud on the first rebuild and then on powers of two, so a channel
                         // that never recovers stays visible without flooding the log.
                         let loud = channel_sub.idle_resubscribes.is_power_of_two();
