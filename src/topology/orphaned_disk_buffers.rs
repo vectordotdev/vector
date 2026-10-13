@@ -234,8 +234,9 @@ fn find_orphaned_disk_buffers(
             continue;
         }
 
-        let entries = match fs::read_dir(&path) {
-            Ok(entries) => entries,
+        let entries = match ignore_not_found(fs::read_dir(&path)) {
+            Ok(Some(entries)) => entries,
+            Ok(None) => continue,
             Err(error) => {
                 warn!(
                     path = path.to_string_lossy().as_ref(),
@@ -265,8 +266,9 @@ fn find_orphaned_disk_buffers(
             else {
                 continue;
             };
-            let metadata = match fs::metadata(&entry_path) {
-                Ok(metadata) => metadata,
+            let metadata = match ignore_not_found(fs::metadata(&entry_path)) {
+                Ok(Some(metadata)) => metadata,
+                Ok(None) => continue,
                 Err(error) => {
                     warn!(
                         path = entry_path.to_string_lossy().as_ref(),
@@ -314,9 +316,9 @@ fn is_disk_buffer_file(path: &Path) -> bool {
 }
 
 fn canonical_path_within_root(path: &Path, canonical_root: &Path) -> Option<PathBuf> {
-    match fs::canonicalize(path) {
-        Ok(path) if path.starts_with(canonical_root) => Some(path),
-        Ok(target) => {
+    match ignore_not_found(fs::canonicalize(path)) {
+        Ok(Some(path)) if path.starts_with(canonical_root) => Some(path),
+        Ok(Some(target)) => {
             warn!(
                 path = path.to_string_lossy().as_ref(),
                 target = target.to_string_lossy().as_ref(),
@@ -324,6 +326,7 @@ fn canonical_path_within_root(path: &Path, canonical_root: &Path) -> Option<Path
             );
             None
         }
+        Ok(None) => None,
         Err(error) => {
             warn!(
                 path = path.to_string_lossy().as_ref(),
@@ -335,11 +338,19 @@ fn canonical_path_within_root(path: &Path, canonical_root: &Path) -> Option<Path
     }
 }
 
+fn ignore_not_found<T>(result: io::Result<T>) -> io::Result<Option<T>> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
         collections::HashSet,
-        fs,
+        fs, io,
         num::NonZeroU64,
         path::PathBuf,
         sync::{
@@ -361,7 +372,7 @@ mod tests {
 
     use super::{
         OrphanedDiskBufferScanner, ScanRequest, disk_buffer_directories,
-        find_orphaned_disk_buffers, report_orphaned_disk_buffers,
+        find_orphaned_disk_buffers, ignore_not_found, report_orphaned_disk_buffers,
     };
 
     #[cfg(feature = "enrichment-tables-memory")]
@@ -657,6 +668,20 @@ mod tests {
         let data_dir = tempdir().unwrap();
         let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
         assert!(actual.is_empty());
+    }
+
+    #[test]
+    fn not_found_is_ignored_without_hiding_other_errors() {
+        assert_eq!(
+            ignore_not_found::<()>(Err(io::ErrorKind::NotFound.into())).unwrap(),
+            None
+        );
+        assert_eq!(
+            ignore_not_found::<()>(Err(io::ErrorKind::PermissionDenied.into()))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::PermissionDenied
+        );
     }
 
     #[test]
