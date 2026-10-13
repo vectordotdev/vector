@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]
 
 use std::{
@@ -32,6 +33,11 @@ fn roundtrip_avro_fixtures(
     roundtrip_avro(path, schema_path, reserialize);
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the existing owned-argument API during the lint rollout."
+)]
 fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
     let schema = load_file(&schema_path);
     let schema = from_utf8(&schema).unwrap().to_string();

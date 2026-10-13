@@ -408,8 +408,9 @@ fn encode_log(
         return Ok(false);
     };
 
-    let Some(message) =
-        message_bytes_mut(event.as_mut_log(), conforms_as_agent).map(|message| message.clone())
+    let Some(message) = message_value_mut(event.as_mut_log(), conforms_as_agent)
+        .and_then(|message| message.as_bytes())
+        .cloned()
     else {
         return Ok(false);
     };
@@ -499,8 +500,8 @@ fn set_truncated_message(
     let mut truncated = Vec::with_capacity(body_len + marker.len());
     truncated.extend_from_slice(&message.as_bytes()[..body_len]);
     truncated.extend_from_slice(marker);
-    *message_bytes_mut(log, conforms_as_agent).expect("the message was previously found") =
-        Bytes::from(truncated);
+    *message_value_mut(log, conforms_as_agent).expect("the message was previously found") =
+        Value::Bytes(Bytes::from(truncated));
 }
 
 fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<usize> {
@@ -531,13 +532,13 @@ fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<u
     })
 }
 
-fn message_bytes_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Bytes> {
+fn message_value_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Value> {
     match log.as_map_mut()?.get_mut(MESSAGE)? {
-        Value::Bytes(message) => Some(message),
-        Value::Object(fields) if conforms_as_agent => match fields.get_mut(MESSAGE)? {
-            Value::Bytes(message) => Some(message),
-            _ => None,
-        },
+        message @ (Value::Bytes(_) | Value::String(_)) => Some(message),
+        Value::Object(fields) if conforms_as_agent => {
+            let message = fields.get_mut(MESSAGE)?;
+            message.is_bytes().then_some(message)
+        }
         _ => None,
     }
 }

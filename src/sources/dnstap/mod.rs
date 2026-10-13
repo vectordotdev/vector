@@ -270,7 +270,7 @@ impl FrameHandler for CommonFrameHandler {
 
     fn handle_event(
         &self,
-        received_from: Option<vrl::prelude::Bytes>,
+        received_from: Option<String>,
         frame: vrl::prelude::Bytes,
     ) -> Option<vector_lib::event::Event> {
         self.bytes_received.emit(ByteSize(frame.len()));

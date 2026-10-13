@@ -19,6 +19,11 @@ use super::{Deserializer, ProtobufDeserializer};
 #[configurable_component]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    reason = "Preserve generated configuration documentation during the lint rollout."
+)]
 pub enum OtlpSignalType {
     /// OTLP logs signal (ExportLogsServiceRequest)
     Logs,
@@ -62,16 +67,19 @@ impl Default for OtlpDeserializerConfig {
 
 impl OtlpDeserializerConfig {
     /// Build the `OtlpDeserializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> OtlpDeserializer {
         OtlpDeserializer::new_with_signals(self.signal_types.clone())
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log | DataType::Trace
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
@@ -118,6 +126,12 @@ impl Default for OtlpDeserializer {
 impl OtlpDeserializer {
     /// Creates a new OTLP deserializer with custom signal support.
     /// During parsing, each signal type is tried in order until one succeeds.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "The codec API panic documentation needs a separate audit."
+    )]
     pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> Self {
         let options = Options {
             use_json_names: true,
@@ -242,7 +256,7 @@ mod tests {
                 scope_logs: vec![ScopeLogs {
                     scope: None,
                     log_records: vec![LogRecord {
-                        time_unix_nano: 1234567890,
+                        time_unix_nano: 1_234_567_890,
                         severity_number: 9,
                         severity_text: "INFO".to_string(),
                         body: None,
@@ -304,8 +318,8 @@ mod tests {
                         flags: 0,
                         name: "test_span".to_string(),
                         kind: 0,
-                        start_time_unix_nano: 1234567890,
-                        end_time_unix_nano: 1234567900,
+                        start_time_unix_nano: 1_234_567_890,
+                        end_time_unix_nano: 1_234_567_900,
                         attributes: vec![],
                         dropped_attributes_count: 0,
                         events: vec![],
@@ -323,6 +337,11 @@ mod tests {
         Bytes::from(request.encode_to_vec())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::similar_names,
+        reason = "Related fixture values retain names that describe their types or encodings."
+    )]
     fn validate_trace_ids(trace: &vrl::value::Value) {
         // Navigate to the span and check traceId and spanId
         let resource_spans = trace

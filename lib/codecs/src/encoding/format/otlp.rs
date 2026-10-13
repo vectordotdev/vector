@@ -21,16 +21,23 @@ pub struct OtlpSerializerConfig {
 
 impl OtlpSerializerConfig {
     /// Build the `OtlpSerializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> Result<OtlpSerializer, crate::encoding::BuildError> {
         OtlpSerializer::new()
     }
 
     /// The data type of events that are accepted by `OtlpSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::all_bits()
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         schema::Requirement::empty()
     }
@@ -63,6 +70,11 @@ pub struct OtlpSerializer {
 
 impl OtlpSerializer {
     /// Creates a new OTLP serializer with the appropriate message descriptors.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn new() -> vector_common::Result<Self> {
         let options = Options {
             use_json_names: true,
@@ -158,7 +170,7 @@ mod tests {
         let mut events: Vec<Event> = request
             .resource_metrics
             .into_iter()
-            .flat_map(|rm| rm.into_event_iter())
+            .flat_map(opentelemetry_proto::proto::metrics::v1::ResourceMetrics::into_event_iter)
             .collect();
 
         assert_eq!(events.len(), 1);
