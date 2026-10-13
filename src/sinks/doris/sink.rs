@@ -76,14 +76,14 @@ where
     }
 }
 
-/// PartitionKey used to partition events by (database, table) pair.
+/// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct DorisPartitionKey {
     pub database: String,
     pub table: String,
 }
 
-/// KeyPartitioner that partitions events by (database, table) pair.
+/// `KeyPartitioner` that partitions events by (database, table) pair.
 struct DorisKeyPartitioner {
     database: ConfinedTemplate,
     table: ConfinedTemplate,

@@ -6,7 +6,10 @@ use sqlx::{
 use std::collections::HashMap;
 use tracing::{info, warn};
 use vector_lib::{
-    codecs::{JsonSerializerConfig, MetricTagValues, encoding::FramingConfig},
+    codecs::{
+        JsonSerializerConfig, MetricTagValues,
+        encoding::{FramingConfig, JsonSerializerOptions},
+    },
     event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent, Value},
 };
 use vrl::event_path;
@@ -16,7 +19,7 @@ use vector_common::sensitive_string::SensitiveString;
 use super::*;
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::util::BatchConfig,
+    sinks::util::{BatchConfig, TowerRequestConfig},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_string, trace_init,
@@ -89,7 +92,7 @@ struct DorisAuth {
 fn config_auth() -> DorisAuth {
     DorisAuth {
         user: "root".to_string(),
-        password: "".to_string(),
+        password: String::new(),
     }
 }
 
@@ -133,7 +136,7 @@ async fn insert_events() {
         log_request: true, // Explicitly enable for integration tests
         encoding: (
             Some(FramingConfig::NewlineDelimited),
-            JsonSerializerConfig::new(MetricTagValues::Full, Default::default()),
+            JsonSerializerConfig::new(MetricTagValues::Full, JsonSerializerOptions::default()),
         )
             .into(),
         headers: default_headers(),
@@ -142,7 +145,7 @@ async fn insert_events() {
             user: config_auth().user,
             password: SensitiveString::from(config_auth().password),
         }),
-        request: Default::default(),
+        request: TowerRequestConfig::default(),
         ..Default::default()
     };
 
@@ -256,7 +259,7 @@ impl DorisTestClient {
             }
             Err(e) => {
                 // Handle specific ignorable errors
-                if self.is_ignorable_error(query, &e) {
+                if Self::is_ignorable_error(query, &e) {
                     warn!(
                         message = "Ignoring expected error for query.",
                         %query,
@@ -272,7 +275,7 @@ impl DorisTestClient {
     }
 
     /// Check if an error can be safely ignored
-    fn is_ignorable_error(&self, query: &str, error: &sqlx::Error) -> bool {
+    fn is_ignorable_error(query: &str, error: &sqlx::Error) -> bool {
         let error_str = error.to_string();
         (query.starts_with("CREATE DATABASE") && error_str.contains("already exists"))
             || (query.starts_with("CREATE TABLE") && error_str.contains("already exists"))
@@ -344,7 +347,7 @@ impl DorisTestClient {
         self.execute_query(&query).await;
     }
 
-    /// Count rows using the common fetch_one pattern
+    /// Count rows using the common `fetch_one` pattern
     async fn count_rows(&self, database: &str, table: &str) -> i64 {
         let query = format!("SELECT COUNT(*) FROM {database}.{table}");
         let row = self.fetch_one_query(&query, "Counting rows").await;
@@ -358,7 +361,7 @@ impl DorisTestClient {
         count
     }
 
-    /// Get column names using the common fetch_all pattern
+    /// Get column names using the common `fetch_all` pattern
     async fn get_column_names(&self, database: &str, table: &str) -> Vec<String> {
         let query = format!(
             "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{database}' AND TABLE_NAME = '{table}' ORDER BY ORDINAL_POSITION"
@@ -368,7 +371,7 @@ impl DorisTestClient {
         rows.iter().map(|row| row.get::<String, _>(0)).collect()
     }
 
-    /// Convert a database row value to DbValue enum
+    /// Convert a database row value to `DbValue` enum
     fn extract_db_value(row: &sqlx::mysql::MySqlRow, column_index: usize) -> DbValue {
         // Try different types in order of preference
         if let Ok(value) = row.try_get::<Option<String>, _>(column_index) {
