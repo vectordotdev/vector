@@ -252,6 +252,7 @@ mod tests {
                         trace_id: vec![],
                         span_id: vec![],
                         observed_time_unix_nano: 0,
+                        event_name: String::new(),
                     }],
                     schema_url: String::new(),
                 }],
