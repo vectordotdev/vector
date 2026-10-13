@@ -15,8 +15,8 @@ fn set_secret(
     key: Value,
     secret: Value,
 ) -> std::result::Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("key must be a string");
-    let secret_str = secret.as_str().expect("secret must be a string");
+    let key_str = key.to_str_lossy().expect("key must be a string");
+    let secret_str = secret.to_str_lossy().expect("secret must be a string");
 
     ctx.target_mut()
         .insert_secret(key_str.as_ref(), secret_str.as_ref());

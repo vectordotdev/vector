@@ -560,7 +560,7 @@ async fn post_with_body() {
     // Verify the body was echoed back correctly
     for log in logs {
         assert_eq!(
-            log.get(event_path!("key")).unwrap().as_str().unwrap(),
+            log.get(event_path!("key")).unwrap().to_str_lossy().unwrap(),
             "value"
         );
         let number = log.get(event_path!("number")).unwrap();
@@ -671,7 +671,10 @@ async fn post_with_vrl_body() {
     // Verify VRL was evaluated correctly
     for log in logs {
         assert_eq!(
-            log.get(event_path!("message")).unwrap().as_str().unwrap(),
+            log.get(event_path!("message"))
+                .unwrap()
+                .to_str_lossy()
+                .unwrap(),
             "HELLO"
         );
         let value = log.get(event_path!("value")).unwrap();
@@ -824,7 +827,7 @@ async fn requests_through_authenticated_proxy() {
                 .into_log()
                 .get(event_path!("data"))
                 .unwrap()
-                .as_str()
+                .to_str_lossy()
                 .unwrap(),
             "foo"
         );
