@@ -79,16 +79,11 @@ where
             continue;
         };
         let result = scan(&request.data_dir);
-        if receiver.has_changed().is_err() {
-            return;
+        match receiver.has_changed() {
+            Err(_) => return,
+            Ok(true) => continue,
+            Ok(false) => report(&request, result),
         }
-        // Reload rejects global option changes, so data_dir is fixed for this scanner. Applying the
-        // completed discovery to the newest request lets reloads share one active traversal.
-        let request = receiver
-            .borrow_and_update()
-            .clone()
-            .expect("scan request cannot be cleared");
-        report(&request, result);
     }
 }
 
@@ -356,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn same_root_requests_share_discovery_and_newest_paths_control_reporting() {
+    fn requests_during_discovery_coalesce_into_one_fresh_scan() {
         let (started_tx, started_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let release_rx = Arc::new(Mutex::new(release_rx));
@@ -387,13 +382,14 @@ mod tests {
         scanner.schedule("data".into(), HashSet::from([candidate.clone()]));
         release_tx.send(()).unwrap();
 
+        assert_eq!(recv(&started_rx), PathBuf::from("data"));
+        assert!(reported_rx.try_recv().is_err());
+        release_tx.send(()).unwrap();
+
         let (configured_paths, orphaned) = recv(&reported_rx);
         assert_eq!(configured_paths, HashSet::from([candidate]));
         assert!(orphaned.is_empty());
-        assert!(matches!(
-            started_rx.recv_timeout(Duration::from_millis(100)),
-            Err(mpsc::RecvTimeoutError::Timeout)
-        ));
+        assert!(started_rx.try_recv().is_err());
     }
 
     #[test]
