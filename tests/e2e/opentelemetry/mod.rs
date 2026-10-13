@@ -159,11 +159,11 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
                 && component_id == "source0"
             {
                 found_metric = true;
-                // Get the counter value
+                // `internal_metrics` emits counters as increments, one per scrape.
                 if let Some(counter) = metric.get("counter")
                     && let Some(value) = counter.get("value").and_then(Value::as_f64)
                 {
-                    total_events = value as u64;
+                    total_events += value as u64;
                 }
             }
         }

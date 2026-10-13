@@ -249,7 +249,6 @@ mod tests {
         time::sleep(time::Duration::from_millis(100)).await;
 
         collect_ready(rx)
-            .await
             .into_iter()
             .map(Event::into_metric)
             .collect()
@@ -451,22 +450,7 @@ mod tests {
         test_util::trace_init();
         counter!(counter_name).increment(10);
 
-        let (tx, rx) = SourceSender::new_test();
-        let source = InternalMetricsConfig::default()
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-
-        counter!(counter_name).increment(5);
-
-        tokio::spawn(source);
-        time::sleep(time::Duration::from_millis(100)).await;
-
-        let metrics = collect_ready(rx)
-            .await
-            .into_iter()
-            .map(Event::into_metric)
-            .collect::<Vec<_>>();
+        let metrics = scrape_once(|| counter!(counter_name).increment(5)).await;
 
         // 5, not the 15 now held by the registry.
         assert_eq!(
