@@ -45,9 +45,9 @@ pub struct DatadogEventsConfig {
 
 impl GenerateConfig for DatadogEventsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_api_key: ${DATADOG_API_KEY_ENV_VAR}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -73,7 +73,7 @@ impl DatadogEventsConfig {
         client: HttpClient,
         validated: &ValidatedEvents,
         endpoint: Uri,
-    ) -> crate::Result<VectorSink> {
+    ) -> VectorSink {
         let service =
             DatadogEventsService::new(endpoint, dd_common.default_api_key.clone(), client);
 
@@ -89,7 +89,7 @@ impl DatadogEventsConfig {
 
         let sink = DatadogEventsSink { service };
 
-        Ok(VectorSink::from_event_streamsink(sink))
+        VectorSink::from_event_streamsink(sink)
     }
 }
 
@@ -143,7 +143,7 @@ impl ValidatedSink for DatadogEventsConfig {
         let dd_common = self.dd_common.with_globals(global)?;
         let healthcheck = dd_common.build_healthcheck(client.clone())?;
         let endpoint = Self::events_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)?;
-        let sink = self.build_sink(&dd_common, client, validated, endpoint)?;
+        let sink = self.build_sink(&dd_common, client, validated, endpoint);
 
         Ok((sink, healthcheck))
     }

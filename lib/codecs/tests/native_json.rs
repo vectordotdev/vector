@@ -1,7 +1,7 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use codecs::{
     NativeJsonDeserializerConfig, NativeJsonSerializerConfig, decoding::format::Deserializer,
     encoding::format::Serializer,
@@ -92,5 +92,35 @@ fn histogram_metric_roundtrip() {
         &mut NativeJsonSerializerConfig.build(),
         &NativeJsonDeserializerConfig::default().build(),
         expected_json_value,
+    );
+}
+
+/// Newer encoders omit `sum` on a histogram that reported no sum. It must still decode, as zero.
+#[test]
+fn histogram_without_sum_decodes_as_zero() {
+    let json = r#"{
+        "metric": {
+            "name": "histogram",
+            "kind": "absolute",
+            "aggregated_histogram": {
+                "buckets": [{"upper_limit": 1.0, "count": 1}],
+                "count": 1
+            }
+        }
+    }"#;
+
+    let events = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(Bytes::from(json), LogNamespace::Vector)
+        .unwrap();
+
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events[0].as_metric().value(),
+        &MetricValue::AggregatedHistogram {
+            buckets: buckets!(1.0 => 1),
+            count: 1,
+            sum: 0.0,
+        }
     );
 }

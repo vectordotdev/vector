@@ -1,4 +1,5 @@
 #![cfg(any(feature = "sinks-datadog_logs", feature = "sinks-datadog_metrics"))]
+#![warn(clippy::pedantic)]
 use bytes::Bytes;
 use http::status::StatusCode;
 
@@ -18,6 +19,11 @@ pub enum ApiStatus {
     BadRequestv2,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 pub fn test_server(
     addr: std::net::SocketAddr,
     api_status: ApiStatus,

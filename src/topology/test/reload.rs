@@ -525,7 +525,7 @@ async fn topology_reload_preserves_enrichment_table_state() {
             let events = events.expect("must get event to output");
             let events = events.into_events().collect::<Vec<_>>();
             assert_eq!(events.len(), 2);
-            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.as_str().is_some_and(|k| k == "message")))
+            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.to_str_lossy().is_some_and(|k| k == "message")))
                 .and_then(|entry| {
                     entry
                         .get("value")
@@ -550,7 +550,7 @@ async fn topology_reload_preserves_enrichment_table_state() {
             let events = events.expect("must get event to output");
             let events = events.into_events().collect::<Vec<_>>();
             assert_eq!(events.len(), 2);
-            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.as_str().is_some_and(|k| k == "message")))
+            let message = events.into_iter().filter_map(|e| e.into_log().value().clone().into_object()).find(|e| e.get("key").is_some_and(|k| k.to_str_lossy().is_some_and(|k| k == "message")))
                 .and_then(|entry| {
                     entry
                         .get("value")
