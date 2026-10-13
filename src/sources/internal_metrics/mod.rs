@@ -44,6 +44,18 @@ pub struct InternalMetricsConfig {
     /// Overrides the default namespace for the metrics emitted by the source.
     #[serde(default = "default_namespace")]
     pub namespace: String,
+
+    /// Emit counters and histograms as incremental metrics holding the change since the previous
+    /// scrape, instead of absolute totals since Vector started. Gauges stay absolute.
+    ///
+    /// Sinks that convert absolute metrics to incremental, such as `datadog_metrics`, drop the
+    /// first value they see for each series, so histograms observed within a single scrape
+    /// interval are never sent. Enabling this option avoids that loss.
+    ///
+    /// Counts start from when the source is built. Sinks that require an interval on incremental
+    /// counters, such as `new_relic`, drop them.
+    #[serde(default)]
+    pub emit_incremental: bool,
 }
 
 impl Default for InternalMetricsConfig {
@@ -52,6 +64,7 @@ impl Default for InternalMetricsConfig {
             scrape_interval_secs: default_scrape_interval(),
             tags: TagsConfig::default(),
             namespace: default_namespace(),
+            emit_incremental: false,
         }
     }
 }
@@ -121,8 +134,11 @@ impl SourceConfig for InternalMetricsConfig {
         // Scrape now so that a source built after Vector has already been running does not report
         // the whole accumulated registry as one enormous first increment. Also covers reloads,
         // which rebuild sources.
-        let mut deltas = DeltaState::default();
-        deltas.seed(controller.capture_metrics());
+        let deltas = self.emit_incremental.then(|| {
+            let mut deltas = DeltaState::default();
+            deltas.seed(controller.capture_metrics());
+            deltas
+        });
 
         Ok(crate::sources::source_with_error(
             InternalMetrics {
@@ -153,7 +169,7 @@ struct InternalMetrics<'a> {
     host_key: OptionalValuePath,
     pid_key: Option<String>,
     controller: &'a Controller,
-    deltas: DeltaState,
+    deltas: Option<DeltaState>,
     interval: time::Duration,
     out: SourceSender,
     shutdown: ShutdownSignal,
@@ -170,7 +186,9 @@ impl InternalMetrics<'_> {
             let pid = std::process::id().to_string();
 
             let mut metrics = self.controller.capture_metrics();
-            self.deltas.convert(&mut metrics);
+            if let Some(deltas) = &mut self.deltas {
+                deltas.convert(&mut metrics);
+            }
 
             let count = metrics.len();
             let byte_size = metrics.size_of();
@@ -231,14 +249,21 @@ mod tests {
         },
     };
 
+    fn incremental_config() -> InternalMetricsConfig {
+        InternalMetricsConfig {
+            emit_incremental: true,
+            ..Default::default()
+        }
+    }
+
     /// Builds and runs the source for a single scrape, letting the caller record metrics in
     /// between so they land after the build-time seed. The default 1s interval fires once
     /// immediately, so exactly one scrape is collected.
-    async fn scrape_once(record: impl FnOnce()) -> Vec<Metric> {
+    async fn scrape_once(config: InternalMetricsConfig, record: impl FnOnce()) -> Vec<Metric> {
         test_util::trace_init();
 
         let (tx, rx) = SourceSender::new_test();
-        let source = InternalMetricsConfig::default()
+        let source = config
             .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
@@ -397,14 +422,14 @@ mod tests {
         assert!(metric.tag_value("pid").is_none());
     }
 
-    /// The scenario from OPA-5040: every observation lands inside a single scrape interval, which
-    /// previously left the sink with only a baseline and nothing to emit.
+    /// Every observation lands inside a single scrape interval. As absolute metrics, a sink
+    /// converting them to increments would only record a baseline and emit nothing.
     #[tokio::test]
     async fn emits_increments_for_counters_and_histograms() {
         let counter_name = CounterName::iter().next().unwrap();
         let histogram_name = HistogramName::iter().next().unwrap();
 
-        let metrics = scrape_once(|| {
+        let metrics = scrape_once(incremental_config(), || {
             counter!(counter_name).increment(3);
             histogram!(histogram_name).record(5.0);
             histogram!(histogram_name).record(6.0);
@@ -427,10 +452,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn absolute_by_default() {
+        let counter_name = CounterName::iter().next().unwrap();
+
+        let metrics = scrape_once(InternalMetricsConfig::default(), || {
+            counter!(counter_name).increment(3);
+        })
+        .await;
+
+        let counter = find(&metrics, counter_name.as_str());
+        assert_eq!(counter.kind(), MetricKind::Absolute);
+        assert_eq!(counter.value(), &MetricValue::Counter { value: 3.0 });
+    }
+
+    #[tokio::test]
     async fn gauges_stay_absolute() {
         let gauge_name = GaugeName::iter().next().unwrap();
 
-        let metrics = scrape_once(|| gauge!(gauge_name).set(2.0)).await;
+        let metrics = scrape_once(incremental_config(), || gauge!(gauge_name).set(2.0)).await;
 
         let gauge = find(&metrics, gauge_name.as_str());
         assert_eq!(gauge.kind(), MetricKind::Absolute);
@@ -447,10 +486,26 @@ mod tests {
     async fn build_time_scrape_excludes_prior_activity() {
         let counter_name = CounterName::iter().next().unwrap();
 
+        // Not `scrape_once`: its `trace_init` clears the registry, which would erase the prior
+        // activity this test relies on.
         test_util::trace_init();
         counter!(counter_name).increment(10);
 
-        let metrics = scrape_once(|| counter!(counter_name).increment(5)).await;
+        let (tx, rx) = SourceSender::new_test();
+        let source = incremental_config()
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        counter!(counter_name).increment(5);
+
+        tokio::spawn(source);
+        time::sleep(time::Duration::from_millis(100)).await;
+
+        let metrics = collect_ready(rx)
+            .into_iter()
+            .map(Event::into_metric)
+            .collect::<Vec<_>>();
 
         // 5, not the 15 now held by the registry.
         assert_eq!(
