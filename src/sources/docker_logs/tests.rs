@@ -584,7 +584,7 @@ mod integration_tests {
                 .iter()
                 .map(|event| {
                     definition.assert_valid_for_event(event);
-                    event.as_log()[&message_key].as_str().unwrap()
+                    event.as_log()[&message_key].to_str_lossy().unwrap()
                 })
                 .unique()
                 .sorted()
