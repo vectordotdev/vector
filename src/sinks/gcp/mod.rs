@@ -118,7 +118,7 @@ pub struct GcpSeries<'a> {
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
+#[expect(
     clippy::ref_option,
     reason = "Serde requires a reference to the field type."
 )]
@@ -144,7 +144,7 @@ where
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
+#[expect(
     clippy::ref_option,
     reason = "Serde requires a reference to the field type."
 )]

@@ -202,7 +202,7 @@ fn labels_examples() -> HashMap<String, String> {
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(
+#[expect(
     clippy::unnecessary_wraps,
     reason = "Serde requires the optional field type."
 )]
