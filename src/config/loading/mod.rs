@@ -8,6 +8,12 @@ pub mod schema_coercion;
 mod secret;
 mod source;
 
+#[cfg(test)]
+mod compatibility_tests;
+
+#[cfg(test)]
+mod metric_tag_tests;
+
 use std::{
     collections::HashMap,
     fmt::Debug,
