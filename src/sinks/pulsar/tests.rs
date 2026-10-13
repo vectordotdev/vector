@@ -18,7 +18,7 @@ fn pulsar_get_headers() {
         .expect("unable to parse OptionalTargetPath");
     let mut property_values = ObjectMap::new();
     property_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
-    property_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
+    property_values.insert("b-key".into(), Value::from("b-value"));
 
     let mut event = Event::Log(LogEvent::from("hello"));
     event

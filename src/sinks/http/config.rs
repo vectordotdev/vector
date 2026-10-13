@@ -14,6 +14,7 @@ use vector_lib::codecs::{
 };
 #[cfg(feature = "aws-core")]
 use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::serde::AsciiChar;
 
 use super::{
     encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
@@ -222,15 +223,15 @@ fn effective_framer_config(encoding: &EncodingConfigWithFraming) -> FramingConfi
     match encoding.config().0 {
         Some(framing) => framing.clone(),
         None => match encoding.config().1 {
-            SerializerConfig::Json(_) => {
-                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(b','))
-            }
+            SerializerConfig::Json(_) => FramingConfig::CharacterDelimited(
+                CharacterDelimitedEncoderConfig::new(AsciiChar::new(',')),
+            ),
             SerializerConfig::Avro { .. } | SerializerConfig::Native => {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
-            SerializerConfig::Gelf(_) => {
-                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
-            }
+            SerializerConfig::Gelf(_) => FramingConfig::CharacterDelimited(
+                CharacterDelimitedEncoderConfig::new(AsciiChar::new('\0')),
+            ),
             SerializerConfig::Protobuf(_) => {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
@@ -261,7 +262,7 @@ pub(super) fn validate_payload_wrapper(
         serde_json::from_str::<serde_json::Value>(&payload),
     ) {
         (SerializerConfig::Json(_), FramingConfig::CharacterDelimited(cfg), Err(_))
-            if cfg.character_delimited.delimiter == b',' =>
+            if cfg.character_delimited.delimiter.as_byte() == b',' =>
         {
             Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into())
         }
@@ -385,7 +386,9 @@ impl ValidatedSink for HttpSinkConfig {
             match (serializer_config, &framer_config) {
                 (RawMessage | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
                 (Json(_), NewlineDelimited) => Some(CONTENT_TYPE_NDJSON.to_owned()),
-                (Json(_), CharacterDelimited(cfg)) if cfg.character_delimited.delimiter == b',' => {
+                (Json(_), CharacterDelimited(cfg))
+                    if cfg.character_delimited.delimiter.as_byte() == b',' =>
+                {
                     Some(CONTENT_TYPE_JSON.to_owned())
                 }
                 #[cfg(feature = "codecs-opentelemetry")]

@@ -18,6 +18,7 @@ use vector_lib::{
     },
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
     finalization::AddBatchNotifier,
+    serde::AsciiChar,
 };
 
 use vrl::event_path;
@@ -175,7 +176,7 @@ fn http_validates_payload_prefix_and_suffix() {
     let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
         // Message-based default for JSON is comma-delimited framing.
         FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
-            b',',
+            AsciiChar::new(','),
         ))
     });
     assert!(
@@ -203,7 +204,7 @@ fn http_validates_payload_prefix_and_suffix_fails_on_invalid_json() {
     let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
         // Message-based default for JSON is comma-delimited framing.
         FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
-            b',',
+            AsciiChar::new(','),
         ))
     });
     assert!(

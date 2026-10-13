@@ -9,6 +9,7 @@ use vector_lib::{
     },
     config::LogNamespace,
     event::Event,
+    serde::AsciiChar,
 };
 use vrl::event_path;
 use warp::{Filter, http::HeaderMap};
@@ -164,7 +165,7 @@ async fn json_decoding_character_delimited() {
         decoding: DeserializerConfig::Json(Default::default()),
         framing: FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
             character_delimited: CharacterDelimitedDecoderOptions {
-                delimiter: b',',
+                delimiter: AsciiChar::new(','),
                 max_length: Some(usize::MAX),
                 oversized_action: Default::default(),
             },

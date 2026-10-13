@@ -109,6 +109,14 @@ components: sources: kubernetes_logs: {
 					options: {}
 				}
 			}
+			"kubernetes.namespace_annotations": {
+				description: "Set of annotations attached to the Namespace."
+				required:    false
+				type: object: {
+					examples: [{"myannotation": "myvalue"}]
+					options: {}
+				}
+			}
 			"kubernetes.pod_ip": {
 				description: "Pod IPv4 address."
 				required:    false
