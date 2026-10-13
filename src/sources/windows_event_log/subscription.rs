@@ -77,6 +77,12 @@ const ERROR_FILE_NOT_FOUND: u32 = 2;
 const ERROR_ACCESS_DENIED: u32 = 5;
 const ERROR_NO_MORE_ITEMS: u32 = 259;
 const ERROR_INVALID_OPERATION: u32 = 4317; // 0x10DD
+/// Returned by `EvtNext` on every pull once the Windows Event Log service (wevtsvc) has been
+/// restarted: all subscription handles of the old service instance are dead for good. Bookmark
+/// handles survive the restart, so rebuilding the subscription from the bookmark resumes without
+/// gap or duplicate (verified on Windows 11 by restarting the EventLog service between EvtNext
+/// calls). Before this was handled, a source went silent until Vector itself was restarted.
+const ERROR_INVALID_HANDLE: u32 = 6;
 const ERROR_EVT_INVALID_QUERY: u32 = 15001; // 0x3A99
 const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 15007; // 0x3A9F
 // Returned by `EvtSubscribe` for direct (analytic/debug) channels, which cannot be
@@ -639,6 +645,7 @@ impl EventLogSubscription {
                     if code == ERROR_EVT_QUERY_RESULT_STALE
                         || code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION
                         || code == ERROR_INVALID_OPERATION
+                        || code == ERROR_INVALID_HANDLE
                     {
                         let now = std::time::Instant::now();
                         let backed_off =
@@ -949,11 +956,11 @@ impl EventLogSubscription {
         // The old handle is deliberately kept open until the replacement exists.
         //
         // Closing it first would leave a closed handle in `channel_sub` whenever
-        // `EvtSubscribe` fails transiently: the next `EvtNext` would then return
-        // ERROR_INVALID_HANDLE, which matches no recovery branch, so the channel would
-        // stay silent forever despite this function logging that it will retry. Keeping
-        // the stale handle means the next pull reproduces the original error code and
-        // routes back into here — that *is* the retry path.
+        // `EvtSubscribe` fails transiently, and `EvtClose` on it later would act on a
+        // handle value that may already be reused. Keeping the stale handle means the
+        // next pull reproduces the original error code and routes back into here — that
+        // *is* the retry path. (ERROR_INVALID_HANDLE itself is now a recovery branch: it is
+        // what every pull returns after the Event Log service restarted.)
         let old_handle = channel_sub.subscription_handle;
 
         let channel_hstring = HSTRING::from(channel_sub.channel.as_str());
