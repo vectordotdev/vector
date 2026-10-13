@@ -127,7 +127,20 @@ jobs:
           cargo-deb: true
           protoc: true
       - name: Build Vector
+        env:
+          # openssl-devel pulls in krb5-devel and keyutils-libs-devel on EL8. The vendored krb5
+          # (`gssapi-vendored`) then links libkeyutils, which makes the vendored Cyrus SASL
+          # configure link check fail, and Cyrus SASL silently drops its GSSAPI plugin.
+          # https://github.com/vectordotdev/vector/issues/26568
+          ac_cv_header_keyutils_h: "no"
         run: make NATIVE=true package-${{ matrix.target }}-all
+      - name: Verify GSSAPI support
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          if ! grep -q gssapiv2_client_plug_init target/${{ matrix.target }}/release/vector; then
+            echo "::error::vector binary for ${{ matrix.target }} is missing the Cyrus SASL GSSAPI plugin"
+            exit 1
+          fi
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
