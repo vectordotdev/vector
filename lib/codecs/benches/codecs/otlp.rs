@@ -168,6 +168,7 @@ fn log_record(body: &str, attributes: Vec<KeyValue>) -> LogRecord {
         flags: 0,
         trace_id: vec![],
         span_id: vec![],
+        event_name: String::new(),
     }
 }
 
