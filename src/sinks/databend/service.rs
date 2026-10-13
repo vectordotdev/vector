@@ -32,16 +32,10 @@ impl RetryLogic for DatabendRetryLogic {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             DatabendError::Response { status, .. } => {
-                match status.as_u16() {
-                    429 => true,
-                    // general server error
-                    500 => true,
-                    // storage doesn't support presign operation
-                    3902 => false,
-                    // fail to parse stage attachment
-                    1046 => false,
-                    _ => false,
-                }
+                // Retry rate limiting and general server errors. Other responses,
+                // including unsupported presigning (3902) and invalid stage
+                // attachments (1046), are not retriable.
+                matches!(status.as_u16(), 429 | 500)
             }
             DatabendError::WithContext(boxed_error, ..) => self.is_retriable_error(boxed_error),
             DatabendError::IO(_) => true,
@@ -129,7 +123,7 @@ impl DatabendService {
             .take(8)
             .map(char::from)
             .collect::<String>();
-        format!("@~/vector/{database}/{}/{now}-{suffix}", self.table,)
+        format!("@~/vector/{database}/{}/{now}-{suffix}", self.table)
     }
 
     pub(crate) async fn insert_with_stage(&self, data: Bytes) -> Result<(), DatabendError> {
