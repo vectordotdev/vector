@@ -198,7 +198,8 @@ jobs:
           wasm-pack build --target web --out-dir public/pkg
 
   test-website:
-    if: ${{ github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'merge_group' && (needs.changes.outputs.website_tests == 'true' || needs.changes.outputs.test-yml == 'true') }}
+    needs: changes
     permissions:
       contents: read
       id-token: write

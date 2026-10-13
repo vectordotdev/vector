@@ -371,7 +371,7 @@ impl FrameStreamReader {
 pub trait FrameHandler {
     fn content_type(&self) -> String;
     fn max_frame_length(&self) -> usize;
-    fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
+    fn handle_event(&self, received_from: Option<String>, frame: Bytes) -> Option<Event>;
     fn multithreaded(&self) -> bool;
     fn max_frame_handling_tasks(&self) -> usize;
     fn host_key(&self) -> &Option<OwnedValuePath>;
@@ -571,7 +571,7 @@ async fn handle_stream(
 
     let span = info_span!("connection");
     span.record("peer_addr", field::debug(&peer_addr));
-    let received_from: Option<Bytes> = Some(peer_addr.to_string().into());
+    let received_from = Some(peer_addr.to_string());
 
     let connection_close_timeout = OptionFuture::from(
         frame_handler
@@ -659,7 +659,7 @@ async fn handle_tcp_frame<T>(
     frame_handler: &mut T,
     frame: Bytes,
     event_sink: &mut SourceSender,
-    received_from: Option<Bytes>,
+    received_from: Option<String>,
     active_parsing_task_nums: Arc<AtomicUsize>,
 ) where
     T: TcpFrameHandler + Send + Sync + Clone + 'static,
@@ -787,8 +787,7 @@ pub fn build_framestream_unix_source(
             } else {
                 None
             };
-            let received_from: Option<Bytes> =
-                path.map(|p| p.to_string_lossy().into_owned().into());
+            let received_from = path.map(|p| p.to_string_lossy().into_owned());
 
             build_framestream_source(
                 frame_handler.clone(),
@@ -825,7 +824,7 @@ pub fn build_framestream_unix_source(
 fn build_framestream_source<T: Send + 'static>(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     socket: impl AsyncRead + AsyncWrite + Send + 'static,
-    received_from: Option<Bytes>,
+    received_from: Option<String>,
     out: SourceSender,
     shutdown: impl Future<Output = T> + Unpin + Send + 'static,
     span: Span,
@@ -898,7 +897,7 @@ async fn spawn_event_handling_tasks(
     event_data: Bytes,
     event_handler: impl FrameHandler + Send + Sync + 'static,
     mut event_sink: SourceSender,
-    received_from: Option<Bytes>,
+    received_from: Option<String>,
     active_task_nums: Arc<AtomicUsize>,
     max_frame_handling_tasks: usize,
 ) -> JoinHandle<()> {
@@ -1067,7 +1066,7 @@ mod test {
             self.max_frame_length
         }
 
-        fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        fn handle_event(&self, received_from: Option<String>, frame: Bytes) -> Option<Event> {
             let mut log_event = LogEvent::from(frame);
 
             log_event.insert(
@@ -1118,7 +1117,7 @@ mod test {
             self.frame_handler.max_frame_length()
         }
 
-        fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        fn handle_event(&self, received_from: Option<String>, frame: Bytes) -> Option<Event> {
             self.frame_handler.handle_event(received_from, frame)
         }
 
@@ -1170,7 +1169,7 @@ mod test {
             self.frame_handler.max_frame_length()
         }
 
-        fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        fn handle_event(&self, received_from: Option<String>, frame: Bytes) -> Option<Event> {
             self.frame_handler.handle_event(received_from, frame)
         }
 

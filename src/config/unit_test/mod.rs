@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 // should match vector-unit-test-tests feature
 #[cfg(all(
     test,
@@ -64,6 +66,8 @@ pub struct UnitTestResult {
 }
 
 impl UnitTest {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
         let (topology, _) = RunningTopology::start_validated(self.config, diff, self.pieces)
@@ -102,6 +106,8 @@ fn init_log_schema_from_paths(
     Ok(())
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
@@ -121,12 +127,14 @@ pub async fn build_unit_tests_main(
     build_unit_tests(config_builder).await
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub async fn build_unit_tests(
     mut config_builder: ConfigBuilder,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     // Sanitize config by removing existing sources and sinks
-    config_builder.sources = Default::default();
-    config_builder.sinks = Default::default();
+    config_builder.sources = IndexMap::default();
+    config_builder.sinks = IndexMap::default();
 
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
@@ -172,6 +180,9 @@ pub struct UnitTestBuildMetadata {
 }
 
 impl UnitTestBuildMetadata {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn initialize(config_builder: &mut ConfigBuilder) -> Result<Self, Vec<String>> {
         // A unique id used to name test sources and sinks to avoid name clashes
         let random_id = Uuid::new_v4().to_string();
@@ -189,7 +200,7 @@ impl UnitTestBuildMetadata {
 
         // Map a test source to every transform
         let mut template_sources = IndexMap::new();
-        for (key, transform) in config_builder.transforms.iter_mut() {
+        for (key, transform) in &mut config_builder.transforms {
             let test_source_id = source_ids
                 .get(key)
                 .expect("Missing test source for a transform")
@@ -235,6 +246,9 @@ impl UnitTestBuildMetadata {
     }
 
     /// Convert test inputs into sources for use in a unit testing topology
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn hydrate_into_sources(
         &self,
         inputs: &[TestInput],
@@ -268,6 +282,9 @@ impl UnitTestBuildMetadata {
     }
 
     /// Convert test outputs into sinks for use in a unit testing topology
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn hydrate_into_sinks(
         &self,
         test_name: &str,
@@ -296,7 +313,7 @@ impl UnitTestBuildMetadata {
             let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
-                transform_ids: ids.iter().map(|id| id.to_string()).collect(),
+                transform_ids: ids.iter().map(std::string::ToString::to_string).collect(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
                 check: UnitTestSinkCheck::Checks {
                     conditions: built.conditions,
@@ -327,7 +344,7 @@ impl UnitTestBuildMetadata {
             .map(|(transform_ids, sink_config)| {
                 let transform_ids_str = transform_ids
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>();
                 let sink_ids = transform_ids
                     .iter()
@@ -446,7 +463,7 @@ async fn build_unit_test(
         config_builder.global.wildcard_matching.unwrap_or_default(),
     )?;
     let valid_outputs = graph.output_map()?;
-    for (_, transform) in config_builder.transforms.iter_mut() {
+    for (_, transform) in &mut config_builder.transforms {
         let inputs = std::mem::take(&mut transform.inputs);
         transform.inputs = inputs
             .into_iter()
@@ -476,7 +493,7 @@ async fn build_unit_test(
 /// consumed but its other outputs are left unconsumed.
 ///
 /// To avoid warning logs that occur when building such topologies, we construct
-/// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
+/// a `NoOp` sink here whose sole purpose is to consume any "loose end" outputs.
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
     let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
@@ -508,7 +525,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
         None
     } else {
         let noop_sink = UnitTestSinkConfig {
-            test_name: "".to_string(),
+            test_name: String::new(),
             transform_ids: vec![],
             result_tx: Arc::new(Mutex::new(None)),
             check: UnitTestSinkCheck::NoOp,
@@ -545,7 +562,7 @@ fn build_and_validate_inputs(
             errors.push(format!(
                 "inputs[{index}]: unable to locate target transform '{}'",
                 input.insert_at
-            ))
+            ));
         }
     }
 
@@ -562,6 +579,11 @@ pub(super) struct BuiltOutput {
     pub(super) conditions: Vec<Vec<Condition>>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Preserve inferred default types"
+)]
 fn build_outputs(
     test_outputs: &[TestOutput],
 ) -> Result<IndexMap<Vec<OutputId>, BuiltOutput>, Vec<String>> {
