@@ -762,7 +762,7 @@ impl RunningTopology {
                         ?new_buffer_dirs,
                         accounted_events = usage.event_count,
                         accounted_bytes = usage.byte_size,
-                        message = "Replacement sink uses a different disk buffer; reload will wait while the previous sink finishes processing remaining accounted data.",
+                        message = "Replacement sink does not use the previous disk buffer. If reload succeeds, its remaining accounted data will be left unreferenced.",
                     );
                 }
             }
