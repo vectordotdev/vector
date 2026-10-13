@@ -2039,10 +2039,10 @@ async fn http_rejections_return_client_error_status_codes() {
     let (status, _) = send_http_request(client.post(&logs_url)).await;
     assert_eq!(status, reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE);
 
+    // Other rejections keep the status code chosen by warp, with a protobuf `Status` body.
     // Only `POST` is routed.
-    let (status, message) = send_http_request(client.get(&logs_url)).await;
+    let (status, _) = send_http_request(client.get(&logs_url)).await;
     assert_eq!(status, reqwest::StatusCode::METHOD_NOT_ALLOWED);
-    assert!(message.contains("POST"), "{message}");
 
     // Unknown paths are not found.
     let (status, _) = send_http_request(
@@ -2053,7 +2053,7 @@ async fn http_rejections_return_client_error_status_codes() {
     .await;
     assert_eq!(status, reqwest::StatusCode::NOT_FOUND);
 
-    // A header value that can't be parsed is a bad request.
+    // A header value that can't be parsed is a bad request, and warp's message is kept.
     let invalid_encoding = reqwest::header::HeaderValue::from_bytes(b"gzip\xff")
         .expect("Header value should be valid.");
     let (status, message) = send_http_request(
