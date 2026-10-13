@@ -34,13 +34,18 @@ dependencies can be installed by running
 
 ## Installation
 
-CI installs vdev from a published binary release via [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) and never builds it from source. To match that locally:
+CI installs the pinned vdev binary via [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)
+when it is available. To match that locally:
 
 ```sh
 ./scripts/environment/prepare.sh --modules=vdev
 ```
 
-This installs the vdev version declared in `vdev/Cargo.toml` by fetching the matching pre-compiled binary from the GitHub release. If no matching release exists yet — e.g. you're on a branch that bumped the version but hasn't been tagged — `prepare.sh` falls back to building vdev from your working tree (`cargo install --path vdev`), which is slower but ensures the installed binary reflects your branch's vdev source.
+This installs the vdev version declared in `vdev/Cargo.toml` by fetching the matching pre-compiled
+binary from `install.datadoghq.com/vector/vdev/<version>/`. If binaries for that version have not
+been published yet — e.g. you're on a branch that bumped the version but hasn't been tagged —
+`prepare.sh` falls back to building vdev from your working tree (`cargo install --path vdev`),
+which is slower but ensures the installed binary reflects your branch's vdev source.
 
 For a quick install of the latest published vdev (not pinned):
 
@@ -84,4 +89,9 @@ Every command group/namespace has its own directory with a `cli` module, includi
 
 ## Releasing vdev
 
-To release a new version of vdev, open a PR that bumps the `version` field in `vdev/Cargo.toml`. When the PR merges to `master`, CI automatically creates the `vdev-vX.Y.Z` tag, which triggers the publish workflow to build the binaries and publish the crate to crates.io.
+To release a new version of vdev, open a PR that bumps the `version` field in `vdev/Cargo.toml`.
+When the PR merges to `master`, CI automatically creates the `vdev-vX.Y.Z` tag, which triggers
+the publish workflow to build the binaries and upload them to the COSE S3 bucket under
+`vector/vdev/<version>/`. After verifying the binaries through
+`install.datadoghq.com/vector/vdev/<version>/`, the workflow publishes the crate to crates.io.
+The version tags do not create GitHub releases.
