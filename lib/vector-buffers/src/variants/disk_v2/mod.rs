@@ -212,12 +212,12 @@ use crate::{
     },
 };
 
-/// An approximate view of unread records in a disk buffer.
+/// An approximate view of unacknowledged records in a disk buffer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DiskBufferUsageSnapshot {
-    /// Number of unread events in the buffer.
+    /// Number of events that have not been acknowledged.
     pub event_count: u64,
-    /// Encoded size of unread records in the buffer.
+    /// Encoded size of records that have not been acknowledged.
     pub byte_size: u64,
 }
 
