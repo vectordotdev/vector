@@ -25,6 +25,14 @@ fn resolve_named_schemas(schema: &apache_avro::Schema) -> Result<NamedSchemas, a
 /// resolve against certain logical type schemas
 /// (e.g. VRL integer (i64) -> Avro `Long` which cannot resolve to Avro `Date`).
 /// This does a recursive pre-pass to coerce such values before resolution.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep recursive schema coercion in one match."
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Time-millis is range checked and Avro union values use u32 indexes."
+)]
 fn coerce_logical_types(
     value: AvroValue,
     schema: &apache_avro::Schema,
@@ -334,6 +342,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep recursive schema cases together in one fixture."
+    )]
     fn coerce_date_fields_recursively() {
         let schema = apache_avro::Schema::parse_str(indoc! {r#"
             {

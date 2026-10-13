@@ -301,7 +301,7 @@ fn generate_avro_test_case_date() -> Result<()> {
 }
 
 fn generate_avro_test_case_named_record_reference() -> Result<()> {
-    let schema = r#"
+    const SCHEMA: &str = r#"
     {
         "type": "record",
         "name": "Outer",
@@ -333,7 +333,7 @@ fn generate_avro_test_case_named_record_reference() -> Result<()> {
         first: Inner { date: 20_000 },
         second: Inner { date: 20_001 },
     };
-    generate_test_case(schema, value, "named_record_reference")
+    generate_test_case(SCHEMA, value, "named_record_reference")
 }
 
 #[allow(unused)]
