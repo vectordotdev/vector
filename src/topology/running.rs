@@ -1714,10 +1714,20 @@ fn register_draining_disk_buffer_sink(
         return Err(task);
     }
     drains.push(DrainingDiskBufferSink {
-        task,
+        task: release_drained_sink_output(task),
         buffer_paths: disk_buffer_directories(config, sink_key),
     });
     Ok(())
+}
+
+// Drops the sink's returned buffer as soon as draining ends so retaining the completed handle does
+// not retain its ledger lock until another reload.
+fn release_drained_sink_output(task: TaskHandle) -> TaskHandle {
+    tokio::spawn(async move {
+        let output = task.await??;
+        drop(output);
+        Ok(TaskOutput::Healthcheck)
+    })
 }
 
 fn sink_buffer(config: &Config, sink_key: &ComponentKey) -> Option<BufferConfig> {
@@ -2062,7 +2072,7 @@ mod disk_buffer_drain_tests {
     }
 
     #[tokio::test]
-    async fn completed_sink_is_reaped_before_reopening_its_disk_buffer() {
+    async fn completed_background_drain_releases_disk_buffer_before_next_reload() {
         let data_dir = tempfile::tempdir().unwrap();
         let data_dir = data_dir.path().to_path_buf();
         let sink_key = ComponentKey::from("readded");
@@ -2070,6 +2080,12 @@ mod disk_buffer_drain_tests {
             max_size: NonZeroU64::new(268_435_488).unwrap(),
             when_full: WhenFull::Block,
         });
+        let mut config = Config::builder();
+        config.global.data_dir = Some(data_dir.clone());
+        config.add_source("in", UnitTestSourceConfig::default());
+        config.add_sink("readded", &["in"], basic_sink(1).1);
+        config.sinks[&sink_key].buffer = buffer.clone();
+        let config = config.build().unwrap();
         let (tx, rx) = buffer
             .build::<EventArray>(
                 Some(data_dir.clone()),
@@ -2082,21 +2098,19 @@ mod disk_buffer_drain_tests {
         let (_, registry) = UtilizationEmitter::new();
         let utilization_sender =
             registry.add_component(sink_key.clone(), gauge!(GaugeName::Utilization));
-        let completed = tokio::spawn(async move {
+        let drain_sink_key = sink_key.clone();
+        let drain = tokio::spawn(async move {
             Ok(TaskOutput::Sink(Utilization::new(
                 utilization_sender,
-                sink_key,
+                drain_sink_key,
                 rx.into_stream(),
             )))
         });
-        while !completed.is_finished() {
+        let mut drains = Vec::new();
+        assert!(register_draining_disk_buffer_sink(&mut drains, drain, &config, &sink_key).is_ok());
+        while !drains[0].task.is_finished() {
             tokio::task::yield_now().await;
         }
-        let buffer_path = data_dir.join("buffer/v2/readded");
-        let mut drains = vec![DrainingDiskBufferSink {
-            task: completed,
-            buffer_paths: vec![buffer_path],
-        }];
 
         assert!(
             buffer
@@ -2106,15 +2120,10 @@ mod disk_buffer_drain_tests {
                     tracing::Span::none(),
                 )
                 .await
-                .is_err()
+                .is_ok()
         );
         resolve_draining_disk_buffer_sinks(&mut drains, HashSet::new()).await;
         assert!(drains.is_empty());
-
-        let reopened = buffer
-            .build::<EventArray>(Some(data_dir), "readded".into(), tracing::Span::none())
-            .await;
-        assert!(reopened.is_ok());
     }
 }
 
