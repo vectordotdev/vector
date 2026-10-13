@@ -85,6 +85,13 @@ mod tests {
     }
 
     #[test]
+    fn service_data_dir_invalid_config_glob_returns_none() {
+        let paths = [config::ConfigPath::File("[".into(), None)];
+        assert!(create_service_arguments(&paths, None).is_none());
+        assert!(create_service_arguments(&paths, Some(Path::new("state"))).is_none());
+    }
+
+    #[test]
     fn service_arguments_leave_unset_data_dir_unchanged() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("vector config.yaml");

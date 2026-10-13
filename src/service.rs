@@ -79,22 +79,22 @@ struct InstallOpts {
 }
 
 impl InstallOpts {
-    fn service_info(&self, data_dir: Option<&Path>) -> ServiceInfo {
+    fn service_info(&self, data_dir: Option<&Path>) -> Option<ServiceInfo> {
         let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
         let display_name = self.display_name.as_deref().unwrap_or("Vector Service");
         let description = crate::built_info::PKG_DESCRIPTION;
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments = create_service_arguments(&config_paths, data_dir).unwrap();
+        let arguments = create_service_arguments(&config_paths, data_dir)?;
 
-        ServiceInfo {
+        Some(ServiceInfo {
             name: OsString::from(service_name),
             display_name: OsString::from(display_name),
             description: OsString::from(description),
             executable_path: current_exe,
             launch_arguments: arguments,
-        }
+        })
     }
 
     fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
@@ -250,7 +250,10 @@ pub fn cmd(opts: &Opts, data_dir: Option<&Path>) -> exitcode::ExitCode {
     match sub_command {
         Some(s) => match s {
             SubCommand::Install(opts) => {
-                control_service(&opts.service_info(data_dir), ControlAction::Install)
+                let Some(service_info) = opts.service_info(data_dir) else {
+                    return exitcode::CONFIG;
+                };
+                control_service(&service_info, ControlAction::Install)
             }
             SubCommand::Uninstall(opts) => {
                 let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
@@ -321,5 +324,32 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
             error!(message = "Error controlling service.", %error);
             exitcode::SOFTWARE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn service_rejects_invalid_config_glob_without_installing() {
+        let opts = Opts::try_parse_from(["service", "install", "--config", "["]).unwrap();
+        let Some(SubCommand::Install(install)) = &opts.sub_command else {
+            panic!("expected install options");
+        };
+        assert!(install.service_info(None).is_none());
+        // Invalid configuration is rejected before the service control manager is contacted.
+        assert_eq!(cmd(&opts, None), exitcode::CONFIG);
+    }
+
+    #[test]
+    fn service_data_dir_rejects_empty_override_without_installing() {
+        let opts = Opts::try_parse_from(["service", "install"]).unwrap();
+        let Some(SubCommand::Install(install)) = &opts.sub_command else {
+            panic!("expected install options");
+        };
+        assert!(install.service_info(Some(Path::new(""))).is_none());
+        // Argument construction fails before the service control manager is contacted.
+        assert_eq!(cmd(&opts, Some(Path::new(""))), exitcode::CONFIG);
     }
 }

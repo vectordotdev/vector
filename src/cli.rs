@@ -596,6 +596,9 @@ pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
 mod tests {
     use std::path::PathBuf;
 
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStringExt;
+
     use clap::Parser;
 
     use super::RootOpts;
@@ -663,6 +666,43 @@ mod tests {
         );
         assert!(String::from_utf8_lossy(&output.stdout).contains("data-dir test completed"));
         true
+    }
+
+    #[test]
+    fn data_dir_rejects_empty_flag() {
+        let error = RootOpts::try_parse_from(["vector", "--data-dir", ""]).unwrap_err();
+        assert_eq!(error.kind(), clap::error::ErrorKind::InvalidValue);
+    }
+
+    #[test]
+    fn data_dir_rejects_empty_environment() {
+        if data_dir_test_in_subprocess("cli::tests::data_dir_rejects_empty_environment", Some("")) {
+            return;
+        }
+        let error = RootOpts::try_parse_from(["vector"]).unwrap_err();
+        assert_eq!(error.kind(), clap::error::ErrorKind::InvalidValue);
+        let opts = RootOpts::try_parse_from(["vector", "--data-dir", "flag-state"]).unwrap();
+        assert_eq!(opts.data_dir, Some(PathBuf::from("flag-state")));
+        #[allow(
+            clippy::print_stdout,
+            reason = "The parent verifies that the isolated test actually ran."
+        )]
+        {
+            println!("data-dir test completed");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn data_dir_parser_preserves_non_unicode_path() {
+        let path = std::ffi::OsString::from_vec(b"state-\xff".to_vec());
+        let opts = RootOpts::try_parse_from([
+            std::ffi::OsString::from("vector"),
+            std::ffi::OsString::from("--data-dir"),
+            path.clone(),
+        ])
+        .unwrap();
+        assert_eq!(opts.data_dir, Some(PathBuf::from(path)));
     }
 
     #[test]
