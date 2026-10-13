@@ -801,7 +801,7 @@ impl RunningTopology {
             let previous = self.tasks.remove(key).unwrap();
             if wait_for_sinks.contains(key) {
                 debug!(message = "Waiting for sink to shutdown.", component_id = %key);
-                previous.await.unwrap().unwrap();
+                release_sink_output(previous.await.unwrap().unwrap()).await;
             } else {
                 if let Err(previous) = register_draining_disk_buffer_sink(
                     &mut self.draining_disk_buffer_sinks,
@@ -836,6 +836,8 @@ impl RunningTopology {
                     };
 
                     buffers.insert((*key).clone(), (tx, Arc::new(Mutex::new(Some(rx)))));
+                } else {
+                    release_sink_output(buffer).await;
                 }
             }
         }
@@ -1724,10 +1726,15 @@ fn register_draining_disk_buffer_sink(
 // not retain its ledger lock until another reload.
 fn release_drained_sink_output(task: TaskHandle) -> TaskHandle {
     tokio::spawn(async move {
-        let output = task.await??;
-        drop(output);
+        release_sink_output(task.await??).await;
         Ok(TaskOutput::Healthcheck)
     })
+}
+
+async fn release_sink_output(output: TaskOutput) {
+    if let TaskOutput::Sink(input) = output {
+        input.into_inner().close().await;
+    }
 }
 
 fn sink_buffer(config: &Config, sink_key: &ComponentKey) -> Option<BufferConfig> {

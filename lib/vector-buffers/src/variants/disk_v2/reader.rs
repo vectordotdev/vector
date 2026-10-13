@@ -437,6 +437,7 @@ where
     record_acks: OrderedAcknowledgements<u64, u64>,
     data_file_acks: OrderedAcknowledgements<u64, ()>,
     finalizer: OrderedFinalizer<u64>,
+    finalizer_task: Option<tokio::task::JoinHandle<()>>,
     _t: PhantomData<T>,
 }
 
@@ -447,7 +448,11 @@ where
     FS::File: Unpin,
 {
     /// Creates a new [`BufferReader`] attached to the given [`Ledger`].
-    pub(crate) fn new(ledger: Arc<Ledger<FS>>, finalizer: OrderedFinalizer<u64>) -> Self {
+    pub(crate) fn new(
+        ledger: Arc<Ledger<FS>>,
+        finalizer: OrderedFinalizer<u64>,
+        finalizer_task: Option<tokio::task::JoinHandle<()>>,
+    ) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id + 1;
 
@@ -464,8 +469,13 @@ where
             record_acks: OrderedAcknowledgements::from_acked(next_expected_record_id),
             data_file_acks: OrderedAcknowledgements::from_acked(0),
             finalizer,
+            finalizer_task,
             _t: PhantomData,
         }
+    }
+
+    pub(crate) fn take_finalizer_task(&mut self) -> Option<tokio::task::JoinHandle<()>> {
+        self.finalizer_task.take()
     }
 
     pub(super) fn ledger(&self) -> &Ledger<FS> {

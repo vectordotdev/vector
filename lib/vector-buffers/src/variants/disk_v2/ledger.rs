@@ -857,15 +857,17 @@ where
     }
 
     #[must_use]
-    pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
+    pub(super) fn spawn_finalizer(
+        self: Arc<Self>,
+    ) -> (OrderedFinalizer<u64>, tokio::task::JoinHandle<()>) {
         let (finalizer, mut stream) = OrderedFinalizer::new(None);
-        vector_common::spawn_in_current_span(async move {
+        let task = vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);
                 self.notify_writer_waiters();
             }
         });
-        finalizer
+        (finalizer, task)
     }
 
     pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>)

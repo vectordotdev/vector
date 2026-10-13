@@ -775,7 +775,7 @@ mod tests {
                 .expect("ledger should not fail to load/create");
             let ledger = Arc::new(ledger);
             let (finalizer, _finalizer_stream) = OrderedFinalizer::new(None);
-            let reader = BufferReader::new(Arc::clone(&ledger), finalizer);
+            let reader = BufferReader::new(Arc::clone(&ledger), finalizer, None);
 
             Self { reader, ledger }
         }

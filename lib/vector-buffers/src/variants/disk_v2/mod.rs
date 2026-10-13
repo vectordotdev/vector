@@ -269,9 +269,9 @@ where
             .await
             .context(WriterSeekFailedSnafu)?;
 
-        let finalizer = Arc::clone(&ledger).spawn_finalizer();
+        let (finalizer, finalizer_task) = Arc::clone(&ledger).spawn_finalizer();
 
-        let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
+        let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer, Some(finalizer_task));
         let mut unread_buffer_size = reader
             .reconcile_checkpoint_window()
             .await

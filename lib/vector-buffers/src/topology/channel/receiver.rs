@@ -6,7 +6,7 @@ use std::{
 
 use async_recursion::async_recursion;
 use futures::Stream;
-use tokio::select;
+use tokio::{select, task::JoinHandle};
 use tokio_util::sync::ReusableBoxFuture;
 use vector_common::internal_event::emit;
 
@@ -60,6 +60,13 @@ where
                     },
                 }
             },
+        }
+    }
+
+    fn take_finalizer_task(&mut self) -> Option<JoinHandle<()>> {
+        match self {
+            Self::InMemory(_) => None,
+            Self::DiskV2(reader) => reader.take_finalizer_task(),
         }
     }
 }
@@ -152,8 +159,17 @@ impl<T: Bufferable> BufferReceiver<T> {
         Some(item)
     }
 
-    pub fn into_stream(self) -> BufferReceiverStream<T> {
-        BufferReceiverStream::new(self)
+    pub fn into_stream(mut self) -> BufferReceiverStream<T> {
+        let mut finalizer_tasks = Vec::new();
+        self.take_finalizer_tasks(&mut finalizer_tasks);
+        BufferReceiverStream::new(self, finalizer_tasks)
+    }
+
+    fn take_finalizer_tasks(&mut self, tasks: &mut Vec<JoinHandle<()>>) {
+        tasks.extend(self.base.take_finalizer_task());
+        if let Some(overflow) = self.overflow.as_mut() {
+            overflow.take_finalizer_tasks(tasks);
+        }
     }
 }
 
@@ -167,13 +183,27 @@ enum StreamState<T: Bufferable> {
 pub struct BufferReceiverStream<T: Bufferable> {
     state: StreamState<T>,
     recv_fut: ReusableBoxFuture<'static, (Option<T>, BufferReceiver<T>)>,
+    finalizer_tasks: Vec<JoinHandle<()>>,
 }
 
 impl<T: Bufferable> BufferReceiverStream<T> {
-    pub fn new(receiver: BufferReceiver<T>) -> Self {
+    fn new(receiver: BufferReceiver<T>, finalizer_tasks: Vec<JoinHandle<()>>) -> Self {
         Self {
             state: StreamState::Idle(receiver),
             recv_fut: ReusableBoxFuture::new(make_recv_future(None)),
+            finalizer_tasks,
+        }
+    }
+
+    /// Closes the receiver and waits for disk-buffer acknowledgements to release their ledgers.
+    pub async fn close(mut self) {
+        let finalizer_tasks = mem::take(&mut self.finalizer_tasks);
+        drop(self);
+
+        for task in finalizer_tasks {
+            if let Err(error) = task.await {
+                error!(%error, message = "Disk buffer finalizer task failed.");
+            }
         }
     }
 }
