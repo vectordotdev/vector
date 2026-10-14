@@ -48,7 +48,7 @@ impl NatsHeaderConfig {
     }
 }
 
-/// Configuration for sending messages using NATS `JetStream`.
+/// Configuration for sending messages using NATS JetStream.
 #[configurable_component]
 #[serde_with::serde_as]
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -133,7 +133,7 @@ pub struct NatsSinkConfig {
 
     /// Send messages using [Jetstream][jetstream].
     ///
-    /// If set, the `subject` must belong to an existing `JetStream` stream.
+    /// If set, the `subject` must belong to an existing JetStream stream.
     ///
     /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
     #[serde(
