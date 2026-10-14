@@ -53,8 +53,8 @@ async fn redis_sink_sentinel_reaches_primary() {
         },
         sentinel_service: Some("vector".to_owned()),
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     let mut redis_connection = cnf.build_connection().await.unwrap();
@@ -99,8 +99,8 @@ async fn redis_sink_sentinel_rpush() {
         },
         sentinel_service: Some("vector".to_owned()),
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
@@ -174,8 +174,8 @@ async fn redis_sink_list_lpush() {
         },
         sentinel_service: None,
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
@@ -249,8 +249,8 @@ async fn redis_sink_list_rpush() {
         },
         sentinel_service: None,
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
@@ -325,8 +325,8 @@ async fn redis_sink_sorted_set_zadd() {
         },
         sentinel_service: None,
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     let mut events: Vec<Event> = Vec::new();
@@ -417,8 +417,8 @@ async fn redis_sink_channel() {
         },
         sentinel_service: None,
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     // Publish events.
@@ -496,8 +496,8 @@ async fn redis_sink_channel_data_volume_tags() {
         },
         sentinel_service: None,
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     // Publish events.
@@ -549,8 +549,8 @@ async fn redis_sink_metrics() {
         },
         sentinel_service: None,
         sentinel_connect: None,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     };
 
     // Create a mix of counter and gauge metrics
@@ -561,14 +561,18 @@ async fn redis_sink_metrics() {
             Metric::new(
                 format!("counter_{i}"),
                 MetricKind::Absolute,
-                MetricValue::Counter { value: i as f64 },
+                MetricValue::Counter {
+                    value: f64::from(u32::try_from(i).expect("test index fits in u32")),
+                },
             )
         } else {
             // Gauge metrics
             Metric::new(
                 format!("gauge_{i}"),
                 MetricKind::Absolute,
-                MetricValue::Gauge { value: i as f64 },
+                MetricValue::Gauge {
+                    value: f64::from(u32::try_from(i).expect("test index fits in u32")),
+                },
             )
         };
         events.push(metric.into());
@@ -616,12 +620,18 @@ async fn redis_sink_metrics() {
             // Counter metrics
             assert_eq!(json["name"], format!("counter_{i}"));
             assert_eq!(json["kind"], "absolute");
-            assert_eq!(json["counter"]["value"], i as f64);
+            assert_eq!(
+                json["counter"]["value"],
+                f64::from(u32::try_from(i).expect("test index fits in u32"))
+            );
         } else {
             // Gauge metrics
             assert_eq!(json["name"], format!("gauge_{i}"));
             assert_eq!(json["kind"], "absolute");
-            assert_eq!(json["gauge"]["value"], i as f64);
+            assert_eq!(
+                json["gauge"]["value"],
+                f64::from(u32::try_from(i).expect("test index fits in u32"))
+            );
         }
 
         // Verify that the name matches what we expect
@@ -651,8 +661,8 @@ async fn redis_sink_traces() {
             request: TowerRequestConfig::default(),
             sentinel_service: None,
             sentinel_connect: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            confinement: crate::template::ConfinementConfig::default(),
         };
 
         // Build the sink
