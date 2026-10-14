@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     io::Error as IoError,
     marker::Unpin,
@@ -107,7 +109,7 @@ where
     T: AsyncWrite + Unpin,
 {
     fn drop(self: Pin<&mut Self>) {
-        self.get_mut().state.ack(EventStatus::Dropped)
+        self.get_mut().state.ack(EventStatus::Dropped);
     }
 }
 
@@ -161,7 +163,7 @@ where
             inner, cx
         ));
         self.as_mut().get_mut().state.ack(match result {
-            Ok(_) => EventStatus::Delivered,
+            Ok(()) => EventStatus::Delivered,
             Err(_) => EventStatus::Errored,
         });
         Poll::Ready(result)
