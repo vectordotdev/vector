@@ -10,10 +10,7 @@ use futures::{FutureExt, future::BoxFuture};
 use pin_project::pin_project;
 use snafu::Snafu;
 use tokio::task::JoinError;
-use vector_lib::{
-    buffers::topology::channel::BufferReceiverStream, event::EventArray, sink::SinkError,
-    source::SourceError,
-};
+use vector_lib::{buffers::topology::channel::BufferReceiverStream, event::EventArray};
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
@@ -32,8 +29,6 @@ pub(crate) enum TaskError {
     Cancelled,
     #[snafu(display("the task panicked and was aborted"))]
     Panicked { panic: String },
-    #[snafu(display("the task completed with an error"))]
-    Opaque,
     #[snafu(display("{}", source))]
     Wrapped { source: crate::Error },
 }
@@ -54,21 +49,9 @@ impl TaskError {
     }
 }
 
-impl From<SourceError> for TaskError {
-    fn from(error: SourceError) -> Self {
-        match error {
-            SourceError::Opaque => Self::Opaque,
-            SourceError::Detailed(error) => Self::wrapped(error),
-        }
-    }
-}
-
-impl From<SinkError> for TaskError {
-    fn from(error: SinkError) -> Self {
-        match error {
-            SinkError::Opaque => Self::Opaque,
-            SinkError::Detailed(error) => Self::wrapped(error),
-        }
+impl From<crate::Error> for TaskError {
+    fn from(error: crate::Error) -> Self {
+        Self::wrapped(error)
     }
 }
 

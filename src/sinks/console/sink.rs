@@ -118,15 +118,12 @@ mod test {
             .await
             .expect_err("writing to a closed pipe should fail");
 
-        match error {
-            SinkError::Detailed(error) => assert_eq!(
-                error
-                    .downcast_ref::<io::Error>()
-                    .expect("the sink should retain the I/O error")
-                    .kind(),
-                io::ErrorKind::BrokenPipe
-            ),
-            SinkError::Opaque => panic!("the sink should retain the I/O error"),
-        }
+        assert_eq!(
+            error
+                .downcast_ref::<io::Error>()
+                .expect("the sink should retain the I/O error")
+                .kind(),
+            io::ErrorKind::BrokenPipe
+        );
     }
 }

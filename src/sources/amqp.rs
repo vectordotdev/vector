@@ -320,9 +320,7 @@ async fn receive_event(
     msg: Delivery,
 ) -> Result<(), crate::sources::SourceError> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let decoder = config
-        .decoder(log_namespace)
-        .map_err(crate::sources::SourceError::Detailed)?;
+    let decoder = config.decoder(log_namespace)?;
     let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message

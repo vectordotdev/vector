@@ -428,7 +428,7 @@ pub fn build_framestream_tcp_source(
                 mode: SocketMode::Tcp,
                 error: &error,
             });
-            crate::sources::SourceError::Detailed(error)
+            crate::sources::SourceError::from(error)
         })?;
 
         info!(

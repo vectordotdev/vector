@@ -62,7 +62,7 @@ impl SourceConfig for TripwireSourceConfig {
             )
             .map(|_| drop(out))
             .unit_error()
-            .map(|result| result.map_err(|_| crate::sources::SourceError::Opaque)),
+            .map(|result| result.map_err(|_| "the task completed with an error".into())),
         ))
     }
 

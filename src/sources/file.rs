@@ -484,7 +484,9 @@ pub fn file_source(
             message = "`include` configuration option must contain at least one file pattern.",
             internal_log_rate_limit = false
         );
-        return Box::pin(future::ready(Err(super::SourceError::Opaque)));
+        return Box::pin(future::ready(
+            Err("the task completed with an error".into()),
+        ));
     }
 
     let exclude_patterns = config

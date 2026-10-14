@@ -419,7 +419,7 @@ pub fn udp(
             Err(_) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Err(super::SourceError::Opaque)
+                Err("the task completed with an error".into())
             }
         }
     })

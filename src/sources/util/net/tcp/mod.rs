@@ -149,7 +149,7 @@ where
                         mode: SocketMode::Tcp,
                         error: &error,
                     });
-                    SourceError::Detailed(error)
+                    SourceError::from(error)
                 })?;
 
             info!(

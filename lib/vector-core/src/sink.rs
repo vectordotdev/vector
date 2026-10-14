@@ -8,22 +8,7 @@ use futures::{
 use crate::event::{Event, EventArray, EventContainer, into_event_stream};
 
 /// Error returned by a running sink.
-#[derive(Debug)]
-pub enum SinkError {
-    /// The sink did not retain its failure reason.
-    Opaque,
-    /// The error that stopped the sink.
-    Detailed(vector_common::Error),
-}
-
-impl<E> From<E> for SinkError
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn from(error: E) -> Self {
-        Self::Detailed(Box::new(error))
-    }
-}
+pub type SinkError = vector_common::Error;
 
 pub enum VectorSink {
     Sink(Box<dyn Sink<EventArray, Error = ()> + Send + Unpin>),
@@ -42,7 +27,7 @@ impl VectorSink {
                 .map(Ok)
                 .forward(sink)
                 .await
-                .map_err(|()| SinkError::Opaque),
+                .map_err(|()| "the task completed with an error".into()),
             Self::Stream(s) => s.run(Box::pin(input)).await,
         }
     }
@@ -144,7 +129,10 @@ where
         self: Box<Self>,
         input: stream::BoxStream<'_, EventArray>,
     ) -> Result<(), SinkError> {
-        self.sink.run(input).await.map_err(|()| SinkError::Opaque)
+        self.sink
+            .run(input)
+            .await
+            .map_err(|()| "the task completed with an error".into())
     }
 }
 
