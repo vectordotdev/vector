@@ -67,7 +67,7 @@ impl Default for HttpConfig {
             request: RequestConfig::default(),
             poll_interval_secs: 30,
             tls_options: None,
-            proxy: Default::default(),
+            proxy: ProxyConfig::default(),
             config_format: Format::default(),
             interpolate_env: false,
         }
@@ -90,7 +90,7 @@ async fn http_request(
 
     // Augment with headers. These may be required e.g. for authentication to
     // private endpoints.
-    for (header, value) in headers.iter() {
+    for (header, value) in headers {
         builder = builder.header(header.as_str(), value.as_str());
     }
 
@@ -184,7 +184,7 @@ fn poll_http(
             match http_request_to_config_builder(&url, tls_options.as_ref(), &headers, &proxy, &config_format, interpolate_env).await {
                 Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
                 Err(_) => {},
-            };
+            }
 
             info!(
                 message = "HTTP provider is waiting.",

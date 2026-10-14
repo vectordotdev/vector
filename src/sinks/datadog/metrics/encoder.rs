@@ -492,6 +492,11 @@ fn get_series_payload_series_field_number() -> u32 {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn sketch_to_proto_message(
     metric: &Metric,
     ddsketch: &AgentDDSketch,
@@ -512,7 +517,7 @@ fn sketch_to_proto_message(
         .unwrap_or_default();
     let tags = encode_tags(&tags);
 
-    let cnt = ddsketch.count() as i64;
+    let cnt = i64::from(ddsketch.count());
     let min = ddsketch
         .min()
         .expect("min should be present for non-empty sketch");
@@ -638,6 +643,15 @@ pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> Seri
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn series_to_proto_message(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
@@ -721,7 +735,7 @@ fn series_to_proto_message(
         points,
         r#type: metric_type.into(),
         // unit is omitted
-        unit: "".to_string(),
+        unit: String::new(),
         source_type_name,
         interval: maybe_interval.map_or(0, |interval| i64::from(interval.whole_secs)),
         metadata,
@@ -729,6 +743,11 @@ fn series_to_proto_message(
 }
 
 // Manually write the field tag and then encode the Message payload directly as a length-delimited message.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn encode_proto_key_and_message<T, B>(msg: T, tag: u32, buf: &mut B) -> Result<(), EncoderError>
 where
     T: prost::Message,
@@ -740,11 +759,16 @@ where
         .map_err(|_| EncoderError::ProtoEncodingFailed)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
     encode_namespace(
         metric
             .namespace()
-            .or_else(|| default_namespace.as_ref().map(|s| s.as_ref())),
+            .or_else(|| default_namespace.as_ref().map(std::convert::AsRef::as_ref)),
         '.',
         metric.name(),
     )
@@ -947,10 +971,15 @@ mod tests {
 
     /// Compresses `n` bytes of high-entropy (worst-case for compression) data and returns the
     /// total output size after `finish()`.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn total_compressed_len(n: usize) -> usize {
         // Xorshift64 — period 2^64-1, passes BigCrush, produces statistically random bytes
         // that zstd cannot compress significantly.
-        let mut state = 0xdeadbeef_cafebabe_u64;
+        let mut state = 0xdead_beef_cafe_babe_u64;
         let data: Vec<u8> = (0..n)
             .map(|_| {
                 state ^= state << 13;
@@ -1017,6 +1046,11 @@ mod tests {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     fn encode_sketches_normal<B>(
         metrics: &[Metric],
         default_namespace: &Option<Arc<str>>,
@@ -1047,7 +1081,7 @@ mod tests {
         };
 
         // Now try encoding this sketch payload, and then try to compress it.
-        sketch_payload.encode(buf).unwrap()
+        sketch_payload.encode(buf).unwrap();
     }
 
     #[test]
@@ -1067,7 +1101,7 @@ mod tests {
     #[test]
     fn test_encode_timestamp() {
         assert_eq!(encode_timestamp(None), Utc::now().timestamp());
-        assert_eq!(encode_timestamp(Some(ts())), 1542182950);
+        assert_eq!(encode_timestamp(Some(ts())), 1_542_182_950);
     }
 
     #[test]
@@ -1199,6 +1233,11 @@ mod tests {
         ));
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "The encoder must preserve this deterministic rate value exactly."
+    )]
     #[test]
     fn encode_counter_with_interval_as_rate() {
         // When a counter explicitly has an interval, we need to encode it as a rate. This means
@@ -1209,7 +1248,7 @@ mod tests {
         let value = 423.1331;
         let interval_ms = 10000;
         let rate_counter = get_simple_rate_counter(value, interval_ms);
-        let expected_value = value / (interval_ms / 1000) as f64;
+        let expected_value = value / f64::from(interval_ms / 1000);
         let expected_interval = interval_ms / 1000;
 
         // series v2
@@ -1222,12 +1261,13 @@ mod tests {
             )
             .unwrap();
             assert_eq!(series_proto.r#type, 2);
-            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.interval, i64::from(expected_interval));
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
     #[test]
     fn series_interval_rounds_wire_field_and_keeps_exact_seconds() {
         let cases = [
@@ -1253,6 +1293,10 @@ mod tests {
         assert_eq!(series_interval(&get_simple_counter()), None);
     }
 
+    #[expect(
+        clippy::float_cmp,
+        reason = "The encoder must produce these exactly representable rate values exactly."
+    )]
     #[test]
     fn encode_counter_with_fractional_second_interval_as_rate() {
         for (value, interval_ms, expected_value, expected_interval) in
@@ -1278,6 +1322,10 @@ mod tests {
         }
     }
 
+    #[expect(
+        clippy::float_cmp,
+        reason = "The encoder must preserve this gauge value exactly."
+    )]
     #[test]
     fn encode_non_rate_metric_with_interval() {
         // It is possible that the Agent sends Gauges with an interval set. This
@@ -1308,7 +1356,7 @@ mod tests {
             )
             .unwrap();
             assert_eq!(series_proto.r#type, 3);
-            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.interval, i64::from(expected_interval));
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
         }
@@ -1686,6 +1734,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn zstd_v2_payload_never_exceeds_512kb_with_incompressible_data() {
         // End-to-end regression test using the real 512 KB compressed limit.
         //
@@ -1711,7 +1764,7 @@ mod tests {
         const PRINTABLE_START: u8 = 0x21;
         const PRINTABLE_END: u8 = 0x7E;
         const PRINTABLE_LEN: u64 = (PRINTABLE_END - PRINTABLE_START + 1) as u64; // 93
-        let mut xor_state = 0xdeadbeef_cafebabe_u64;
+        let mut xor_state = 0xdead_beef_cafe_babe_u64;
         let mut next_name = || -> String {
             std::iter::once('m')
                 .chain((0..4999).map(|_| {
@@ -1804,7 +1857,7 @@ mod tests {
                 format!("counter_{i:0>20}"),
                 MetricKind::Incremental,
                 MetricValue::Counter {
-                    value: (i + 1) as f64,
+                    value: f64::from(i + 1),
                 },
             )
             .with_timestamp(Some(ts()));
@@ -1835,6 +1888,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn zstd_buffered_bound_resets_to_last_metric_size_after_block_flush() {
         // White-box test: directly verifies that buffered_bound resets to exactly n (the last
         // metric's encoded size) when a zstd block flush occurs, not to 0 or some other value.
@@ -1965,7 +2023,7 @@ mod tests {
 
                 // V2 uses zstd.
                 let result = CappedDecoder::zstd(&payload[..])
-                    .and_then(|decoder| decoder.decompress())
+                    .and_then(vector_common::decompression::CappedDecoder::decompress)
                     .map(Bytes::from);
                 prop_assert!(result.is_ok());
 

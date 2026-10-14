@@ -33,7 +33,7 @@ pub(super) struct PartitionKey {
     pub pipeline_version: Option<String>,
 }
 
-/// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
+/// `KeyPartitioner` that partitions events by (dbname, table, `pipeline_name`, `pipeline_version`) pair.
 pub(super) struct KeyPartitioner {
     dbname: ConfinedTemplate,
     table: ConfinedTemplate,
@@ -129,7 +129,7 @@ fn prepare_log_ingester_url(
     db: &str,
     table: &str,
     metadata: &PartitionKey,
-    extra_params: &Option<HashMap<String, String>>,
+    extra_params: Option<&HashMap<String, String>>,
 ) -> String {
     let path = endpoint
         .append_path("/v1/events/logs")
@@ -146,8 +146,8 @@ fn prepare_log_ingester_url(
         url_builder.append_pair("pipeline_version", pipeline_version);
     }
 
-    if let Some(extra_params) = extra_params.as_ref() {
-        for (key, value) in extra_params.iter() {
+    if let Some(extra_params) = extra_params {
+        for (key, value) in extra_params {
             url_builder.append_pair(key, value);
         }
     }
@@ -162,8 +162,13 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
         let db = metadata.dbname.clone();
 
         // prepare url
-        let url =
-            prepare_log_ingester_url(&self.endpoint, &db, &table, metadata, &self.extra_params);
+        let url = prepare_log_ingester_url(
+            &self.endpoint,
+            &db,
+            &table,
+            metadata,
+            self.extra_params.as_ref(),
+        );
 
         // prepare body
         let payload = request.take_payload();
@@ -173,7 +178,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             .header(CONTENT_LENGTH, payload.len());
 
         if let Some(extra_headers) = self.extra_headers.as_ref() {
-            for (key, value) in extra_headers.iter() {
+            for (key, value) in extra_headers {
                 builder = builder.header(key, value);
             }
         }
@@ -290,7 +295,7 @@ mod tests {
                 .collect(),
         );
 
-        let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, &extra_params);
+        let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, extra_params.as_ref());
         let url = url::Url::parse(&url).unwrap();
         assert_eq!(
             url.path(),

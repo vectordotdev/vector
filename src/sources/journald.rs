@@ -874,7 +874,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
 
     let timestamp = timestamp_value
         .filter(|&ts| ts.is_bytes())
-        .and_then(|ts| ts.as_str().unwrap().parse::<u64>().ok())
+        .and_then(|ts| ts.to_str_lossy().unwrap().parse::<u64>().ok())
         .map(|ts| {
             chrono::Utc
                 .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)
@@ -916,7 +916,7 @@ fn create_log_event_from_record(
         LogNamespace::Vector => {
             let message_value = record
                 .remove(MESSAGE)
-                .map(|msg| Value::Bytes(Bytes::from(msg)))
+                .map(Value::from)
                 .unwrap_or(Value::Null);
 
             let mut log = LogEvent::from(message_value).with_batch_notifier_option(batch);

@@ -68,7 +68,7 @@ pub struct TraceApiRequest {
 impl TraceApiRequest {
     pub fn into_http_request(self) -> http::Result<Request<Body>> {
         let mut request = Request::post(self.uri);
-        for (k, v) in self.headers.iter() {
+        for (k, v) in &self.headers {
             request = request.header(k, v);
         }
         request.body(Body::from(self.body))

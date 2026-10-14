@@ -83,6 +83,7 @@ fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
                     observed_time_unix_nano: 2,
                     severity_number: 9,
                     severity_text: "info".into(),
+                    event_name: "build.finished".into(),
                     body: Some(AnyValue {
                         value: Some(StringValue("log body".into())),
                     }),
@@ -485,6 +486,10 @@ async fn receive_grpc_logs_vector_namespace() {
 
         let meta = event.as_log().metadata().value();
         assert_eq!(
+            meta.get(path!("opentelemetry", "event_name")).unwrap(),
+            &value!("build.finished")
+        );
+        assert_eq!(
             meta.get(path!("vector", "source_type")).unwrap(),
             &value!(OpentelemetryConfig::NAME)
         );
@@ -581,6 +586,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         let actual_event = output.pop().unwrap();
         schema_definitions.assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
+            ("event_name", "build.finished".into()),
             (
                 "attributes",
                 Value::Object(vec_into_btmap(vec![("attr_key", "attr_val".into())])),
@@ -1489,6 +1495,60 @@ async fn send_and_collect_otel_event(
 }
 
 #[tokio::test]
+async fn receive_http_native_event_name() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        // ExportLogsServiceRequest containing only LogRecord field 12 (event_name).
+        // Encode independently of the generated types to catch a missing or incorrect wire tag.
+        let encoded = b"\x0a\x14\x12\x12\x12\x10\x62\x0ebuild.finished";
+        for (vector_namespace, use_otlp_decoding) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let env =
+                build_otlp_test_env_with(LOGS, Some(vector_namespace), use_otlp_decoding).await;
+            test_util::wait_for_tcp(env.config.http.address).await;
+            let response = reqwest::Client::new()
+                .post(format!("http://{}/v1/logs", env.config.http.address))
+                .header("Content-Type", "application/x-protobuf")
+                .body(encoded.as_slice())
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+            let mut events = test_util::collect_ready(env.output);
+            assert_eq!(events.len(), 1);
+            let event = events.pop().unwrap();
+            let log = event.as_log();
+            let event_name = if use_otlp_decoding {
+                log.get(event_path!(
+                    "resourceLogs",
+                    0,
+                    "scopeLogs",
+                    0,
+                    "logRecords",
+                    0,
+                    "eventName"
+                ))
+            } else if vector_namespace {
+                log.metadata()
+                    .value()
+                    .get(path!("opentelemetry", "event_name"))
+            } else {
+                log.get(event_path!("event_name"))
+            };
+            assert_eq!(event_name, Some(&value!("build.finished")));
+            env.config
+                .outputs(LogNamespace::Legacy)
+                .remove(0)
+                .schema_definition(true)
+                .unwrap()
+                .assert_valid_for_event(&event);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn http_headers_logs_use_otlp_decoding_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let (_guard_0, grpc_addr) = next_addr();
@@ -1519,6 +1579,7 @@ async fn http_headers_logs_use_otlp_decoding_false() {
                         observed_time_unix_nano: 2,
                         severity_number: 9,
                         severity_text: "info".into(),
+                        event_name: String::new(),
                         body: Some(AnyValue {
                             value: Some(StringValue("log body".into())),
                         }),
@@ -1600,6 +1661,7 @@ async fn http_headers_logs_use_otlp_decoding_true() {
                         observed_time_unix_nano: 2,
                         severity_number: 9,
                         severity_text: "info".into(),
+                        event_name: String::new(),
                         body: Some(AnyValue {
                             value: Some(StringValue("log body".into())),
                         }),
@@ -1956,6 +2018,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
                     observed_time_unix_nano: 2,
                     severity_number: 9,
                     severity_text: "info".into(),
+                    event_name: String::new(),
                     body: Some(AnyValue {
                         value: Some(StringValue("log body".into())),
                     }),

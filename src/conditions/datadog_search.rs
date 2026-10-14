@@ -1,6 +1,5 @@
 use std::{borrow::Cow, str::FromStr};
 
-use bytes::Bytes;
 use vector_lib::{
     configurable::configurable_component,
     event::{Event, EventRef, LogEvent, Value},
@@ -140,17 +139,13 @@ impl Filter<LogEvent> for EventFilter {
             Field::Reserved(field) if field == "tags" => {
                 let to_match = to_match.to_owned();
 
-                array_match_multiple(vec!["ddtags", "tags"], move |values| {
-                    values.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-                })
+                any_string_match_multiple(vec!["ddtags", "tags"], move |value| value == to_match)
             }
             // Individual tags are compared by element key:value.
             Field::Tag(tag) => {
-                let value_bytes = Value::Bytes(format!("{tag}:{to_match}").into());
+                let to_match = format!("{tag}:{to_match}");
 
-                array_match_multiple(vec!["ddtags", "tags"], move |values| {
-                    values.contains(&value_bytes)
-                })
+                any_string_match_multiple(vec!["ddtags", "tags"], move |value| value == to_match)
             }
             // A literal "source" field should string match in "source" and "ddsource" fields (OR condition).
             Field::Reserved(field) if field == "source" => {
@@ -1646,6 +1641,28 @@ mod test {
     /// Parse each Datadog Search Syntax query and check that it passes/fails.
     fn event_filter() {
         test_filter(EventFilter, vector_lib::event::Event::into_log);
+    }
+
+    #[test]
+    fn tag_equality_matches_byte_values() {
+        for query in ["tags:foo", "env:prod"] {
+            let config: DatadogSearchConfig = query.parse().unwrap();
+            let runner = DatadogSearchRunner::try_from(&config).unwrap();
+            let mut log = LogEvent::default();
+            log.insert(
+                vrl::event_path!("tags"),
+                Value::Array(vec![Value::Bytes(
+                    if query == "tags:foo" {
+                        "foo"
+                    } else {
+                        "env:prod"
+                    }
+                    .into(),
+                )]),
+            );
+
+            assert!(runner.matches(&Event::Log(log)), "query: {query}");
+        }
     }
 
     #[test]

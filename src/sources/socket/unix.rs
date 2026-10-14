@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use chrono::Utc;
 use vector_lib::{
     codecs::decoding::FramingConfig,
@@ -23,7 +22,7 @@ use crate::{
 fn handle_events(
     events: &mut [Event],
     host_key: &OptionalValuePath,
-    received_from: Option<Bytes>,
+    received_from: Option<String>,
     log_namespace: LogNamespace,
 ) {
     let now = Utc::now();

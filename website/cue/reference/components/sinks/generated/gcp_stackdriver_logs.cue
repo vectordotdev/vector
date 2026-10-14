@@ -110,7 +110,7 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 	labels_key: {
 		description: """
 			The value of this field is used to retrieve the associated labels from the `jsonPayload`
-			and extract their values to set as LogEntry labels.
+			and extract their values to set as `LogEntry` labels.
 			"""
 		required: false
 		type: string: {

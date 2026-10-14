@@ -42,6 +42,7 @@ use vector_core::{
     config::{DataType, LogNamespace},
     event::{Event, EventMetadata},
     schema,
+    serde::AsciiChar,
 };
 
 use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
@@ -426,9 +427,9 @@ impl DeserializerConfig {
                 FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig::default())
             }
             DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
-            DeserializerConfig::Gelf(_) => {
-                FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig::new(0))
-            }
+            DeserializerConfig::Gelf(_) => FramingConfig::CharacterDelimited(
+                CharacterDelimitedDecoderConfig::new(AsciiChar::new('\0')),
+            ),
         }
     }
 
@@ -511,12 +512,12 @@ impl DeserializerConfig {
                 FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
                     character_delimited:
                         CharacterDelimitedDecoderOptions {
-                            delimiter: b',',
+                            delimiter,
                             max_length: Some(usize::MAX),
                             ..
                         },
                 }),
-            ) => "application/json",
+            ) if delimiter.as_byte() == b',' => "application/json",
             (DeserializerConfig::Native | DeserializerConfig::Avro { .. }, _) => {
                 "application/octet-stream"
             }
@@ -619,11 +620,11 @@ mod tests {
             framing_config,
             FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
-                    delimiter: 0,
+                    delimiter,
                     max_length: None,
                     ..
                 }
-            })
+            }) if delimiter.as_byte() == 0
         ));
     }
 }
