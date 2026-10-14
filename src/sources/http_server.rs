@@ -30,7 +30,6 @@ use crate::{
 };
 
 /// Configuration for the `http_server` source.
-#[serde_with::serde_as]
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
@@ -122,8 +121,7 @@ pub struct SimpleHttpConfig {
 
     decoding: Option<DeserializerConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

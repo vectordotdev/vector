@@ -19,7 +19,6 @@ use crate::{
 /// Base configuration for the `aws_kinesis_` sinks.
 /// The actual specific sink configuration types should either wrap this in a newtype wrapper,
 /// or should extend it in a new struct with `serde(flatten)`.
-#[serde_with::serde_as]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -50,8 +49,11 @@ pub struct KinesisSinkBaseConfig {
     #[serde(default)]
     pub request_retry_partial: bool,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// The log field used as the Kinesis record’s partition key value.

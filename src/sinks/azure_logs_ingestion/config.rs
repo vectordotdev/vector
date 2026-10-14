@@ -37,7 +37,6 @@ pub(super) fn default_timestamp_field() -> String {
 }
 
 /// Configuration for the `azure_logs_ingestion` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "azure_logs_ingestion",
     "Publish log events to the Azure Monitor Logs Ingestion API."
@@ -97,8 +96,11 @@ pub struct AzureLogsIngestionConfig {
 
     pub tls: Option<TlsConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

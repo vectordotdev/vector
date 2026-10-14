@@ -57,7 +57,6 @@ pub enum S3BatchEncoding {
 }
 
 /// Configuration for the `aws_s3` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "aws_s3",
     "Store observability events in the AWS S3 object storage system."
@@ -158,8 +157,11 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

@@ -38,7 +38,7 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::serde::BoolOrStruct<vector_core::config::SourceAcknowledgementsConfig>"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	address: {
 		description: "The socket address to listen for connections on."

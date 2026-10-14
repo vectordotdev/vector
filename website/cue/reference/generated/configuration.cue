@@ -927,7 +927,7 @@ generated: configuration: {
 			group:       "pipeline_components"
 		}
 		acknowledgements: {
-			type: _schemaDefinitions["vector_core::serde::BoolOrStruct<vector_core::config::AcknowledgementsConfig>"]
+			type: _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 			description: """
 				Controls how acknowledgements are handled for all sinks by default.
 

@@ -10,7 +10,7 @@ generated: components: sinks: vector: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::serde::BoolOrStruct<vector_core::config::AcknowledgementsConfig>"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	address: {
 		deprecated:         true

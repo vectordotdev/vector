@@ -1,16 +1,7 @@
-use std::{cell::RefCell, fmt, marker::PhantomData};
+use std::{fmt, marker::PhantomData};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
-use serde_with::{DeserializeAs, SerializeAs};
-use vector_config::{
-    Configurable, GenerateError, Metadata,
-    attributes::CustomAttribute,
-    constants::DOCS_META_ENUM_TAGGING,
-    schema::{
-        SchemaGenerator, SchemaObject, generate_bool_schema, generate_one_of_schema,
-        get_or_generate_schema,
-    },
-};
+use serde::{Deserialize, Deserializer, Serialize, de};
+use vector_config::Configurable;
 
 /// Answers "Is this value in it's default state?" which can be used to skip serializing the value.
 #[inline]
@@ -24,6 +15,10 @@ pub fn is_default<E: Default + PartialEq>(e: &E) -> bool {
 /// healthcheck: bool
 /// healthcheck.enabled: bool
 /// Both are accepted.
+///
+/// For `Configurable` fields, use the qualified `crate::serde::bool_or_struct` path
+/// (or the `vector_core` / `vector_lib` re-export) so schema generation recognizes both forms.
+/// Flattened fields remain object-only.
 ///
 /// # Errors
 ///
@@ -61,53 +56,6 @@ where
     }
 
     deserializer.deserialize_any(BoolOrStruct(PhantomData))
-}
-
-/// A schema-aware adapter for fields that accept a boolean shorthand or a struct.
-///
-/// Deserialization follows [`bool_or_struct`], while serialization retains the
-/// struct representation. Use with `#[serde_as(as = "BoolOrStruct<T>")]` so the
-/// generated schema describes both accepted input forms.
-pub struct BoolOrStruct<T>(PhantomData<fn() -> T>);
-
-impl<'de, T> DeserializeAs<'de, T> for BoolOrStruct<T>
-where
-    T: Deserialize<'de> + From<bool>,
-{
-    fn deserialize_as<D>(deserializer: D) -> Result<T, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        bool_or_struct(deserializer)
-    }
-}
-
-impl<T: Serialize> SerializeAs<T> for BoolOrStruct<T> {
-    fn serialize_as<S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        value.serialize(serializer)
-    }
-}
-
-impl<T: Configurable + 'static> Configurable for BoolOrStruct<T> {
-    fn referenceable_name() -> Option<&'static str> {
-        Some(std::any::type_name::<Self>())
-    }
-
-    fn metadata() -> Metadata {
-        let mut metadata = T::metadata();
-        metadata.add_custom_attribute(CustomAttribute::kv(DOCS_META_ENUM_TAGGING, "untagged"));
-        metadata
-    }
-
-    fn generate_schema(
-        generator: &RefCell<SchemaGenerator>,
-    ) -> Result<SchemaObject, GenerateError> {
-        let structure = get_or_generate_schema(&T::as_configurable_ref(), generator, None)?;
-        Ok(generate_one_of_schema(&[generate_bool_schema(), structure]))
-    }
 }
 
 /// One ASCII character, represented as a string in configuration and a byte in codecs.
@@ -161,7 +109,6 @@ impl<'de> Deserialize<'de> for AsciiChar {
 mod tests {
     use serde::{Deserialize, Serialize};
     use serde_json::{Value, json};
-    use serde_with::serde_as;
     use vector_config::{Configurable, configurable_component, schema::generate_root_schema};
 
     use super::AsciiChar;
@@ -250,19 +197,11 @@ mod tests {
         }
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
-    struct BoolOrStructConfig {
-        #[serde(default, deserialize_with = "super::bool_or_struct")]
-        options: Options,
-    }
-
-    /// Configuration using the schema-aware boolean-or-struct adapter.
-    #[serde_as]
+    /// Configuration using the existing boolean-or-struct deserializer.
     #[derive(Debug, Deserialize, Serialize, Configurable)]
-    struct AdaptedConfig {
+    struct BoolOrStructConfig {
         /// Configurable options.
-        #[serde_as(as = "super::BoolOrStruct<Options>")]
-        #[serde(default)]
+        #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
         options: Options,
     }
 
@@ -331,26 +270,11 @@ mod tests {
                 expected: None,
             },
         ] {
-            let result = serde_json::from_value::<BoolOrStructConfig>(case.input.clone());
-            let adapted = serde_json::from_value::<AdaptedConfig>(case.input);
+            let result = serde_json::from_value::<BoolOrStructConfig>(case.input);
             if let Some(expected) = case.expected {
                 let config = result.unwrap_or_else(|error| panic!("{}: {error}", case.name));
                 let serialized = serde_json::to_value(config).unwrap();
                 assert_eq!(serialized, json!({"options": expected}), "{}", case.name);
-                assert_eq!(
-                    serde_json::to_value(adapted.unwrap()).unwrap(),
-                    serialized,
-                    "{}",
-                    case.name
-                );
-                let adapted_roundtrip: AdaptedConfig =
-                    serde_json::from_value(serialized.clone()).unwrap();
-                assert_eq!(
-                    serde_json::to_value(adapted_roundtrip).unwrap(),
-                    serialized,
-                    "{}",
-                    case.name
-                );
                 let roundtrip: BoolOrStructConfig =
                     serde_json::from_value(serialized.clone()).unwrap();
                 assert_eq!(
@@ -361,7 +285,6 @@ mod tests {
                 );
             } else {
                 assert!(result.is_err(), "{}: {result:?}", case.name);
-                assert!(adapted.is_err(), "{}: {adapted:?}", case.name);
             }
         }
     }
@@ -369,7 +292,7 @@ mod tests {
     #[test]
     fn schema_preserves_both_forms_defaults_and_deprecation() {
         let schema =
-            serde_json::to_value(generate_root_schema::<AdaptedConfig>().unwrap()).unwrap();
+            serde_json::to_value(generate_root_schema::<BoolOrStructConfig>().unwrap()).unwrap();
         let options = &schema["properties"]["options"];
         assert_eq!(options["default"], json!({"enabled": true, "timeout": 10}));
         let shared = options

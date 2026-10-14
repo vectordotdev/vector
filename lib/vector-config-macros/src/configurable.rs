@@ -231,11 +231,21 @@ fn generate_struct_field(field: &Field<'_>, sibling_keys: &[String]) -> proc_mac
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
     let field_schema_ty = get_field_schema_ty(field);
 
-    // Flattened `Option<T>` cannot use `Option`'s nullable-property schema: `allOf` merge
-    // validates the parent object, which is never JSON `null`. Tagged enums get an absence
-    // encoding instead; other `Option<T>` flatten fields fall back to the property schema.
     let spanned_generate_schema =
-        if let (true, Some(inner_ty)) = (field.flatten(), option_inner_type(field_schema_ty)) {
+        // Flattened fields receive map entries, so the shorthand cannot apply there.
+        // This changes only schema generation; Serde keeps using the original helper.
+        if field.bool_or_struct() && !field.flatten() && !field.skip_deserializing() {
+            quote_spanned! {field.span()=>
+                ::vector_config::schema::generate_bool_or_struct_schema(
+                    &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                    schema_gen,
+                    Some(#field_metadata_ref),
+                )?
+            }
+        } else if let (true, Some(inner_ty)) = (field.flatten(), option_inner_type(field_schema_ty)) {
+            // Flattened `Option<T>` cannot use `Option`'s nullable-property schema: `allOf` merge
+            // validates the parent object, which is never JSON `null`. Tagged enums get an absence
+            // encoding instead; other `Option<T>` flatten fields fall back to the property schema.
             let sibling_key_lits = sibling_keys.iter().map(|key| quote! { #key });
             quote_spanned! {field.span()=>
                 ::vector_config::schema::generate_flattened_optional_schema(

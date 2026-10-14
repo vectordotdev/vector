@@ -19,7 +19,6 @@ use crate::{
 };
 
 /// Configuration for the `aws_sqs` source.
-#[serde_with::serde_as]
 #[configurable_component(source("aws_sqs", "Collect logs from AWS SQS."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -89,8 +88,7 @@ pub struct AwsSqsConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
     pub tls: Option<TlsConfig>,

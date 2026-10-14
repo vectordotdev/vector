@@ -57,7 +57,6 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -167,8 +166,11 @@ pub struct InfluxDbConfig {
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     acknowledgements: AcknowledgementsConfig,
 }
 

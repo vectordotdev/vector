@@ -31,7 +31,6 @@ use crate::{
 pub(super) const HOST: &str = "https://cloud.humio.com";
 
 /// Configuration for the `humio_logs` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("humio_logs", "Deliver log event data to Humio."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -124,8 +123,11 @@ pub struct HumioLogsConfig {
     #[serde(default = "timestamp_nanos_key")]
     pub timestamp_nanos_key: Option<String>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// Overrides the name of the log field used to retrieve the timestamp to send to Humio.

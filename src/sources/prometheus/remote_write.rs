@@ -37,7 +37,6 @@ pub enum MetadataConflictStrategy {
 }
 
 /// Configuration for the `prometheus_remote_write` source.
-#[serde_with::serde_as]
 #[configurable_component(source(
     "prometheus_remote_write",
     "Receive metric via the Prometheus Remote Write protocol."
@@ -64,8 +63,7 @@ pub struct PrometheusRemoteWriteConfig {
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]

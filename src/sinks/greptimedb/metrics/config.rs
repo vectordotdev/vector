@@ -17,7 +17,6 @@ use crate::{
 };
 
 /// Configuration items for GreptimeDB
-#[serde_with::serde_as]
 #[configurable_component(sink("greptimedb_metrics", "Ingest metrics data into GreptimeDB."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -66,8 +65,11 @@ pub struct GreptimeDBMetricsConfig {
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     pub tls: Option<TlsConfig>,

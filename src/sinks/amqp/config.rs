@@ -63,7 +63,6 @@ impl AmqpPropertiesConfig {
 /// Configuration for the `amqp` sink.
 ///
 /// Supports AMQP version 0.9.1
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "amqp",
     "Send events to AMQP 0.9.1 compatible brokers like RabbitMQ."
@@ -84,8 +83,11 @@ pub struct AmqpSinkConfig {
 
     pub(crate) encoding: EncodingConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub(crate) acknowledgements: AcknowledgementsConfig,
 
     /// Maximum number of AMQP channels to keep active (channels are created as needed).

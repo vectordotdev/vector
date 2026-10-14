@@ -35,7 +35,6 @@ use crate::{
 };
 
 /// Configuration for the `prometheus_pushgateway` source.
-#[serde_with::serde_as]
 #[configurable_component(source(
     "prometheus_pushgateway",
     "Receive metrics via the Prometheus Pushgateway protocol."
@@ -52,8 +51,7 @@ pub struct PrometheusPushgatewayConfig {
 
     auth: Option<HttpServerAuthConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]

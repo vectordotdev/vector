@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "vector_core::serde::BoolOrStruct<vector_core::config::AcknowledgementsConfig>": {
+_schemaDefinitions: "bool_or_struct::vector_core::config::AcknowledgementsConfig": {
 	bool: {}
 	object: options: enabled: {
 		description: """

@@ -30,7 +30,6 @@ use crate::{
 const PATH: &str = "/logs/ingest";
 
 /// Configuration for the `mezmo` (formerly `logdna`) sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("mezmo", "Deliver log event data to Mezmo."))]
 #[derive(Clone, Debug)]
 pub struct MezmoConfig {
@@ -87,8 +86,11 @@ pub struct MezmoConfig {
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     acknowledgements: AcknowledgementsConfig,
 }
 

@@ -27,7 +27,6 @@ use crate::{
 pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
 
 /// Configuration for the `honeycomb` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
@@ -64,8 +63,11 @@ pub struct HoneycombConfig {
     #[serde(default = "Compression::zstd_default")]
     compression: Compression,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

@@ -25,7 +25,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Configuration for the `doris` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("doris", "Deliver log data to an Apache Doris database."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -96,8 +95,11 @@ pub struct DorisConfig {
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(flatten)]

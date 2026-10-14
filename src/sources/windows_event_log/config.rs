@@ -17,7 +17,6 @@ const MAX_EVENT_TIMEOUT_MS: u64 = 60000;
 const MAX_BATCH_SIZE: u32 = 10000;
 
 /// Configuration for the `windows_event_log` source.
-#[serde_with::serde_as]
 #[configurable_component(source(
     "windows_event_log",
     "Collect logs from Windows Event Log channels using the Windows Event Log API."
@@ -191,8 +190,7 @@ pub struct WindowsEventLogConfig {
     /// When disabled (default), checkpoints are updated immediately after reading
     /// events, which may result in data loss if Vector crashes before events are
     /// delivered to sinks.
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 

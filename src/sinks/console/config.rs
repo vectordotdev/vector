@@ -36,7 +36,6 @@ pub enum Target {
 }
 
 /// Configuration for the `console` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "console",
     "Display observability events in the console, which can be useful for debugging purposes."
@@ -50,8 +49,11 @@ pub struct ConsoleSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 }
 

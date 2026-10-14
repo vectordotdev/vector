@@ -46,7 +46,6 @@ const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";
 const CONTENT_TYPE_JSON: &str = "application/json";
 
 /// Configuration for the `http` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -95,8 +94,11 @@ pub struct HttpSinkConfig {
 
     pub tls: Option<TlsConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

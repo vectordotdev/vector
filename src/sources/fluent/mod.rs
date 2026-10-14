@@ -144,7 +144,6 @@ mod deser {
 }
 
 /// Configuration for the `fluent` TCP source.
-#[serde_with::serde_as]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -176,8 +175,7 @@ pub struct FluentTcpConfig {
 
     tls: Option<TlsSourceConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 }
 

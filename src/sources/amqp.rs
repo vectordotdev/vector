@@ -49,7 +49,6 @@ enum BuildError {
 /// Configuration for the `amqp` source.
 ///
 /// Supports AMQP version 0.9.1
-#[serde_with::serde_as]
 #[configurable_component(source(
     "amqp",
     "Collect events from AMQP 0.9.1 compatible brokers like RabbitMQ."
@@ -98,8 +97,7 @@ pub struct AmqpSourceConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub(crate) decoding: DeserializerConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 
     /// Maximum number of unacknowledged messages the broker will deliver to this consumer.

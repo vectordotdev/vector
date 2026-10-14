@@ -85,7 +85,6 @@ pub enum AzureBlobType {
 }
 
 /// Configuration for the `azure_blob` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "azure_blob",
     "Store your observability data in Azure Blob Storage."
@@ -291,8 +290,11 @@ pub struct AzureBlobSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig<AzureBlobTowerRequestConfigDefaults>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

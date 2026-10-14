@@ -33,7 +33,6 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
-#[serde_with::serde_as]
 #[configurable_component(source(
     "aws_kinesis_firehose",
     "Collect logs from AWS Kinesis Firehose."
@@ -88,8 +87,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

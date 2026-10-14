@@ -12,7 +12,6 @@ use crate::{
 };
 
 /// Configuration for the `websocket_server` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "websocket_server",
     "Deliver observability event data to websocket clients."
@@ -33,8 +32,11 @@ pub struct WebSocketListenerSinkConfig {
     #[serde(default)]
     pub subprotocol: SubProtocolConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 
     pub message_buffering: Option<MessageBufferingConfig>,

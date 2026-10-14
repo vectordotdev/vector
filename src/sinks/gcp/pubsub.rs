@@ -48,7 +48,6 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_pubsub` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "gcp_pubsub",
     "Publish observability events to GCP's Pub/Sub messaging system."
@@ -89,8 +88,11 @@ pub struct PubsubConfig {
     #[serde(default)]
     pub tls: Option<TlsConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     acknowledgements: AcknowledgementsConfig,
 }
 

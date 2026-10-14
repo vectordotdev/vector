@@ -116,7 +116,6 @@ impl OtlpDecodingConfig {
 }
 
 /// Configuration for the `opentelemetry` source.
-#[serde_with::serde_as]
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -125,8 +124,7 @@ pub struct OpentelemetryConfig {
 
     pub http: HttpConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
     /// Maximum number of requests processed concurrently across the HTTP and gRPC servers.
@@ -180,8 +178,7 @@ pub struct OpentelemetryConfig {
     /// - Metrics are parsed as logs while preserving the OTLP format
     /// - Vector's metric transforms will NOT be compatible with this output
     /// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
-    #[serde_as(as = "crate::serde::BoolOrStruct<OtlpDecodingConfig>")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub use_otlp_decoding: OtlpDecodingConfig,
 }
 

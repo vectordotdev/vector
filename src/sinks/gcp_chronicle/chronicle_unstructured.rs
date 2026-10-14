@@ -175,7 +175,6 @@ impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefau
 }
 
 /// Configuration for the `gcp_chronicle_unstructured` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "gcp_chronicle_unstructured",
     "Store unstructured log events in Google Chronicle."
@@ -241,8 +240,11 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
     pub fallback_log_type: Option<String>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     acknowledgements: AcknowledgementsConfig,
 }
 

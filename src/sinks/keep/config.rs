@@ -29,7 +29,6 @@ use crate::{
 pub(super) const HTTP_HEADER_KEEP_API_KEY: &str = "x-api-key";
 
 /// Configuration for the `keep` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("keep", "Deliver log events to Keep."))]
 #[derive(Clone, Debug)]
 pub struct KeepConfig {
@@ -55,8 +54,11 @@ pub struct KeepConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

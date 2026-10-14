@@ -52,7 +52,7 @@ impl Service<NatsRequest> for NatsService {
                 .await
             {
                 Err(error) => Err(NatsError::ServerError { source: error }),
-                Ok(_) => Ok(NatsResponse {
+                Ok(()) => Ok(NatsResponse {
                     metadata: req.metadata,
                 }),
             }

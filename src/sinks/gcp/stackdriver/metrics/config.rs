@@ -31,7 +31,6 @@ impl TowerRequestConfigDefaults for StackdriverMetricsTowerRequestConfigDefaults
 }
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink(
     "gcp_stackdriver_metrics",
     "Deliver metrics to GCP's Cloud Monitoring system."
@@ -71,8 +70,11 @@ pub struct StackdriverConfig {
 
     pub(super) tls: Option<TlsConfig>,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

@@ -33,7 +33,6 @@ const fn default_pool_size() -> u32 {
 }
 
 /// Configuration for the `postgres` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("postgres", "Deliver log data to a PostgreSQL database."))]
 #[derive(Clone, Default, Debug)]
 #[serde(deny_unknown_fields)]
@@ -70,8 +69,11 @@ pub struct PostgresConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 }
 

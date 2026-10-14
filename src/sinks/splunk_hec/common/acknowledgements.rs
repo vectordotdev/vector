@@ -47,7 +47,7 @@ pub struct HecClientAcknowledgementsConfig {
     // Flattened fields receive map entries, never a standalone boolean shorthand.
     #[serde(
         default,
-        deserialize_with = "vector_lib::serde::bool_or_struct",
+        deserialize_with = "crate::serde::bool_or_struct",
         flatten,
         skip_serializing_if = "crate::serde::is_default"
     )]

@@ -35,7 +35,6 @@ use crate::{
 };
 
 /// Configuration for the `databend` sink.
-#[serde_with::serde_as]
 #[configurable_component(sink("databend", "Deliver log data to a Databend database."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -78,8 +77,11 @@ pub struct DatabendConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 }
 
