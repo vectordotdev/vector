@@ -43,7 +43,7 @@ impl Telemetry {
             scrape_interval_secs: Duration::from_millis(100),
             ..Default::default()
         };
-        let mut vector_sink = VectorSinkConfig::from_address(listen_addr.as_uri());
+        let mut vector_sink = VectorSinkConfig::from_address(&listen_addr.as_uri());
 
         // We want to ensure that the output sink is flushed as soon as
         // possible, so we set the batch timeout to a very low value. We also
