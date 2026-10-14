@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use futures::future::BoxFuture;
+use futures::{TryFutureExt, future::BoxFuture};
 
 /// Error returned by a running source.
 pub type SourceError = vector_common::Error;
@@ -13,7 +13,7 @@ pub fn opaque_source<F>(future: F) -> Source
 where
     F: Future<Output = Result<(), ()>> + Send + 'static,
 {
-    Box::pin(async move { future.await.map_err(|()| crate::default_task_error()) })
+    Box::pin(future.map_err(|()| crate::default_task_error()))
 }
 
 /// Adapt a source that returns an error with a cause.
@@ -22,5 +22,5 @@ where
     F: Future<Output = Result<(), E>> + Send + 'static,
     E: Into<SourceError>,
 {
-    Box::pin(async move { future.await.map_err(Into::into) })
+    Box::pin(future.err_into())
 }
