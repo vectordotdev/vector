@@ -522,10 +522,7 @@ fn get_type_and_fields(
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
         MetricValue::Set { values } => {
             // https://github.com/vectordotdev/vector/issues/23659
-            #[expect(
-                clippy::cast_precision_loss,
-                reason = "Set sizes are encoded as floating-point fields."
-            )]
+            #[allow(clippy::cast_precision_loss, reason = "Preserve set-size rounding.")]
             let count = values.len() as f64;
             ("set", Some(to_fields(count)))
         }
@@ -616,10 +613,7 @@ fn get_type_and_fields(
 fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<KeyString, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "Preserve floating-point distribution count encoding."
-    )]
+    #[allow(clippy::cast_precision_loss, reason = "Preserve count rounding.")]
     let count = statistic.count as f64;
 
     Some(
@@ -1321,11 +1315,7 @@ mod integration_tests {
             let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
             let res = query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
 
-            // https://github.com/vectordotdev/vector/issues/23659
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "Fixture counter values are small exact integers."
-            )]
+            #[expect(clippy::cast_possible_truncation, reason = "Exact integer fixtures.")]
             let expected_value = value as isize;
             assert_eq!(
                 res,

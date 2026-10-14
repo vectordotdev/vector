@@ -552,10 +552,9 @@ pub mod test_util {
     }
 
     // InfluxDB strips off trailing zeros in timestamps in metrics
-    // https://github.com/vectordotdev/vector/issues/23659
     #[expect(
         clippy::case_sensitive_file_extension_comparisons,
-        reason = "Timestamp suffixes require case-sensitive matching."
+        reason = "Match timestamp suffixes exactly."
     )]
     fn strip_timestamp(timestamp: String) -> String {
         #[expect(
