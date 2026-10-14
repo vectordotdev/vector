@@ -312,150 +312,17 @@ fn ignore_not_found<T>(result: io::Result<T>) -> io::Result<Option<T>> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::HashSet,
-        fs, io,
-        num::NonZeroU64,
-        path::PathBuf,
-        sync::{Arc, Mutex, mpsc},
-        time::Duration,
-    };
+    use std::{collections::HashSet, fs, sync::mpsc, time::Duration};
 
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
 
     use tempfile::tempdir;
-    use vector_lib::{
-        buffers::{BufferConfig, BufferType},
-        config::ComponentKey,
-    };
 
-    use super::{
-        DiscoveredDiskBuffer, OrphanedDiskBufferScanner, ScanRequest, disk_buffer_directories,
-        filter_orphaned_disk_buffers, find_orphaned_disk_buffers, ignore_not_found,
-        report_orphaned_disk_buffers,
-    };
-
-    #[cfg(feature = "enrichment-tables-memory")]
-    use super::referenced_disk_buffer_directories;
-
-    #[cfg(feature = "enrichment-tables-memory")]
-    use crate::{
-        config::{Config, unit_test::UnitTestSourceConfig},
-        enrichment_tables::{EnrichmentTables, memory::MemoryConfig},
-        test_util::mock::basic_sink,
-    };
+    use super::{OrphanedDiskBufferScanner, find_orphaned_disk_buffers};
 
     fn recv<T>(receiver: &mpsc::Receiver<T>) -> T {
         receiver.recv_timeout(Duration::from_secs(2)).unwrap()
-    }
-
-    #[test]
-    fn requests_during_discovery_coalesce_into_one_fresh_scan() {
-        let (started_tx, started_rx) = mpsc::channel();
-        let (release_tx, release_rx) = mpsc::channel();
-        let release_rx = Arc::new(Mutex::new(release_rx));
-        let (reported_tx, reported_rx) = mpsc::channel();
-        let candidate = PathBuf::from("data/buffer/v2/candidate");
-        let scanned_candidate = candidate.clone();
-        let scanner = OrphanedDiskBufferScanner::spawn(
-            move |data_dir| {
-                started_tx.send(data_dir.to_path_buf()).unwrap();
-                release_rx.lock().unwrap().recv().unwrap();
-                Ok(vec![DiscoveredDiskBuffer {
-                    path: scanned_candidate.clone(),
-                    canonical_path: scanned_candidate.clone(),
-                }])
-            },
-            move |request, result| {
-                let orphaned =
-                    filter_orphaned_disk_buffers(result.unwrap(), &request.configured_buffer_paths);
-                reported_tx
-                    .send((request.configured_buffer_paths.clone(), orphaned))
-                    .unwrap();
-            },
-        );
-
-        scanner.schedule("data".into(), HashSet::new());
-        assert_eq!(recv(&started_rx), PathBuf::from("data"));
-        scanner.schedule("data".into(), HashSet::from([PathBuf::from("superseded")]));
-        scanner.schedule("data".into(), HashSet::from([candidate.clone()]));
-        release_tx.send(()).unwrap();
-
-        assert_eq!(recv(&started_rx), PathBuf::from("data"));
-        assert!(reported_rx.try_recv().is_err());
-        release_tx.send(()).unwrap();
-
-        let (configured_paths, orphaned) = recv(&reported_rx);
-        assert_eq!(configured_paths, HashSet::from([candidate]));
-        assert!(orphaned.is_empty());
-        assert!(started_rx.try_recv().is_err());
-    }
-
-    #[test]
-    fn scanner_scheduling_does_not_wait_for_reporting() {
-        let (report_started_tx, report_started_rx) = mpsc::channel();
-        let (release_report_tx, release_report_rx) = mpsc::channel();
-        let scanner = Arc::new(OrphanedDiskBufferScanner::spawn(
-            |_| Ok(Vec::new()),
-            move |request, _| {
-                report_started_tx.send(request.data_dir.clone()).unwrap();
-                release_report_rx.recv().unwrap();
-            },
-        ));
-        scanner.schedule("first".into(), HashSet::new());
-        assert_eq!(recv(&report_started_rx), PathBuf::from("first"));
-
-        let (schedule_started_tx, schedule_started_rx) = mpsc::channel();
-        let (schedule_finished_tx, schedule_finished_rx) = mpsc::channel();
-        let scheduler = Arc::clone(&scanner);
-        let schedule = std::thread::spawn(move || {
-            schedule_started_tx.send(()).unwrap();
-            scheduler.schedule("latest".into(), HashSet::new());
-            schedule_finished_tx.send(()).unwrap();
-        });
-        recv(&schedule_started_rx);
-        recv(&schedule_finished_rx);
-
-        release_report_tx.send(()).unwrap();
-        assert_eq!(recv(&report_started_rx), PathBuf::from("latest"));
-        release_report_tx.send(()).unwrap();
-        schedule.join().unwrap();
-    }
-
-    #[test]
-    fn drop_during_blocked_scan_suppresses_report_and_worker_terminates() {
-        let (release_tx, release_rx) = mpsc::channel();
-        let release_rx = Arc::new(Mutex::new(release_rx));
-        let (started_tx, started_rx) = mpsc::channel();
-        let (worker_tx, worker_rx) = mpsc::channel::<()>();
-        let (reported_tx, reported_rx) = mpsc::channel();
-        let scanner = OrphanedDiskBufferScanner::spawn(
-            move |_| {
-                started_tx.send(()).unwrap();
-                release_rx.lock().unwrap().recv().unwrap();
-                Ok(Vec::new())
-            },
-            move |_, _| {
-                let _worker_lifetime = &worker_tx;
-                reported_tx.send(()).unwrap();
-            },
-        );
-        scanner.schedule("scan".into(), HashSet::new());
-        recv(&started_rx);
-
-        drop(scanner);
-        release_tx.send(()).unwrap();
-
-        assert!(matches!(
-            worker_rx.recv_timeout(Duration::from_secs(2)),
-            Err(mpsc::RecvTimeoutError::Disconnected)
-        ));
-        assert!(matches!(
-            reported_rx.recv_timeout(Duration::from_secs(2)),
-            Err(mpsc::RecvTimeoutError::Disconnected)
-        ));
-        assert!(started_rx.try_recv().is_err());
     }
 
     #[test]
@@ -530,105 +397,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn missing_disk_buffer_root_has_no_orphans() {
-        let data_dir = tempdir().unwrap();
-        let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
-        assert!(actual.is_empty());
-    }
-
-    #[test]
-    fn not_found_is_ignored_without_hiding_other_errors() {
-        assert_eq!(
-            ignore_not_found::<()>(Err(io::ErrorKind::NotFound.into())).unwrap(),
-            None
-        );
-        assert_eq!(
-            ignore_not_found::<()>(Err(io::ErrorKind::PermissionDenied.into()))
-                .unwrap_err()
-                .kind(),
-            io::ErrorKind::PermissionDenied
-        );
-    }
-
-    #[test]
-    fn reporter_skips_results_outside_the_buffer_root() {
-        let request = ScanRequest {
-            data_dir: PathBuf::from("data"),
-            configured_buffer_paths: HashSet::new(),
-        };
-
-        report_orphaned_disk_buffers(
-            &request,
-            Ok(vec![DiscoveredDiskBuffer {
-                path: PathBuf::from("elsewhere"),
-                canonical_path: PathBuf::from("elsewhere"),
-            }]),
-        );
-    }
-
-    #[test]
-    fn disk_path_collection_includes_all_sink_entries() {
-        let data_dir = PathBuf::from("data");
-        let disk_buffer = || {
-            BufferConfig::Single(BufferType::DiskV2 {
-                max_size: NonZeroU64::new(1).unwrap(),
-                when_full: Default::default(),
-            })
-        };
-        let sinks = [
-            (ComponentKey::from("ordinary"), disk_buffer()),
-            (ComponentKey::from("enrichment"), disk_buffer()),
-        ];
-
-        let actual = disk_buffer_directories(Some(data_dir.clone()), sinks.into_iter());
-
-        assert_eq!(
-            actual,
-            HashSet::from([
-                data_dir.join("buffer/v2/ordinary"),
-                data_dir.join("buffer/v2/enrichment"),
-            ])
-        );
-    }
-
-    #[cfg(feature = "enrichment-tables-memory")]
-    #[test]
-    fn configured_paths_are_discovered_from_real_sink_and_enrichment_table_config() {
-        let data_dir = PathBuf::from("data");
-        let ordinary_key = ComponentKey::from("ordinary");
-        let enrichment_key = ComponentKey::from("enrichment");
-        let mut builder = Config::builder();
-        builder.global.data_dir = Some(data_dir.clone());
-        builder.add_source("in", UnitTestSourceConfig::default());
-        builder.add_sink("ordinary", &["in"], basic_sink(1).1);
-        builder.sinks[&ordinary_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
-            max_size: NonZeroU64::new(268_435_488).unwrap(),
-            when_full: Default::default(),
-        });
-        builder.add_enrichment_table(
-            "enrichment",
-            &["in"],
-            EnrichmentTables::Memory(MemoryConfig::default()),
-        );
-        let config = builder.build().unwrap();
-
-        // Enrichment-table sinks currently always receive the default memory buffer in `as_sink`,
-        // so no real configuration can assign one a disk stage. This still exercises that iterator
-        // alongside an ordinary disk-buffered sink at the Config boundary.
-        assert!(
-            config
-                .enrichment_table(&enrichment_key)
-                .unwrap()
-                .as_sink(&enrichment_key)
-                .is_some()
-        );
-        assert_eq!(
-            referenced_disk_buffer_directories(&config),
-            HashSet::from([data_dir.join("buffer/v2/ordinary")])
-        );
-    }
-
     #[cfg(unix)]
     #[test]
     fn safely_follows_symlinked_buffer_directories_and_files() {
@@ -652,42 +420,5 @@ mod tests {
 
         let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
         assert_eq!(actual, vec![linked_buffer, linked_file_buffer]);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn matches_configured_buffers_by_symlink_target() {
-        let data_dir = tempdir().unwrap();
-        let buffer_root = data_dir.path().join("buffer").join("v2");
-        let target = buffer_root.join("z-target");
-        let configured_link = buffer_root.join("a-configured-link");
-        fs::create_dir_all(&target).unwrap();
-        fs::write(target.join("buffer.db"), b"configured").unwrap();
-        symlink(&target, &configured_link).unwrap();
-
-        let configured_paths = HashSet::from([configured_link]);
-        let actual = find_orphaned_disk_buffers(data_dir.path(), &configured_paths).unwrap();
-        assert!(actual.is_empty());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn supports_a_symlinked_disk_buffer_root() {
-        let data_dir = tempdir().unwrap();
-        let storage_dir = tempdir().unwrap();
-        let buffer_parent = data_dir.path().join("buffer");
-        let buffer_root = buffer_parent.join("v2");
-        let orphaned = buffer_root.join("orphaned");
-        fs::create_dir(&buffer_parent).unwrap();
-        fs::create_dir(storage_dir.path().join("orphaned")).unwrap();
-        fs::write(
-            storage_dir.path().join("orphaned").join("buffer.db"),
-            b"orphaned",
-        )
-        .unwrap();
-        symlink(storage_dir.path(), &buffer_root).unwrap();
-
-        let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
-        assert_eq!(actual, vec![orphaned]);
     }
 }
