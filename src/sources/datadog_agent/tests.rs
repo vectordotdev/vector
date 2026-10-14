@@ -2774,6 +2774,17 @@ fn decode_v3_rejects_excessive_point_tag_cloning() {
 }
 
 #[test]
+fn decode_v3_accounts_for_metric_tag_entry_storage() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: (0..200_000).map(|index| format!("t{index}")).collect(),
+        resources: Vec::new(),
+    };
+
+    assert!(super::metrics::decode_v3_metric_data(&data, Some(&metadata)).is_err());
+}
+
+#[test]
 fn decode_v3_rejects_excessive_event_expansion() {
     let mut data = minimal_v3_metric_data();
     data.num_points[0] = 1_000_000;

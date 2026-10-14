@@ -7,7 +7,7 @@ use prost::Message;
 use super::decode_ddseries;
 use crate::{
     common::datadog::DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX,
-    event::Event,
+    event::{Event, metric::TagValueSet},
     sources::datadog_agent::{
         ddmetric_proto::{
             Metadata, Origin,
@@ -24,6 +24,10 @@ const MAX_V3_EXPANDED_RESOURCE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_SERIES_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_EVENT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_DECODED_REPEATED_BYTES: usize = 16 * 1024 * 1024;
+// `decode_ddseries` converts every wire tag/resource into a BTreeMap entry. Account for the
+// key/value containers plus a conservative three-pointer share of the tree node allocation.
+const V3_METRIC_TAG_ENTRY_BYTES: usize =
+    std::mem::size_of::<(String, TagValueSet)>() + 3 * std::mem::size_of::<usize>();
 
 // `MetricData.types` packs three independent values into each integer. These masks mirror
 // `metricType`, `valueType`, and `metricFlags` in Datadog's `intake_v3.proto`.
@@ -304,6 +308,13 @@ struct V3AllocationBudget {
     event_bytes: usize,
 }
 
+struct V3TagResourceSize {
+    tag_bytes: usize,
+    tag_count: usize,
+    resource_bytes: usize,
+    resource_count: usize,
+}
+
 impl V3AllocationBudget {
     /// Accounts for every clone and vector expansion performed for one series.
     ///
@@ -315,12 +326,12 @@ impl V3AllocationBudget {
         name: &str,
         unit: &str,
         source_type: &str,
-        tag_bytes: usize,
-        resource_bytes: usize,
+        tag_resources: V3TagResourceSize,
     ) -> crate::Result<()> {
-        let tag_resource_bytes = tag_bytes
+        let tag_resource_bytes = tag_resources
+            .tag_bytes
             .checked_add(source_type.len())
-            .and_then(|total| total.checked_add(resource_bytes))
+            .and_then(|total| total.checked_add(tag_resources.resource_bytes))
             .ok_or("Datadog v3 expanded series size overflow")?;
         let tag_resource_copies = point_count
             .checked_add(1)
@@ -349,12 +360,21 @@ impl V3AllocationBudget {
             return Err("Datadog v3 expanded series exceed size limit".into());
         }
 
+        let event_tag_count = tag_resources
+            .tag_count
+            .checked_add(tag_resources.resource_count)
+            .and_then(|total| total.checked_add(usize::from(!source_type.is_empty())))
+            .ok_or("Datadog v3 expanded event size overflow")?;
+        let event_tag_entry_bytes = event_tag_count
+            .checked_mul(V3_METRIC_TAG_ENTRY_BYTES)
+            .ok_or("Datadog v3 expanded event size overflow")?;
         let event_bytes = std::mem::size_of::<Event>()
             .checked_add(name.len())
-            .and_then(|total| total.checked_add(tag_bytes))
-            .and_then(|total| total.checked_add(resource_bytes))
+            .and_then(|total| total.checked_add(tag_resources.tag_bytes))
+            .and_then(|total| total.checked_add(tag_resources.resource_bytes))
             .and_then(|total| total.checked_add(source_type.len()))
             .and_then(|total| total.checked_add(unit.len()))
+            .and_then(|total| total.checked_add(event_tag_entry_bytes))
             .ok_or("Datadog v3 expanded event size overflow")?;
         self.event_bytes = self
             .event_bytes
@@ -395,6 +415,7 @@ pub(crate) fn decode_v3_metric_data(
         .iter()
         .map(|tags| v3_string_list_bytes(tags))
         .collect::<crate::Result<Vec<_>>>()?;
+    let tagset_counts = tagsets.iter().map(Vec::len).collect::<Vec<_>>();
     let metadata_resource_bytes = metadata
         .map(|metadata| v3_string_list_bytes(&metadata.resources))
         .transpose()?
@@ -407,6 +428,11 @@ pub(crate) fn decode_v3_metric_data(
                 .ok_or_else(|| "Datadog v3 expanded resource size overflow".into())
         })
         .collect::<crate::Result<Vec<_>>>()?;
+    let metadata_resource_count = metadata.map_or(0, |metadata| metadata.resources.len() / 2);
+    let resource_counts = resources
+        .iter()
+        .map(|entry| entry.len() + metadata_resource_count)
+        .collect::<Vec<_>>();
 
     let dictionary_lengths = [
         names.len(),
@@ -438,8 +464,12 @@ pub(crate) fn decode_v3_metric_data(
             name,
             &unit,
             source_type,
-            tagset_bytes[refs.tagset],
-            resource_bytes[refs.resources],
+            V3TagResourceSize {
+                tag_bytes: tagset_bytes[refs.tagset],
+                tag_count: tagset_counts[refs.tagset],
+                resource_bytes: resource_bytes[refs.resources],
+                resource_count: resource_counts[refs.resources],
+            },
         )?;
         let points = point_decoder.decode_points(value_type, point_count)?;
 
