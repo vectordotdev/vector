@@ -120,7 +120,6 @@ mod tests {
     use super::Cli;
 
     const SCRIPT_COMMANDS: &[(&str, &str)] = &[
-        ("check", "docs"),
         ("package", "archive"),
         ("package", "deb"),
         ("package", "msi"),
