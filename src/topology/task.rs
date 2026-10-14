@@ -10,7 +10,9 @@ use futures::{FutureExt, future::BoxFuture};
 use pin_project::pin_project;
 use snafu::Snafu;
 use tokio::task::JoinError;
-use vector_lib::{buffers::topology::channel::BufferReceiverStream, event::EventArray};
+use vector_lib::{
+    buffers::topology::channel::BufferReceiverStream, event::EventArray, sink::SinkError,
+};
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
@@ -52,6 +54,12 @@ impl TaskError {
 impl From<crate::Error> for TaskError {
     fn from(error: crate::Error) -> Self {
         Self::wrapped(error)
+    }
+}
+
+impl From<SinkError> for TaskError {
+    fn from(error: SinkError) -> Self {
+        Self::wrapped(error.into_inner())
     }
 }
 

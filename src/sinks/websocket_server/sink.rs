@@ -364,11 +364,7 @@ impl StreamSink<Event, SinkError> for WebSocketListenerSink {
         let events_sent = register!(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
-        let listener = self
-            .tls
-            .bind(&self.address)
-            .await
-            .map_err(SinkError::from)?;
+        let listener = self.tls.bind(&self.address).await.map_err(SinkError::new)?;
 
         let peers = Arc::new(Mutex::new(HashMap::default()));
         let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(

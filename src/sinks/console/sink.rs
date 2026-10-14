@@ -40,7 +40,7 @@ where
             let mut bytes = BytesMut::new();
             self.encoder.encode(event, &mut bytes).map_err(|error| {
                 finalizers.update_status(EventStatus::Errored);
-                SinkError::from(error)
+                SinkError::new(error)
             })?;
 
             if let Err(error) = self.output.write_all(&bytes).await {
@@ -48,7 +48,7 @@ where
                 // so stop the sink.
                 error!(message = "Error writing to output. Stopping sink.", %error, internal_log_rate_limit = false);
                 finalizers.update_status(EventStatus::Errored);
-                return Err(SinkError::from(error));
+                return Err(SinkError::new(error));
             }
 
             finalizers.update_status(EventStatus::Delivered);

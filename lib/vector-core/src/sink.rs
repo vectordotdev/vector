@@ -1,4 +1,4 @@
-use std::{fmt, iter::IntoIterator, pin::Pin};
+use std::{fmt, iter::IntoIterator, ops::Deref, pin::Pin};
 
 use futures::{
     Sink, SinkExt, Stream, StreamExt, stream,
@@ -8,7 +8,51 @@ use futures::{
 use crate::event::{Event, EventArray, EventContainer, into_event_stream};
 
 /// Error returned by a running sink.
-pub type SinkError = vector_common::Error;
+#[repr(transparent)]
+#[derive(Debug)]
+pub struct SinkError(vector_common::Error);
+
+impl SinkError {
+    pub fn new(error: impl Into<vector_common::Error>) -> Self {
+        Self(error.into())
+    }
+
+    pub fn into_inner(self) -> vector_common::Error {
+        self.0
+    }
+}
+
+impl Default for SinkError {
+    fn default() -> Self {
+        Self(crate::default_task_error())
+    }
+}
+
+impl From<vector_common::Error> for SinkError {
+    fn from(error: vector_common::Error) -> Self {
+        Self(error)
+    }
+}
+
+impl fmt::Display for SinkError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::error::Error for SinkError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+
+impl Deref for SinkError {
+    type Target = vector_common::Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub enum VectorSink {
     Sink(Box<dyn Sink<EventArray, Error = ()> + Send + Unpin>),
@@ -27,7 +71,7 @@ impl VectorSink {
                 .map(Ok)
                 .forward(sink)
                 .await
-                .map_err(|()| crate::default_task_error()),
+                .map_err(|()| SinkError::default()),
             Self::Stream(s) => s.run(Box::pin(input)).await,
         }
     }
@@ -132,7 +176,7 @@ where
         self.sink
             .run(input)
             .await
-            .map_err(|()| crate::default_task_error())
+            .map_err(|()| SinkError::default())
     }
 }
 

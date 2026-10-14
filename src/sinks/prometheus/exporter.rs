@@ -548,7 +548,7 @@ impl StreamSink<Event, SinkError> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), SinkError> {
         self.start_server_if_needed().await.map_err(|error| {
             error!("Failed to start Prometheus exporter: {error}.");
-            SinkError::from(error)
+            SinkError::new(error)
         })?;
 
         let mut last_flush = Instant::now();
