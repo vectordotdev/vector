@@ -49,7 +49,7 @@ use crate::{
         GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util,
     tls::{TlsConfig, TlsSettings},
@@ -213,7 +213,7 @@ pub struct PubsubConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 

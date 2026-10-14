@@ -16,7 +16,7 @@ generated: components: sources: opentelemetry: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	grpc: {
 		description: "Configuration for the `opentelemetry` gRPC server."
@@ -156,36 +156,39 @@ generated: components: sources: opentelemetry: configuration: {
 			- The events can be forwarded directly (passthrough) to a downstream OTLP collector
 			"""
 		required: false
-		type: object: options: {
-			logs: {
-				description: """
-					Whether to use OTLP decoding for logs.
+		type: {
+			bool: {}
+			object: options: {
+				logs: {
+					description: """
+						Whether to use OTLP decoding for logs.
 
-					When `true`, logs preserve their OTLP format.
-					When `false` (default), logs are converted to Vector's native format.
-					"""
-				required: false
-				type: bool: default: false
-			}
-			metrics: {
-				description: """
-					Whether to use OTLP decoding for metrics.
+						When `true`, logs preserve their OTLP format.
+						When `false` (default), logs are converted to Vector's native format.
+						"""
+					required: false
+					type: bool: default: false
+				}
+				metrics: {
+					description: """
+						Whether to use OTLP decoding for metrics.
 
-					When `true`, metrics preserve their OTLP format but are processed as logs.
-					When `false` (default), metrics are converted to Vector's native metric format.
-					"""
-				required: false
-				type: bool: default: false
-			}
-			traces: {
-				description: """
-					Whether to use OTLP decoding for traces.
+						When `true`, metrics preserve their OTLP format but are processed as logs.
+						When `false` (default), metrics are converted to Vector's native metric format.
+						"""
+					required: false
+					type: bool: default: false
+				}
+				traces: {
+					description: """
+						Whether to use OTLP decoding for traces.
 
-					When `true`, traces preserve their OTLP format.
-					When `false` (default), traces are converted to Vector's native format.
-					"""
-				required: false
-				type: bool: default: false
+						When `true`, traces preserve their OTLP format.
+						When `false` (default), traces are converted to Vector's native format.
+						"""
+					required: false
+					type: bool: default: false
+				}
 			}
 		}
 	}

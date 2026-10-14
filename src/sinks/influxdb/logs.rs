@@ -106,7 +106,7 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "text"))]
     pub message_key: Option<OptionalValuePath>,
 
-    /// Use this option to customize the key containing the source_type.
+    /// Use this option to customize the key containing the `source_type`.
     ///
     /// The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
     #[configurable(metadata(docs::examples = "source"))]
@@ -264,7 +264,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
         let sink = BatchedHttpSink::new(
             sink,
             Buffer::new(batch.size, Compression::None),
-            request,
+            &request,
             batch.timeout,
             client,
         )
@@ -347,7 +347,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
                 count: 1
             });
             return None;
-        };
+        }
 
         Some(output)
     }
@@ -492,7 +492,8 @@ mod tests {
         settings
             .lines()
             .map(|line| format!("    {line}\n"))
-            .collect()
+            .collect::<Vec<_>>()
+            .concat()
     }
 
     const V1_SETTINGS: &str = "endpoint: http://localhost:8086\ndatabase: my-database\nconsistency: quorum\nretention_policy_name: autogen\nusername: my-user\npassword: my-password";
@@ -609,11 +610,11 @@ mod tests {
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
             settings: v2_settings(),
             tags: vec![],
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             host_key: None,
             message_key: None,
             source_type_key: None,
@@ -636,11 +637,11 @@ mod tests {
             settings: v2_settings(),
             host_key: Some(OptionalValuePath::new("custom_host")),
             tags: vec![],
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             message_key: None,
             source_type_key: None,
         };
@@ -681,7 +682,7 @@ mod tests {
         let line_protocol = split_line_protocol(string);
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
-        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_fields(&line_protocol.2, ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
 
         sink.transformer
@@ -695,7 +696,7 @@ mod tests {
             "host=aws.cloud.eur", line_protocol.1,
             "metric_type tag should be excluded"
         );
-        assert_fields(line_protocol.2, ["message=\"hello\""].to_vec());
+        assert_fields(&line_protocol.2, ["message=\"hello\""].to_vec());
     }
 
     #[test]
@@ -735,7 +736,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            &line_protocol.2,
             [
                 "int=4i",
                 "float=5.5",
@@ -786,7 +787,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            &line_protocol.2,
             [
                 "int=4i",
                 "float=5.5",
@@ -831,7 +832,7 @@ mod tests {
         assert_eq!("vector", line_protocol.0);
         assert_eq!("", line_protocol.1, "tags should be empty");
         assert_fields(
-            line_protocol.2,
+            &line_protocol.2,
             ["value=100i", "message=\"hello\""].to_vec(),
         );
 
@@ -865,7 +866,7 @@ mod tests {
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(
-            line_protocol.2,
+            &line_protocol.2,
             [
                 "a=1i",
                 "nested.array[0]=\"example-value\"",
@@ -907,7 +908,7 @@ mod tests {
             "as_a_tag=10,metric_type=logs,source_type=file",
             line_protocol.1
         );
-        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_fields(&line_protocol.2, ["message=\"hello\""].to_vec());
 
         assert_eq!("1542182950000000011\n", line_protocol.3);
     }
@@ -1009,7 +1010,7 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
         let lines = std::iter::repeat(())
-            .map(move |_| "message_value")
+            .map(move |()| "message_value")
             .take(5)
             .collect::<Vec<_>>();
         let mut events = Vec::new();
@@ -1020,7 +1021,14 @@ mod tests {
             event.insert(event_path!(format!("key{i}").as_str()), format!("value{i}"));
 
             let timestamp = Utc
-                .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
+                .with_ymd_and_hms(
+                    1970,
+                    1,
+                    1,
+                    0,
+                    0,
+                    u32::try_from(i).expect("test index fits in u32") + 1,
+                )
                 .single()
                 .expect("invalid timestamp");
             event.insert(event_path!("timestamp"), timestamp);
@@ -1062,7 +1070,7 @@ mod tests {
         assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs,source_type=file", line_protocol.1);
         assert_fields(
-            line_protocol.2.to_string(),
+            &line_protocol.2,
             [
                 &*format!("key{i}=\"value{i}\""),
                 "message=\"message_value\"",
@@ -1070,7 +1078,7 @@ mod tests {
             .to_vec(),
         );
 
-        assert_eq!(((i + 1) * 1000000000).to_string(), line_protocol.3);
+        assert_eq!(((i + 1) * 1_000_000_000).to_string(), line_protocol.3);
     }
 
     fn create_sink(
@@ -1083,14 +1091,14 @@ mod tests {
         let uri = uri.parse::<Uri>().unwrap();
         let token = token.to_string();
         let measurement = measurement.to_string();
-        let tags: HashSet<_> = tags.into_iter().map(|tag| tag.into()).collect();
+        let tags: HashSet<_> = tags.into_iter().map(Into::into).collect();
         InfluxDbLogsSink {
             uri,
             token,
             protocol_version,
             measurement,
             tags,
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             host_key: owned_value_path!("host"),
             message_key: owned_value_path!("message"),
             source_type_key: owned_value_path!("source_type"),
@@ -1125,6 +1133,11 @@ mod integration_tests {
     };
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the end-to-end log fixture together."
+    )]
     async fn influxdb2_logs_put_data() {
         let endpoint = address_v2();
         onboarding_v2(&endpoint).await;
@@ -1140,17 +1153,17 @@ mod integration_tests {
         let config = InfluxDbLogsConfig {
             measurement: Some(measure.clone()),
             endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
-            tags: Default::default(),
+            tags: Vec::default(),
             settings: InfluxDbSettings::V2(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string().into(),
             }),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             host_key: None,
             message_key: None,
             source_type_key: None,
@@ -1195,13 +1208,13 @@ mod integration_tests {
 
         drop(batch);
 
-        let events = vec![
+        let input_logs = vec![
             Event::Log(event1),
             Event::Log(event2),
             Event::Log(namespaced_log),
         ];
 
-        run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(input_logs), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

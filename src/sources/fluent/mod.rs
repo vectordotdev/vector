@@ -26,7 +26,6 @@ use crate::{
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
-    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
 };
@@ -176,7 +175,7 @@ pub struct FluentTcpConfig {
 
     tls: Option<TlsSourceConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 }
 

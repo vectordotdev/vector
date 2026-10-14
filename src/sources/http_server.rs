@@ -21,7 +21,7 @@ use crate::{
     config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
-    serde::{bool_or_struct, default_decoding},
+    serde::default_decoding,
     sources::util::{
         HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
@@ -121,7 +121,7 @@ pub struct SimpleHttpConfig {
 
     decoding: Option<DeserializerConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

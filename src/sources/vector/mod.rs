@@ -23,7 +23,6 @@ use crate::{
     },
     internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
-    serde::bool_or_struct,
     sources::{
         Source,
         util::{
@@ -145,7 +144,7 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]

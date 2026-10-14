@@ -54,7 +54,6 @@ use crate::{
         JournaldInvalidRecordError, JournaldReadError, JournaldStartJournalctlError,
         StreamClosedError,
     },
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
 };
 
@@ -204,7 +203,7 @@ pub struct JournaldConfig {
     #[serde(default)]
     pub journal_namespace: Option<String>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// Enables remapping the `PRIORITY` field from an integer to string value.

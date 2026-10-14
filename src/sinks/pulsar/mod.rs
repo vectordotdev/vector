@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 pub(super) mod config;
 mod encoder;
 mod request_builder;

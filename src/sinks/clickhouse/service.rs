@@ -39,20 +39,20 @@ impl RetryLogic for ClickhouseRetryLogic {
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        let status = StatusCode::from_u16(response.http_response.status().as_u16())
+        let status = StatusCode::from_u16(response.response.status().as_u16())
             .expect("HTTP status codes are valid u16 values");
 
         if !status.is_success() {
             debug!(
                 message = "HTTP response.",
                 %status,
-                body = %String::from_utf8_lossy(response.http_response.body()),
+                body = %String::from_utf8_lossy(response.response.body()),
             );
         }
 
         match status {
             StatusCode::INTERNAL_SERVER_ERROR => {
-                let body = response.http_response.body();
+                let body = response.response.body();
 
                 // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
                 // This attempts to check if the body starts with `Code: {code_num}` and to not

@@ -72,7 +72,6 @@ use crate::{
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
-    serde::bool_or_struct,
     sources::util::{decompression::CappedDecoder, http::capped_body},
     tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
@@ -124,7 +123,7 @@ pub struct SplunkConfig {
 
     tls: Option<TlsEnableableConfig>,
 
-    #[serde(deserialize_with = "bool_or_struct")]
+    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global settings.
