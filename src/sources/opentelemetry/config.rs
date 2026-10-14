@@ -6,7 +6,6 @@ use crate::{
         SourceContext, SourceOutput,
     },
     http::KeepaliveConfig,
-    serde::bool_or_struct,
     sources::{
         Source,
         http_server::{build_param_matcher, remove_duplicates},
@@ -125,7 +124,7 @@ pub struct OpentelemetryConfig {
 
     pub http: HttpConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
     /// Maximum number of requests processed concurrently across the HTTP and gRPC servers.
@@ -179,7 +178,7 @@ pub struct OpentelemetryConfig {
     /// - Metrics are parsed as logs while preserving the OTLP format
     /// - Vector's metric transforms will NOT be compatible with this output
     /// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub use_otlp_decoding: OtlpDecodingConfig,
 }
 

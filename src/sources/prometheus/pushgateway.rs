@@ -27,7 +27,6 @@ use crate::{
     },
     event::Event,
     http::KeepaliveConfig,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, http::HttpMethod},
@@ -52,7 +51,7 @@ pub struct PrometheusPushgatewayConfig {
 
     auth: Option<HttpServerAuthConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]

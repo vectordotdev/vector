@@ -34,7 +34,7 @@ use crate::{
         StreamClosedError,
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
 };
 
@@ -97,7 +97,7 @@ pub struct AmqpSourceConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub(crate) decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 
     /// Maximum number of unacknowledged messages the broker will deliver to this consumer.

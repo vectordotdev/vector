@@ -44,6 +44,7 @@ pub struct HecClientAcknowledgementsConfig {
     /// Once reached, the sink begins applying backpressure.
     pub max_pending_acks: NonZeroU64,
 
+    // Flattened fields receive map entries, never a standalone boolean shorthand.
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -300,7 +301,8 @@ mod tests {
     use tokio::sync::oneshot::{self, Receiver};
     use vector_lib::{config::proxy::ProxyConfig, event::EventStatus};
 
-    use super::HecAckClient;
+    use super::{HecAckClient, HecClientAcknowledgementsConfig};
+
     use crate::{
         http::HttpClient,
         sinks::{
@@ -310,6 +312,31 @@ mod tests {
             util::Compression,
         },
     };
+
+    #[test]
+    fn flattened_acknowledgements_remain_object_only() {
+        for enabled in [false, true] {
+            let input = serde_json::json!({"enabled": enabled});
+            let config: HecClientAcknowledgementsConfig = serde_json::from_value(input).unwrap();
+            assert_eq!(config.inner.enabled(), enabled);
+            assert_eq!(serde_json::to_value(config).unwrap()["enabled"], enabled);
+            assert!(
+                serde_json::from_value::<HecClientAcknowledgementsConfig>(serde_json::json!(
+                    enabled
+                ))
+                .is_err()
+            );
+        }
+        let schema =
+            serde_json::to_value(
+                vector_lib::configurable::schema::generate_root_schema::<
+                    HecClientAcknowledgementsConfig,
+                >()
+                .unwrap(),
+            )
+            .unwrap();
+        assert!(schema.get("oneOf").is_none(), "{schema}");
+    }
 
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
