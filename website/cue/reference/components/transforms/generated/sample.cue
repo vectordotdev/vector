@@ -71,7 +71,7 @@ generated: components: transforms: sample: configuration: {
 			"""
 		required: false
 		type: uint: {
-			default: 10485760
+			default: 134217728
 			unit:    "bytes"
 		}
 	}

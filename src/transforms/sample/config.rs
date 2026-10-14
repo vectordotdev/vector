@@ -166,7 +166,7 @@ pub struct SampleConfig {
 }
 
 pub const fn default_max_state_bytes() -> NonZeroUsize {
-    NonZeroUsize::new(10 * 1024 * 1024).expect("static non-zero number")
+    NonZeroUsize::new(128 * 1024 * 1024).expect("static non-zero number")
 }
 
 impl SampleConfig {
