@@ -14,6 +14,8 @@ and `acknowledgements` on the Splunk HEC source.
 Ordinary boolean options, such as `healthcheck.enabled`, are unaffected.
 
 Please also see the [dedicated note for `use_otlp_decoding`](/deprecations/#opentelemetry-use_otlp_decoding).
+Its planned replacement is handled separately; follow that note instead of migrating through an
+intermediate object form.
 
 ### Settings with an `enabled` field
 
