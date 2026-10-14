@@ -2571,6 +2571,58 @@ async fn decode_series_endpoint_v2() {
     .await;
 }
 
+#[test]
+fn decode_series_v2_rejects_excessive_unit_event_expansion() {
+    let point = ddmetric_proto::metric_payload::MetricPoint {
+        value: 1.0,
+        timestamp: 1_542_182_950,
+    };
+    let payload = ddmetric_proto::MetricPayload {
+        series: vec![ddmetric_proto::metric_payload::MetricSeries {
+            metric: "unit.expansion".to_string(),
+            points: vec![point; 16_385],
+            r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
+            unit: "u".repeat(1024),
+            ..Default::default()
+        }],
+    };
+    let mut body = Vec::new();
+    payload.encode(&mut body).unwrap();
+
+    assert!(super::metrics::decode_ddseries_v2(Bytes::from(body), &None, false).is_err());
+}
+
+#[tokio::test]
+async fn decode_series_v1_rejects_excessive_unit_event_expansion() {
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, true).await;
+    let request = DatadogSeriesRequest {
+        series: vec![DatadogSeriesMetric {
+            metric: "unit.expansion".to_string(),
+            r#type: DatadogMetricType::Gauge,
+            interval: None,
+            points: vec![DatadogPoint(1_542_182_950, 1.0); 16_385],
+            tags: None,
+            host: None,
+            source_type_name: None,
+            device: None,
+            unit: Some("u".repeat(1024)),
+            metadata: None,
+        }],
+    };
+
+    assert_eq!(
+        422,
+        send_with_path(
+            addr,
+            serde_json::to_vec(&request).unwrap(),
+            dd_api_key_headers(),
+            DD_API_SERIES_V1_PATH,
+        )
+        .await
+    );
+    assert!(crate::test_util::collect_ready(rx).is_empty());
+}
+
 fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
     values
         .iter()
