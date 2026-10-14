@@ -1699,10 +1699,7 @@ mod integration_tests {
             Value::String("some_value".into())
         );
         // https://github.com/vectordotdev/vector/issues/23659
-        #[expect(
-            clippy::cast_precision_loss,
-            reason = "Compare Unix seconds with the Prometheus timestamp."
-        )]
+        #[expect(clippy::cast_precision_loss, reason = "Unix seconds fit f64.")]
         let start_timestamp = start as f64;
         assert!(data["value"][0].as_f64().unwrap() >= start_timestamp);
         assert_eq!(data["value"][1], Value::String("123.4".into()));

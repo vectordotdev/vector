@@ -68,10 +68,7 @@ async fn insert_metrics(url: &str) {
             match metric.value() {
                 MetricValue::Gauge { value } => {
                     // https://github.com/vectordotdev/vector/issues/23659
-                    #[expect(
-                        clippy::float_cmp,
-                        reason = "Fixture values are exact multiples of 11."
-                    )]
+                    #[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
                     {
                         assert_eq!(output["value"].as_f64().unwrap(), *value);
                     }
