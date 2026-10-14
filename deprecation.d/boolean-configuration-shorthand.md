@@ -39,9 +39,3 @@ acknowledgements:
 
 Other options in these objects retain their defaults. Use the same transformation for either `true`
 or `false`.
-
-### Already-deprecated source acknowledgements
-
-Other source-level `acknowledgements` settings are already deprecated and have no effect. Remove those
-settings and configure acknowledgements globally or on the relevant sinks, following the
-[end-to-end acknowledgements documentation](/docs/architecture/end-to-end-acknowledgements/).
