@@ -114,6 +114,16 @@ fn resubscribe_backoff(attempt: u32) -> std::time::Duration {
         .min(RESUBSCRIBE_BACKOFF_MAX)
 }
 
+/// Whether `EvtNext` returning `code` means the handle can definitely never deliver again.
+///
+/// `ERROR_INVALID_OPERATION` is excluded: it also appears on a healthy but idle (disabled or
+/// empty) channel, which must keep counting as active.
+fn handle_is_dead(code: u32) -> bool {
+    code == ERROR_EVT_QUERY_RESULT_STALE
+        || code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION
+        || code == ERROR_INVALID_HANDLE
+}
+
 /// Cap a pending re-subscription deadline at the base interval from `now`.
 ///
 /// Used for `ERROR_INVALID_HANDLE`: the handle's service instance is gone and it can never
@@ -694,6 +704,12 @@ impl EventLogSubscription {
                             // Still unusable, nothing new signalled, backoff not over: leave
                             // the handle as it is. The speculative pull in mod.rs brings us
                             // back here; a signal ends the wait immediately.
+                            // A definitely dead handle must not be reported as active while
+                            // it waits; a successful re-subscription sets it active again.
+                            if handle_is_dead(code) && channel_sub.subscription_active {
+                                channel_sub.subscription_active = false;
+                                channel_sub.subscription_active_gauge.set(0.0);
+                            }
                             debug!(
                                 message = "Re-subscription backed off, channel idle.",
                                 error_code = code,
@@ -1359,6 +1375,17 @@ mod tests {
         let short = Some(now + Duration::from_secs(2));
         assert_eq!(cap_deadline_for_invalid_handle(short, now), short);
         assert_eq!(cap_deadline_for_invalid_handle(None, now), None);
+    }
+
+    #[test]
+    fn test_dead_handle_codes_exclude_idle_invalid_operation() {
+        // Definitely dead: reported inactive while waiting for the re-subscription.
+        assert!(handle_is_dead(ERROR_INVALID_HANDLE));
+        assert!(handle_is_dead(ERROR_EVT_QUERY_RESULT_STALE));
+        assert!(handle_is_dead(ERROR_EVT_QUERY_RESULT_INVALID_POSITION));
+        // Also returned by a healthy but idle channel, so it must not flip the active state.
+        assert!(!handle_is_dead(ERROR_INVALID_OPERATION));
+        assert!(!handle_is_dead(ERROR_NO_MORE_ITEMS));
     }
 
     #[test]
