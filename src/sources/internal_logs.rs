@@ -113,7 +113,7 @@ impl SourceConfig for InternalLogsConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(crate::sources::opaque_source(run(
+        Ok(crate::sources::source_with_error(run(
             host_key,
             pid_key,
             subscription,
@@ -145,7 +145,7 @@ async fn run(
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> Result<(), vector_lib::source_sender::SendError> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
@@ -196,10 +196,10 @@ async fn run(
             Utc::now(),
         );
 
-        if (out.send_event(Event::from(log)).await).is_err() {
+        if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(StreamClosedError { count: 1 });
-            return Err(());
+            return Err(error);
         }
     }
 

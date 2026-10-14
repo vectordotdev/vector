@@ -157,7 +157,7 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let http_client = HttpClient::new(None, &cx.proxy)?;
 
-        Ok(crate::sources::opaque_source(aws_ecs_metrics(
+        Ok(crate::sources::source_with_error(aws_ecs_metrics(
             http_client,
             self.stats_endpoint(),
             self.scrape_interval_secs,
@@ -183,7 +183,7 @@ async fn aws_ecs_metrics(
     namespace: Option<String>,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
-) -> Result<(), ()> {
+) -> Result<(), vector_lib::source_sender::SendError> {
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
@@ -210,9 +210,9 @@ async fn aws_ecs_metrics(
                                     endpoint: uri.path(),
                                 });
 
-                                if (out.send_batch(metrics).await).is_err() {
+                                if let Err(error) = out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count });
-                                    return Err(());
+                                    return Err(error);
                                 }
                             }
                             Err(error) => {

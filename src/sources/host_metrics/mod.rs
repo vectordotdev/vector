@@ -304,7 +304,7 @@ impl SourceConfig for HostMetricsConfig {
         let mut config = self.clone();
         config.namespace = config.namespace.filter(|namespace| !namespace.is_empty());
 
-        Ok(crate::sources::opaque_source(
+        Ok(crate::sources::source_with_error(
             config.run(cx.out, cx.shutdown),
         ))
     }
@@ -324,7 +324,11 @@ impl HostMetricsConfig {
         self.scrape_interval_secs = Duration::from_secs_f64(value);
     }
 
-    async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run(
+        self,
+        mut out: SourceSender,
+        shutdown: ShutdownSignal,
+    ) -> Result<(), vector_lib::source_sender::SendError> {
         let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
@@ -336,9 +340,9 @@ impl HostMetricsConfig {
             bytes_received.emit(ByteSize(0));
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
-            if (out.send_batch(metrics).await).is_err() {
+            if let Err(error) = out.send_batch(metrics).await {
                 emit!(StreamClosedError { count });
-                return Err(());
+                return Err(error);
             }
         }
 

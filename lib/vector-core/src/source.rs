@@ -15,3 +15,12 @@ where
 {
     Box::pin(async move { future.await.map_err(|()| crate::default_task_error()) })
 }
+
+/// Adapt a source that returns an error with a cause.
+pub fn source_with_error<F, E>(future: F) -> Source
+where
+    F: Future<Output = Result<(), E>> + Send + 'static,
+    E: Into<SourceError>,
+{
+    Box::pin(async move { future.await.map_err(Into::into) })
+}

@@ -377,7 +377,7 @@ impl SourceConfig for HttpClientConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(crate::sources::opaque_source(call(
+        Ok(crate::sources::source_with_error(call(
             inputs,
             context,
             cx.out,

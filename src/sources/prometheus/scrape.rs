@@ -171,7 +171,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(crate::sources::opaque_source(call(
+        Ok(crate::sources::source_with_error(call(
             inputs,
             builder,
             cx.out,

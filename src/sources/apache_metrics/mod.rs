@@ -149,7 +149,7 @@ fn apache_metrics(
     mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
-    crate::sources::opaque_source(async move {
+    crate::sources::source_with_error(async move {
         let mut stream = IntervalStream::new(tokio::time::interval(interval))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
@@ -267,10 +267,10 @@ fn apache_metrics(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(_) => {
+            Err(error) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Err(())
+                Err(error)
             }
         }
     })
