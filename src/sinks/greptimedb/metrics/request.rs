@@ -34,7 +34,7 @@ impl GreptimeDBGrpcRequest {
             finalizers.merge(metric.take_finalizers());
             estimated_request_size += GreptimeDBBatchSizer::estimated_size_of(&metric);
 
-            request_metadata_builder.track_event(metric.clone());
+            request_metadata_builder.track_event(&metric);
 
             items.push(metric_to_insert_request(&metric, options));
         }
