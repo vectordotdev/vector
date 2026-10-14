@@ -184,7 +184,7 @@ impl ValidatedSink for PubsubConfig {
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch_settings.size),
-            request_settings,
+            &request_settings,
             batch_settings.timeout,
             client,
         )
