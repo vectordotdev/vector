@@ -13,9 +13,5 @@ pub fn opaque_source<F>(future: F) -> Source
 where
     F: Future<Output = Result<(), ()>> + Send + 'static,
 {
-    Box::pin(async move {
-        future
-            .await
-            .map_err(|()| "the task completed with an error".into())
-    })
+    Box::pin(async move { future.await.map_err(|()| crate::default_task_error()) })
 }

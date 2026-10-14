@@ -59,6 +59,11 @@ pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 
+/// Error for a component that reports failure without a cause.
+pub fn default_task_error() -> vector_common::Error {
+    "the task completed with an error".into()
+}
+
 pub(crate) use vector_common::{Error, Result};
 
 pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {

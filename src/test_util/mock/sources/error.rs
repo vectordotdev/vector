@@ -23,7 +23,7 @@ impl_generate_config_from_default!(ErrorSourceConfig);
 #[typetag::serde(name = "test_error")]
 impl SourceConfig for ErrorSourceConfig {
     async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
-        Ok(err("the task completed with an error".into()).boxed())
+        Ok(err(vector_lib::default_task_error()).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

@@ -60,9 +60,10 @@ impl SourceConfig for TripwireSourceConfig {
                     .then(crate::shutdown::tripwire_handler)
                     .boxed(),
             )
-            .map(|_| drop(out))
-            .unit_error()
-            .map(|result| result.map_err(|_| "the task completed with an error".into())),
+            .map(|_| {
+                drop(out);
+                Ok(())
+            }),
         ))
     }
 

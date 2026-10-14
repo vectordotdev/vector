@@ -55,7 +55,7 @@ pub fn build_unix_datagram_source(
             });
         }
 
-        result.map_err(|_| "the task completed with an error".into())
+        result
     }))
 }
 
@@ -66,7 +66,7 @@ async fn listen(
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<String>) + Clone + Send + Sync + 'static,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let mut buf = BytesMut::with_capacity(max_length);
     let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
     loop {
@@ -78,7 +78,8 @@ async fn listen(
                     emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
-                    })
+                    });
+                    crate::sources::SourceError::from(error)
                 })?;
 
                 let span = info_span!("datagram");

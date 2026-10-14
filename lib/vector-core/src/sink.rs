@@ -27,7 +27,7 @@ impl VectorSink {
                 .map(Ok)
                 .forward(sink)
                 .await
-                .map_err(|()| "the task completed with an error".into()),
+                .map_err(|()| crate::default_task_error()),
             Self::Stream(s) => s.run(Box::pin(input)).await,
         }
     }
@@ -132,7 +132,7 @@ where
         self.sink
             .run(input)
             .await
-            .map_err(|()| "the task completed with an error".into())
+            .map_err(|()| crate::default_task_error())
     }
 }
 
