@@ -923,9 +923,9 @@ mod tests {
 
     #[tokio::test]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
-        reason = "Keep the partition fixture and assertions together."
+        reason = "Keep the partition fixture together until the test can be split."
     )]
     async fn log_many_partitions() {
         let directory = temp_dir();

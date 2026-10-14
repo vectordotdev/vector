@@ -174,9 +174,9 @@ impl HttpSinkConfig {
 impl GenerateConfig for HttpSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"uri: https://10.22.212.22:9000/endpoint
+            r"uri: https://10.22.212.22:9000/endpoint
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -285,12 +285,12 @@ impl SinkConfig for HttpSinkConfig {
         let mut files = Vec::new();
         if let Some(tls) = &self.tls {
             if let Some(crt_file) = &tls.crt_file {
-                files.push(crt_file)
+                files.push(crt_file);
             }
             if let Some(key_file) = &tls.key_file {
-                files.push(key_file)
+                files.push(key_file);
             }
-        };
+        }
         files
     }
 
@@ -381,8 +381,10 @@ impl ValidatedSink for HttpSinkConfig {
         )?;
 
         let content_type = {
-            use FramingConfig::*;
-            use SerializerConfig::*;
+            use FramingConfig::{CharacterDelimited, NewlineDelimited};
+            #[cfg(feature = "codecs-opentelemetry")]
+            use SerializerConfig::Otlp;
+            use SerializerConfig::{Json, RawMessage, Text};
             match (serializer_config, &framer_config) {
                 (RawMessage | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
                 (Json(_), NewlineDelimited) => Some(CONTENT_TYPE_NDJSON.to_owned()),
@@ -434,7 +436,7 @@ impl ValidatedSink for HttpSinkConfig {
         validated: &ValidatedHttp,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.build_from_validated(validated, cx, Self::NAME).await
+        Box::pin(self.build_from_validated(validated, cx, Self::NAME)).await
     }
 }
 
@@ -498,10 +500,10 @@ impl HttpSinkConfig {
                     .region()
                     .await;
                 let region = (match &auth {
-                    AwsAuthentication::AccessKey { region, .. } => region.clone(),
+                    AwsAuthentication::AccessKey { region, .. }
+                    | AwsAuthentication::Role { region, .. }
+                    | AwsAuthentication::Default { region, .. } => region.clone(),
                     AwsAuthentication::File { .. } => None,
-                    AwsAuthentication::Role { region, .. } => region.clone(),
-                    AwsAuthentication::Default { region, .. } => region.clone(),
                 })
                 .map_or(default_region, |r| Some(Region::new(r)))
                 .expect("Region must be specified");
