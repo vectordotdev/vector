@@ -106,7 +106,9 @@ pub fn simple_trace_event(resource: String) -> TraceEvent {
     t
 }
 
-fn validate_simple_span(span: dd_proto::Span, resource: String) {
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::float_cmp, reason = "Assert exact serialized values.")]
+fn validate_simple_span(span: &dd_proto::Span, resource: &str) {
     assert_eq!(span.service, "a_service");
     assert_eq!(span.name, "a_name");
     assert_eq!(span.resource, resource);
@@ -122,6 +124,8 @@ fn validate_simple_span(span: dd_proto::Span, resource: String) {
     assert_eq!(span.metrics["a_metric"], 0.577);
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::float_cmp, reason = "Assert an empty sketch.")]
 #[tokio::test]
 async fn smoke() {
     let mut t = simple_trace_event("a_resource".to_string());
@@ -154,7 +158,7 @@ async fn smoke() {
     assert_eq!(tracer_payload.chunks.len(), 1);
     let mut chunk = tracer_payload.chunks.pop().unwrap();
     assert_eq!(chunk.spans.len(), 1);
-    validate_simple_span(chunk.spans.pop().unwrap(), "a_resource".to_string());
+    validate_simple_span(&chunk.spans.pop().unwrap(), "a_resource");
 
     let (stats_parts, stats_body) = stats.unwrap();
     assert_eq!(
@@ -262,13 +266,13 @@ async fn multiple_traces() {
     assert_eq!(decoded_payload.host_name, "a_host");
     assert_eq!(decoded_payload.env, "an_env");
 
-    ["trace_2", "trace_1"].into_iter().for_each(|t| {
+    for t in ["trace_2", "trace_1"] {
         let mut tracer_payload = decoded_payload.tracer_payloads.pop().unwrap();
         assert_eq!(tracer_payload.chunks.len(), 1);
         let mut chunk = tracer_payload.chunks.pop().unwrap();
         assert_eq!(chunk.spans.len(), 1);
-        validate_simple_span(chunk.spans.pop().unwrap(), t.to_string());
-    });
+        validate_simple_span(&chunk.spans.pop().unwrap(), t);
+    }
 
     let (stats_parts, stats_body) = stats.unwrap();
     assert_eq!(
