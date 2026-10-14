@@ -21,7 +21,8 @@ use crate::{
 };
 
 /// Maximum number of events the main task will gather into a single batch before calling
-/// `send_batch`. Amortizes per-call overhead (timestamp capture, metrics, chunking).
+/// `send_batch`. Amortizes per-call overhead (timestamp capture, metrics, chunking). The
+/// effective batch size is further capped to `source_sender::chunk_size_events()`, see `run`.
 const MAX_BATCH_SIZE: usize = 1024;
 
 /// Capacity of the intermediate queue that decouples broadcast consumption from downstream
@@ -193,8 +194,14 @@ async fn run(
     // infinite loop since it receives all such logs. Broadcast lag is
     // reported by `TraceSubscription::into_stream` itself, after an event
     // has been received, so its log cannot lag the receiver again.
-    let mut batch: Vec<LogEvent> = Vec::with_capacity(MAX_BATCH_SIZE);
-    while queue_rx.recv_many(&mut batch, MAX_BATCH_SIZE).await > 0 {
+    //
+    // Batches are capped to one source sender chunk, so `send_batch` enqueues each batch as a
+    // single unit: on error none of its events were forwarded, and `event_count` below is the
+    // exact number of dropped events. A larger batch would be split into several chunks, and an
+    // error after the first chunk would over-report drops.
+    let max_batch_size = MAX_BATCH_SIZE.min(vector_lib::source_sender::chunk_size_events());
+    let mut batch: Vec<LogEvent> = Vec::with_capacity(max_batch_size);
+    while queue_rx.recv_many(&mut batch, max_batch_size).await > 0 {
         let mut events: Vec<Event> = Vec::with_capacity(batch.len());
         let mut byte_size_total: usize = 0;
         let mut json_byte_size_total = vector_lib::json_size::JsonSize::zero();
