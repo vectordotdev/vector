@@ -51,4 +51,7 @@ ignore = [
   { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is unmaintained - transitive dep via mlua_derive v0.11.0; unblocked when mlua upgrades its derive macro" },
   { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7 is vulnerable but unmaintained; upgrading vector-buffers to rkyv 0.8 requires a breaking serialization migration" },
   { id = "RUSTSEC-2026-0258", reason = "h2 0.3 via aws-smithy-http-client (hyper 0.14) and tonic 0.11 - http 1.0 / AWS SDK upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0346", reason = "rustls 0.22 is vulnerable - unpatched crate (https://github.com/bytebeamio/rumqtt) & tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0348", reason = "rustls 0.22 is vulnerable - unpatched crate (https://github.com/bytebeamio/rumqtt) & tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0349", reason = "rustls 0.22 is vulnerable - unpatched crate (https://github.com/bytebeamio/rumqtt) & tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
 ]
