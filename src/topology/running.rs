@@ -735,17 +735,28 @@ impl RunningTopology {
                     && !buffer_dirs
                         .iter()
                         .any(|path| new_buffer_dirs.contains(path))
-                    && let Some(usage) = usage
-                    && (usage.event_count > 0 || usage.byte_size > 0)
                 {
-                    warn!(
-                        component_id = %key,
-                        ?buffer_dirs,
-                        ?new_buffer_dirs,
-                        accounted_events = usage.event_count,
-                        accounted_bytes = usage.byte_size,
-                        message = "Replacement sink does not use the previous disk buffer. If reload succeeds, its remaining accounted data will be left unreferenced.",
-                    );
+                    match usage {
+                        Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
+                            warn!(
+                                component_id = %key,
+                                ?buffer_dirs,
+                                ?new_buffer_dirs,
+                                accounted_events = usage.event_count,
+                                accounted_bytes = usage.byte_size,
+                                message = "Replacement sink does not use the previous disk buffer. If reload succeeds, its remaining accounted data will be left unreferenced.",
+                            );
+                        }
+                        None => {
+                            warn!(
+                                component_id = %key,
+                                ?buffer_dirs,
+                                ?new_buffer_dirs,
+                                message = "Replacement sink does not use the previous disk buffer, and its remaining usage is unavailable. If reload succeeds, any remaining data will be left unreferenced.",
+                            );
+                        }
+                        Some(_) => {}
+                    }
                 }
             }
 
