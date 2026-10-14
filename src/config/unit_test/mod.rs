@@ -93,36 +93,20 @@ impl UnitTest {
     }
 }
 
-/// Loads Log Schema from configurations and sets global schema.
-/// Once this is done, configurations can be correctly loaded using
-/// configured log schema defaults.
-/// If deny is set, will panic if schema has already been set.
-fn init_log_schema_from_paths(
-    config_paths: &[ConfigPath],
-    deny_if_set: bool,
-) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
-    vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
-    Ok(())
-}
-
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    init_log_schema_from_paths(paths, false)?;
-    let secrets_backends_loader =
-        loading::loader_from_paths(loading::SecretBackendLoader::default(), paths)?;
-    let secrets = secrets_backends_loader
-        .retrieve_secrets(signal_handler)
-        .await
-        .map_err(|e| vec![e])?;
-
-    let config_builder = ConfigBuilderLoader::default()
-        .secrets(secrets)
-        .load_from_paths(paths)?;
+    let mut inputs = loading::ParsedInputs::from_paths(paths);
+    inputs.interpolate_environment(loading::env_var_interpolation_enabled());
+    // Establish log-schema defaults before the final deserialization, using the
+    // same input snapshot for bootstrap, secret discovery, and test construction.
+    let bootstrap = ConfigBuilderLoader::default().load_prepared(&inputs)?;
+    vector_lib::config::init_log_schema(bootstrap.global.log_schema, false);
+    let config_builder =
+        loading::load_builder_from_prepared_with_secrets(inputs, signal_handler, false).await?;
 
     build_unit_tests(config_builder).await
 }

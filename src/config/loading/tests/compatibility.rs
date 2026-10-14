@@ -51,14 +51,14 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
             enabled: Some(true),
         },
         Case {
-            name: "quoted environment boolean is a string",
+            name: "interpolated environment boolean shorthand",
             input: json!("${VECTOR_TEST_COMPAT_UNSET:-false}"),
-            enabled: None,
+            enabled: Some(false),
         },
         Case {
-            name: "quoted secret boolean is a string",
+            name: "interpolated secret boolean shorthand",
             input: json!("SECRET[backend.healthcheck]"),
-            enabled: None,
+            enabled: Some(false),
         },
         Case {
             name: "integer",
@@ -139,7 +139,10 @@ fn namespaced_tests_load_interpolated_event_counts() {
     for (name, count) in [
         ("environment", "${VECTOR_TEST_COMPAT_UNSET:-42}"),
         ("secret", "SECRET[backend.count]"),
-    ] {
+    ]
+    .into_iter()
+    .flat_map(|(name, count)| [(name, count.to_owned()), (name, format!("'{count}'"))])
+    {
         let directory = tempfile::tempdir().unwrap();
         let input = format!(
             "name: event count\noutputs:\n  - extract_from: transform\n    expected_event_count: {count}\n"
@@ -172,7 +175,7 @@ fn directory_fragments_preserve_merge_semantics() {
         field: &'static str,
         first: &'static str,
         second: &'static str,
-        expected: Option<Value>,
+        expected: Result<Value, &'static str>,
     }
 
     for case in [
@@ -181,70 +184,70 @@ fn directory_fragments_preserve_merge_semantics() {
             field: "count",
             first: "43",
             second: "43",
-            expected: Some(json!(43)),
+            expected: Ok(json!(43)),
         },
         Case {
             name: "environment integer merges with literal",
             field: "count",
             first: "43",
             second: "${VECTOR_TEST_COMPAT_UNSET:-43}",
-            expected: Some(json!(43)),
+            expected: Ok(json!(43)),
         },
         Case {
             name: "secret integer merges with literal",
             field: "count",
             first: "SECRET[backend.count]",
             second: "43",
-            expected: Some(json!(43)),
+            expected: Ok(json!(43)),
         },
         Case {
             name: "environment float merges with literal",
             field: "interval",
             first: "2.5",
             second: "${VECTOR_TEST_COMPAT_UNSET:-2.5}",
-            expected: Some(json!(2.5)),
+            expected: Ok(json!(2.5)),
         },
         Case {
             name: "environment boolean merges with literal",
             field: "log_namespace",
             first: "true",
             second: "${VECTOR_TEST_COMPAT_UNSET:-true}",
-            expected: Some(json!(true)),
+            expected: Ok(json!(true)),
         },
         Case {
             name: "integer conflicts with boolean",
             field: "count",
             first: "1",
             second: "true",
-            expected: None,
+            expected: Err("Incompatible types"),
         },
         Case {
             name: "integer conflicts with float",
             field: "interval",
             first: "1.5",
             second: "2",
-            expected: None,
+            expected: Err("Incompatible types"),
         },
         Case {
             name: "array conflicts with string",
             field: "lines",
             first: "[first]",
             second: "second",
-            expected: None,
+            expected: Err("Incompatible types"),
         },
         Case {
             name: "invalid interpolation cannot be hidden",
             field: "count",
             first: "${VECTOR_TEST_COMPAT_UNSET:-invalid}",
             second: "43",
-            expected: None,
+            expected: Err("Expected integer at 'sources.demo.count'"),
         },
         Case {
-            name: "quoted interpolation conflicts with integer",
+            name: "quoted interpolation merges with integer",
             field: "count",
             first: "'${VECTOR_TEST_COMPAT_UNSET:-43}'",
             second: "43",
-            expected: None,
+            expected: Ok(json!(43)),
         },
     ] {
         for reversed in [false, true] {
@@ -274,7 +277,7 @@ fn directory_fragments_preserve_merge_semantics() {
                 .interpolate_env(true)
                 .secrets(HashMap::from([("backend.count".into(), "43".into())]))
                 .load_from_paths(&[ConfigPath::Dir(directory.path().to_owned())]);
-            if let Some(expected) = &case.expected {
+            if let Ok(expected) = &case.expected {
                 let builder = result.unwrap_or_else(|errors| {
                     panic!("{} / reversed={reversed}: {errors:?}", case.name)
                 });
@@ -289,7 +292,7 @@ fn directory_fragments_preserve_merge_semantics() {
                 assert!(
                     errors
                         .iter()
-                        .any(|error| error.contains("Incompatible types")),
+                        .any(|error| error.contains(case.expected.as_ref().unwrap_err())),
                     "{} / reversed={reversed}: {errors:?}",
                     case.name
                 );
@@ -457,44 +460,44 @@ fn interpolated_scalars_follow_format_quoting() {
         accepted: bool,
     }
 
-    // These are the text-first loader's expectations. Quoted numeric/boolean
-    // placeholders are strings, not values of the destination field's type.
+    // Parse-first loading requires syntactically valid input before substitution.
+    // Quoted numeric and boolean placeholders are coerced using the field schema.
     for case in [
         Case {
-            name: "YAML plain placeholders",
+            name: "YAML plain placeholders and a field alias",
             format: Format::Yaml,
-            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: @COUNT@\n    interval: @INTERVAL@\n    log_namespace: @BOOL@\n",
+            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: @COUNT@\n    batch_interval: @INTERVAL@\n    log_namespace: @BOOL@\n",
             accepted: true,
         },
         Case {
             name: "YAML quoted placeholders",
             format: Format::Yaml,
             template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: '@COUNT@'\n    interval: '@INTERVAL@'\n    log_namespace: '@BOOL@'\n",
-            accepted: false,
+            accepted: true,
         },
         Case {
             name: "TOML unquoted placeholders",
             format: Format::Toml,
             template: "[sources.demo]\ntype = 'demo_logs'\nformat = 'json'\ncount = @COUNT@\ninterval = @INTERVAL@\nlog_namespace = @BOOL@\n",
-            accepted: true,
+            accepted: false,
         },
         Case {
             name: "TOML quoted placeholders",
             format: Format::Toml,
             template: "[sources.demo]\ntype = 'demo_logs'\nformat = 'json'\ncount = '@COUNT@'\ninterval = '@INTERVAL@'\nlog_namespace = '@BOOL@'\n",
-            accepted: false,
+            accepted: true,
         },
         Case {
             name: "JSON unquoted placeholders",
             format: Format::Json,
             template: r#"{"sources":{"demo":{"type":"demo_logs","format":"json","count":@COUNT@,"interval":@INTERVAL@,"log_namespace":@BOOL@}}}"#,
-            accepted: true,
+            accepted: false,
         },
         Case {
             name: "JSON quoted placeholders",
             format: Format::Json,
             template: r#"{"sources":{"demo":{"type":"demo_logs","format":"json","count":"@COUNT@","interval":"@INTERVAL@","log_namespace":"@BOOL@"}}}"#,
-            accepted: false,
+            accepted: true,
         },
     ] {
         for (source, count, interval, boolean) in [
@@ -554,7 +557,7 @@ fn disabled_environment_interpolation_preserves_strings() {
             type: demo_logs
             format: shuffle
             lines: ['${VECTOR_TEST_COMPAT_DISABLED_UNSET:?must not be read}', '$$literal']
-            count: 42
+            count: '42'
     "};
     let builder = ConfigBuilderLoader::default()
         .interpolate_env(false)

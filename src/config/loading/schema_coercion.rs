@@ -2,12 +2,12 @@
 //!
 //! This is a preparation pass, not a general JSON Schema validator. Serde remains
 //! authoritative for final component validation.
-//! The loader does not invoke this pass yet.
+//! The loader invokes this pass after environment-variable and secret substitution.
 
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
 use std::collections::HashSet;
-use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_VARIANT_ALIASES};
+use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_STRING_ONLY, SERDE_VARIANT_ALIASES};
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -194,6 +194,18 @@ impl<'a> ValueCoercer<'a> {
     }
 
     fn coerce_object_schema(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        // Some custom string deserializers (for example ASCII characters) reject
+        // native numbers. Do not turn those inputs into valid-looking strings.
+        if schema
+            .get(METADATA)
+            .and_then(|metadata| metadata.get(SERDE_STRING_ONLY))
+            .and_then(Value::as_bool)
+            == Some(true)
+            && !value.is_string()
+        {
+            return fail_expected!(String, value, self.path);
+        }
+
         // Keywords can coexist. Apply every constraint in this order.
         self.apply_reference(value, schema)?;
         self.apply_all_of(value, schema)?;

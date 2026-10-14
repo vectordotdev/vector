@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     sync::LazyLock,
 };
 
@@ -14,7 +13,8 @@ use crate::{
     config::{
         SecretBackend,
         loading::{
-            ComponentHint, Loader, deserialize_config_map, prepare_input, process::Process,
+            deserialize_config_map,
+            loader::{ConfigScope, ParsedInputs, merge_root_config},
             representation::ConfigMap,
         },
     },
@@ -33,6 +33,8 @@ use crate::{
 // - "SECRET[.secret.name]" will not match
 pub static COLLECTOR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]").unwrap());
+
+pub(super) const SECRET_KEY: &str = "secret";
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -55,6 +57,69 @@ impl SecretBackendLoader {
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
+    }
+
+    /// Loads secret backends and discovers secret references from configuration paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading, parsing, interpolating, or merging
+    /// configuration, or deserializing secret backends.
+    pub fn load_from_paths(self, paths: &[super::ConfigPath]) -> Result<Self, Vec<String>> {
+        self.load(ParsedInputs::from_paths(paths))
+    }
+
+    /// Loads secret backends and discovers secret references from a configuration reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors encountered while reading, parsing, or interpolating the input,
+    /// or deserializing secret backends.
+    pub fn load_from_input(
+        self,
+        input: impl std::io::Read,
+        format: super::Format,
+    ) -> Result<Self, Vec<String>> {
+        self.load(ParsedInputs::from_input(input, format))
+    }
+
+    fn load(self, mut inputs: ParsedInputs) -> Result<Self, Vec<String>> {
+        inputs.interpolate_environment(self.interpolate_env);
+        self.load_prepared(&inputs)
+    }
+
+    /// Discovers secrets from the same environment-expanded snapshot used by the builder.
+    pub(crate) fn load_prepared(mut self, inputs: &ParsedInputs) -> Result<Self, Vec<String>> {
+        let mut secret_keys = std::mem::take(&mut self.secret_keys);
+        inputs.assemble_coerced(
+            super::loader::CoercionScope::SecretBackends,
+            |map| collect_secret_keys_from_map(map, &mut secret_keys),
+            |map, scope| self.merge(map, scope),
+        )?;
+        self.secret_keys = secret_keys;
+        Ok(self)
+    }
+
+    fn merge(&mut self, mut map: ConfigMap, scope: ConfigScope) -> Result<(), Vec<String>> {
+        if matches!(scope, ConfigScope::DirectoryRoot) {
+            // Other components may contain unresolved secrets, including type tags.
+            // Only assemble and coerce the backend settings needed to fetch secrets.
+            for value in map.values_mut() {
+                if let serde_json::Value::Object(map) = value {
+                    map.retain(|key, _| key == SECRET_KEY);
+                }
+            }
+            map = merge_root_config(map)?;
+        }
+        if let Some(backends) = map.remove(SECRET_KEY) {
+            let additional =
+                deserialize_config_map::<SecretBackendOuter>(ConfigMap::from_iter([(
+                    SECRET_KEY.to_owned(),
+                    backends,
+                )]))?;
+            self.backends.extend(additional.secret);
+        }
+        Ok(())
     }
 
     /// Retrieve secrets from backends.
@@ -107,29 +172,6 @@ impl Default for SecretBackendLoader {
             secret_keys: HashMap::new(),
             interpolate_env: super::env_var_interpolation_enabled(),
         }
-    }
-}
-
-impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input, self.interpolate_env)?;
-        // Collect secret placeholders just after env var processing
-        collect_secret_keys(&config_string, &mut self.secret_keys);
-        Ok(config_string)
-    }
-
-    fn merge(&mut self, map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if map.contains_key("secret") {
-            let additional = deserialize_config_map::<SecretBackendOuter>(map)?;
-            self.backends.extend(additional.secret);
-        }
-        Ok(())
-    }
-}
-
-impl Loader<SecretBackendLoader> for SecretBackendLoader {
-    fn take(self) -> SecretBackendLoader {
-        self
     }
 }
 
