@@ -23,8 +23,8 @@ use crate::{
     schema::Definition,
     test_util::{
         mock::{
-            basic_sink, basic_sink_failing_healthcheck, basic_sink_with_data, basic_source,
-            basic_source_with_data, basic_source_with_event_counter, basic_transform,
+            backpressure_sink, basic_sink, basic_sink_failing_healthcheck, basic_sink_with_data,
+            basic_source, basic_source_with_data, basic_source_with_event_counter, basic_transform,
             error_definition_transform,
         },
         start_topology, trace_init,
@@ -362,6 +362,51 @@ async fn topology_remove_one_sink() {
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
+}
+
+#[tokio::test]
+async fn topology_reload_replaces_sink_that_stops_polling_input() {
+    // A changed sink must finish before the reload can hand its buffer to the new sink. A sink
+    // that never polls its input again, such as a socket sink retrying a connection forever,
+    // used to hang the reload. See https://github.com/vectordotdev/vector/issues/26687.
+    trace_init();
+
+    let (mut in1, source1) = basic_source();
+    let mut config = Config::builder();
+    config.graceful_shutdown_duration = Some(Duration::from_secs(1));
+    config.add_source("in1", source1);
+    config.add_sink("out1", &["in1"], backpressure_sink(1));
+
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
+
+    // The old sink takes this event and then stops polling its input.
+    in1.send_event(Event::Log(LogEvent::from("stuck")))
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(100)).await;
+
+    let (out1, sink1) = basic_sink(10);
+    let mut config = Config::builder();
+    config.graceful_shutdown_duration = Some(Duration::from_secs(1));
+    config.add_source("in1", basic_source().1);
+    config.add_sink("out1", &["in1"], sink1);
+
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        topology.reload_config_and_respawn(config.build().unwrap(), Default::default()),
+    )
+    .await
+    .expect("reload hung waiting for the old sink")
+    .unwrap();
+
+    let mut event = Event::Log(LogEvent::from("delivered"));
+    in1.send_event(event.clone()).await.unwrap();
+
+    topology.stop().await;
+
+    let res = out1.flat_map(into_event_stream).collect::<Vec<_>>().await;
+    set_expected_source_metadata(&mut event, "in1");
+    assert_eq!(vec![event], res);
 }
 
 #[tokio::test]
