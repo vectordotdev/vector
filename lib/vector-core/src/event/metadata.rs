@@ -333,6 +333,11 @@ impl EventMetadata {
         self.get_mut().datadog_metric_unit = Some(unit.into());
     }
 
+    /// Clears the Datadog metric unit.
+    pub fn clear_datadog_metric_unit(&mut self) {
+        self.get_mut().datadog_metric_unit = None;
+    }
+
     /// Returns a reference to the event id.
     pub fn source_event_id(&self) -> Option<Uuid> {
         self.inner.source_event_id
@@ -389,16 +394,14 @@ impl ByteSizeOf for EventMetadata {
     fn allocated_bytes(&self) -> usize {
         // Most Arc-backed metadata points to allocations owned or accounted for elsewhere. The
         // Datadog metric unit is retained solely by event metadata, so include its allocation.
-        let datadog_metric_unit_bytes = self.inner.datadog_metric_unit.as_ref().map_or(0, |unit| {
-            // Amortize the shared string allocation across both copies of this metadata wrapper
-            // and copy-on-write `Inner` values that retain the same unit. This keeps a collection
-            // of cloned events accountable for the allocation without charging its full size to
-            // every event.
-            let owners = Arc::strong_count(&self.inner)
-                .saturating_mul(Arc::strong_count(unit))
-                .max(1);
-            unit.len().div_ceil(owners)
-        });
+        // Charge each event conservatively. Arc owner counts are transient: fanout branches can
+        // disappear after a memory queue has snapshotted this value, leaving that queue as the sole
+        // owner without updating its reservation.
+        let datadog_metric_unit_bytes = self
+            .inner
+            .datadog_metric_unit
+            .as_ref()
+            .map_or(0, |unit| unit.len());
 
         self.inner.finalizers.allocated_bytes() + datadog_metric_unit_bytes
     }
@@ -727,21 +730,17 @@ mod test {
     }
 
     #[test]
-    fn metadata_byte_size_accounts_for_shared_datadog_metric_unit_once() {
+    fn metadata_byte_size_conservatively_accounts_for_shared_datadog_metric_unit() {
         let unit = "x".repeat(1024);
         let metadata = EventMetadata::default().with_datadog_metric_unit(unit);
         let mut shared_inner = metadata.clone();
 
-        assert_eq!(
-            metadata.allocated_bytes() + shared_inner.allocated_bytes(),
-            1024
-        );
+        assert_eq!(metadata.allocated_bytes(), 1024);
+        assert_eq!(shared_inner.allocated_bytes(), 1024);
 
         shared_inner.set_datadog_api_key(Arc::from(SECRET));
-        assert_eq!(
-            metadata.allocated_bytes() + shared_inner.allocated_bytes(),
-            1024
-        );
+        assert_eq!(metadata.allocated_bytes(), 1024);
+        assert_eq!(shared_inner.allocated_bytes(), 1024);
     }
 
     #[test]
