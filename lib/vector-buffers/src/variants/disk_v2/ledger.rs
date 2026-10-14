@@ -20,6 +20,7 @@ use tokio::{
     io::AsyncWriteExt,
     sync::{Mutex, MutexGuard, Notify},
 };
+use tokio_util::sync::CancellationToken;
 use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
@@ -33,6 +34,8 @@ use super::{
     ser::SerializeError,
 };
 use crate::buffer_usage_data::BufferUsageHandle;
+
+pub(crate) type CleanupTask = (CancellationToken, tokio::task::JoinHandle<()>);
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 
@@ -870,14 +873,19 @@ where
         (finalizer, task)
     }
 
-    pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>)
+    pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>) -> CleanupTask
     where
         FS: 'static,
     {
         let ledger = Arc::downgrade(self);
-        vector_common::spawn_in_current_span(async move {
+        let shutdown = CancellationToken::new();
+        let task_shutdown = shutdown.clone();
+        let task = vector_common::spawn_in_current_span(async move {
             loop {
-                tokio::time::sleep(DEFAULT_DATA_FILE_CLEANUP_INTERVAL).await;
+                tokio::select! {
+                    () = task_shutdown.cancelled() => break,
+                    () = tokio::time::sleep(DEFAULT_DATA_FILE_CLEANUP_INTERVAL) => {}
+                }
 
                 let Some(ledger) = ledger.upgrade() else {
                     break;
@@ -891,8 +899,13 @@ where
                 }
 
                 drop(ledger);
+
+                if task_shutdown.is_cancelled() {
+                    break;
+                }
             }
         });
+        (shutdown, task)
     }
 }
 

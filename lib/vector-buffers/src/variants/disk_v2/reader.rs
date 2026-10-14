@@ -15,7 +15,7 @@ use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 use super::{
     Filesystem,
     common::create_crc32c_hasher,
-    ledger::Ledger,
+    ledger::{CleanupTask, Ledger},
     record::{ArchivedRecord, Record, RecordStatus, validate_record_archive},
 };
 use crate::{
@@ -438,6 +438,7 @@ where
     data_file_acks: OrderedAcknowledgements<u64, ()>,
     finalizer: OrderedFinalizer<u64>,
     finalizer_task: Option<tokio::task::JoinHandle<()>>,
+    cleanup_task: Option<CleanupTask>,
     _t: PhantomData<T>,
 }
 
@@ -470,12 +471,21 @@ where
             data_file_acks: OrderedAcknowledgements::from_acked(0),
             finalizer,
             finalizer_task,
+            cleanup_task: None,
             _t: PhantomData,
         }
     }
 
     pub(crate) fn take_finalizer_task(&mut self) -> Option<tokio::task::JoinHandle<()>> {
         self.finalizer_task.take()
+    }
+
+    pub(crate) fn set_cleanup_task(&mut self, task: CleanupTask) {
+        self.cleanup_task = Some(task);
+    }
+
+    pub(crate) fn take_cleanup_task(&mut self) -> Option<CleanupTask> {
+        self.cleanup_task.take()
     }
 
     pub(super) fn ledger(&self) -> &Ledger<FS> {

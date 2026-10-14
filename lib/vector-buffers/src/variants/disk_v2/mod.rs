@@ -187,6 +187,7 @@ mod checkpoint_recovery;
 pub(crate) mod common;
 mod io;
 mod ledger;
+pub(crate) use ledger::CleanupTask;
 mod reader;
 mod record;
 mod ser;
@@ -315,7 +316,7 @@ where
 
         ledger.synchronize_buffer_usage();
         if ledger.filesystem().supports_background_cleanup() {
-            ledger.spawn_data_file_cleanup();
+            reader.set_cleanup_task(ledger.spawn_data_file_cleanup());
         }
 
         Ok((writer, reader, ledger))
