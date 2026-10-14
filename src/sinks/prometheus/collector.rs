@@ -56,8 +56,8 @@ pub(super) trait MetricCollector {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(clippy::too_many_lines, reason = "Keep metric variants together.")]
-    #[expect(clippy::cast_precision_loss, reason = "Preserve f64 count rounding.")]
+    #[allow(clippy::too_many_lines, reason = "Keep metric variants together.")]
+    #[allow(clippy::cast_precision_loss, reason = "Preserve f64 count rounding.")]
     fn encode_metric(
         &mut self,
         default_namespace: Option<&str>,

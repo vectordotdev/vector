@@ -31,8 +31,7 @@ macro_rules! labels {
     }
 
 #[tokio::test]
-// https://github.com/vectordotdev/vector/issues/23659
-#[expect(clippy::float_cmp, reason = "Fixtures use exact small integer values.")]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_request() {
     let outputs = send_request("", vec![create_event("gauge-2".into(), 32.0)]).await;
     assert_eq!(outputs.len(), 1);
@@ -53,8 +52,7 @@ async fn sends_request() {
 }
 
 #[tokio::test]
-// https://github.com/vectordotdev/vector/issues/23659
-#[expect(clippy::float_cmp, reason = "Fixtures use exact small integer values.")]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_authenticated_request() {
     let outputs = send_request(
         indoc! {r#"
@@ -140,8 +138,7 @@ async fn sends_templated_x_scope_orgid_header() {
 }
 
 #[tokio::test]
-// https://github.com/vectordotdev/vector/issues/23659
-#[expect(clippy::float_cmp, reason = "Fixtures use exact small integer values.")]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_custom_headers() {
     let outputs = send_request(
         indoc! {r#"
@@ -175,8 +172,7 @@ async fn sends_custom_headers() {
 }
 
 #[tokio::test]
-// https://github.com/vectordotdev/vector/issues/23659
-#[expect(clippy::float_cmp, reason = "Fixtures use exact small integer values.")]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn retains_state_between_requests() {
     // This sink converts all incremental events to absolute, and
     // should accumulate their totals between batches.
@@ -205,8 +201,7 @@ async fn retains_state_between_requests() {
 }
 
 #[tokio::test]
-// https://github.com/vectordotdev/vector/issues/23659
-#[expect(clippy::float_cmp, reason = "Fixtures use exact small integer values.")]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn aggregates_batches() {
     let outputs = send_request(
         "batch:\n  max_events: 3",
@@ -233,8 +228,7 @@ async fn aggregates_batches() {
 }
 
 #[tokio::test]
-// https://github.com/vectordotdev/vector/issues/23659
-#[expect(clippy::float_cmp, reason = "Fixtures use exact small integer values.")]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn doesnt_aggregate_batches() {
     let outputs = send_request(
         indoc! {"
