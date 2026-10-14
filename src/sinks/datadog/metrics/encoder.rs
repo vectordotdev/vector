@@ -444,6 +444,7 @@ fn generate_proto_metadata(
             }
             ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
+                    metric_type: origin.metric_type().unwrap_or_default(),
                     origin_product: origin.product().unwrap_or_default(),
                     origin_category: origin.category().unwrap_or_default(),
                     origin_service: origin.service().unwrap_or_default(),
@@ -1273,6 +1274,7 @@ mod tests {
             .unwrap();
 
             let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.metric_type, 9);
             assert_eq!(generated_origin.origin_product, product);
             assert_eq!(generated_origin.origin_category, category);
             assert_eq!(generated_origin.origin_service, service);

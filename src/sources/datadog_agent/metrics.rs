@@ -295,6 +295,11 @@ fn decode_datadog_series_v3(
 /// utilized for passing through origin metadata set by the Agent.
 fn get_event_metadata(metadata: Option<&Metadata>, metric_type: Option<i32>) -> EventMetadata {
     let origin = metadata.and_then(|metadata| metadata.origin.as_ref());
+    let metric_type = metric_type.or_else(|| {
+        origin
+            .map(|origin| origin.metric_type)
+            .filter(|metric_type| *metric_type != 0)
+    });
     if origin.is_none() && metric_type.is_none() {
         EventMetadata::default()
     } else {

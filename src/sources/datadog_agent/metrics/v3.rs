@@ -450,6 +450,7 @@ pub(crate) fn decode_v3_metric_data(
             let offset = (refs.origin - 1) * 3;
             Some(Metadata {
                 origin: Some(Origin {
+                    metric_type: 0,
                     origin_product: u32::try_from(data.dict_origin_info[offset])
                         .map_err(|_| "invalid Datadog v3 origin product")?,
                     origin_category: u32::try_from(data.dict_origin_info[offset + 1])
