@@ -160,7 +160,7 @@ impl WebSocketListenerSink {
 
     #[allow(clippy::too_many_arguments)]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
         reason = "Keep the connection lifecycle together."
     )]
