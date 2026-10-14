@@ -174,10 +174,12 @@ pub struct InfluxDbConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+#[must_use]
 pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
+#[must_use]
 pub fn example_tags() -> HashMap<String, String> {
     HashMap::from([("region".to_string(), "us-west-1".to_string())])
 }
@@ -197,18 +199,15 @@ impl GenerateConfig for InfluxDbConfig {
 
 impl InfluxDbConfig {
     fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        let version = match self.version {
-            Some(version) => {
-                self.validate_version(version)?;
-                version
-            }
-            None => {
-                warn!(
-                    "The `version` option is currently optional but will be required in a future release. \
-                     Please set it to `1` or `2` to match your InfluxDB settings."
-                );
-                self.infer_version()?
-            }
+        let version = if let Some(version) = self.version {
+            self.validate_version(version)?;
+            version
+        } else {
+            warn!(
+                "The `version` option is currently optional but will be required in a future release. \
+                 Please set it to `1` or `2` to match your InfluxDB settings."
+            );
+            self.infer_version()?
         };
         match version {
             InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
@@ -334,7 +333,7 @@ impl ValidatedSink for InfluxDbConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(self.clone().endpoint, self.settings()?, client.clone())?;
-        let sink = InfluxDbSvc::from_validated(self.clone(), validated, client)?;
+        let sink = InfluxDbSvc::from_validated(self.clone(), validated, client);
         Ok((sink, healthcheck))
     }
 }
@@ -343,14 +342,14 @@ impl InfluxDbSvc {
     #[cfg(all(test, feature = "influxdb-integration-tests"))]
     pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
         let validated = config.validate()?;
-        Self::from_validated(config, &validated, client)
+        Ok(Self::from_validated(config, &validated, client))
     }
 
     fn from_validated(
         config: InfluxDbConfig,
         validated: &ValidatedInfluxDbMetrics,
         client: HttpClient,
-    ) -> crate::Result<VectorSink> {
+    ) -> VectorSink {
         let ValidatedInfluxDbMetrics {
             uri,
             token,
@@ -390,7 +389,7 @@ impl InfluxDbSvc {
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error, internal_log_rate_limit = false));
 
         #[allow(deprecated)]
-        Ok(VectorSink::from_event_sink(sink))
+        VectorSink::from_event_sink(sink)
     }
 }
 
@@ -483,7 +482,7 @@ fn encode_events(
     let mut output = BytesMut::new();
     let count = events.len();
 
-    for event in events.into_iter() {
+    for event in events {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
         let tags = merge_tags(&event, tags);
@@ -504,7 +503,7 @@ fn encode_events(
                 error_message,
                 count,
             });
-        };
+        }
     }
 
     // remove last '\n'
@@ -521,7 +520,15 @@ fn get_type_and_fields(
     match value {
         MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
-        MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
+        MetricValue::Set { values } => {
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "Set sizes are encoded as floating-point fields."
+            )]
+            let count = values.len() as f64;
+            ("set", Some(to_fields(count)))
+        }
         MetricValue::AggregatedHistogram {
             buckets,
             count,
@@ -608,6 +615,12 @@ fn get_type_and_fields(
 
 fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<KeyString, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "Preserve floating-point distribution count encoding."
+    )]
+    let count = statistic.count as f64;
 
     Some(
         [
@@ -616,7 +629,7 @@ fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<
             ("median".into(), Field::Float(statistic.median)),
             ("avg".into(), Field::Float(statistic.avg)),
             ("sum".into(), Field::Float(statistic.sum)),
-            ("count".into(), Field::Float(statistic.count as f64)),
+            ("count".into(), Field::Float(count)),
         ]
         .into_iter()
         .chain(
@@ -682,12 +695,12 @@ mod tests {
             retention_policy_name: None,
             username: None,
             password: None,
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tags: None,
             tls: None,
             quantiles: default_summary_quantiles(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -791,14 +804,14 @@ mod tests {
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
-        let line_protocol1 = split_line_protocol(line_protocols[0]);
-        assert_eq!("ns.requests", line_protocol1.0);
+        let first_record = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", first_record.0);
         assert_eq!(
             "metric_type=histogram,normal_tag=value,true_tag=true",
-            line_protocol1.1
+            first_record.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            &first_record.2,
             [
                 "bucket_1=1i",
                 "bucket_2.1=2i",
@@ -808,7 +821,7 @@ mod tests {
             ]
             .to_vec(),
         );
-        assert_eq!("1542182950000000011", line_protocol1.3);
+        assert_eq!("1542182950000000011", first_record.3);
     }
 
     #[test]
@@ -834,14 +847,14 @@ mod tests {
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
-        let line_protocol1 = split_line_protocol(line_protocols[0]);
-        assert_eq!("ns.requests", line_protocol1.0);
+        let first_record = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", first_record.0);
         assert_eq!(
             "metric_type=histogram,normal_tag=value,true_tag=true",
-            line_protocol1.1
+            first_record.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            &first_record.2,
             [
                 "bucket_1=1u",
                 "bucket_2.1=2u",
@@ -851,7 +864,7 @@ mod tests {
             ]
             .to_vec(),
         );
-        assert_eq!("1542182950000000011", line_protocol1.3);
+        assert_eq!("1542182950000000011", first_record.3);
     }
 
     #[test]
@@ -877,14 +890,14 @@ mod tests {
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
-        let line_protocol1 = split_line_protocol(line_protocols[0]);
-        assert_eq!("ns.requests_sum", line_protocol1.0);
+        let first_record = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests_sum", first_record.0);
         assert_eq!(
             "metric_type=summary,normal_tag=value,true_tag=true",
-            line_protocol1.1
+            first_record.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            &first_record.2,
             [
                 "count=6i",
                 "quantile_0.01=1.5",
@@ -894,7 +907,7 @@ mod tests {
             ]
             .to_vec(),
         );
-        assert_eq!("1542182950000000011", line_protocol1.3);
+        assert_eq!("1542182950000000011", first_record.3);
     }
 
     #[test]
@@ -920,14 +933,14 @@ mod tests {
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
-        let line_protocol1 = split_line_protocol(line_protocols[0]);
-        assert_eq!("ns.requests_sum", line_protocol1.0);
+        let first_record = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests_sum", first_record.0);
         assert_eq!(
             "metric_type=summary,normal_tag=value,true_tag=true",
-            line_protocol1.1
+            first_record.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            &first_record.2,
             [
                 "count=6u",
                 "quantile_0.01=1.5",
@@ -937,10 +950,15 @@ mod tests {
             ]
             .to_vec(),
         );
-        assert_eq!("1542182950000000011", line_protocol1.3);
+        assert_eq!("1542182950000000011", first_record.3);
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the complete encoding fixture together."
+    )]
     fn test_encode_distribution() {
         let events = vec![
             Metric::new(
@@ -992,14 +1010,14 @@ mod tests {
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
-        let line_protocol1 = split_line_protocol(line_protocols[0]);
-        assert_eq!("ns.requests", line_protocol1.0);
+        let first_record = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", first_record.0);
         assert_eq!(
             "metric_type=distribution,normal_tag=value,true_tag=true",
-            line_protocol1.1
+            first_record.1
         );
         assert_fields(
-            line_protocol1.2.to_string(),
+            &first_record.2,
             [
                 "avg=1.875",
                 "count=8",
@@ -1011,13 +1029,13 @@ mod tests {
             ]
             .to_vec(),
         );
-        assert_eq!("1542182950000000011", line_protocol1.3);
+        assert_eq!("1542182950000000011", first_record.3);
 
-        let line_protocol2 = split_line_protocol(line_protocols[1]);
-        assert_eq!("ns.dense_stats", line_protocol2.0);
-        assert_eq!("metric_type=distribution", line_protocol2.1);
+        let second_record = split_line_protocol(line_protocols[1]);
+        assert_eq!("ns.dense_stats", second_record.0);
+        assert_eq!("metric_type=distribution", second_record.1);
         assert_fields(
-            line_protocol2.2.to_string(),
+            &second_record.2,
             [
                 "avg=9.5",
                 "count=20",
@@ -1029,13 +1047,13 @@ mod tests {
             ]
             .to_vec(),
         );
-        assert_eq!("1542182950000000011", line_protocol2.3);
+        assert_eq!("1542182950000000011", second_record.3);
 
-        let line_protocol3 = split_line_protocol(line_protocols[2]);
-        assert_eq!("ns.sparse_stats", line_protocol3.0);
-        assert_eq!("metric_type=distribution", line_protocol3.1);
+        let third_record = split_line_protocol(line_protocols[2]);
+        assert_eq!("ns.sparse_stats", third_record.0);
+        assert_eq!("metric_type=distribution", third_record.1);
         assert_fields(
-            line_protocol3.2.to_string(),
+            &third_record.2,
             [
                 "avg=3",
                 "count=10",
@@ -1047,7 +1065,7 @@ mod tests {
             ]
             .to_vec(),
         );
-        assert_eq!("1542182950000000011", line_protocol3.3);
+        assert_eq!("1542182950000000011", third_record.3);
     }
 
     #[test]
@@ -1125,7 +1143,7 @@ mod tests {
             line_protocol.1
         );
         assert_fields(
-            line_protocol.2.to_string(),
+            &line_protocol.2,
             [
                 "avg=1.875",
                 "count=8",
@@ -1201,7 +1219,7 @@ mod integration_tests {
     use vector_lib::metric_tags;
 
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{AcknowledgementsConfig, SinkConfig, SinkContext},
         event::{
             Event,
             metric::{Metric, MetricKind, MetricValue},
@@ -1215,7 +1233,7 @@ mod integration_tests {
                 onboarding_v1, onboarding_v2, query_v1,
             },
         },
-        sinks::util::HttpEndpoint,
+        sinks::util::{BatchConfig, HttpEndpoint, TowerRequestConfig},
         test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         tls::{self, TlsConfig},
     };
@@ -1229,12 +1247,12 @@ mod integration_tests {
                 ..Default::default()
             }),
         )
-        .await
+        .await;
     }
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_http() {
-        insert_metrics_v1(address_v1(false).as_str(), None).await
+        insert_metrics_v1(address_v1(false).as_str(), None).await;
     }
 
     async fn insert_metrics_v1(url: &str, tls: Option<TlsConfig>) {
@@ -1254,13 +1272,13 @@ mod integration_tests {
             org: None,
             bucket: None,
             token: None,
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls,
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
@@ -1303,6 +1321,12 @@ mod integration_tests {
             let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
             let res = query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
 
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "Fixture counter values are small exact integers."
+            )]
+            let expected_value = value as isize;
             assert_eq!(
                 res,
                 serde_json::json! {
@@ -1311,7 +1335,7 @@ mod integration_tests {
                         "series": [{
                             "name": name,
                             "columns": ["time", "metric_type", "production", "region", "value"],
-                            "values": [[timestamp, "counter", "true", "us-west-1", value as isize]]
+                            "values": [[timestamp, "counter", "true", "us-west-1", expected_value]]
                         }]
                     }]}
                 }
@@ -1331,6 +1355,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the complete encoding fixture together."
+    )]
     async fn influxdb2_metrics_put_data() {
         crate::test_util::trace_init();
         let endpoint = address_v2();
@@ -1350,12 +1379,12 @@ mod integration_tests {
             bucket: Some(BUCKET.to_string()),
             token: Some(TOKEN.to_string().into()),
             quantiles: default_summary_quantiles(),
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tags: None,
             tls: None,
             default_namespace: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let metric = format!(
@@ -1370,7 +1399,9 @@ mod integration_tests {
                 Metric::new(
                     metric.clone(),
                     MetricKind::Incremental,
-                    MetricValue::Counter { value: i as f64 },
+                    MetricValue::Counter {
+                        value: f64::from(i),
+                    },
                 )
                 .with_namespace(Some("ns"))
                 .with_tags(Some(metric_tags!(
@@ -1451,7 +1482,9 @@ mod integration_tests {
             Metric::new(
                 format!("counter-{i}"),
                 MetricKind::Incremental,
-                MetricValue::Counter { value: i as f64 },
+                MetricValue::Counter {
+                    value: f64::from(i),
+                },
             )
             .with_namespace(Some("ns"))
             .with_tags(Some(metric_tags!(

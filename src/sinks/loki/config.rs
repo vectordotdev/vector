@@ -196,17 +196,17 @@ pub enum OutOfOrderAction {
 impl GenerateConfig for LokiConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"endpoint: http://localhost:3100
+            r"endpoint: http://localhost:3100
             encoding:
               codec: json
-            labels: {}"#,
+            labels: {}",
         })
         .unwrap()
     }
 }
 
 impl LokiConfig {
-    pub(super) fn build_client(&self, cx: SinkContext) -> crate::Result<HttpClient> {
+    pub(super) fn build_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
         Ok(client)
@@ -326,7 +326,7 @@ impl ValidatedSink for LokiConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
         let healthcheck_uri = cx.healthcheck.uri.clone();
-        let client = self.build_client(cx)?;
+        let client = self.build_client(&cx)?;
 
         let sink = LokiSink::from_validated(self, validated.clone(), client.clone())?;
 
@@ -341,6 +341,7 @@ impl ValidatedSink for LokiConfig {
     }
 }
 
+#[must_use]
 pub fn valid_label_name(label: &Template) -> bool {
     label.is_dynamic() || {
         // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -353,7 +354,7 @@ pub fn valid_label_name(label: &Template) -> bool {
         // underlying object keys.
         let mut label_trim = label.get_ref().trim();
         if let Some(without_opening_end) = label_trim.strip_suffix('*') {
-            label_trim = without_opening_end
+            label_trim = without_opening_end;
         }
 
         let mut label_chars = label_trim.chars();

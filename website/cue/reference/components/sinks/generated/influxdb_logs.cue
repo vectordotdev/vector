@@ -138,7 +138,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 	}
 	source_type_key: {
 		description: """
-			Use this option to customize the key containing the source_type.
+			Use this option to customize the key containing the `source_type`.
 
 			The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
 			"""

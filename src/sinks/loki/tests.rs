@@ -37,8 +37,8 @@ async fn interpolate_labels() {
     "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
@@ -84,8 +84,8 @@ async fn use_label_from_dropped_fields() {
         "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
@@ -218,8 +218,8 @@ async fn sink_uses_validated_endpoint_and_auth() {
         "#
     );
     let (config, cx) = load_sink::<LokiConfig>(&config).unwrap();
-    let client = config.build_client(cx).unwrap();
-    let sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let sink = LokiSink::new(&config, client).unwrap();
 
     let (mut rx, _trigger, server) = build_test_server(addr);
     tokio::spawn(server);
@@ -322,8 +322,8 @@ async fn timestamp_out_of_range() {
     "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = LogEvent::from("hello world");
     if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
@@ -352,8 +352,8 @@ async fn structured_metadata_as_json() {
         "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
     e1.as_mut_log().insert(event_path!("foo"), "bar");
