@@ -664,8 +664,9 @@ impl EventLogSubscription {
                         channel_drained = true;
                         break;
                     }
-                    // All three of these mean the subscription handle can no longer serve
-                    // results and must be rebuilt; continuing to pull from it yields nothing.
+                    // These errors can mean the subscription handle no longer serves results
+                    // and must be rebuilt (ERROR_INVALID_OPERATION can also mean a healthy but
+                    // idle channel, handled below); continuing to pull from it yields nothing.
                     //
                     // `ERROR_INVALID_OPERATION` is observed in practice on a freshly created
                     // `EvtSubscribeToFutureEvents` pull subscription: `EvtNext` returns it
@@ -770,7 +771,7 @@ impl EventLogSubscription {
                             Ok(()) => {
                                 if loud {
                                     info!(
-                                        message = "Re-subscription succeeded after stale query.",
+                                        message = "Re-subscription succeeded.",
                                         channel = %channel_sub.channel
                                     );
                                 }
