@@ -24,9 +24,8 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         influxdb::{
-            Field, InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, InfluxDbVersion,
-            ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol,
-            influxdb_settings,
+            Field, InfluxDbSettings, ProtocolVersion, encode_timestamp, healthcheck,
+            influx_line_protocol, influxdb_settings,
         },
         util::{
             BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
@@ -59,7 +58,6 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 /// Configuration for the `influxdb_metrics` sink.
 #[configurable_component(sink("influxdb_metrics", "Deliver metric event data to InfluxDB."))]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
     /// Sets the default namespace for any metrics sent.
     ///
@@ -75,76 +73,8 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
     pub endpoint: HttpEndpoint,
 
-    /// The InfluxDB API version to use.
-    #[configurable(metadata(docs::examples = "2"))]
-    #[configurable(metadata(docs::examples = "1"))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub version: InfluxDbVersion,
-
-    /// The name of the database to write into.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "vector-database"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    #[configurable(metadata(docs::required_when = "version = \"1\""))]
-    pub database: Option<String>,
-
-    /// The consistency level to use for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "any"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub consistency: Option<String>,
-
-    /// The target retention policy for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "autogen"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub retention_policy_name: Option<String>,
-
-    /// The username to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "todd"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub username: Option<String>,
-
-    /// The password to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
-    #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
-    pub password: Option<SensitiveString>,
-
-    /// The name of the organization to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
-    #[configurable(metadata(docs::examples = "my-org"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
-    #[configurable(metadata(docs::required_when = "version = \"2\""))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub org: Option<String>,
-
-    /// The name of the bucket to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
-    #[configurable(metadata(docs::examples = "vector-bucket"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
-    #[configurable(metadata(docs::required_when = "version = \"2\""))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub bucket: Option<String>,
-
-    /// The [token][token_docs] to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
-    ///
-    /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
-    #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
-    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
-    #[configurable(metadata(docs::required_when = "version = \"2\""))]
-    #[configurable(metadata(docs::minimal = true))]
-    pub token: Option<SensitiveString>,
+    #[serde(flatten)]
+    pub settings: InfluxDbSettings,
 
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
@@ -192,65 +122,6 @@ impl GenerateConfig for InfluxDbConfig {
     }
 }
 
-impl InfluxDbConfig {
-    fn settings(&self) -> crate::Result<InfluxDbSettings> {
-        self.validate_version(self.version)?;
-        match self.version {
-            InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
-                database: self
-                    .database
-                    .clone()
-                    .ok_or("the `database` option is required when using InfluxDB v1")?,
-                consistency: self.consistency.clone(),
-                retention_policy_name: self.retention_policy_name.clone(),
-                username: self.username.clone(),
-                password: self.password.clone(),
-            })),
-            InfluxDbVersion::V2 => Ok(InfluxDbSettings::V2(InfluxDb2Settings {
-                org: self
-                    .org
-                    .clone()
-                    .ok_or("the `org` option is required when using InfluxDB v2")?,
-                bucket: self
-                    .bucket
-                    .clone()
-                    .ok_or("the `bucket` option is required when using InfluxDB v2")?,
-                token: self
-                    .token
-                    .clone()
-                    .ok_or("the `token` option is required when using InfluxDB v2")?,
-            })),
-        }
-    }
-
-    const fn settings_present(&self) -> (bool, bool) {
-        let has_v1 = self.database.is_some()
-            || self.consistency.is_some()
-            || self.retention_policy_name.is_some()
-            || self.username.is_some()
-            || self.password.is_some();
-        let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
-        (has_v1, has_v2)
-    }
-
-    /// Rejects settings that belong to the version that was not selected, so that
-    /// an explicit `version` cannot silently ignore stale settings for the other version.
-    fn validate_version(&self, version: InfluxDbVersion) -> crate::Result<()> {
-        let (has_v1, has_v2) = self.settings_present();
-        match version {
-            InfluxDbVersion::V1 if has_v2 => Err(
-                "InfluxDB v1 settings are configured, but v2 settings were also provided; configure only one version."
-                    .into(),
-            ),
-            InfluxDbVersion::V2 if has_v1 => Err(
-                "InfluxDB v2 settings are configured, but v1 settings were also provided; configure only one version."
-                    .into(),
-            ),
-            _ => Ok(()),
-        }
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
@@ -281,7 +152,7 @@ impl ValidatedSink for InfluxDbConfig {
     fn validate(&self) -> crate::Result<ValidatedInfluxDbMetrics> {
         validate_quantiles(&self.quantiles)?;
 
-        let settings = influxdb_settings(self.settings()?);
+        let settings = influxdb_settings(self.settings.clone());
 
         let uri = settings.write_uri(self.endpoint.clone())?;
 
@@ -305,7 +176,8 @@ impl ValidatedSink for InfluxDbConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(self.clone().endpoint, self.settings()?, client.clone())?;
+        let healthcheck =
+            healthcheck(self.endpoint.clone(), self.settings.clone(), client.clone())?;
         let sink = InfluxDbSvc::from_validated(self.clone(), validated, client)?;
         Ok((sink, healthcheck))
     }
@@ -616,7 +488,10 @@ mod tests {
     use crate::{
         config::ValidatedSink,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts},
+        sinks::influxdb::{
+            InfluxDb2Settings,
+            test_util::{assert_fields, split_line_protocol, tags, ts},
+        },
     };
 
     #[test]
@@ -640,67 +515,75 @@ mod tests {
         serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
     }
 
-    #[test]
-    fn test_config_version_required() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            bucket: "my-bucket"
-            org: "my-org"
-            token: "my-token"
-        "#};
+    /// Loads `settings` as an `influxdb_metrics` sink through the regular config loading path and
+    /// returns the serialized sink config.
+    fn load_sink_config(settings: &str) -> Result<serde_json::Value, String> {
+        let settings: String = settings
+            .lines()
+            .map(|line| format!("    {line}\n"))
+            .collect();
+        let config =
+            format!("sinks:\n  out:\n    type: influxdb_metrics\n    inputs: [in]\n{settings}");
+        let builder = crate::config::loading::load::<_, crate::config::ConfigBuilder>(
+            config.as_bytes(),
+            crate::config::Format::Yaml,
+        )
+        .map_err(|errors| errors.join("\n"))?;
+        let sink = builder.sinks.values().next().unwrap();
+        Ok(serde_json::to_value(&sink.inner).unwrap())
+    }
 
-        let error = serde_yaml::from_str::<InfluxDbConfig>(config).unwrap_err();
-        assert!(error.to_string().contains("version"), "{error}");
+    const V1_SETTINGS: &str = "endpoint: http://localhost:8086\ndatabase: my-database";
+    const V2_SETTINGS: &str =
+        "endpoint: http://localhost:9999\norg: my-org\nbucket: my-bucket\ntoken: my-token";
+
+    #[test]
+    fn test_config_version_selects_settings() {
+        for (version, settings, expected) in
+            [("\"1\"", V1_SETTINGS, "1"), ("\"2\"", V2_SETTINGS, "2")]
+        {
+            let config = load_sink_config(&format!("version: {version}\n{settings}"))
+                .unwrap_or_else(|error| panic!("version {version}: {error}"));
+            assert_eq!(config["version"], expected);
+        }
     }
 
     #[test]
-    fn test_config_v1_rejects_v2_settings() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:8086"
-            version: "1"
-            database: "my-database"
-            token: "my-token"
-        "#};
-
-        let sink_config = serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
-        let Err(error) = sink_config.validate() else {
-            panic!("validation should fail");
-        };
-        assert!(error.to_string().contains("v2 settings were also provided"));
-    }
-
-    #[test]
-    fn test_config_v2_rejects_v1_settings() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            version: "2"
-            bucket: "my-bucket"
-            org: "my-org"
-            token: "my-token"
-            database: "my-database"
-        "#};
-
-        let sink_config = serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
-        let Err(error) = sink_config.validate() else {
-            panic!("validation should fail");
-        };
-        assert!(error.to_string().contains("v1 settings were also provided"));
+    fn test_config_rejects_invalid_settings() {
+        for (settings, expected) in [
+            (V2_SETTINGS.to_string(), "missing field `version`"),
+            (
+                format!("version: 1\n{V1_SETTINGS}"),
+                "invalid type: integer",
+            ),
+            (
+                "version: \"1\"\nendpoint: http://localhost:8086".to_string(),
+                "missing field `database`",
+            ),
+            (
+                format!("version: \"2\"\n{V2_SETTINGS}\ndatabase: d"),
+                "unknown field `database`",
+            ),
+            (
+                format!("version: \"2\"\n{V2_SETTINGS}\nendpont: e"),
+                "unknown field `endpont`",
+            ),
+        ] {
+            let error = load_sink_config(&settings).unwrap_err();
+            assert!(error.contains(expected), "{expected}: {error}");
+        }
     }
 
     #[test]
     fn prepares_valid_config() {
         let config = InfluxDbConfig {
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
-            org: Some("my-org".to_string()),
-            bucket: Some("my-bucket".to_string()),
-            token: Some("my-token".to_string().into()),
+            settings: InfluxDbSettings::V2(InfluxDb2Settings {
+                org: "my-org".to_string(),
+                bucket: "my-bucket".to_string(),
+                token: "my-token".to_string().into(),
+            }),
             default_namespace: None,
-            version: InfluxDbVersion::V2,
-            database: None,
-            consistency: None,
-            retention_policy_name: None,
-            username: None,
-            password: None,
             batch: Default::default(),
             request: Default::default(),
             tags: None,
@@ -1227,7 +1110,7 @@ mod integration_tests {
         },
         http::HttpClient,
         sinks::influxdb::{
-            InfluxDbVersion,
+            InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings,
             metrics::{InfluxDbConfig, InfluxDbSvc, default_summary_quantiles},
             test_util::{
                 BUCKET, ORG, TOKEN, address_v1, address_v2, cleanup_v1, format_timestamp,
@@ -1264,15 +1147,13 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint: HttpEndpoint::parse(url).unwrap(),
-            version: InfluxDbVersion::V1,
-            database: Some(database.clone()),
-            consistency: None,
-            retention_policy_name: Some("autogen".to_string()),
-            username: None,
-            password: None,
-            org: None,
-            bucket: None,
-            token: None,
+            settings: InfluxDbSettings::V1(InfluxDb1Settings {
+                database: database.clone(),
+                consistency: None,
+                retention_policy_name: Some("autogen".to_string()),
+                username: None,
+                password: None,
+            }),
             batch: Default::default(),
             request: Default::default(),
             tls,
@@ -1359,15 +1240,11 @@ mod integration_tests {
 
         let config = InfluxDbConfig {
             endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
-            version: InfluxDbVersion::V2,
-            database: None,
-            consistency: None,
-            retention_policy_name: None,
-            username: None,
-            password: None,
-            org: Some(ORG.to_string()),
-            bucket: Some(BUCKET.to_string()),
-            token: Some(TOKEN.to_string().into()),
+            settings: InfluxDbSettings::V2(InfluxDb2Settings {
+                org: ORG.to_string(),
+                bucket: BUCKET.to_string(),
+                token: TOKEN.to_string().into(),
+            }),
             quantiles: default_summary_quantiles(),
             batch: Default::default(),
             request: Default::default(),
