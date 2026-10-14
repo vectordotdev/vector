@@ -689,8 +689,7 @@ impl EventLogSubscription {
                                 now,
                             );
                         }
-                        let backed_off =
-                            channel_sub.next_resubscribe_at.is_some_and(|at| now < at);
+                        let backed_off = channel_sub.next_resubscribe_at.is_some_and(|at| now < at);
                         if !signalled && backed_off {
                             // Still unusable, nothing new signalled, backoff not over: leave
                             // the handle as it is. The speculative pull in mod.rs brings us
@@ -1146,7 +1145,11 @@ impl EventLogSubscription {
         // Read the tracked state, not the handle. A failed re-subscription deliberately
         // keeps the old, unusable handle so the next pull retries — inferring activity
         // from handle nullness would report "healthy" during exactly that outage.
-        let active = self.channels.iter().filter(|c| c.subscription_active).count();
+        let active = self
+            .channels
+            .iter()
+            .filter(|c| c.subscription_active)
+            .count();
         (total, active)
     }
 
@@ -1366,7 +1369,10 @@ mod tests {
         // ... a failed rebuild (old handle of a stopped Event Log service, which never signals
         // again) is retried on the base interval, however often it failed before.
         for attempt in [1, 2, 8, 100, u32::MAX] {
-            assert_eq!(resubscribe_retry_after(attempt, true), Duration::from_secs(5));
+            assert_eq!(
+                resubscribe_retry_after(attempt, true),
+                Duration::from_secs(5)
+            );
         }
     }
 
@@ -1684,7 +1690,10 @@ mod tests {
         // Application log the first pull can exhaust its 100-event budget before reaching
         // the failing `EvtNext`, so the backlog alone would satisfy a non-empty check
         // while event 102 never arrives.
-        seed("102", "second seed for #26117 — must arrive after the first pull");
+        seed(
+            "102",
+            "second seed for #26117 — must arrive after the first pull",
+        );
 
         let mut later_events = Vec::new();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
