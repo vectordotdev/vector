@@ -166,7 +166,7 @@ impl ValidatedSink for MezmoConfig {
         let sink = PartitionHttpSink::new(
             self.clone(),
             PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
-            request_settings.clone(),
+            request_settings,
             batch_settings.timeout,
             client.clone(),
         )
