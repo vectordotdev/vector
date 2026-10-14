@@ -11,6 +11,7 @@ generated: components: sinks: greptimedb_logs: configuration: {
 			"""
 		required: false
 		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
+		warnings: ["Boolean shorthand is deprecated. Use the object form instead. Users will have at least two minor release cycles to migrate before removal; no removal release is scheduled. See the [migration guide](/deprecations/)."]
 	}
 	batch: {
 		description: "Event batching behavior."

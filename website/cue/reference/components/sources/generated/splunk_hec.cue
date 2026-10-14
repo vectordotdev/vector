@@ -65,6 +65,7 @@ generated: components: sources: splunk_hec: configuration: {
 				}
 			}
 		}
+		warnings: ["Boolean shorthand is deprecated. Use the object form instead. Users will have at least two minor release cycles to migrate before removal; no removal release is scheduled. See the [migration guide](/deprecations/)."]
 	}
 	address: {
 		description: """

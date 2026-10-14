@@ -9,8 +9,14 @@ components: sinks: [Name=string]: {
 		inputs: generated.components.sinks.configuration.inputs
 		buffer: generated.components.sinks.configuration.buffer
 		healthcheck: {
-			description: generated.components.sinks.configuration.healthcheck.description
+			description: """
+				\(generated.components.sinks.configuration.healthcheck.description)
+
+				A boolean value sets `enabled`; other healthcheck options retain their defaults.
+				"""
 			required:    generated.components.sinks.configuration.healthcheck.required
+			warnings:    generated.components.sinks.configuration.healthcheck.warnings
+			type: bool: generated.components.sinks.configuration.healthcheck.type.bool
 			type: object: options: {
 				enabled: generated.components.sinks.configuration.healthcheck.type.object.options.enabled
 

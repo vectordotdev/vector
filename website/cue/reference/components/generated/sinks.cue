@@ -26,6 +26,7 @@ generated: components: sinks: configuration: {
 		description: "Healthcheck configuration."
 		required:    false
 		type:        _schemaDefinitions["derived::7ad58e4d9af48ec29d981195"]
+		warnings: ["Boolean shorthand is deprecated. Use the object form instead. Users will have at least two minor release cycles to migrate before removal; no removal release is scheduled. See the [migration guide](/deprecations/)."]
 	}
 	inputs: {
 		description: """

@@ -44,6 +44,9 @@ where
         where
             E: de::Error,
         {
+            tracing::warn!(
+                "DEPRECATED: Boolean shorthand for an object-valued configuration option. Use the object form instead. See https://vector.dev/deprecations/ for migration instructions."
+            );
             Ok(value.into())
         }
 
