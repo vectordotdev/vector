@@ -91,10 +91,10 @@ pub struct SematextMetricsConfig {
 
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_namespace: vector
             token: ${SEMATEXT_TOKEN}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -111,8 +111,7 @@ async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     let response = client.send(request).await?;
 
     match response.status() {
-        StatusCode::OK => Ok(()),
-        StatusCode::NO_CONTENT => Ok(()),
+        StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
@@ -171,7 +170,7 @@ impl ValidatedSink for SematextMetricsConfig {
         let client = HttpClient::new(None, cx.proxy())?;
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
-        let sink = SematextMetricsService::from_validated(self.clone(), validated, client)?;
+        let sink = SematextMetricsService::from_validated(self.clone(), validated, client);
 
         Ok((sink, healthcheck))
     }
@@ -194,7 +193,7 @@ impl SematextMetricsService {
         config: SematextMetricsConfig,
         validated: &ValidatedSematextMetrics,
         client: HttpClient,
-    ) -> Result<VectorSink> {
+    ) -> VectorSink {
         let ValidatedSematextMetrics { uri, batch, .. } = validated;
         let request = config.request.into_settings();
         let http_service = HttpBatchService::new(client, create_build_request(uri.clone()));
@@ -223,7 +222,7 @@ impl SematextMetricsService {
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error, internal_log_rate_limit = false));
 
         #[allow(deprecated)]
-        Ok(VectorSink::from_event_sink(sink))
+        VectorSink::from_event_sink(sink)
     }
 }
 
@@ -288,7 +287,7 @@ fn encode_events(
     let mut output = BytesMut::new();
     let byte_size = metrics.size_of();
     let json_byte_size = metrics.estimated_json_encoded_size_of();
-    for metric in metrics.into_iter() {
+    for metric in metrics {
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
             .name
@@ -317,7 +316,7 @@ fn encode_events(
             &mut output,
         ) {
             emit!(SematextMetricsEncodeEventError { error });
-        };
+        }
     }
 
     if !output.is_empty() {
@@ -363,9 +362,9 @@ mod tests {
             region: Region::Us,
             endpoint: Some("http://localhost:9999".to_string()),
             token: "atoken".to_string().into(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -385,9 +384,9 @@ mod tests {
             region: Region::Us,
             endpoint: Some(endpoint.to_string()),
             token: "atoken".to_string().into(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         // Non-http(s) schemes are rejected by the HttpEndpoint type-level validation.
@@ -460,7 +459,9 @@ mod tests {
             Metric::new(
                 "pool.committed",
                 MetricKind::Incremental,
-                MetricValue::Counter { value: 18874368.0 },
+                MetricValue::Counter {
+                    value: 18_874_368.0,
+                },
             )
             .with_namespace(Some("jvm"))
             .with_timestamp(Some(
@@ -502,15 +503,15 @@ mod tests {
 
         // Make our test metrics.
         let metrics = vec![
-            ("os", "swap.size", 324292.0),
+            ("os", "swap.size", 324_292.0),
             ("os", "network.tx", 42000.0),
             ("os", "network.rx", 54293.0),
             ("process", "count", 12.0),
             ("process", "uptime", 32423.0),
-            ("process", "rss", 2342333.0),
-            ("jvm", "pool.used", 18874368.0),
-            ("jvm", "pool.committed", 18868584.0),
-            ("jvm", "pool.max", 18874368.0),
+            ("process", "rss", 2_342_333.0),
+            ("jvm", "pool.used", 18_874_368.0),
+            ("jvm", "pool.committed", 18_868_584.0),
+            ("jvm", "pool.max", 18_874_368.0),
         ];
 
         let mut events = Vec::new();
@@ -524,7 +525,7 @@ mod tests {
                 .with_namespace(Some(*namespace))
                 .with_tags(Some(metric_tags!("os.host" => "somehost")))
                     .with_timestamp(Some(Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0).single()
-                                         .and_then(|t| t.with_nanosecond(i as u32))
+                                         .and_then(|t| t.with_nanosecond(u32::try_from(i).expect("test index fits in u32")))
                                          .expect("invalid timestamp"))),
             );
             events.push(event);

@@ -59,9 +59,9 @@ pub struct SematextLogsConfig {
 
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             token: ${SEMATEXT_TOKEN}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -217,10 +217,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: "mylogtoken".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -237,10 +237,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: token.to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let validated = config.validate().expect("preparation should succeed");
@@ -261,10 +261,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: "{{ index }}".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         assert!(
@@ -282,10 +282,10 @@ mod tests {
             region: Region::Us,
             endpoint: None,
             token: "%".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let err = config
@@ -307,10 +307,10 @@ mod tests {
             region: Region::Us,
             endpoint: Some("/path".to_string()),
             token: "mylogtoken".to_string().into(),
-            encoding: Default::default(),
-            request: Default::default(),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            encoding: Transformer::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let err = config
