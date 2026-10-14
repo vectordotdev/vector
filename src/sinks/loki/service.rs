@@ -93,8 +93,8 @@ pub struct LokiService {
 impl LokiService {
     pub const fn new(client: HttpClient, endpoint: HttpEndpoint, auth: Option<Auth>) -> Self {
         Self {
-            client,
             endpoint,
+            client,
             auth,
         }
     }

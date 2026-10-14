@@ -136,7 +136,7 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						A bearer token (`OAuth2`, JWT, etc) is passed as-is.
 						"""
 				}
 			}

@@ -78,9 +78,9 @@ generated: components: sinks: mqtt: configuration: {
 		type: string: {
 			default: "atleastonce"
 			enum: {
-				atleastonce: "AtLeastOnce."
-				atmostonce:  "AtMostOnce."
-				exactlyonce: "ExactlyOnce."
+				atleastonce: "`AtLeastOnce`."
+				atmostonce:  "`AtMostOnce`."
+				exactlyonce: "`ExactlyOnce`."
 			}
 		}
 	}
