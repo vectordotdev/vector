@@ -432,7 +432,7 @@ where
             buffer_dir = buffer_path.to_string_lossy().as_ref(),
             accounted_events = usage.event_count,
             accounted_bytes = usage.byte_size,
-            message = "Opened disk buffer with remaining accounted data; resuming processing.",
+            message = "Opened disk buffer with remaining accounted data.",
         );
     }
 
