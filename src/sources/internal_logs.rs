@@ -255,7 +255,7 @@ async fn run(
     }
 
     // Wait for the drain task to exit cleanly after shutdown.
-    let _ = drain_task.await;
+    _ = drain_task.await;
     Ok(())
 }
 
@@ -594,7 +594,16 @@ mod tests {
             .build(SourceContext::new_test(tx, None))
             .await
             .unwrap();
-        tokio::spawn(source);
+        // Run the source in a component span, like the topology does, so the test also checks
+        // that the drop metric keeps its component tags.
+        tokio::spawn(tracing::Instrument::instrument(
+            source,
+            error_span!(
+                "source",
+                component_kind = "source",
+                component_id = "lagtest"
+            ),
+        ));
 
         // Yield twice: once for the drain task to start polling the broadcast, once for the
         // main task to start polling the queue. Both will block immediately (nothing to read).
@@ -619,14 +628,14 @@ mod tests {
             tokio::task::yield_now().await;
         }
 
-        let discarded_any = controller
-            .capture_metrics()
-            .into_iter()
-            .any(|m| m.name() == "component_discarded_events_total");
+        let discarded_any = controller.capture_metrics().into_iter().any(|m| {
+            m.name() == "component_discarded_events_total"
+                && m.tags().and_then(|t| t.get("component_id")) == Some("lagtest")
+        });
 
         assert!(
             discarded_any,
-            "expected component_discarded_events_total to be emitted when broadcast lags"
+            "expected component_discarded_events_total with the source's component_id when broadcast lags"
         );
     }
 
