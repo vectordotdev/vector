@@ -367,13 +367,14 @@ impl ValidatedSink for VectorConfig {
             }
             EndpointStrategy::LoadBalance => {
                 let service = request_settings.distributed_service(
-                    VectorGrpcRetryLogic,
+                    &VectorGrpcRetryLogic,
                     services,
-                    self.routing
+                    &self
+                        .routing
                         .as_ref()
                         .and_then(|routing| routing.health.clone())
                         .unwrap_or_else(default_endpoint_health_config),
-                    VectorGrpcHealthLogic,
+                    &VectorGrpcHealthLogic,
                     1,
                 );
 

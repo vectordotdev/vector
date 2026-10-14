@@ -858,12 +858,12 @@ impl ValidatedSink for ElasticsearchConfig {
             .collect::<Vec<_>>();
 
         let service = validated.request_limits.clone().distributed_service(
-            ElasticsearchRetryLogic {
+            &ElasticsearchRetryLogic {
                 retry_partial: self.request_retry_partial,
             },
             services,
-            health_config,
-            ElasticsearchHealthLogic,
+            &health_config,
+            &ElasticsearchHealthLogic,
             1,
         );
 
