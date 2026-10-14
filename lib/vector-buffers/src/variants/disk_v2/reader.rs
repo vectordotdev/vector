@@ -15,7 +15,7 @@ use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 use super::{
     Filesystem,
     common::create_crc32c_hasher,
-    ledger::{CleanupTask, Ledger},
+    ledger::{DiskBufferTasks, Ledger},
     record::{ArchivedRecord, Record, RecordStatus, validate_record_archive},
 };
 use crate::{
@@ -437,8 +437,7 @@ where
     record_acks: OrderedAcknowledgements<u64, u64>,
     data_file_acks: OrderedAcknowledgements<u64, ()>,
     finalizer: OrderedFinalizer<u64>,
-    finalizer_task: Option<tokio::task::JoinHandle<()>>,
-    cleanup_task: Option<CleanupTask>,
+    tasks: Option<DiskBufferTasks>,
     _t: PhantomData<T>,
 }
 
@@ -449,11 +448,7 @@ where
     FS::File: Unpin,
 {
     /// Creates a new [`BufferReader`] attached to the given [`Ledger`].
-    pub(crate) fn new(
-        ledger: Arc<Ledger<FS>>,
-        finalizer: OrderedFinalizer<u64>,
-        finalizer_task: Option<tokio::task::JoinHandle<()>>,
-    ) -> Self {
+    pub(crate) fn new(ledger: Arc<Ledger<FS>>, finalizer: OrderedFinalizer<u64>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id + 1;
 
@@ -470,26 +465,17 @@ where
             record_acks: OrderedAcknowledgements::from_acked(next_expected_record_id),
             data_file_acks: OrderedAcknowledgements::from_acked(0),
             finalizer,
-            finalizer_task,
-            cleanup_task: None,
+            tasks: None,
             _t: PhantomData,
         }
     }
 
-    pub(crate) fn take_finalizer_task(&mut self) -> Option<tokio::task::JoinHandle<()>> {
-        self.finalizer_task.take()
+    pub(crate) fn set_tasks(&mut self, tasks: DiskBufferTasks) {
+        self.tasks = Some(tasks);
     }
 
-    pub(crate) fn set_finalizer_task(&mut self, task: tokio::task::JoinHandle<()>) {
-        self.finalizer_task = Some(task);
-    }
-
-    pub(crate) fn set_cleanup_task(&mut self, task: CleanupTask) {
-        self.cleanup_task = Some(task);
-    }
-
-    pub(crate) fn take_cleanup_task(&mut self) -> Option<CleanupTask> {
-        self.cleanup_task.take()
+    pub(crate) fn take_tasks(&mut self) -> Option<DiskBufferTasks> {
+        self.tasks.take()
     }
 
     pub(super) fn ledger(&self) -> &Ledger<FS> {

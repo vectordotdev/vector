@@ -35,7 +35,34 @@ use super::{
 };
 use crate::buffer_usage_data::BufferUsageHandle;
 
-pub(crate) type CleanupTask = (CancellationToken, tokio::task::JoinHandle<()>);
+type CleanupTask = (CancellationToken, tokio::task::JoinHandle<()>);
+
+#[derive(Debug)]
+pub(crate) struct DiskBufferTasks {
+    finalizer: tokio::task::JoinHandle<()>,
+    cleanup: Option<CleanupTask>,
+}
+
+impl DiskBufferTasks {
+    pub(crate) fn new(
+        finalizer: tokio::task::JoinHandle<()>,
+        cleanup: Option<CleanupTask>,
+    ) -> Self {
+        Self { finalizer, cleanup }
+    }
+
+    pub(crate) async fn close(self) {
+        if let Some((shutdown, task)) = self.cleanup {
+            shutdown.cancel();
+            if let Err(error) = task.await {
+                error!(%error, message = "Disk buffer cleanup task failed.");
+            }
+        }
+        if let Err(error) = self.finalizer.await {
+            error!(%error, message = "Disk buffer finalizer task failed.");
+        }
+    }
+}
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 

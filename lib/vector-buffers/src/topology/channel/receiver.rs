@@ -5,8 +5,8 @@ use std::{
 };
 
 use async_recursion::async_recursion;
-use futures::Stream;
-use tokio::{select, task::JoinHandle};
+use futures::{Stream, future::BoxFuture};
+use tokio::select;
 use tokio_util::sync::ReusableBoxFuture;
 use vector_common::internal_event::emit;
 
@@ -14,7 +14,7 @@ use super::limited_queue::LimitedReceiver;
 use crate::{
     Bufferable,
     buffer_usage_data::BufferUsageHandle,
-    variants::disk_v2::{self, CleanupTask, ProductionFilesystem},
+    variants::disk_v2::{self, DiskBufferTasks, ProductionFilesystem},
 };
 
 /// Adapter for papering over various receiver backends.
@@ -63,14 +63,11 @@ where
         }
     }
 
-    fn take_ledger_tasks(
-        &mut self,
-        finalizers: &mut Vec<JoinHandle<()>>,
-        cleanups: &mut Vec<CleanupTask>,
-    ) {
+    fn take_disk_buffer_tasks(&mut self) -> Option<DiskBufferTasks> {
         if let Self::DiskV2(reader) = self {
-            finalizers.extend(reader.take_finalizer_task());
-            cleanups.extend(reader.take_cleanup_task());
+            reader.take_tasks()
+        } else {
+            None
         }
     }
 }
@@ -164,20 +161,15 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 
     pub fn into_stream(mut self) -> BufferReceiverStream<T> {
-        let mut finalizer_tasks = Vec::new();
-        let mut cleanup_tasks = Vec::new();
-        self.take_ledger_tasks(&mut finalizer_tasks, &mut cleanup_tasks);
-        BufferReceiverStream::new(self, finalizer_tasks, cleanup_tasks)
+        let mut tasks = Vec::new();
+        self.take_disk_buffer_tasks(&mut tasks);
+        BufferReceiverStream::new(self, tasks)
     }
 
-    fn take_ledger_tasks(
-        &mut self,
-        finalizers: &mut Vec<JoinHandle<()>>,
-        cleanups: &mut Vec<CleanupTask>,
-    ) {
-        self.base.take_ledger_tasks(finalizers, cleanups);
+    fn take_disk_buffer_tasks(&mut self, tasks: &mut Vec<DiskBufferTasks>) {
+        tasks.extend(self.base.take_disk_buffer_tasks());
         if let Some(overflow) = self.overflow.as_mut() {
-            overflow.take_ledger_tasks(finalizers, cleanups);
+            overflow.take_disk_buffer_tasks(tasks);
         }
     }
 }
@@ -192,43 +184,28 @@ enum StreamState<T: Bufferable> {
 pub struct BufferReceiverStream<T: Bufferable> {
     state: StreamState<T>,
     recv_fut: ReusableBoxFuture<'static, (Option<T>, BufferReceiver<T>)>,
-    finalizer_tasks: Vec<JoinHandle<()>>,
-    cleanup_tasks: Vec<CleanupTask>,
+    tasks: Vec<DiskBufferTasks>,
 }
 
 impl<T: Bufferable> BufferReceiverStream<T> {
-    fn new(
-        receiver: BufferReceiver<T>,
-        finalizer_tasks: Vec<JoinHandle<()>>,
-        cleanup_tasks: Vec<CleanupTask>,
-    ) -> Self {
+    fn new(receiver: BufferReceiver<T>, tasks: Vec<DiskBufferTasks>) -> Self {
         Self {
             state: StreamState::Idle(receiver),
             recv_fut: ReusableBoxFuture::new(make_recv_future(None)),
-            finalizer_tasks,
-            cleanup_tasks,
+            tasks,
         }
     }
 
     /// Closes the receiver and waits for disk-buffer acknowledgements to release their ledgers.
-    pub async fn close(mut self) {
-        let finalizer_tasks = mem::take(&mut self.finalizer_tasks);
-        let cleanup_tasks = mem::take(&mut self.cleanup_tasks);
-        drop(self);
+    pub fn close(mut self) -> BoxFuture<'static, ()> {
+        Box::pin(async move {
+            let tasks = mem::take(&mut self.tasks);
+            drop(self);
 
-        for (shutdown, _) in &cleanup_tasks {
-            shutdown.cancel();
-        }
-        for (_, task) in cleanup_tasks {
-            if let Err(error) = task.await {
-                error!(%error, message = "Disk buffer cleanup task failed.");
+            for task_set in tasks {
+                task_set.close().await;
             }
-        }
-        for task in finalizer_tasks {
-            if let Err(error) = task.await {
-                error!(%error, message = "Disk buffer finalizer task failed.");
-            }
-        }
+        })
     }
 }
 

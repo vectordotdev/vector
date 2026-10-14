@@ -754,26 +754,30 @@ impl<'a> Builder<'a> {
             let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
             let events_received = register!(EventsReceived);
-            sink.run(
-                rx.by_ref()
-                    .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
-                    .inspect(|events| {
-                        events_received.emit(CountByteSize(
-                            events.len(),
-                            events.estimated_json_encoded_size_of(),
-                        ))
-                    })
-                    .take_until_if(tripwire),
-            )
-            .await
-            .map(|_| {
-                debug!("Sink finished normally.");
-                TaskOutput::Sink(rx)
-            })
-            .map_err(|_| {
-                debug!("Sink finished with an error.");
-                TaskError::Opaque
-            })
+            let result = sink
+                .run(
+                    rx.by_ref()
+                        .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
+                        .inspect(|events| {
+                            events_received.emit(CountByteSize(
+                                events.len(),
+                                events.estimated_json_encoded_size_of(),
+                            ))
+                        })
+                        .take_until_if(tripwire),
+                )
+                .await;
+            match result {
+                Ok(()) => {
+                    debug!("Sink finished normally.");
+                    Ok(TaskOutput::Sink(rx))
+                }
+                Err(()) => {
+                    debug!("Sink finished with an error.");
+                    rx.into_inner().close().await;
+                    Err(TaskError::Opaque)
+                }
+            }
         };
 
         let task = Task::new(key.clone(), typetag, sink);

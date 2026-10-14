@@ -187,7 +187,7 @@ mod checkpoint_recovery;
 pub(crate) mod common;
 mod io;
 mod ledger;
-pub(crate) use ledger::CleanupTask;
+pub(crate) use ledger::DiskBufferTasks;
 mod reader;
 mod record;
 mod ser;
@@ -272,7 +272,7 @@ where
 
         let (finalizer, finalizer_stream) = OrderedFinalizer::new(None);
 
-        let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer, None);
+        let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
         let mut unread_buffer_size = reader
             .reconcile_checkpoint_window()
             .await
@@ -315,10 +315,12 @@ where
         );
 
         ledger.synchronize_buffer_usage();
-        reader.set_finalizer_task(Arc::clone(&ledger).spawn_finalizer(finalizer_stream));
-        if ledger.filesystem().supports_background_cleanup() {
-            reader.set_cleanup_task(ledger.spawn_data_file_cleanup());
-        }
+        let finalizer_task = Arc::clone(&ledger).spawn_finalizer(finalizer_stream);
+        let cleanup_task = ledger
+            .filesystem()
+            .supports_background_cleanup()
+            .then(|| ledger.spawn_data_file_cleanup());
+        reader.set_tasks(DiskBufferTasks::new(finalizer_task, cleanup_task));
 
         Ok((writer, reader, ledger))
     }
