@@ -14,7 +14,7 @@ jobs:
   CLAAssistant:
     # Signatures are stored in DataDog/cla-signatures via an STS token only upstream can obtain.
     if: ${{ github.repository == 'vectordotdev/vector' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: write # Required to comment on PRs
       id-token: write # Required to federate tokens with dd-octo-sts-action

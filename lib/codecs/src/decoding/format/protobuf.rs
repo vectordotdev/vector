@@ -255,7 +255,7 @@ mod tests {
             assert_eq!(log["name"], "someone".into());
             assert_eq!(
                 log["phones"].as_array().unwrap()[0].as_object().unwrap()["number"]
-                    .as_str()
+                    .to_str_lossy()
                     .unwrap(),
                 "123456"
             );
@@ -278,7 +278,7 @@ mod tests {
             assert_eq!(log["name"], "someone".into());
             assert_eq!(
                 log["phones"].as_array().unwrap()[0].as_object().unwrap()["number"]
-                    .as_str()
+                    .to_str_lossy()
                     .unwrap(),
                 "1234"
             );

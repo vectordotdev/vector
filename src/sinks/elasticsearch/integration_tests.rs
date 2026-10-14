@@ -112,7 +112,7 @@ impl ElasticsearchCommon {
                         provider,
                         Some(region),
                     )
-                    .await?
+                    .await?;
                 }
             }
         }
@@ -200,7 +200,7 @@ async fn ensure_pipeline_in_params() {
 #[tokio::test]
 async fn ensure_empty_pipeline_not_in_params() {
     let index = gen_index();
-    let pipeline = String::from("");
+    let pipeline = String::new();
 
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -581,7 +581,12 @@ async fn insert_events_in_data_stream() {
         .await
         .expect("Data stream creation error");
 
-    run_insert_tests_with_config(&cfg, TestType::Normal, BatchStatus::Delivered).await;
+    Box::pin(run_insert_tests_with_config(
+        &cfg,
+        TestType::Normal,
+        BatchStatus::Delivered,
+    ))
+    .await;
 
     delete_data_stream(&common, &stream_index)
         .await
@@ -675,7 +680,7 @@ async fn run_insert_tests(
     if test_type == TestType::Error {
         config.id_key = Some("_id".into());
     }
-    run_insert_tests_with_config(&config, test_type, status).await;
+    Box::pin(run_insert_tests_with_config(&config, test_type, status)).await;
 }
 
 fn create_http_client() -> reqwest::Client {
