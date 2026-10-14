@@ -297,10 +297,15 @@ impl RunningTopology {
     /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
     pub async fn reload_config_and_respawn(
         &mut self,
-        new_config: Config,
+        mut new_config: Config,
         extra_context: ExtraContext,
     ) -> Result<(), ReloadError> {
         info!("Reloading running topology with new configuration.");
+
+        // The graceful shutdown limit comes from the command line, so a config loaded for a
+        // reload doesn't carry it. Keep the running topology's limit, which also bounds how long
+        // the sinks built by this reload get to finish when a later reload detaches them.
+        new_config.graceful_shutdown_duration = self.graceful_shutdown_duration;
 
         if self.config.global != new_config.global {
             return match self.config.global.diff(&new_config.global) {

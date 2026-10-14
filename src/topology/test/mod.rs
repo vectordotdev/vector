@@ -371,6 +371,18 @@ async fn topology_reload_replaces_sink_that_stops_polling_input() {
     // used to hang the reload. See https://github.com/vectordotdev/vector/issues/26687.
     trace_init();
 
+    async fn reload(topology: &mut RunningTopology, config: Config) {
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            topology.reload_config_and_respawn(config, Default::default()),
+        )
+        .await
+        .expect("reload hung waiting for the old sink")
+        .unwrap();
+    }
+
+    // Only the startup config carries the graceful shutdown limit, as when it comes from the
+    // command line.
     let (mut in1, source1) = basic_source();
     let mut config = Config::builder();
     config.graceful_shutdown_duration = Some(Duration::from_secs(1));
@@ -379,25 +391,29 @@ async fn topology_reload_replaces_sink_that_stops_polling_input() {
 
     let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
 
-    // The old sink takes this event and then stops polling its input.
-    in1.send_event(Event::Log(LogEvent::from("stuck")))
+    // The sink takes this event and then stops polling its input.
+    in1.send_event(Event::Log(LogEvent::from("stuck 1")))
         .await
         .unwrap();
     sleep(Duration::from_millis(100)).await;
 
+    // Replace it with another sink that gets stuck the same way.
+    let mut config = Config::builder();
+    config.add_source("in1", basic_source().1);
+    config.add_sink("out1", &["in1"], backpressure_sink(2));
+    reload(&mut topology, config.build().unwrap()).await;
+
+    in1.send_event(Event::Log(LogEvent::from("stuck 2")))
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(100)).await;
+
+    // Replacing the sink built by the first reload must not hang either.
     let (out1, sink1) = basic_sink(10);
     let mut config = Config::builder();
-    config.graceful_shutdown_duration = Some(Duration::from_secs(1));
     config.add_source("in1", basic_source().1);
     config.add_sink("out1", &["in1"], sink1);
-
-    tokio::time::timeout(
-        Duration::from_secs(10),
-        topology.reload_config_and_respawn(config.build().unwrap(), Default::default()),
-    )
-    .await
-    .expect("reload hung waiting for the old sink")
-    .unwrap();
+    reload(&mut topology, config.build().unwrap()).await;
 
     let mut event = Event::Log(LogEvent::from("delivered"));
     in1.send_event(event.clone()).await.unwrap();
