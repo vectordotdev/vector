@@ -118,7 +118,7 @@ fn report_orphaned_disk_buffers(
         warn!(
             buffer_id = orphaned_buffer_id.to_string_lossy().as_ref(),
             buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
-            message = "Found disk buffer not referenced by the current configuration; any remaining data is not being processed by the current topology.",
+            message = "Found disk buffer not referenced by the current configuration. It may still be draining through a detached sink instance; otherwise any remaining data is not being processed.",
         );
     }
 }
