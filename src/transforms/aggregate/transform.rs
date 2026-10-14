@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_stream::stream;
+use chrono::{DateTime, TimeDelta, Utc};
 use futures::{Stream, StreamExt};
 use vector_lib::event::{
     MetricValue,
@@ -98,6 +99,8 @@ pub struct Aggregate {
     pub(crate) config: AggregateConfig,
     /// Interval to set on flushed incremental metrics; `Some` only when `set_interval_ms` is enabled.
     output_interval_ms: Option<NonZeroU32>,
+    /// Start of the next flush window, given to flushed metrics that have no timestamp.
+    next_window_start: Option<DateTime<Utc>>,
 }
 
 /// Upper bound for any millisecond-valued duration field that is later cast
@@ -164,6 +167,7 @@ impl Aggregate {
             watermark: None,
             config: *config,
             output_interval_ms,
+            next_window_start: None,
         })
     }
 
@@ -375,14 +379,25 @@ impl Aggregate {
 
     /// Overwrites `interval_ms` on flushed incremental metrics with the flush interval, so a
     /// counter aggregated over the window can be read as a rate over that window.
-    fn set_output_interval(&self, flushed: &mut [Event]) {
+    ///
+    /// Metrics without a timestamp get the window start. Otherwise a sink that stamps them with
+    /// its send time can give two windows the same timestamp and combine them, so the rate is
+    /// overstated. Windows advance by exactly the interval, so their starts never share a second.
+    fn set_output_interval(&mut self, flushed: &mut [Event]) {
         let Some(interval_ms) = self.output_interval_ms else {
             return;
         };
+        let interval = TimeDelta::milliseconds(i64::from(interval_ms.get()));
+        let window_start = *self
+            .next_window_start
+            .get_or_insert_with(|| Utc::now() - interval);
+        self.next_window_start = Some(window_start + interval);
         for event in flushed {
             let metric = event.as_mut_metric();
             if metric.kind() == MetricKind::Incremental {
-                metric.data_mut().time.interval_ms = Some(interval_ms);
+                let time = &mut metric.data_mut().time;
+                time.interval_ms = Some(interval_ms);
+                time.timestamp.get_or_insert(window_start);
             }
         }
     }

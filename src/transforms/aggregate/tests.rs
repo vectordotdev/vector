@@ -1860,6 +1860,63 @@ fn set_interval_ms_sets_interval_on_flushed_incremental_metrics() {
 }
 
 #[test]
+fn set_interval_ms_gives_untimestamped_metrics_their_window_start() {
+    let untimestamped = || {
+        make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+    };
+    let flush = |agg: &mut Aggregate| {
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        out
+    };
+    let timestamp_of = |event: &Event| event.as_metric().timestamp();
+    let one_second = chrono::Duration::milliseconds(1000);
+
+    let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
+        AggregationMode::Auto,
+    )))
+    .unwrap();
+
+    // The first window starts one interval before the first flush.
+    let before = Utc::now();
+    agg.record(untimestamped());
+    let out = flush(&mut agg);
+    let after = Utc::now();
+    let first = timestamp_of(&out[0]).expect("an untimestamped metric gets its window start");
+    assert!(before - one_second <= first && first <= after - one_second);
+
+    // Later windows start exactly one interval apart, also after a flush with no output.
+    agg.record(untimestamped());
+    let out = flush(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), Some(first + one_second));
+    assert!(flush(&mut agg).is_empty());
+    agg.record(untimestamped());
+    let out = flush_final(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), Some(first + one_second * 3));
+
+    // A metric that already has a timestamp keeps it.
+    let sample_ts = Utc.timestamp_opt(1_600_000_000, 0).single().unwrap();
+    agg.record(make_metric_with_timestamp(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+        sample_ts,
+    ));
+    let out = flush(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), Some(sample_ts));
+
+    // Flag off: untimestamped output stays untimestamped.
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
+    agg.record(untimestamped());
+    let out = flush(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), None);
+}
+
+#[test]
 fn set_interval_ms_overwrites_input_interval() {
     let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
         AggregationMode::Sum,

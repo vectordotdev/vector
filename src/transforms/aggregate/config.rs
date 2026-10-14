@@ -40,6 +40,9 @@ pub struct AggregateConfig {
     /// interval. For example, the `datadog_metrics` sink sends counters that have an interval
     /// as rates. Absolute metrics and metrics that pass through unchanged are not modified.
     ///
+    /// Aggregated metrics that have no timestamp get the start of their flush window as their
+    /// timestamp, so that a sink cannot combine two windows into one point.
+    ///
     /// When enabled, `interval_ms` must be a whole number of seconds (a multiple of 1000) and
     /// must not be greater than 4294967295 (about 49.7 days).
     #[serde(default)]
