@@ -1078,6 +1078,13 @@
   resolved "https://registry.yarnpkg.com/@pagefind/windows-x64/-/windows-x64-1.5.2.tgz#931fdbc9f00f72057950cd260ef965d4fd02a92e"
   integrity sha512-Fa2Iyw7kaDRzGMfNYNUXNW2zbL5FQVDgSOcbDHdzBrDEdpqOqg8TcZ68F22ol6NJ9IGzvUdmeyZypLW5dyhqsg==
 
+"@playwright/test@1.63.0":
+  version "1.63.0"
+  resolved "https://registry.yarnpkg.com/@playwright/test/-/test-1.63.0.tgz#808020c46e8b6b91f9d628cd0ebcbb32bdfd8b6c"
+  integrity sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==
+  dependencies:
+    playwright "1.63.0"
+
 "@react-spring/animated@~10.1.2":
   version "10.1.2"
   resolved "https://registry.yarnpkg.com/@react-spring/animated/-/animated-10.1.2.tgz#3f9ca38dca5c1eb047a728f574b13a62b90e70c9"
@@ -1518,9 +1525,9 @@ binary-extensions@^2.0.0:
   integrity sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==
 
 brace-expansion@^5.0.8:
-  version "5.0.9"
-  resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-5.0.9.tgz#7c72438809b5fa5babf54199a1f1c281a6984fcf"
-  integrity sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==
+  version "5.0.12"
+  resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-5.0.12.tgz#995fbb4750a77c4d16a7dc942ff2ca6ef8e675ec"
+  integrity sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==
   dependencies:
     balanced-match "^4.0.2"
 
@@ -2193,6 +2200,18 @@ pify@^2.3.0:
   resolved "https://registry.npmjs.org/pify/-/pify-2.3.0.tgz"
   integrity sha1-7RQaasBDqEnqWISY59yosVMw6Qw=
 
+playwright-core@1.63.0:
+  version "1.63.0"
+  resolved "https://registry.yarnpkg.com/playwright-core/-/playwright-core-1.63.0.tgz#e57665bc32846c213ac39a1e4d5bc6228e76b376"
+  integrity sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==
+
+playwright@1.63.0:
+  version "1.63.0"
+  resolved "https://registry.yarnpkg.com/playwright/-/playwright-1.63.0.tgz#99b56f9f69b1b70c44f00bf84b2fe52348ae2511"
+  integrity sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==
+  dependencies:
+    playwright-core "1.63.0"
+
 postcss-cli@^12.0.0:
   version "12.0.0"
   resolved "https://registry.yarnpkg.com/postcss-cli/-/postcss-cli-12.0.0.tgz#eedc5d69fd4f3b83de261b604e4f158c92754d10"
@@ -2456,9 +2475,9 @@ slash@^5.0.0, slash@^5.1.0:
   integrity sha512-ZA6oR3T/pEyuqwMgAKT0/hAv8oAXckzbkmR0UkUosQ+Mc4RxGoJkRmwHgHufaenlyAgE1Mxgpdcrf75y6XcnDg==
 
 source-map-js@^1.2.1:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/source-map-js/-/source-map-js-1.2.1.tgz#1ce5650fddd87abc099eda37dcff024c2667ae46"
-  integrity sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==
+  version "1.2.2"
+  resolved "https://registry.yarnpkg.com/source-map-js/-/source-map-js-1.2.2.tgz#79fb88d97535a21cb27162cb05d211b67acea4ab"
+  integrity sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==
 
 source-map@0.5.6:
   version "0.5.6"

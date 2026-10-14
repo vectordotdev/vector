@@ -1,6 +1,5 @@
 use std::{borrow::Cow, str::FromStr};
 
-use bytes::Bytes;
 use vector_lib::{
     configurable::configurable_component,
     event::{Event, EventRef, LogEvent, Value},
@@ -34,6 +33,8 @@ impl Default for DatadogSearchConfig {
 }
 
 impl DatadogSearchConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<LogEvent>>> {
         Ok(build_matcher(&self.source, &EventFilter)?)
     }
@@ -138,17 +139,13 @@ impl Filter<LogEvent> for EventFilter {
             Field::Reserved(field) if field == "tags" => {
                 let to_match = to_match.to_owned();
 
-                array_match_multiple(vec!["ddtags", "tags"], move |values| {
-                    values.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-                })
+                any_string_match_multiple(vec!["ddtags", "tags"], move |value| value == to_match)
             }
             // Individual tags are compared by element key:value.
             Field::Tag(tag) => {
-                let value_bytes = Value::Bytes(format!("{tag}:{to_match}").into());
+                let to_match = format!("{tag}:{to_match}");
 
-                array_match_multiple(vec!["ddtags", "tags"], move |values| {
-                    values.contains(&value_bytes)
-                })
+                any_string_match_multiple(vec!["ddtags", "tags"], move |value| value == to_match)
             }
             // A literal "source" field should string match in "source" and "ddsource" fields (OR condition).
             Field::Reserved(field) if field == "source" => {
@@ -239,6 +236,11 @@ impl Filter<LogEvent> for EventFilter {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Numeric precision audit deferred"
+    )]
     fn compare(
         &self,
         field: Field,
@@ -292,8 +294,11 @@ impl Filter<LogEvent> for EventFilter {
                             }
                         }
                         // Where the rhs is a string ref, the lhs is coerced into a string.
-                        (Some(Value::Bytes(v)), ComparisonValue::String(rhs)) => {
-                            let lhs = String::from_utf8_lossy(v);
+                        (
+                            Some(v @ (Value::Bytes(_) | Value::String(_))),
+                            ComparisonValue::String(rhs),
+                        ) => {
+                            let lhs = v.to_string_lossy();
                             let rhs = Cow::from(rhs);
 
                             match comparator {
@@ -304,8 +309,8 @@ impl Filter<LogEvent> for EventFilter {
                             }
                         }
                         // Otherwise, compare directly as strings.
-                        (Some(Value::Bytes(v)), _) => {
-                            let lhs = String::from_utf8_lossy(v);
+                        (Some(v @ (Value::Bytes(_) | Value::String(_))), _) => {
+                            let lhs = v.to_string_lossy();
 
                             match comparator {
                                 Comparison::Lt => lhs < rhs,
@@ -384,6 +389,7 @@ where
         match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
             Some(Value::Boolean(v)) => func(v.to_string().into()),
             Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
+            Some(Value::String(v)) => func(Cow::Borrowed(v.as_ref())),
             Some(Value::Integer(v)) => func(v.to_string().into()),
             Some(Value::Float(v)) => func(v.to_string().into()),
             _ => false,
@@ -403,6 +409,7 @@ where
     Run::boxed(move |log: &LogEvent| {
         match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
             Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
+            Some(Value::String(v)) => func(Cow::Borrowed(v.as_ref())),
             _ => false,
         }
     })
@@ -482,6 +489,8 @@ mod test {
     /// should pass when matched against the compiled source, and an `Event` that should fail.
     /// This is exported as public so any implementor of this lib can assert that each check
     /// still passes/fails in the context it's used.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
     fn get_checks() -> Vec<(&'static str, Event, Event)> {
         vec![
             // Tag exists.
@@ -1606,6 +1615,11 @@ mod test {
     /// Test a `Matcher` by providing a `Filter<V>` and a processor that receives an
     /// `Event`, and returns a `V`. This allows testing against the pass/fail events that are returned
     /// from `get_checks()` and modifying into a type that allows for their processing.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     fn test_filter<V, F, P>(filter: F, processor: P)
     where
         V: std::fmt::Debug + Send + Sync + Clone + 'static,
@@ -1626,7 +1640,29 @@ mod test {
     #[test]
     /// Parse each Datadog Search Syntax query and check that it passes/fails.
     fn event_filter() {
-        test_filter(EventFilter, |ev| ev.into_log())
+        test_filter(EventFilter, vector_lib::event::Event::into_log);
+    }
+
+    #[test]
+    fn tag_equality_matches_byte_values() {
+        for query in ["tags:foo", "env:prod"] {
+            let config: DatadogSearchConfig = query.parse().unwrap();
+            let runner = DatadogSearchRunner::try_from(&config).unwrap();
+            let mut log = LogEvent::default();
+            log.insert(
+                vrl::event_path!("tags"),
+                Value::Array(vec![Value::Bytes(
+                    if query == "tags:foo" {
+                        "foo"
+                    } else {
+                        "env:prod"
+                    }
+                    .into(),
+                )]),
+            );
+
+            assert!(runner.matches(&Event::Log(log)), "query: {query}");
+        }
     }
 
     #[test]
@@ -1635,13 +1671,18 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     fn check_datadog() {
         for (source, pass, fail) in get_checks() {
             let config: DatadogSearchConfig = source.parse().unwrap();
 
             // Every query should build successfully.
             let cond = config
-                .build(&Default::default(), &Default::default())
+                .build(&Default::default(), &MetricsStorage::default())
                 .unwrap_or_else(|_| panic!("build failed: {source}"));
 
             assert!(

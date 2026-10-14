@@ -1,5 +1,6 @@
+#![warn(clippy::pedantic)]
 //! `AMQP` sink.
-//! Handles version AMQP 0.9.1 which is used by RabbitMQ.
+//! Handles version AMQP 0.9.1 which is used by [RabbitMQ](https://www.rabbitmq.com/).
 mod channel;
 mod config;
 mod encoder;

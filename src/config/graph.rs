@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fmt,
@@ -6,8 +8,8 @@ use std::{
 use indexmap::set::IndexSet;
 
 use super::{
-    Component, ComponentKey, ComponentKind, DataType, OutputId, SourceOutput, TransformContext,
-    TransformOutput, WildcardMatching, schema,
+    ComponentKey, ComponentKind, DataType, OutputId, SourceOutput, TransformOutput,
+    WildcardMatching,
 };
 
 /// Port metadata derived from a component for graph validation.
@@ -15,108 +17,78 @@ use super::{
 /// Schemas remain on the component configuration; this graph only uses port
 /// names and event data types to resolve and validate connections.
 #[derive(Debug, Clone)]
-struct Output {
-    port: Option<String>,
-    ty: DataType,
+pub(super) struct OutputSpec {
+    pub port: Option<String>,
+    pub data_type: DataType,
 }
 
-impl From<SourceOutput> for Output {
+impl From<SourceOutput> for OutputSpec {
     fn from(output: SourceOutput) -> Self {
         Self {
             port: output.port,
-            ty: output.ty,
+            data_type: output.ty,
         }
     }
 }
 
-impl From<TransformOutput> for Output {
+impl From<TransformOutput> for OutputSpec {
     fn from(output: TransformOutput) -> Self {
         Self {
             port: output.port,
-            ty: output.ty,
+            data_type: output.ty,
         }
     }
 }
 
-impl fmt::Display for Output {
+impl fmt::Display for OutputSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.port {
             Some(port) => write!(f, "port: \"{port}\","),
             None => write!(f, "port: None,"),
         }?;
-        write!(f, " types: {}", self.ty)
+        write!(f, " types: {}", self.data_type)
     }
 }
 
-/// A graph snapshot of a component's kind and ports, keyed by its component ID.
+/// The event input accepted by an execution node, before resolving connections.
 #[derive(Debug, Clone)]
-struct Node {
-    kind: ComponentKind,
-    input_type: Option<DataType>,
-    outputs: Vec<Output>,
+pub(super) struct InputSpec {
+    pub data_type: DataType,
+    pub upstream: Vec<String>,
 }
 
-impl Node {
-    fn new(component: &Component<'_, String>, id: &ComponentKey, schema: schema::Options) -> Self {
-        let (input_type, outputs) = match component {
-            Component::Source(source) => (
-                None,
-                source
-                    .inner
-                    .outputs(schema.log_namespace())
-                    .into_iter()
-                    .map(Output::from)
-                    .collect(),
-            ),
-            Component::Transform(transform) => (
-                Some(transform.inner.input().data_type()),
-                transform
-                    .inner
-                    .outputs(
-                        &TransformContext {
-                            schema,
-                            ..Default::default()
-                        },
-                        &[(id.into(), schema::Definition::any())],
-                    )
-                    .into_iter()
-                    .map(Output::from)
-                    .collect(),
-            ),
-            Component::Sink(sink) => (Some(sink.inner.input().data_type()), Vec::new()),
-            Component::EnrichmentTable(_) => {
-                unreachable!("enrichment tables are expanded before graph construction")
-            }
-        };
-        Self {
-            kind: component.kind(),
-            input_type,
-            outputs,
-        }
-    }
+/// Prepared execution-node metadata. A configured component may own multiple
+/// nodes; ownership does not create event-flow edges between them.
+#[derive(Debug, Clone)]
+pub(super) struct NodeSpec {
+    pub runtime_id: ComponentKey,
+    pub component_id: ComponentKey,
+    // Preserve the existing diagnostic labels and sink-rooted traversals.
+    pub kind: ComponentKind,
+    pub input: Option<InputSpec>,
+    pub outputs: Vec<OutputSpec>,
 }
 
-impl fmt::Display for Node {
+impl fmt::Display for NodeSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
-            ComponentKind::Source => write!(f, "component_kind: source\n  outputs:")?,
+            ComponentKind::Source | ComponentKind::EnrichmentTable => {
+                write!(f, "component_kind: {}\n  outputs:", self.kind)?;
+            }
             ComponentKind::Transform => {
                 // Preserve the existing diagnostic text during this refactor.
                 write!(
                     f,
                     "component_kind: source\n  input_types: {}\n  outputs:",
-                    self.input_type.expect("transform has inputs")
+                    self.input.as_ref().expect("transform has inputs").data_type
                 )?;
             }
             ComponentKind::Sink => {
                 return write!(
                     f,
                     "component_kind: sink\n  types: {}",
-                    self.input_type.expect("sink has inputs")
+                    self.input.as_ref().expect("sink has inputs").data_type
                 );
-            }
-            ComponentKind::EnrichmentTable => {
-                unreachable!("enrichment tables are expanded before graph construction")
             }
         }
         for output in &self.outputs {
@@ -134,34 +106,36 @@ struct Edge {
 
 #[derive(Default)]
 pub struct Graph {
-    nodes: HashMap<ComponentKey, Node>,
+    nodes: HashMap<ComponentKey, NodeSpec>,
     edges: Vec<Edge>,
     input_errors: Vec<String>,
 }
 
 impl Graph {
-    /// Builds a graph from components in insertion order.
+    /// Builds a graph from prepared execution nodes in insertion order.
     ///
-    /// Enrichment tables must already be expanded into their sources and sinks.
     /// Unresolved inputs are retained as diagnostics for `check_inputs`; ambiguous
     /// output names prevent construction entirely.
-    pub fn new<'a>(
-        components: impl Iterator<Item = (&'a ComponentKey, Component<'a, String>)> + Clone,
-        schema: schema::Options,
+    pub fn new(
+        nodes: impl IntoIterator<Item = NodeSpec>,
         wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
-        // Derive each node from its component before resolving any connections.
         let mut graph = Self::default();
-        for (id, component) in components.clone() {
-            graph
-                .nodes
-                .insert(id.clone(), Node::new(&component, id, schema));
+        let mut inputs = Vec::new();
+        for mut node in nodes {
+            if let Some(input) = &mut node.input {
+                inputs.push((node.runtime_id.clone(), std::mem::take(&mut input.upstream)));
+            }
+            graph.nodes.insert(node.runtime_id.clone(), node);
         }
 
         let available_outputs = graph.output_map()?;
-        for (id, component) in components {
-            for input in component.inputs().into_iter().flatten() {
-                if let Err(e) = graph.add_input(input, id, &available_outputs, wildcard_matching) {
+        // Retain every input in insertion order, even when a later node replaces
+        // an earlier node with the same runtime ID.
+        for (id, upstream) in inputs {
+            for input in upstream {
+                if let Err(e) = graph.add_input(&input, &id, &available_outputs, wildcard_matching)
+                {
                     graph.input_errors.push(e);
                 }
             }
@@ -194,10 +168,7 @@ impl Graph {
             });
             Ok(())
         } else {
-            let component_kind = match self.nodes.get(to).map(|node| node.kind) {
-                Some(kind @ (ComponentKind::Transform | ComponentKind::Sink)) => kind,
-                _ => panic!("only transforms and sinks have inputs"),
-            };
+            let component_kind = self.nodes[to].kind;
             // allow empty result if relaxed wildcard matching is enabled
             match wildcard_matching {
                 WildcardMatching::Relaxed => {
@@ -230,25 +201,28 @@ impl Graph {
     ///
     /// # Panics
     ///
-    /// Will panic if the given key is not present in the graph or identifies a source, which can't
-    /// have inputs.
+    /// Will panic if the given key is not present in the graph or identifies a node without
+    /// an event input.
     fn get_input_type(&self, key: &ComponentKey) -> DataType {
-        self.nodes[key].input_type.expect("no inputs on sources")
+        self.nodes[key]
+            .input
+            .as_ref()
+            .expect("node does not accept inputs")
+            .data_type
     }
 
     /// Return the output type associated with a given `OutputId`.
     ///
     /// # Panics
     ///
-    /// Will panic if the given id is not present in the graph or identifies a sink, which can't
-    /// have inputs.
+    /// Will panic if the given id is not present in the graph or does not identify a declared
+    /// output port.
     fn get_output_type(&self, id: &OutputId) -> DataType {
         let node = &self.nodes[&id.component];
-        assert!(node.kind != ComponentKind::Sink, "no outputs on sinks");
         node.outputs
             .iter()
             .find(|output| output.port == id.port)
-            .map(|output| output.ty)
+            .map(|output| output.data_type)
             .expect("output didn't exist")
     }
 
@@ -293,13 +267,13 @@ impl Graph {
             traversal.push_back(s.to_owned());
             while !traversal.is_empty() {
                 let n = traversal.back().expect("can't be empty").clone();
-                if !visited.contains(&n) {
-                    visited.insert(n.clone());
-                    stack.insert(n.clone());
-                } else {
+                if visited.contains(&n) {
                     // we came back to the node after exploring all its children - remove it from the stack and traversal
                     stack.shift_remove(&n);
                     traversal.pop_back();
+                } else {
+                    visited.insert(n.clone());
+                    stack.insert(n.clone());
                 }
                 let inputs = self
                     .edges
@@ -315,7 +289,7 @@ impl Graph {
                             .iter()
                             .skip(1) // skip the sink
                             .rev()
-                            .map(|item| item.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>();
                         return Err(format!(
                             "Cyclic dependency detected in the chain [ {} -> {} ]",
@@ -361,10 +335,11 @@ impl Graph {
         }
     }
 
-    pub fn inputs_for(&self, node: &ComponentKey) -> Vec<OutputId> {
+    /// Resolves inputs belonging to a configured component, including its table tasks.
+    pub fn inputs_for_component(&self, component: &ComponentKey) -> Vec<OutputId> {
         self.edges
             .iter()
-            .filter(|edge| &edge.to == node)
+            .filter(|edge| &self.nodes[&edge.to].component_id == component)
             .map(|edge| edge.from.clone())
             .collect()
     }
@@ -420,7 +395,10 @@ mod test {
     use vector_lib::schema::Definition;
 
     use super::*;
-    use crate::{config::ConfigBuilder, test_util::mock::transforms::BasicTransformConfig};
+    use crate::{
+        config::{ConfigBuilder, graph_builder},
+        test_util::mock::transforms::BasicTransformConfig,
+    };
 
     #[test]
     fn partial_graph_retains_connections_and_reports_unresolved_inputs() {
@@ -435,12 +413,7 @@ mod test {
             &["first", "missing_transform"],
             BasicTransformConfig::default(),
         );
-        let components = config
-            .transforms
-            .iter()
-            .map(|(key, transform)| (key, Component::from(transform)));
-
-        let graph = Graph::new(components, config.schema, WildcardMatching::Strict).unwrap();
+        let graph = Graph::new(graph_builder::nodes(&config), WildcardMatching::Strict).unwrap();
         let outputs = graph.output_map().unwrap();
         assert_eq!(
             outputs,
@@ -451,7 +424,7 @@ mod test {
         );
 
         assert_eq!(
-            graph.inputs_for(&"second".into()),
+            graph.inputs_for_component(&"second".into()),
             vec![OutputId::from("first")]
         );
         assert_eq!(
@@ -465,13 +438,17 @@ mod test {
 
     #[test]
     fn preserves_node_diagnostics() {
-        let source = Node::source(vec![SourceOutput::new_metrics().with_port("metrics")]);
+        let source = NodeSpec::source(
+            "source",
+            vec![SourceOutput::new_metrics().with_port("metrics")],
+        );
         assert_eq!(
             source.to_string(),
             "component_kind: source\n  outputs:\n    port: \"metrics\", types: [\"Metric\"]"
         );
 
-        let transform = Node::transform(
+        let transform = NodeSpec::transform(
+            "transform",
             DataType::Log,
             vec![TransformOutput::new(DataType::Trace, HashMap::new())],
         );
@@ -480,34 +457,63 @@ mod test {
             "component_kind: source\n  input_types: [\"Log\"]\n  outputs:\n    port: None, types: [\"Trace\"]"
         );
 
-        let sink = Node::sink(DataType::Metric);
+        let sink = NodeSpec::sink("sink", DataType::Metric);
         assert_eq!(
             sink.to_string(),
             "component_kind: sink\n  types: [\"Metric\"]"
         );
     }
 
-    impl Node {
-        fn source(outputs: Vec<SourceOutput>) -> Self {
+    #[test]
+    fn replacing_a_runtime_node_retains_all_input_diagnostics() {
+        let mut first = NodeSpec::transform("shared", DataType::Log, Vec::new());
+        first.input.as_mut().unwrap().upstream = vec!["missing_first".into()];
+        let mut second = NodeSpec::sink("shared", DataType::Log);
+        second.input.as_mut().unwrap().upstream = vec!["missing_second".into()];
+
+        let graph = Graph::new([first, second], WildcardMatching::Strict).unwrap();
+        assert_eq!(
+            graph.check_inputs().unwrap_err(),
+            vec![
+                "Input \"missing_first\" for sink \"shared\" doesn't match any components.",
+                "Input \"missing_second\" for sink \"shared\" doesn't match any components.",
+            ]
+        );
+    }
+
+    impl NodeSpec {
+        fn source(id: &str, outputs: Vec<SourceOutput>) -> Self {
             Self {
+                runtime_id: id.into(),
+                component_id: id.into(),
                 kind: ComponentKind::Source,
-                input_type: None,
-                outputs: outputs.into_iter().map(Output::from).collect(),
+                input: None,
+                outputs: outputs.into_iter().map(OutputSpec::from).collect(),
             }
         }
 
-        fn transform(input_type: DataType, outputs: Vec<TransformOutput>) -> Self {
+        fn transform(id: &str, input_type: DataType, outputs: Vec<TransformOutput>) -> Self {
             Self {
+                runtime_id: id.into(),
+                component_id: id.into(),
                 kind: ComponentKind::Transform,
-                input_type: Some(input_type),
-                outputs: outputs.into_iter().map(Output::from).collect(),
+                input: Some(InputSpec {
+                    data_type: input_type,
+                    upstream: Vec::new(),
+                }),
+                outputs: outputs.into_iter().map(OutputSpec::from).collect(),
             }
         }
 
-        fn sink(input_type: DataType) -> Self {
+        fn sink(id: &str, input_type: DataType) -> Self {
             Self {
+                runtime_id: id.into(),
+                component_id: id.into(),
                 kind: ComponentKind::Sink,
-                input_type: Some(input_type),
+                input: Some(InputSpec {
+                    data_type: input_type,
+                    upstream: Vec::new(),
+                }),
                 outputs: Vec::new(),
             }
         }
@@ -517,11 +523,14 @@ mod test {
         fn add_source(&mut self, id: &str, ty: DataType) {
             self.nodes.insert(
                 id.into(),
-                Node::source(vec![match ty {
-                    DataType::Metric => SourceOutput::new_metrics(),
-                    DataType::Trace => SourceOutput::new_traces(),
-                    _ => SourceOutput::new_maybe_logs(ty, Definition::any()),
-                }]),
+                NodeSpec::source(
+                    id,
+                    vec![match ty {
+                        DataType::Metric => SourceOutput::new_metrics(),
+                        DataType::Trace => SourceOutput::new_traces(),
+                        _ => SourceOutput::new_maybe_logs(ty, Definition::any()),
+                    }],
+                ),
             );
         }
 
@@ -536,7 +545,8 @@ mod test {
             let inputs = clean_inputs(inputs);
             self.nodes.insert(
                 id.clone(),
-                Node::transform(
+                NodeSpec::transform(
+                    id.id(),
                     in_ty,
                     vec![TransformOutput::new(
                         out_ty,
@@ -570,7 +580,7 @@ mod test {
         fn add_sink(&mut self, id: &str, ty: DataType, inputs: Vec<&str>) {
             let id = ComponentKey::from(id);
             let inputs = clean_inputs(inputs);
-            self.nodes.insert(id.clone(), Node::sink(ty));
+            self.nodes.insert(id.clone(), NodeSpec::sink(id.id(), ty));
             for from in inputs {
                 self.edges.push(Edge {
                     from,
@@ -792,21 +802,28 @@ mod test {
         // these all look like "foo.bar", but should only yield one error
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
-            Node::source(vec![SourceOutput::new_maybe_logs(
-                DataType::all_bits(),
-                Definition::any(),
-            )]),
+            NodeSpec::source(
+                "foo.bar",
+                vec![SourceOutput::new_maybe_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
+            ),
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
-            Node::source(vec![SourceOutput::new_maybe_logs(
-                DataType::all_bits(),
-                Definition::any(),
-            )]),
+            NodeSpec::source(
+                "foo.bar",
+                vec![SourceOutput::new_maybe_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
+            ),
         );
         graph.nodes.insert(
             ComponentKey::from("foo"),
-            Node::transform(
+            NodeSpec::transform(
+                "foo",
                 DataType::all_bits(),
                 vec![
                     TransformOutput::new(
@@ -825,14 +842,18 @@ mod test {
         // make sure we return more than one
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
-            Node::source(vec![SourceOutput::new_maybe_logs(
-                DataType::all_bits(),
-                Definition::any(),
-            )]),
+            NodeSpec::source(
+                "baz.errors",
+                vec![SourceOutput::new_maybe_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
+            ),
         );
         graph.nodes.insert(
             ComponentKey::from("baz"),
-            Node::transform(
+            NodeSpec::transform(
+                "baz",
                 DataType::all_bits(),
                 vec![
                     TransformOutput::new(
@@ -909,7 +930,7 @@ mod test {
             .collect();
 
         assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"])
+        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"]);
     }
 
     #[test]

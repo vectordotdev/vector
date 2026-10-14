@@ -237,7 +237,11 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::ConnectOptions {
     type Error = NatsConfigError;
 
     fn try_from(config: &NatsSinkConfig) -> Result<Self, Self::Error> {
-        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
+        from_tls_auth_config(
+            &config.connection_name,
+            config.auth.as_ref(),
+            config.tls.as_ref(),
+        )
     }
 }
 

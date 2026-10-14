@@ -8,7 +8,11 @@ use vector_core::{
     schema,
 };
 use vrl::{
-    compiler::{CompileConfig, Program, TimeZone, TypeState, runtime::Runtime, state::ExternalEnv},
+    compiler::{
+        CompileConfig, Program, TimeZone, TypeState,
+        runtime::Runtime,
+        state::{ExternalEnv, LocalEnv},
+    },
     diagnostic::Formatter,
     value::Kind,
 };
@@ -50,9 +54,14 @@ pub struct VrlDeserializerOptions {
 
 impl VrlDeserializerConfig {
     /// Build the `VrlDeserializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> vector_common::Result<VrlDeserializer> {
         let state = TypeState {
-            local: Default::default(),
+            local: LocalEnv::default(),
             external: ExternalEnv::default(),
         };
 
@@ -74,11 +83,13 @@ impl VrlDeserializerConfig {
     }
 
     /// Return the type of event build by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
@@ -151,7 +162,7 @@ impl VrlDeserializer {
         match runtime.resolve(&mut target, &self.program, &self.timezone) {
             Ok(_) => match target.into_events(log_namespace) {
                 TargetEvents::One(event) => Ok(smallvec![event]),
-                TargetEvents::Logs(events_iter) => Ok(SmallVec::from_iter(events_iter)),
+                TargetEvents::Logs(events_iter) => Ok(events_iter.collect::<SmallVec<_>>()),
                 TargetEvents::Traces(_) => Err("trace targets are not supported".into()),
             },
             Err(e) => Err(e.to_string().into()),
@@ -246,12 +257,12 @@ mod tests {
     #[test]
     fn test_syslog_and_cef_input() {
         let source = indoc!(
-            r#"
+            r"
             if exists(.message) {
                 . = string!(.message)
             }
             . = parse_syslog(.) ?? parse_cef(.) ?? null
-            "#
+            "
         );
 
         let decoder = make_decoder(source);
@@ -361,7 +372,7 @@ mod tests {
         let decoder = make_decoder(r#".secret_value = get_secret!("my_token")"#)
             .with_metadata_template(metadata_with_secret("my_token", "super-secret"));
 
-        let bytes = Bytes::from(r#"hello"#);
+        let bytes = Bytes::from(r"hello");
         let events = decoder
             .parse(bytes, LogNamespace::Legacy)
             .expect("parse should succeed");
@@ -380,7 +391,7 @@ mod tests {
         let decoder = make_decoder(r#"set_secret!("my_token", "codec-wins")"#)
             .with_metadata_template(metadata_with_secret("my_token", "template-loses"));
 
-        let bytes = Bytes::from(r#"hello"#);
+        let bytes = Bytes::from(r"hello");
         let events = decoder
             .parse(bytes, LogNamespace::Legacy)
             .expect("parse should succeed");

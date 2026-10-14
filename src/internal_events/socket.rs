@@ -18,6 +18,7 @@ pub enum SocketMode {
 }
 
 impl SocketMode {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
@@ -34,6 +35,8 @@ pub struct SocketBytesReceived {
 }
 
 impl InternalEvent for SocketBytesReceived {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         let protocol = self.mode.as_str();
         trace!(
@@ -58,6 +61,8 @@ pub struct SocketEventsReceived {
 }
 
 impl InternalEvent for SocketEventsReceived {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         let mode = self.mode.as_str();
         trace!(

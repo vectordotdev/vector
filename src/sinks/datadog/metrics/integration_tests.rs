@@ -18,7 +18,7 @@ use vector_lib::{
 
 use super::{
     DatadogMetricsConfig,
-    config::{SERIES_V1_PATH, SERIES_V2_PATH, SERIES_V3_PATH},
+    config::{SERIES_V2_PATH, SERIES_V3_PATH},
     encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
 };
 use crate::{
@@ -45,7 +45,7 @@ fn generate_counters() -> Vec<Event> {
                     format!("counter_{}", rng().random::<u32>()),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: index as f64,
+                        value: f64::from(index),
                     },
                 )
                 .with_timestamp(Some(ts))
@@ -110,7 +110,7 @@ fn generate_counter_gauge_set() -> Vec<Event> {
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
 async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
-    // Pinned to v2: the tests built on this helper decode `MetricPayload`, which is the v1/v2
+    // Pinned to v2: the tests built on this helper decode `MetricPayload`, which is the v2
     // wire shape. The default (v3) is a different, columnar format and is covered separately by
     // `default_series_version_uses_the_v3_intake` below.
     start_test_with_series_version(events, Some("v2")).await
@@ -118,6 +118,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 
 /// Same as [`start_test`], but selects the series API version explicitly. Passing `None` omits
 /// the option entirely so the sink's default applies.
+// https://github.com/vectordotdev/vector/issues/23659
 async fn start_test_with_series_version(
     events: Vec<Event>,
     series_api_version: Option<&str>,
@@ -129,7 +130,9 @@ async fn start_test_with_series_version(
     .to_string();
 
     if let Some(series_api_version) = series_api_version {
-        config.push_str(&format!("series_api_version = \"{series_api_version}\"\n"));
+        config.push_str("series_api_version = \"");
+        config.push_str(series_api_version);
+        config.push_str("\"\n");
     }
 
     let (mut config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
@@ -156,12 +159,13 @@ async fn start_test_with_series_version(
     (events, rx)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
-    if is_zstd(&payload) {
-        CappedDecoder::zstd(&payload[..])?.decompress()
-    } else {
-        CappedDecoder::zlib(&payload[..]).decompress()
-    }
+    CappedDecoder::zstd(&payload[..])?.decompress()
 }
 
 #[tokio::test]
@@ -176,11 +180,8 @@ async fn all_series_metric_types() {
 
     let request = output.first().unwrap();
 
-    match request.0.uri.path() {
-        SERIES_V1_PATH => warn!("Deprecated endpoint used."),
-        SERIES_V2_PATH => validate_protobuf_set_gauge_rate(request),
-        _ => panic!("Unexpected request type received!"),
-    }
+    assert_eq!(request.0.uri.path(), SERIES_V2_PATH);
+    validate_protobuf_set_gauge_rate(request);
 }
 
 #[tokio::test]
@@ -203,11 +204,8 @@ async fn smoke() {
 
     let request = output.first().unwrap();
 
-    match request.0.uri.path() {
-        SERIES_V1_PATH => validate_json_counters(request),
-        SERIES_V2_PATH => validate_protobuf_counters(request),
-        _ => panic!("Unexpected request type received!"),
-    }
+    assert_eq!(request.0.uri.path(), SERIES_V2_PATH);
+    validate_protobuf_counters(request);
 }
 
 #[tokio::test]
@@ -254,6 +252,11 @@ fn validate_common(request: &(Parts, Bytes)) {
     assert!(request.0.headers.contains_key("DD-Agent-Payload"));
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::float_cmp,
+    reason = "The input counter values and their sum are exact integers."
+)]
 fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
@@ -279,7 +282,7 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     sorted_names.sort();
     assert_eq!(metric_names, sorted_names);
 
-    series.iter().for_each(|serie| {
+    for serie in &series {
         // name
         assert!(serie.metric.starts_with("foo.counter_"));
 
@@ -290,14 +293,13 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
         );
 
         // resources
-        serie
-            .resources
-            .iter()
-            .for_each(|resource| match resource.r#type.as_str() {
+        for resource in &serie.resources {
+            match resource.r#type.as_str() {
                 "host" => assert_eq!(resource.name.as_str(), "a_host"),
                 "device" => assert_eq!(resource.name.as_str(), "a_device"),
                 _ => panic!("Unexpected resource found!"),
-            });
+            }
+        }
 
         // source_type_name
         assert_eq!(serie.source_type_name, "a_name");
@@ -317,7 +319,7 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
         assert_eq!(origin_metadata.origin_product, *ORIGIN_PRODUCT_VALUE);
         assert_eq!(origin_metadata.origin_category, ORIGIN_CATEGORY_VALUE);
         assert_eq!(origin_metadata.origin_service, 0);
-    });
+    }
 
     // points
     // the input values are [0..10)
@@ -330,6 +332,15 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     );
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::float_cmp,
+    reason = "The encoded values are exact integers or an exact division by two."
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
@@ -393,93 +404,6 @@ fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
         assert_eq!(count.points.len(), 1);
         assert_eq!(count.points[0].value, 1234.0 / count.interval as f64);
     }
-}
-
-fn validate_json_counters(request: &(Parts, Bytes)) {
-    assert_eq!(
-        request.0.headers.get("Content-Type").unwrap(),
-        "application/json"
-    );
-
-    validate_common(request);
-
-    let compressed_payload = request.1.to_vec();
-    let payload = decompress_payload(compressed_payload).unwrap();
-    let payload = std::str::from_utf8(&payload).unwrap();
-    let payload: serde_json::Value = serde_json::from_str(payload).unwrap();
-
-    let series = payload
-        .as_object()
-        .unwrap()
-        .get("series")
-        .unwrap()
-        .as_array()
-        .unwrap();
-    assert!(!series.is_empty());
-
-    // check metrics are sorted by name, which helps HTTP compression
-    let metric_names: Vec<String> = series
-        .iter()
-        .map(|value| {
-            value
-                .as_object()
-                .unwrap()
-                .get("metric")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string()
-        })
-        .collect();
-    let mut sorted_names = metric_names.clone();
-    sorted_names.sort();
-    assert_eq!(metric_names, sorted_names);
-
-    let entry = series.first().unwrap().as_object().unwrap();
-    assert!(
-        entry
-            .get("metric")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .starts_with("foo.counter_"),
-    );
-    assert_eq!(entry.get("type").unwrap().as_str().unwrap(), "count");
-    let points = entry
-        .get("points")
-        .unwrap()
-        .as_array()
-        .unwrap()
-        .first()
-        .unwrap()
-        .as_array()
-        .unwrap();
-    assert_eq!(points.len(), 2);
-
-    // validate that all values were received
-    let all_values: f64 = series
-        .iter()
-        .map(|entry| {
-            entry
-                .as_object()
-                .unwrap()
-                .get("points")
-                .unwrap()
-                .as_array()
-                .unwrap()
-                .first()
-                .unwrap()
-                .as_array()
-                .unwrap()
-                .get(1)
-                .unwrap()
-                .as_f64()
-                .unwrap()
-        })
-        .sum();
-
-    // the input values are [0..10)
-    assert_eq!(all_values, 45.0);
 }
 
 async fn run_sink() {

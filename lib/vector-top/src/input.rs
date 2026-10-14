@@ -29,6 +29,11 @@ pub(crate) async fn handle_input<B: Backend>(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing dashboard layout and event handling together during the lint rollout."
+)]
 async fn handle_top_input<B: Backend>(
     key_event: KeyEvent,
     event_tx: &state::UiEventTx,
@@ -129,7 +134,7 @@ async fn handle_top_input<B: Backend>(
             };
             event_tx.send(UiEventType::SortByColumn(col)).await.ok();
         }
-        KeyCode::F(4) | KeyCode::Char('f') | KeyCode::Char('/') => {
+        KeyCode::F(4) | KeyCode::Char('f' | '/') => {
             event_tx.send(UiEventType::ToggleFilterMenu).await.ok();
         }
         _ => (),

@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::print_stdout)] // tests
 #![allow(clippy::print_stderr)] // tests
 
@@ -21,6 +22,11 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Each boolean represents an independent command-line switch."
+)]
 pub struct Cmd {
     #[clap(short, long)]
     pattern: Option<String>,
@@ -65,7 +71,7 @@ impl Cmd {
     }
 }
 
-fn should_run(name: &str, pat: &Option<String>, _runtime: VrlRuntime) -> bool {
+fn should_run(name: &str, pat: Option<&str>, _runtime: VrlRuntime) -> bool {
     if name == "tests/example.vrl" {
         return false;
     }
@@ -113,6 +119,11 @@ fn main() {
     );
 }
 
+/// Returns the test crate directory.
+///
+/// # Panics
+/// Panics if `CARGO_MANIFEST_DIR` is not set.
+#[must_use]
 pub fn test_dir() -> PathBuf {
     PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap())
 }
@@ -146,7 +157,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
         .filter(|test| {
             should_run(
                 &format!("{}/{}", test.category, test.name),
-                &cmd.pattern,
+                cmd.pattern.as_deref(),
                 cmd.runtime,
             )
         })
