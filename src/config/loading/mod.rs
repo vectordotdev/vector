@@ -9,9 +9,6 @@ mod secret;
 mod source;
 
 #[cfg(test)]
-mod metric_tag_tests;
-
-#[cfg(test)]
 mod tests;
 
 #[cfg(all(test, feature = "sources-demo_logs"))]

@@ -106,159 +106,6 @@ impl<T: Configurable + 'static> Configurable for BoolOrStruct<T> {
     }
 }
 
-#[cfg(test)]
-mod bool_or_struct_tests {
-    use serde::{Deserialize, Serialize};
-    use serde_json::{Value, json};
-    use serde_with::serde_as;
-    use vector_config::{Configurable, schema::generate_root_schema};
-
-    /// Options with a boolean shorthand and another independently defaulted setting.
-    #[derive(Clone, Debug, Deserialize, Serialize, Configurable)]
-    #[serde(default)]
-    struct Options {
-        /// Whether the option is enabled.
-        enabled: bool,
-        /// Timeout in seconds.
-        timeout: u64,
-    }
-
-    impl Default for Options {
-        fn default() -> Self {
-            Self {
-                enabled: true,
-                timeout: 10,
-            }
-        }
-    }
-
-    impl From<bool> for Options {
-        fn from(enabled: bool) -> Self {
-            Self {
-                enabled,
-                ..Self::default()
-            }
-        }
-    }
-
-    /// Configuration using the schema-aware boolean-or-struct adapter.
-    #[serde_as]
-    #[derive(Debug, Deserialize, Serialize, Configurable)]
-    struct Adapted {
-        /// Configurable options.
-        #[serde_as(as = "super::BoolOrStruct<Options>")]
-        #[serde(default)]
-        options: Options,
-    }
-
-    #[derive(Deserialize, Serialize)]
-    struct Legacy {
-        #[serde(default, deserialize_with = "super::bool_or_struct")]
-        options: Options,
-    }
-
-    #[test]
-    fn both_input_forms_keep_the_existing_struct_output_and_defaults() {
-        struct Case {
-            name: &'static str,
-            input: Value,
-            expected: Value,
-        }
-
-        for case in [
-            Case {
-                name: "boolean false keeps other defaults",
-                input: json!({"options": false}),
-                expected: json!({"enabled": false, "timeout": 10}),
-            },
-            Case {
-                name: "boolean true keeps other defaults",
-                input: json!({"options": true}),
-                expected: json!({"enabled": true, "timeout": 10}),
-            },
-            Case {
-                name: "struct sets both fields",
-                input: json!({"options": {"enabled": false, "timeout": 7}}),
-                expected: json!({"enabled": false, "timeout": 7}),
-            },
-            Case {
-                name: "partial struct retains omitted defaults",
-                input: json!({"options": {"timeout": 7}}),
-                expected: json!({"enabled": true, "timeout": 7}),
-            },
-            Case {
-                name: "missing field retains the struct default",
-                input: json!({}),
-                expected: json!({"enabled": true, "timeout": 10}),
-            },
-        ] {
-            let adapted: Adapted = serde_json::from_value(case.input.clone())
-                .unwrap_or_else(|error| panic!("{}: {error}", case.name));
-            let legacy: Legacy = serde_json::from_value(case.input).unwrap();
-            let serialized = serde_json::to_value(adapted).unwrap();
-            assert_eq!(serialized["options"], case.expected, "{}", case.name);
-            assert_eq!(
-                serialized,
-                serde_json::to_value(legacy).unwrap(),
-                "{}",
-                case.name
-            );
-            let roundtrip: Adapted = serde_json::from_value(serialized.clone()).unwrap();
-            assert_eq!(
-                serde_json::to_value(roundtrip).unwrap(),
-                serialized,
-                "{}",
-                case.name
-            );
-        }
-    }
-
-    #[test]
-    fn adapter_rejects_the_same_invalid_scalar_and_array_inputs() {
-        for (name, value) in [
-            ("integer", json!(1)),
-            ("float", json!(1.5)),
-            ("boolean-looking string", json!("false")),
-            ("arbitrary string", json!("invalid")),
-            ("null", Value::Null),
-            ("array", json!([false])),
-        ] {
-            let input = json!({"options": value});
-            assert!(
-                serde_json::from_value::<Adapted>(input.clone()).is_err(),
-                "{name}"
-            );
-            assert!(serde_json::from_value::<Legacy>(input).is_err(), "{name}");
-        }
-    }
-
-    #[test]
-    fn schema_describes_both_forms_with_an_unchanged_struct_default() {
-        let schema = serde_json::to_value(generate_root_schema::<Adapted>().unwrap()).unwrap();
-        let options = &schema["properties"]["options"];
-        assert_eq!(options["_metadata"]["docs::enum_tagging"], "untagged");
-        assert_eq!(options["default"], json!({"enabled": true, "timeout": 10}));
-
-        let variants = options["oneOf"].as_array().unwrap();
-        let types = variants
-            .iter()
-            .map(|variant| {
-                let resolved =
-                    variant
-                        .get("$ref")
-                        .and_then(Value::as_str)
-                        .map_or(variant, |reference| {
-                            schema
-                                .pointer(reference.strip_prefix('#').unwrap())
-                                .unwrap()
-                        });
-                resolved["type"].as_str().unwrap()
-            })
-            .collect::<Vec<_>>();
-        assert_eq!(types, ["boolean", "object"]);
-    }
-}
-
 /// One ASCII character, represented as a string in configuration and a byte in codecs.
 #[derive(Clone, Copy, Configurable, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
@@ -310,7 +157,8 @@ impl<'de> Deserialize<'de> for AsciiChar {
 mod tests {
     use serde::{Deserialize, Serialize};
     use serde_json::{Value, json};
-    use vector_config::{configurable_component, schema::generate_root_schema};
+    use serde_with::serde_as;
+    use vector_config::{Configurable, configurable_component, schema::generate_root_schema};
 
     use super::AsciiChar;
 
@@ -370,10 +218,13 @@ mod tests {
         assert_eq!(property["_metadata"]["serde::string_only"], true);
     }
 
-    #[derive(Debug, Deserialize, Serialize)]
+    /// Options accepting a boolean shorthand while retaining other defaults.
+    #[derive(Clone, Debug, Deserialize, Serialize, Configurable)]
     #[serde(default)]
     struct Options {
+        /// Whether the option is enabled.
         enabled: bool,
+        /// Timeout in seconds.
         timeout: u64,
     }
 
@@ -398,6 +249,16 @@ mod tests {
     #[derive(Debug, Deserialize, Serialize)]
     struct BoolOrStructConfig {
         #[serde(default, deserialize_with = "super::bool_or_struct")]
+        options: Options,
+    }
+
+    /// Configuration using the schema-aware boolean-or-struct adapter.
+    #[serde_as]
+    #[derive(Debug, Deserialize, Serialize, Configurable)]
+    struct AdaptedConfig {
+        /// Configurable options.
+        #[serde_as(as = "super::BoolOrStruct<Options>")]
+        #[serde(default)]
         options: Options,
     }
 
@@ -466,11 +327,26 @@ mod tests {
                 expected: None,
             },
         ] {
-            let result = serde_json::from_value::<BoolOrStructConfig>(case.input);
+            let result = serde_json::from_value::<BoolOrStructConfig>(case.input.clone());
+            let adapted = serde_json::from_value::<AdaptedConfig>(case.input);
             if let Some(expected) = case.expected {
                 let config = result.unwrap_or_else(|error| panic!("{}: {error}", case.name));
                 let serialized = serde_json::to_value(config).unwrap();
                 assert_eq!(serialized, json!({"options": expected}), "{}", case.name);
+                assert_eq!(
+                    serde_json::to_value(adapted.unwrap()).unwrap(),
+                    serialized,
+                    "{}",
+                    case.name
+                );
+                let adapted_roundtrip: AdaptedConfig =
+                    serde_json::from_value(serialized.clone()).unwrap();
+                assert_eq!(
+                    serde_json::to_value(adapted_roundtrip).unwrap(),
+                    serialized,
+                    "{}",
+                    case.name
+                );
                 let roundtrip: BoolOrStructConfig =
                     serde_json::from_value(serialized.clone()).unwrap();
                 assert_eq!(
@@ -481,7 +357,43 @@ mod tests {
                 );
             } else {
                 assert!(result.is_err(), "{}: {result:?}", case.name);
+                assert!(adapted.is_err(), "{}: {adapted:?}", case.name);
             }
         }
+    }
+
+    #[test]
+    fn schema_describes_both_forms_with_an_unchanged_struct_default() {
+        let schema =
+            serde_json::to_value(generate_root_schema::<AdaptedConfig>().unwrap()).unwrap();
+        let options = &schema["properties"]["options"];
+        assert_eq!(options["default"], json!({"enabled": true, "timeout": 10}));
+        let shared = options
+            .get("$ref")
+            .and_then(Value::as_str)
+            .map_or(options, |reference| {
+                schema
+                    .pointer(reference.strip_prefix('#').unwrap())
+                    .unwrap()
+            });
+        assert_eq!(shared["_metadata"]["docs::enum_tagging"], "untagged");
+
+        let variants = shared["oneOf"].as_array().unwrap();
+        let types = variants
+            .iter()
+            .map(|variant| {
+                let resolved =
+                    variant
+                        .get("$ref")
+                        .and_then(Value::as_str)
+                        .map_or(variant, |reference| {
+                            schema
+                                .pointer(reference.strip_prefix('#').unwrap())
+                                .unwrap()
+                        });
+                resolved["type"].as_str().unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(types, ["boolean", "object"]);
     }
 }

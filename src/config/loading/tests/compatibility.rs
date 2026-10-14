@@ -139,7 +139,10 @@ fn namespaced_tests_load_interpolated_event_counts() {
     for (name, count) in [
         ("environment", "${VECTOR_TEST_COMPAT_UNSET:-42}"),
         ("secret", "SECRET[backend.count]"),
-    ] {
+    ]
+    .into_iter()
+    .flat_map(|(name, count)| [(name, count.to_owned()), (name, format!("'{count}'"))])
+    {
         let directory = tempfile::tempdir().unwrap();
         let input = format!(
             "name: event count\noutputs:\n  - extract_from: transform\n    expected_event_count: {count}\n"
@@ -461,9 +464,9 @@ fn interpolated_scalars_follow_format_quoting() {
     // Quoted numeric and boolean placeholders are coerced using the field schema.
     for case in [
         Case {
-            name: "YAML plain placeholders",
+            name: "YAML plain placeholders and a field alias",
             format: Format::Yaml,
-            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: @COUNT@\n    interval: @INTERVAL@\n    log_namespace: @BOOL@\n",
+            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: @COUNT@\n    batch_interval: @INTERVAL@\n    log_namespace: @BOOL@\n",
             accepted: true,
         },
         Case {
@@ -554,7 +557,7 @@ fn disabled_environment_interpolation_preserves_strings() {
             type: demo_logs
             format: shuffle
             lines: ['${VECTOR_TEST_COMPAT_DISABLED_UNSET:?must not be read}', '$$literal']
-            count: 42
+            count: '42'
     "};
     let builder = ConfigBuilderLoader::default()
         .interpolate_env(false)
