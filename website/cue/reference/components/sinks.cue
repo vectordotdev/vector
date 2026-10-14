@@ -15,7 +15,6 @@ components: sinks: [Name=string]: {
 				A boolean value sets `enabled`; other healthcheck options retain their defaults.
 				"""
 			required:    generated.components.sinks.configuration.healthcheck.required
-			warnings:    generated.components.sinks.configuration.healthcheck.warnings
 			type: bool: generated.components.sinks.configuration.healthcheck.type.bool
 			type: object: options: {
 				enabled: generated.components.sinks.configuration.healthcheck.type.object.options.enabled

@@ -806,10 +806,6 @@ pub fn generate_bool_or_struct_schema(
             constants::DOCS_META_ENUM_TAGGING,
             "untagged",
         ));
-        metadata.add_custom_attribute(CustomAttribute::kv(
-            "docs::warnings",
-            "Boolean shorthand is deprecated. Use the object form instead. Users will have at least two minor release cycles to migrate before removal; no removal release is scheduled. See the [migration guide](/deprecations/).",
-        ));
         apply_configurable_metadata(config, &mut schema, metadata);
         generator
             .borrow_mut()

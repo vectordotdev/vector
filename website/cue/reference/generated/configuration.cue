@@ -809,8 +809,7 @@ generated: configuration: {
 					healthcheck: {
 						type:        _schemaDefinitions["derived::7ad58e4d9af48ec29d981195"]
 						description: "Healthcheck configuration."
-						warnings: ["Boolean shorthand is deprecated. Use the object form instead. Users will have at least two minor release cycles to migrate before removal; no removal release is scheduled. See the [migration guide](/deprecations/)."]
-						required: false
+						required:    false
 					}
 					inputs: {
 						type: array: items: type: string: examples: ["my-source-or-transform-id", "prefix-*"]
@@ -938,8 +937,7 @@ generated: configuration: {
 				[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 				"""
 			required: false
-			warnings: ["Boolean shorthand is deprecated. Use the object form instead. Users will have at least two minor release cycles to migrate before removal; no removal release is scheduled. See the [migration guide](/deprecations/)."]
-			group: "global_options"
+			group:    "global_options"
 		}
 		buffer_utilization_ewma_half_life_seconds: {
 			type: float: {}

@@ -17,7 +17,6 @@ generated: components: sources: aws_s3: configuration: {
 			"""
 		required: false
 		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
-		warnings: ["Boolean shorthand is deprecated. Use the object form instead. Users will have at least two minor release cycles to migrate before removal; no removal release is scheduled. See the [migration guide](/deprecations/)."]
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."

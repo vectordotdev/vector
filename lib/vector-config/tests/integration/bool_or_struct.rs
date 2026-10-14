@@ -137,12 +137,6 @@ fn shared_schema_preserves_defaults_descriptions_and_deprecation() {
     assert_eq!(shared["deprecated"], true);
     assert_eq!(shared["_metadata"]["docs::enum_tagging"], "untagged");
     assert_eq!(shared["oneOf"][0]["deprecated"], true);
-    assert!(
-        shared["_metadata"]["docs::warnings"]
-            .as_str()
-            .unwrap()
-            .contains("Boolean shorthand is deprecated")
-    );
 }
 
 #[test]

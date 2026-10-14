@@ -61,21 +61,10 @@ for (const { sink, usesUri } of [
     const header = heading.locator("../..");
     await expect(header.getByText("bool", { exact: true })).toBeVisible();
     await expect(header.getByText("object", { exact: true })).toBeVisible();
-    const option = header.locator("..");
-    await expect(option.getByText(/Boolean shorthand is deprecated/)).toBeVisible();
-    await expect(option.getByRole("link", { name: "migration guide", exact: true })).toHaveAttribute(
-      "href",
-      "/deprecations/"
-    );
     await expect(page.getByRole("heading", { name: "healthcheck.enabled", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "healthcheck.uri", exact: true })).toHaveCount(usesUri ? 1 : 0);
     await expect(
       page.getByText("A boolean value sets enabled; other healthcheck options retain their defaults.", { exact: true })
     ).toBeVisible();
-    await option.getByRole("link", { name: "migration guide", exact: true }).click();
-    await expect(
-      page.getByText("Boolean shorthand for object-valued configuration options", { exact: true })
-    ).toBeVisible();
-    await expect(page.getByText(/We will allow at least two minor release cycles/)).toBeVisible();
   });
 }
