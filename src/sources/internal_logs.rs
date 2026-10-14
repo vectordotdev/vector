@@ -4,7 +4,6 @@ use vector_lib::{
     codecs::BytesDeserializerConfig,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
@@ -151,27 +150,18 @@ async fn run(
     let pid = std::process::id();
 
     // Chain any log events that were captured during early buffering to the front,
-    // and then continue with the normal stream of internal log events. Each item carries the
-    // number of events dropped just before it due to broadcast lag; buffered events have none.
+    // and then continue with the normal stream of internal log events.
     let buffered_events = subscription.buffered_events().await;
-    let mut rx = stream::iter(buffered_events.into_iter().flatten().map(|log| (log, 0)))
+    let mut rx = stream::iter(buffered_events.into_iter().flatten())
         .chain(subscription.into_stream())
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
-    // infinite loop since it receives all such logs. The one exception is
-    // `ComponentEventsDropped` below. It is only emitted after an event has
-    // been received following a lag (see `TraceSubscription::into_stream`),
-    // so its log cannot lag the receiver again, and it adds at most one log
-    // per received event.
-    while let Some((mut log, dropped)) = rx.next().await {
-        if dropped > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: dropped as usize,
-                reason: "Internal logs broadcast receiver lagged.",
-            });
-        }
+    // infinite loop since it receives all such logs. Broadcast lag is
+    // reported by `TraceSubscription::into_stream` itself, after an event
+    // has been received, so its log cannot lag the receiver again.
+    while let Some(mut log) = rx.next().await {
         // TODO: Should this actually be in memory size?
         let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();

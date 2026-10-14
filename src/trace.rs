@@ -27,8 +27,11 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
-use vector_lib::SpanField;
-use vector_lib::lookup::event_path;
+use vector_lib::{
+    SpanField,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    lookup::event_path,
+};
 use vrl::value::Value;
 
 use crate::event::LogEvent;
@@ -309,18 +312,26 @@ impl TraceSubscription {
 
     /// Converts this subscription into a raw stream of log events.
     ///
-    /// Each item pairs a log event with the number of events dropped just before it because the
-    /// underlying broadcast receiver lagged. The count is reported with the next received event,
-    /// not when the lag is detected. After a lag, the receiver points at the oldest slot of a
-    /// full buffer, so any log emitted before the next receive (for example the
-    /// `ComponentEventsDropped` error for the lag itself) overwrites that slot and lags the
-    /// receiver again, indefinitely. Once an event has been received, that slot is consumed and
-    /// callers can log about the drop.
-    pub fn into_stream(self) -> impl Stream<Item = (LogEvent, u64)> + Unpin {
+    /// Events dropped because the underlying broadcast receiver lagged are reported via
+    /// `ComponentEventsDropped` when the next event is received, not when the lag is detected.
+    /// After a lag, the receiver points at the oldest slot of a full buffer, so any log emitted
+    /// before the next receive (including the `ComponentEventsDropped` error itself) overwrites
+    /// that slot and lags the receiver again, indefinitely. Once an event has been received, that
+    /// slot is consumed and the drop can be logged safely.
+    pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
         BroadcastStream::new(self.trace_rx)
             .scan(0u64, |dropped, event| {
                 ready(Some(match event {
-                    Ok(log) => Some((log, std::mem::take(dropped))),
+                    Ok(log) => {
+                        let count = std::mem::take(dropped);
+                        if count > 0 {
+                            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                                count: usize::try_from(count).unwrap_or(usize::MAX),
+                                reason: "Internal logs broadcast receiver lagged.",
+                            });
+                        }
+                        Some(log)
+                    }
                     Err(BroadcastStreamRecvError::Lagged(n)) => {
                         *dropped += n;
                         None
@@ -502,7 +513,7 @@ mod tests {
         let messages: Vec<String> = tokio::time::timeout(Duration::from_secs(5), async {
             let mut collected = Vec::with_capacity(EXPECTED);
             loop {
-                let (event, _dropped) = stream
+                let event = stream
                     .next()
                     .await
                     .expect("broadcast stream ended unexpectedly");
