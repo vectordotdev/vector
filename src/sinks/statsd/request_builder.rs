@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-/// Incremental request builder specific to StatsD.
+/// Incremental request builder specific to `StatsD`.
 pub struct StatsdRequestBuilder {
     encoder: StatsdEncoder,
     request_max_size: usize,

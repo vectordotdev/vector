@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! An encoder for [Snappy] compression.
 //! Whilst there does exist a [Writer] implementation for Snappy, this compresses
 //! using the [Snappy frame format][frame], which is not quite what we want. So
@@ -26,6 +28,11 @@ impl<W: io::Write> SnappyEncoder<W> {
         }
     }
 
+    /// Compresses the buffered data and returns the writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if compression or writing fails.
     pub fn finish(mut self) -> io::Result<W> {
         let mut encoder = Encoder::new();
         let compressed = encoder.compress_vec(&self.buffer)?;
