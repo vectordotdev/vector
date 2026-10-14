@@ -1,4 +1,5 @@
 mod changelog_fragments;
+mod check_docs;
 mod component_examples;
 mod component_features;
 mod deny;
@@ -10,8 +11,6 @@ mod licenses;
 mod markdown;
 mod rust;
 mod scripts;
-
-use crate::utils::command::ScriptArgs;
 
 /// Check parts of the Vector code base...
 #[derive(clap::Args, Debug)]
@@ -28,7 +27,7 @@ enum Commands {
     ComponentExamples(component_examples::Cli),
     Deny(deny::Cli),
     /// Check that all /docs files are valid
-    Docs(ScriptArgs),
+    Docs(check_docs::Cli),
     Events(events::Cli),
     Examples(examples::Cli),
     Fmt(fmt::Cli),
@@ -46,7 +45,7 @@ impl Cli {
             Commands::ComponentFeatures(cli) => cli.exec(),
             Commands::ComponentExamples(cli) => cli.exec(),
             Commands::Deny(cli) => cli.exec(),
-            Commands::Docs(args) => args.exec("check-docs.sh"),
+            Commands::Docs(cli) => cli.exec(),
             Commands::Events(cli) => cli.exec(),
             Commands::Examples(cli) => cli.exec(),
             Commands::Fmt(cli) => cli.exec(),
