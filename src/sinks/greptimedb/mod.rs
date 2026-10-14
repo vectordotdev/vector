@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use crate::sinks::prelude::*;
 
 // sub level implementations

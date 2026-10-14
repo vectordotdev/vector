@@ -111,12 +111,11 @@ pub struct NewRelicConfig {
 impl_generate_config_from_default!(NewRelicConfig);
 
 impl NewRelicConfig {
-    pub fn build_healthcheck(
-        &self,
+    fn build_healthcheck(
         client: HttpClient,
         credentials: Arc<NewRelicCredentials>,
-    ) -> crate::Result<super::Healthcheck> {
-        Ok(healthcheck::healthcheck(client, credentials).boxed())
+    ) -> super::Healthcheck {
+        healthcheck::healthcheck(client, credentials).boxed()
     }
 }
 
@@ -177,7 +176,7 @@ impl ValidatedSink for NewRelicConfig {
         let tls_settings = TlsSettings::from_options(None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        let healthcheck = self.build_healthcheck(client.clone(), Arc::clone(credentials))?;
+        let healthcheck = Self::build_healthcheck(client.clone(), Arc::clone(credentials));
 
         let service = ServiceBuilder::new()
             .settings(request_limits.clone(), NewRelicApiRetry)

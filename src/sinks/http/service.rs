@@ -78,12 +78,12 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
             .expect("Failed to access headers in http::Request builder- builder has errors.");
 
         // Static headers from config
-        for (header_name, header_value) in self.static_headers.iter() {
+        for (header_name, header_value) in &self.static_headers {
             headers.insert(header_name.inner(), header_value.clone());
         }
 
         // Template headers from the partition key
-        for (name, value) in metadata.headers.iter() {
+        for (name, value) in &metadata.headers {
             let header_name = HeaderName::from_bytes(name.as_bytes())
                 .map_err(|e| format!("Invalid header name '{name}': {e}"))?;
             let header_value = HeaderValue::from_bytes(value.as_bytes())
