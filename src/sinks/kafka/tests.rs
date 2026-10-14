@@ -346,10 +346,7 @@ mod integration_test {
 
     #[tokio::test]
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::too_many_lines,
-        reason = "Keep the broker fixture and delivery assertions together."
-    )]
+    #[allow(clippy::too_many_lines, reason = "Keep the broker fixture together.")]
     async fn kafka_happy_path_trace_events() {
         crate::test_util::trace_init();
 
@@ -481,10 +478,7 @@ mod integration_test {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::too_many_lines,
-        reason = "Keep the broker fixture and delivery assertions together."
-    )]
+    #[allow(clippy::too_many_lines, reason = "Keep the broker fixture together.")]
     async fn kafka_happy_path(
         server: String,
         sasl: Option<KafkaSaslConfig>,

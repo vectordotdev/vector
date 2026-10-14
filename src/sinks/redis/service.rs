@@ -51,9 +51,9 @@ impl Service<RedisRequest> for RedisService {
                 super::DataType::SortedSet(method) => match method {
                     SortedSetMethod::ZAdd => {
                         // https://github.com/vectordotdev/vector/issues/23659
-                        #[expect(
+                        #[allow(
                             clippy::cast_precision_loss,
-                            reason = "Redis scores are f64; preserve the existing rounding."
+                            reason = "Preserve Redis score rounding."
                         )]
                         let score = kv.score.unwrap_or(0) as f64;
                         if count > 1 {
