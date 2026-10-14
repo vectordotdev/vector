@@ -17,6 +17,15 @@ use vector_lib::{
     source_sender::SourceSenderItem,
 };
 
+#[cfg(feature = "sinks-websocket_server")]
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{Message, protocol::frame::coding::CloseCode},
+};
+
+#[cfg(feature = "sinks-websocket_server")]
+use crate::sinks::websocket_server::WebSocketListenerSinkConfig;
+
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{Event, EventArray, EventContainer, LogEvent, into_event_stream},
@@ -362,6 +371,69 @@ async fn topology_remove_one_sink() {
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
+}
+
+#[cfg(feature = "sinks-websocket_server")]
+#[tokio::test]
+async fn topology_replace_websocket_server_on_same_port() {
+    trace_init();
+    let (_guard, address) = crate::test_util::addr::next_addr();
+    let (mut sender, source) = basic_source();
+    let sink = WebSocketListenerSinkConfig {
+        address,
+        ..Default::default()
+    };
+    let mut config = Config::builder();
+    config.add_source("in", source);
+    config.add_sink("ws0", &["in"], sink.clone());
+    let (mut topology, mut crash) = start_topology(config.clone().build().unwrap(), false).await;
+
+    tokio::time::timeout(Duration::from_secs(20), async {
+        for generation in 0..3 {
+            crate::test_util::wait_for_tcp(address).await;
+            let (mut client, _) = connect_async(format!("ws://{address}")).await.unwrap();
+            let message = format!("generation {generation}");
+            sender
+                .send_event(Event::Log(LogEvent::from(message.clone())))
+                .await
+                .unwrap();
+            let received = client.next().await.unwrap().unwrap();
+            let received: serde_json::Value =
+                serde_json::from_str(received.to_text().unwrap()).unwrap();
+            assert_eq!(received["message"], message);
+
+            let close = crate::spawn_in_current_span(async move {
+                let message = client.next().await.unwrap().unwrap();
+                assert!(
+                    matches!(message, Message::Close(Some(frame)) if frame.code == CloseCode::Away)
+                );
+                futures::SinkExt::flush(&mut client).await.unwrap();
+            });
+
+            // A new component ID prevents buffer reuse from hiding a missing port resource declaration.
+            config
+                .sinks
+                .shift_remove(&ComponentKey::from(format!("ws{generation}")));
+            config.add_sink(format!("ws{}", generation + 1), &["in"], sink.clone());
+            topology
+                .reload_config_and_respawn(config.clone().build().unwrap(), Default::default())
+                .await
+                .unwrap();
+            close.await.unwrap();
+        }
+
+        crate::test_util::wait_for_tcp(address).await;
+        topology.stop().await;
+        let _listener =
+            std::net::TcpListener::bind(address).expect("shutdown must release the listener");
+    })
+    .await
+    .expect("repeated WebSocket sink replacement must finish");
+
+    assert!(
+        crash.try_recv().is_err(),
+        "the topology must not crash during reload"
+    );
 }
 
 #[tokio::test]
