@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! `NATS` sink
 //! Publishes data using [NATS](nats.io)(Neural Autonomic Transport System).
 
