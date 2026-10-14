@@ -376,12 +376,17 @@ pub(crate) fn decode_v3_metric_data(
     metadata: Option<&MetricMetadataV3>,
 ) -> crate::Result<Vec<MetricSeries>> {
     validate_v3_metric_columns(data, metadata)?;
-    let names = decode_v3_strings(&data.dict_name_str, false)?;
-    let tag_strings = decode_v3_strings(&data.dict_tag_str, true)?;
-    let units = decode_v3_strings(&data.dict_unit_str, false)?;
+    let mut string_dictionary_bytes = 0;
+    let names = decode_v3_strings(&data.dict_name_str, false, &mut string_dictionary_bytes)?;
+    let tag_strings = decode_v3_strings(&data.dict_tag_str, true, &mut string_dictionary_bytes)?;
+    let units = decode_v3_strings(&data.dict_unit_str, false, &mut string_dictionary_bytes)?;
     let tagsets = decode_v3_tagsets(&data.dict_tagsets, &tag_strings, metadata)?;
-    let resources = decode_v3_resources(data)?;
-    let source_types = decode_v3_strings(&data.dict_source_type_name, false)?;
+    let resources = decode_v3_resources(data, &mut string_dictionary_bytes)?;
+    let source_types = decode_v3_strings(
+        &data.dict_source_type_name,
+        false,
+        &mut string_dictionary_bytes,
+    )?;
     let origin_count = data.dict_origin_info.len() / 3 + 1;
 
     // The size of a dictionary entry is stable, so calculate it once rather than rescanning the
@@ -495,9 +500,16 @@ pub(crate) fn decode_v3_metric_data(
     Ok(series)
 }
 
-fn decode_v3_strings(raw: &[u8], sanitize: bool) -> crate::Result<Vec<String>> {
+fn decode_v3_strings(
+    raw: &[u8],
+    sanitize: bool,
+    expanded_bytes: &mut usize,
+) -> crate::Result<Vec<String>> {
+    *expanded_bytes = checked_v3_string_bytes(*expanded_bytes, "")?;
+    if *expanded_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+        return Err("Datadog v3 expanded string dictionaries exceed size limit".into());
+    }
     let mut values = vec![String::new()];
-    let mut expanded_bytes = std::mem::size_of::<String>();
     let mut offset = 0;
     while offset < raw.len() {
         let (length, consumed) = decode_v3_varint(&raw[offset..])?;
@@ -510,34 +522,35 @@ fn decode_v3_strings(raw: &[u8], sanitize: bool) -> crate::Result<Vec<String>> {
             return Err("truncated Datadog v3 string dictionary".into());
         }
         let bytes = &raw[offset..end];
-        let valid_string_bytes = expanded_bytes
+        let valid_string_bytes = (*expanded_bytes)
             .checked_add(std::mem::size_of::<String>())
             .and_then(|total| total.checked_add(length))
             .ok_or("Datadog v3 expanded string dictionary size overflow")?;
         if valid_string_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
-            return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+            return Err("Datadog v3 expanded string dictionaries exceed size limit".into());
         }
         let value = match std::str::from_utf8(bytes) {
-            Ok(value) => value.to_owned(),
+            Ok(value) => {
+                *expanded_bytes = valid_string_bytes;
+                value.to_owned()
+            }
             Err(_) if sanitize => {
                 let worst_case_length = length
                     .checked_mul(3)
                     .ok_or("Datadog v3 expanded string dictionary size overflow")?;
-                let worst_case_bytes = expanded_bytes
+                let worst_case_bytes = (*expanded_bytes)
                     .checked_add(std::mem::size_of::<String>())
                     .and_then(|total| total.checked_add(worst_case_length))
                     .ok_or("Datadog v3 expanded string dictionary size overflow")?;
                 if worst_case_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
-                    return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+                    return Err("Datadog v3 expanded string dictionaries exceed size limit".into());
                 }
-                String::from_utf8_lossy(bytes).into_owned()
+                let value = String::from_utf8_lossy(bytes).into_owned();
+                *expanded_bytes = checked_v3_string_bytes(*expanded_bytes, &value)?;
+                value
             }
             Err(error) => return Err(error.into()),
         };
-        expanded_bytes = checked_v3_string_bytes(expanded_bytes, &value)?;
-        if expanded_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
-            return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
-        }
         values.push(value);
         offset = end;
     }
@@ -827,8 +840,11 @@ fn decode_v3_tagsets(
     Ok(tagsets)
 }
 
-fn decode_v3_resources(data: &MetricDataV3) -> crate::Result<Vec<Vec<(String, String)>>> {
-    let dictionary = decode_v3_strings(&data.dict_resource_str, false)?;
+fn decode_v3_resources(
+    data: &MetricDataV3,
+    string_dictionary_bytes: &mut usize,
+) -> crate::Result<Vec<Vec<(String, String)>>> {
+    let dictionary = decode_v3_strings(&data.dict_resource_str, false, string_dictionary_bytes)?;
     let mut resources = vec![Vec::new()];
     let mut expanded_bytes = std::mem::size_of::<Vec<(String, String)>>();
     let mut entry_offset: usize = 0;

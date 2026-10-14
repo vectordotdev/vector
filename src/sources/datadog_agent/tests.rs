@@ -2824,6 +2824,18 @@ fn decode_v3_rejects_excessive_empty_string_entries() {
 }
 
 #[test]
+fn decode_v3_accumulates_string_dictionary_expansion_across_fields() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = vec![0; 300_000];
+    data.dict_tag_str = vec![0; 300_000];
+    data.dict_unit_str = vec![0; 300_000];
+    data.dict_resource_str = vec![0; 300_000];
+    data.dict_source_type_name = vec![0; 300_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
 fn decode_v3_rejects_excessive_empty_tagsets() {
     let mut data = minimal_v3_metric_data();
     data.dict_tagsets = vec![0; 700_000];
