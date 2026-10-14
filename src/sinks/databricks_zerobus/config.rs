@@ -108,6 +108,7 @@ impl Default for ZerobusStreamOptions {
 }
 
 /// Configuration for the Databricks Zerobus sink.
+#[serde_with::serde_as]
 #[configurable_component(sink(
     "databricks_zerobus",
     "Stream observability data to Databricks Unity Catalog via Zerobus."
@@ -180,11 +181,8 @@ pub struct ZerobusSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 }
 

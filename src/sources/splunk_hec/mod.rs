@@ -72,7 +72,6 @@ use crate::{
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
-    serde::bool_or_struct,
     sources::util::{decompression::CappedDecoder, http::capped_body},
     tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
@@ -88,6 +87,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 const X_SPLUNK_REQUEST_CHANNEL: &str = "x-splunk-request-channel";
 
 /// Configuration for the `splunk_hec` source.
+#[serde_with::serde_as]
 #[configurable_component(source("splunk_hec", "Receive logs from Splunk."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
@@ -124,7 +124,7 @@ pub struct SplunkConfig {
 
     tls: Option<TlsEnableableConfig>,
 
-    #[serde(deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<HecAcknowledgementsConfig>")]
     acknowledgements: HecAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global settings.

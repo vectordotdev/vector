@@ -74,6 +74,7 @@ impl From<bool> for JetStreamConfig {
 }
 
 /// Configuration for the `nats` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink(
     "nats",
     "Publish observability data to subjects on the NATS messaging system."
@@ -83,11 +84,8 @@ impl From<bool> for JetStreamConfig {
 pub struct NatsSinkConfig {
     pub(super) encoding: EncodingConfig,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// A NATS [name][nats_connection_name] assigned to the NATS connection.
@@ -136,11 +134,8 @@ pub struct NatsSinkConfig {
     /// If set, the `subject` must belong to an existing JetStream stream.
     ///
     /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<JetStreamConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(super) jetstream: JetStreamConfig,
 
     #[serde(flatten)]

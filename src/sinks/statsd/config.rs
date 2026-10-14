@@ -34,6 +34,7 @@ impl SinkBatchSettings for StatsdDefaultBatchSettings {
 }
 
 /// Configuration for the `statsd` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("statsd", "Deliver metric data to a StatsD aggregator."))]
 #[derive(Clone, Debug)]
 pub struct StatsdSinkConfig {
@@ -51,11 +52,8 @@ pub struct StatsdSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 }
 

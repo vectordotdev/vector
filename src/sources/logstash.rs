@@ -31,13 +31,13 @@ use crate::{
         SourceContext, SourceOutput, log_schema,
     },
     event::{Event, LogEvent, Value},
-    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
     types,
 };
 
 /// Configuration for the `logstash` source.
+#[serde_with::serde_as]
 #[configurable_component(source("logstash", "Collect logs from a Logstash agent."))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
@@ -66,7 +66,8 @@ pub struct LogstashConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     tls_handshake_timeout_secs: Option<NonZeroU64>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

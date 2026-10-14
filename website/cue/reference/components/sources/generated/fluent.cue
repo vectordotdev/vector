@@ -17,7 +17,7 @@ generated: components: sources: fluent: configuration: {
 			"""
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type:          _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:          _schemaDefinitions["vector_core::serde::BoolOrStruct<vector_core::config::SourceAcknowledgementsConfig>"]
 	}
 	address: {
 		description: """

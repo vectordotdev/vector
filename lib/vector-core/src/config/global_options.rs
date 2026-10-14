@@ -8,7 +8,6 @@ use super::{
     super::default_data_dir, AcknowledgementsConfig, LogSchema, Telemetry,
     metrics_expiration::PerMetricSetExpiration, proxy::ProxyConfig,
 };
-use crate::serde::bool_or_struct;
 
 #[expect(
     clippy::ref_option,
@@ -62,6 +61,7 @@ pub enum WildcardMatching {
 //
 // If this is modified, make sure those changes are reflected in the `ConfigBuilder::append`
 // function!
+#[serde_with::serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GlobalOptions {
@@ -122,11 +122,8 @@ pub struct GlobalOptions {
     /// acknowledgement.
     ///
     /// [e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
-    #[serde(
-        default,
-        deserialize_with = "bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::required = false))]
     pub acknowledgements: AcknowledgementsConfig,
 

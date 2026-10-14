@@ -39,7 +39,6 @@ use crate::{
         FileSourceInternalEventsEmitter, StreamClosedError,
     },
     line_agg::{self, LineAgg},
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
 };
 
@@ -220,7 +219,8 @@ pub struct FileConfig {
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

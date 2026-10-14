@@ -121,11 +121,8 @@ pub struct KafkaSinkConfig {
     #[configurable(metadata(docs::examples = "headers"))]
     pub headers_key: Option<ConfigTargetPath>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(flatten)]

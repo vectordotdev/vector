@@ -23,7 +23,6 @@ use crate::{
     },
     internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
-    serde::bool_or_struct,
     sources::{
         Source,
         util::{
@@ -130,6 +129,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 }
 
 /// Configuration for the `vector` source.
+#[serde_with::serde_as]
 #[configurable_component(source("vector", "Collect observability data from a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -145,7 +145,8 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]

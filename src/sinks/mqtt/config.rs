@@ -18,6 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `mqtt` sink
+#[serde_with::serde_as]
 #[configurable_component(sink("mqtt"))]
 #[derive(Clone, Debug)]
 pub struct MqttSinkConfig {
@@ -37,11 +38,8 @@ pub struct MqttSinkConfig {
 
     pub encoding: EncodingConfig,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(default = "default_qos")]

@@ -34,6 +34,7 @@ pub mod traces;
 
 /// Shared configuration for Datadog sinks.
 /// Contains the maximum set of common settings that applies to all DD sink components.
+#[serde_with::serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -80,11 +81,8 @@ pub struct LocalDatadogCommonConfig {
     #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 }
 

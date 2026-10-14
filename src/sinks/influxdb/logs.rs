@@ -46,6 +46,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_logs` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("influxdb_logs", "Deliver log event data to InfluxDB."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -155,11 +156,8 @@ pub struct InfluxDbLogsConfig {
 
     pub tls: Option<TlsConfig>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     acknowledgements: AcknowledgementsConfig,
 
     // `host_key`, `message_key`, and `source_type_key` are `Option` as we want `vector generate`

@@ -1,3 +1,4 @@
+mod bool_or_struct;
 mod compatibility;
 mod metric_tags;
 

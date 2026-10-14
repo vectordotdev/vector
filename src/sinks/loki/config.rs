@@ -27,6 +27,7 @@ fn default_loki_path() -> String {
 }
 
 /// Configuration for the `loki` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("loki", "Deliver log event data to the Loki aggregation system."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -116,11 +117,8 @@ pub struct LokiConfig {
 
     pub tls: Option<TlsConfig>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     acknowledgements: AcknowledgementsConfig,
 
     #[serde(flatten)]

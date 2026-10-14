@@ -16,7 +16,7 @@ generated: components: sources: aws_s3: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["vector_core::serde::BoolOrStruct<vector_core::config::SourceAcknowledgementsConfig>"]
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."

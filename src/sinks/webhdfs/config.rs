@@ -29,6 +29,7 @@ fn default_endpoint() -> HttpEndpoint {
 }
 
 /// Configuration for the `webhdfs` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("webhdfs", "WebHDFS."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -72,11 +73,8 @@ pub struct WebHdfsConfig {
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(flatten)]

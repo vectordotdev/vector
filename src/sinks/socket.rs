@@ -17,17 +17,15 @@ use crate::{
 };
 
 /// Configuration for the `socket` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("socket", "Deliver logs to a remote socket endpoint."))]
 #[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 }
 

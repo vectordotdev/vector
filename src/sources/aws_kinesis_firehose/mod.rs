@@ -22,7 +22,7 @@ use crate::{
         SourceOutput,
     },
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::http_server::{build_param_matcher, remove_duplicates},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -33,6 +33,7 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
+#[serde_with::serde_as]
 #[configurable_component(source(
     "aws_kinesis_firehose",
     "Collect logs from AWS Kinesis Firehose."
@@ -87,7 +88,8 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

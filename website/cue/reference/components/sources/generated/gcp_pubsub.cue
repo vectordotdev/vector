@@ -39,7 +39,7 @@ generated: components: sources: gcp_pubsub: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["vector_core::serde::BoolOrStruct<vector_core::config::SourceAcknowledgementsConfig>"]
 	}
 	api_key: {
 		description: """

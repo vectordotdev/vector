@@ -32,7 +32,7 @@ use crate::{
     event::{Event, LogEvent},
     http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::{
         http_server::{HttpConfigParamKind, build_param_matcher, remove_duplicates},
         util::{
@@ -44,6 +44,7 @@ use crate::{
 };
 
 /// Configuration for `heroku_logs` source.
+#[serde_with::serde_as]
 #[configurable_component(source(
     "heroku_logs",
     "Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps."
@@ -79,7 +80,8 @@ pub struct LogplexConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

@@ -78,6 +78,7 @@ impl UrlOrRegion {
 }
 
 /// Configuration for the `axiom` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("axiom", "Deliver log events to Axiom."))]
 #[derive(Clone, Debug, Default)]
 pub struct AxiomConfig {
@@ -119,11 +120,8 @@ pub struct AxiomConfig {
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     /// Controls how acknowledgements are handled for this sink.
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

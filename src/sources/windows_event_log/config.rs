@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use vector_config::component::GenerateConfig;
 use vector_lib::configurable::configurable_component;
 
-use crate::{config::SourceAcknowledgementsConfig, serde::bool_or_struct};
+use crate::config::SourceAcknowledgementsConfig;
 
 // Validation constants
 const MAX_CHANNEL_NAME_LENGTH: usize = 256;
@@ -17,6 +17,7 @@ const MAX_EVENT_TIMEOUT_MS: u64 = 60000;
 const MAX_BATCH_SIZE: u32 = 10000;
 
 /// Configuration for the `windows_event_log` source.
+#[serde_with::serde_as]
 #[configurable_component(source(
     "windows_event_log",
     "Collect logs from Windows Event Log channels using the Windows Event Log API."
@@ -190,7 +191,8 @@ pub struct WindowsEventLogConfig {
     /// When disabled (default), checkpoints are updated immediately after reading
     /// events, which may result in data loss if Vector crashes before events are
     /// delivered to sinks.
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 

@@ -62,6 +62,7 @@ impl TowerRequestConfigDefaults for CloudWatchMetricsTowerRequestConfigDefaults 
 }
 
 /// Configuration for the `aws_cloudwatch_metrics` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink(
     "aws_cloudwatch_metrics",
     "Publish metric events to AWS CloudWatch Metrics."
@@ -106,11 +107,8 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     acknowledgements: AcknowledgementsConfig,
 
     /// A map from metric name to AWS storage resolution.

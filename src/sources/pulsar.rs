@@ -39,10 +39,11 @@ use crate::{
     internal_events::{
         PulsarErrorEvent, PulsarErrorEventData, PulsarErrorEventType, StreamClosedError,
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
 };
 
 /// Configuration for the `pulsar` source.
+#[serde_with::serde_as]
 #[configurable_component(source("pulsar", "Collect logs from Apache Pulsar."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -87,7 +88,8 @@ pub struct PulsarSourceConfig {
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.

@@ -39,6 +39,7 @@ pub struct RemoteWriteBatchConfig {
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink(
     "prometheus_remote_write",
     "Deliver metric data to a Prometheus remote write endpoint."
@@ -107,11 +108,8 @@ pub struct RemoteWriteConfig {
     #[cfg(feature = "aws-config")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(default = "default_compression")]

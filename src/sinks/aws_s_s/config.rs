@@ -23,6 +23,7 @@ pub(super) enum BuildError {
 }
 
 /// Base Configuration `aws_s_s` for sns and sqs sink.
+#[serde_with::serde_as]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -57,11 +58,8 @@ pub(super) struct BaseSSSinkConfig {
     #[serde(default)]
     pub(super) auth: AwsAuthentication,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
 

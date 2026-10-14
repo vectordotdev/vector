@@ -28,6 +28,7 @@ use crate::{
 };
 
 /// Configuration for the `pulsar` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("pulsar", "Publish observability events to Apache Pulsar topics."))]
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
@@ -72,11 +73,8 @@ pub struct PulsarSinkConfig {
 
     pub(crate) auth: Option<PulsarAuthConfig>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     #[serde(default)]

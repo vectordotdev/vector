@@ -83,6 +83,7 @@ where
 }
 
 /// Configuration for the `aws_cloudwatch_logs` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink(
     "aws_cloudwatch_logs",
     "Publish log events to AWS CloudWatch Logs."
@@ -158,11 +159,8 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// The [ARN][arn] (Amazon Resource Name) of the [KMS key][kms_key] to use when encrypting log data.

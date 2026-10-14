@@ -53,7 +53,7 @@ use crate::{
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{HttpBytesReceived, StreamClosedError},
     schema,
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::{
         self,
         util::{
@@ -70,11 +70,11 @@ pub const TRACES: &str = "traces";
 pub const LLMOBS: &str = "llmobs";
 
 /// Configuration for the `datadog_agent` source.
+#[serde_as]
 #[configurable_component(source(
     "datadog_agent",
     "Receive logs, metrics, and traces collected by a Datadog Agent."
 ))]
-#[serde_as]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
     /// The socket address to accept connections on.
@@ -140,7 +140,8 @@ pub struct DatadogAgentConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -155,7 +156,6 @@ pub struct DatadogAgentConfig {
     /// internal metric. By setting this option to a value less than the Agent's timeout, Vector
     /// will instead respond to the Agent with a HTTP 503 Service Unavailable error, emit a warning,
     /// and increment the `component_timed_out_events_total` internal metric instead.
-    #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
     send_timeout_secs: Option<f64>,
 }
 

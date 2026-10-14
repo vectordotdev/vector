@@ -29,7 +29,7 @@ use crate::{
         ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     line_agg,
-    serde::{bool_or_struct, default_decoding},
+    serde::default_decoding,
     tls::TlsConfig,
 };
 
@@ -94,6 +94,7 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
+#[serde_with::serde_as]
 #[configurable_component(source("aws_s3", "Collect logs from AWS S3."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -127,7 +128,8 @@ pub struct AwsS3Config {
     /// If not specified, multiline aggregation is disabled.
     multiline: Option<MultilineConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde_as(as = "crate::serde::BoolOrStruct<SourceAcknowledgementsConfig>")]
+    #[serde(default)]
     acknowledgements: SourceAcknowledgementsConfig,
 
     tls_options: Option<TlsConfig>,

@@ -45,6 +45,7 @@ use crate::{
 };
 
 /// Configuration for the `vector` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("vector", "Relay observability data to a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -107,11 +108,8 @@ pub struct VectorConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     keepalive: Option<VectorKeepaliveConfig>,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
 }
 

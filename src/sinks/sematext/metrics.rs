@@ -52,6 +52,7 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `sematext_metrics` sink.
+#[serde_with::serde_as]
 #[configurable_component(sink("sematext_metrics", "Publish metric events to Sematext."))]
 #[derive(Clone, Debug)]
 pub struct SematextMetricsConfig {
@@ -83,11 +84,8 @@ pub struct SematextMetricsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::is_default"
-    )]
+    #[serde_as(as = "crate::serde::BoolOrStruct<AcknowledgementsConfig>")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     acknowledgements: AcknowledgementsConfig,
 }
 
