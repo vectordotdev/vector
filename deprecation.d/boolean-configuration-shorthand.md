@@ -6,8 +6,8 @@ deprecated_since: "0.60.0"
 Boolean shorthand for object-valued configuration options is deprecated. Use the object form instead
 so that each setting has one consistent representation and the options being configured are explicit.
 
-Existing boolean values continue to work. **We will allow at least two minor release cycles for users
-to migrate before removing this shorthand. No removal release has been scheduled.**
+Existing boolean values continue to work. Removal is not yet scheduled. We will give users at least
+one month to migrate before removing this shorthand.
 
 This applies to `healthcheck` on sinks, global and sink `acknowledgements`, `jetstream` on the NATS sink,
 and `acknowledgements` on the Splunk HEC source.
