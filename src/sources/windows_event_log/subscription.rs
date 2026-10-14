@@ -114,6 +114,18 @@ fn resubscribe_backoff(attempt: u32) -> std::time::Duration {
         .min(RESUBSCRIBE_BACKOFF_MAX)
 }
 
+/// Cap a pending re-subscription deadline at the base interval from `now`.
+///
+/// Used for `ERROR_INVALID_HANDLE`: the handle's service instance is gone and it can never
+/// signal, so an idle-channel deadline set before the service stopped must not hold back
+/// its replacement. Without a deadline, the rebuild happens right away.
+fn cap_deadline_for_invalid_handle(
+    deadline: Option<std::time::Instant>,
+    now: std::time::Instant,
+) -> Option<std::time::Instant> {
+    deadline.map(|at| at.min(now + RESUBSCRIBE_BACKOFF_BASE))
+}
+
 /// Wait before the next rebuild attempt after rebuild number `attempt` (1-based).
 ///
 /// The doubling backoff is meant for a channel whose rebuilt subscription works but still
@@ -666,6 +678,16 @@ impl EventLogSubscription {
                         || code == ERROR_INVALID_HANDLE
                     {
                         let now = std::time::Instant::now();
+                        // An invalid handle belongs to an Event Log service instance that is
+                        // gone; it can never signal again. An idle-channel deadline inherited
+                        // from before the service stopped (up to RESUBSCRIBE_BACKOFF_MAX) must
+                        // not delay its replacement, so cap it at the base interval.
+                        if code == ERROR_INVALID_HANDLE {
+                            channel_sub.next_resubscribe_at = cap_deadline_for_invalid_handle(
+                                channel_sub.next_resubscribe_at,
+                                now,
+                            );
+                        }
                         let backed_off =
                             channel_sub.next_resubscribe_at.is_some_and(|at| now < at);
                         if !signalled && backed_off {
@@ -731,7 +753,7 @@ impl EventLogSubscription {
                         let loud = channel_sub.idle_resubscribes.is_power_of_two();
                         if loud {
                             warn!(
-                                message = "Subscription handle no longer usable (stale result, invalidated position, or invalid operation), attempting re-subscription.",
+                                message = "Subscription handle no longer usable (stale result, invalidated position, invalid operation, or invalid handle), attempting re-subscription.",
                                 error_code = code,
                                 channel = %channel_sub.channel,
                                 idle_resubscribes = channel_sub.idle_resubscribes
@@ -759,9 +781,9 @@ impl EventLogSubscription {
                                 break;
                             }
                             Err(e) => {
-                                // The old handle stays in place and can never signal again
-                                // (e.g. its Event Log service instance is gone), so retry on
-                                // the base interval rather than the idle-channel backoff.
+                                // The old handle stays in place; if its Event Log service instance
+                                // is gone it can never signal again, so retry on the base
+                                // interval rather than the idle-channel backoff.
                                 channel_sub.next_resubscribe_at = Some(
                                     now + resubscribe_retry_after(
                                         channel_sub.idle_resubscribes,
@@ -1316,6 +1338,23 @@ mod tests {
         assert_eq!(resubscribe_backoff(u32::MAX), Duration::from_secs(600));
         // Defensive: 0 is never passed (the counter is incremented first), but must not panic.
         assert_eq!(resubscribe_backoff(0), Duration::from_secs(5));
+    }
+
+    #[test]
+    fn test_invalid_handle_caps_inherited_idle_deadline() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        // A healthy but idle subscription had backed off to the 10-minute cap when the
+        // Event Log service stopped: the dead handle must be rebuilt within the base interval.
+        let inherited = Some(now + Duration::from_secs(600));
+        assert_eq!(
+            cap_deadline_for_invalid_handle(inherited, now),
+            Some(now + Duration::from_secs(5))
+        );
+        // A shorter deadline is kept, and no deadline means rebuild immediately.
+        let short = Some(now + Duration::from_secs(2));
+        assert_eq!(cap_deadline_for_invalid_handle(short, now), short);
+        assert_eq!(cap_deadline_for_invalid_handle(None, now), None);
     }
 
     #[test]
