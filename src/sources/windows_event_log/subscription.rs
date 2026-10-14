@@ -114,11 +114,35 @@ fn resubscribe_backoff(attempt: u32) -> std::time::Duration {
         .min(RESUBSCRIBE_BACKOFF_MAX)
 }
 
+/// Wait time for `WaitForMultipleObjects`: the configured timeout, shortened to the nearest
+/// pending re-subscription deadline that still lies in the future.
+///
+/// A retained handle of a stopped Event Log service never signals, so without this a retry
+/// scheduled after `RESUBSCRIBE_BACKOFF_BASE` would only run once a longer configured
+/// `event_timeout_ms` expires. Deadlines already passed are ignored: they are handled by the
+/// next pull, and counting them would turn the wait into a busy loop. Rounded up so the loop
+/// does not wake just before the deadline.
+fn effective_wait_ms(
+    timeout_ms: u32,
+    now: std::time::Instant,
+    deadlines: impl IntoIterator<Item = Option<std::time::Instant>>,
+) -> u32 {
+    deadlines
+        .into_iter()
+        .flatten()
+        .filter(|at| *at > now)
+        .map(|at| {
+            let ms = (at - now).as_nanos().div_ceil(1_000_000);
+            u32::try_from(ms).unwrap_or(u32::MAX).max(1)
+        })
+        .fold(timeout_ms, u32::min)
+}
+
 /// Whether `EvtNext` returning `code` means the handle can definitely never deliver again.
 ///
 /// `ERROR_INVALID_OPERATION` is excluded: it also appears on a healthy but idle (disabled or
 /// empty) channel, which must keep counting as active.
-fn handle_is_dead(code: u32) -> bool {
+const fn handle_is_dead(code: u32) -> bool {
     code == ERROR_EVT_QUERY_RESULT_STALE
         || code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION
         || code == ERROR_INVALID_HANDLE
@@ -534,6 +558,11 @@ impl EventLogSubscription {
         handles.push(self.shutdown_event);
         handles.extend(self.channels.iter().map(|c| c.signal_event));
 
+        let timeout_ms = effective_wait_ms(
+            timeout_ms,
+            std::time::Instant::now(),
+            self.channels.iter().map(|c| c.next_resubscribe_at),
+        );
         let result = unsafe { WaitForMultipleObjects(&handles, false, timeout_ms) };
 
         match result {
@@ -855,6 +884,12 @@ impl EventLogSubscription {
                 // The channel delivers again: the next unusable handle is rebuilt at once.
                 channel_sub.idle_resubscribes = 0;
                 channel_sub.next_resubscribe_at = None;
+                // A handle retained after a failed rebuild (or reported inactive while backed
+                // off) is evidently working: report it active again.
+                if !channel_sub.subscription_active {
+                    channel_sub.subscription_active = true;
+                    channel_sub.subscription_active_gauge.set(1.0);
+                }
 
                 channel_sub.events_read_counter.increment(returned as u64);
                 channel_sub
@@ -1375,6 +1410,42 @@ mod tests {
         let short = Some(now + Duration::from_secs(2));
         assert_eq!(cap_deadline_for_invalid_handle(short, now), short);
         assert_eq!(cap_deadline_for_invalid_handle(None, now), None);
+    }
+
+    #[test]
+    fn test_wait_is_shortened_to_the_nearest_future_deadline() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        // No deadline: the configured timeout.
+        assert_eq!(effective_wait_ms(60_000, now, [None, None]), 60_000);
+        // A failed rebuild due in 5 s wakes the loop then, not after 60 s.
+        assert_eq!(
+            effective_wait_ms(60_000, now, [None, Some(now + Duration::from_secs(5))]),
+            5_000
+        );
+        // The nearest of several deadlines wins; a later one never lengthens the wait.
+        assert_eq!(
+            effective_wait_ms(
+                60_000,
+                now,
+                [
+                    Some(now + Duration::from_secs(600)),
+                    Some(now + Duration::from_millis(1500))
+                ]
+            ),
+            1_500
+        );
+        assert_eq!(
+            effective_wait_ms(5_000, now, [Some(now + Duration::from_secs(600))]),
+            5_000
+        );
+        // Sub-millisecond remainders round up, so the loop does not wake just before.
+        assert_eq!(
+            effective_wait_ms(60_000, now, [Some(now + Duration::from_micros(2_500))]),
+            3
+        );
+        // A deadline already passed is ignored instead of producing a busy loop.
+        assert_eq!(effective_wait_ms(60_000, now, [Some(now)]), 60_000);
     }
 
     #[test]

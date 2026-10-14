@@ -382,9 +382,11 @@ impl WindowsEventLogSource {
         let mut error_backoff = std::time::Duration::from_millis(100);
         const MAX_ERROR_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
 
-        // Health heartbeat: log every ~30s regardless of checkpoint interval
-        let mut timeout_count: u32 = 0;
-        let health_interval_timeouts = (30_000 / self.config.event_timeout_ms).max(1) as u32;
+        // Health heartbeat: log every ~30s regardless of checkpoint interval. Time-based,
+        // because the wait can be shortened to a pending re-subscription deadline, so the
+        // number of timeouts no longer measures elapsed time.
+        let mut last_health = std::time::Instant::now();
+        const HEALTH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
         loop {
             // Move subscription into blocking thread for WaitForMultipleObjects.
@@ -475,9 +477,8 @@ impl WindowsEventLogSource {
                     }
 
                     // Health heartbeat on a separate ~30s cadence
-                    timeout_count += 1;
-                    if timeout_count >= health_interval_timeouts {
-                        timeout_count = 0;
+                    if last_health.elapsed() >= HEALTH_INTERVAL {
+                        last_health = std::time::Instant::now();
                         let (total, active) = subscription.channel_health_summary();
                         if active < total {
                             warn!(
