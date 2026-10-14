@@ -387,10 +387,20 @@ pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
 
 impl ByteSizeOf for EventMetadata {
     fn allocated_bytes(&self) -> usize {
-        // NOTE we don't count the `str` here because it's allocated somewhere
-        // else. We're just moving around the pointer, which is already captured
-        // by `ByteSizeOf::size_of`.
-        self.inner.finalizers.allocated_bytes()
+        // Most Arc-backed metadata points to allocations owned or accounted for elsewhere. The
+        // Datadog metric unit is retained solely by event metadata, so include its allocation.
+        let datadog_metric_unit_bytes = self.inner.datadog_metric_unit.as_ref().map_or(0, |unit| {
+            // Amortize the shared string allocation across both copies of this metadata wrapper
+            // and copy-on-write `Inner` values that retain the same unit. This keeps a collection
+            // of cloned events accountable for the allocation without charging its full size to
+            // every event.
+            let owners = Arc::strong_count(&self.inner)
+                .saturating_mul(Arc::strong_count(unit))
+                .max(1);
+            unit.len().div_ceil(owners)
+        });
+
+        self.inner.finalizers.allocated_bytes() + datadog_metric_unit_bytes
     }
 }
 
@@ -714,6 +724,24 @@ mod test {
         let original_unit = metadata.inner.datadog_metric_unit.as_ref().unwrap();
         let cloned_unit = cloned.inner.datadog_metric_unit.as_ref().unwrap();
         assert!(Arc::ptr_eq(original_unit, cloned_unit));
+    }
+
+    #[test]
+    fn metadata_byte_size_accounts_for_shared_datadog_metric_unit_once() {
+        let unit = "x".repeat(1024);
+        let metadata = EventMetadata::default().with_datadog_metric_unit(unit);
+        let mut shared_inner = metadata.clone();
+
+        assert_eq!(
+            metadata.allocated_bytes() + shared_inner.allocated_bytes(),
+            1024
+        );
+
+        shared_inner.set_datadog_api_key(Arc::from(SECRET));
+        assert_eq!(
+            metadata.allocated_bytes() + shared_inner.allocated_bytes(),
+            1024
+        );
     }
 
     #[test]
