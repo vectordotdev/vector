@@ -180,7 +180,7 @@ use std::{
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
 use tracing::{debug, info};
-use vector_common::finalization::Finalizable;
+use vector_common::{finalization::Finalizable, finalizer::OrderedFinalizer};
 
 mod backed_archive;
 mod checkpoint_recovery;
@@ -270,9 +270,9 @@ where
             .await
             .context(WriterSeekFailedSnafu)?;
 
-        let (finalizer, finalizer_task) = Arc::clone(&ledger).spawn_finalizer();
+        let (finalizer, finalizer_stream) = OrderedFinalizer::new(None);
 
-        let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer, Some(finalizer_task));
+        let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer, None);
         let mut unread_buffer_size = reader
             .reconcile_checkpoint_window()
             .await
@@ -315,6 +315,7 @@ where
         );
 
         ledger.synchronize_buffer_usage();
+        reader.set_finalizer_task(Arc::clone(&ledger).spawn_finalizer(finalizer_stream));
         if ledger.filesystem().supports_background_cleanup() {
             reader.set_cleanup_task(ledger.spawn_data_file_cleanup());
         }

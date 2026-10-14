@@ -374,6 +374,7 @@ impl RunningTopology {
 
                 return Ok(());
             }
+            new_pieces.close_buffer_receivers().await;
         }
 
         // We failed to build, connect, and spawn all of the changed/new components, so we flip
@@ -393,19 +394,26 @@ impl RunningTopology {
             .with_utilization_registry(self.utilization_registry.clone())
             .build_or_log_errors()
             .await
-            && self
+        {
+            if self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
-        {
-            self.connect_diff(&diff, &mut new_pieces);
-            self.spawn_diff(&diff, new_pieces);
-            // `self.config` still holds the old config on the rollback path, so
-            // this restores the gauges for the re-spawned old sinks.
-            self.refresh_confinement_gauges();
+            {
+                self.connect_diff(&diff, &mut new_pieces);
+                self.spawn_diff(&diff, new_pieces);
+                let draining_disk_buffer_paths =
+                    active_draining_disk_buffer_paths(&mut self.draining_disk_buffer_sinks);
+                self.orphaned_disk_buffer_scanner
+                    .scan(&self.config, draining_disk_buffer_paths);
+                // `self.config` still holds the old config on the rollback path, so
+                // this restores the gauges for the re-spawned old sinks.
+                self.refresh_confinement_gauges();
 
-            info!("Old configuration restored successfully.");
+                info!("Old configuration restored successfully.");
 
-            return Err(ReloadError::TopologyBuildFailed);
+                return Err(ReloadError::TopologyBuildFailed);
+            }
+            new_pieces.close_buffer_receivers().await;
         }
 
         error!(
@@ -1481,6 +1489,7 @@ impl RunningTopology {
                     message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
                     internal_log_rate_limit = false
                 );
+                pieces.close_buffer_receivers().await;
                 return None;
             }
             warn!(
@@ -1501,6 +1510,7 @@ impl RunningTopology {
             )
         {
             error!(message = "Invalid metrics expiry.", %error, internal_log_rate_limit = false);
+            pieces.close_buffer_receivers().await;
             return None;
         }
 
@@ -1519,6 +1529,7 @@ impl RunningTopology {
             .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
             .await
         {
+            pieces.close_buffer_receivers().await;
             return None;
         }
         running_topology.connect_diff(&diff, &mut pieces);

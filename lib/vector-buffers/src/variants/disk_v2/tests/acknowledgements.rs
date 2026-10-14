@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use vector_common::finalization::{BatchNotifier, EventFinalizer, EventStatus};
+use vector_common::finalizer::OrderedFinalizer;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -34,7 +35,8 @@ async fn ack_updates_ledger_and_finalizer_releases_lock() {
 
             // Create our ledger, and make sure it's empty.
             let ledger = Arc::new(ledger);
-            let (finalizer, finalizer_task) = Arc::clone(&ledger).spawn_finalizer();
+            let (finalizer, finalizer_stream) = OrderedFinalizer::new(None);
+            let finalizer_task = Arc::clone(&ledger).spawn_finalizer(finalizer_stream);
             assert_eq!(ledger.consume_pending_acks(), 0);
 
             // Now make sure it updates pending acks.
@@ -78,7 +80,8 @@ async fn ack_wakes_reader() {
             // Create our ledger, as well as a future for awaiting
             // writer progress, and make sure it's not yet woken up.
             let ledger = Arc::new(ledger);
-            let (finalizer, _finalizer_task) = Arc::clone(&ledger).spawn_finalizer();
+            let (finalizer, finalizer_stream) = OrderedFinalizer::new(None);
+            let _finalizer_task = Arc::clone(&ledger).spawn_finalizer(finalizer_stream);
 
             let mut wait_for_writer = spawn(ledger.wait_for_writer());
             assert_pending!(wait_for_writer.poll());

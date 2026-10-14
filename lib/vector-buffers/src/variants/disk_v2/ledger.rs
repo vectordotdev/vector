@@ -12,7 +12,7 @@ use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use rkyv::{Archive, Serialize, with::Atomic};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -21,7 +21,7 @@ use tokio::{
     sync::{Mutex, MutexGuard, Notify},
 };
 use tokio_util::sync::CancellationToken;
-use vector_common::finalizer::OrderedFinalizer;
+use vector_common::finalization::BatchStatus;
 
 use super::{
     Filesystem,
@@ -860,17 +860,16 @@ where
     }
 
     #[must_use]
-    pub(super) fn spawn_finalizer(
-        self: Arc<Self>,
-    ) -> (OrderedFinalizer<u64>, tokio::task::JoinHandle<()>) {
-        let (finalizer, mut stream) = OrderedFinalizer::new(None);
-        let task = vector_common::spawn_in_current_span(async move {
+    pub(super) fn spawn_finalizer<S>(self: Arc<Self>, mut stream: S) -> tokio::task::JoinHandle<()>
+    where
+        S: Stream<Item = (BatchStatus, u64)> + Send + Unpin + 'static,
+    {
+        vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);
                 self.notify_writer_waiters();
             }
-        });
-        (finalizer, task)
+        })
     }
 
     pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>) -> CleanupTask

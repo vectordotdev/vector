@@ -26,8 +26,8 @@ use vector_lib::{
         topology::{
             builder::TopologyBuilder,
             channel::{
-                BufferChannelKind, BufferReceiver, BufferSender, ChannelMetricMetadata,
-                LimitedReceiver,
+                BufferChannelKind, BufferReceiver, BufferReceiverStream, BufferSender,
+                ChannelMetricMetadata, LimitedReceiver,
             },
         },
     },
@@ -127,6 +127,7 @@ static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
+type PendingBufferReceiver = Arc<Mutex<Option<BufferReceiverStream<EventArray>>>>;
 
 struct Builder<'a> {
     config: &'a super::Config,
@@ -139,6 +140,7 @@ struct Builder<'a> {
     inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     healthchecks: HashMap<ComponentKey, Task>,
     detach_triggers: HashMap<ComponentKey, Trigger>,
+    buffer_receivers: Vec<PendingBufferReceiver>,
     extra_context: ExtraContext,
     utilization_emitter: Option<UtilizationEmitter>,
     utilization_registry: UtilizationRegistry,
@@ -171,6 +173,7 @@ impl<'a> Builder<'a> {
             inputs: HashMap::new(),
             healthchecks: HashMap::new(),
             detach_triggers: HashMap::new(),
+            buffer_receivers: Vec::new(),
             extra_context,
             utilization_emitter: emitter,
             utilization_registry: registry,
@@ -198,12 +201,14 @@ impl<'a> Builder<'a> {
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
                 detach_triggers: self.detach_triggers,
+                buffer_receivers: self.buffer_receivers,
                 metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
                     .utilization_emitter
                     .map(|e| (e, self.utilization_registry)),
             })
         } else {
+            close_buffer_receivers(&mut self.buffer_receivers).await;
             Err(self.errors)
         }
     }
@@ -696,7 +701,11 @@ impl<'a> Builder<'a> {
                         self.errors.push(format!("Sink \"{key}\": {error}"));
                         return;
                     }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
+                    Ok((tx, rx)) => {
+                        let rx = Arc::new(Mutex::new(Some(rx.into_stream())));
+                        self.buffer_receivers.push(Arc::clone(&rx));
+                        (tx, rx)
+                    }
                 }
             }
         };
@@ -1108,8 +1117,18 @@ pub struct TopologyPieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
+    buffer_receivers: Vec<PendingBufferReceiver>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
+}
+
+async fn close_buffer_receivers(receivers: &mut Vec<PendingBufferReceiver>) {
+    for receiver in std::mem::take(receivers) {
+        let stream = receiver.lock().unwrap().take();
+        if let Some(stream) = stream {
+            stream.close().await;
+        }
+    }
 }
 
 /// Builder for constructing TopologyPieces with a fluent API.
@@ -1195,6 +1214,10 @@ impl<'a> TopologyPiecesBuilder<'a> {
 }
 
 impl TopologyPieces {
+    pub(super) async fn close_buffer_receivers(&mut self) {
+        close_buffer_receivers(&mut self.buffer_receivers).await;
+    }
+
     pub async fn build_or_log_errors(
         config: &Config,
         diff: &ConfigDiff,

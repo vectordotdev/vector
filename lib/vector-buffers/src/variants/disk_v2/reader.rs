@@ -480,6 +480,10 @@ where
         self.finalizer_task.take()
     }
 
+    pub(crate) fn set_finalizer_task(&mut self, task: tokio::task::JoinHandle<()>) {
+        self.finalizer_task = Some(task);
+    }
+
     pub(crate) fn set_cleanup_task(&mut self, task: CleanupTask) {
         self.cleanup_task = Some(task);
     }
