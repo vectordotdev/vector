@@ -122,9 +122,8 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let mut current_stage = None;
 
         for (stage_idx, stage) in self.stages.into_iter().enumerate().rev() {
-            let when_full = stage.when_full;
             // Make sure the stage is valid for our current builder state.
-            match when_full {
+            match stage.when_full {
                 // The innermost stage can't be set to overflow, there's nothing else to overflow _to_.
                 WhenFull::Overflow => {
                     if current_stage.is_none() {
@@ -135,7 +134,6 @@ impl<T: Bufferable> TopologyBuilder<T> {
                 // doesn't no sense.  Overflowing is the only valid transition to another stage.
                 WhenFull::Block | WhenFull::DropNewest => {
                     if current_stage.is_some() {
-                        close_current_stage(current_stage.take()).await;
                         return Err(TopologyError::NextStageNotUsed { stage_idx });
                     }
                 }
@@ -147,22 +145,15 @@ impl<T: Bufferable> TopologyBuilder<T> {
             // have to pay for letting each stage function in an opaque way when wrapped.
             let usage_handle = buffer_usage.add_stage(stage_idx);
             let provides_instrumentation = stage.untransformed.provides_instrumentation();
-            let stage = stage
+            let (sender, receiver) = stage
                 .untransformed
                 .into_buffer_parts(usage_handle.clone())
                 .await
-                .context(FailedToBuildStageSnafu { stage_idx });
-            let (sender, receiver) = match stage {
-                Ok(stage) => stage,
-                Err(error) => {
-                    close_current_stage(current_stage.take()).await;
-                    return Err(error);
-                }
-            };
+                .context(FailedToBuildStageSnafu { stage_idx })?;
 
             let (mut sender, mut receiver) = match current_stage.take() {
                 None => (
-                    BufferSender::new(sender, when_full),
+                    BufferSender::new(sender, stage.when_full),
                     BufferReceiver::new(receiver),
                 ),
                 Some((current_sender, current_receiver)) => (
@@ -188,13 +179,6 @@ impl<T: Bufferable> TopologyBuilder<T> {
         buffer_usage.install(buffer_id.as_str());
 
         Ok((sender, receiver))
-    }
-}
-
-async fn close_current_stage<T: Bufferable>(stage: Option<(BufferSender<T>, BufferReceiver<T>)>) {
-    if let Some((sender, receiver)) = stage {
-        drop(sender);
-        receiver.into_stream().close().await;
     }
 }
 

@@ -15,7 +15,7 @@ use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 use super::{
     Filesystem,
     common::create_crc32c_hasher,
-    ledger::{DiskBufferTasks, Ledger},
+    ledger::Ledger,
     record::{ArchivedRecord, Record, RecordStatus, validate_record_archive},
 };
 use crate::{
@@ -437,7 +437,6 @@ where
     record_acks: OrderedAcknowledgements<u64, u64>,
     data_file_acks: OrderedAcknowledgements<u64, ()>,
     finalizer: OrderedFinalizer<u64>,
-    tasks: Option<DiskBufferTasks>,
     _t: PhantomData<T>,
 }
 
@@ -465,17 +464,8 @@ where
             record_acks: OrderedAcknowledgements::from_acked(next_expected_record_id),
             data_file_acks: OrderedAcknowledgements::from_acked(0),
             finalizer,
-            tasks: None,
             _t: PhantomData,
         }
-    }
-
-    pub(crate) fn set_tasks(&mut self, tasks: DiskBufferTasks) {
-        self.tasks = Some(tasks);
-    }
-
-    pub(crate) fn take_tasks(&mut self) -> Option<DiskBufferTasks> {
-        self.tasks.take()
     }
 
     pub(super) fn ledger(&self) -> &Ledger<FS> {

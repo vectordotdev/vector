@@ -123,7 +123,7 @@ fn report_orphaned_disk_buffers(
     }
 }
 
-fn referenced_disk_buffer_directories(config: &Config) -> HashSet<PathBuf> {
+pub(super) fn referenced_disk_buffer_directories(config: &Config) -> HashSet<PathBuf> {
     let data_dir = config.global.data_dir.clone();
     let sinks = config
         .sinks()

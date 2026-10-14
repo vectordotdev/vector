@@ -12,7 +12,7 @@ use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
-use futures::{Stream, StreamExt};
+use futures::StreamExt;
 use rkyv::{Archive, Serialize, with::Atomic};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -20,8 +20,7 @@ use tokio::{
     io::AsyncWriteExt,
     sync::{Mutex, MutexGuard, Notify},
 };
-use tokio_util::sync::CancellationToken;
-use vector_common::finalization::BatchStatus;
+use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
     Filesystem,
@@ -34,35 +33,6 @@ use super::{
     ser::SerializeError,
 };
 use crate::buffer_usage_data::BufferUsageHandle;
-
-type CleanupTask = (CancellationToken, tokio::task::JoinHandle<()>);
-
-#[derive(Debug)]
-pub(crate) struct DiskBufferTasks {
-    finalizer: tokio::task::JoinHandle<()>,
-    cleanup: Option<CleanupTask>,
-}
-
-impl DiskBufferTasks {
-    pub(crate) fn new(
-        finalizer: tokio::task::JoinHandle<()>,
-        cleanup: Option<CleanupTask>,
-    ) -> Self {
-        Self { finalizer, cleanup }
-    }
-
-    pub(crate) async fn close(self) {
-        if let Some((shutdown, task)) = self.cleanup {
-            shutdown.cancel();
-            if let Err(error) = task.await {
-                error!(%error, message = "Disk buffer cleanup task failed.");
-            }
-        }
-        if let Err(error) = self.finalizer.await {
-            error!(%error, message = "Disk buffer finalizer task failed.");
-        }
-    }
-}
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 
@@ -887,31 +857,25 @@ where
     }
 
     #[must_use]
-    pub(super) fn spawn_finalizer<S>(self: Arc<Self>, mut stream: S) -> tokio::task::JoinHandle<()>
-    where
-        S: Stream<Item = (BatchStatus, u64)> + Send + Unpin + 'static,
-    {
+    pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
+        let (finalizer, mut stream) = OrderedFinalizer::new(None);
         vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);
                 self.notify_writer_waiters();
             }
-        })
+        });
+        finalizer
     }
 
-    pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>) -> CleanupTask
+    pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>)
     where
         FS: 'static,
     {
         let ledger = Arc::downgrade(self);
-        let shutdown = CancellationToken::new();
-        let task_shutdown = shutdown.clone();
-        let task = vector_common::spawn_in_current_span(async move {
+        vector_common::spawn_in_current_span(async move {
             loop {
-                tokio::select! {
-                    () = task_shutdown.cancelled() => break,
-                    () = tokio::time::sleep(DEFAULT_DATA_FILE_CLEANUP_INTERVAL) => {}
-                }
+                tokio::time::sleep(DEFAULT_DATA_FILE_CLEANUP_INTERVAL).await;
 
                 let Some(ledger) = ledger.upgrade() else {
                     break;
@@ -925,13 +889,8 @@ where
                 }
 
                 drop(ledger);
-
-                if task_shutdown.is_cancelled() {
-                    break;
-                }
             }
         });
-        (shutdown, task)
     }
 }
 
