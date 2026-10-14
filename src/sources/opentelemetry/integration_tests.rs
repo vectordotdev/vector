@@ -65,7 +65,8 @@ async fn receive_logs_legacy_namespace() {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: Default::default(),
-            use_otlp_decoding: false.into(),
+            decoding: None,
+            use_otlp_decoding: Some(false.into()),
         };
 
         let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
@@ -168,7 +169,8 @@ async fn receive_trace() {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: Default::default(),
-            use_otlp_decoding: false.into(),
+            decoding: None,
+            use_otlp_decoding: Some(false.into()),
         };
 
         let (sender, trace_output, _) = new_source(EventStatus::Delivered, TRACES.to_string());
@@ -277,7 +279,8 @@ async fn receive_metric() {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: Default::default(),
-            use_otlp_decoding: false.into(),
+            decoding: None,
+            use_otlp_decoding: Some(false.into()),
         };
 
         let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());

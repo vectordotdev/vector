@@ -1,3 +1,5 @@
+mod decoding;
+
 use std::{
     net,
     sync::Arc,
@@ -1457,7 +1459,16 @@ fn get_source_config_with_headers(
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace: Default::default(),
-        use_otlp_decoding: use_otlp_decoding.into(),
+        decoding: use_otlp_decoding.then(|| super::config::DecodingConfig::Otlp {
+            signal_types: [
+                vector_lib::codecs::decoding::OtlpSignalType::Logs,
+                vector_lib::codecs::decoding::OtlpSignalType::Metrics,
+                vector_lib::codecs::decoding::OtlpSignalType::Traces,
+            ]
+            .into_iter()
+            .collect(),
+        }),
+        use_otlp_decoding: None,
     }
 }
 
@@ -1897,7 +1908,16 @@ async fn build_otlp_test_env_with(
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace,
-        use_otlp_decoding: use_otlp_decoding.into(),
+        decoding: use_otlp_decoding.then(|| super::config::DecodingConfig::Otlp {
+            signal_types: [
+                vector_lib::codecs::decoding::OtlpSignalType::Logs,
+                vector_lib::codecs::decoding::OtlpSignalType::Metrics,
+                vector_lib::codecs::decoding::OtlpSignalType::Traces,
+            ]
+            .into_iter()
+            .collect(),
+        }),
+        use_otlp_decoding: None,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
@@ -1996,7 +2016,8 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace: None,
-        use_otlp_decoding: true.into(),
+        decoding: None,
+        use_otlp_decoding: Some(true.into()),
     };
 
     let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
@@ -2135,9 +2156,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(config.use_otlp_decoding.logs);
-        assert!(config.use_otlp_decoding.metrics);
-        assert!(config.use_otlp_decoding.traces);
+        assert!(config.otlp_decoding().logs);
+        assert!(config.otlp_decoding().metrics);
+        assert!(config.otlp_decoding().traces);
 
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -2149,9 +2170,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs);
-        assert!(!config.use_otlp_decoding.metrics);
-        assert!(!config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs);
+        assert!(!config.otlp_decoding().metrics);
+        assert!(!config.otlp_decoding().traces);
     }
 
     #[test]
@@ -2170,9 +2191,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs);
-        assert!(!config.use_otlp_decoding.metrics);
-        assert!(config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs);
+        assert!(!config.otlp_decoding().metrics);
+        assert!(config.otlp_decoding().traces);
 
         // Test deserializing from a struct with partial fields (using defaults)
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
@@ -2186,9 +2207,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs); // default false
-        assert!(!config.use_otlp_decoding.metrics); // default false
-        assert!(config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs); // default false
+        assert!(!config.otlp_decoding().metrics); // default false
+        assert!(config.otlp_decoding().traces);
     }
 
     #[test]
@@ -2203,9 +2224,9 @@ mod otlp_decoding_config_tests {
             "#,
         })
         .unwrap();
-        assert!(!config.use_otlp_decoding.logs);
-        assert!(!config.use_otlp_decoding.metrics);
-        assert!(!config.use_otlp_decoding.traces);
+        assert!(!config.otlp_decoding().logs);
+        assert!(!config.otlp_decoding().metrics);
+        assert!(!config.otlp_decoding().traces);
     }
 
     #[tokio::test]
@@ -2226,11 +2247,15 @@ mod otlp_decoding_config_tests {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            use_otlp_decoding: OtlpDecodingConfig {
-                logs: true,
-                metrics: true,
-                traces: true,
-            },
+            decoding: None,
+            use_otlp_decoding: Some(
+                OtlpDecodingConfig {
+                    logs: true,
+                    metrics: true,
+                    traces: true,
+                }
+                .into(),
+            ),
         };
 
         // All should return Some deserializer
@@ -2269,11 +2294,15 @@ mod otlp_decoding_config_tests {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            use_otlp_decoding: OtlpDecodingConfig {
-                logs: false,
-                metrics: false,
-                traces: true,
-            },
+            decoding: None,
+            use_otlp_decoding: Some(
+                OtlpDecodingConfig {
+                    logs: false,
+                    metrics: false,
+                    traces: true,
+                }
+                .into(),
+            ),
         };
 
         // Only traces should return Some deserializer
@@ -2315,11 +2344,15 @@ mod otlp_decoding_config_tests {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            use_otlp_decoding: OtlpDecodingConfig {
-                logs: false,
-                metrics: true,
-                traces: true,
-            },
+            decoding: None,
+            use_otlp_decoding: Some(
+                OtlpDecodingConfig {
+                    logs: false,
+                    metrics: true,
+                    traces: true,
+                }
+                .into(),
+            ),
         };
 
         let outputs = config_mixed.outputs(LogNamespace::Legacy);

@@ -25,12 +25,12 @@ use crate::{
 };
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
-use serde::{Deserialize, Deserializer, de};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use tokio::sync::Semaphore;
 use tonic::transport::server::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
-    codecs::decoding::{OtlpDeserializer, OtlpSignalType},
+    codecs::decoding::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType},
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     internal_event::{BytesReceived, EventsReceived, Protocol},
@@ -115,6 +115,67 @@ impl OtlpDecodingConfig {
     }
 }
 
+/// Selects which signals retain their OTLP representation.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "codec", rename_all = "snake_case", deny_unknown_fields)]
+#[configurable(metadata(
+    docs::enum_tag_description = "The codec to use. Only `otlp` is supported."
+))]
+pub enum DecodingConfig {
+    /// Preserves the OTLP representation of the selected signals.
+    Otlp {
+        /// Signals that retain their OTLP representation.
+        ///
+        /// Unlisted signals are still accepted and converted to Vector's native representation.
+        /// Omitting this list selects all signals. An empty list uses native conversion for all
+        /// signals. Order has no effect, and duplicate signal names are ignored.
+        /// OTLP metrics are emitted as log events and cannot be used with native metric transforms.
+        #[serde(default = "default_signal_types")]
+        signal_types: IndexSet<OtlpSignalType>,
+    },
+}
+
+fn default_signal_types() -> IndexSet<OtlpSignalType> {
+    OtlpDeserializerConfig::default().signal_types
+}
+
+/// Legacy configuration for selecting OTLP representation.
+#[configurable_component(no_ser)]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum LegacyOtlpDecodingConfig {
+    /// Selects the same representation for all signals.
+    Boolean(bool),
+    /// Selects the representation of each signal separately.
+    PerSignal(OtlpDecodingConfig),
+}
+
+impl Serialize for LegacyOtlpDecodingConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Keep boolean and object inputs equivalent in normalized configurations.
+        match self {
+            Self::Boolean(value) => OtlpDecodingConfig::from(*value).serialize(serializer),
+            Self::PerSignal(config) => config.serialize(serializer),
+        }
+    }
+}
+
+impl From<bool> for LegacyOtlpDecodingConfig {
+    fn from(value: bool) -> Self {
+        Self::Boolean(value)
+    }
+}
+
+impl From<OtlpDecodingConfig> for LegacyOtlpDecodingConfig {
+    fn from(value: OtlpDecodingConfig) -> Self {
+        Self::PerSignal(value)
+    }
+}
+
 /// Configuration for the `opentelemetry` source.
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
 #[derive(Clone, Debug)]
@@ -150,36 +211,23 @@ pub struct OpentelemetryConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    /// Configuration for OTLP decoding behavior.
+    /// Decoding configuration for the signals received by this source.
     ///
-    /// This configuration controls how OpenTelemetry Protocol (OTLP) data is decoded for each
-    /// signal type (logs, metrics, traces). When a signal is configured to use OTLP decoding, the raw OTLP format is
-    /// preserved, allowing the data to be forwarded to downstream OTLP collectors without transformation.
-    /// Otherwise, the signal is converted to Vector's native event format.
+    /// Set `codec` to `otlp` to preserve the OTLP representation. When this option is omitted,
+    /// all signals are converted to Vector's native representation. Only the `otlp` codec is
+    /// supported. Do not set this option together with `use_otlp_decoding`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decoding: Option<DecodingConfig>,
+
+    /// Deprecated selection of OTLP decoding behavior.
     ///
-    /// Simple boolean form:
-    ///
-    /// ```yaml
-    /// use_otlp_decoding: true  # All signals preserve OTLP format
-    /// # or
-    /// use_otlp_decoding: false # All signals use Vector native format (default)
-    /// ```
-    ///
-    /// Per-signal configuration:
-    ///
-    /// ```yaml
-    /// use_otlp_decoding:
-    ///   logs: false     # Convert to Vector native format
-    ///   metrics: false  # Convert to Vector native format
-    ///   traces: true    # Preserve OTLP format
-    /// ```
-    ///
-    /// **Note:** When OTLP decoding is enabled for metrics:
-    /// - Metrics are parsed as logs while preserving the OTLP format
-    /// - Vector's metric transforms will NOT be compatible with this output
-    /// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
-    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
-    pub use_otlp_decoding: OtlpDecodingConfig,
+    /// Use `decoding.codec: otlp` instead. To select individual signals, set
+    /// `decoding.signal_types`. Remove this option to use native conversion for all signals.
+    /// Existing boolean and object values remain supported during migration.
+    /// See the [migration guide](/deprecations/#opentelemetry-use_otlp_decoding).
+    #[configurable(deprecated)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_otlp_decoding: Option<LegacyOtlpDecodingConfig>,
 }
 
 fn deserialize_max_concurrent_requests<'de, D>(
@@ -277,21 +325,38 @@ impl GenerateConfig for OpentelemetryConfig {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            use_otlp_decoding: OtlpDecodingConfig::default(),
+            decoding: None,
+            use_otlp_decoding: None,
         })
         .unwrap()
     }
 }
 
 impl OpentelemetryConfig {
+    pub(crate) fn otlp_decoding(&self) -> OtlpDecodingConfig {
+        if let Some(DecodingConfig::Otlp { signal_types }) = &self.decoding {
+            return OtlpDecodingConfig {
+                logs: signal_types.contains(&OtlpSignalType::Logs),
+                metrics: signal_types.contains(&OtlpSignalType::Metrics),
+                traces: signal_types.contains(&OtlpSignalType::Traces),
+            };
+        }
+        match &self.use_otlp_decoding {
+            Some(LegacyOtlpDecodingConfig::Boolean(value)) => (*value).into(),
+            Some(LegacyOtlpDecodingConfig::PerSignal(config)) => config.clone(),
+            None => OtlpDecodingConfig::default(),
+        }
+    }
+
     pub(crate) fn get_signal_deserializer(
         &self,
         signal_type: OtlpSignalType,
     ) -> vector_common::Result<Option<OtlpDeserializer>> {
+        let decoding = self.otlp_decoding();
         let should_use_otlp = match signal_type {
-            OtlpSignalType::Logs => self.use_otlp_decoding.logs,
-            OtlpSignalType::Metrics => self.use_otlp_decoding.metrics,
-            OtlpSignalType::Traces => self.use_otlp_decoding.traces,
+            OtlpSignalType::Logs => decoding.logs,
+            OtlpSignalType::Metrics => decoding.metrics,
+            OtlpSignalType::Traces => decoding.traces,
         };
 
         if should_use_otlp {
@@ -312,6 +377,14 @@ impl OpentelemetryConfig {
         grpc_tls_reloader: Option<TlsAcceptorReloader>,
         http_tls_reloader: Option<TlsAcceptorReloader>,
     ) -> crate::Result<Source> {
+        if self.decoding.is_some() && self.use_otlp_decoding.is_some() {
+            return Err("`decoding` and `use_otlp_decoding` cannot be set together".into());
+        }
+        if self.use_otlp_decoding.is_some() {
+            warn!(
+                "DEPRECATED: `use_otlp_decoding` is deprecated. Use `decoding.codec: otlp` and `decoding.signal_types`, or omit both options for native conversion. See https://vector.dev/deprecations/#opentelemetry-use_otlp_decoding for migration instructions."
+            );
+        }
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
         let request_control = RequestControl::new(
@@ -323,12 +396,13 @@ impl OpentelemetryConfig {
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
         // Log info message when using mixed OTLP decoding formats
-        if self.use_otlp_decoding.is_mixed() {
+        let decoding = self.otlp_decoding();
+        if decoding.is_mixed() {
             info!(
                 message = "Signals with OTLP decoding enabled will preserve raw format; others will use Vector native format.",
-                logs_otlp = self.use_otlp_decoding.logs,
-                metrics_otlp = self.use_otlp_decoding.metrics,
-                traces_otlp = self.use_otlp_decoding.traces,
+                logs_otlp = decoding.logs,
+                metrics_otlp = decoding.metrics,
+                traces_otlp = decoding.traces,
             );
         }
 
@@ -524,13 +598,14 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
-        let logs_output = if self.use_otlp_decoding.logs {
+        let decoding = self.otlp_decoding();
+        let logs_output = if decoding.logs {
             SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(LOGS)
         } else {
             SourceOutput::new_maybe_logs(DataType::Log, schema_definition).with_port(LOGS)
         };
 
-        let metrics_output = if self.use_otlp_decoding.metrics {
+        let metrics_output = if decoding.metrics {
             SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(METRICS)
         } else {
             SourceOutput::new_metrics().with_port(METRICS)
