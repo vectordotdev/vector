@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
@@ -31,6 +33,11 @@ impl UriSerde {
     /// `Uri` supports incomplete URIs such as "/test", "example.com", etc.
     /// This function fills in empty scheme with HTTP,
     /// and empty authority with "127.0.0.1".
+    ///
+    /// # Panics
+    ///
+    /// Panics if the URI parts cannot be combined after filling in defaults.
+    #[must_use]
     pub fn with_default_parts(&self) -> Self {
         let mut parts = self.uri.clone().into_parts();
         if parts.scheme.is_none() {
@@ -52,6 +59,10 @@ impl UriSerde {
     }
 
     /// Creates a new instance of `UriSerde` by appending a path to the existing one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the combined URI is invalid.
     pub fn append_path(&self, path: &str) -> crate::Result<Self> {
         let uri = self.uri.to_string();
         let self_path = uri.trim_end_matches('/');
@@ -64,6 +75,7 @@ impl UriSerde {
         })
     }
 
+    #[must_use]
     pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
         self.auth = auth;
         self
@@ -317,6 +329,10 @@ impl HttpEndpoint {
     /// valid `http::Uri` with an authority but an empty host, and
     /// `http://localhost:notaport` parses with a nonempty host but a port that
     /// cannot be dialed. Both are checked explicitly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the scheme, host, or port is invalid.
     pub fn new(uri: Uri) -> Result<Self, HttpEndpointError> {
         let has_valid_scheme_and_host = matches!(uri.scheme_str(), Some("http" | "https"))
             && uri.host().is_some_and(|host| !host.is_empty());
@@ -339,6 +355,10 @@ impl HttpEndpoint {
     /// `https://example.com:8080`. An explicit `http`/`https` scheme is
     /// preserved. Endpoints that still lack a host after defaulting (for
     /// example `/path`) are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the endpoint cannot be parsed or fails [`Self::new`].
     pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
         Self::parse_with_default_scheme(endpoint, "https")
     }
@@ -348,6 +368,10 @@ impl HttpEndpoint {
     /// A missing scheme is defaulted to `http` (unlike [`Self::parse`], which
     /// defaults to `https`). An explicit `http`/`https` scheme is preserved.
     /// Endpoints that still lack a host after defaulting are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the endpoint cannot be parsed or fails [`Self::new`].
     pub fn parse_default_http(endpoint: &str) -> Result<Self, HttpEndpointError> {
         Self::parse_with_default_scheme(endpoint, "http")
     }
@@ -398,6 +422,11 @@ impl HttpEndpoint {
     /// is always parseable back by `http 1` (the `http 1` parser descends from
     /// the `http 0.2` parser and accepts the same absolute forms), so this
     /// cannot fail — the same invariant `protocol_endpoint` relies on.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the validated URI cannot be parsed by `http 1`, violating the
+    /// parser compatibility invariant above.
     pub fn into_v1(self) -> http_1::Uri {
         self.0
             .to_string()
@@ -407,6 +436,10 @@ impl HttpEndpoint {
 
     /// Extracts basic-auth credentials embedded in the authority, returning a
     /// credential-free endpoint alongside the credentials.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if credentials cannot be parsed or the resulting URI is invalid.
     pub fn extract_basic_auth(self) -> crate::Result<(Self, Option<Auth>)> {
         if !self
             .as_uri()
@@ -433,6 +466,10 @@ impl HttpEndpoint {
     /// `path` may include a leading slash and a query. The existing query, if
     /// any, is dropped (as with `UriSerde::append_path`), but the scheme and
     /// authority are preserved and the result is still an absolute `http(s)` URL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the combined path or resulting URI is invalid.
     pub fn append_path(&self, path: &str) -> Result<Self, HttpEndpointError> {
         if path.is_empty() {
             return Ok(self.clone());
@@ -470,6 +507,10 @@ impl HttpEndpoint {
     /// Unlike [`HttpEndpoint::append_path`], this does not add a `/`. It is for
     /// API method suffixes that attach directly to a resource path, such as
     /// Google's `:publish` convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the combined path or resulting URI is invalid.
     pub fn append_raw_suffix(&self, suffix: &str) -> Result<Self, HttpEndpointError> {
         if suffix.is_empty() {
             return Ok(self.clone());
@@ -518,8 +559,7 @@ fn authority_has_invalid_port(uri: &Uri) -> bool {
     // Strip any userinfo (everything up to the last `@`).
     let host_port = auth
         .rsplit_once('@')
-        .map(|(_, host_port)| host_port)
-        .unwrap_or(auth);
+        .map_or(auth, |(_, host_port)| host_port);
     // An IPv6 host is bracketed; the port follows the closing `]`.
     let host_end = host_port.rfind(']').map_or(0, |i| i + 1);
     let Some(host_port) = host_port.get(host_end..) else {
@@ -797,10 +837,10 @@ mod tests {
             assert!(
                 matches!(
                     HttpEndpoint::parse(endpoint),
-                    Err(HttpEndpointError::NotAbsoluteHttp { .. })
-                        | Err(HttpEndpointError::InvalidUri { .. })
-                        | Err(HttpEndpointError::InvalidUriParts { .. })
-                        | Err(HttpEndpointError::InvalidPort { .. })
+                    Err(HttpEndpointError::NotAbsoluteHttp { .. }
+                        | HttpEndpointError::InvalidUri { .. }
+                        | HttpEndpointError::InvalidUriParts { .. }
+                        | HttpEndpointError::InvalidPort { .. })
                 ),
                 "expected `{endpoint}` to be rejected"
             );

@@ -46,6 +46,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 /// Retention policy configuration for AWS CloudWatch Log Group
+#[expect(clippy::doc_markdown, reason = "Service name")]
 pub struct Retention {
     /// Whether or not to set a retention policy when creating a new Log Group.
     #[serde(default)]
@@ -64,11 +65,11 @@ fn retention_days<'de, D>(deserializer: D) -> Result<u32, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let days: u32 = Deserialize::deserialize(deserializer)?;
     const ALLOWED_VALUES: &[u32] = &[
         1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557,
         2922, 3288, 3653,
     ];
+    let days: u32 = Deserialize::deserialize(deserializer)?;
     if ALLOWED_VALUES.contains(&days) {
         Ok(days)
     } else {
@@ -92,6 +93,7 @@ pub struct CloudwatchLogsSinkConfig {
     /// The [group name][group_name] of the target CloudWatch Logs stream.
     ///
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "group-name"))]
     #[configurable(metadata(docs::examples = "group-{{ file }}"))]
     pub group_name: Template,
@@ -103,6 +105,7 @@ pub struct CloudwatchLogsSinkConfig {
     /// unique per instance.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "stream-{{ host }}"))]
     #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "stream-name"))]
@@ -183,6 +186,9 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSinkConfig {
+    /// # Errors
+    /// Returns an error if the region cannot be resolved or the credentials or HTTP client
+    /// cannot be configured.
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
         create_client::<CloudwatchLogsClientBuilder>(
             &CloudwatchLogsClientBuilder {},
@@ -291,22 +297,22 @@ impl GenerateConfig for CloudwatchLogsSinkConfig {
 fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
         encoding,
-        group_name: Default::default(),
-        stream_name: Default::default(),
-        region: Default::default(),
+        group_name: Template::default(),
+        stream_name: UnconfinedTemplate::default(),
+        region: RegionOrEndpoint::default(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
-        assume_role: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        kms_key: Default::default(),
-        tags: Default::default(),
-        confinement: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
+        assume_role: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        kms_key: None,
+        tags: None,
+        confinement: ConfinementConfig::default(),
     }
 }
 

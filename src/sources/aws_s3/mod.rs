@@ -29,7 +29,7 @@ use crate::{
         ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     line_agg,
-    serde::{bool_or_struct, default_decoding},
+    serde::default_decoding,
     tls::TlsConfig,
 };
 
@@ -127,7 +127,7 @@ pub struct AwsS3Config {
     /// If not specified, multiline aggregation is disabled.
     multiline: Option<MultilineConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     tls_options: Option<TlsConfig>,

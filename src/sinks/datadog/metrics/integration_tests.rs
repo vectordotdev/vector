@@ -45,7 +45,7 @@ fn generate_counters() -> Vec<Event> {
                     format!("counter_{}", rng().random::<u32>()),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: index as f64,
+                        value: f64::from(index),
                     },
                 )
                 .with_timestamp(Some(ts))
@@ -118,6 +118,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
 
 /// Same as [`start_test`], but selects the series API version explicitly. Passing `None` omits
 /// the option entirely so the sink's default applies.
+// https://github.com/vectordotdev/vector/issues/23659
 async fn start_test_with_series_version(
     events: Vec<Event>,
     series_api_version: Option<&str>,
@@ -129,7 +130,9 @@ async fn start_test_with_series_version(
     .to_string();
 
     if let Some(series_api_version) = series_api_version {
-        config.push_str(&format!("series_api_version = \"{series_api_version}\"\n"));
+        config.push_str("series_api_version = \"");
+        config.push_str(series_api_version);
+        config.push_str("\"\n");
     }
 
     let (mut config, cx) = load_sink::<DatadogMetricsConfig>(config.as_str()).unwrap();
@@ -156,6 +159,11 @@ async fn start_test_with_series_version(
     (events, rx)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
     CappedDecoder::zstd(&payload[..])?.decompress()
 }
@@ -244,6 +252,11 @@ fn validate_common(request: &(Parts, Bytes)) {
     assert!(request.0.headers.contains_key("DD-Agent-Payload"));
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::float_cmp,
+    reason = "The input counter values and their sum are exact integers."
+)]
 fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
@@ -269,7 +282,7 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     sorted_names.sort();
     assert_eq!(metric_names, sorted_names);
 
-    series.iter().for_each(|serie| {
+    for serie in &series {
         // name
         assert!(serie.metric.starts_with("foo.counter_"));
 
@@ -280,14 +293,13 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
         );
 
         // resources
-        serie
-            .resources
-            .iter()
-            .for_each(|resource| match resource.r#type.as_str() {
+        for resource in &serie.resources {
+            match resource.r#type.as_str() {
                 "host" => assert_eq!(resource.name.as_str(), "a_host"),
                 "device" => assert_eq!(resource.name.as_str(), "a_device"),
                 _ => panic!("Unexpected resource found!"),
-            });
+            }
+        }
 
         // source_type_name
         assert_eq!(serie.source_type_name, "a_name");
@@ -307,7 +319,7 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
         assert_eq!(origin_metadata.origin_product, *ORIGIN_PRODUCT_VALUE);
         assert_eq!(origin_metadata.origin_category, ORIGIN_CATEGORY_VALUE);
         assert_eq!(origin_metadata.origin_service, 0);
-    });
+    }
 
     // points
     // the input values are [0..10)
@@ -320,6 +332,15 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     );
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::float_cmp,
+    reason = "The encoded values are exact integers or an exact division by two."
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
 fn validate_protobuf_set_gauge_rate(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),

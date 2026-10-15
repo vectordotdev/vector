@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Support for loading configs from multiple formats.
 
 #![deny(missing_docs, missing_debug_implementations)]
@@ -62,10 +64,12 @@ impl fmt::Display for Format {
 
 impl Format {
     /// Obtain the format from the file path using extension as a hint.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn from_path<T: AsRef<Path>>(path: T) -> Result<Self, T> {
         match path.as_ref().extension().and_then(|ext| ext.to_str()) {
             Some("toml") => Ok(Format::Toml),
-            Some("yaml") | Some("yml") => Ok(Format::Yaml),
+            Some("yaml" | "yml") => Ok(Format::Yaml),
             Some("json") => Ok(Format::Json),
             _ => Err(path),
         }
@@ -73,6 +77,8 @@ impl Format {
 }
 
 /// Parse the string represented in the specified format.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
@@ -90,6 +96,8 @@ where
 }
 
 /// Serialize the specified `value` into a string.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn serialize<T>(value: &T, format: Format) -> Result<String, String>
 where
     T: serde::ser::Serialize,
@@ -161,7 +169,7 @@ mod tests {
 
         for (input, expected) in cases {
             let output = Format::from_path(std::path::PathBuf::from(input));
-            assert_eq!(expected, output.ok(), "{input}")
+            assert_eq!(expected, output.ok(), "{input}");
         }
     }
 
@@ -173,6 +181,8 @@ mod tests {
         feature = "sinks-socket"
     ))]
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
     fn test_deserialize_matches_toml() {
         use crate::config::ConfigBuilder;
 
@@ -319,7 +329,7 @@ mod tests {
                     let expected_output: ConfigBuilder = deserialize(expected, Format::Toml)
                         .expect("Invalid TOML passed as an expectation");
                     let expected_json = serde_json::to_value(expected_output).unwrap();
-                    assert_eq!(expected_json, output_json, "{input}")
+                    assert_eq!(expected_json, output_json, "{input}");
                 }
                 Err(expected) => assert_eq!(
                     expected,

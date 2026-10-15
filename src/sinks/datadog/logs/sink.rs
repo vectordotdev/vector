@@ -71,11 +71,13 @@ impl<S> LogSinkBuilder<S> {
         }
     }
 
+    #[must_use]
     pub const fn compression(mut self, compression: Compression) -> Self {
         self.compression = Some(compression);
         self
     }
 
+    #[must_use]
     pub const fn truncation(mut self, truncation: Option<DatadogLogsTruncationConfig>) -> Self {
         self.truncation = truncation;
         self
@@ -235,6 +237,7 @@ pub fn position_reserved_attr_event_root(
 // `PartialEq<BorrowedTargetPath<'_>>`. The alternative is doing a comparison against another
 // `OwnedTargetPath`, but the naïve implementation of that requires multiple allocations and copies
 // just to test equality.
+#[must_use]
 pub fn path_is_field(path: &OwnedTargetPath, field: &str) -> bool {
     path.prefix == PathPrefix::Event
         && matches!(&path.path.segments[..], [OwnedSegment::Field(f)] if f.as_str() == field)
@@ -272,6 +275,11 @@ struct LogRequestBuilder {
 }
 
 impl LogRequestBuilder {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Retain ownership of the API key while building and returning its requests."
+    )]
     pub fn build_request(
         &self,
         events: Vec<Event>,
@@ -354,6 +362,11 @@ impl LogRequestBuilder {
         Ok((events_serialized, buf, byte_size))
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Release the uncompressed request buffer before returning the encoded request."
+    )]
     fn finish_request(
         &self,
         buf: Vec<u8>,
@@ -408,8 +421,9 @@ fn encode_log(
         return Ok(false);
     };
 
-    let Some(message) =
-        message_bytes_mut(event.as_mut_log(), conforms_as_agent).map(|message| message.clone())
+    let Some(message) = message_value_mut(event.as_mut_log(), conforms_as_agent)
+        .and_then(|message| message.as_bytes())
+        .cloned()
     else {
         return Ok(false);
     };
@@ -499,8 +513,8 @@ fn set_truncated_message(
     let mut truncated = Vec::with_capacity(body_len + marker.len());
     truncated.extend_from_slice(&message.as_bytes()[..body_len]);
     truncated.extend_from_slice(marker);
-    *message_bytes_mut(log, conforms_as_agent).expect("the message was previously found") =
-        Bytes::from(truncated);
+    *message_value_mut(log, conforms_as_agent).expect("the message was previously found") =
+        Value::Bytes(Bytes::from(truncated));
 }
 
 fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<usize> {
@@ -531,13 +545,13 @@ fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> io::Result<u
     })
 }
 
-fn message_bytes_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Bytes> {
+fn message_value_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Value> {
     match log.as_map_mut()?.get_mut(MESSAGE)? {
-        Value::Bytes(message) => Some(message),
-        Value::Object(fields) if conforms_as_agent => match fields.get_mut(MESSAGE)? {
-            Value::Bytes(message) => Some(message),
-            _ => None,
-        },
+        message @ (Value::Bytes(_) | Value::String(_)) => Some(message),
+        Value::Object(fields) if conforms_as_agent => {
+            let message = fields.get_mut(MESSAGE)?;
+            message.is_bytes().then_some(message)
+        }
         _ => None,
     }
 }
@@ -660,6 +674,7 @@ mod tests {
         simdutf_bytes_utf8_lossy,
     };
     use crate::{
+        codecs::Transformer,
         common::datadog::DD_RESERVED_SEMANTIC_ATTRS,
         sinks::{
             datadog::logs::config::{
@@ -732,7 +747,7 @@ mod tests {
     ) -> Vec<super::LogApiRequest> {
         LogRequestBuilder {
             default_api_key: Arc::from("unused"),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             compression: Compression::None,
             conforms_as_agent,
             max_payload_bytes,
@@ -901,6 +916,11 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "A metric counter is integer-valued, so exact zero proves no events were dropped."
+    )]
     #[test]
     fn does_not_count_best_effort_log_as_dropped() {
         vector_lib::metrics::init_test();

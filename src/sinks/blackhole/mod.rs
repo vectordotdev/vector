@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 mod config;
 mod sink;
 
@@ -9,6 +11,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::{
+        config::AcknowledgementsConfig,
         sinks::{
             VectorSink,
             blackhole::{config::BlackholeConfig, sink::BlackholeSink},
@@ -24,7 +27,7 @@ mod tests {
         let config = BlackholeConfig {
             print_interval_secs: Duration::from_secs(10),
             rate: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let sink = BlackholeSink::new(config);
         let sink = VectorSink::Stream(Box::new(sink));

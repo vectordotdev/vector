@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 mod buffering;
 mod config;
 mod sink;

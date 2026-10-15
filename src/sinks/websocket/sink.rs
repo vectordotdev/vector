@@ -36,21 +36,21 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         config: &WebSocketSinkConfig,
         connector: WebSocketConnector,
         transformer: Transformer,
         serializer: Serializer,
-    ) -> crate::Result<Self> {
+    ) -> Self {
         let encoder = Encoder::<()>::new(serializer);
 
-        Ok(Self {
+        Self {
             transformer,
             encoder,
             connector,
             ping_interval: config.common.ping_interval,
             ping_timeout: config.common.ping_timeout,
-        })
+        }
     }
 
     async fn create_sink_and_stream(
@@ -107,7 +107,7 @@ impl WebSocketSink {
             let result = tokio::select! {
                 _ = ping_interval.tick() => {
                     match self.check_received_pong_time(last_pong) {
-                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map(|_| ()),
+                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await,
                         Err(e) => Err(e)
                     }
                 },
@@ -125,9 +125,7 @@ impl WebSocketSink {
                 },
 
                 event = input.next() => {
-                    let mut event = if let Some(event) = event {
-                        event
-                    } else {
+                    let Some(mut event) = event else {
                         break;
                     };
 
@@ -138,28 +136,24 @@ impl WebSocketSink {
                     let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
-                    match self.encoder.encode(event, &mut bytes) {
-                        Ok(()) => {
-                            finalizers.update_status(EventStatus::Delivered);
+                    if let Ok(()) = self.encoder.encode(event, &mut bytes) {
+                        finalizers.update_status(EventStatus::Delivered);
 
-                            let message = if encode_as_binary {
-                                Message::binary(bytes)
-                            }
-                            else {
-                                Message::text(String::from_utf8_lossy(&bytes))
-                            };
-                            let message_len = message.len();
+                        let message = if encode_as_binary {
+                            Message::binary(bytes)
+                        } else {
+                            Message::text(String::from_utf8_lossy(&bytes))
+                        };
+                        let message_len = message.len();
 
-                            ws_sink.send(message).await.map(|_| {
-                                events_sent.emit(CountByteSize(1, event_byte_size));
-                                bytes_sent.emit(ByteSize(message_len));
-                            })
-                        },
-                        Err(_) => {
-                            // Error is handled by `Encoder`.
-                            finalizers.update_status(EventStatus::Errored);
-                            Ok(())
-                        }
+                        ws_sink.send(message).await.map(|()| {
+                            events_sent.emit(CountByteSize(1, event_byte_size));
+                            bytes_sent.emit(ByteSize(message_len));
+                        })
+                    } else {
+                        // Error is handled by `Encoder`.
+                        finalizers.update_status(EventStatus::Errored);
+                        Ok(())
                     }
                 },
                 else => break,
@@ -224,7 +218,7 @@ mod tests {
     use super::*;
     use crate::{
         common::websocket::WebSocketCommonConfig,
-        config::{SinkConfig, SinkContext},
+        config::{AcknowledgementsConfig, SinkConfig, SinkContext},
         http::Auth,
         test_util::{
             CountReceiver,
@@ -249,7 +243,7 @@ mod tests {
                 auth: None,
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -274,7 +268,7 @@ mod tests {
                 auth: None,
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -306,7 +300,7 @@ mod tests {
                 auth: None,
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         send_events_and_assert(addr, config, tls, None).await;
@@ -326,7 +320,7 @@ mod tests {
                 auth: None,
             },
             encoding: JsonSerializerConfig::default().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -376,10 +370,10 @@ mod tests {
             .message_key()
             .expect("global log_schema.message_key to be valid path")
             .to_string();
-        for (source, received) in lines.iter().zip(output) {
-            let json = serde_json::from_str::<JsonValue>(&received).expect("Invalid JSON");
-            let received = json.get(message_key.as_str()).unwrap().as_str().unwrap();
-            assert_eq!(source, received);
+        for (source, payload) in lines.iter().zip(output) {
+            let json = serde_json::from_str::<JsonValue>(&payload).expect("Invalid JSON");
+            let message = json.get(message_key.as_str()).unwrap().as_str().unwrap();
+            assert_eq!(source, message);
         }
     }
 
@@ -460,9 +454,10 @@ mod tests {
                 })
                 .flatten();
 
-            match interrupt_stream {
-                false => stream.boxed(),
-                true => stream.take_until(stream_tripwire).boxed(),
+            if interrupt_stream {
+                stream.take_until(stream_tripwire).boxed()
+            } else {
+                stream.boxed()
             }
         })
     }

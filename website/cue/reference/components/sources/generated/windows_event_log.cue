@@ -16,7 +16,7 @@ generated: components: sources: windows_event_log: configuration: {
 			delivered to sinks.
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	batch_size: {
 		description: """

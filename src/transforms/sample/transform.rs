@@ -1,11 +1,8 @@
-use std::{
-    collections::HashMap,
-    fmt,
-    hash::{Hash, Hasher},
-    num::NonZeroU64,
-};
+use std::{fmt, mem, num::NonZeroU64};
 
+use lru::LruCache;
 use vector_lib::{
+    ByteSizeOf,
     config::LegacyKey,
     lookup::{OwnedTargetPath, lookup_v2::OptionalValuePath},
     sampling::RatioSampler,
@@ -20,6 +17,16 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
+fn hash_ratio_threshold(ratio: f64) -> u64 {
+    (ratio * (u64::MAX as u128) as f64) as u64
+}
+
+/// Approximate bytes retained for one cached group: the key (including its heap allocation), the
+/// sampling state, the LRU node's previous/next pointers, and the hash table slot pointing at it.
+pub(super) fn group_state_entry_bytes(group_by_key: &Option<String>) -> usize {
+    group_by_key.size_of() + mem::size_of::<GroupState>() + 4 * mem::size_of::<usize>()
+}
+
 /// Exists only for backwards compatibility purposes so that the value of sample_rate_key is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
 /// of percentages
@@ -27,27 +34,21 @@ use crate::{
 pub enum SampleMode {
     Rate {
         rate: u64,
-        counters: HashMap<Option<String>, u64>,
     },
     Ratio {
         ratio: f64,
-        samplers: HashMap<Option<String>, RatioSampler>,
         hash_ratio_threshold: u64,
     },
 }
 
 impl SampleMode {
-    pub fn new_rate(rate: u64) -> Self {
-        Self::Rate {
-            rate,
-            counters: HashMap::default(),
-        }
+    pub const fn new_rate(rate: u64) -> Self {
+        Self::Rate { rate }
     }
 
     pub fn new_ratio(ratio: f64) -> Self {
         Self::Ratio {
             ratio,
-            samplers: HashMap::default(),
             // Supports the 'key_field' option, assuming an equal distribution of values for a given
             // field, hashing its contents this component should output events according to the
             // configured ratio.
@@ -55,41 +56,65 @@ impl SampleMode {
             // To do one option would be to convert the hash to a number between 0 and 1 and compare
             // to the ratio. However to address issues with precision, here the ratio is scaled to
             // meet the width of the type of the hash.
-            hash_ratio_threshold: (ratio * (u64::MAX as u128) as f64) as u64,
+            hash_ratio_threshold: hash_ratio_threshold(ratio),
         }
     }
 
-    fn increment(&mut self, group_by_key: Option<String>, value: Option<&Value>) -> bool {
-        let threshold_exceeded = match self {
-            Self::Rate { rate, counters } => {
-                let counter_value = counters.entry(group_by_key).or_default();
-                let old_counter_value = *counter_value;
-                *counter_value += 1;
-                old_counter_value % *rate == 0
-            }
-            Self::Ratio {
-                ratio, samplers, ..
-            } => samplers
-                .entry(group_by_key)
-                .or_insert_with(|| RatioSampler::new(*ratio))
-                .sample(),
-        };
-        if let Some(value) = value {
-            self.hash_within_ratio(value.to_string_lossy().as_bytes())
-        } else {
-            threshold_exceeded
+    fn new_state(&self) -> StaticSampleState {
+        match self {
+            Self::Rate { rate } => StaticSampleState::Rate {
+                rate: *rate,
+                counter: 0,
+            },
+            Self::Ratio { ratio, .. } => StaticSampleState::Ratio {
+                sampler: RatioSampler::new(*ratio),
+            },
         }
     }
 
     fn hash_within_ratio(&self, value: &[u8]) -> bool {
         let hash = seahash::hash(value);
         match self {
-            Self::Rate { rate, .. } => hash.is_multiple_of(*rate),
+            Self::Rate { rate } => hash.is_multiple_of(*rate),
             Self::Ratio {
                 hash_ratio_threshold,
                 ..
             } => hash <= *hash_ratio_threshold,
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum StaticSampleState {
+    Rate { rate: u64, counter: u64 },
+    Ratio { sampler: RatioSampler },
+}
+
+impl StaticSampleState {
+    fn sample(&mut self) -> bool {
+        match self {
+            Self::Rate { rate, counter } => {
+                let old_counter_value = *counter;
+                *counter += 1;
+                old_counter_value % *rate == 0
+            }
+            Self::Ratio { sampler } => sampler.sample(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct GroupState {
+    static_state: StaticSampleState,
+    dynamic_event_counter: u64,
+}
+
+impl GroupState {
+    fn take_next(&mut self) -> Self {
+        let next = self.clone();
+        self.static_state.sample();
+        self.dynamic_event_counter += 1;
+        next
     }
 }
 
@@ -103,6 +128,17 @@ impl EventSampleMode {
         match self {
             Self::Ratio(ratio) => ratio.to_string(),
             Self::Rate(rate) => rate.to_string(),
+        }
+    }
+
+    fn sample(&self, counter: &mut u64) -> bool {
+        let old_counter_value = *counter;
+        *counter += 1;
+        let hash = seahash::hash(&old_counter_value.to_ne_bytes());
+
+        match self {
+            Self::Ratio(ratio) => hash <= hash_ratio_threshold(*ratio),
+            Self::Rate(rate) => hash.is_multiple_of(rate.get()),
         }
     }
 }
@@ -136,27 +172,42 @@ pub enum SampleKeySource {
     },
 }
 
+impl SampleKeySource {
+    const fn group_by(&self) -> Option<&UnconfinedTemplate> {
+        match self {
+            Self::Static { group_by, .. } | Self::Dynamic { group_by, .. } => group_by.as_ref(),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Sample {
     name: String,
     static_mode: SampleMode,
     key_source: SampleKeySource,
-    dynamic_event_counters: HashMap<Option<String>, u64>,
+    next_group_state: GroupState,
+    group_states: LruCache<Option<String>, GroupState>,
+    group_state_bytes: usize,
+    max_state_bytes: usize,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
+    include_group_tag: bool,
 }
 
 impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         static_mode: SampleMode,
         key_field: Option<String>,
         group_by: Option<UnconfinedTemplate>,
+        max_state_bytes: usize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
@@ -165,25 +216,32 @@ impl Sample {
                 key_field,
                 group_by,
             },
+            max_state_bytes,
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new_with_dynamic(
         name: String,
         static_mode: SampleMode,
         fields: DynamicSampleFields,
         group_by: Option<UnconfinedTemplate>,
+        max_state_bytes: usize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
         Self::new_with_source(
             name,
             static_mode,
             SampleKeySource::Dynamic { fields, group_by },
+            max_state_bytes,
             exclude,
             sample_rate_key,
+            include_group_tag,
         )
     }
 
@@ -191,17 +249,64 @@ impl Sample {
         name: String,
         static_mode: SampleMode,
         key_source: SampleKeySource,
+        max_state_bytes: usize,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
+        include_group_tag: bool,
     ) -> Self {
+        let next_group_state = GroupState {
+            static_state: static_mode.new_state(),
+            dynamic_event_counter: 0,
+        };
         Self {
             name,
             static_mode,
             key_source,
-            dynamic_event_counters: HashMap::default(),
+            next_group_state,
+            group_states: LruCache::unbounded(),
+            group_state_bytes: 0,
+            max_state_bytes,
             exclude,
             sample_rate_key,
+            include_group_tag,
         }
+    }
+
+    /// Runs `sample` against the group's state, admitting unknown groups from the shared
+    /// admission state and evicting least recently used groups to stay within `max_state_bytes`.
+    ///
+    /// A group whose entry alone exceeds the limit is sampled but not retained, so each of its
+    /// events is admitted like a new group.
+    fn sample_group(
+        &mut self,
+        group_by_key: Option<String>,
+        sample: impl FnOnce(&mut GroupState) -> bool,
+    ) -> bool {
+        if let Some(state) = self.group_states.get_mut(&group_by_key) {
+            return sample(state);
+        }
+
+        let mut state = self.next_group_state.take_next();
+        let should_sample = sample(&mut state);
+
+        let entry_bytes = group_state_entry_bytes(&group_by_key);
+        if entry_bytes <= self.max_state_bytes {
+            while self.group_state_bytes + entry_bytes > self.max_state_bytes {
+                let Some((evicted_key, _)) = self.group_states.pop_lru() else {
+                    break;
+                };
+                self.group_state_bytes -= group_state_entry_bytes(&evicted_key);
+            }
+            self.group_states.put(group_by_key, state);
+            self.group_state_bytes += entry_bytes;
+        }
+
+        should_sample
+    }
+
+    #[cfg(test)]
+    pub const fn retained_state_bytes(&self) -> usize {
+        self.group_state_bytes
     }
 
     #[cfg(test)]
@@ -210,26 +315,6 @@ impl Sample {
             SampleMode::Rate { rate, .. } => 1.0f64 / *rate as f64,
             SampleMode::Ratio { ratio, .. } => *ratio,
         }
-    }
-
-    fn dynamic_sample_hash(group_by_key: Option<&str>, counter: u64) -> u64 {
-        let mut hasher = seahash::SeaHasher::new();
-        group_by_key.hash(&mut hasher);
-        counter.hash(&mut hasher);
-        hasher.finish()
-    }
-
-    fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
-        let counter_value = self
-            .dynamic_event_counters
-            .entry(group_by_key.clone())
-            .or_default();
-        let old_counter_value = *counter_value;
-        *counter_value += 1;
-
-        let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
-        let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
-        hash <= hash_ratio_threshold
     }
 
     fn event_ratio(&self, event: &Event) -> Option<f64> {
@@ -244,6 +329,7 @@ impl Sample {
             Value::Integer(value) => *value as f64,
             Value::Float(value) => value.into_inner(),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<f64>().ok()?,
+            Value::String(string) => string.parse::<f64>().ok()?,
             _ => return None,
         };
 
@@ -261,6 +347,7 @@ impl Sample {
         match value {
             Value::Integer(value) => u64::try_from(*value).ok().and_then(NonZeroU64::new),
             Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<NonZeroU64>().ok(),
+            Value::String(string) => string.parse::<NonZeroU64>().ok(),
             _ => None,
         }
     }
@@ -279,23 +366,8 @@ impl Sample {
             .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
     }
 
-    fn sample_with_dynamic_rate(&mut self, rate: NonZeroU64, group_by_key: Option<String>) -> bool {
-        let counter_value = self
-            .dynamic_event_counters
-            .entry(group_by_key.clone())
-            .or_default();
-        let old_counter_value = *counter_value;
-        *counter_value += 1;
-        let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
-
-        hash.is_multiple_of(rate.get())
-    }
-
     fn group_by_key(&self, event: &Event) -> Option<String> {
-        let group_by = match &self.key_source {
-            SampleKeySource::Static { group_by, .. } => group_by.as_ref()?,
-            SampleKeySource::Dynamic { group_by, .. } => group_by.as_ref()?,
-        };
+        let group_by = self.key_source.group_by()?;
 
         match event {
             Event::Log(event) => group_by.render_string(event),
@@ -339,21 +411,28 @@ impl FunctionTransform for Sample {
         };
 
         let group_by_key = self.group_by_key(&event);
-        let value = self.static_key_value(&event);
-
+        let discarded_group = self
+            .include_group_tag
+            .then(|| group_by_key.clone())
+            .flatten();
+        let static_key_sample = self.static_key_value(&event).map(|value| {
+            self.static_mode
+                .hash_within_ratio(value.to_string_lossy().as_bytes())
+        });
         let event_sample_mode = self.event_sample_mode(&event);
         let sample_rate = event_sample_mode
             .as_ref()
             .map(EventSampleMode::sample_rate_label)
             .unwrap_or_else(|| self.static_mode.to_string());
 
-        let should_sample = match event_sample_mode {
-            Some(EventSampleMode::Ratio(ratio)) => {
-                self.sample_with_dynamic_ratio(ratio, group_by_key)
-            }
-            Some(EventSampleMode::Rate(rate)) => self.sample_with_dynamic_rate(rate, group_by_key),
-            None => self.static_mode.increment(group_by_key, value),
-        };
+        let should_sample =
+            self.sample_group(group_by_key, |group_state| match event_sample_mode {
+                Some(mode) => mode.sample(&mut group_state.dynamic_event_counter),
+                None => {
+                    let threshold_exceeded = group_state.static_state.sample();
+                    static_key_sample.unwrap_or(threshold_exceeded)
+                }
+            });
 
         if should_sample {
             if let Some(path) = &self.sample_rate_key.path {
@@ -375,7 +454,10 @@ impl FunctionTransform for Sample {
             }
             output.push(event);
         } else {
-            emit!(SampleEventDiscarded);
+            emit!(SampleEventDiscarded {
+                group: discarded_group,
+                include_group_tag: self.include_group_tag,
+            });
         }
     }
 }

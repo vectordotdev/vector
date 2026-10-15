@@ -150,7 +150,7 @@ impl From<FluentValue> for Value {
                 .map(Value::Integer)
                 // unwrap large numbers to string similar to how
                 // `From<serde_json::Value> for Value` handles it
-                .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
+                .unwrap_or_else(|| Value::from(i.to_string())),
             rmpv::Value::F32(f) => {
                 // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
                 NotNan::new(f as f64)
@@ -161,7 +161,13 @@ impl From<FluentValue> for Value {
                 // serde_json converts NaN to Null, so we model that behavior here since this is non-fallible
                 NotNan::new(f).map(Value::Float).unwrap_or(Value::Null)
             }
-            rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
+            rmpv::Value::String(s) => {
+                if s.is_str() {
+                    Value::from(s.into_str().expect("string is valid UTF-8"))
+                } else {
+                    Value::Bytes(s.into_bytes().into())
+                }
+            }
             rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
             rmpv::Value::Array(values) => Value::Array(
                 values
@@ -250,7 +256,7 @@ mod test {
         fn from_u64(input: u64) -> () {
             if input > i64::MAX as u64 {
                 assert_eq!(Value::from(FluentValue(rmpv::Value::Integer(rmpv::Integer::from(input)))),
-                           Value::Bytes(input.to_string().into()))
+                           Value::from(input.to_string()))
             } else {
                 assert_eq!(Value::from(FluentValue(rmpv::Value::Integer(rmpv::Integer::from(input)))),
                            Value::Integer(input as i64))
@@ -282,9 +288,49 @@ mod test {
 
     quickcheck! {
       fn from_string(input: String) -> () {
-          assert_eq!(Value::from(FluentValue(rmpv::Value::String(rmpv::Utf8String::from(input.clone())))),
-                     Value::Bytes(input.into_bytes().into()))
+          let value = Value::from(FluentValue(rmpv::Value::String(
+              rmpv::Utf8String::from(input.clone()),
+          )));
+          assert!(matches!(value, Value::String(_)));
+          assert_eq!(value, Value::from(input))
       }
+    }
+
+    #[test]
+    fn from_string_preserves_contents_and_nested_strings() {
+        let actual = Value::from(FluentValue(rmpv::Value::Array(vec![
+            rmpv::Value::String("hello\n\\world".into()),
+            rmpv::Value::Map(vec![(
+                rmpv::Value::String("key".into()),
+                rmpv::Value::String("value".into()),
+            )]),
+        ])));
+
+        let expected = Value::Array(vec![
+            Value::from("hello\n\\world"),
+            Value::Object(ObjectMap::from([("key".into(), Value::from("value"))])),
+        ]);
+        assert_eq!(actual, expected);
+        assert!(matches!(
+            actual,
+            Value::Array(values)
+                if matches!(values.first(), Some(Value::String(_)))
+                    && matches!(
+                        values.get(1),
+                        Some(Value::Object(object))
+                            if matches!(object.get("key"), Some(Value::String(_)))
+                    )
+        ));
+    }
+
+    #[test]
+    fn from_invalid_string_preserves_bytes() {
+        let mut encoded = &b"\xa1\xff"[..];
+        let value = rmpv::decode::read_value(&mut encoded).unwrap();
+        let actual = Value::from(FluentValue(value));
+
+        assert_eq!(actual, Value::from(&[0xff][..]));
+        assert!(matches!(actual, Value::Bytes(_)));
     }
 
     quickcheck! {

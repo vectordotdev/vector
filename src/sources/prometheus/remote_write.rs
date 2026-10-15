@@ -17,7 +17,6 @@ use crate::{
     event::Event,
     http::KeepaliveConfig,
     internal_events::PrometheusRemoteWriteParseError,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, decompress_body, http::HttpMethod},
@@ -64,7 +63,7 @@ pub struct PrometheusRemoteWriteConfig {
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]

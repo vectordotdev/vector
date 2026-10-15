@@ -59,6 +59,7 @@ use crate::{
     sources::aws_s3::AwsS3Config,
     tls::TlsConfig,
 };
+use vrl::value::Value;
 
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -920,7 +921,7 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!("bucket"))),
         path!("bucket"),
-        Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
+        Value::from(s3_event.s3.bucket.name.clone()),
     );
 
     log_namespace.insert_source_metadata(
@@ -928,14 +929,14 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!("object"))),
         path!("object"),
-        Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
+        Value::from(s3_event.s3.object.key.clone()),
     );
     log_namespace.insert_source_metadata(
         AwsS3Config::NAME,
         log,
         Some(LegacyKey::Overwrite(path!("region"))),
         path!("region"),
-        Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
+        Value::from(s3_event.aws_region.clone()),
     );
 
     if let Some(metadata) = metadata {
@@ -954,7 +955,7 @@ fn handle_single_log(
         log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(AwsS3Config::NAME.as_bytes()),
+        Value::from_static_str(AwsS3Config::NAME),
     );
 
     // This handles the transition from the original timestamp logic. Originally the

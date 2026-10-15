@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use bytes::{Bytes, BytesMut};
 use encoding_rs::{CoderResult, Encoding};
@@ -21,6 +22,7 @@ pub struct Decoder {
 }
 
 impl Decoder {
+    #[must_use]
     pub fn new(encoding: &'static Encoding) -> Self {
         Self {
             buffer: [0; BUFFER_SIZE],
@@ -44,7 +46,7 @@ impl Decoder {
         }
     }
 
-    pub fn decode_to_utf8(&mut self, input: Bytes) -> Bytes {
+    pub fn decode_to_utf8(&mut self, input: &[u8]) -> Bytes {
         let mut total_read_from_input = 0;
         let mut total_had_errors = false;
 
@@ -114,6 +116,7 @@ enum Utf16Encoding {
 }
 
 impl Encoder {
+    #[must_use]
     pub fn new(encoding: &'static Encoding) -> Self {
         Self {
             buffer: [0; BUFFER_SIZE],
@@ -232,41 +235,41 @@ mod tests {
     #[test]
     fn test_decoder_various() {
         let mut d = Decoder::new(UTF_8);
-        assert_eq!(d.decode_to_utf8(Bytes::from("123")), Bytes::from("123"));
-        assert_eq!(d.decode_to_utf8(Bytes::from("\n")), Bytes::from("\n"));
-        assert_eq!(d.decode_to_utf8(Bytes::from("भेक्टर")), Bytes::from("भेक्टर"));
+        assert_eq!(d.decode_to_utf8(b"123"), Bytes::from("123"));
+        assert_eq!(d.decode_to_utf8(b"\n"), Bytes::from("\n"));
+        assert_eq!(d.decode_to_utf8("भेक्टर".as_bytes()), Bytes::from("भेक्टर"));
 
         let mut d = Decoder::new(UTF_16LE);
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16le_123())),
+            d.decode_to_utf8(test_data_utf16le_123()),
             Bytes::from("123")
         );
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16le_crlf())),
+            d.decode_to_utf8(test_data_utf16le_crlf()),
             Bytes::from("\r\n")
         );
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16le_vector_devanagari())),
+            d.decode_to_utf8(test_data_utf16le_vector_devanagari()),
             Bytes::from("भेक्टर")
         );
 
         let mut d = Decoder::new(UTF_16BE);
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16be_123())),
+            d.decode_to_utf8(test_data_utf16be_123()),
             Bytes::from("123")
         );
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16be_crlf())),
+            d.decode_to_utf8(test_data_utf16be_crlf()),
             Bytes::from("\r\n")
         );
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16be_vector_devanagari())),
+            d.decode_to_utf8(test_data_utf16be_vector_devanagari()),
             Bytes::from("भेक्टर")
         );
 
         let mut d = Decoder::new(SHIFT_JIS);
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_shiftjis_helloworld_japanese())),
+            d.decode_to_utf8(test_data_shiftjis_helloworld_japanese()),
             // ハロー・ワールド
             Bytes::from("\u{30CF}\u{30ED}\u{30FC}\u{30FB}\u{30EF}\u{30FC}\u{30EB}\u{30C9}")
         );
@@ -279,7 +282,7 @@ mod tests {
         let long_input = "This line is super long and will take up more space than Decoder's internal buffer, just to make sure that everything works properly when multiple inner decode calls are involved".repeat(10000);
 
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(long_input.clone())),
+            d.decode_to_utf8(long_input.as_bytes()),
             Bytes::from(long_input)
         );
     }
@@ -293,7 +296,7 @@ mod tests {
         let problematic_input = [BOM_UTF16LE, b"123"].concat();
 
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(problematic_input)),
+            d.decode_to_utf8(&problematic_input),
             Bytes::from(format!("{REPLACEMENT_CHARACTER}{REPLACEMENT_CHARACTER}123"))
         );
     }
@@ -305,37 +308,31 @@ mod tests {
         let input_bom_start = [BOM_UTF16LE, test_data_utf16le_123()].concat();
 
         // starting BOM should be removed for first input
-        assert_eq!(
-            d.decode_to_utf8(Bytes::from(input_bom_start.clone())),
-            Bytes::from("123")
-        );
+        assert_eq!(d.decode_to_utf8(&input_bom_start), Bytes::from("123"));
 
         // starting BOM should continue to be removed for subsequent inputs
-        assert_eq!(
-            d.decode_to_utf8(Bytes::from(input_bom_start)),
-            Bytes::from("123")
-        );
+        assert_eq!(d.decode_to_utf8(&input_bom_start), Bytes::from("123"));
 
         // but if BOM is not at the start, it should be left untouched
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(
-                [
+            d.decode_to_utf8(
+                &[
                     test_data_utf16le_123(),
                     BOM_UTF16LE,
                     test_data_utf16le_123(),
                 ]
-                .concat()
-            )),
+                .concat(),
+            ),
             Bytes::from([b"123", BOM_UTF8, b"123"].concat())
         );
 
         // inputs without BOM should continue to work
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16le_123())),
+            d.decode_to_utf8(test_data_utf16le_123()),
             Bytes::from("123")
         );
         assert_eq!(
-            d.decode_to_utf8(Bytes::from(test_data_utf16le_crlf())),
+            d.decode_to_utf8(test_data_utf16le_crlf()),
             Bytes::from("\r\n")
         );
     }
@@ -421,7 +418,7 @@ mod tests {
             // this should be an identity operation for our input plus the choice
             // of encoding (no BOM bytes in the input, plus the unicode characters
             // can be represented fully in both utf8 and utf16)
-            decoder.decode_to_utf8(encoder.encode_from_utf8(input)),
+            decoder.decode_to_utf8(&encoder.encode_from_utf8(input)),
             Bytes::from(input),
         );
     }

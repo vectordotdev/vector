@@ -6,7 +6,6 @@ use crate::{
         SourceContext, SourceOutput,
     },
     http::KeepaliveConfig,
-    serde::bool_or_struct,
     sources::{
         Source,
         http_server::{build_param_matcher, remove_duplicates},
@@ -38,8 +37,9 @@ use vector_lib::{
     lookup::{OwnedTargetPath, owned_value_path},
     opentelemetry::{
         logs::{
-            ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
-            RESOURCE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
+            ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, EVENT_NAME_KEY, FLAGS_KEY,
+            OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY,
+            SPAN_ID_KEY, TRACE_ID_KEY,
         },
         proto::collector::{
             logs::v1::logs_service_server::LogsServiceServer,
@@ -124,7 +124,7 @@ pub struct OpentelemetryConfig {
 
     pub http: HttpConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
     /// Maximum number of requests processed concurrently across the HTTP and gRPC servers.
@@ -178,7 +178,7 @@ pub struct OpentelemetryConfig {
     /// - Metrics are parsed as logs while preserving the OTLP format
     /// - Vector's metric transforms will NOT be compatible with this output
     /// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub use_otlp_decoding: OtlpDecodingConfig,
 }
 
@@ -432,6 +432,13 @@ impl SourceConfig for OpentelemetryConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!(EVENT_NAME_KEY))),
+                &owned_value_path!(EVENT_NAME_KEY),
+                Kind::bytes().or_undefined(),
+                None,
+            )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!(RESOURCE_KEY))),

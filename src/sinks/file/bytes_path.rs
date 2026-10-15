@@ -1,4 +1,4 @@
-//! Fun little hack around bytes and OsStr
+//! Fun little hack around bytes and `OsStr`
 
 use std::path::Path;
 

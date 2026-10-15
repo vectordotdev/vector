@@ -13,7 +13,7 @@ use crate::{
     codecs::DecodingConfig,
     common::sqs::SqsClientBuilder,
     config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
     tls::TlsConfig,
 };
@@ -88,7 +88,7 @@ pub struct AwsSqsConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
     pub tls: Option<TlsConfig>,
