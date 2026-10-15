@@ -6,8 +6,9 @@
 use metrics::Gauge;
 use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
 use windows::Win32::System::EventLog::{
-    EVT_HANDLE, EVT_LOG_PROPERTY_ID, EvtClose, EvtGetLogInfo, EvtLogNumberOfLogRecords, EvtOpenLog,
-    EvtRender, EvtRenderEventXml,
+    EVT_CHANNEL_CONFIG_PROPERTY_ID, EVT_HANDLE, EVT_LOG_PROPERTY_ID, EvtChannelConfigEnabled,
+    EvtClose, EvtGetChannelConfigProperty, EvtGetLogInfo, EvtLogNumberOfLogRecords,
+    EvtOpenChannelConfig, EvtOpenLog, EvtRender, EvtRenderEventXml,
 };
 use windows::core::HSTRING;
 
@@ -97,12 +98,19 @@ pub(super) fn render_event_xml(
 /// `rate(events_read_total)` to detect ingestion lag.
 /// Best-effort: if any API call fails, the gauge is left unchanged.
 pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
+    if let Some(record_count) = channel_record_count(channel) {
+        gauge.set(record_count as f64);
+    }
+}
+
+/// Number of records currently in a channel, or `None` if it cannot be read.
+pub(super) fn channel_record_count(channel: &str) -> Option<u64> {
     let channel_hstring = HSTRING::from(channel);
     let log_handle = unsafe {
         // EvtOpenChannelPath = 1
         match EvtOpenLog(None, &channel_hstring, 1) {
             Ok(h) => h,
-            Err(_) => return,
+            Err(_) => return None,
         }
     };
 
@@ -126,9 +134,46 @@ pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
 
     if result.is_ok() {
         // EVT_VARIANT for UInt64: first 8 bytes are the value (little-endian)
-        let record_count = u64::from_le_bytes(buffer[..8].try_into().unwrap_or([0; 8]));
-        gauge.set(record_count as f64);
+        Some(u64::from_le_bytes(buffer[..8].try_into().unwrap_or([0; 8])))
+    } else {
+        None
     }
+}
+
+/// Whether a channel is enabled in its configuration, or `None` if it cannot be read.
+///
+/// A disabled channel can still be subscribed to, but never delivers anything.
+pub(super) fn channel_enabled(channel: &str) -> Option<bool> {
+    let channel_hstring = HSTRING::from(channel);
+    // SAFETY: `channel_hstring` is a valid, NUL-terminated wide string that outlives the call;
+    // the returned handle is closed below.
+    let config_handle = unsafe { EvtOpenChannelConfig(None, &channel_hstring, 0) }.ok()?;
+
+    // EVT_VARIANT is 16 bytes: 8 bytes value + 4 bytes count + 4 bytes type
+    let mut buffer = [0u8; 16];
+    let mut buffer_used = 0u32;
+
+    // SAFETY: `config_handle` is a valid channel configuration handle, `buffer` is writable for
+    // `buffer.len()` bytes and `buffer_used` is a valid `u32` for the duration of the call.
+    let result = unsafe {
+        EvtGetChannelConfigProperty(
+            config_handle,
+            EVT_CHANNEL_CONFIG_PROPERTY_ID(EvtChannelConfigEnabled.0),
+            0,
+            buffer.len() as u32,
+            Some(buffer.as_mut_ptr().cast()),
+            &raw mut buffer_used,
+        )
+    };
+
+    // SAFETY: `config_handle` was opened above and is not used after this call.
+    if let Err(error) = unsafe { EvtClose(config_handle) } {
+        debug!(message = "Failed to close channel configuration handle.", channel, %error);
+    }
+
+    result.ok()?;
+    // EVT_VARIANT for Boolean: a Win32 BOOL in the first 4 bytes (little-endian)
+    Some(i32::from_le_bytes(buffer[..4].try_into().unwrap_or([0; 4])) != 0)
 }
 
 /// Decode a UTF-16LE buffer (as returned by Windows EvtRender) into a String.
