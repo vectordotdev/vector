@@ -44,6 +44,10 @@ debug = false # Do not include debug symbols in the executable.
 codegen-units = 1
 lto = "fat"
 
+[profile.qrelease]
+inherits = "release"
+lto = "thin"
+
 [profile.bench]
 debug = true
 
