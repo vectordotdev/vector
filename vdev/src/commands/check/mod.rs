@@ -1,8 +1,8 @@
 mod changelog_fragments;
-mod check_docs;
 mod component_examples;
 mod component_features;
 mod deny;
+mod docs;
 mod events;
 mod examples;
 mod fmt;
@@ -27,7 +27,7 @@ enum Commands {
     ComponentExamples(component_examples::Cli),
     Deny(deny::Cli),
     /// Check that all /docs files are valid
-    Docs(check_docs::Cli),
+    Docs(docs::Cli),
     Events(events::Cli),
     Examples(examples::Cli),
     Fmt(fmt::Cli),

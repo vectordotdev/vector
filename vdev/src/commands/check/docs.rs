@@ -39,10 +39,7 @@ impl Cli {
             bail!("CUE files validation failed:\n{err}");
         }
 
-        println!(
-            "Success! The contents of the sources in the './{}' directory are valid",
-            CUE_DIR
-        );
+        println!("Success! The contents of the sources in the './{CUE_DIR}' directory are valid");
         Ok(())
     }
 
