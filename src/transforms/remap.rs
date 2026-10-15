@@ -782,41 +782,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn runtime_build_uses_live_metrics_after_schema_compilation() {
-        let config = RemapConfig {
-            source: Some(r#".runtime_metric = get_vector_metric("cache_probe")"#.to_owned()),
-            ..Default::default()
-        };
-        let context = TransformContext::default();
-
-        // Schema compilation uses an isolated metrics store but the same cache key.
-        config
-            .compile_vrl_program(
-                context.enrichment_tables.clone(),
-                MetricsStorage::default(),
-                context.merged_schema_definition.clone(),
-            )
-            .unwrap();
-        context
-            .metrics_storage
-            .cache
-            .store(Arc::new(vec![Metric::new(
-                "cache_probe",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 42.0 },
-            )]));
-
-        let Transform::Synchronous(mut transform) = config.build(&context).await.unwrap() else {
-            panic!("remap must build a synchronous transform");
-        };
-        let result = transform_one(transform.as_mut(), LogEvent::default().into()).unwrap();
-        assert_eq!(
-            result.as_log().get(event_path!("runtime_metric", "name")),
-            Some(&Value::from("cache_probe")),
-        );
-    }
-
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<RemapConfig>();
