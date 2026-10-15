@@ -12,7 +12,7 @@ badges:
 ---
 
 {{< info >}}
-this was originally `use_otlp_decoding`, article was updated to reflect current config
+This was originally `use_otlp_decoding`, article was updated to reflect current config
 {{< /info >}}
 
 ## Summary
