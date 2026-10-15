@@ -5,7 +5,8 @@ deprecated_since: "0.60.0"
 
 ### OpenTelemetry: `use_otlp_decoding`
 
-The `opentelemetry` source's `use_otlp_decoding` option is deprecated. Use `decoding` instead.
+The `opentelemetry` source's `use_otlp_decoding` option is deprecated.
+Use `decoding` instead with the now available `codec: otlp`.
 Signals listed in `signal_types` keep their OTLP format; the rest are converted to Vector's native
 format. The source still accepts logs, metrics, and traces, with the same choices as before.
 
