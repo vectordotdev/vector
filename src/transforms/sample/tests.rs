@@ -334,10 +334,6 @@ fn handles_trace_event() {
 }
 
 #[test]
-#[expect(
-    clippy::similar_names,
-    reason = "Fixture names and exact values distinguish test cases."
-)]
 fn group_by_uses_independent_ratio_samplers() {
     let mut sampler = Sample::new(
         "sample".to_string(),
@@ -350,20 +346,16 @@ fn group_by_uses_independent_ratio_samplers() {
         false,
     );
 
-    let sampled = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
+    let decisions = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
         let mut event = LogEvent::from("event");
         event.insert(event_path!("service"), service);
         transform_one(&mut sampler, event.into()).is_some()
     });
 
-    assert_eq!(sampled, [true, false, false, true]);
+    assert_eq!(decisions, [true, false, false, true]);
 }
 
 #[test]
-#[expect(
-    clippy::similar_names,
-    reason = "Fixture names and exact values distinguish test cases."
-)]
 fn group_state_evicts_least_recently_used_group() {
     let mut sampler = Sample::new(
         "sample".to_string(),
@@ -376,7 +368,7 @@ fn group_state_evicts_least_recently_used_group() {
         false,
     );
 
-    let sampled = [
+    let decisions = [
         "service-a",
         "service-b",
         "service-a",
@@ -390,14 +382,10 @@ fn group_state_evicts_least_recently_used_group() {
         transform_one(&mut sampler, event.into()).is_some()
     });
 
-    assert_eq!(sampled, [true, false, false, true, true, false]);
+    assert_eq!(decisions, [true, false, false, true, true, false]);
 }
 
 #[test]
-#[expect(
-    clippy::similar_names,
-    reason = "Fixture names and exact values distinguish test cases."
-)]
 fn capacity_thrashing_does_not_bypass_static_sampling() {
     for (name, mode) in [
         ("rate", SampleMode::new_rate(2)),
@@ -414,14 +402,14 @@ fn capacity_thrashing_does_not_bypass_static_sampling() {
             false,
         );
 
-        let sampled = (0..6).map(|index| {
+        let decisions = (0..6).map(|index| {
             let mut event = LogEvent::from("event");
             event.insert(event_path!("service"), format!("service-{}", index % 3));
             transform_one(&mut sampler, event.into()).is_some()
         });
 
         assert_eq!(
-            sampled.collect::<Vec<_>>(),
+            decisions.collect::<Vec<_>>(),
             [true, false, true, false, true, false],
             "{name} sampling was bypassed",
         );

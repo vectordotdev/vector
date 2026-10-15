@@ -219,36 +219,32 @@ fn event_time_config_with(
 }
 
 #[test]
-#[expect(
-    clippy::similar_names,
-    reason = "Fixture names and exact values distinguish test cases."
-)]
 fn incremental_auto() {
     let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
-    let counter_a_1 = make_metric(
+    let initial_increment = make_metric(
         "counter_a",
         MetricKind::Incremental,
         MetricValue::Counter { value: 42.0 },
     );
-    let counter_a_2 = make_metric(
+    let subsequent_increment = make_metric(
         "counter_a",
         MetricKind::Incremental,
         MetricValue::Counter { value: 43.0 },
     );
-    let counter_a_summed = make_metric(
+    let expected_sum = make_metric(
         "counter_a",
         MetricKind::Incremental,
         MetricValue::Counter { value: 85.0 },
     );
 
     // Single item, just stored regardless of kind
-    agg.record(counter_a_1.clone());
+    agg.record(initial_increment.clone());
     let mut out = vec![];
-    // We should flush 1 item counter_a_1
+    // We should flush 1 item initial_increment
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
-    assert_eq!(&counter_a_1, &out[0]);
+    assert_eq!(&initial_increment, &out[0]);
 
     // A subsequent flush doesn't send out anything
     out.clear();
@@ -261,29 +257,29 @@ fn incremental_auto() {
     assert_eq!(0, out.len());
 
     // Two increments with the same series, should sum into 1
-    agg.record(counter_a_1.clone());
-    agg.record(counter_a_2);
+    agg.record(initial_increment.clone());
+    agg.record(subsequent_increment);
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
-    assert_eq!(&counter_a_summed, &out[0]);
+    assert_eq!(&expected_sum, &out[0]);
 
-    let counter_b_1 = make_metric(
+    let independent_series = make_metric(
         "counter_b",
         MetricKind::Incremental,
         MetricValue::Counter { value: 44.0 },
     );
     // Two increments with the different series, should get each back as-is
-    agg.record(counter_a_1.clone());
-    agg.record(counter_b_1.clone());
+    agg.record(initial_increment.clone());
+    agg.record(independent_series.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(2, out.len());
     // B/c we don't know the order they'll come back
     for event in out {
         match event.as_metric().series().name.name.as_str() {
-            "counter_a" => assert_eq!(counter_a_1, event),
-            "counter_b" => assert_eq!(counter_b_1, event),
+            "counter_a" => assert_eq!(initial_increment, event),
+            "counter_b" => assert_eq!(independent_series, event),
             _ => panic!("Unexpected metric name in aggregate output"),
         }
     }
@@ -336,31 +332,27 @@ fn passes_through_ignored_kind() {
 }
 
 #[test]
-#[expect(
-    clippy::similar_names,
-    reason = "Fixture names and exact values distinguish test cases."
-)]
 fn absolute_auto() {
     let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
-    let gauge_a_1 = make_metric(
+    let initial_reading = make_metric(
         "gauge_a",
         MetricKind::Absolute,
         MetricValue::Gauge { value: 42.0 },
     );
-    let gauge_a_2 = make_metric(
+    let latest_reading = make_metric(
         "gauge_a",
         MetricKind::Absolute,
         MetricValue::Gauge { value: 43.0 },
     );
 
     // Single item, just stored regardless of kind
-    agg.record(gauge_a_1.clone());
+    agg.record(initial_reading.clone());
     let mut out = vec![];
-    // We should flush 1 item gauge_a_1
+    // We should flush 1 item initial_reading
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
-    assert_eq!(&gauge_a_1, &out[0]);
+    assert_eq!(&initial_reading, &out[0]);
 
     // A subsequent flush doesn't send out anything
     out.clear();
@@ -373,29 +365,29 @@ fn absolute_auto() {
     assert_eq!(0, out.len());
 
     // Two absolutes with the same series, should get the 2nd (last) back.
-    agg.record(gauge_a_1.clone());
-    agg.record(gauge_a_2.clone());
+    agg.record(initial_reading.clone());
+    agg.record(latest_reading.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
-    assert_eq!(&gauge_a_2, &out[0]);
+    assert_eq!(&latest_reading, &out[0]);
 
-    let gauge_b_1 = make_metric(
+    let independent_series = make_metric(
         "gauge_b",
         MetricKind::Absolute,
         MetricValue::Gauge { value: 44.0 },
     );
     // Two increments with the different series, should get each back as-is
-    agg.record(gauge_a_1.clone());
-    agg.record(gauge_b_1.clone());
+    agg.record(initial_reading.clone());
+    agg.record(independent_series.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(2, out.len());
     // B/c we don't know the order they'll come back
     for event in out {
         match event.as_metric().series().name.name.as_str() {
-            "gauge_a" => assert_eq!(gauge_a_1, event),
-            "gauge_b" => assert_eq!(gauge_b_1, event),
+            "gauge_a" => assert_eq!(initial_reading, event),
+            "gauge_b" => assert_eq!(independent_series, event),
             _ => panic!("Unexpected metric name in aggregate output"),
         }
     }

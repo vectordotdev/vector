@@ -587,72 +587,68 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
-#[expect(
-    clippy::similar_names,
-    reason = "Fixture names and exact values distinguish test cases."
-)]
 #[allow(
     clippy::too_many_lines,
     reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
 )]
 async fn separate_value_limit_per_metric_name(config: Config) {
     Box::pin(assert_transform_compliance(async move {
-        let mut event_a1 =
+        let mut limited_baseline =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricA");
 
         // The limit for tag1 should already be reached here
-        let mut event_a2 =
+        let mut rejected_first_tag =
             make_metric_with_name(metric_tags!("tag1" => "val2", "tag2" => "val1"), "metricA");
 
         // The limit for tag2 should be reached here
-        let mut event_a3 =
+        let mut rejected_second_tag =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val2"), "metricA");
 
         // MetricB should have all of its tags kept due to higher limit
-        let mut event_b1 =
+        let mut higher_limit_baseline =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricB");
-        let mut event_b2 =
+        let mut accepted_first_tag_change =
             make_metric_with_name(metric_tags!("tag1" => "val2", "tag2" => "val1"), "metricB");
-        let mut event_b3 =
+        let mut accepted_second_tag_change =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val2"), "metricB");
 
         // MetricC has no specific config, so it uses the global config, which allows 2 values
-        let mut event_c1 =
+        let mut default_baseline =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricC");
-        let mut event_c2 =
+        let mut accepted_default_pair =
             make_metric_with_name(metric_tags!("tag1" => "val2", "tag2" => "val2"), "metricC");
         // The limit for tag2 should be reached here
-        let mut event_c3 =
+        let mut rejected_default_second_tag =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val3"), "metricC");
 
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
         let events = vec![
-            &mut event_a1,
-            &mut event_a2,
-            &mut event_a3,
-            &mut event_b1,
-            &mut event_b2,
-            &mut event_b3,
-            &mut event_c1,
-            &mut event_c2,
-            &mut event_c3,
+            &mut limited_baseline,
+            &mut rejected_first_tag,
+            &mut rejected_second_tag,
+            &mut higher_limit_baseline,
+            &mut accepted_first_tag_change,
+            &mut accepted_second_tag_change,
+            &mut default_baseline,
+            &mut accepted_default_pair,
+            &mut rejected_default_second_tag,
         ];
 
         for event in &events {
             tx.send((*event).clone()).await.unwrap();
         }
 
-        let new_event_a1 = out.recv().await;
-        let new_event_a2 = out.recv().await;
-        let new_event_a3 = out.recv().await;
-        let new_event_b1 = out.recv().await;
-        let new_event_b2 = out.recv().await;
-        let new_event_b3 = out.recv().await;
-        let new_event_c1 = out.recv().await;
-        let new_event_c2 = out.recv().await;
-        let new_event_c3 = out.recv().await;
+        let baseline_output = out.recv().await;
+        let first_tag_filtered_output = out.recv().await;
+        let second_tag_filtered_output = out.recv().await;
+        let high_limit_initial_output = out.recv().await;
+        let high_limit_first_change_output = out.recv().await;
+        let high_limit_second_change_output = out.recv().await;
+        let default_initial_output = out.recv().await;
+        let default_pair_output = out.recv().await;
+        let default_filtered_output = out.recv().await;
 
         drop(tx);
         topology.stop().await;
@@ -665,11 +661,11 @@ async fn separate_value_limit_per_metric_name(config: Config) {
             ));
         }
 
-        assert_eq!(new_event_a1, Some(event_a1));
+        assert_eq!(baseline_output, Some(limited_baseline));
         // The second event should have been modified to remove "tag1"
-        let new_event_a2 = new_event_a2.unwrap();
+        let first_tag_filtered_output = first_tag_filtered_output.unwrap();
         assert!(
-            !new_event_a2
+            !first_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -677,7 +673,7 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
         assert_eq!(
             "val1",
-            new_event_a2
+            first_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -686,9 +682,9 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
 
         // The third event should have been modified to remove "tag2"
-        let new_event_a3 = new_event_a3.unwrap();
+        let second_tag_filtered_output = second_tag_filtered_output.unwrap();
         assert!(
-            !new_event_a3
+            !second_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -696,7 +692,7 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
         assert_eq!(
             "val1",
-            new_event_a3
+            second_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -704,16 +700,22 @@ async fn separate_value_limit_per_metric_name(config: Config) {
                 .unwrap()
         );
 
-        assert_eq!(new_event_b1, Some(event_b1));
-        assert_eq!(new_event_b2, Some(event_b2));
-        assert_eq!(new_event_b3, Some(event_b3));
+        assert_eq!(high_limit_initial_output, Some(higher_limit_baseline));
+        assert_eq!(
+            high_limit_first_change_output,
+            Some(accepted_first_tag_change)
+        );
+        assert_eq!(
+            high_limit_second_change_output,
+            Some(accepted_second_tag_change)
+        );
 
-        assert_eq!(new_event_c1, Some(event_c1));
-        assert_eq!(new_event_c2, Some(event_c2));
+        assert_eq!(default_initial_output, Some(default_baseline));
+        assert_eq!(default_pair_output, Some(accepted_default_pair));
         // The third event should have been modified to remove "tag2"
-        let new_event_c3 = new_event_c3.unwrap();
+        let default_filtered_output = default_filtered_output.unwrap();
         assert!(
-            !new_event_c3
+            !default_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -721,7 +723,7 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
         assert_eq!(
             "val1",
-            new_event_c3
+            default_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
