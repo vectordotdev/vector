@@ -302,7 +302,7 @@ fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
         let input_definitions = topology::schema::input_definitions(
             &transform.inputs,
             config,
-            enrichment_tables.clone(),
+            &enrichment_tables,
             &mut definition_cache,
         )
         .unwrap_or_default();

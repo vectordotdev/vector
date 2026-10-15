@@ -2,6 +2,7 @@ use tokio::time::{Duration, timeout};
 use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 
 use crate::{
+    config::AcknowledgementsConfig,
     config::Config,
     sinks::console::{ConsoleSinkConfig, Target},
     sources::demo_logs::DemoLogsConfig,
@@ -22,7 +23,7 @@ async fn sources_finished() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         },
     );
 
