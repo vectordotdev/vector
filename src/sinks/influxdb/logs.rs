@@ -472,48 +472,42 @@ mod tests {
         );
     }
 
-    /// Loads `settings` as an `influxdb_logs` sink through the regular config loading path and
-    /// returns the serialized sink config.
-    fn load_sink_config(settings: &str) -> Result<serde_json::Value, String> {
-        let config = format!(
-            "sinks:\n  out:\n    type: influxdb_logs\n    inputs: [in]\n    measurement: vector-logs\n{}",
-            indent(settings)
-        );
-        let builder = crate::config::loading::load::<_, crate::config::ConfigBuilder>(
-            config.as_bytes(),
-            crate::config::Format::Yaml,
-        )
-        .map_err(|errors| errors.join("\n"))?;
-        let sink = builder.sinks.values().next().unwrap();
-        Ok(serde_json::to_value(&sink.inner).unwrap())
-    }
-
-    fn indent(settings: &str) -> String {
-        settings
-            .lines()
-            .map(|line| format!("    {line}\n"))
-            .collect::<Vec<_>>()
-            .concat()
-    }
-
-    const V1_SETTINGS: &str = "endpoint: http://localhost:8086\ndatabase: my-database\nconsistency: quorum\nretention_policy_name: autogen\nusername: my-user\npassword: my-password";
-    const V2_SETTINGS: &str =
-        "endpoint: http://localhost:9999\norg: my-org\nbucket: my-bucket\ntoken: my-token";
-
     #[test]
     fn test_config_version_selects_settings() {
-        for (version, settings, expected) in
-            [("\"1\"", V1_SETTINGS, "1"), ("\"2\"", V2_SETTINGS, "2")]
-        {
-            let config = load_sink_config(&format!("version: {version}\n{settings}"))
-                .unwrap_or_else(|error| panic!("version {version}: {error}"));
-            assert_eq!(config["version"], expected);
-        }
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V1(_)));
 
-        // All v1 settings are carried through to the write URI.
-        let mut config = load_sink_config(&format!("version: \"1\"\n{V1_SETTINGS}")).unwrap();
-        config.as_object_mut().unwrap().remove("type");
-        let config: InfluxDbLogsConfig = serde_json::from_value(config).unwrap();
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V2(_)));
+    }
+
+    #[test]
+    fn test_config_v1_settings_in_write_uri() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+            consistency: "quorum"
+            retention_policy_name: "autogen"
+            username: "my-user"
+            password: "my-password"
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
         assert_eq!(
             config.validate().unwrap().uri.to_string(),
             "http://localhost:8086/write?consistency=quorum&db=my-database&rp=autogen&p=my-password&u=my-user&precision=ns"
@@ -521,8 +515,25 @@ mod tests {
     }
 
     #[test]
+    fn test_config_version_required() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+        "#};
+        let error = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap_err();
+        assert!(
+            error.to_string().contains("missing field `version`"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn test_config_version_rejects_invalid_values() {
-        // Only the strings "1" and "2" are accepted; integer versions are rejected.
+        // Use the regular config loading path: it parses into an intermediate value, which is
+        // where an unquoted integer could otherwise be read as a variant index.
         for (version, expected) in [
             ("0", "invalid type: integer"),
             ("1", "invalid type: integer"),
@@ -530,41 +541,46 @@ mod tests {
             ("3", "invalid type: integer"),
             ("\"x\"", "unknown variant `x`"),
         ] {
-            let error =
-                load_sink_config(&format!("version: {version}\n{V2_SETTINGS}")).expect_err(version);
+            let config = format!(
+                "measurement: vector-logs\nendpoint: http://localhost:9999\nversion: {version}\norg: my-org\nbucket: my-bucket\ntoken: my-token\n"
+            );
+            let errors = crate::config::loading::load::<_, InfluxDbLogsConfig>(
+                config.as_bytes(),
+                crate::config::Format::Yaml,
+            )
+            .unwrap_err();
+            let error = errors.join("\n");
             assert!(error.contains(expected), "version {version}: {error}");
         }
     }
 
     #[test]
-    fn test_config_version_required() {
-        let error = load_sink_config(V2_SETTINGS).unwrap_err();
-        assert!(error.contains("missing field `version`"), "{error}");
-    }
-
-    #[test]
     fn test_config_version_requires_settings() {
-        for (settings, field) in [
+        for (config, field) in [
             (
-                "version: \"1\"\nendpoint: http://localhost:8086",
+                indoc! {r#"
+                    measurement: "vector-logs"
+                    endpoint: "http://localhost:8086"
+                    version: "1"
+                "#},
                 "database",
             ),
             (
-                "version: \"2\"\nendpoint: http://localhost:9999\nbucket: b\ntoken: t",
+                indoc! {r#"
+                    measurement: "vector-logs"
+                    endpoint: "http://localhost:9999"
+                    version: "2"
+                    bucket: "my-bucket"
+                    token: "my-token"
+                "#},
                 "org",
             ),
-            (
-                "version: \"2\"\nendpoint: http://localhost:9999\norg: o\ntoken: t",
-                "bucket",
-            ),
-            (
-                "version: \"2\"\nendpoint: http://localhost:9999\norg: o\nbucket: b",
-                "token",
-            ),
         ] {
-            let error = load_sink_config(settings).unwrap_err();
+            let error = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap_err();
             assert!(
-                error.contains(&format!("missing field `{field}`")),
+                error
+                    .to_string()
+                    .contains(&format!("missing field `{field}`")),
                 "{field}: {error}"
             );
         }
@@ -572,27 +588,67 @@ mod tests {
 
     #[test]
     fn test_config_rejects_unknown_fields() {
-        for (settings, field) in [
-            (format!("version: \"1\"\n{V1_SETTINGS}\ntoken: t"), "token"),
-            (
-                format!("version: \"2\"\n{V2_SETTINGS}\ndatabase: d"),
-                "database",
-            ),
-            (
-                format!("version: \"2\"\n{V2_SETTINGS}\nbukcet: b"),
-                "bukcet",
-            ),
-            (
-                format!("version: \"2\"\n{V2_SETTINGS}\nendpont: e"),
-                "endpont",
-            ),
+        let v2 = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+        "#};
+        for (extra, field) in [
+            ("database: my-database", "database"),
+            ("bukcet: my-bucket", "bukcet"),
+            ("bukcet: null", "bukcet"),
+            ("endpont: http://localhost:9999", "endpont"),
         ] {
-            let error = load_sink_config(&settings).unwrap_err();
+            let config = format!("{v2}{extra}\n");
+            let error = serde_yaml::from_str::<InfluxDbLogsConfig>(&config).unwrap_err();
             assert!(
-                error.contains(&format!("unknown field `{field}`")),
+                error
+                    .to_string()
+                    .contains(&format!("unknown field `{field}`")),
                 "{field}: {error}"
             );
         }
+    }
+
+    #[test]
+    fn test_config_accepts_null_settings_for_other_version() {
+        for null in ["database: null", "database:"] {
+            let config = format!(
+                "measurement: vector-logs\nendpoint: http://localhost:9999\nversion: \"2\"\norg: my-org\nbucket: my-bucket\ntoken: my-token\n{null}\n"
+            );
+            let config = serde_yaml::from_str::<InfluxDbLogsConfig>(&config)
+                .unwrap_or_else(|error| panic!("{null}: {error}"));
+            assert!(matches!(config.settings, InfluxDbSettings::V2(_)));
+        }
+
+        // `null` for the selected version's optional settings is still treated as unset.
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+            password: null
+            token: null
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V1(_)));
+    }
+
+    #[test]
+    fn test_config_rejects_null_required_settings() {
+        let config = indoc! {r#"
+            measurement: "vector-logs"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: null
+        "#};
+        let error = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap_err();
+        assert!(error.to_string().contains("invalid type: null"), "{error}");
     }
 
     fn v2_settings() -> InfluxDbSettings {

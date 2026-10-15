@@ -525,64 +525,61 @@ mod tests {
         serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
     }
 
-    /// Loads `settings` as an `influxdb_metrics` sink through the regular config loading path and
-    /// returns the serialized sink config.
-    fn load_sink_config(settings: &str) -> Result<serde_json::Value, String> {
-        let settings = settings
-            .lines()
-            .map(|line| format!("    {line}\n"))
-            .collect::<Vec<_>>()
-            .concat();
-        let config =
-            format!("sinks:\n  out:\n    type: influxdb_metrics\n    inputs: [in]\n{settings}");
-        let builder = crate::config::loading::load::<_, crate::config::ConfigBuilder>(
-            config.as_bytes(),
-            crate::config::Format::Yaml,
-        )
-        .map_err(|errors| errors.join("\n"))?;
-        let sink = builder.sinks.values().next().unwrap();
-        Ok(serde_json::to_value(&sink.inner).unwrap())
-    }
-
-    const V1_SETTINGS: &str = "endpoint: http://localhost:8086\ndatabase: my-database";
-    const V2_SETTINGS: &str =
-        "endpoint: http://localhost:9999\norg: my-org\nbucket: my-bucket\ntoken: my-token";
-
     #[test]
     fn test_config_version_selects_settings() {
-        for (version, settings, expected) in
-            [("\"1\"", V1_SETTINGS, "1"), ("\"2\"", V2_SETTINGS, "2")]
-        {
-            let config = load_sink_config(&format!("version: {version}\n{settings}"))
-                .unwrap_or_else(|error| panic!("version {version}: {error}"));
-            assert_eq!(config["version"], expected);
-        }
+        let config = indoc! {r#"
+            endpoint: "http://localhost:8086"
+            version: "1"
+            database: "my-database"
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V1(_)));
+
+        let config = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            version: "2"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+            database: null
+        "#};
+        let config = serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
+        assert!(matches!(config.settings, InfluxDbSettings::V2(_)));
     }
 
     #[test]
     fn test_config_rejects_invalid_settings() {
-        for (settings, expected) in [
-            (V2_SETTINGS.to_string(), "missing field `version`"),
+        let v2 = indoc! {r#"
+            endpoint: "http://localhost:9999"
+            org: "my-org"
+            bucket: "my-bucket"
+            token: "my-token"
+        "#};
+        for (config, expected) in [
+            (v2.to_string(), "missing field `version`"),
             (
-                format!("version: 1\n{V1_SETTINGS}"),
-                "invalid type: integer",
-            ),
-            (
-                "version: \"1\"\nendpoint: http://localhost:8086".to_string(),
-                "missing field `database`",
-            ),
-            (
-                format!("version: \"2\"\n{V2_SETTINGS}\ndatabase: d"),
+                format!("version: \"2\"\n{v2}database: my-database\n"),
                 "unknown field `database`",
             ),
             (
-                format!("version: \"2\"\n{V2_SETTINGS}\nendpont: e"),
+                format!("version: \"2\"\n{v2}endpont: http://localhost:9999\n"),
                 "unknown field `endpont`",
             ),
         ] {
-            let error = load_sink_config(&settings).unwrap_err();
-            assert!(error.contains(expected), "{expected}: {error}");
+            let error = serde_yaml::from_str::<InfluxDbConfig>(&config).unwrap_err();
+            assert!(error.to_string().contains(expected), "{expected}: {error}");
         }
+
+        // Use the regular config loading path, where an unquoted integer could otherwise be read
+        // as a variant index.
+        let config = format!("version: 1\n{v2}");
+        let errors = crate::config::loading::load::<_, InfluxDbConfig>(
+            config.as_bytes(),
+            crate::config::Format::Yaml,
+        )
+        .unwrap_err();
+        let error = errors.join("\n");
+        assert!(error.contains("invalid type: integer"), "{error}");
     }
 
     #[test]

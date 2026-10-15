@@ -116,6 +116,15 @@ pub enum InfluxDbSettings {
     V2(InfluxDb2Settings),
 }
 
+const V1_SETTINGS_KEYS: [&str; 5] = [
+    "database",
+    "consistency",
+    "retention_policy_name",
+    "username",
+    "password",
+];
+const V2_SETTINGS_KEYS: [&str; 3] = ["org", "bucket", "token"];
+
 // The derived internally tagged deserializer would match integer tags by variant index, so an
 // unquoted `version: 1` would resolve to v2. Parse the tag with a plain enum instead, which only
 // accepts the strings "1" and "2", and hand the remaining fields to the per-version settings.
@@ -139,7 +148,19 @@ impl<'de> Deserialize<'de> for InfluxDbSettings {
             settings: serde_json::Map<String, serde_json::Value>,
         }
 
-        let Tagged { version, settings } = Tagged::deserialize(deserializer)?;
+        let Tagged {
+            version,
+            mut settings,
+        } = Tagged::deserialize(deserializer)?;
+
+        // `null` used to mean unset, so keep accepting `null` for the other version's settings.
+        let other_version_keys: &[&str] = match version {
+            Version::V1 => &V2_SETTINGS_KEYS,
+            Version::V2 => &V1_SETTINGS_KEYS,
+        };
+        settings
+            .retain(|key, value| !(value.is_null() && other_version_keys.contains(&key.as_str())));
+
         let settings = serde_json::Value::Object(settings);
         match version {
             Version::V1 => InfluxDb1Settings::deserialize(settings).map(Self::V1),
