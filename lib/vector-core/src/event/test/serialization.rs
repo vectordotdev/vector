@@ -110,6 +110,28 @@ fn disk_buffer_preserves_unrecognized_trace_layout() {
 }
 
 #[test]
+fn disk_buffer_preserves_datadog_metric_unit() {
+    let mut metric = Metric::new(
+        "test",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 1.0 },
+    );
+    metric
+        .metadata_mut()
+        .set_datadog_metric_unit("byte".to_owned());
+    let expected = EventArray::from(Event::Metric(metric));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Metrics(metrics) = actual else {
+        panic!("expected a metrics array");
+    };
+    assert_eq!(metrics[0].metadata().datadog_metric_unit(), Some("byte"));
+}
+
+#[test]
 fn serialization() {
     let mut event = LogEvent::from("raw log line");
     event.insert(event_path!("foo"), "bar");

@@ -9,6 +9,7 @@ use std::{
 fn main() -> Result<()> {
     for path in [
         "proto/datadog/agentpayload.proto",
+        "proto/datadog/metrics/intake_v3.proto",
         "proto/datadog/trace/agent_payload.proto",
         "proto/datadog/trace/tracer_payload.proto",
         "proto/datadog/trace/span.proto",
