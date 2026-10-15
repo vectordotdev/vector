@@ -405,7 +405,7 @@ impl<T: Bufferable> BufferSender<T> {
 }
 
 #[cfg(test)]
-mod usage_snapshot_tests {
+mod tests {
     use std::num::{NonZeroU64, NonZeroUsize};
 
     use tempfile::tempdir;
