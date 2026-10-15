@@ -2,12 +2,15 @@ use std::{collections::btree_map, fmt::Write as _, iter, slice, sync::LazyLock};
 
 use regex::Regex;
 use serde::{Serialize, Serializer};
-use vrl::path::PathPrefix;
+use vrl::path::{OwnedSegment, OwnedTargetPath, OwnedValuePath, PathPrefix};
 
 use crate::event::{KeyString, ObjectMap, Value};
 
 static IS_VALID_PATH_SEGMENT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
+
+/// The synthetic key used for an event whose root is not an object.
+static MESSAGE_KEY: LazyLock<KeyString> = LazyLock::new(|| KeyString::from("message"));
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
@@ -33,9 +36,12 @@ pub fn all_fields_non_object_root(value: &Value) -> FieldsIter<'_> {
 }
 
 /// An iterator similar to `all_fields`, but instead of visiting each array element individually,
-/// it treats the entire array as a single value.
-pub fn all_fields_skip_array_elements(fields: &ObjectMap) -> FieldsIter<'_> {
-    FieldsIter::new_with_skip_array_elements(fields)
+/// it treats the entire array as a single value. Paths are returned as event [`OwnedTargetPath`]s
+/// built from the field names, so they never need to be parsed.
+pub fn all_fields_skip_array_elements(fields: &ObjectMap) -> TargetPathFieldsIter<'_> {
+    TargetPathFieldsIter {
+        inner: FieldsIter::new_with_skip_array_elements(fields),
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -130,6 +136,59 @@ impl<'a> FieldsIter<'a> {
         self.path.pop();
     }
 
+    /// Advances the depth-first traversal to the next leaf.
+    ///
+    /// Returns the leaf's own path component together with its value. `self.path` still holds
+    /// the component's parent prefix at this point, so the caller can render the full path in
+    /// whichever representation it needs.
+    fn next_component(&mut self) -> Option<(PathComponent<'a>, &'a Value)> {
+        loop {
+            match self.stack.last_mut() {
+                None => return None,
+                Some(LeafIter::Map(map_iter)) => match map_iter.next() {
+                    None => self.pop(),
+                    Some((key, value)) => {
+                        if let Some(scalar_value) = self.push(value, PathComponent::Key(key)) {
+                            return Some((PathComponent::Key(key), scalar_value));
+                        }
+                    }
+                },
+                Some(LeafIter::Array(array_iter)) => match array_iter.next() {
+                    None => self.pop(),
+                    Some((index, value)) => {
+                        if let Some(scalar_value) = self.push(value, PathComponent::Index(index)) {
+                            return Some((PathComponent::Index(index), scalar_value));
+                        }
+                    }
+                },
+                Some(LeafIter::Root((value, visited))) => {
+                    let result = (!*visited).then_some((PathComponent::Key(&MESSAGE_KEY), *value));
+                    *visited = true;
+                    return result;
+                }
+            }
+        }
+    }
+
+    /// Builds the current path as an [`OwnedTargetPath`] directly from the field names, so field
+    /// names never need to be quoted or escaped.
+    fn make_target_path(&self, component: PathComponent<'a>) -> OwnedTargetPath {
+        let mut segments = Vec::with_capacity(self.path.len() + 1);
+        for component in self.path.iter().chain(iter::once(&component)) {
+            segments.push(match component {
+                PathComponent::Key(key) => OwnedSegment::Field((*key).clone()),
+                PathComponent::Index(index) => {
+                    OwnedSegment::Index(isize::try_from(*index).expect("array index fits in isize"))
+                }
+            });
+        }
+        let path = OwnedValuePath { segments };
+        match self.path_prefix {
+            Some(PathPrefix::Metadata) => OwnedTargetPath::metadata(path),
+            None | Some(PathPrefix::Event) => OwnedTargetPath::event(path),
+        }
+    }
+
     fn make_path(&mut self, component: PathComponent<'a>) -> KeyString {
         let mut res = match self.path_prefix {
             None => String::new(),
@@ -164,35 +223,23 @@ impl<'a> Iterator for FieldsIter<'a> {
     type Item = (KeyString, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.stack.last_mut() {
-                None => return None,
-                Some(LeafIter::Map(map_iter)) => match map_iter.next() {
-                    None => self.pop(),
-                    Some((key, value)) => {
-                        if let Some(scalar_value) = self.push(value, PathComponent::Key(key)) {
-                            return Some((self.make_path(PathComponent::Key(key)), scalar_value));
-                        }
-                    }
-                },
-                Some(LeafIter::Array(array_iter)) => match array_iter.next() {
-                    None => self.pop(),
-                    Some((index, value)) => {
-                        if let Some(scalar_value) = self.push(value, PathComponent::Index(index)) {
-                            return Some((
-                                self.make_path(PathComponent::Index(index)),
-                                scalar_value,
-                            ));
-                        }
-                    }
-                },
-                Some(LeafIter::Root((value, visited))) => {
-                    let result = (!*visited).then(|| ("message".into(), *value));
-                    *visited = true;
-                    break result;
-                }
-            }
-        }
+        let (component, value) = self.next_component()?;
+        Some((self.make_path(component), value))
+    }
+}
+
+/// Yields the same fields as [`FieldsIter`], with each path as an [`OwnedTargetPath`].
+#[derive(Clone)]
+pub struct TargetPathFieldsIter<'a> {
+    inner: FieldsIter<'a>,
+}
+
+impl<'a> Iterator for TargetPathFieldsIter<'a> {
+    type Item = (OwnedTargetPath, &'a Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (component, value) = self.inner.next_component()?;
+        Some((self.inner.make_target_path(component), value))
     }
 }
 
@@ -264,6 +311,34 @@ mod test {
                 .unwrap_or(a)
                 .cmp(b.strip_prefix('"').unwrap_or(b))
         });
+
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn keys_special_target_paths() {
+        let mut fields = special_fields();
+        fields.insert("a\\b".into(), Value::Integer(6));
+        fields.insert(
+            "nested".into(),
+            Value::from(fields_from_json(json!({ "c\"d": 7 }))),
+        );
+        let collected: Vec<_> = all_fields_skip_array_elements(&fields).collect();
+
+        let root = OwnedTargetPath::event_root();
+        let expected: Vec<(OwnedTargetPath, &Value)> = vec![
+            (root.with_field_appended("\"a\""), &Value::Integer(5)),
+            (root.with_field_appended(".a .b*"), &Value::Integer(4)),
+            (root.with_field_appended("a b"), &Value::Integer(3)),
+            (root.with_field_appended("a*b"), &Value::Integer(2)),
+            (root.with_field_appended("a-b"), &Value::Integer(1)),
+            (root.with_field_appended("a\\b"), &Value::Integer(6)),
+            (
+                root.with_field_appended("nested")
+                    .with_field_appended("c\"d"),
+                &Value::Integer(7),
+            ),
+        ];
 
         assert_eq!(collected, expected);
     }
