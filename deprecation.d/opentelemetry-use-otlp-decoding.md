@@ -3,6 +3,8 @@ what: "OpenTelemetry `use_otlp_decoding` configuration option"
 deprecated_since: "0.60.0"
 ---
 
+<a id="opentelemetry-use_otlp_decoding"></a>
+
 The `opentelemetry` source's `use_otlp_decoding` option is deprecated.
 Switch to `decoding` with `codec: otlp` to preserve the same behavior as `use_otlp_decoding: true`.
 
