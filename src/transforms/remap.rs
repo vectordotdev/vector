@@ -261,7 +261,8 @@ impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
         let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
-                let (remap, warnings) = Remap::new_ast(self, context)?;
+                // Cloning clears the schema-compilation cache before binding runtime state.
+                let (remap, warnings) = Remap::new_ast(&self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
             }
         };
@@ -779,6 +780,41 @@ mod tests {
         ) -> std::result::Result<Value, Terminate> {
             Err(Terminate::Interrupted)
         }
+    }
+
+    #[tokio::test]
+    async fn runtime_build_uses_live_metrics_after_schema_compilation() {
+        let config = RemapConfig {
+            source: Some(r#".runtime_metric = get_vector_metric("cache_probe")"#.to_owned()),
+            ..Default::default()
+        };
+        let context = TransformContext::default();
+
+        // Schema compilation uses an isolated metrics store but the same cache key.
+        config
+            .compile_vrl_program(
+                context.enrichment_tables.clone(),
+                MetricsStorage::default(),
+                context.merged_schema_definition.clone(),
+            )
+            .unwrap();
+        context
+            .metrics_storage
+            .cache
+            .store(Arc::new(vec![Metric::new(
+                "cache_probe",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 42.0 },
+            )]));
+
+        let Transform::Synchronous(mut transform) = config.build(&context).await.unwrap() else {
+            panic!("remap must build a synchronous transform");
+        };
+        let result = transform_one(transform.as_mut(), LogEvent::default().into()).unwrap();
+        assert_eq!(
+            result.as_log().get(event_path!("runtime_metric", "name")),
+            Some(&Value::from("cache_probe")),
+        );
     }
 
     #[test]
