@@ -300,11 +300,21 @@ mod test {
 
 #[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
-    use std::time::Duration;
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
 
     use futures::StreamExt;
     use redis::AsyncCommands;
-    use tokio::time::Instant;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+        time::Instant,
+    };
     use vrl::value;
 
     use super::*;
@@ -511,6 +521,91 @@ mod integration_test {
     #[tokio::test]
     async fn redis_source_list_rpop_loses_no_entries_on_shutdown() {
         assert_no_entries_lost_on_shutdown(Method::Rpop).await;
+    }
+
+    /// Starts a TCP proxy to the test Redis server whose replies can be frozen, which makes the
+    /// connection look half-open to the client. Returns the proxy URL and the freeze switch.
+    async fn freezable_redis_proxy() -> (String, Arc<AtomicBool>) {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let redis::ConnectionAddr::Tcp(host, port) = client.get_connection_info().addr.clone()
+        else {
+            panic!("test Redis must be reachable over plain TCP");
+        };
+        let db = client.get_connection_info().redis.db;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_url = format!("redis://{}/{db}", listener.local_addr().unwrap());
+        let frozen = Arc::new(AtomicBool::new(false));
+
+        let frozen_replies = Arc::clone(&frozen);
+        tokio::spawn(async move {
+            loop {
+                let (inbound, _) = listener.accept().await.unwrap();
+                let outbound = TcpStream::connect((host.as_str(), port)).await.unwrap();
+                let (mut client_read, mut client_write) = inbound.into_split();
+                let (mut server_read, mut server_write) = outbound.into_split();
+                tokio::spawn(async move {
+                    _ = tokio::io::copy(&mut client_read, &mut server_write).await;
+                });
+                let frozen = Arc::clone(&frozen_replies);
+                tokio::spawn(async move {
+                    let mut buf = vec![0; 16 * 1024];
+                    loop {
+                        let Ok(n @ 1..) = server_read.read(&mut buf).await else {
+                            return;
+                        };
+                        if frozen.load(Ordering::SeqCst) {
+                            // Swallow this and every later reply.
+                            std::future::pending::<()>().await;
+                        }
+                        if client_write.write_all(&buf[..n]).await.is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+
+        (proxy_url, frozen)
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_shutdown_is_bounded_when_replies_stop() {
+        let (proxy_url, frozen) = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method: Method::Lpop,
+            }),
+            url: proxy_url,
+            key: format!("test-key-{}", random_string(10)),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let source = tokio::spawn(config.build(cx).await.unwrap());
+        let _received = tokio::spawn(rx.count());
+
+        // Let the source connect and block on the empty list, then stop delivering replies so
+        // its in-flight pop never completes.
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        frozen.store(true, Ordering::SeqCst);
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        let stopped = tokio::time::timeout(Duration::from_secs(10), async {
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(30)))
+                .await;
+            source.await.unwrap().unwrap();
+        })
+        .await;
+        assert!(
+            stopped.is_ok(),
+            "source did not stop while its Redis connection was unresponsive"
+        );
     }
 
     #[tokio::test]

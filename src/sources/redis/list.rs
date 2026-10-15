@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use futures::FutureExt;
 use redis::{AsyncCommands, ErrorKind, RedisError, RedisResult, aio::ConnectionManager};
 use snafu::{ResultExt, Snafu};
 
 use super::{InputHandler, Method};
 use crate::{
-    common::backoff::ExponentialBackoff, internal_events::RedisReceiveEventError, sources::Source,
+    common::backoff::ExponentialBackoff, internal_events::RedisReceiveEventError,
+    shutdown::ShutdownSignal, sources::Source,
 };
 
 #[derive(Debug, Snafu)]
@@ -35,28 +35,27 @@ impl InputHandler {
                 .max_delay(Duration::from_secs(1));
 
             loop {
-                // Shutdown is checked between pops instead of racing an in-flight pop: Redis
-                // removes an entry as soon as it replies, so abandoning a pop could lose an
-                // entry. The blocking pop times out regularly so shutdown is still noticed.
-                if (&mut shutdown).now_or_never().is_some() {
-                    break;
-                }
-
-                let res = match method {
-                    Method::Rpop => brpop(&mut conn, &self.key).await,
-                    Method::Lpop => blpop(&mut conn, &self.key).await,
+                let pop = async {
+                    match method {
+                        Method::Rpop => brpop(&mut conn, &self.key).await,
+                        Method::Lpop => blpop(&mut conn, &self.key).await,
+                    }
                 };
+                let (res, stopping) = read_or_shutdown(pop, &mut shutdown).await;
 
                 match res {
+                    // Shutdown was signalled and the pop did not return in time, e.g. because
+                    // the connection is half-open.
+                    None => break,
                     // Timed out with the list empty.
-                    Ok(None) => {}
-                    Err(error) => {
+                    Some(Ok(None)) => {}
+                    Some(Err(error)) => {
                         let err: RedisError = error;
                         let kind = err.kind();
 
                         emit!(RedisReceiveEventError::from(err));
 
-                        if kind == ErrorKind::IoError {
+                        if kind == ErrorKind::IoError && !stopping {
                             // Back off before retrying, but stay responsive to shutdown.
                             let delay = backoff.next().expect("backoff never ends");
                             tokio::select! {
@@ -65,12 +64,16 @@ impl InputHandler {
                             }
                         }
                     }
-                    Ok(Some(line)) => {
+                    Some(Ok(Some(line))) => {
                         backoff.reset();
                         if let Err(()) = self.handle_line(line).await {
                             break;
                         }
                     }
+                }
+
+                if stopping {
+                    break;
                 }
             }
             Ok(())
@@ -79,8 +82,30 @@ impl InputHandler {
 }
 
 /// How long a blocking pop waits for an entry before returning, which bounds how long shutdown
-/// waits for an idle source.
+/// waits for an in-flight pop on a healthy connection.
 const BLOCKING_POP_TIMEOUT_SECS: f64 = 1.0;
+
+/// How long shutdown waits for an in-flight read to finish. A healthy server replies within
+/// `BLOCKING_POP_TIMEOUT_SECS` plus a round trip; this only bounds shutdown when the reply never
+/// arrives, so an unresponsive Redis connection cannot stall shutdown.
+const SHUTDOWN_READ_GRACE: Duration = Duration::from_secs(5);
+
+/// Awaits a Redis read while watching for shutdown. If shutdown is signalled first, the read is
+/// still given `SHUTDOWN_READ_GRACE` to finish: Redis removes entries as soon as it replies, so
+/// abandoning a read whose reply is on its way would lose them.
+///
+/// Returns the read's result, or `None` if it did not finish in time, and whether shutdown was
+/// signalled. Once shutdown was signalled, `shutdown` must not be awaited again.
+async fn read_or_shutdown<T>(
+    read: impl Future<Output = RedisResult<T>>,
+    shutdown: &mut ShutdownSignal,
+) -> (Option<RedisResult<T>>, bool) {
+    tokio::pin!(read);
+    tokio::select! {
+        res = &mut read => (Some(res), false),
+        _ = shutdown => (tokio::time::timeout(SHUTDOWN_READ_GRACE, read).await.ok(), true),
+    }
+}
 
 // A nil reply means the pop timed out.
 async fn brpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<Option<String>> {
