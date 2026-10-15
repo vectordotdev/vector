@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs, io,
     path::{Path, PathBuf},
     thread,
@@ -133,10 +133,7 @@ pub(super) fn referenced_disk_buffer_directories(config: &Config) -> HashSet<Pat
         .filter_map(|(id, table)| table.as_sink(id))
         .map(|(id, sink)| (id, sink.buffer));
 
-    let effective_sinks = sinks
-        .chain(enrichment_table_sinks)
-        .collect::<HashMap<_, _>>();
-    disk_buffer_directories(data_dir, effective_sinks.into_iter())
+    disk_buffer_directories(data_dir, sinks.chain(enrichment_table_sinks))
 }
 
 fn disk_buffer_directories(
