@@ -22,6 +22,9 @@ generated: components: sinks: vector: configuration: {
 
 			The address _must_ include a port.
 
+			If no scheme is specified, `https` is used. Specify `http://` explicitly to connect
+			without TLS.
+
 			This option is mutually exclusive with `routing`. Set exactly one of
 			`address` or `routing`.
 
@@ -153,6 +156,9 @@ generated: components: sinks: vector: configuration: {
 					Both IP addresses and hostnames are accepted formats.
 
 					Each endpoint _must_ include a port.
+
+					If no scheme is specified, `https` is used. Specify `http://` explicitly to connect
+					without TLS.
 					"""
 				required: false
 				type: array: {
