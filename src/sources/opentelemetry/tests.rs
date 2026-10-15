@@ -1437,7 +1437,7 @@ async fn receive_summary_metric() {
 fn get_source_config_with_headers(
     grpc_addr: net::SocketAddr,
     http_addr: net::SocketAddr,
-    use_otlp_decoding: bool,
+    preserve_otlp: bool,
 ) -> OpentelemetryConfig {
     OpentelemetryConfig {
         grpc: GrpcConfig {
@@ -1459,7 +1459,7 @@ fn get_source_config_with_headers(
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace: Default::default(),
-        decoding: use_otlp_decoding.then(|| super::config::DecodingConfig::Otlp {
+        decoding: preserve_otlp.then(|| super::config::DecodingConfig::Otlp {
             signal_types: [
                 vector_lib::codecs::decoding::OtlpSignalType::Logs,
                 vector_lib::codecs::decoding::OtlpSignalType::Metrics,
@@ -1473,7 +1473,7 @@ fn get_source_config_with_headers(
 }
 
 async fn send_and_collect_otel_event(
-    use_otlp_decoding: bool,
+    preserve_otlp: bool,
     output_port: &str,
     endpoint: &str,
     body: Vec<u8>,
@@ -1481,7 +1481,7 @@ async fn send_and_collect_otel_event(
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
 
-    let source = get_source_config_with_headers(grpc_addr, http_addr, use_otlp_decoding);
+    let source = get_source_config_with_headers(grpc_addr, http_addr, preserve_otlp);
 
     let (sender, output, _) = new_source(EventStatus::Delivered, output_port.to_string());
     let server = source
@@ -1511,11 +1511,10 @@ async fn receive_http_native_event_name() {
         // ExportLogsServiceRequest containing only LogRecord field 12 (event_name).
         // Encode independently of the generated types to catch a missing or incorrect wire tag.
         let encoded = b"\x0a\x14\x12\x12\x12\x10\x62\x0ebuild.finished";
-        for (vector_namespace, use_otlp_decoding) in
+        for (vector_namespace, preserve_otlp) in
             [(false, false), (true, false), (false, true), (true, true)]
         {
-            let env =
-                build_otlp_test_env_with(LOGS, Some(vector_namespace), use_otlp_decoding).await;
+            let env = build_otlp_test_env_with(LOGS, Some(vector_namespace), preserve_otlp).await;
             test_util::wait_for_tcp(env.config.http.address).await;
             let response = reqwest::Client::new()
                 .post(format!("http://{}/v1/logs", env.config.http.address))
@@ -1530,7 +1529,7 @@ async fn receive_http_native_event_name() {
             assert_eq!(events.len(), 1);
             let event = events.pop().unwrap();
             let log = event.as_log();
-            let event_name = if use_otlp_decoding {
+            let event_name = if preserve_otlp {
                 log.get(event_path!(
                     "resourceLogs",
                     0,
@@ -1560,7 +1559,7 @@ async fn receive_http_native_event_name() {
 }
 
 #[tokio::test]
-async fn http_headers_logs_use_otlp_decoding_false() {
+async fn http_headers_logs_preserve_otlp_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let (_guard_0, grpc_addr) = next_addr();
         let (_guard_1, http_addr) = next_addr();
@@ -1646,7 +1645,7 @@ async fn http_headers_logs_use_otlp_decoding_false() {
 }
 
 #[tokio::test]
-async fn http_headers_logs_use_otlp_decoding_true() {
+async fn http_headers_logs_preserve_otlp_true() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let (_guard_0, grpc_addr) = next_addr();
         let (_guard_1, http_addr) = next_addr();
@@ -1708,7 +1707,7 @@ async fn http_headers_logs_use_otlp_decoding_true() {
 }
 
 #[tokio::test]
-async fn http_headers_metrics_use_otlp_decoding_false() {
+async fn http_headers_metrics_preserve_otlp_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             false,
@@ -1743,7 +1742,7 @@ async fn http_headers_metrics_use_otlp_decoding_false() {
 }
 
 #[tokio::test]
-async fn http_headers_metrics_use_otlp_decoding_true() {
+async fn http_headers_metrics_preserve_otlp_true() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             true,
@@ -1760,7 +1759,7 @@ async fn http_headers_metrics_use_otlp_decoding_true() {
 }
 
 #[tokio::test]
-async fn http_headers_traces_use_otlp_decoding_false() {
+async fn http_headers_traces_preserve_otlp_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             false,
@@ -1799,7 +1798,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
 }
 
 #[tokio::test]
-async fn http_headers_traces_use_otlp_decoding_true() {
+async fn http_headers_traces_preserve_otlp_true() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let event = send_and_collect_otel_event(
             true,
@@ -1837,9 +1836,9 @@ async fn http_headers_traces_use_otlp_decoding_true() {
     .await;
 }
 
-async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
+async fn assert_grpc_trace_layout_marker(preserve_otlp: bool) {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let env = build_otlp_test_env_with(TRACES, None, use_otlp_decoding).await;
+        let env = build_otlp_test_env_with(TRACES, None, preserve_otlp).await;
         let mut client = TraceServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
@@ -1848,7 +1847,7 @@ async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
             .await;
         let mut events = test_util::collect_ready(env.output);
         assert_eq!(events.len(), 1);
-        let expected = if use_otlp_decoding {
+        let expected = if preserve_otlp {
             TraceLayout::OtlpResourceSpans
         } else {
             TraceLayout::OtelFlattened
@@ -1862,12 +1861,12 @@ async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
 }
 
 #[tokio::test]
-async fn grpc_traces_use_otlp_decoding_false_sets_layout_marker() {
+async fn grpc_traces_preserve_otlp_false_sets_layout_marker() {
     assert_grpc_trace_layout_marker(false).await;
 }
 
 #[tokio::test]
-async fn grpc_traces_use_otlp_decoding_true_sets_layout_marker() {
+async fn grpc_traces_preserve_otlp_true_sets_layout_marker() {
     assert_grpc_trace_layout_marker(true).await;
 }
 
@@ -1887,7 +1886,7 @@ pub async fn build_otlp_test_env(
 async fn build_otlp_test_env_with(
     event_name: &'static str,
     log_namespace: Option<bool>,
-    use_otlp_decoding: bool,
+    preserve_otlp: bool,
 ) -> OTelTestEnv {
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
@@ -1908,7 +1907,7 @@ async fn build_otlp_test_env_with(
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace,
-        decoding: use_otlp_decoding.then(|| super::config::DecodingConfig::Otlp {
+        decoding: preserve_otlp.then(|| super::config::DecodingConfig::Otlp {
             signal_types: [
                 vector_lib::codecs::decoding::OtlpSignalType::Logs,
                 vector_lib::codecs::decoding::OtlpSignalType::Metrics,
@@ -1992,7 +1991,7 @@ fn current_time_and_nanos() -> (SystemTime, u64) {
 }
 
 #[tokio::test]
-async fn http_logs_use_otlp_decoding_emits_metric() {
+async fn http_logs_preserve_otlp_emits_metric() {
     use crate::metrics::Controller;
 
     test_util::trace_init();
@@ -2016,8 +2015,16 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace: None,
-        decoding: None,
-        use_otlp_decoding: Some(true.into()),
+        decoding: Some(super::config::DecodingConfig::Otlp {
+            signal_types: [
+                vector_lib::codecs::decoding::OtlpSignalType::Logs,
+                vector_lib::codecs::decoding::OtlpSignalType::Metrics,
+                vector_lib::codecs::decoding::OtlpSignalType::Traces,
+            ]
+            .into_iter()
+            .collect(),
+        }),
+        use_otlp_decoding: None,
     };
 
     let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
@@ -2129,7 +2136,7 @@ mod otlp_decoding_config_tests {
     }
 
     #[test]
-    fn test_otlp_decoding_from_bool() {
+    fn test_legacy_otlp_decoding_from_bool() {
         // Test direct From<bool> trait implementation
         let config_true = OtlpDecodingConfig::from(true);
         assert!(config_true.logs);
@@ -2176,7 +2183,7 @@ mod otlp_decoding_config_tests {
     }
 
     #[test]
-    fn test_otlp_decoding_deserialization_from_struct() {
+    fn test_legacy_otlp_decoding_deserialization_from_struct() {
         // Test deserializing from a struct with all fields
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
@@ -2214,7 +2221,7 @@ mod otlp_decoding_config_tests {
 
     #[test]
     fn test_otlp_decoding_default_when_not_specified() {
-        // Test that when use_otlp_decoding is not specified, it uses defaults (all false)
+        // Test that when decoding is not specified, it uses defaults (all false)
         let config: OpentelemetryConfig = serde_yaml::from_str(indoc! {
             r#"
             grpc:
@@ -2247,15 +2254,18 @@ mod otlp_decoding_config_tests {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            decoding: None,
-            use_otlp_decoding: Some(
-                OtlpDecodingConfig {
-                    logs: true,
-                    metrics: true,
-                    traces: true,
-                }
-                .into(),
+            decoding: Some(
+                crate::sources::opentelemetry::config::DecodingConfig::Otlp {
+                    signal_types: [
+                        OtlpSignalType::Logs,
+                        OtlpSignalType::Metrics,
+                        OtlpSignalType::Traces,
+                    ]
+                    .into_iter()
+                    .collect(),
+                },
             ),
+            use_otlp_decoding: None,
         };
 
         // All should return Some deserializer
@@ -2294,15 +2304,12 @@ mod otlp_decoding_config_tests {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            decoding: None,
-            use_otlp_decoding: Some(
-                OtlpDecodingConfig {
-                    logs: false,
-                    metrics: false,
-                    traces: true,
-                }
-                .into(),
+            decoding: Some(
+                crate::sources::opentelemetry::config::DecodingConfig::Otlp {
+                    signal_types: [OtlpSignalType::Traces].into_iter().collect(),
+                },
             ),
+            use_otlp_decoding: None,
         };
 
         // Only traces should return Some deserializer
@@ -2344,15 +2351,14 @@ mod otlp_decoding_config_tests {
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
-            decoding: None,
-            use_otlp_decoding: Some(
-                OtlpDecodingConfig {
-                    logs: false,
-                    metrics: true,
-                    traces: true,
-                }
-                .into(),
+            decoding: Some(
+                crate::sources::opentelemetry::config::DecodingConfig::Otlp {
+                    signal_types: [OtlpSignalType::Metrics, OtlpSignalType::Traces]
+                        .into_iter()
+                        .collect(),
+                },
             ),
+            use_otlp_decoding: None,
         };
 
         let outputs = config_mixed.outputs(LogNamespace::Legacy);
