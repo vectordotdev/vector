@@ -395,6 +395,12 @@ struct PubsubSource {
     events_received: Registered<EventsReceived>,
 }
 
+/// The request half of a streaming pull was dropped, which happens when the server
+/// closes the stream (for example with an HTTP/2 GOAWAY). Acknowledgement IDs can no
+/// longer be sent on it, so the stream has to be restarted.
+#[derive(Debug)]
+struct RequestStreamClosed;
+
 enum State {
     RetryNow,
     RetryDelay,
@@ -519,22 +525,27 @@ impl PubsubSource {
                 biased;
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
                     pending_acks -= 1;
-                    if status == BatchStatus::Delivered {
-                        ack_ids_sender
-                            .send(receipts)
-                            .await
-                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                    if status == BatchStatus::Delivered && ack_ids_sender.send(receipts).await.is_err() {
+                        // The request stream was dropped because the server closed the
+                        // streaming pull (e.g. an HTTP/2 GOAWAY). These IDs can no longer
+                        // be acknowledged on this stream; Pub/Sub redelivers them once the
+                        // ack deadline passes.
+                        debug!("Request stream closed while acknowledging, restarting stream.");
+                        break State::RetryNow;
                     }
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
-                        self.handle_response(
+                        if let Err(RequestStreamClosed) = self.handle_response(
                             response,
                             &finalizer,
                             &ack_ids_sender,
                             &mut pending_acks,
                             busy_flag,
-                        ).await;
+                        ).await {
+                            debug!("Request stream closed while acknowledging, restarting stream.");
+                            break State::RetryNow;
+                        }
                     }
                     Some(Err(error)) => break translate_error(error),
                     None => break State::RetryNow,
@@ -563,10 +574,10 @@ impl PubsubSource {
                     // other activity has happened. This will result
                     // in a new request with empty fields, effectively
                     // a keepalive.
-                    ack_ids_sender
-                        .send(Vec::new())
-                        .await
-                        .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                    if ack_ids_sender.send(Vec::new()).await.is_err() {
+                        debug!("Request stream closed while sending keepalive, restarting stream.");
+                        break State::RetryNow;
+                    }
                 }
             }
         }
@@ -611,7 +622,7 @@ impl PubsubSource {
         ack_ids: &mpsc::Sender<Vec<String>>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
-    ) {
+    ) -> Result<(), RequestStreamClosed> {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
@@ -624,10 +635,7 @@ impl PubsubSource {
         match self.out.send_batch(events).await {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
-                None => ack_ids
-                    .send(ids)
-                    .await
-                    .unwrap_or_else(|_| unreachable!("request stream never closes")),
+                None => ack_ids.send(ids).await.map_err(|_| RequestStreamClosed)?,
                 Some(notifier) => {
                     finalizer
                         .as_ref()
@@ -637,6 +645,7 @@ impl PubsubSource {
                 }
             },
         }
+        Ok(())
     }
 
     fn parse_messages(
