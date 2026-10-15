@@ -65,6 +65,19 @@ pub enum StatsdConfig {
     Unix(UnixOnly<UnixConfig>),
 }
 
+/// Unix socket modes.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum UnixMode {
+    /// Stream-oriented (`SOCK_STREAM`).
+    #[default]
+    Stream,
+
+    /// Datagram-oriented (`SOCK_DGRAM`).
+    Datagram,
+}
+
 /// Unix domain socket configuration for the `statsd` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -74,6 +87,18 @@ pub struct UnixConfig {
     /// This should be an absolute path.
     #[configurable(metadata(docs::examples = "/path/to/socket"))]
     pub path: PathBuf,
+
+    /// The Unix socket mode to use.
+    #[serde(default)]
+    pub unix_mode: UnixMode,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    #[configurable(metadata(docs::examples = 0o777))]
+    #[configurable(metadata(docs::examples = 0o600))]
+    pub socket_file_mode: Option<u32>,
 
     #[serde(default = "default_sanitize")]
     pub sanitize: bool,
@@ -540,6 +565,8 @@ mod test {
             let config = StatsdConfig::Unix(
                 UnixConfig {
                     path: in_path.clone(),
+                    unix_mode: UnixMode::Stream,
+                    socket_file_mode: None,
                     sanitize: true,
                     convert_to: ConversionUnit::Seconds,
                 }
@@ -554,6 +581,33 @@ mod test {
                         .write_all(bytes)
                         .await
                         .unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_statsd_unix_datagram() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+            let in_path = tempfile::tempdir().unwrap().keep().join("unix_dgram_test");
+            let config = StatsdConfig::Unix(
+                UnixConfig {
+                    path: in_path.clone(),
+                    unix_mode: UnixMode::Datagram,
+                    socket_file_mode: None,
+                    sanitize: true,
+                    convert_to: ConversionUnit::Seconds,
+                }
+                .into(),
+            );
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                let socket = tokio::net::UnixDatagram::unbound().unwrap();
+                while let Some(bytes) = receiver.next().await {
+                    socket.send_to(bytes, &in_path).await.unwrap();
                 }
             });
             test_statsd(config, sender).await;
