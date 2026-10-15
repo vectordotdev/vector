@@ -50,3 +50,4 @@ vector-api-client = { path = "../vector-api-client", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+tracing-test = "0.2.6"
