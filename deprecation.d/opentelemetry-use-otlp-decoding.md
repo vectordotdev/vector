@@ -46,8 +46,8 @@ Existing boolean and object settings still work, but produce a deprecation warni
 
 When migrating:
 
-- Leave out `signal_types` to keep all signals in OTLP format, or set it to `[]` to convert all signals
-  to Vector's native format.
+- Leave out `signal_types` to keep all signals in OTLP format. Any
+  types not included will remain in Vector's native format.
 - If you currently use `use_otlp_decoding: false`, remove it and leave out `decoding`. Native conversion
   remains the default.
 - Use `codec: otlp` and the signal names `logs`, `metrics`, and `traces`. Other values are not supported.
