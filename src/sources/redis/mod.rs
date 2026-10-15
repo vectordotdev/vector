@@ -300,13 +300,17 @@ mod test {
 
 #[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
+    use std::time::Duration;
+
+    use futures::StreamExt;
     use redis::AsyncCommands;
+    use tokio::time::Instant;
     use vrl::value;
 
     use super::*;
     use crate::{
         SourceSender,
-        config::log_schema,
+        config::{ComponentKey, log_schema},
         test_util::{
             collect_n,
             components::{SOURCE_TAGS, run_and_assert_source_compliance_n},
@@ -441,6 +445,72 @@ mod integration_test {
             events[2].as_log()[log_schema().message_key().unwrap().to_string()],
             "3".into()
         );
+    }
+
+    /// Stops the source while it is reading a long list and checks that every entry is either
+    /// emitted or still in the list.
+    async fn assert_no_entries_lost_on_shutdown(method: Method) {
+        const ENTRIES: usize = 4_000;
+        const ROUNDS: usize = 5;
+
+        let client = redis::Client::open(redis_url()).unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
+
+        for _ in 0..ROUNDS {
+            let key = format!("test-key-{}", random_string(10));
+            let values: Vec<String> = (1..=ENTRIES).map(|i| i.to_string()).collect();
+            for chunk in values.chunks(1000) {
+                let _: i64 = conn.rpush(&key, chunk).await.unwrap();
+            }
+
+            let config = RedisSourceConfig {
+                data_type: DataTypeConfig::List,
+                list: Some(ListOption { method }),
+                url: redis_url(),
+                key: key.clone(),
+                redis_key: None,
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
+                log_namespace: Some(false),
+            };
+
+            let (tx, rx) = SourceSender::new_test();
+            let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+            let source = tokio::spawn(config.build(cx).await.unwrap());
+            // Consume concurrently so the source is busy popping, not waiting on a full channel.
+            let received = tokio::spawn(rx.count());
+
+            // Stop the source part-way through the list, while it is still popping entries.
+            loop {
+                let remaining: usize = conn.llen(&key).await.unwrap();
+                if remaining < ENTRIES / 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(10)))
+                .await;
+            source.await.unwrap().unwrap();
+
+            let received = received.await.unwrap();
+            let remaining: usize = conn.llen(&key).await.unwrap();
+            assert_eq!(
+                received + remaining,
+                ENTRIES,
+                "received {received} + remaining {remaining} != pushed {ENTRIES}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_lpop_loses_no_entries_on_shutdown() {
+        assert_no_entries_lost_on_shutdown(Method::Lpop).await;
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_rpop_loses_no_entries_on_shutdown() {
+        assert_no_entries_lost_on_shutdown(Method::Rpop).await;
     }
 
     #[tokio::test]
