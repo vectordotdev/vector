@@ -26,7 +26,7 @@ enum Commands {
     ComponentFeatures(component_features::Cli),
     ComponentExamples(component_examples::Cli),
     Deny(deny::Cli),
-    /// Check that all /docs files are valid
+    /// Check CUE documentation formatting and validity
     Docs(docs::Cli),
     Events(events::Cli),
     Examples(examples::Cli),
