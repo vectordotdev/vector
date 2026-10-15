@@ -402,6 +402,15 @@ impl Aggregate {
         }
     }
 
+    /// Tick `k` of the flush timer fires at `timer_start + k * interval`, so its window starts one
+    /// interval earlier. Anchoring here keeps that true when missed ticks arrive in a burst.
+    fn start_window_timeline(&mut self, timer_start: DateTime<Utc>) {
+        if let Some(interval_ms) = self.output_interval_ms {
+            self.next_window_start =
+                Some(timer_start - TimeDelta::milliseconds(i64::from(interval_ms.get())));
+        }
+    }
+
     fn flush_system_time(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
@@ -492,6 +501,7 @@ impl TaskTransform<Event> for Aggregate {
         Self: 'static,
     {
         let mut flush_stream = tokio::time::interval(self.interval);
+        self.start_window_timeline(Utc::now());
 
         Box::pin(stream! {
             let mut output = Vec::new();
