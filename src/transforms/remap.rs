@@ -23,7 +23,7 @@ use vrl::{
     compiler::{
         CompileConfig, ExpressionError, Program, TypeState, VrlRuntime,
         runtime::{Runtime, Terminate},
-        state::ExternalEnv,
+        state::{ExternalEnv, LocalEnv},
     },
     diagnostic::{DiagnosticMessage, Note},
     path,
@@ -37,7 +37,7 @@ use crate::{
         ComponentKey, DataType, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput, log_schema,
     },
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, LogEvent, TargetEvents, VrlTarget},
     format_vrl_diagnostics,
     internal_events::{RemapMappingAbort, RemapMappingError},
     schema,
@@ -213,7 +213,7 @@ impl RemapConfig {
         };
 
         let state = TypeState {
-            local: vrl::compiler::state::LocalEnv::default(),
+            local: LocalEnv::default(),
             external: ExternalEnv::new_with_kind(
                 merged_schema_definition.event_kind().clone(),
                 merged_schema_definition.metadata_kind().clone(),
@@ -618,7 +618,7 @@ where
 
         let log_namespace = event
             .maybe_as_log()
-            .map_or(LogNamespace::Legacy, vector_lib::event::LogEvent::namespace);
+            .map_or(LogNamespace::Legacy, LogEvent::namespace);
 
         let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
         let result = self.run_vrl(&mut target);
@@ -933,7 +933,7 @@ mod tests {
         assert_eq!(get_field_string(&result, "."), "root string");
 
         let mut outputs = conf.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(OutputId::dummy(), initial_definition)],
         );
 
@@ -1623,7 +1623,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                &crate::config::TransformContext::default(),
+                &TransformContext::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
@@ -1714,13 +1714,7 @@ mod tests {
 
     fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
         let out = collect_outputs(ft, event);
-        assert_eq!(
-            0,
-            out.named
-                .values()
-                .map(vector_lib::transform::OutputBuffer::len)
-                .sum::<usize>()
-        );
+        assert_eq!(0, out.named.values().map(OutputBuffer::len).sum::<usize>());
         assert!(out.primary.len() <= 1);
         out.primary.into_events().next()
     }
@@ -1790,7 +1784,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[("in".into(), schema::Definition::default_legacy_namespace())],
         );
 
@@ -1812,7 +1806,7 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1859,7 +1853,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1893,7 +1887,7 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1936,7 +1930,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1976,7 +1970,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2004,7 +1998,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2044,7 +2038,7 @@ mod tests {
         };
 
         let outputs1 = transform1.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2105,7 +2099,7 @@ mod tests {
         assert_eq!(result.as_log().get(event_path!()), Some(&Value::Null));
 
         let outputs1 = conf.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(

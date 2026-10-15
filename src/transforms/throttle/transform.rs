@@ -175,13 +175,9 @@ mod tests {
         "})
         .unwrap();
 
-        let throttle = Throttle::new(
-            &config,
-            &crate::config::TransformContext::default(),
-            clock.clone(),
-        )
-        .map(Transform::event_task)
-        .unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
 
         let throttle = throttle.into_task();
 
@@ -246,13 +242,9 @@ mod tests {
         "})
         .unwrap();
 
-        let throttle = Throttle::new(
-            &config,
-            &crate::config::TransformContext::default(),
-            clock.clone(),
-        )
-        .map(Transform::event_task)
-        .unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
 
         let throttle = throttle.into_task();
 
@@ -328,13 +320,9 @@ mod tests {
         "#})
         .unwrap();
 
-        let throttle = Throttle::new(
-            &config,
-            &crate::config::TransformContext::default(),
-            clock.clone(),
-        )
-        .map(Transform::event_task)
-        .unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
 
         let throttle = throttle.into_task();
 

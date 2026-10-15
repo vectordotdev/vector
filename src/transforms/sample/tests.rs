@@ -2,7 +2,9 @@ use approx::assert_relative_eq;
 use indoc::indoc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{enrichment::TableRegistry, lookup::lookup_v2::OptionalValuePath};
+use vector_vrl_metrics::MetricsStorage;
+use vrl::compiler::VrlRuntime;
 use vrl::{event_path, owned_value_path};
 
 use crate::{
@@ -14,7 +16,10 @@ use crate::{
     transforms::{
         FunctionTransform, OutputBuffer,
         sample::{
-            config::{SampleConfig, default_max_state_bytes, default_sample_rate_key},
+            config::{
+                SampleConfig, SampleInternalMetricsConfig, default_max_state_bytes,
+                default_sample_rate_key,
+            },
             transform::{DynamicSampleFields, Sample, SampleMode, group_state_entry_bytes},
         },
         test::{create_topology, transform_one},
@@ -34,8 +39,7 @@ async fn emits_internal_events() {
             max_state_bytes: default_max_state_bytes(),
             exclude: None,
             sample_rate_key: default_sample_rate_key(),
-            internal_metrics:
-                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -887,14 +891,11 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
 fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
         source: format!(r#"contains!(."{key}", "{needle}")"#),
-        runtime: vrl::compiler::VrlRuntime::default(),
+        runtime: VrlRuntime::default(),
     };
 
     vrl_config
-        .build(
-            &vector_lib::enrichment::TableRegistry::default(),
-            &vector_vrl_metrics::MetricsStorage::default(),
-        )
+        .build(&TableRegistry::default(), &MetricsStorage::default())
         .expect("should not fail to build VRL condition")
 }
 

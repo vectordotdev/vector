@@ -220,8 +220,7 @@ impl GenerateConfig for SampleConfig {
             max_state_bytes: default_max_state_bytes(),
             exclude: None::<AnyCondition>,
             sample_rate_key: default_sample_rate_key(),
-            internal_metrics:
-                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         })
         .unwrap()
     }
@@ -323,6 +322,7 @@ pub fn default_sample_rate_key() -> OptionalValuePath {
 
 #[cfg(test)]
 mod tests {
+    use super::SampleInternalMetricsConfig;
     use crate::{
         config::TransformConfig,
         transforms::sample::config::{SampleConfig, SampleError},
@@ -361,8 +361,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics:
-                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -381,8 +380,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics:
-                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -401,8 +399,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics:
-                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         assert!(config.validate_structure().is_ok());
@@ -420,8 +417,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics:
-                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -440,8 +436,7 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics:
-                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();

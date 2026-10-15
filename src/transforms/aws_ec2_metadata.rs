@@ -721,7 +721,7 @@ mod test {
     use vrl::{owned_value_path, value::Kind};
 
     use crate::{
-        config::{LogNamespace, OutputId, TransformConfig, schema::Definition},
+        config::{LogNamespace, OutputId, TransformConfig, TransformContext, schema::Definition},
         transforms::aws_ec2_metadata::Ec2Metadata,
     };
 
@@ -736,7 +736,7 @@ mod test {
             Definition::new(Kind::bytes(), Kind::any_object(), [LogNamespace::Vector]);
 
         let mut outputs = transform_config.outputs(
-            &crate::config::TransformContext::default(),
+            &TransformContext::default(),
             &[(OutputId::dummy(), input_definition)],
         );
         assert_eq!(outputs.len(), 1);
@@ -924,10 +924,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        match config
-            .build(&crate::config::TransformContext::default())
-            .await
-        {
+        match config.build(&TransformContext::default()).await {
             Ok(_) => panic!("expected timeout failure"),
             // cannot create tokio::time::error::Elapsed to compare with since constructor is
             // private
@@ -960,10 +957,7 @@ mod integration_tests {
         };
 
         assert!(
-            config
-                .build(&crate::config::TransformContext::default())
-                .await
-                .is_ok(),
+            config.build(&TransformContext::default()).await.is_ok(),
             "expected no failure because 'required' config value set to false"
         );
     }

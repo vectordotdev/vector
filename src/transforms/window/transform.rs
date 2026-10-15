@@ -101,6 +101,7 @@ impl FunctionTransform for Window {
 #[cfg(test)]
 mod test {
     use std::ops::RangeInclusive;
+    use vrl::compiler::VrlRuntime;
 
     use tokio::sync::{
         mpsc,
@@ -375,7 +376,7 @@ mod test {
     fn get_condition(message: &str) -> AnyCondition {
         AnyCondition::from(ConditionConfig::Vrl(VrlConfig {
             source: format!(r#".message == "{message}""#),
-            runtime: vrl::compiler::VrlRuntime::default(),
+            runtime: VrlRuntime::default(),
         }))
     }
 

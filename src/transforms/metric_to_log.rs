@@ -400,7 +400,7 @@ mod tests {
             result
         }))
         .await
-        .map(vector_lib::event::Event::into_log)
+        .map(Event::into_log)
     }
 
     fn ts() -> DateTime<Utc> {
@@ -733,7 +733,7 @@ mod tests {
             metric_tag_values,
             ..Default::default()
         }
-        .build_transform(&crate::config::TransformContext::default())
+        .build_transform(&TransformContext::default())
         .transform(&mut output, counter.into());
 
         assert_eq!(output.len(), 1);

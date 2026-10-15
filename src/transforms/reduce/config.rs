@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use serde_with::serde_as;
 use vector_lib::configurable::configurable_component;
 use vrl::{
-    path::{PathPrefix, parse_target_path},
+    path::{OwnedSegment, PathPrefix, parse_target_path},
     prelude::{Collection, KeyString, Kind},
 };
 
@@ -237,13 +237,7 @@ impl TransformConfig for ReduceConfig {
         for (path, _) in &self.merge_strategies {
             match parse_target_path(path) {
                 Err(_) => errors.push(format!("Could not parse path: `{path}`")),
-                Ok(parsed)
-                    if parsed
-                        .path
-                        .segments
-                        .iter()
-                        .any(vrl::path::OwnedSegment::is_index) =>
-                {
+                Ok(parsed) if parsed.path.segments.iter().any(OwnedSegment::is_index) => {
                     errors.push(format!(
                         "Merge strategies with indexes are currently not supported. Path: `{path}`"
                     ));

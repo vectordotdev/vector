@@ -107,7 +107,7 @@ mod tests {
             result
         }))
         .await
-        .map(vector_lib::event::Event::into_log)
+        .map(Event::into_log)
     }
 
     #[tokio::test]

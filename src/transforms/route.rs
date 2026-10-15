@@ -256,8 +256,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform =
-            Route::new(&config, &crate::config::TransformContext::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -303,8 +302,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform =
-            Route::new(&config, &crate::config::TransformContext::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -347,8 +345,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform =
-            Route::new(&config, &crate::config::TransformContext::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -392,8 +389,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform =
-            Route::new(&config, &crate::config::TransformContext::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()

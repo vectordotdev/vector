@@ -27,7 +27,7 @@ use crate::{
     internal_events::{
         DROP_EVENT, LogToMetricFieldNullError, LogToMetricParseFloatError,
         MetricMetadataInvalidFieldValueError, MetricMetadataMetricDetailsNotFoundError,
-        MetricMetadataParseError, ParserMissingFieldError,
+        MetricMetadataParseError, PairExpansionError, ParserMissingFieldError,
     },
     schema,
     template::{TemplateRenderingError, UnconfinedTemplate},
@@ -892,7 +892,7 @@ impl FunctionTransform for LogToMetric {
                         emit!(MetricMetadataMetricDetailsNotFoundError {});
                     }
                     TransformError::PairExpansionError { key, value, error } => {
-                        emit!(crate::internal_events::PairExpansionError {
+                        emit!(PairExpansionError {
                             key: &key,
                             value: &value,
                             drop_event: true,
@@ -934,7 +934,7 @@ impl FunctionTransform for LogToMetric {
                                 });
                             }
                             TransformError::PairExpansionError { key, value, error } => {
-                                emit!(crate::internal_events::PairExpansionError {
+                                emit!(PairExpansionError {
                                     key: &key,
                                     value: &value,
                                     drop_event: true,

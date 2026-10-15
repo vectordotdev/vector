@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
-    path::{OwnedTargetPath, parse_target_path},
+    path::{OwnedSegment, OwnedTargetPath, parse_target_path},
     prelude::KeyString,
 };
 
@@ -159,7 +159,7 @@ fn validate_merge_strategies(strategies: &IndexMap<KeyString, MergeStrategy>) ->
             .path
             .segments
             .iter()
-            .any(vrl::path::OwnedSegment::is_index);
+            .any(OwnedSegment::is_index);
         if contains_index {
             return Err(format!(
                 "Merge strategies with indexes are currently not supported. Path: `{path}`"
@@ -358,6 +358,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::config::TransformContext;
     use std::sync::Arc;
 
     use indoc::indoc;
@@ -403,7 +404,7 @@ mod test {
                 );
             let schema_definitions = reduce_config
                 .outputs(
-                    &crate::config::TransformContext::default(),
+                    &TransformContext::default(),
                     &[("test".into(), input_definition)],
                 )
                 .first()
@@ -412,7 +413,7 @@ mod test {
                 .clone();
 
             let new_schema_definition = reduce_config.outputs(
-                &crate::config::TransformContext::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -500,7 +501,7 @@ mod test {
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                &crate::config::TransformContext::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -567,7 +568,7 @@ mod test {
         Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let new_schema_definition = reduce_config.outputs(
-                &crate::config::TransformContext::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -773,7 +774,7 @@ mod test {
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                &crate::config::TransformContext::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -935,7 +936,7 @@ mod test {
         let error = Reduce::new(
             &config,
             &TableRegistry::default(),
-            &vector_vrl_metrics::MetricsStorage::default(),
+            &MetricsStorage::default(),
         )
         .unwrap_err();
         assert_eq!(

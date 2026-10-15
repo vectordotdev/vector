@@ -267,9 +267,8 @@ mod tests {
         "})
         .unwrap();
 
-        let delay = Transform::event_task(
-            Delay::new(&config, &crate::config::TransformContext::default()).unwrap(),
-        );
+        let delay =
+            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
 
         let delay = delay.into_task();
 
@@ -299,9 +298,8 @@ mod tests {
         "})
         .unwrap();
 
-        let delay = Transform::event_task(
-            Delay::new(&config, &crate::config::TransformContext::default()).unwrap(),
-        );
+        let delay =
+            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
 
         let delay = delay.into_task();
 
@@ -335,9 +333,8 @@ mod tests {
         "})
         .unwrap();
 
-        let delay = Transform::event_task(
-            Delay::new(&config, &crate::config::TransformContext::default()).unwrap(),
-        );
+        let delay =
+            Transform::event_task(Delay::new(&config, &TransformContext::default()).unwrap());
 
         let delay = delay.into_task();
 
