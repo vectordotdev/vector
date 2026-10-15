@@ -667,9 +667,9 @@ mod tests {
     }
 
     #[test]
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
-        reason = "Keep the schema expansion cases together."
+        reason = "Splitting these schema expansion cases is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
     fn test_expanded_definition() {
         struct TestCase {

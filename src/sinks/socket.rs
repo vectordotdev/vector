@@ -606,9 +606,9 @@ mod test {
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
     #[tokio::test]
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
-        reason = "Keep the disconnect and reconnect scenario together."
+        reason = "Shortening this reconnect test is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
     async fn tcp_stream_detects_disconnect() {
         use std::{

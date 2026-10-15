@@ -92,15 +92,11 @@ impl Future for Task {
     }
 }
 
-#[expect(
-    clippy::missing_fields_in_debug,
-    reason = "Keep debug output focused on task identity."
-)]
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
             .field("typetag", &self.typetag)
-            .finish()
+            .finish_non_exhaustive()
     }
 }

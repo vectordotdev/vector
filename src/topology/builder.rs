@@ -324,9 +324,9 @@ impl<'a> Builder<'a> {
         source_tasks
     }
 
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
-        reason = "Keep source construction and instrumentation together."
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
     async fn build_instrumented_source(
         &mut self,
@@ -651,9 +651,9 @@ impl<'a> Builder<'a> {
         }
     }
 
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
-        reason = "Keep sink construction and instrumentation together."
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
     async fn build_instrumented_sink(
         &mut self,

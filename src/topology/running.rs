@@ -440,9 +440,9 @@ impl RunningTopology {
     /// Shuts down any changed/removed component in the given configuration diff.
     ///
     /// If buffers for any of the changed/removed components can be recovered, they'll be returned.
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
-        reason = "Keep the ordered component shutdown steps together."
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
     async fn shutdown_diff(
         &mut self,
@@ -748,9 +748,9 @@ impl RunningTopology {
     }
 
     /// Connects all changed/added components in the given configuration diff.
-    #[expect(
+    #[allow(
         clippy::too_many_lines,
-        reason = "Keep topology connection changes together."
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
     pub(crate) fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut TopologyPieces) {
         debug!("Connecting changed/added component(s).");

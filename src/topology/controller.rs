@@ -49,16 +49,12 @@ pub struct TopologyController {
     pub extra_context: ExtraContext,
 }
 
-#[expect(
-    clippy::missing_fields_in_debug,
-    reason = "Keep debug output focused on configuration paths and health requirements."
-)]
 impl std::fmt::Debug for TopologyController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TopologyController")
             .field("config_paths", &self.config_paths)
             .field("require_healthy", &self.require_healthy)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
