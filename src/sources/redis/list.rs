@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures::FutureExt;
 use redis::{AsyncCommands, ErrorKind, RedisError, RedisResult, aio::ConnectionManager};
 use snafu::{ResultExt, Snafu};
 
@@ -94,14 +95,23 @@ const SHUTDOWN_READ_GRACE: Duration = Duration::from_secs(5);
 /// still given `SHUTDOWN_READ_GRACE` to finish: Redis removes entries as soon as it replies, so
 /// abandoning a read whose reply is on its way would lose them.
 ///
-/// Returns the read's result, or `None` if it did not finish in time, and whether shutdown was
-/// signalled. Once shutdown was signalled, `shutdown` must not be awaited again.
+/// Returns the read's result, or `None` if it did not finish in time or was not started because
+/// shutdown had already been signalled, and whether shutdown was signalled. Once shutdown was
+/// signalled, `shutdown` must not be awaited again.
 async fn read_or_shutdown<T>(
     read: impl Future<Output = RedisResult<T>>,
     shutdown: &mut ShutdownSignal,
 ) -> (Option<RedisResult<T>>, bool) {
+    // Do not send a new read once shutdown has been signalled.
+    if (&mut *shutdown).now_or_never().is_some() {
+        return (None, true);
+    }
+
     tokio::pin!(read);
     tokio::select! {
+        // Poll the read first so it is sent before shutdown is checked: the grace period then only
+        // ever applies to a read that is already in flight.
+        biased;
         res = &mut read => (Some(res), false),
         _ = shutdown => (tokio::time::timeout(SHUTDOWN_READ_GRACE, read).await.ok(), true),
     }
@@ -160,5 +170,49 @@ mod integration_test {
             Method::Lpop => blpop(conn, key).await,
             Method::Rpop => brpop(conn, key).await,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn read_is_not_started_after_shutdown() {
+        let (trigger, mut shutdown, _done) = ShutdownSignal::new_wired();
+        trigger.cancel();
+
+        let started = AtomicBool::new(false);
+        let read = async {
+            started.store(true, Ordering::SeqCst);
+            RedisResult::Ok(())
+        };
+
+        let (res, stopping) = read_or_shutdown(read, &mut shutdown).await;
+        assert!(res.is_none());
+        assert!(stopping);
+        assert!(!started.load(Ordering::SeqCst), "a new read was sent");
+    }
+
+    #[tokio::test]
+    async fn in_flight_read_finishes_after_shutdown() {
+        let (trigger, mut shutdown, _done) = ShutdownSignal::new_wired();
+        let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+        let read = async move { RedisResult::Ok(reply_rx.await.unwrap()) };
+
+        // The read is waiting for its reply when shutdown is signalled; the reply then arrives.
+        let signal_then_reply = async move {
+            tokio::task::yield_now().await;
+            trigger.cancel();
+            tokio::task::yield_now().await;
+            reply_tx.send(42).unwrap();
+        };
+        let ((res, stopping), ()) =
+            tokio::join!(read_or_shutdown(read, &mut shutdown), signal_then_reply);
+
+        assert_eq!(res.unwrap().unwrap(), 42);
+        assert!(stopping);
     }
 }
