@@ -50,4 +50,3 @@ vector-api-client = { path = "../vector-api-client", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
-vector-common = { path = "../vector-common", features = ["test"] }

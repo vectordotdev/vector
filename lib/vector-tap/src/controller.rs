@@ -12,10 +12,7 @@ use tokio::sync::{
 use tracing::{Instrument, Span};
 use uuid::Uuid;
 use vector_buffers::{WhenFull, topology::builder::TopologyBuilder};
-use vector_common::{
-    config::ComponentKey,
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
-};
+use vector_common::config::ComponentKey;
 use vector_core::{
     config::OutputId,
     event::{EventArray, EventContainer, LogArray, MetricArray, TraceArray},
@@ -183,10 +180,14 @@ impl TapTransformer {
 
         match self.tap_tx.try_send(payload) {
             Ok(()) => {}
-            Err(TrySendError::Full(_)) => emit(ComponentEventsDropped::<UNINTENTIONAL> {
+            // The tap is best-effort and must never apply backpressure to the topology, so a
+            // client that can't keep up loses events; say so instead of dropping them silently.
+            Err(TrySendError::Full(_)) => warn!(
+                message = "Tap channel is full, dropping events.",
                 count,
-                reason: "Tap channel is full.",
-            }),
+                component_id = ?self.output.output_id,
+                internal_log_rate_limit = true,
+            ),
             Err(TrySendError::Closed(payload)) => debug!(
                 message = "Couldn't send event.",
                 payload = ?payload,
@@ -508,7 +509,6 @@ mod tests {
         sync::{mpsc, watch},
         time::timeout,
     };
-    use vector_common::event_test_util;
     use vector_core::event::LogEvent;
 
     use super::*;
@@ -658,17 +658,17 @@ mod tests {
     }
 
     #[test]
-    fn emits_dropped_events_when_tap_channel_is_full() {
-        let (tap_tx, _tap_rx) = mpsc::channel(1);
+    fn drops_events_when_tap_channel_is_full() {
+        let (tap_tx, mut tap_rx) = mpsc::channel(1);
         let mut transformer = TapTransformer::new(tap_tx, tap_output("in"));
         let events = || EventArray::from(LogEvent::default());
 
-        event_test_util::clear_recorded_events();
         transformer.try_send(events());
-        assert!(event_test_util::contains_name_once("ComponentEventsDropped").is_err());
+        // The channel is full: this one is dropped (and logged) rather than waited on.
+        transformer.try_send(events());
 
-        transformer.try_send(events());
-        event_test_util::contains_name_once("ComponentEventsDropped").unwrap();
+        assert!(matches!(tap_rx.try_recv(), Ok(TapPayload::Log(..))));
+        assert!(tap_rx.try_recv().is_err());
     }
 
     #[test]
