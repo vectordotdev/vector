@@ -119,6 +119,7 @@ fn flush_final(agg: &mut Aggregate) -> Vec<Event> {
     out
 }
 
+#[expect(clippy::float_cmp, reason = "Fixture values are exact.")]
 fn assert_counter(event: &Event, expected: f64) {
     match event.as_metric().value() {
         MetricValue::Counter { value } => assert_eq!(*value, expected),
@@ -126,6 +127,7 @@ fn assert_counter(event: &Event, expected: f64) {
     }
 }
 
+#[expect(clippy::float_cmp, reason = "Fixture values are exact.")]
 fn assert_gauge(event: &Event, expected: f64) {
     match event.as_metric().value() {
         MetricValue::Gauge { value } => assert_eq!(*value, expected),
@@ -217,6 +219,10 @@ fn event_time_config_with(
 }
 
 #[test]
+#[expect(
+    clippy::similar_names,
+    reason = "Fixture names and exact values distinguish test cases."
+)]
 fn incremental_auto() {
     let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
@@ -330,6 +336,10 @@ fn passes_through_ignored_kind() {
 }
 
 #[test]
+#[expect(
+    clippy::similar_names,
+    reason = "Fixture names and exact values distinguish test cases."
+)]
 fn absolute_auto() {
     let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
@@ -895,7 +905,7 @@ async fn transform_shutdown() {
             "counter_a" => assert_eq!(counter_a_summed, event),
             "gauge_a" => assert_eq!(gauge_a_2, event),
             _ => panic!("Unexpected metric name in aggregate output"),
-        };
+        }
     }
     // There were only 2
     assert_eq!(2, count);
@@ -931,7 +941,7 @@ async fn transform_interval() {
         MetricValue::Gauge { value: 43.0 },
     );
 
-    assert_transform_compliance(async {
+    Box::pin(assert_transform_compliance(async {
         let (tx, rx) = mpsc::channel(10);
         let (topology, out) = create_topology(ReceiverStream::new(rx), transform_config).await;
         let mut out = ReceiverStream::new(out);
@@ -961,7 +971,7 @@ async fn transform_interval() {
                         "counter_a" => assert_eq!(counter_a_summed, event),
                         "gauge_a" => assert_eq!(gauge_a_2, event),
                         _ => panic!("Unexpected metric name in aggregate output"),
-                    };
+                    }
                     count += 1;
                 }
                 _ => {
@@ -975,7 +985,7 @@ async fn transform_interval() {
         drop(tx);
         topology.stop().await;
         assert_eq!(out.next().await, None);
-    })
+    }))
     .await;
 }
 
@@ -1101,7 +1111,7 @@ fn event_time_diff_uses_previous_bucket() {
 #[test]
 fn event_time_late_events_are_rejected_by_cutoff_and_watermark() {
     let interval_ms = 10_000_u64;
-    let interval_i64 = interval_ms as i64;
+    let interval_i64 = interval_ms.cast_signed();
 
     // Wall-clock cutoff rejects ended windows before the periodic flush tick.
     let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
@@ -1219,7 +1229,7 @@ fn event_time_previous_bucket_retention_is_mode_specific_and_bounded() {
     }
 }
 
-/// `event_time.missing_timestamp` parses the snake_case literals shown in docs.
+/// `event_time.missing_timestamp` parses the `snake_case` literals shown in docs.
 #[test]
 fn event_time_block_parses_documented_literals() {
     use crate::config::GenerateConfig;
@@ -1268,11 +1278,11 @@ fn event_time_block_parses_documented_literals() {
 async fn event_time_drains_open_buckets_on_shutdown() {
     // Long interval/grace so only the final-flush path can emit.
     let agg = toml::from_str::<AggregateConfig>(
-        r#"
+        r"
 interval_ms = 600000
 [event_time]
 allowed_lateness_ms = 600000
-"#,
+",
     )
     .unwrap()
     .build(&TransformContext::default())
@@ -1340,7 +1350,7 @@ fn event_time_future_skew_gating_and_boundary() {
 }
 
 /// Far-future buckets must use saturating cutoff math so non-forced flush
-/// does not wrap, emit early, or advance the watermark to ~i64::MAX.
+/// does not wrap, emit early, or advance the watermark to ~`i64::MAX`.
 #[test]
 fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
     let mut agg = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
@@ -1378,11 +1388,11 @@ fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
     );
 }
 
-/// Missing-timestamp drop vs use_system_time, plus same-instant cutoff reuse.
+/// Missing-timestamp drop vs `use_system_time`, plus same-instant cutoff reuse.
 #[test]
 fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
     let interval_ms = 1_000_u64;
-    let interval_i64 = interval_ms as i64;
+    let interval_i64 = interval_ms.cast_signed();
 
     // Default missing_timestamp = drop.
     let mut drop_agg =
@@ -1463,9 +1473,13 @@ fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
     assert_eq!(out.len(), 1);
 }
 
-/// EventMetadata::merge keeps finalizers/secrets but not attribution (`source_type`).
+/// `EventMetadata::merge` keeps finalizers/secrets but not attribution (`source_type`).
 /// Every replacement path must use the winner as the metadata base, then merge losers.
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
     let interval_ms = 10_000;
     let base_time = open_bucket_timestamp(interval_ms);

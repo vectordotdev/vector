@@ -165,6 +165,10 @@ pub struct SampleConfig {
     pub internal_metrics: SampleInternalMetricsConfig,
 }
 
+#[must_use]
+/// # Panics
+///
+/// Panics if the fixed non-zero default is changed to zero.
 pub const fn default_max_state_bytes() -> NonZeroUsize {
     NonZeroUsize::new(128 * 1024 * 1024).expect("static non-zero number")
 }
@@ -216,7 +220,8 @@ impl GenerateConfig for SampleConfig {
             max_state_bytes: default_max_state_bytes(),
             exclude: None::<AnyCondition>,
             sample_rate_key: default_sample_rate_key(),
-            internal_metrics: Default::default(),
+            internal_metrics:
+                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
         })
         .unwrap()
     }
@@ -311,6 +316,7 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+#[must_use]
 pub fn default_sample_rate_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("sample_rate"))
 }
@@ -355,7 +361,8 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics:
+                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -374,7 +381,8 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics:
+                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -393,7 +401,8 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics:
+                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
         };
 
         assert!(config.validate_structure().is_ok());
@@ -411,7 +420,8 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics:
+                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -430,7 +440,8 @@ mod tests {
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics:
+                crate::transforms::sample::config::SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();

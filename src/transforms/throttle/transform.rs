@@ -35,6 +35,10 @@ where
     C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference,
 {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the exclusion condition cannot be built.
     pub fn new(
         config: &ThrottleConfig,
         context: &TransformContext,
@@ -42,9 +46,8 @@ where
     ) -> crate::Result<Self> {
         let flush_keys_interval = config.window_secs;
 
-        let threshold = match NonZeroU32::new(config.threshold) {
-            Some(threshold) => threshold,
-            None => return Err(Box::new(ConfigError::NonZero)),
+        let Some(threshold) = NonZeroU32::new(config.threshold) else {
+            return Err(Box::new(ConfigError::NonZero));
         };
 
         let quota = match Quota::with_period(Duration::from_secs_f64(
@@ -118,7 +121,7 @@ where
                                     error,
                                     field: Some("key_field"),
                                     drop_event: false,
-                                })
+                                });
                             })
                             .ok()
                     });
@@ -172,9 +175,13 @@ mod tests {
         "})
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::event_task)
-            .unwrap();
+        let throttle = Throttle::new(
+            &config,
+            &crate::config::TransformContext::default(),
+            clock.clone(),
+        )
+        .map(Transform::event_task)
+        .unwrap();
 
         let throttle = throttle.into_task();
 
@@ -239,9 +246,13 @@ mod tests {
         "})
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::event_task)
-            .unwrap();
+        let throttle = Throttle::new(
+            &config,
+            &crate::config::TransformContext::default(),
+            clock.clone(),
+        )
+        .map(Transform::event_task)
+        .unwrap();
 
         let throttle = throttle.into_task();
 
@@ -317,9 +328,13 @@ mod tests {
         "#})
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::event_task)
-            .unwrap();
+        let throttle = Throttle::new(
+            &config,
+            &crate::config::TransformContext::default(),
+            clock.clone(),
+        )
+        .map(Transform::event_task)
+        .unwrap();
 
         let throttle = throttle.into_task();
 
@@ -361,13 +376,13 @@ mod tests {
 
     #[tokio::test]
     async fn emits_internal_events() {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = ThrottleConfig {
                 threshold: 1,
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
-                internal_metrics: Default::default(),
+                internal_metrics: ThrottleInternalMetricsConfig::default(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -380,7 +395,7 @@ mod tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await
+        }))
+        .await;
     }
 }
