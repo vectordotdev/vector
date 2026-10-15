@@ -49,6 +49,7 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
             continue;
         }
 
+        let mut socket_error = false;
         let delivered = if let Some(chunker) = chunker {
             let data_size = bytes.len();
             match chunker.chunk(bytes.freeze()) {
@@ -57,6 +58,7 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
                     for bytes in chunks {
                         if !send_and_emit(&mut socket, &bytes, bytes_sent).await {
                             chunks_delivered = false;
+                            socket_error = true;
                             break;
                         }
                     }
@@ -70,14 +72,20 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
                     false
                 }
             }
+        } else if send_and_emit(&mut socket, &bytes.freeze(), bytes_sent).await {
+            true
         } else {
-            send_and_emit(&mut socket, &bytes.freeze(), bytes_sent).await
+            socket_error = true;
+            false
         };
 
         if delivered {
             finalizers.update_status(EventStatus::Delivered);
         } else {
             finalizers.update_status(EventStatus::Errored);
+            if socket_error {
+                return;
+            }
         }
     }
 }
