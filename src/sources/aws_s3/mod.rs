@@ -493,16 +493,20 @@ mod integration_tests {
         any::Any,
         collections::HashMap,
         fs::File,
-        io::{self, BufRead},
+        io::{self, BufRead, Read},
         path::Path,
         time::Duration,
     };
 
     use aws_sdk_s3::Client as S3Client;
     use aws_sdk_sqs::{Client as SqsClient, types::QueueAttributeName};
+    use chrono::Utc;
+    use futures::StreamExt;
     use similar_asserts::assert_eq;
+    use tokio::time::timeout;
     use vector_lib::{
         codecs::{JsonDeserializerConfig, decoding::DeserializerConfig},
+        config::LogNamespace,
         lookup::path,
     };
     use vrl::value::Value;
@@ -515,14 +519,18 @@ mod integration_tests {
         config::{ProxyConfig, SourceConfig, SourceContext},
         event::EventStatus::{self, *},
         line_agg,
+        shutdown::ShutdownSignal,
         sources::{
-            aws_s3::{S3ClientBuilder, sqs::S3Event},
+            aws_s3::{
+                S3ClientBuilder,
+                sqs::{DeferredConfig, IngestorProcess, S3Event},
+            },
             util::MultilineConfig,
         },
         test_util::{
             collect_n,
             components::{SOURCE_TAGS, assert_source_compliance},
-            lines_from_gzip_file, random_lines, trace_init,
+            lines_from_gzip_file, random_lines, trace_init, wait_for,
         },
     };
 
@@ -1110,5 +1118,485 @@ mod integration_tests {
         )
         .await
         .unwrap()
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum FdrTestCase {
+        Delivered,
+        RecentDeferral,
+        InvalidTimestampWithoutDeferral,
+        MissingObject,
+        InvalidGzip,
+        Errored,
+        Rejected,
+    }
+
+    #[tokio::test]
+    async fn fdr_processes_all_files_before_deleting_notification() {
+        test_fdr_notification(FdrTestCase::Delivered, false).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_processes_files_with_log_namespace() {
+        test_fdr_notification(FdrTestCase::Delivered, true).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_keeps_notification_when_object_is_missing() {
+        test_fdr_notification(FdrTestCase::MissingObject, false).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_keeps_notification_when_gzip_read_fails() {
+        test_fdr_notification(FdrTestCase::InvalidGzip, false).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_keeps_notification_when_delivery_errors() {
+        test_fdr_notification(FdrTestCase::Errored, false).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_keeps_notification_when_delivery_is_rejected() {
+        test_fdr_notification(FdrTestCase::Rejected, false).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_processes_recent_batch_with_deferral_enabled() {
+        test_fdr_notification(FdrTestCase::RecentDeferral, false).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_ignores_invalid_timestamp_without_deferral() {
+        test_fdr_notification(FdrTestCase::InvalidTimestampWithoutDeferral, false).await;
+    }
+
+    async fn test_fdr_notification(case: FdrTestCase, vector_namespace: bool) {
+        assert_source_compliance(&SOURCE_TAGS, async move {
+        let should_deliver = matches!(
+            case,
+            FdrTestCase::Delivered
+                | FdrTestCase::RecentDeferral
+                | FdrTestCase::InvalidTimestampWithoutDeferral
+        );
+        let s3 = s3_client().await;
+        let sqs = sqs_client().await;
+        let bucket = create_bucket(&s3).await;
+        let queue = create_queue(&sqs).await;
+        let deferred_queue = if case == FdrTestCase::RecentDeferral {
+            Some(create_queue(&sqs).await)
+        } else {
+            None
+        };
+        let prefix = format!("data/{}", uuid::Uuid::new_v4());
+        let keys = [
+            format!("{prefix}/part+00000%2F.gz"),
+            format!("{prefix}/part+00001%2F.gz"),
+        ];
+        let records: Vec<String> = (0..4)
+            .map(|index| {
+                format!(r#"{{"event_simpleName":"ProcessRollup2","test_id":"record-{index}"}}"#)
+            })
+            .collect();
+
+        for (index, key) in keys.iter().enumerate() {
+            if case == FdrTestCase::MissingObject && index == 1 {
+                continue;
+            }
+            let mut payload = Vec::new();
+            if case == FdrTestCase::InvalidGzip && index == 1 {
+                payload.extend_from_slice(b"not a gzip stream");
+            } else {
+                // Each record is a separate gzip member, exercising concatenated gzip streams.
+                for record in &records[index * 2..index * 2 + 2] {
+                    let mut encoder = flate2::read::GzEncoder::new(
+                        io::Cursor::new(format!("{record}\n")),
+                        flate2::Compression::fast(),
+                    );
+                    encoder.read_to_end(&mut payload).unwrap();
+                }
+            }
+            s3.put_object()
+                .bucket(&bucket)
+                .key(key)
+                .content_encoding("gzip")
+                .body(payload.into())
+                .send()
+                .await
+                .unwrap();
+        }
+
+        let mut notification = serde_json::json!({
+            "bucket": bucket,
+            "pathPrefix": prefix,
+            "files": keys.iter().map(|key| serde_json::json!({"path": key})).collect::<Vec<_>>(),
+        });
+        match case {
+            FdrTestCase::RecentDeferral => {
+                notification["timestamp"] = serde_json::json!(Utc::now().timestamp_millis());
+            }
+            FdrTestCase::InvalidTimestampWithoutDeferral => {
+                notification["timestamp"] = serde_json::json!("invalid");
+            }
+            _ => {}
+        }
+        sqs.send_message()
+            .queue_url(&queue)
+            .message_body(notification.to_string())
+            .send()
+            .await
+            .unwrap();
+
+        let namespace = if vector_namespace {
+            LogNamespace::Vector
+        } else {
+            LogNamespace::Legacy
+        };
+        let mut source_config = config(&queue, None, vector_namespace, DeserializerConfig::Bytes);
+        let sqs_config = source_config.sqs.as_mut().unwrap();
+        sqs_config.visibility_timeout_secs = 2;
+        sqs_config.delete_failed_message = false;
+        sqs_config.deferred = deferred_queue.as_ref().map(|queue_url| DeferredConfig {
+            queue_url: queue_url.clone(),
+            max_age_secs: 3600,
+        });
+        let ingestor = source_config
+            .create_sqs_ingestor(None, &ProxyConfig::default(), namespace)
+            .await
+            .unwrap();
+        let (tx, mut rx) = SourceSender::new_test();
+        let mut process =
+            IngestorProcess::new(ingestor.state, tx, ShutdownSignal::noop(), namespace, true);
+        // One poll makes completion and deletion assertions independent of background retries.
+        let run = tokio::spawn(async move { process.run_once().await });
+        let expected_events = if should_deliver { 4 } else { 2 };
+        let status = match case {
+            FdrTestCase::Errored => EventStatus::Errored,
+            FdrTestCase::Rejected => EventStatus::Rejected,
+            _ => EventStatus::Delivered,
+        };
+
+        for (index, record) in records.iter().take(expected_events).enumerate() {
+            let mut event = timeout(Duration::from_secs(10), rx.next())
+                .await
+                .expect("Timed out waiting for an FDR log")
+                .expect("FDR source output closed");
+            let log = event.as_log();
+            if vector_namespace {
+                assert_eq!(log.value(), &Value::from(record.as_str()));
+            } else {
+                assert_eq!(log["message"], record.as_str().into());
+            }
+            assert_eq!(
+                namespace.get_source_metadata(
+                    AwsS3Config::NAME,
+                    log,
+                    path!("bucket"),
+                    path!("bucket")
+                ),
+                Some(&Value::from(bucket.as_str()))
+            );
+            assert_eq!(
+                namespace.get_source_metadata(
+                    AwsS3Config::NAME,
+                    log,
+                    path!("object"),
+                    path!("object")
+                ),
+                Some(&Value::from(keys[index / 2].as_str()))
+            );
+            assert_eq!(
+                namespace.get_source_metadata(
+                    AwsS3Config::NAME,
+                    log,
+                    path!("region"),
+                    path!("region")
+                ),
+                Some(&Value::from("us-east-1"))
+            );
+            if let Some(schema) = source_config
+                .outputs(namespace)
+                .pop()
+                .unwrap()
+                .schema_definition
+            {
+                schema.is_valid_for_event(&event).unwrap();
+            }
+
+            if should_deliver && index == expected_events - 1 {
+                assert!(!run.is_finished());
+                assert_eq!(queue_message_count(&sqs, &queue).await, 1);
+            }
+            event.metadata_mut().update_status(status);
+            event.metadata_mut().update_sources();
+        }
+
+        timeout(Duration::from_secs(10), run)
+            .await
+            .expect("Timed out waiting for FDR notification processing")
+            .unwrap()
+            .unwrap();
+
+        if should_deliver {
+            wait_for(|| {
+                let sqs = sqs.clone();
+                let queue = queue.clone();
+                async move { queue_message_count(&sqs, &queue).await == 0 }
+            })
+            .await;
+        } else {
+            assert_eq!(queue_message_count(&sqs, &queue).await, 1);
+            let messages = sqs
+                .receive_message()
+                .queue_url(&queue)
+                .visibility_timeout(0)
+                .wait_time_seconds(5)
+                .send()
+                .await
+                .unwrap()
+                .messages
+                .unwrap_or_default();
+            assert_eq!(messages.len(), 1);
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(messages[0].body.as_ref().unwrap())
+                    .unwrap(),
+                notification
+            );
+        }
+
+        for key in &keys {
+            s3.delete_object()
+                .bucket(&bucket)
+                .key(key)
+                .send()
+                .await
+                .unwrap();
+        }
+        s3.delete_bucket().bucket(&bucket).send().await.unwrap();
+        sqs.delete_queue().queue_url(&queue).send().await.unwrap();
+        if let Some(deferred_queue) = deferred_queue {
+            assert_eq!(queue_message_count(&sqs, &deferred_queue).await, 0);
+            sqs.delete_queue()
+                .queue_url(deferred_queue)
+                .send()
+                .await
+                .unwrap();
+        }
+    })
+    .await;
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum DeferralCase {
+        Old,
+        MissingTimestamp,
+        InvalidTimestamp,
+        ForwardFailure,
+        S3Old,
+        S3ForwardFailure,
+        MixedForwardFailure,
+        MixedForwardFailureWithoutDeletion,
+    }
+
+    #[tokio::test]
+    async fn fdr_defers_entire_old_batch_before_reading_files() {
+        test_deferral(DeferralCase::Old).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_keeps_notification_when_deferral_timestamp_is_missing() {
+        test_deferral(DeferralCase::MissingTimestamp).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_keeps_notification_when_deferral_timestamp_is_invalid() {
+        test_deferral(DeferralCase::InvalidTimestamp).await;
+    }
+
+    #[tokio::test]
+    async fn fdr_preserves_legacy_deletion_when_forwarding_fails() {
+        test_deferral(DeferralCase::ForwardFailure).await;
+    }
+
+    #[tokio::test]
+    async fn s3_defers_old_notification_before_reading_files() {
+        test_deferral(DeferralCase::S3Old).await;
+    }
+
+    #[tokio::test]
+    async fn s3_preserves_legacy_deletion_when_forwarding_fails() {
+        test_deferral(DeferralCase::S3ForwardFailure).await;
+    }
+
+    #[tokio::test]
+    async fn mixed_deferrals_share_legacy_deletion_when_forwarding_fails() {
+        test_deferral(DeferralCase::MixedForwardFailure).await;
+    }
+
+    #[tokio::test]
+    async fn mixed_deferrals_keep_notifications_when_deletion_is_disabled() {
+        test_deferral(DeferralCase::MixedForwardFailureWithoutDeletion).await;
+    }
+
+    async fn test_deferral(case: DeferralCase) {
+        let sqs = sqs_client().await;
+        let queue = create_queue(&sqs).await;
+        let deferred_queue = create_queue(&sqs).await;
+        let forward_failure = matches!(
+            case,
+            DeferralCase::ForwardFailure
+                | DeferralCase::S3ForwardFailure
+                | DeferralCase::MixedForwardFailure
+                | DeferralCase::MixedForwardFailureWithoutDeletion
+        );
+        if forward_failure {
+            sqs.delete_queue()
+                .queue_url(&deferred_queue)
+                .send()
+                .await
+                .unwrap();
+        }
+
+        // Neither file exists. Successful forwarding proves the batch was checked before S3 reads.
+        let mut notification = serde_json::json!({
+            "bucket": "fdr-deferral-test-bucket",
+            "files": [{"path": "data/first.gz"}, {"path": "data/second.gz"}],
+        });
+        let old_time = Utc::now() - chrono::Duration::hours(1);
+        match case {
+            DeferralCase::MissingTimestamp => {}
+            DeferralCase::InvalidTimestamp => {
+                notification["timestamp"] = serde_json::json!("invalid");
+            }
+            _ => {
+                notification["timestamp"] = serde_json::json!(old_time.timestamp_millis());
+            }
+        }
+        let s3_notification = serde_json::json!({
+            "Records": [{
+                "eventVersion": "2.1",
+                "eventSource": "aws:s3",
+                "awsRegion": "us-east-1",
+                "eventName": "ObjectCreated:Put",
+                "eventTime": old_time.to_rfc3339(),
+                "s3": {
+                    "bucket": {"name": "s3-deferral-test-bucket"},
+                    "object": {"key": "data/first.gz"},
+                },
+            }],
+        });
+        let notifications = match case {
+            DeferralCase::S3Old | DeferralCase::S3ForwardFailure => vec![s3_notification],
+            DeferralCase::MixedForwardFailure
+            | DeferralCase::MixedForwardFailureWithoutDeletion => {
+                vec![s3_notification, notification]
+            }
+            _ => vec![notification],
+        };
+        for notification in &notifications {
+            sqs.send_message()
+                .queue_url(&queue)
+                .message_body(notification.to_string())
+                .send()
+                .await
+                .unwrap();
+        }
+
+        let mut source_config = config(&queue, None, false, DeserializerConfig::Bytes);
+        source_config.sqs.as_mut().unwrap().deferred = Some(DeferredConfig {
+            queue_url: deferred_queue.clone(),
+            max_age_secs: 60,
+        });
+        if case == DeferralCase::MixedForwardFailureWithoutDeletion {
+            source_config.sqs.as_mut().unwrap().delete_message = false;
+        }
+        let ingestor = source_config
+            .create_sqs_ingestor(None, &ProxyConfig::default(), LogNamespace::Legacy)
+            .await
+            .unwrap();
+        let (tx, mut rx) = SourceSender::new_test();
+        let mut process = IngestorProcess::new(
+            ingestor.state,
+            tx,
+            ShutdownSignal::noop(),
+            LogNamespace::Legacy,
+            true,
+        );
+        timeout(Duration::from_secs(10), process.run_once())
+            .await
+            .unwrap()
+            .unwrap();
+        drop(process);
+        assert!(rx.next().await.is_none());
+
+        let read_queue = match case {
+            DeferralCase::Old | DeferralCase::S3Old => {
+                assert_eq!(queue_message_count(&sqs, &queue).await, 0);
+                Some(&deferred_queue)
+            }
+            DeferralCase::ForwardFailure
+            | DeferralCase::S3ForwardFailure
+            | DeferralCase::MixedForwardFailure => {
+                // Both formats preserve existing S3 behavior, even on a failed forward.
+                assert_eq!(queue_message_count(&sqs, &queue).await, 0);
+                None
+            }
+            DeferralCase::MixedForwardFailureWithoutDeletion => {
+                assert_eq!(queue_message_count(&sqs, &queue).await, notifications.len());
+                Some(&queue)
+            }
+            _ => {
+                assert_eq!(queue_message_count(&sqs, &queue).await, 1);
+                if !forward_failure {
+                    assert_eq!(queue_message_count(&sqs, &deferred_queue).await, 0);
+                }
+                Some(&queue)
+            }
+        };
+        if let Some(read_queue) = read_queue {
+            let messages = sqs
+                .receive_message()
+                .queue_url(read_queue)
+                .max_number_of_messages(10)
+                .visibility_timeout(0)
+                .wait_time_seconds(5)
+                .send()
+                .await
+                .unwrap()
+                .messages
+                .unwrap_or_default();
+            let received: Vec<serde_json::Value> = messages
+                .iter()
+                .map(|message| serde_json::from_str(message.body.as_ref().unwrap()).unwrap())
+                .collect();
+            assert_eq!(received.len(), notifications.len());
+            for notification in &notifications {
+                assert!(received.contains(notification));
+            }
+        }
+
+        sqs.delete_queue().queue_url(queue).send().await.unwrap();
+        if !forward_failure {
+            sqs.delete_queue()
+                .queue_url(deferred_queue)
+                .send()
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn queue_message_count(sqs: &SqsClient, queue: &str) -> usize {
+        sqs.get_queue_attributes()
+            .queue_url(queue)
+            .attribute_names(QueueAttributeName::ApproximateNumberOfMessages)
+            .attribute_names(QueueAttributeName::ApproximateNumberOfMessagesNotVisible)
+            .send()
+            .await
+            .unwrap()
+            .attributes
+            .unwrap()
+            .values()
+            .map(|count| count.parse::<usize>().unwrap())
+            .sum()
     }
 }

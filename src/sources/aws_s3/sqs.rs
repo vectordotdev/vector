@@ -76,12 +76,19 @@ pub(super) struct DeferredConfig {
     #[configurable(validation(format = "uri"))]
     pub(super) queue_url: String,
 
-    /// Event must have been emitted within the last `max_age_secs` seconds to be processed.
+    /// Maximum allowed notification age before deferral.
     ///
-    /// If the event is older, it is forwarded to the `queue_url` for later processing.
+    /// Age uses standard S3 `eventTime` or the FDR batch's epoch-millisecond `timestamp`.
+    /// Older notifications are forwarded to `queue_url` for later processing.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600))]
     pub(super) max_age_secs: u64,
+}
+
+impl DeferredConfig {
+    fn is_too_old(&self, event_time: DateTime<Utc>) -> bool {
+        (Utc::now() - event_time).num_seconds() > self.max_age_secs as i64
+    }
 }
 
 /// SQS configuration options.
@@ -220,6 +227,10 @@ pub enum ProcessingError {
         source: serde_json::Error,
         message_id: String,
     },
+    #[snafu(display(
+        "FDR age-based deferral requires a valid batch timestamp in Unix epoch milliseconds"
+    ))]
+    InvalidFdrTimestamp,
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
         source: SdkError<GetObjectError, HttpResponse>,
@@ -297,7 +308,7 @@ pub struct State {
 }
 
 pub(super) struct Ingestor {
-    state: Arc<State>,
+    pub(super) state: Arc<State>,
 }
 
 impl Ingestor {
@@ -435,7 +446,7 @@ impl IngestorProcess {
         }
     }
 
-    async fn run_once(&mut self) -> Result<(), ()> {
+    pub(super) async fn run_once(&mut self) -> Result<(), ()> {
         let messages = match self.receive_messages().await {
             Ok(messages) => {
                 emit!(SqsMessageReceiveSucceeded {
@@ -600,16 +611,12 @@ impl IngestorProcess {
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let sqs_body = message.body.unwrap_or_default();
-        let sqs_body = serde_json::from_str::<SnsNotification>(sqs_body.as_ref())
-            .map(|notification| notification.message)
-            .unwrap_or(sqs_body);
-        let s3_event: SqsEvent =
-            serde_json::from_str(sqs_body.as_ref()).context(InvalidSqsMessageSnafu {
-                message_id: message
-                    .message_id
-                    .clone()
-                    .unwrap_or_else(|| "<empty>".to_owned()),
-            })?;
+        let s3_event = SqsEvent::parse(&sqs_body).context(InvalidSqsMessageSnafu {
+            message_id: message
+                .message_id
+                .clone()
+                .unwrap_or_else(|| "<empty>".to_owned()),
+        })?;
 
         match s3_event {
             SqsEvent::TestEvent(_s3_test_event) => {
@@ -617,6 +624,7 @@ impl IngestorProcess {
                 Ok(())
             }
             SqsEvent::Event(s3_event) => self.handle_s3_event(s3_event).await,
+            SqsEvent::Fdr(notification) => self.handle_fdr_notification(notification).await,
         }
     }
 
@@ -624,6 +632,38 @@ impl IngestorProcess {
         for record in s3_event.records {
             self.handle_s3_event_record(record, self.log_namespace)
                 .await?
+        }
+        Ok(())
+    }
+
+    async fn handle_fdr_notification(
+        &mut self,
+        notification: FdrNotification,
+    ) -> Result<(), ProcessingError> {
+        if let Some(deferred) = &self.state.deferred {
+            // All files share the batch timestamp; check once before processing any of them.
+            let too_old = notification
+                .is_too_old(deferred)
+                .ok_or(ProcessingError::InvalidFdrTimestamp)?;
+            if too_old && let Some(file) = notification.files.first() {
+                return Err(ProcessingError::FileTooOld {
+                    bucket: notification.bucket.clone(),
+                    key: file.path.clone(),
+                    deferred_queue: deferred.queue_url.clone(),
+                });
+            }
+        }
+
+        for file in notification.files {
+            self.handle_s3_object(
+                S3ObjectReference {
+                    bucket: notification.bucket.clone(),
+                    key: file.path,
+                    region: self.state.region.as_ref().to_owned(),
+                },
+                self.log_namespace,
+            )
+            .await?;
         }
         Ok(())
     }
@@ -660,39 +700,54 @@ impl IngestorProcess {
             });
         }
 
-        if let Some(deferred) = &self.state.deferred {
-            let delta = Utc::now() - s3_event.event_time;
-            if delta.num_seconds() > deferred.max_age_secs as i64 {
-                return Err(ProcessingError::FileTooOld {
-                    bucket: s3_event.s3.bucket.name.clone(),
-                    key: s3_event.s3.object.key.clone(),
-                    deferred_queue: deferred.queue_url.clone(),
-                });
-            }
+        if let Some(deferred) = &self.state.deferred
+            && deferred.is_too_old(s3_event.event_time)
+        {
+            return Err(ProcessingError::FileTooOld {
+                bucket: s3_event.s3.bucket.name.clone(),
+                key: s3_event.s3.object.key.clone(),
+                deferred_queue: deferred.queue_url.clone(),
+            });
         }
 
+        self.handle_s3_object(
+            S3ObjectReference {
+                bucket: s3_event.s3.bucket.name,
+                key: s3_event.s3.object.key,
+                region: s3_event.aws_region,
+            },
+            log_namespace,
+        )
+        .await
+    }
+
+    async fn handle_s3_object(
+        &mut self,
+        object_reference: S3ObjectReference,
+        log_namespace: LogNamespace,
+    ) -> Result<(), ProcessingError> {
         let download_start = Instant::now();
 
         let object_result = self
             .state
             .s3_client
             .get_object()
-            .bucket(s3_event.s3.bucket.name.clone())
-            .key(s3_event.s3.object.key.clone())
+            .bucket(object_reference.bucket.clone())
+            .key(object_reference.key.clone())
             .set_request_payer(self.state.s3_options.request_payer.map(Into::into))
             .send()
             .await
             .context(GetObjectSnafu {
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
+                bucket: object_reference.bucket.clone(),
+                key: object_reference.key.clone(),
             });
 
         let object = object_result?;
 
         debug!(
             message = "Got S3 object from SQS notification.",
-            bucket = s3_event.s3.bucket.name,
-            key = s3_event.s3.object.key,
+            bucket = object_reference.bucket,
+            key = object_reference.key,
         );
 
         let metadata = object.metadata;
@@ -706,7 +761,7 @@ impl IngestorProcess {
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
             self.state.s3_options.compression,
-            &s3_event.s3.object.key,
+            &object_reference.key,
             object.content_encoding.as_deref(),
             object.content_type.as_deref(),
             object.body,
@@ -772,7 +827,7 @@ impl IngestorProcess {
                         handle_single_log(
                             log_event,
                             log_namespace,
-                            &s3_event,
+                            &object_reference,
                             &metadata,
                             timestamp,
                         );
@@ -798,7 +853,7 @@ impl IngestorProcess {
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
 
-        let bucket = &s3_event.s3.bucket.name;
+        let bucket = &object_reference.bucket;
         let duration = download_start.elapsed();
 
         if read_error.is_some() {
@@ -814,14 +869,14 @@ impl IngestorProcess {
         if let Some(error) = read_error {
             Err(ProcessingError::ReadObject {
                 source: error,
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
+                bucket: object_reference.bucket.clone(),
+                key: object_reference.key.clone(),
             })
         } else if let Some(error) = send_error {
             Err(ProcessingError::PipelineSend {
                 source: error,
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
+                bucket: object_reference.bucket.clone(),
+                key: object_reference.key.clone(),
             })
         } else {
             match receiver {
@@ -832,30 +887,30 @@ impl IngestorProcess {
                         BatchStatus::Delivered => {
                             debug!(
                                 message = "S3 object from SQS delivered.",
-                                bucket = s3_event.s3.bucket.name,
-                                key = s3_event.s3.object.key,
+                                bucket = object_reference.bucket,
+                                key = object_reference.key,
                             );
                             Ok(())
                         }
                         BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement {
-                            bucket: s3_event.s3.bucket.name,
-                            key: s3_event.s3.object.key,
-                            region: s3_event.aws_region,
+                            bucket: object_reference.bucket,
+                            key: object_reference.key,
+                            region: object_reference.region,
                         }),
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
                                 warn!(
                                     message =
                                         "S3 object from SQS was rejected. Deleting failed message.",
-                                    bucket = s3_event.s3.bucket.name,
-                                    key = s3_event.s3.object.key,
+                                    bucket = object_reference.bucket,
+                                    key = object_reference.key,
                                 );
                                 Ok(())
                             } else {
                                 Err(ProcessingError::ErrorAcknowledgement {
-                                    bucket: s3_event.s3.bucket.name,
-                                    key: s3_event.s3.object.key,
-                                    region: s3_event.aws_region,
+                                    bucket: object_reference.bucket,
+                                    key: object_reference.key,
+                                    region: object_reference.region,
                                 })
                             }
                         }
@@ -908,10 +963,16 @@ impl IngestorProcess {
     }
 }
 
+struct S3ObjectReference {
+    bucket: String,
+    key: String,
+    region: String,
+}
+
 fn handle_single_log(
     log: &mut LogEvent,
     log_namespace: LogNamespace,
-    s3_event: &S3EventRecord,
+    object_reference: &S3ObjectReference,
     metadata: &Option<HashMap<String, String>>,
     timestamp: Option<DateTime<Utc>>,
 ) {
@@ -920,7 +981,7 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!("bucket"))),
         path!("bucket"),
-        Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
+        Bytes::from(object_reference.bucket.as_bytes().to_vec()),
     );
 
     log_namespace.insert_source_metadata(
@@ -928,14 +989,14 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!("object"))),
         path!("object"),
-        Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
+        Bytes::from(object_reference.key.as_bytes().to_vec()),
     );
     log_namespace.insert_source_metadata(
         AwsS3Config::NAME,
         log,
         Some(LegacyKey::Overwrite(path!("region"))),
         path!("region"),
-        Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
+        Bytes::from(object_reference.region.as_bytes().to_vec()),
     );
 
     if let Some(metadata) = metadata {
@@ -993,6 +1054,50 @@ pub struct SnsNotification {
 enum SqsEvent {
     Event(S3Event),
     TestEvent(S3TestEvent),
+    Fdr(FdrNotification),
+}
+
+impl SqsEvent {
+    fn parse(body: &str) -> Result<Self, serde_json::Error> {
+        let sns_notification = serde_json::from_str::<SnsNotification>(body);
+        let body = sns_notification
+            .as_ref()
+            .map_or(body, |notification| notification.message.as_str());
+        serde_json::from_str(body)
+    }
+}
+
+/// Object references published by CrowdStrike Falcon Data Replicator.
+#[derive(Clone, Debug, Deserialize)]
+pub struct FdrNotification {
+    pub bucket: String,
+    pub files: Vec<FdrFile>,
+    /// Time the FDR batch became available in S3, supplied as Unix epoch milliseconds.
+    #[serde(default, deserialize_with = "deserialize_fdr_timestamp")]
+    pub timestamp: Option<DateTime<Utc>>,
+}
+
+impl FdrNotification {
+    fn is_too_old(&self, deferred: &DeferredConfig) -> Option<bool> {
+        self.timestamp
+            .map(|timestamp| deferred.is_too_old(timestamp))
+    }
+}
+
+fn deserialize_fdr_timestamp<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // Invalid optional metadata must not block ingestion when deferral is disabled.
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(value.as_i64().and_then(DateTime::from_timestamp_millis))
+}
+
+/// File paths are used verbatim as S3 object keys, without prefixing or URL decoding.
+/// See https://github.com/CrowdStrike/FDR/blob/main/Falcon%20Data%20Replicator%20Sample/data_replicator_sample_consumer.py.
+#[derive(Clone, Debug, Deserialize)]
+pub struct FdrFile {
+    pub path: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1174,6 +1279,174 @@ mod urlencoded_string {
             &utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).collect::<String>(),
         )
     }
+}
+
+#[test]
+fn test_fdr_notification() {
+    let notification = SqsEvent::parse(include_str!(
+        "../../../tests/data/crowdstrike-fdr-notification.json"
+    ))
+    .unwrap();
+    let SqsEvent::Fdr(notification) = notification else {
+        panic!("Expected an FDR notification");
+    };
+
+    assert_eq!(notification.bucket, "cs-prod-cannon-xxxxxxxxxxxxxxxx");
+    assert_eq!(
+        notification.timestamp.unwrap().timestamp_millis(),
+        1492726639137
+    );
+    assert_eq!(notification.files.len(), 4);
+    for (index, file) in notification.files.iter().enumerate() {
+        assert_eq!(
+            file.path,
+            format!("data/f0714ca5-3689-448d-b5cc-582a6f7a56b1/part-{index:05}.gz")
+        );
+    }
+}
+
+#[test]
+fn test_fdr_notification_without_metadata() {
+    let notification =
+        SqsEvent::parse(r#"{"bucket":"fdr-bucket","files":[{"path":"data/part-00000.gz"}]}"#)
+            .unwrap();
+    let SqsEvent::Fdr(notification) = notification else {
+        panic!("Expected an FDR notification");
+    };
+
+    assert_eq!(notification.bucket, "fdr-bucket");
+    assert!(notification.timestamp.is_none());
+    assert_eq!(notification.files[0].path, "data/part-00000.gz");
+}
+
+#[test]
+fn test_fdr_notification_preserves_object_keys_and_ignores_unknown_fields() {
+    let notification = SqsEvent::parse(
+        r#"{
+            "bucket":"fdr-bucket",
+            "pathPrefix":"data/prefix",
+            "futureMetadata":{"version":2},
+            "files":[{"path":"data/prefix/part+00000%2F.gz","futureMetadata":true}]
+        }"#,
+    )
+    .unwrap();
+    let SqsEvent::Fdr(notification) = notification else {
+        panic!("Expected an FDR notification");
+    };
+
+    assert_eq!(notification.files[0].path, "data/prefix/part+00000%2F.gz");
+}
+
+#[test]
+fn test_fdr_notification_rejects_missing_or_invalid_object_references() {
+    for body in [
+        r#"{"files":[{"path":"data/part-00000.gz"}]}"#,
+        r#"{"bucket":"fdr-bucket"}"#,
+        r#"{"bucket":"fdr-bucket","files":[{"size":10}]}"#,
+        r#"{"bucket":"fdr-bucket","files":["data/part-00000.gz"]}"#,
+        r#"{"bucket":"fdr-bucket","files":[{"path":10}]}"#,
+    ] {
+        assert!(
+            SqsEvent::parse(body).is_err(),
+            "Accepted invalid notification: {body}"
+        );
+    }
+}
+
+#[test]
+fn test_fdr_notification_invalid_timestamp_metadata() {
+    for timestamp in [
+        serde_json::Value::Null,
+        serde_json::json!("invalid"),
+        serde_json::json!(false),
+        serde_json::json!(1.5),
+        serde_json::json!(i64::MAX),
+        serde_json::json!(u64::MAX),
+    ] {
+        let body = serde_json::json!({
+            "bucket": "fdr-bucket",
+            "files": [{"path": "data/part-00000.gz"}],
+            "timestamp": timestamp,
+        });
+        let notification: FdrNotification = serde_json::from_value(body).unwrap();
+        assert!(notification.timestamp.is_none());
+        let deferred = DeferredConfig {
+            queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/deferred".to_owned(),
+            max_age_secs: 3600,
+        };
+        assert!(notification.is_too_old(&deferred).is_none());
+    }
+}
+
+#[test]
+fn test_fdr_notification_age_policy() {
+    let deferred = DeferredConfig {
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/deferred".to_owned(),
+        max_age_secs: 3600,
+    };
+    let mut notification: FdrNotification = serde_json::from_str(
+        r#"{"bucket":"fdr-bucket","files":[{"path":"data/first.gz"},{"path":"data/second.gz"}]}"#,
+    )
+    .unwrap();
+    assert!(notification.is_too_old(&deferred).is_none());
+
+    notification.timestamp = Some(Utc::now());
+    assert_eq!(notification.is_too_old(&deferred), Some(false));
+    notification.timestamp = Some(Utc::now() - chrono::Duration::hours(2));
+    assert_eq!(notification.is_too_old(&deferred), Some(true));
+}
+
+#[test]
+fn test_shared_notification_age_policy() {
+    let deferred = DeferredConfig {
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/deferred".to_owned(),
+        max_age_secs: 3600,
+    };
+    assert!(!deferred.is_too_old(Utc::now()));
+    assert!(deferred.is_too_old(Utc::now() - chrono::Duration::hours(2)));
+}
+
+#[test]
+fn test_fdr_sns_notification() {
+    let body = serde_json::json!({
+        "Message": include_str!("../../../tests/data/crowdstrike-fdr-notification.json"),
+        "Timestamp": "2012-03-29T05:12:16.901Z",
+    });
+    let notification = SqsEvent::parse(&body.to_string()).unwrap();
+
+    assert!(matches!(notification, SqsEvent::Fdr(_)));
+}
+
+#[test]
+fn test_standard_s3_notification() {
+    let notification = SqsEvent::parse(
+        r#"{
+            "Records":[{
+                "eventVersion":"2.1",
+                "eventSource":"aws:s3",
+                "awsRegion":"us-east-1",
+                "eventName":"ObjectCreated:Put",
+                "eventTime":"2014-10-13T15:57:02.089Z",
+                "s3":{"bucket":{"name":"bucketname"},"object":{"key":"part+00000%2B.gz"}}
+            }]
+        }"#,
+    )
+    .unwrap();
+    let SqsEvent::Event(notification) = notification else {
+        panic!("Expected a standard S3 notification");
+    };
+
+    assert_eq!(notification.records[0].s3.bucket.name, "bucketname");
+    assert_eq!(notification.records[0].s3.object.key, "part 00000+.gz");
+}
+
+#[test]
+fn test_sqs_s3_test_notification() {
+    let notification =
+        SqsEvent::parse(r#"{"Service":"Amazon S3","Event":"s3:TestEvent","Bucket":"bucketname"}"#)
+            .unwrap();
+
+    assert!(matches!(notification, SqsEvent::TestEvent(_)));
 }
 
 #[test]
