@@ -5,6 +5,9 @@ use super::{
     confined_preview, fmt,
 };
 
+#[cfg(doc)]
+use super::{Template, UnconfinedTemplate, UriTemplate};
+
 impl fmt::Debug for ConfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ConfinedTemplate")
