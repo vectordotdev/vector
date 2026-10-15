@@ -26,6 +26,9 @@ use crate::{
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
+/// The key we use for the `stream` field.
+const STREAM_KEY: &str = "stream";
+
 const EXPIRATION_TIME: Duration = Duration::from_secs(30);
 
 const TRUNCATED_SUFFIX: &[u8] = b"..TRUNCATED";
@@ -40,12 +43,12 @@ impl PartialEventMergeState {
     fn add_event(
         &mut self,
         event: LogEvent,
-        file: &str,
+        key: &str,
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
     ) {
         let mut bytes_mut = BytesMut::new();
-        if let Some(bucket) = self.buckets.get_mut(file) {
+        if let Some(bucket) = self.buckets.get_mut(key) {
             if bucket.exceeds_max_merged_line_limit {
                 if !bucket.truncated {
                     emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -141,7 +144,7 @@ impl PartialEventMergeState {
             }
 
             self.buckets.insert(
-                file.to_owned(),
+                key.to_owned(),
                 Bucket {
                     event,
                     expiration: Instant::now() + expiration_time,
@@ -156,9 +159,9 @@ impl PartialEventMergeState {
         !bucket.exceeds_max_merged_line_limit || bucket.truncated
     }
 
-    fn remove_event(&mut self, file: &str) -> Option<LogEvent> {
+    fn remove_event(&mut self, key: &str) -> Option<LogEvent> {
         self.buckets
-            .remove(file)
+            .remove(key)
             .filter(Self::should_emit)
             .map(|bucket| bucket.event)
     }
@@ -227,6 +230,13 @@ fn merge_partial_events_with_custom_expiration(
         LogNamespace::Legacy => OwnedTargetPath::event(owned_value_path!(FILE_KEY)),
     };
 
+    let stream_path = match log_namespace {
+        LogNamespace::Vector => {
+            OwnedTargetPath::metadata(owned_value_path!(super::Config::NAME, STREAM_KEY))
+        }
+        LogNamespace::Legacy => OwnedTargetPath::event(owned_value_path!(STREAM_KEY)),
+    };
+
     let state = PartialEventMergeState {
         buckets: HashMap::new(),
         maybe_max_merged_line_bytes,
@@ -254,8 +264,21 @@ fn merge_partial_events_with_custom_expiration(
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 
-            state.add_event(event, &file, &message_path, expiration_time);
-            if !is_partial && let Some(log_event) = state.remove_event(&file) {
+            // CRI interleaves stdout and stderr in the same log file, so the file alone
+            // is not enough to group partial fragments: a full line on one stream must not
+            // be merged into a partial line buffered for the other stream. Include the
+            // stream in the bucket key so reassembly only joins fragments of the same stream.
+            let stream_name = event
+                .get(&stream_path)
+                .and_then(|x| x.as_str())
+                .map(|x| x.to_string())
+                .unwrap_or_default();
+
+            // NUL cannot appear in a file path or in the stream value, so it is a safe separator.
+            let key = format!("{file}\0{stream_name}");
+
+            state.add_event(event, &key, &message_path, expiration_time);
+            if !is_partial && let Some(log_event) = state.remove_event(&key) {
                 emitter.emit(log_event);
             }
         },
@@ -339,6 +362,63 @@ mod test {
         assert_eq!(
             output[0].as_log().get(event_path!("message")),
             Some(&value!("test message 1test message 2"))
+        );
+    }
+
+    // Regression test for cross-stream merge corruption: CRI interleaves stdout and
+    // stderr in the same log file, so a full stderr line arriving between a partial
+    // stdout line and its continuation must not be merged into the stdout buffer.
+    #[tokio::test]
+    async fn partial_merge_does_not_cross_streams_legacy() {
+        // stdout P
+        let mut stdout_partial = LogEvent::from("stdout part 1 ");
+        stdout_partial.insert(event_path!(FILE_KEY), "0.log");
+        stdout_partial.insert(event_path!(STREAM_KEY), "stdout");
+        stdout_partial.insert(event_path!("_partial"), true);
+
+        // stderr F (complete line on the other stream)
+        let mut stderr_full = LogEvent::from("stderr line");
+        stderr_full.insert(event_path!(FILE_KEY), "0.log");
+        stderr_full.insert(event_path!(STREAM_KEY), "stderr");
+
+        // stdout F (the real continuation of the partial stdout line)
+        let mut stdout_full = LogEvent::from("stdout part 2");
+        stdout_full.insert(event_path!(FILE_KEY), "0.log");
+        stdout_full.insert(event_path!(STREAM_KEY), "stdout");
+
+        let input_stream = futures::stream::iter([
+            stdout_partial.into(),
+            stderr_full.into(),
+            stdout_full.into(),
+        ]);
+        let output_stream = merge_partial_events(
+            input_stream,
+            LogNamespace::Legacy,
+            None,
+            OversizedAction::Drop,
+        );
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 2);
+
+        // The stderr line is emitted on its own, uncorrupted, as soon as it is seen.
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("stderr line"))
+        );
+        assert_eq!(
+            output[0].as_log().get(event_path!(STREAM_KEY)),
+            Some(&value!("stderr"))
+        );
+
+        // The two stdout fragments merge into a single record.
+        assert_eq!(
+            output[1].as_log().get(event_path!("message")),
+            Some(&value!("stdout part 1 stdout part 2"))
+        );
+        assert_eq!(
+            output[1].as_log().get(event_path!(STREAM_KEY)),
+            Some(&value!("stdout"))
         );
     }
 
