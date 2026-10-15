@@ -314,12 +314,14 @@ mod integration_test {
         },
     };
 
-    const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
+    fn redis_url() -> String {
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
+    }
 
     #[tokio::test]
     async fn redis_source_list_rpop() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
@@ -335,7 +337,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Rpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -362,7 +364,7 @@ mod integration_test {
     #[tokio::test]
     async fn redis_source_list_rpop_with_log_namespace() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
@@ -376,7 +378,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Rpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: Some(OptionalValuePath::from(owned_value_path!("remapped_key"))),
             framing: default_framing_message_based(),
@@ -401,7 +403,7 @@ mod integration_test {
     #[tokio::test]
     async fn redis_source_list_lpop() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
@@ -417,7 +419,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Lpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -450,7 +452,7 @@ mod integration_test {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Channel,
             list: None,
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -474,7 +476,7 @@ mod integration_test {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
 
         let mut async_conn = client
             .get_multiplexed_async_connection()
