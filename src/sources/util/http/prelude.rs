@@ -1,14 +1,30 @@
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
+use std::fs::remove_file;
 use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use hyper::{Server, service::make_service_fn};
 use tokio::net::TcpStream;
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
+use tokio::net::UnixListener;
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
+use tokio_stream::wrappers::UnixListenerStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogNamespace, SourceAcknowledgementsConfig},
+    configurable::configurable_component,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
 };
 use vrl::{path::PathPrefix, path::ValuePath as _, value::ObjectMap};
@@ -23,6 +39,11 @@ use warp::{
 };
 
 use super::encoding::{capped_body, decompress_body};
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
+use crate::internal_events::UnixSocketFileDeleteError;
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
@@ -34,6 +55,41 @@ use crate::{
     sources::util::http::HttpMethod,
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
 };
+
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
+use crate::sources::util::{change_socket_ownership, change_socket_permissions};
+
+/// Configuration for listening on a Unix domain socket.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct UnixSocketConfig {
+    /// The Unix domain socket path to listen for connections on.
+    #[configurable(metadata(docs::examples = "/var/run/vector-http.sock"))]
+    pub path: std::path::PathBuf,
+
+    /// Unix file mode bits to apply to the Unix socket file.
+    ///
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    #[configurable(metadata(docs::examples = 0o660))]
+    #[configurable(metadata(docs::examples = 0o666))]
+    #[serde(default)]
+    pub file_mode: Option<u32>,
+
+    /// User ID to own the Unix socket file.
+    #[configurable(metadata(docs::examples = 1000))]
+    #[serde(default)]
+    pub file_uid: Option<u32>,
+
+    /// Group ID to own the Unix socket file.
+    #[configurable(metadata(docs::examples = 1000))]
+    #[serde(default)]
+    pub file_gid: Option<u32>,
+}
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
     // This function can be defined to enrich events with additional HTTP
@@ -114,7 +170,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
-        address: SocketAddr,
+        address: Option<SocketAddr>,
+        #[cfg(unix)] socket: Option<&UnixSocketConfig>,
         path: &str,
         method: HttpMethod,
         response_code: StatusCode,
@@ -125,6 +182,16 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         acknowledgements: SourceAcknowledgementsConfig,
         keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
+        #[cfg(unix)]
+        if socket.is_some() && tls.and_then(|config| config.enabled).unwrap_or(false) {
+            return Err("`tls` cannot be used when `socket` is configured.".into());
+        }
+        #[cfg(all(
+            unix,
+            any(feature = "sources-socket", feature = "sources-utils-net-unix")
+        ))]
+        let socket = socket.cloned();
+
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
         let auth_matcher = auth
@@ -247,43 +314,95 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
-                let remote_addr = conn.peer_addr();
-                let svc = ServiceBuilder::new()
-                    .layer(build_http_trace_layer(span.clone()))
-                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
-                        MaxConnectionAgeLayer::new(
-                            Duration::from_secs(secs),
-                            keepalive_settings.max_connection_age_jitter_factor,
-                            remote_addr,
-                        )
-                    }))
-                    .map_request(move |mut request: hyper::Request<_>| {
-                        request.extensions_mut().insert(PeerAddr::new(remote_addr));
+            if let Some(address) = address {
+                let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                    let remote_addr = conn.peer_addr();
+                    let svc = ServiceBuilder::new()
+                        .layer(build_http_trace_layer(span.clone()))
+                        .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                            MaxConnectionAgeLayer::new(
+                                Duration::from_secs(secs),
+                                keepalive_settings.max_connection_age_jitter_factor,
+                                remote_addr,
+                            )
+                        }))
+                        .map_request(move |mut request: hyper::Request<_>| {
+                            request.extensions_mut().insert(PeerAddr::new(remote_addr));
 
-                        request
-                    })
-                    .service(warp::service(routes.clone()));
-                futures_util::future::ok::<_, Infallible>(svc)
-            });
+                            request
+                        })
+                        .service(warp::service(routes.clone()));
+                    futures_util::future::ok::<_, Infallible>(svc)
+                });
 
-            info!(message = "Building HTTP server.", address = %address);
+                info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls
-                .bind(&address)
-                .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                })?
-                .with_keepalive(keepalive_settings.tcp_keepalive);
+                let listener = tls
+                    .bind(&address)
+                    .await
+                    .map_err(|err| {
+                        error!("An error occurred: {err:?}.");
+                    })?
+                    .with_keepalive(keepalive_settings.tcp_keepalive);
 
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(make_svc)
-                .with_graceful_shutdown(cx.shutdown.map(|_| ()))
-                .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                })?;
+                Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                    .serve(make_svc)
+                    .with_graceful_shutdown(cx.shutdown.map(|_| ()))
+                    .await
+                    .map_err(|err| {
+                        error!("An error occurred: {err:?}.");
+                    })?;
+            } else {
+                #[cfg(all(
+                    unix,
+                    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+                ))]
+                if let Some(UnixSocketConfig {
+                    path,
+                    file_mode,
+                    file_uid,
+                    file_gid,
+                }) = socket
+                {
+                    let listener = UnixListener::bind(&path).map_err(|err| {
+                        error!(message = "Failed to bind Unix socket.", ?path, %err);
+                    })?;
+
+                    if let Err(error) = change_socket_ownership(&path, file_uid, file_gid) {
+                        error!(message = "Failed to set socket ownership.", ?path, %error);
+                        return Err(());
+                    }
+
+                    if let Err(error) = change_socket_permissions(&path, file_mode) {
+                        error!(message = "Failed to set socket permissions.", ?path, %error);
+                        return Err(());
+                    }
+
+                    let make_svc = make_service_fn(move |_conn: &tokio::net::UnixStream| {
+                        let svc = ServiceBuilder::new()
+                            .layer(build_http_trace_layer(span.clone()))
+                            .service(warp::service(routes.clone()));
+                        futures_util::future::ok::<_, Infallible>(svc)
+                    });
+
+                    info!(message = "Building HTTP server.", path = %path.display());
+
+                    let server_result = Server::builder(hyper::server::accept::from_stream(
+                        UnixListenerStream::new(listener),
+                    ))
+                    .serve(make_svc)
+                    .with_graceful_shutdown(cx.shutdown.map(|_| ()))
+                    .await;
+
+                    if let Err(error) = remove_file(&path) {
+                        emit!(UnixSocketFileDeleteError { path: &path, error });
+                    }
+
+                    server_result.map_err(|err| {
+                        error!("An error occurred: {err:?}.");
+                    })?;
+                }
+            }
 
             Ok(())
         }))

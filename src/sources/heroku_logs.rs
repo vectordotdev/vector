@@ -196,7 +196,9 @@ impl SourceConfig for LogplexConfig {
         };
 
         source.run(
-            self.address,
+            Some(self.address),
+            #[cfg(unix)]
+            None,
             "events",
             HttpMethod::Post,
             StatusCode::OK,

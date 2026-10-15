@@ -50,7 +50,7 @@ pub use multiline_config::MultilineConfig;
     unix,
     any(feature = "sources-socket", feature = "sources-utils-net-unix",)
 ))]
-pub use unix::change_socket_permissions;
+pub use unix::{change_socket_ownership, change_socket_permissions};
 #[cfg(all(unix, feature = "sources-socket",))]
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-net-unix",))]
