@@ -1,5 +1,6 @@
 use async_nats::jetstream::{
-    consumer::StreamError as ConsumerStreamError, context::GetStreamError,
+    consumer::{AckPolicy, StreamError as ConsumerStreamError},
+    context::GetStreamError,
 };
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
@@ -12,9 +13,11 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::DecodingConfig,
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{
+        GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
     nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
-    serde::{default_decoding, default_framing_message_based},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         Source,
         nats::source::{
@@ -39,6 +42,10 @@ pub enum BuildError {
     Consumer { source: async_nats::Error },
     #[snafu(display("Failed to retrieve messages from NATS consumer: {}", source))]
     Messages { source: ConsumerStreamError },
+    #[snafu(display(
+        "NATS JetStream consumer must use `AckPolicy::Explicit` when acknowledgements are enabled, found {policy:?}"
+    ))]
+    InvalidAckPolicy { policy: AckPolicy },
 }
 
 /// Batch settings for a JetStream pull consumer.
@@ -166,6 +173,9 @@ pub struct NatsSourceConfig {
 
     #[serde(default)]
     pub jetstream: Option<JetStreamConfig>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 pub fn default_subject_key_field() -> OptionalValuePath {
@@ -193,6 +203,7 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
@@ -200,16 +211,19 @@ impl SourceConfig for NatsSourceConfig {
         match self.mode() {
             NatsMode::JetStream(js_config) => {
                 let connection = self.connect().await?;
-                let messages = create_consumer_stream(&connection, js_config).await?;
+                let (messages, ack_wait) =
+                    create_consumer_stream(&connection, js_config, acknowledgements).await?;
 
                 Ok(Box::pin(run_nats_jetstream(
                     self.clone(),
                     connection,
                     messages,
+                    ack_wait,
                     decoder,
                     log_namespace,
                     cx.shutdown,
                     cx.out,
+                    acknowledgements,
                 )))
             }
             NatsMode::Core => {
@@ -255,7 +269,7 @@ impl SourceConfig for NatsSourceConfig {
 
     // Acknowledgment is only possible with Jetstream.
     fn can_acknowledge(&self) -> bool {
-        true
+        self.jetstream.is_some()
     }
 }
 
