@@ -17,6 +17,7 @@ use crate::{
 pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
 
 impl SharedTopologyController {
+    #[must_use]
     pub fn new(inner: TopologyController) -> Self {
         Self(Arc::new(Mutex::new(inner)))
     }
@@ -29,6 +30,11 @@ impl SharedTopologyController {
         self.0.lock().await
     }
 
+    /// Unwraps the controller when no other shared handles remain.
+    ///
+    /// # Errors
+    ///
+    /// Returns this handle if another handle still shares the controller.
     pub fn try_into_inner(self) -> Result<Mutex<TopologyController>, Self> {
         Arc::try_unwrap(self.0).map_err(Self)
     }
@@ -43,6 +49,10 @@ pub struct TopologyController {
     pub extra_context: ExtraContext,
 }
 
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "Keep debug output focused on configuration paths and health requirements."
+)]
 impl std::fmt::Debug for TopologyController {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TopologyController")
@@ -195,8 +205,6 @@ impl TopologyController {
             let top = mutex.lock().await;
             if top.topology.sources_finished().now_or_never().is_some() {
                 return;
-            } else {
-                continue;
             }
         }
     }
