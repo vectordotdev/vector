@@ -65,6 +65,18 @@ cp -a %{_builddir}/licenses/. %{buildroot}%{_datadir}/%{_name}/licenses
 cp -a %{_builddir}/NOTICE %{buildroot}%{_datadir}/%{_name}/NOTICE
 cp -a %{_builddir}/LICENSE-3rdparty.csv %{buildroot}%{_datadir}/%{_name}/LICENSE-3rdparty.csv
 
+# Generate shell completions; fall back to empty files if the binary cannot run
+# (e.g. cross-compiled for a different architecture without QEMU/binfmt support).
+mkdir -p %{buildroot}%{_datadir}/bash-completion/completions
+mkdir -p %{buildroot}%{_datadir}/zsh/site-functions
+mkdir -p %{buildroot}%{_datadir}/fish/vendor_completions.d
+%{buildroot}%{_bindir}/vector completion bash > %{buildroot}%{_datadir}/bash-completion/completions/vector 2>/dev/null || \
+  touch %{buildroot}%{_datadir}/bash-completion/completions/vector
+%{buildroot}%{_bindir}/vector completion zsh  > %{buildroot}%{_datadir}/zsh/site-functions/_vector 2>/dev/null || \
+  touch %{buildroot}%{_datadir}/zsh/site-functions/_vector
+%{buildroot}%{_bindir}/vector completion fish > %{buildroot}%{_datadir}/fish/vendor_completions.d/vector.fish 2>/dev/null || \
+  touch %{buildroot}%{_datadir}/fish/vendor_completions.d/vector.fish
+
 %post
 getent passwd %{_username} > /dev/null || \
   useradd --shell /sbin/nologin --system --home-dir %{_sharedstatedir}/%{_name} --user-group \
@@ -93,6 +105,9 @@ rm -rf %{buildroot}
 %doc %{_datadir}/%{_name}/licenses/*
 %doc %{_datadir}/%{_name}/LICENSE-3rdparty.csv
 %license LICENSE
+%{_datadir}/bash-completion/completions/vector
+%{_datadir}/zsh/site-functions/_vector
+%{_datadir}/fish/vendor_completions.d/vector.fish
 
 %changelog
 * Fri Jun 21 2019 Vector Devs <vector@datadoghq.com> - 0.3.0
