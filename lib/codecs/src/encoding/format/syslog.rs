@@ -637,7 +637,7 @@ mod tests {
     use bytes::BytesMut;
     use chrono::NaiveDate;
     use std::sync::Arc;
-    use vector_core::config::LogNamespace;
+    use vector_core::config::{LogNamespace, log_schema};
     use vector_core::event::Event::Metric;
     use vector_core::event::{Event, MetricKind, MetricValue, StatisticKind};
     use vrl::path::parse_target_path;
@@ -829,7 +829,7 @@ mod tests {
 
         let mut log = create_simple_log();
         log.insert(
-            event_path!("message"),
+            log_schema().message_key_target_path().unwrap(),
             "A\nB\tC, Привіт D, E\u{0007}F", //newline, tab, unicode
         );
 
@@ -953,7 +953,7 @@ mod tests {
         .unwrap();
 
         let mut log = create_simple_log();
-        log.insert(event_path!("message"), "");
+        log.insert(log_schema().message_key_target_path().unwrap(), "");
         log.insert(event_path!("structured_data"), value!({}));
 
         let output = run_encode(config, Event::Log(log));
