@@ -7,11 +7,9 @@ deprecated_since: "0.60.0"
 
 The `opentelemetry` source's `use_otlp_decoding` option is deprecated. Use `decoding` instead.
 Signals listed in `signal_types` keep their OTLP format; the rest are converted to Vector's native
-format. The source still accepts logs, metrics, and traces, with the same choices as before. Metrics
-kept in OTLP format are emitted as log events and cannot be used with native metric transforms.
+format. The source still accepts logs, metrics, and traces, with the same choices as before.
 
-Existing boolean and object settings still work, but produce a deprecation warning. Removal is not
-yet scheduled. We will give users at least one month to migrate before removing the option.
+We will give users more than sufficient time to migrate.
 
 To preserve the OTLP representation of all signals, replace:
 
@@ -42,6 +40,8 @@ decoding:
   codec: otlp
   signal_types: ["traces"]
 ```
+
+Existing boolean and object settings still work, but produce a deprecation warning.
 
 When migrating:
 
