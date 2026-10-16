@@ -144,6 +144,8 @@ on:
         value: ${{ jobs.int_tests.outputs.redis }}
       splunk:
         value: ${{ jobs.int_tests.outputs.splunk }}
+      victoriametrics:
+        value: ${{ jobs.int_tests.outputs.victoriametrics }}
       webhdfs:
         value: ${{ jobs.int_tests.outputs.webhdfs }}
       # e2e tests
@@ -404,6 +406,7 @@ jobs:
       pulsar: ${{ steps.filter.outputs.pulsar }}
       redis: ${{ steps.filter.outputs.redis }}
       splunk: ${{ steps.filter.outputs.splunk }}
+      victoriametrics: ${{ steps.filter.outputs.victoriametrics }}
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
@@ -470,6 +473,7 @@ jobs:
             "pulsar": ${{ steps.filter.outputs.pulsar }},
             "redis": ${{ steps.filter.outputs.redis }},
             "splunk": ${{ steps.filter.outputs.splunk }},
+            "victoriametrics": ${{ steps.filter.outputs.victoriametrics }},
             "webhdfs": ${{ steps.filter.outputs.webhdfs }}
           }
           EOF
