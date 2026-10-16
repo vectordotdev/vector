@@ -1,0 +1,3 @@
+Fixed the `file` and `kubernetes_logs` sources stopping without reporting an error. When their output channel closes (all downstream components are gone), the file server stops ingesting and the events read from files but not yet sent downstream are dropped. Previously that only produced log lines and `component_discarded_events_total`, and the source then reported itself as finished, so Vector treated it as a clean shutdown of that source. Both sources now report the closed channel as a source failure with its cause, which Vector reports as an aborted component, and a panic in the file server is reported as a component panic instead of being logged and swallowed.
+
+authors: thomasqueirozb

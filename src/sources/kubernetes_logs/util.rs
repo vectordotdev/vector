@@ -13,6 +13,8 @@ use vector_lib::{
     file_source_common::{Checkpointer, FileSourceInternalEvents},
 };
 
+use crate::sources::SourceError;
+
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]
 /// task.
 pub async fn run_file_server<PP, E, C, S>(
@@ -20,12 +22,12 @@ pub async fn run_file_server<PP, E, C, S>(
     chans: C,
     shutdown: S,
     checkpointer: Checkpointer,
-) -> Result<FileServerShutdown, tokio::task::JoinError>
+) -> Result<FileServerShutdown, SourceError>
 where
     PP: PathsProvider + Send + Sync + 'static,
     E: FileSourceInternalEvents,
     C: Sink<Vec<Line>> + Unpin + Send + 'static,
-    <C as Sink<Vec<Line>>>::Error: Error + Send,
+    <C as Sink<Vec<Line>>>::Error: Error + Send + Sync + 'static,
     S: Future + Unpin + Send + 'static,
     <S as Future>::Output: Clone + Send + Sync,
     <<PP as PathsProvider>::IntoIter as IntoIterator>::IntoIter: Send,
@@ -41,10 +43,22 @@ where
         let _enter = span.enter();
 
         let rt = tokio::runtime::Handle::current();
-        let result = rt.block_on(file_server.run(chans, shutdown, shutdown2, checkpointer));
-        result.expect("file server exited with an error")
+        // Return the error instead of panicking on it, so that this source reports the
+        // failure with its cause.
+        rt.block_on(file_server.run(chans, shutdown, shutdown2, checkpointer))
+            .map_err(SourceError::from)
     });
-    join_handle.await
+
+    match join_handle.await {
+        Ok(result) => result,
+        Err(join_error) => {
+            // Keep a panic in the file server reportable as a component panic.
+            if join_error.is_panic() {
+                std::panic::resume_unwind(join_error.into_panic());
+            }
+            Err(format!("the file server task failed: {join_error}").into())
+        }
+    }
 }
 
 pub async fn complete_with_deadline_on_signal<F, S>(
