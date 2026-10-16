@@ -29,8 +29,13 @@ pub struct AwsTimeout {
     ///
     /// Limits the amount of time allowed for an operation to be fully serviced; an
     /// operation represents the full request/response lifecycle of a call to a service.
-    /// Take care when configuring this settings to allow enough time for the polling
-    /// interval configured in `poll_secs`
+    ///
+    /// For operations with a streaming response body, such as S3 `GetObject`, the operation
+    /// completes once the response headers are received, so this does not limit the time
+    /// spent downloading the body.
+    ///
+    /// For SQS, take care to allow enough time for the long-polling interval configured in
+    /// `poll_secs`.
     #[configurable(metadata(docs::examples = 20))]
     #[configurable(metadata(docs::human_name = "Operation Timeout"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
@@ -41,8 +46,11 @@ pub struct AwsTimeout {
     /// The read timeout for AWS requests
     ///
     /// Limits the amount of time allowed to read the first byte of a response from the
-    /// time the request is initiated. Take care when configuring this settings to allow
-    /// enough time for the polling interval configured in `poll_secs`
+    /// time the request is initiated. It does not apply to reading the rest of a streaming
+    /// response body, such as an S3 object.
+    ///
+    /// For SQS, take care to allow enough time for the long-polling interval configured in
+    /// `poll_secs`.
     #[configurable(metadata(docs::examples = 20))]
     #[configurable(metadata(docs::human_name = "Read Timeout"))]
     #[configurable(metadata(docs::type_unit = "seconds"))]
