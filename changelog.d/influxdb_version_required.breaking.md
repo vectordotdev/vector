@@ -6,6 +6,10 @@ The `version` option is now required for the `influxdb_logs` and `influxdb_metri
 Omitting it was [deprecated in 0.58.0](https://vector.dev/deprecations/), and the version is no
 longer inferred from the configured settings. Configurations without `version` now fail to load.
 
+Settings that belong to the other version are now rejected even when set to `null`. For example,
+`version: "2"` with `database: null` fails with `unknown field 'database'`. Remove these settings
+from the configuration.
+
 ## Migration
 
 Add `version: "1"` or `version: "2"` to match the configured InfluxDB settings. Use `"1"` with

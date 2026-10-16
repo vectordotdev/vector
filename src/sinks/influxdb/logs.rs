@@ -598,6 +598,8 @@ mod tests {
         "#};
         for (extra, field) in [
             ("database: my-database", "database"),
+            ("database: null", "database"),
+            ("database:", "database"),
             ("bukcet: my-bucket", "bukcet"),
             ("bukcet: null", "bukcet"),
             ("endpont: http://localhost:9999", "endpont"),
@@ -614,24 +616,13 @@ mod tests {
     }
 
     #[test]
-    fn test_config_accepts_null_settings_for_other_version() {
-        for null in ["database: null", "database:"] {
-            let config = format!(
-                "measurement: vector-logs\nendpoint: http://localhost:9999\nversion: \"2\"\norg: my-org\nbucket: my-bucket\ntoken: my-token\n{null}\n"
-            );
-            let config = serde_yaml::from_str::<InfluxDbLogsConfig>(&config)
-                .unwrap_or_else(|error| panic!("{null}: {error}"));
-            assert!(matches!(config.settings, InfluxDbSettings::V2(_)));
-        }
-
-        // `null` for the selected version's optional settings is still treated as unset.
+    fn test_config_accepts_null_optional_settings() {
         let config = indoc! {r#"
             measurement: "vector-logs"
             endpoint: "http://localhost:8086"
             version: "1"
             database: "my-database"
             password: null
-            token: null
         "#};
         let config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
         assert!(matches!(config.settings, InfluxDbSettings::V1(_)));

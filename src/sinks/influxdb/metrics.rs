@@ -541,7 +541,6 @@ mod tests {
             org: "my-org"
             bucket: "my-bucket"
             token: "my-token"
-            database: null
         "#};
         let config = serde_yaml::from_str::<InfluxDbConfig>(config).unwrap();
         assert!(matches!(config.settings, InfluxDbSettings::V2(_)));
@@ -559,6 +558,10 @@ mod tests {
             (v2.to_string(), "missing field `version`"),
             (
                 format!("version: \"2\"\n{v2}database: my-database\n"),
+                "unknown field `database`",
+            ),
+            (
+                format!("version: \"2\"\n{v2}database: null\n"),
                 "unknown field `database`",
             ),
             (
