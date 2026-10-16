@@ -2137,6 +2137,49 @@ fn validation_allows_zero_ttl_in_fingerprint_mode() {
     assert!(config.validate_structure().is_ok());
 }
 
+/// `ttl_generations: 0` is only clamped to `1` internally, so with a TTL set it
+/// is rejected on both the global block and per-metric entries.
+#[test]
+fn validation_rejects_zero_ttl_generations_with_ttl() {
+    let mut config = make_transform_bloom(500, LimitExceededAction::DropTag);
+    config.global.ttl_secs = Some(3600);
+    config.global.ttl_generations = 0;
+    let errors = config
+        .validate_structure()
+        .expect_err("ttl_generations: 0 with ttl_secs must not build");
+    assert!(
+        errors.iter().any(|e| e.contains("ttl_generations is 0")),
+        "got: {errors:?}"
+    );
+
+    let mut per_metric = make_per_metric(10, LimitExceededAction::DropTag, HashMap::new());
+    per_metric.config.ttl_secs = Some(3600);
+    per_metric.config.ttl_generations = 0;
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([("metricA".to_string(), per_metric)]),
+    );
+    let errors = config
+        .validate_structure()
+        .expect_err("per-metric ttl_generations: 0 with ttl_secs must not build");
+    assert!(
+        errors.iter().any(|e| e.contains("metricA")),
+        "error should name the offending metric, got: {errors:?}"
+    );
+}
+
+/// Without a TTL, `ttl_generations` is ignored, so a leftover `0` still builds.
+#[test]
+fn validation_allows_zero_ttl_generations_without_ttl() {
+    let mut config = make_transform_bloom(500, LimitExceededAction::DropTag);
+    config.global.ttl_generations = 0;
+    assert!(config.validate_structure().is_ok());
+
+    config.global.ttl_secs = Some(0);
+    assert!(config.validate_structure().is_ok());
+}
+
 /// TTL stays valid on the backends that can actually expire values.
 #[test]
 fn validation_allows_ttl_in_exact_and_probabilistic_modes() {

@@ -250,6 +250,7 @@ components: transforms: tag_cardinality_limit: {
 				4), probabilistic mode still keeps the extra write shard so retention
 				stays in `[ttl_secs, 2·ttl_secs)` — only an explicit
 				`ttl_generations: 1` selects the one-shard tumbling window.
+				`ttl_generations: 0` is rejected at startup whenever `ttl_secs` is set.
 
 				**Per-metric overrides do not inherit**: setting `ttl_secs` inside a
 				`per_metric_limits.<name>` block (or leaving it unset there) fully

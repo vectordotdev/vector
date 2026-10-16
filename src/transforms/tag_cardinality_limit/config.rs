@@ -139,7 +139,8 @@ pub struct Inner {
     /// it has no benefit for correctness and can increase CPU on large
     /// `value_limit` buckets.
     ///
-    /// Ignored when `ttl_secs` is unset.
+    /// Must be at least `1` when `ttl_secs` is set. Ignored when `ttl_secs` is
+    /// unset.
     #[serde(default = "default_ttl_generations")]
     #[configurable(metadata(docs::human_name = "TTL Generations"))]
     pub ttl_generations: u8,
@@ -439,6 +440,12 @@ pub enum BuildError {
          `exact` or `probabilistic` mode."
     ))]
     TtlUnsupportedInFingerprintMode { scope: String },
+
+    #[snafu(display(
+        "ttl_generations is 0 on {scope} while ttl_secs is set. Use `1` for a tumbling window \
+         or a higher value for a sliding window."
+    ))]
+    ZeroTtlGenerations { scope: String },
 }
 
 #[async_trait::async_trait]
@@ -517,12 +524,28 @@ impl TransformConfig for Config {
             );
         }
 
+        if ttl_duration(self.global.ttl_secs).is_some() && self.global.ttl_generations == 0 {
+            errors.push(
+                BuildError::ZeroTtlGenerations {
+                    scope: "the global configuration".to_string(),
+                }
+                .to_string(),
+            );
+        }
+
         for (metric_name, per_metric) in &self.per_metric_limits {
-            if ttl_duration(per_metric.config.ttl_secs).is_some()
-                && matches!(per_metric.config.mode, OverrideMode::ExactFingerprint)
-            {
+            let ttl_enabled = ttl_duration(per_metric.config.ttl_secs).is_some();
+            if ttl_enabled && matches!(per_metric.config.mode, OverrideMode::ExactFingerprint) {
                 errors.push(
                     BuildError::TtlUnsupportedInFingerprintMode {
+                        scope: format!("`per_metric_limits.{metric_name}`"),
+                    }
+                    .to_string(),
+                );
+            }
+            if ttl_enabled && per_metric.config.ttl_generations == 0 {
+                errors.push(
+                    BuildError::ZeroTtlGenerations {
                         scope: format!("`per_metric_limits.{metric_name}`"),
                     }
                     .to_string(),

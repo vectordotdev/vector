@@ -223,7 +223,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			it has no benefit for correctness and can increase CPU on large
 			`value_limit` buckets.
 
-			Ignored when `ttl_secs` is unset.
+			Must be at least `1` when `ttl_secs` is set. Ignored when `ttl_secs` is
+			unset.
 			"""
 		required: false
 		type: uint: default: 4

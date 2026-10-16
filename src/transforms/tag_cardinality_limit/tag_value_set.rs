@@ -284,8 +284,9 @@ struct RollingBloomStorage {
     generations: u8,
     /// For sliding windows, `generations + 1`: the closed shards spanning the
     /// window, plus the open one currently accepting writes. An explicit
-    /// `ttl_generations: 0|1` uses one shard for the documented tumbling
-    /// behavior. When a higher request is clamped to one generation because
+    /// `ttl_generations: 1` uses one shard for the documented tumbling
+    /// behavior (config validation rejects `0`; a `0` reaching here is treated
+    /// as `1`). When a higher request is clamped to one generation because
     /// `ttl_secs` is too short for multi-slice windows (e.g. `ttl_secs: 1`
     /// with the default of 4), we still keep two shards so retention stays in
     /// `[ttl, 2·ttl)` rather than tumbling early.
