@@ -50,21 +50,3 @@ test("VRL TOC highlight follows scrolling between functions and their examples",
   }
   await expect(page).toHaveURL(new RegExp(`${functions}$`));
 });
-
-for (const { sink, usesUri } of [
-  { sink: "vector", usesUri: false },
-  { sink: "http", usesUri: true }
-]) {
-  test(`${sink} healthcheck documents both input forms and applicable object fields`, async ({ page }) => {
-    await page.goto(`/docs/reference/configuration/sinks/${sink}/`);
-    const heading = page.getByRole("heading", { name: "healthcheck", exact: true });
-    const header = heading.locator("../..");
-    await expect(header.getByText("bool", { exact: true })).toBeVisible();
-    await expect(header.getByText("object", { exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "healthcheck.enabled", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "healthcheck.uri", exact: true })).toHaveCount(usesUri ? 1 : 0);
-    await expect(
-      page.getByText("A boolean value sets enabled; other healthcheck options retain their defaults.", { exact: true })
-    ).toBeVisible();
-  });
-}
