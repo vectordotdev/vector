@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
@@ -265,7 +266,7 @@ impl InputHandler {
                                 path!("key"),
                                 self.key.as_str(),
                             );
-                        };
+                        }
 
                         event
                     });

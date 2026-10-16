@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 pub(crate) mod parser;
 
 #[cfg(feature = "sources-prometheus_pushgateway")]

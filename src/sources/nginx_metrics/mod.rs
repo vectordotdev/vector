@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{
     convert::TryFrom,
     time::{Duration, Instant},
@@ -32,16 +33,28 @@ use vector_lib::config::LogNamespace;
 
 macro_rules! counter {
     ($value:expr_2021) => {
-        MetricValue::Counter {
-            value: $value as f64,
+        {
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_lossless,
+                reason = "The metric macro accepts integer and floating-point counters; preserve their existing conversion. https://github.com/vectordotdev/vector/issues/23659"
+            )]
+            let value = $value as f64;
+            MetricValue::Counter { value }
         }
     };
 }
 
 macro_rules! gauge {
     ($value:expr_2021) => {
-        MetricValue::Gauge {
-            value: $value as f64,
+        {
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_lossless,
+                reason = "The metric macro accepts integer and floating-point counters; preserve their existing conversion. https://github.com/vectordotdev/vector/issues/23659"
+            )]
+            let value = $value as f64;
+            MetricValue::Gauge { value }
         }
     };
 }
@@ -94,6 +107,7 @@ pub(super) const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> String {
     "nginx".to_string()
 }
@@ -109,7 +123,7 @@ impl SourceConfig for NginxMetricsConfig {
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let mut sources = Vec::with_capacity(self.endpoints.len());
-        for endpoint in self.endpoints.iter() {
+        for endpoint in &self.endpoints {
             sources.push(NginxMetrics::new(
                 http_client.clone(),
                 endpoint.clone(),
@@ -124,7 +138,7 @@ impl SourceConfig for NginxMetricsConfig {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
-                let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
+                let metrics = join_all(sources.iter().map(NginxMetrics::collect)).await;
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
@@ -214,7 +228,7 @@ impl NginxMetrics {
             emit!(NginxMetricsRequestError {
                 error,
                 endpoint: &self.endpoint,
-            })
+            });
         })?;
         emit!(EndpointBytesReceived {
             byte_size: response.len(),
@@ -227,7 +241,7 @@ impl NginxMetrics {
                 emit!(NginxMetricsStubStatusParseError {
                     error,
                     endpoint: &self.endpoint,
-                })
+                });
             })?;
 
         Ok(vec![
@@ -323,7 +337,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_stub_status() {
         let url = format!("{}/basic_status", nginx_address());
-        test_nginx(url, None, ProxyConfig::default()).await
+        test_nginx(url, None, ProxyConfig::default()).await;
     }
 
     #[tokio::test]
@@ -337,7 +351,7 @@ mod integration_tests {
             }),
             ProxyConfig::default(),
         )
-        .await
+        .await;
     }
 
     // This integration test verifies that proxy support is wired up correctly in Vector
@@ -353,6 +367,6 @@ mod integration_tests {
                 ..Default::default()
             },
         )
-        .await
+        .await;
     }
 }

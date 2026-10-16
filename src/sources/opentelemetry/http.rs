@@ -1,4 +1,7 @@
+use smallvec::SmallVec;
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use vector_lib::opentelemetry::proto::metrics::v1::ResourceMetrics;
+use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
@@ -193,7 +196,7 @@ fn parse_with_deserializer(
 ) -> Result<Vec<Event>, ErrorMessage> {
     let events = deserializer
         .parse(body, log_namespace)
-        .map(|r| r.into_vec())
+        .map(SmallVec::into_vec)
         .map_err(emit_decode_error)?;
 
     // Count individual items within OTLP batches for consistency with other sources
@@ -386,7 +389,7 @@ fn decode_trace_body(
     let events: Vec<Event> = request
         .resource_spans
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(ResourceSpans::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(
@@ -427,7 +430,7 @@ fn decode_metrics_body(
     let events: Vec<Event> = request
         .resource_metrics
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(ResourceMetrics::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(

@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
@@ -112,6 +113,7 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
+    #[must_use]
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -171,6 +173,7 @@ pub struct TcpConfig {
 
 impl TcpConfig {
     #[cfg(test)]
+    #[must_use]
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -463,10 +466,10 @@ mod test {
 
     #[test]
     fn unix_mode_deserializes_on_all_platforms() {
-        let config: StatsdConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: StatsdConfig = serde_yaml::from_str(indoc::indoc! {r"
             mode: unix
             path: /tmp/vector-statsd.sock
-        "#})
+        "})
         .unwrap();
 
         assert!(matches!(config, StatsdConfig::Unix(_)));

@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #[cfg(all(test, feature = "opentelemetry-integration-tests"))]
 mod integration_tests;
 #[cfg(test)]
@@ -28,18 +29,16 @@ fn count_items_inner(resource: &Value, array_id: &str, inner_id: &str) -> usize 
         .map(|r| {
             r.get(vrl::path!(array_id))
                 .and_then(|s| s.as_array())
-                .map(|scope_array| {
+                .map_or(0, |scope_array| {
                     scope_array
                         .iter()
                         .map(|sl| {
                             sl.get(vrl::path!(inner_id))
                                 .and_then(|lr| lr.as_array())
-                                .map(|arr| arr.len())
-                                .unwrap_or(0)
+                                .map_or(0, <[Value]>::len)
                         })
                         .sum::<usize>()
                 })
-                .unwrap_or(0)
         })
         .sum()
 }
@@ -73,7 +72,7 @@ pub(crate) fn count_otlp_items(events: &[Event]) -> usize {
                     0
                 }
             }
-            _ => 0, // unreachable
+            Event::Metric(_) => 0, // unreachable
         })
         .sum()
 }
