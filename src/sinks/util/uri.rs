@@ -734,21 +734,20 @@ mod tests {
 
     #[test]
     fn http_endpoint_defaults_missing_scheme_to_https() {
-        for endpoint in [
-            "example.com",
-            "example.com:8080",
-            "localhost:8080/path",
-            "[::1]:8080",
+        // Only the scheme is added; host, port, path, and userinfo are kept.
+        for (endpoint, expected) in [
+            ("example.com", "https://example.com/"),
+            ("example.com:8080", "https://example.com:8080/"),
+            ("localhost:8080/path", "https://localhost:8080/path"),
+            ("[::1]:8080", "https://[::1]:8080/"),
+            (
+                "user:pass@example.com:8080",
+                "https://user:pass@example.com:8080/",
+            ),
         ] {
-            let endpoint =
+            let parsed =
                 HttpEndpoint::parse(endpoint).expect("should default a missing scheme to https");
-            assert_eq!(endpoint.as_uri().scheme_str(), Some("https"));
-            assert!(
-                endpoint
-                    .as_uri()
-                    .host()
-                    .is_some_and(|host| !host.is_empty())
-            );
+            assert_eq!(parsed.as_uri().to_string(), expected, "{endpoint:?}");
         }
         // An explicit scheme is preserved.
         assert_eq!(

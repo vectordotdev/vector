@@ -171,7 +171,7 @@ struct RoutingConfig {
     /// If no scheme is specified, `https` is used. Specify `http://` explicitly to connect
     /// without TLS.
     #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(docs::examples = "https://127.0.0.1:6000"))]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
     endpoints: Vec<String>,
@@ -1485,28 +1485,6 @@ mod tests {
                     validated_uris(&format!("{tls}\n[routing]\nendpoints = [\"{endpoint}\"]"));
                 assert_eq!(routing, [expected], "routing {endpoint:?} with {tls:?}");
             }
-        }
-    }
-
-    #[test]
-    fn scheme_less_endpoint_keeps_host_port_and_path() {
-        for (endpoint, expected) in [
-            (
-                "vector.example.com:6000",
-                "https://vector.example.com:6000/",
-            ),
-            ("[::1]:6000", "https://[::1]:6000/"),
-            ("127.0.0.1:6000/prefix", "https://127.0.0.1:6000/prefix"),
-            (
-                "user:secret@127.0.0.1:6000",
-                "https://user:secret@127.0.0.1:6000/",
-            ),
-        ] {
-            assert_eq!(
-                validated_uris(&format!("address = \"{endpoint}\"")),
-                [expected],
-                "{endpoint:?}"
-            );
         }
     }
 
