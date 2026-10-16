@@ -308,27 +308,31 @@ fn vector_sink_otel_sink_traces_match() {
 
     let mut seen_span_ids = std::collections::HashSet::new();
     for rs in &collector_sink_request.resource_spans {
-        let mut deduped_rs = rs.clone();
-        deduped_rs.scope_spans.clear();
+        let mut deduplicated_resource_spans = rs.clone();
+        deduplicated_resource_spans.scope_spans.clear();
 
         for ss in &rs.scope_spans {
-            let mut deduped_ss = ss.clone();
-            deduped_ss.spans.clear();
+            let mut deduplicated_scope_spans = ss.clone();
+            deduplicated_scope_spans.spans.clear();
 
             for span in &ss.spans {
                 let span_id = span.span_id.as_slice();
                 if seen_span_ids.insert(span_id) {
-                    deduped_ss.spans.push(span.clone());
+                    deduplicated_scope_spans.spans.push(span.clone());
                 }
             }
 
-            if !deduped_ss.spans.is_empty() {
-                deduped_rs.scope_spans.push(deduped_ss);
+            if !deduplicated_scope_spans.spans.is_empty() {
+                deduplicated_resource_spans
+                    .scope_spans
+                    .push(deduplicated_scope_spans);
             }
         }
 
-        if !deduped_rs.scope_spans.is_empty() {
-            deduped_sink_request.resource_spans.push(deduped_rs);
+        if !deduplicated_resource_spans.scope_spans.is_empty() {
+            deduped_sink_request
+                .resource_spans
+                .push(deduplicated_resource_spans);
         }
     }
 
@@ -342,11 +346,11 @@ fn vector_sink_otel_sink_traces_match() {
 
 #[test]
 fn vector_component_received_events_total_counts_individual_spans() {
-    // This test verifies that when use_otlp_decoding is enabled, the
+    // This test verifies that when OTLP preservation is enabled, the
     // component_received_events_total metric counts individual spans
     // within OTLP batches, not the number of OTLP requests.
     // This ensures consistency with other Vector sources and with the same
-    // OpenTelemetry source when use_otlp_decoding is disabled.
+    // OpenTelemetry source when native conversion is enabled.
     use crate::opentelemetry::assert_component_received_events_total;
 
     assert_component_received_events_total("traces", FORWARDED_SPAN_COUNT);

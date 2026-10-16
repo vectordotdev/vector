@@ -1,7 +1,7 @@
 //! V3 columnar protobuf encoder for the Datadog metrics sink.
 //!
 //! Translates Vector's [`Metric`] events into the V3 columnar format produced by
-//! [`datadog_agent_metrics_v3`].  Unlike V1/V2 (incremental per-metric serialization),
+//! [`datadog_agent_metrics_v3`]. Unlike V2 (incremental per-metric serialization),
 //! V3 accumulates all metrics into a [`V3Writer`] and serializes the entire batch
 //! in a single call when [`DatadogMetricsV3Encoder::finish`] is invoked.  This is
 //! required because delta encoding applies across the whole payload.
@@ -104,6 +104,11 @@ impl DatadogMetricsV3Encoder {
     ///
     /// On success returns `(EncodeResult, processed_metrics)`.  On overflow
     /// returns `FinishError::TooLarge` with the metrics and a split hint.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let writer = mem::replace(&mut self.writer, V3Writer::new());
         let metrics = mem::take(&mut self.pending);
@@ -171,6 +176,15 @@ impl DatadogMetricsV3Encoder {
 
 // ── Metric → V3Writer ────────────────────────────────────────────────────────
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn encode_metric_to_v3(
     writer: &mut V3Writer,
     metric: &Metric,
@@ -185,10 +199,9 @@ fn encode_metric_to_v3(
     let metric_type = match metric.value() {
         MetricValue::Counter { .. } if maybe_interval.is_some() => V3MetricType::Rate,
         MetricValue::Counter { .. } => V3MetricType::Count,
-        MetricValue::Gauge { .. } => V3MetricType::Gauge,
-        MetricValue::Set { .. } => V3MetricType::Gauge,
+        MetricValue::Gauge { .. } | MetricValue::Set { .. } => V3MetricType::Gauge,
         // Sketch-valued metrics are routed to the sketches endpoint (see `sink.rs`), which
-        // always uses the V1/V2 encoder, so they never reach this encoder. `AggregatedSummary`
+        // always uses the V2 encoder, so they never reach this encoder. `AggregatedSummary`
         // is split into counters/gauges, and `Distribution`/`AggregatedHistogram` are converted
         // into `Sketch(AgentDDSketch)`, by the shared `DatadogMetricsNormalizer` before metrics
         // ever reach either encoder. None of these should happen — mirrors V2's
@@ -207,7 +220,7 @@ fn encode_metric_to_v3(
     let name = encode_namespace(
         metric
             .namespace()
-            .or_else(|| default_namespace.as_ref().map(|s| s.as_ref())),
+            .or_else(|| default_namespace.as_ref().map(std::convert::AsRef::as_ref)),
         '.',
         metric.name(),
     );
@@ -216,7 +229,7 @@ fn encode_metric_to_v3(
 
     // ── Tags, resources & source type ───────────────────────────────────────
     //
-    // Delegated wholesale to the V1/V2 encoder's splitter so both protocols send the same
+    // Delegated wholesale to the V2 encoder's splitter so both protocols send the same
     // tags and resources for the same metric. Notably this is what restores the
     // `resource.<type>` tags that the `datadog_agent` source produces from an upstream V2
     // payload's resources back into structured resources.
@@ -275,7 +288,7 @@ fn encode_metric_to_v3(
     match metric.value() {
         MetricValue::Counter { value } => {
             let value = match maybe_interval {
-                Some(interval) => *value / (interval as f64),
+                Some(interval) => *value / f64::from(interval),
                 None => *value,
             };
             builder.add_point(timestamp, value);
@@ -300,8 +313,7 @@ fn encode_metric_to_v3(
 }
 
 fn encode_timestamp(ts: Option<DateTime<Utc>>) -> i64 {
-    ts.map(|t| t.timestamp())
-        .unwrap_or_else(|| Utc::now().timestamp())
+    ts.map_or_else(|| Utc::now().timestamp(), |t| t.timestamp())
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -348,7 +360,7 @@ mod tests {
             None,
         );
         for i in 0..10 {
-            enc.try_encode(counter("m", i as f64)).unwrap();
+            enc.try_encode(counter("m", f64::from(i))).unwrap();
         }
         let (_, metrics) = enc.finish().unwrap();
         assert_eq!(metrics.len(), 10);
@@ -525,7 +537,7 @@ mod tests {
         // `AggregatedSummary` is split into counters/gauges, and `Distribution`/
         // `AggregatedHistogram` are converted into `Sketch(AgentDDSketch)`, by the shared
         // `DatadogMetricsNormalizer`, whose sketch output is then routed to the sketches
-        // endpoint and its V1/V2 encoder (see `sink.rs`) — so none of these values, sketches
+        // endpoint and its V2 encoder (see `sink.rs`) — so none of these values, sketches
         // included, can reach the V3 encoder. Mirror V2 and error rather than guess.
         use vector_lib::event::metric::{Bucket, Quantile, Sample};
 

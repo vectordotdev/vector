@@ -9,6 +9,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::{
+        config::AcknowledgementsConfig,
         sinks::{
             VectorSink,
             blackhole::{config::BlackholeConfig, sink::BlackholeSink},
@@ -24,10 +25,10 @@ mod tests {
         let config = BlackholeConfig {
             print_interval_secs: Duration::from_secs(10),
             rate: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let sink = BlackholeSink::new(config);
-        let sink = VectorSink::Stream(Box::new(sink));
+        let sink = VectorSink::from_streamsink(sink);
 
         let (_input_lines, events) = random_events_with_stream(100, 10, None);
         run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;

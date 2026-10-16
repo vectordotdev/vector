@@ -47,7 +47,7 @@ fn encode_events(
         })
         .collect::<Vec<_>>();
 
-    let uncompressed_byte_size = request.iter().map(|event| event.encoded_length()).sum();
+    let uncompressed_byte_size = request.iter().map(EncodedLength::encoded_length).sum();
 
     EncodeResult {
         payload: request,
@@ -68,11 +68,11 @@ pub(super) fn request_builder(
 ) -> RedisRequest {
     let finalizers = events.take_finalizers();
     let builder = RequestMetadataBuilder::from_events(&events);
-    let encoded = encode_events(events, transformer, encoder);
-    let metadata = builder.build(&encoded);
+    let payload = encode_events(events, transformer, encoder);
+    let metadata = builder.build(&payload);
 
     RedisRequest {
-        request: encoded.into_payload(),
+        request: payload.into_payload(),
         finalizers,
         metadata,
     }

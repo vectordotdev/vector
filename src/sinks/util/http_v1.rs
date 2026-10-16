@@ -37,26 +37,26 @@ pub(crate) trait HttpServiceRequestBuilder<T: Send> {
 /// The response returned by the native `http 1` sink service.
 #[derive(Debug)]
 pub(crate) struct HttpResponse {
-    pub http_response: Response<Bytes>,
+    pub response: Response<Bytes>,
     pub events_byte_size: GroupedCountByteSize,
     pub raw_byte_size: usize,
 }
 
 impl sink::Response for HttpResponse {
     fn is_successful(&self) -> bool {
-        self.http_response.status().is_success()
+        self.response.status().is_success()
     }
 
     fn is_transient(&self) -> bool {
-        self.http_response.status().is_server_error()
+        self.response.status().is_server_error()
     }
 }
 
 impl DriverResponse for HttpResponse {
     fn event_status(&self) -> EventStatus {
-        if self.http_response.status().is_success() {
+        if self.response.status().is_success() {
             EventStatus::Delivered
-        } else if self.http_response.status().is_server_error() {
+        } else if self.response.status().is_server_error() {
             EventStatus::Errored
         } else {
             EventStatus::Rejected
@@ -136,7 +136,7 @@ where
             let (parts, body) = response.into_parts();
             let body = body.collect().await.map_err(HttpError::new)?.to_bytes();
             Ok(HttpResponse {
-                http_response: Response::from_parts(parts, body),
+                response: Response::from_parts(parts, body),
                 events_byte_size,
                 raw_byte_size,
             })
@@ -161,15 +161,15 @@ pub(crate) fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
 > {
     super::http::HttpStatusRetryLogic::new_with_error(
         |response: &HttpResponse| {
-            let status = http::StatusCode::from_u16(response.http_response.status().as_u16())
+            let status = http::StatusCode::from_u16(response.response.status().as_u16())
                 .expect("HTTP status codes are valid u16 values");
             if !status.is_success() {
                 debug!(
                     message = "HTTP response.",
                     %status,
                     body = %String::from_utf8_lossy(
-                        &response.http_response.body()[..response
-                            .http_response
+                        &response.response.body()[..response
+                            .response
                             .body()
                             .len()
                             .min(super::http::MAX_ERROR_BODY_BYTES)],

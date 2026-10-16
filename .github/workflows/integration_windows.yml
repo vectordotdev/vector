@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -31,7 +31,7 @@ jobs:
 
   run-test-integration-windows:
     needs: changes
-    if: needs.changes.outputs.windows == 'true'
+    if: needs.changes.outputs.windows == 'true' && github.repository == 'vectordotdev/vector'
     runs-on: windows-2025-8core
     timeout-minutes: 60
     steps:
@@ -49,7 +49,7 @@ jobs:
 
   test-integration-windows:
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: run-test-integration-windows
     steps:
       - run: |

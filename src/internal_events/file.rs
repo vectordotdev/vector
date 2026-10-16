@@ -36,6 +36,8 @@ pub struct FileOpen {
 }
 
 impl InternalEvent for FileOpen {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         gauge!(GaugeName::OpenFiles).set(self.count as f64);
     }
@@ -502,6 +504,11 @@ mod source {
     }
 
     impl InternalEvent for FileCheckpointed {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Bounds and overflow audit deferred"
+        )]
         fn emit(self) {
             debug!(
                 message = "Files checkpointed.",

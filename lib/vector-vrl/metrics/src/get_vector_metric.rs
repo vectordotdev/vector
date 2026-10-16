@@ -21,7 +21,7 @@ fn get_metric(
     key: Value,
     tags: BTreeMap<String, String>,
 ) -> Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("argument must be a string");
+    let key_str = key.to_str_lossy().expect("argument must be a string");
     let value = match metrics_storage.get_metric(&key_str, tags) {
         Some(value) => metric_into_vrl(&value),
         None => Value::Null,

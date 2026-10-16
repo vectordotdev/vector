@@ -5,6 +5,10 @@ use tokio::net::UdpSocket;
 
 use super::SocketListenAddr;
 
+///
+/// # Errors
+///
+/// Returns an error if the address cannot be bound or the inherited socket cannot be configured.
 /// Binds a UDP socket to the listen address.
 pub async fn try_bind_udp_socket(
     addr: SocketListenAddr,

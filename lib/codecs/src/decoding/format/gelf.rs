@@ -316,30 +316,28 @@ mod tests {
 
         assert_eq!(
             log.get(event_path!(VERSION)),
-            Some(&Value::Bytes(Bytes::from_static(b"1.1")))
+            Some(&Value::from_static_str("1.1"))
         );
         assert_eq!(
             log.get(event_path!(HOST)),
-            Some(&Value::Bytes(Bytes::from_static(b"example.org")))
+            Some(&Value::from_static_str("example.org"))
         );
         assert_eq!(
             log.get(log_schema().message_key_target_path().unwrap()),
-            Some(&Value::Bytes(Bytes::from_static(
-                b"A short message that helps you identify what is going on"
-            )))
+            Some(&Value::from_static_str(
+                "A short message that helps you identify what is going on"
+            ))
         );
         assert_eq!(
             log.get(event_path!(FULL_MESSAGE)),
-            Some(&Value::Bytes(Bytes::from_static(
-                b"Backtrace here\n\nmore stuff"
-            )))
+            Some(&Value::from_static_str("Backtrace here\n\nmore stuff"))
         );
         let dt = DateTime::from_timestamp(1_385_053_862, 307_200_000).expect("invalid timestamp");
         assert_eq!(log.get(event_path!(TIMESTAMP)), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(event_path!(LEVEL)), Some(&Value::Integer(1)));
         assert_eq!(
             log.get(event_path!(FACILITY)),
-            Some(&Value::Bytes(Bytes::from_static(b"foo")))
+            Some(&Value::from_static_str("foo"))
         );
         assert_eq!(
             log.get(event_path!(LINE)),
@@ -347,7 +345,7 @@ mod tests {
         );
         assert_eq!(
             log.get(event_path!(FILE)),
-            Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
+            Some(&Value::from_static_str("/tmp/bar"))
         );
         assert_eq!(
             log.get(event_path!(add_on_int_in)),
@@ -357,7 +355,7 @@ mod tests {
         );
         assert_eq!(
             log.get(event_path!(add_on_str_in)),
-            Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
+            Some(&Value::from_static_str("A Space Odyssey"))
         );
     }
 
@@ -486,7 +484,7 @@ mod tests {
 
         assert_eq!(
             log.get(event_path!(VERSION)),
-            Some(&Value::Bytes(Bytes::from_static(b"1.0")))
+            Some(&Value::from_static_str("1.0"))
         );
 
         assert_eq!(

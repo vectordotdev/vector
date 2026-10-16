@@ -14,7 +14,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use cuckoo_clock::{
     CuckooFilter, ExportableRandomState, InsertValues, LookupValues,
     config::{CounterConfig, CuckooConfiguration, LruAgingStrategy, LruConfig, TtlConfig},
@@ -52,7 +51,7 @@ use crate::enrichment_tables::memory::{
     },
 };
 
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a cuckoo table.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a cuckoo table.
 #[derive(Clone)]
 pub(super) struct CuckooMemoryTable {
     filter: CuckooFilter<ExportableRandomState>,
@@ -64,6 +63,11 @@ pub(super) struct CuckooMemoryTable {
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Keep the existing state representation pending a separate type-design review."
+)]
 pub struct CuckooMemoryConfig {
     /// Number of bits used for fingerprint.
     #[serde(default = "default_cuckoo_fingerprint_bits")]
@@ -211,7 +215,7 @@ const fn default_cuckoo_max_kicks() -> usize {
 }
 
 impl CuckooMemoryTable {
-    /// Creates a new [CuckooMemoryTable] based on the provided config.
+    /// Creates a new [`CuckooMemoryTable`] based on the provided config.
     pub(super) fn new(
         config: MemoryConfig,
         cuckoo_config: CuckooMemoryConfig,
@@ -270,7 +274,7 @@ impl CuckooMemoryTable {
                         "Persisted configuration had a different default TTL value ({}), comapared to the new value ({}). Previous default TTL value is effectively {} seconds, while the new one is {} seconds.",
                         persisted_ttl.ttl,
                         ttl.ttl,
-                        (persisted_ttl.ttl.get() as u64) * config.scan_interval.get(),
+                        u64::from(persisted_ttl.ttl.get()) * config.scan_interval.get(),
                         config.ttl
                     );
                 }
@@ -289,13 +293,13 @@ impl CuckooMemoryTable {
         };
 
         Ok(Self {
-            config,
             filter,
+            config,
             cuckoo_config,
         })
     }
 
-    /// Creates a new [CuckooMemoryTable] based on the provided config and previous state.
+    /// Creates a new [`CuckooMemoryTable`] based on the provided config and previous state.
     pub(super) fn from_previous_state(
         config: MemoryConfig,
         cuckoo_config: CuckooMemoryConfig,
@@ -332,7 +336,7 @@ impl CuckooMemoryTable {
                         "Restored configuration had a different default TTL value ({}), comapared to the new value ({}). Previous default TTL value is effectively {} seconds, while the new one is {} seconds.",
                         old_ttl.ttl,
                         ttl.ttl,
-                        (old_ttl.ttl.get() as u64) * config.scan_interval.get(),
+                        u64::from(old_ttl.ttl.get()) * config.scan_interval.get(),
                         config.ttl
                     );
                 }
@@ -482,19 +486,19 @@ impl CuckooMemoryTable {
             .in_current_span();
             handles.spawn(task);
         }
-        if !self.cuckoo_config.concurrent_scanning {
-            let _ = handles.join_all().await;
-            emit!(MemoryEnrichmentTableFlushed {
-                new_objects_count: filter.get_item_count(),
-                new_byte_size: filter.get_memory_usage()
-            });
-        } else {
+        if self.cuckoo_config.concurrent_scanning {
             tokio::spawn(async move {
                 let _ = handles.join_all().await;
                 emit!(MemoryEnrichmentTableFlushed {
                     new_objects_count: filter.get_item_count(),
                     new_byte_size: filter.get_memory_usage()
                 });
+            });
+        } else {
+            let _ = handles.join_all().await;
+            emit!(MemoryEnrichmentTableFlushed {
+                new_objects_count: filter.get_item_count(),
+                new_byte_size: filter.get_memory_usage()
             });
         }
     }
@@ -505,7 +509,7 @@ impl CuckooMemoryTable {
                 if let Err(error) = writer.flush() {
                     warn!("Cuckoo filter export failed: {error}");
                     return Err(());
-                };
+                }
                 Ok(())
             }
             Err(error) => {
@@ -515,8 +519,17 @@ impl CuckooMemoryTable {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep ownership and drop timing unchanged during the lint rollout."
+    )]
     fn handle_value(&self, value: ObjectMap) {
-        for (k, value) in value.iter() {
+        for (k, value) in &value {
             if matches!(value, Value::Null) {
                 if self.filter.remove(k) {
                     emit!(MemoryEnrichmentTableRemoved {
@@ -526,7 +539,7 @@ impl CuckooMemoryTable {
                 }
 
                 continue;
-            };
+            }
 
             let res = if self.cuckoo_config.ttl_enabled || self.cuckoo_config.counter_enabled {
                 let mut ttl = self
@@ -535,7 +548,7 @@ impl CuckooMemoryTable {
                     .path
                     .as_ref()
                     .and_then(|p| value.get(p))
-                    .and_then(|v| v.as_integer())
+                    .and_then(vector_lib::event::Value::as_integer)
                     .and_then(|v| u64::try_from(v).ok())
                     .or(Some(self.config.ttl))
                     .map(|v| (v.div_ceil(self.config.scan_interval.get())).max(1))
@@ -551,8 +564,7 @@ impl CuckooMemoryTable {
                         // Unchecked conversion to u32, because ttl_bits can't be higher than 32 anyways
                         *ttl = 2_u32
                             .checked_pow(self.cuckoo_config.ttl_bits.get() as u32)
-                            .map(|ttl| ttl - 1)
-                            .unwrap_or(u32::MAX);
+                            .map_or(u32::MAX, |ttl| ttl - 1);
                     }
                 }
                 let counter = self
@@ -561,13 +573,12 @@ impl CuckooMemoryTable {
                     .path
                     .as_ref()
                     .and_then(|p| value.get(p))
-                    .and_then(|v| v.as_integer())
-                    .map(|v| {
-                        i32::try_from(v)
-                            .ok()
-                            .unwrap_or_else(|| v.clamp(i32::MIN as i64, i32::MAX as i64) as i32)
-                    })
-                    .unwrap_or(self.cuckoo_config.counter_insertion_increment);
+                    .and_then(vector_lib::event::Value::as_integer)
+                    .map_or(self.cuckoo_config.counter_insertion_increment, |v| {
+                        i32::try_from(v).ok().unwrap_or_else(|| {
+                            v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+                        })
+                    });
                 self.filter.insert_if_not_present_with_update(
                     k,
                     InsertValues {
@@ -634,21 +645,16 @@ impl Table for CuckooMemoryTable {
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
                     });
                     let mut result = ObjectMap::from([
-                        (
-                            KeyString::from("key"),
-                            Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
-                        ),
+                        (KeyString::from("key"), Value::from(key)),
                         (
                             KeyString::from("fingerprint"),
-                            Value::Bytes(Bytes::from(format!(
-                                "{:X}",
-                                associated_data.get_fingerprint()
-                            ))),
+                            Value::from(format!("{:X}", associated_data.get_fingerprint())),
                         ),
                         (KeyString::from("value"), Value::Null),
                     ]);
                     if let Ok(ttl) = associated_data.get_stored_ttl_value()
-                        && let Ok(ttl) = (ttl as u64 * self.config.scan_interval.get()).try_into()
+                        && let Ok(ttl) =
+                            (u64::from(ttl) * self.config.scan_interval.get()).try_into()
                     {
                         result.insert(KeyString::from("ttl"), Value::Integer(ttl));
                     }
@@ -661,7 +667,7 @@ impl Table for CuckooMemoryTable {
                         key: &key,
                         include_key_metric_tag: self.config.internal_metrics.include_key_tag
                     });
-                    Ok(Default::default())
+                    Ok(Vec::default())
                 }
             }
             Some(_) => Err(Error::OnlyEqualityConditionAllowed),
@@ -700,6 +706,11 @@ impl std::fmt::Debug for CuckooMemoryTable {
 
 #[async_trait]
 impl StreamSink<Event> for CuckooMemoryTable {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::manual_let_else,
+        reason = "Keep the existing branching and control flow during the lint rollout."
+    )]
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
@@ -714,19 +725,19 @@ impl StreamSink<Event> for CuckooMemoryTable {
             .flush_interval
             .map(NonZeroU64::get)
             .map(Duration::from_secs)
-            .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
-                Box::pin(IntervalStream::new(interval(d)))
-            })
-            .unwrap_or(Box::pin(stream::empty()));
+            .map_or::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(
+                Box::pin(stream::empty()),
+                |d| Box::pin(IntervalStream::new(interval(d))),
+            );
         let mut export_interval: Pin<Box<dyn Stream<Item = Instant> + Send>> = self
             .cuckoo_config
             .export_interval
             .map(NonZeroU64::get)
             .map(Duration::from_secs)
-            .map::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(|d| {
-                Box::pin(IntervalStream::new(interval(d)))
-            })
-            .unwrap_or(Box::pin(stream::empty()));
+            .map_or::<Pin<Box<dyn Stream<Item = Instant> + Send>>, _>(
+                Box::pin(stream::empty()),
+                |d| Box::pin(IntervalStream::new(interval(d))),
+            );
 
         let scans_in_progress = Arc::new(AtomicUsize::new(0));
         let mut export_handle: Option<JoinHandle<()>> = None;
@@ -747,8 +758,8 @@ impl StreamSink<Event> for CuckooMemoryTable {
                     let log = event.into_log();
 
                     if let (Value::Object(map), _) = log.into_parts() {
-                        self.handle_value(map)
-                    };
+                        self.handle_value(map);
+                    }
 
                     finalizers.update_status(EventStatus::Delivered);
                     events_sent.emit(CountByteSize(1, event_byte_size));
@@ -848,7 +859,7 @@ mod tests {
 
     #[test]
     fn finds_row() {
-        let memory = CuckooMemoryTable::new(Default::default(), build_cuckoo_config(|_| {}))
+        let memory = CuckooMemoryTable::new(MemoryConfig::default(), build_cuckoo_config(|_| {}))
             .expect("default cuckoo memory table should build correctly");
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -872,7 +883,7 @@ mod tests {
             Value::from(5),
         )])));
 
-        let memory = CuckooMemoryTable::new(Default::default(), build_cuckoo_config(|_| {}))
+        let memory = CuckooMemoryTable::new(MemoryConfig::default(), build_cuckoo_config(|_| {}))
             .expect("default cuckoo memory table should build correctly");
 
         run_and_assert_sink_compliance(
@@ -885,7 +896,7 @@ mod tests {
 
     #[test]
     fn missing_key() {
-        let memory = CuckooMemoryTable::new(Default::default(), build_cuckoo_config(|_| {}))
+        let memory = CuckooMemoryTable::new(MemoryConfig::default(), build_cuckoo_config(|_| {}))
             .expect("default cuckoo memory table should build correctly");
 
         let condition = Condition::Equals {
@@ -947,7 +958,7 @@ mod tests {
 
     #[test]
     fn restores_state() {
-        let memory = CuckooMemoryTable::new(Default::default(), build_cuckoo_config(|_| {}))
+        let memory = CuckooMemoryTable::new(MemoryConfig::default(), build_cuckoo_config(|_| {}))
             .expect("default cuckoo memory table should build correctly");
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -970,7 +981,7 @@ mod tests {
         assert!(result.contains_key("fingerprint"));
 
         let restored_memory = CuckooMemoryTable::from_previous_state(
-            Default::default(),
+            MemoryConfig::default(),
             build_cuckoo_config(|_| {}),
             memory
                 .extract_state()

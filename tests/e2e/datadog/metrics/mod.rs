@@ -55,9 +55,10 @@ where
             let content_str = String::from_utf8_lossy(&payload);
 
             // Try to parse as JSON to show structured content
-            let json_repr = serde_json::from_slice::<Value>(&payload)
-                .map(|v| format!("JSON: {v}"))
-                .unwrap_or_else(|_| format!("raw: '{content_str}'"));
+            let json_repr = serde_json::from_slice::<Value>(&payload).map_or_else(
+                |_| format!("raw: '{content_str}'"),
+                |v| format!("JSON: {v}"),
+            );
 
             warn!(
                 "Skipping small payload (likely diagnostic/health check): expected protobuf type {}, got {} bytes, content: {json_repr}, hex: {payload:02x?}",
@@ -68,38 +69,35 @@ where
         }
 
         // Try to decode directly first (handles decompressed data from fakeintake)
-        let decoded = match T::decode(Bytes::from(payload.clone())) {
-            Ok(decoded) => {
-                // Successfully decoded directly - fakeintake returned decompressed data
-                debug!(
-                    "Decoded protobuf directly (fakeintake returned decompressed): type {}, size {} bytes",
+        let decoded = if let Ok(decoded) = T::decode(Bytes::from(payload.clone())) {
+            // Successfully decoded directly - fakeintake returned decompressed data
+            debug!(
+                "Decoded protobuf directly (fakeintake returned decompressed): type {}, size {} bytes",
+                std::any::type_name::<T>(),
+                payload.len()
+            );
+            decoded
+        } else {
+            // Direct decode failed - payload is still compressed, decompress first
+            debug!(
+                "Direct decode failed, attempting decompression: type {}, size {} bytes",
+                std::any::type_name::<T>(),
+                payload.len()
+            );
+            let decompressed = decompress_payload(payload.as_slice()).await.map_err(|e| {
+                format!(
+                    "Failed to decompress payload: {e}. Type {}, length {}, first 4 bytes: {:02x?}",
                     std::any::type_name::<T>(),
-                    payload.len()
-                );
-                decoded
-            }
-            Err(_) => {
-                // Direct decode failed - payload is still compressed, decompress first
-                debug!(
-                    "Direct decode failed, attempting decompression: type {}, size {} bytes",
-                    std::any::type_name::<T>(),
-                    payload.len()
-                );
-                let decompressed = decompress_payload(payload.as_slice())
-                    .await
-                    .map_err(|e| format!(
-                        "Failed to decompress payload: {e}. Type {}, length {}, first 4 bytes: {:02x?}",
-                        std::any::type_name::<T>(),
-                        payload.len(),
-                        &payload[..payload.len().min(4)]
-                    ))?;
-                T::decode(Bytes::from(decompressed)).map_err(|e| {
-                    format!(
-                        "Failed to decode protobuf after decompression: {e} (type {})",
-                        std::any::type_name::<T>()
-                    )
-                })?
-            }
+                    payload.len(),
+                    &payload[..payload.len().min(4)]
+                )
+            })?;
+            T::decode(Bytes::from(decompressed)).map_err(|e| {
+                format!(
+                    "Failed to decode protobuf after decompression: {e} (type {})",
+                    std::any::type_name::<T>()
+                )
+            })?
         };
 
         out_payloads.push(decoded);

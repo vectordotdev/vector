@@ -180,9 +180,8 @@ impl ConfinementChecker {
     /// confinement. Returns `Ok(None)` if the template is static and needs no
     /// confinement.
     fn validate_common(tpl: &UnconfinedTemplate) -> Result<Option<String>, BuildError> {
-        let fields = match tpl.get_fields() {
-            Some(f) => f,
-            None => return Ok(None),
+        let Some(fields) = tpl.get_fields() else {
+            return Ok(None);
         };
         let prefix = tpl.literal_prefix();
         if prefix.is_empty() {
@@ -264,10 +263,10 @@ impl ConfinementChecker {
                 // are invalid percent escapes), so their literal prefix —
                 // scheme and authority before the first `%` — is validated
                 // instead.
-                if !tpl.inner.is_dynamic() {
-                    Self::validate_static_uri(tpl).map(|()| None)
-                } else {
+                if tpl.inner.is_dynamic() {
                     Self::validate_static_uri_prefix(tpl.inner.literal_prefix()).map(|()| None)
+                } else {
+                    Self::validate_static_uri(tpl).map(|()| None)
                 }
             }
         }
@@ -563,6 +562,7 @@ impl ConfinementConfig {
     /// Returns a `ConfinementConfig` that opts out of confinement.
     ///
     /// Use only in tests where templates intentionally have no literal prefix.
+    #[must_use]
     pub const fn unconfined() -> Self {
         Self {
             dangerously_allow_unconfined_template_resolution: true,
@@ -588,4 +588,7 @@ impl ConfinementConfig {
         );
     }
 }
-use super::*;
+use super::{
+    ConfinementConfig, Hash, MAX_RENDERED_PATH_LEN, Snafu, Template, UnconfinedTemplate, Uri,
+    confined_preview, warn,
+};

@@ -72,7 +72,7 @@ impl DatadogEventsService {
                 .header("DD-API-KEY", api_key)
                 .header("Content-Length", req.body.len())
                 .body(req.body)
-                .map_err(|x| x.into());
+                .map_err(std::convert::Into::into);
             future::ready(request)
         });
 
