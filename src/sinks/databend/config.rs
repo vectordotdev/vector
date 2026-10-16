@@ -224,6 +224,14 @@ impl ValidatedSink for DatabendConfig {
             transformer,
         } = validated;
 
+        if self
+            .tls
+            .as_ref()
+            .is_some_and(TlsConfig::has_protocol_version_bounds)
+        {
+            vector_lib::tls::warn_unenforceable_protocol_versions("databend-client");
+        }
+
         let ua = format!("vector/{}", vector_version());
         let health_client = DatabendAPIClient::new(endpoint, Some(ua.clone())).await?;
         let healthcheck = select_one(health_client).boxed();
