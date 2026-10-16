@@ -137,6 +137,13 @@ impl Controller {
         self.recorder.with_registry(Registry::clear);
     }
 
+    /// Remove all metrics associated with a component that is no longer active.
+    pub fn remove_component_metrics(&self, component_id: &str, component_kind: &str) {
+        self.recorder.with_registry(|registry| {
+            registry.remove_component_metrics(component_id, component_kind);
+        });
+    }
+
     /// Get a handle to the globally registered controller, if it's initialized.
     ///
     /// # Errors
@@ -205,8 +212,8 @@ impl Controller {
 mod tests {
     use strum::IntoEnumIterator;
     use vector_common::{
-        counter, gauge,
-        internal_event::{CounterName, GaugeName},
+        counter, gauge, histogram,
+        internal_event::{CounterName, GaugeName, HistogramName},
     };
 
     use super::*;
@@ -269,6 +276,86 @@ mod tests {
         assert_eq!(controller.capture_metrics().len(), 4);
         gauge.set(1.0);
         assert_eq!(controller.capture_metrics().len(), 4);
+    }
+
+    #[test]
+    fn removes_component_metrics() {
+        let controller = init_metrics();
+        let counter_name = CounterName::iter().next().unwrap();
+        let gauge_name = GaugeName::iter().next().unwrap();
+        let histogram_name = HistogramName::iter().next().unwrap();
+
+        let removed_counter =
+            counter!(counter_name, "component_id" => "removed", "component_kind" => "transform");
+        removed_counter.increment(1);
+        gauge!(gauge_name, "component_id" => "removed", "component_kind" => "transform").set(2.0);
+        histogram!(histogram_name, "component_id" => "removed", "component_kind" => "transform")
+            .record(3.0);
+
+        counter!(counter_name, "component_id" => "live", "component_kind" => "transform")
+            .increment(1);
+        gauge!(gauge_name, "component_id" => "live", "component_kind" => "transform").set(2.0);
+        histogram!(histogram_name, "component_id" => "live", "component_kind" => "transform")
+            .record(3.0);
+        counter!(counter_name, "component_id" => "removed", "component_kind" => "source")
+            .increment(1);
+        counter!(counter_name, "component_id" => "removed.child", "component_kind" => "transform")
+            .increment(1);
+        counter!(counter_name).increment(1);
+
+        assert_eq!(
+            controller
+                .capture_metrics()
+                .iter()
+                .filter(
+                    |metric| metric.tags().and_then(|tags| tags.get("component_id"))
+                        == Some("removed")
+                )
+                .count(),
+            4
+        );
+
+        controller.remove_component_metrics("removed", "transform");
+        removed_counter.increment(1);
+
+        let metrics = controller.capture_metrics();
+        assert!(!metrics.iter().any(|metric| {
+            metric.tags().and_then(|tags| tags.get("component_id")) == Some("removed")
+                && metric.tags().and_then(|tags| tags.get("component_kind")) == Some("transform")
+        }));
+        assert!(metrics.iter().any(|metric| {
+            metric.tags().and_then(|tags| tags.get("component_id")) == Some("removed")
+                && metric.tags().and_then(|tags| tags.get("component_kind")) == Some("source")
+        }));
+        assert!(
+            metrics.iter().any(
+                |metric| metric.tags().and_then(|tags| tags.get("component_id")) == Some("live")
+            )
+        );
+        assert!(metrics.iter().any(
+            |metric| metric.tags().and_then(|tags| tags.get("component_id"))
+                == Some("removed.child")
+        ));
+        assert!(metrics.iter().any(|metric| metric.tags().is_none()));
+    }
+
+    #[test]
+    fn removes_component_metric_recency() {
+        let controller = init_metrics();
+        controller
+            .set_expiry(Some(IDLE_TIMEOUT), Vec::new())
+            .unwrap();
+        let name = CounterName::iter().next().unwrap();
+
+        counter!(name, "component_id" => "recreated", "component_kind" => "transform").increment(1);
+        controller.capture_metrics();
+        controller.remove_component_metrics("recreated", "transform");
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+
+        counter!(name, "component_id" => "recreated", "component_kind" => "transform").increment(1);
+        assert!(controller.capture_metrics().iter().any(|metric| {
+            metric.tags().and_then(|tags| tags.get("component_id")) == Some("recreated")
+        }));
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use std::{
     cell::OnceCell,
+    collections::HashSet,
     sync::{Arc, RwLock, atomic::Ordering},
     time::Duration,
 };
@@ -34,6 +35,41 @@ impl Registry {
 
     pub(super) fn clear(&self) {
         self.registry.clear();
+    }
+
+    pub(super) fn remove_component_metrics(&self, component_id: &str, component_kind: &str) {
+        let mut removed = HashSet::new();
+        let mut retain = |key: &Key| {
+            let belongs_to_component =
+                Self::belongs_to_component(key, component_id, component_kind);
+            if belongs_to_component {
+                removed.insert(key.clone());
+            }
+            !belongs_to_component
+        };
+
+        self.registry.retain_counters(|key, _| retain(key));
+        self.registry.retain_gauges(|key, _| retain(key));
+        self.registry.retain_histograms(|key, _| retain(key));
+
+        if let Some(recency) = self
+            .recency
+            .read()
+            .expect("Failed to acquire read lock on recency map")
+            .as_ref()
+        {
+            recency.remove_keys(&removed);
+        }
+    }
+
+    fn belongs_to_component(key: &Key, component_id: &str, component_kind: &str) -> bool {
+        let mut id_matches = false;
+        let mut kind_matches = false;
+        for label in key.labels() {
+            id_matches |= label.key() == "component_id" && label.value() == component_id;
+            kind_matches |= label.key() == "component_kind" && label.value() == component_kind;
+        }
+        id_matches && kind_matches
     }
 
     pub(super) fn set_expiry(
