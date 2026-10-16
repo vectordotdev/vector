@@ -185,6 +185,10 @@ pub struct DiskBufferConfig<FS> {
     /// implementation essentially defines how we open and delete data files, as well as the type of
     /// the data file objects we get when opening a data file.
     pub(crate) filesystem: FS,
+
+    /// Whether records shed because the buffer is full are marked `Errored` (enabled for `reject`
+    /// buffers) rather than acknowledged as delivered.
+    pub(crate) error_on_full: bool,
 }
 
 /// Builder for [`DiskBufferConfig`].
@@ -200,6 +204,7 @@ where
     pub(crate) write_buffer_size: Option<usize>,
     pub(crate) flush_interval: Option<Duration>,
     pub(crate) filesystem: FS,
+    pub(crate) error_on_full: Option<bool>,
 }
 
 impl DiskBufferConfigBuilder {
@@ -215,6 +220,7 @@ impl DiskBufferConfigBuilder {
             write_buffer_size: None,
             flush_interval: None,
             filesystem: ProductionFilesystem,
+            error_on_full: None,
         }
     }
 }
@@ -262,6 +268,12 @@ where
     #[allow(dead_code)]
     pub fn max_record_size(mut self, amount: usize) -> Self {
         self.max_record_size = Some(amount);
+        self
+    }
+
+    /// Sets whether records shed because the buffer is full are marked `Errored`. Defaults to `false`.
+    pub fn error_on_full(mut self, error_on_full: bool) -> Self {
+        self.error_on_full = Some(error_on_full);
         self
     }
 
@@ -313,6 +325,7 @@ where
             write_buffer_size: self.write_buffer_size,
             flush_interval: self.flush_interval,
             filesystem,
+            error_on_full: self.error_on_full,
         }
     }
 
@@ -430,6 +443,8 @@ where
         // `max_buffer_size`.
         let max_buffer_size = max_buffer_size - max_data_file_size;
 
+        let error_on_full = self.error_on_full.unwrap_or(false);
+
         Ok(DiskBufferConfig {
             data_dir: self.data_dir,
             max_buffer_size,
@@ -438,6 +453,7 @@ where
             write_buffer_size,
             flush_interval,
             filesystem,
+            error_on_full,
         })
     }
 }
