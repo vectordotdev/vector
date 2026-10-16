@@ -168,7 +168,8 @@ impl MqttSourceConfig {
             .into_iter()
             .find(|topic| !rumqttc::valid_filter(topic))
         {
-            return Err(ConfigurationError::InvalidTopicFilter { topic }).context(ConfigurationSnafu);
+            return Err(ConfigurationError::InvalidTopicFilter { topic })
+                .context(ConfigurationSnafu);
         }
 
         let client_id = self.common.client_id.clone().unwrap_or_else(|| {

@@ -937,8 +937,10 @@ impl MqttSource {
             // stale) generation, until the ConnAck handler resolves them.
             // Everything else keeps the simpler drop/keep call made by
             // `keep_buffered_event_after_disconnect` -- see its doc comment.
-            let (kept, orphaned) =
-                partition_buffered_events(std::mem::take(&mut connection.state.events), self.acknowledgements);
+            let (kept, orphaned) = partition_buffered_events(
+                std::mem::take(&mut connection.state.events),
+                self.acknowledgements,
+            );
             connection.state.events = kept;
             orphaned_publishes.extend(
                 orphaned
@@ -1331,10 +1333,7 @@ mod tests {
             assert_eq!(
                 connection.pending,
                 VecDeque::from([
-                    rumqttc::Request::Subscribe(rumqttc::Subscribe::new(
-                        "topic",
-                        QoS::AtLeastOnce
-                    )),
+                    rumqttc::Request::Subscribe(rumqttc::Subscribe::new("topic", QoS::AtLeastOnce)),
                     rumqttc::Request::PingReq(rumqttc::PingReq),
                 ])
             );
@@ -1728,35 +1727,15 @@ mod tests {
         let mut state = ProtocolState::default();
         state.on_connack(true, true);
 
-        assert!(
-            state
-                .finalize_publish(BatchStatus::Delivered, 1)
-                .should_ack
-        );
+        assert!(state.finalize_publish(BatchStatus::Delivered, 1).should_ack);
 
-        assert!(
-            !state
-                .finalize_publish(BatchStatus::Rejected, 1)
-                .should_ack
-        );
-        assert!(
-            !state
-                .finalize_publish(BatchStatus::Delivered, 1)
-                .should_ack
-        );
-        assert!(
-            !state
-                .finalize_publish(BatchStatus::Delivered, 1)
-                .should_ack
-        );
+        assert!(!state.finalize_publish(BatchStatus::Rejected, 1).should_ack);
+        assert!(!state.finalize_publish(BatchStatus::Delivered, 1).should_ack);
+        assert!(!state.finalize_publish(BatchStatus::Delivered, 1).should_ack);
 
         // A reconnect starts a fresh generation, resuming normal acking.
         state.on_connack(true, false);
-        assert!(
-            state
-                .finalize_publish(BatchStatus::Delivered, 2)
-                .should_ack
-        );
+        assert!(state.finalize_publish(BatchStatus::Delivered, 2).should_ack);
     }
 
     // A withheld ack must trigger a forced reconnect (so the broker
@@ -2077,8 +2056,7 @@ mod tests {
                 ModelEvent::EscalationDue => self.forced.escalate_at().is_some(),
                 ModelEvent::ResubscribeRetryDue { .. } => self.resubscribe_retry_scheduled,
                 ModelEvent::LoopTopResubscribe { .. } => {
-                    self.state.loop_actions().retry_resubscribe
-                        && !self.forced.disconnect_sent()
+                    self.state.loop_actions().retry_resubscribe && !self.forced.disconnect_sent()
                 }
             }
         }
