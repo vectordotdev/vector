@@ -24,7 +24,7 @@ impl SinkError {
 
 impl Default for SinkError {
     fn default() -> Self {
-        Self(crate::default_task_error())
+        Self("the sink task completed with an error".into())
     }
 }
 

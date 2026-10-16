@@ -22,8 +22,8 @@ pub use vector_config as configurable;
 pub use vector_config::impl_generate_config_from_default;
 pub use vector_core::compile_vrl;
 pub use vector_core::{
-    EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, default_task_error, emit,
-    event, fanout, ipallowlist, latency, metric_tags, metrics, partition, quantiles, register,
+    EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, emit, event, fanout,
+    ipallowlist, latency, metric_tags, metrics, partition, quantiles, register,
     register_extra_span_field, samples, schema, serde, sink, source, source_sender, tcp, tls,
     transform,
 };
