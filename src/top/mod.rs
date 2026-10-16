@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Top subcommand
 mod cmd;
 

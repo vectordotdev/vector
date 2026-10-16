@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use indexmap::IndexMap;
 
 use super::{

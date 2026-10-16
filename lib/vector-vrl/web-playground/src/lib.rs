@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::collections::BTreeMap;
 
 use gloo_utils::format::JsValueSerdeExt;

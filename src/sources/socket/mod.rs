@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 pub mod tcp;
 pub mod udp;
 #[cfg(unix)]

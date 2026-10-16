@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use async_trait::async_trait;
 use vector_lib::config::LogNamespace;
 use vrl::value::{Kind, kind::Collection};

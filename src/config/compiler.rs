@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use indexmap::{IndexMap, IndexSet};
 use std::sync::Arc;
 use vector_lib::config::ComponentKey;

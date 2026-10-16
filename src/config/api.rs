@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::net::{Ipv4Addr, SocketAddr};
 
 use url::Url;

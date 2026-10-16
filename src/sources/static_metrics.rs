@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{collections::BTreeMap, num::NonZeroU32, time::Duration};
 
 use chrono::Utc;

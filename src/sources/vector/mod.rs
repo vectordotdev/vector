@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
 

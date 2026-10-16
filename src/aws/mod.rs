@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;

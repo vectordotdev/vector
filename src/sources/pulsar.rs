@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! `Pulsar` source.
 //! Accepts log events streamed from [`Apache Pulsar`][pulsar].
 //!

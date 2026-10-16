@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use snafu::Snafu;
 
 use crate::event::metric::Sample;

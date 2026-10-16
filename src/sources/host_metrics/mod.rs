@@ -182,6 +182,7 @@ const fn default_scrape_interval() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
@@ -201,6 +202,10 @@ const fn example_collectors() -> [&'static str; 10] {
     ]
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Serde requires the optional field type in this default function."
+)]
 fn default_collectors() -> Option<Vec<Collector>> {
     let mut collectors = vec![
         Collector::Cpu,
@@ -266,6 +271,10 @@ fn example_cgroups() -> FilterList {
     }
 }
 
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Non-Linux platforms omit cgroups outside schema generation. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn default_cgroups_config() -> Option<CGroupsConfig> {
     // Include the Linux-only default when generating docs on other platforms.
     if is_generating_root_schema() {
@@ -371,6 +380,7 @@ pub struct HostMetrics {
 
 impl HostMetrics {
     #[cfg(not(target_os = "linux"))]
+    #[must_use]
     pub fn new(config: HostMetricsConfig) -> Self {
         Self {
             config,
@@ -381,6 +391,7 @@ impl HostMetrics {
     }
 
     #[cfg(target_os = "linux")]
+    #[must_use]
     pub fn new(config: HostMetricsConfig) -> Self {
         let cgroups = config.cgroups.clone().unwrap_or_default();
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
@@ -393,6 +404,7 @@ impl HostMetrics {
         }
     }
 
+    #[must_use]
     pub fn buffer(&self) -> MetricsBuffer {
         MetricsBuffer::new(self.config.namespace.clone())
     }
@@ -454,17 +466,17 @@ impl HostMetrics {
             Ok(loadavg) => {
                 output.gauge(
                     GaugeName::Load1,
-                    loadavg.0.get::<ratio>() as f64,
+                    f64::from(loadavg.0.get::<ratio>()),
                     MetricTags::default(),
                 );
                 output.gauge(
                     GaugeName::Load5,
-                    loadavg.1.get::<ratio>() as f64,
+                    f64::from(loadavg.1.get::<ratio>()),
                     MetricTags::default(),
                 );
                 output.gauge(
                     GaugeName::Load15,
-                    loadavg.2.get::<ratio>() as f64,
+                    f64::from(loadavg.2.get::<ratio>()),
                     MetricTags::default(),
                 );
             }
@@ -530,6 +542,7 @@ impl MetricsBuffer {
     }
 
     /// Consumes the buffer, returning the collected metrics.
+    #[must_use]
     pub fn into_metrics(self) -> Vec<Metric> {
         self.metrics
     }
@@ -552,7 +565,7 @@ impl MetricsBuffer {
             .with_namespace(self.namespace.clone())
             .with_tags(Some(self.tags(tags)))
             .with_timestamp(Some(self.timestamp)),
-        )
+        );
     }
 
     fn gauge(&mut self, name: GaugeName, value: f64, tags: MetricTags) {
@@ -565,7 +578,7 @@ impl MetricsBuffer {
             .with_namespace(self.namespace.clone())
             .with_tags(Some(self.tags(tags)))
             .with_timestamp(Some(self.timestamp)),
-        )
+        );
     }
 }
 
@@ -600,33 +613,31 @@ fn init_roots() {
         static INIT: Once = Once::new();
 
         INIT.call_once(|| {
-            match std::env::var_os("PROCFS_ROOT") {
-                Some(procfs_root) => {
-                    info!(
-                        message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
-                        custom = ?procfs_root
-                    );
-                    heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
-                }
-                None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
-            };
+            if let Some(procfs_root) = std::env::var_os("PROCFS_ROOT") {
+                info!(
+                    message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
+                    custom = ?procfs_root
+                );
+                heim::os::linux::set_procfs_root(PathBuf::from(&procfs_root));
+            } else {
+                info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root.");
+            }
 
-            match std::env::var_os("SYSFS_ROOT") {
-                Some(sysfs_root) => {
-                    info!(
-                        message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
-                        custom = ?sysfs_root
-                    );
-                    heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
-                }
-                None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
+            if let Some(sysfs_root) = std::env::var_os("SYSFS_ROOT") {
+                info!(
+                    message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
+                    custom = ?sysfs_root
+                );
+                heim::os::linux::set_sysfs_root(PathBuf::from(&sysfs_root));
+            } else {
+                info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root.");
             }
         });
     };
 }
 
 impl FilterList {
-    fn contains<T, M>(&self, value: &Option<T>, matches: M) -> bool
+    fn contains<T: ?Sized, M>(&self, value: Option<&T>, matches: M) -> bool
     where
         M: Fn(&PatternWrapper, &T) -> bool,
     {
@@ -639,9 +650,8 @@ impl FilterList {
             (Some(includes), Some(value)) => includes.iter().any(|pattern| matches(pattern, value)),
         }) && match (&self.excludes, value) {
             // No excludes, list excludes nothing
-            (None, _) => true,
             // No value, never excluded
-            (Some(_), None) => true,
+            (None, _) | (Some(_), None) => true,
             // Otherwise find the given value
             (Some(excludes), Some(value)) => {
                 !excludes.iter().any(|pattern| matches(pattern, value))
@@ -650,11 +660,11 @@ impl FilterList {
     }
 
     fn contains_str(&self, value: Option<&str>) -> bool {
-        self.contains(&value, |pattern, s| pattern.matches_str(s))
+        self.contains(value, PatternWrapper::matches_str)
     }
 
     fn contains_path(&self, value: Option<&Path>) -> bool {
-        self.contains(&value, |pattern, path| pattern.matches_path(path))
+        self.contains(value, PatternWrapper::matches_path)
     }
 
     #[cfg(test)]
@@ -916,8 +926,7 @@ mod tests {
                 .tags()
                 .unwrap()
                 .get(tag)
-                .map(|value| !matches(value))
-                .unwrap_or(false)
+                .is_some_and(|value| !matches(value))
         })
     }
 
