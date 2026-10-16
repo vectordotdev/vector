@@ -1158,7 +1158,8 @@ e2e-tests-opentelemetry = [
   "sinks-console",
   "sinks-file",
   "codecs-opentelemetry",
-  "dep:prost-reflect"
+  "dep:prost-reflect",
+  "dep:bollard"
 ]
 
 vector-api-tests = [

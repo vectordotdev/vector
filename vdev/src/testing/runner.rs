@@ -19,6 +19,7 @@ use crate::{
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
+const VOLUME_BUILD_CACHE: &str = "vector_build_cache";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
 const RUNNER_HOSTNAME: &str = "runner";
@@ -91,6 +92,8 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn volumes(&self) -> Vec<String>;
 
+    fn target_volume(&self) -> &str;
+
     fn state(&self) -> Result<RunnerState> {
         let mut command = docker_command(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
         let container_name = self.container_name();
@@ -150,6 +153,7 @@ pub trait ContainerTestRunner: TestRunner {
 
         let mut volumes = HashSet::new();
         volumes.insert(VOLUME_TARGET);
+        volumes.insert(self.target_volume());
         volumes.insert(VOLUME_CARGO_GIT);
         volumes.insert(VOLUME_CARGO_REGISTRY);
         for volume in command.check_output()?.lines() {
@@ -230,7 +234,7 @@ pub trait ContainerTestRunner: TestRunner {
                 "--volume",
                 &format!("{}:{MOUNT_PATH}", app::path()),
                 "--volume",
-                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
+                &format!("{}:{TARGET_PATH}", self.target_volume()),
                 "--volume",
                 &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
                 "--volume",
@@ -300,6 +304,7 @@ pub(super) struct IntegrationTestRunner {
     // The integration is None when compiling the runner image with the `all-integration-tests` feature.
     integration: Option<String>,
     needs_docker_socket: bool,
+    preserve_build_cache: bool,
     network: Option<String>,
     volumes: Vec<String>,
 }
@@ -327,6 +332,7 @@ impl IntegrationTestRunner {
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
+            preserve_build_cache: config.preserve_build_cache,
             network,
             volumes,
         })
@@ -402,6 +408,14 @@ impl ContainerTestRunner for IntegrationTestRunner {
 
     fn volumes(&self) -> Vec<String> {
         self.volumes.clone()
+    }
+
+    fn target_volume(&self) -> &str {
+        if self.preserve_build_cache {
+            VOLUME_BUILD_CACHE
+        } else {
+            VOLUME_TARGET
+        }
     }
 }
 

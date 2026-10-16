@@ -1,0 +1,21 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  file:
+    path: /output/opentelemetry-traces-multiservice/${env:CONFIG_INGRESS_EXPORTER}/output.jsonl
+    flush_interval: 100ms
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [file]

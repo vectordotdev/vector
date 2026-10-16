@@ -1,0 +1,37 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+file_format: "1.0"
+disabled: false
+log_level: info
+logger_provider:
+  processors:
+    - batch:
+        exporter:
+          otlp_grpc:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+meter_provider:
+  readers:
+    - periodic:
+        exporter:
+          otlp_grpc:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+            temporality_preference: ${OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE:-cumulative}
+tracer_provider:
+  processors:
+    - batch:
+        exporter:
+          otlp_grpc:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+propagator:
+  composite:
+    - tracecontext:
+    - baggage:
+resource:
+  attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}
+  detection/development:
+    detectors:
+      - container:
+      - host:
+      - process:
+      - service:
