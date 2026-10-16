@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
@@ -82,7 +83,7 @@ pub struct UnixConfig {
     pub convert_to: ConversionUnit,
 }
 
-/// Specifies the target unit for converting incoming StatsD timing values. When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to "milliseconds", the original timing values are preserved.
+/// Specifies the target unit for converting incoming `StatsD` timing values. When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to "milliseconds", the original timing values are preserved.
 #[configurable_component]
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -112,6 +113,7 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
+    #[must_use]
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -171,6 +173,7 @@ pub struct TcpConfig {
 
 impl TcpConfig {
     #[cfg(test)]
+    #[must_use]
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -354,7 +357,7 @@ async fn statsd_udp(
             emit!(SocketBindError {
                 mode: SocketMode::Udp,
                 error
-            })
+            });
         })
         .await?;
 
@@ -462,10 +465,10 @@ mod test {
 
     #[test]
     fn unix_mode_deserializes_on_all_platforms() {
-        let config: StatsdConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: StatsdConfig = serde_yaml::from_str(indoc::indoc! {r"
             mode: unix
             path: /tmp/vector-statsd.sock
-        "#})
+        "})
         .unwrap();
 
         assert!(matches!(config, StatsdConfig::Unix(_)));

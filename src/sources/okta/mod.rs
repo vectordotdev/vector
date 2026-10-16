@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #[cfg(feature = "sources-okta")]
 pub mod client;
 

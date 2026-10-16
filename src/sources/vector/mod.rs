@@ -1,4 +1,5 @@
-//! The `vector` source. See [VectorConfig].
+#![warn(clippy::pedantic)]
+//! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
 
 use chrono::Utc;
@@ -96,7 +97,7 @@ impl proto::Service for Service {
                 emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
-            .and_then(|_| handle_batch_status(receiver))
+            .and_then(|()| handle_batch_status(receiver))
             .await?;
 
         Ok(Response::new(proto::PushEventsResponse {}))
@@ -158,6 +159,7 @@ pub struct VectorConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
+    #[must_use]
     pub fn from_address(addr: SocketAddr) -> Self {
         Self {
             address: addr,
@@ -172,8 +174,8 @@ impl Default for VectorConfig {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
-            acknowledgements: Default::default(),
-            keepalive: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
             log_namespace: None,
         }
     }
@@ -360,7 +362,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -379,7 +381,7 @@ mod test {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -565,6 +567,8 @@ mod tests {
 
     #[tokio::test]
     async fn standard_grpc_health_check_works() {
+        use tonic_health::pb::health_check_response::ServingStatus;
+
         use tonic::transport::Channel;
         use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
 
@@ -599,7 +603,6 @@ mod tests {
             .await
             .unwrap();
 
-        use tonic_health::pb::health_check_response::ServingStatus;
         assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
 
         // Check the named Vector service health
