@@ -17,6 +17,7 @@ use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags,
+    source_sender::SendError,
 };
 
 use crate::{
@@ -135,7 +136,7 @@ impl SourceConfig for MongoDbMetricsConfig {
 
         let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
-        Ok(Box::pin(async move {
+        Ok(crate::sources::source_with_error(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
@@ -148,13 +149,13 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
                 let count = metrics.len();
 
-                if (cx.out.send_batch(metrics).await).is_err() {
-                    emit!(StreamClosedError { count });
-                    return Err(());
-                }
+                cx.out
+                    .send_batch(metrics)
+                    .await
+                    .inspect_err(|_| emit!(StreamClosedError { count }))?;
             }
 
-            Ok(())
+            Ok::<(), SendError>(())
         }))
     }
 

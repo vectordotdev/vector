@@ -61,7 +61,7 @@ async fn create_topology(
 
 #[tokio::test]
 async fn test_function_transform_single_event() {
-    assert_transform_compliance(async {
+    Box::pin(assert_transform_compliance(async {
         let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Function).await;
@@ -75,13 +75,13 @@ async fn test_function_transform_single_event() {
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
-    })
+    }))
     .await;
 }
 
 #[tokio::test]
 async fn test_sync_transform_single_event() {
-    assert_transform_compliance(async {
+    Box::pin(assert_transform_compliance(async {
         let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) =
@@ -96,13 +96,13 @@ async fn test_sync_transform_single_event() {
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
-    })
+    }))
     .await;
 }
 
 #[tokio::test]
 async fn test_task_transform_single_event() {
-    assert_transform_compliance(async {
+    Box::pin(assert_transform_compliance(async {
         let mut original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Task).await;
@@ -116,6 +116,6 @@ async fn test_task_transform_single_event() {
 
         let event = events.remove(0);
         assert_eq!(original_event, event);
-    })
+    }))
     .await;
 }

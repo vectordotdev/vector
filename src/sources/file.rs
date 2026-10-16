@@ -492,11 +492,9 @@ pub fn file_source(
 ) -> super::Source {
     // the include option must be specified but also must contain at least one entry.
     if config.include.is_empty() {
-        error!(
-            message = "`include` configuration option must contain at least one file pattern.",
-            internal_log_rate_limit = false
-        );
-        return Box::pin(future::ready(Err(())));
+        let error = "`include` configuration option must contain at least one file pattern.";
+        error!(message = error, internal_log_rate_limit = false);
+        return Box::pin(future::ready(Err(error.into())));
     }
 
     let exclude_patterns = config
@@ -599,7 +597,7 @@ pub fn file_source(
 
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
-    Box::pin(async move {
+    crate::sources::opaque_source(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);

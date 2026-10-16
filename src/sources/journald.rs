@@ -445,18 +445,22 @@ struct JournaldSource {
 }
 
 impl JournaldSource {
-    async fn run_shutdown(self, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run_shutdown(
+        self,
+        shutdown: ShutdownSignal,
+    ) -> Result<(), crate::sources::SourceError> {
         let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
                 emit!(JournaldCheckpointFileOpenError {
-                    error,
+                    error: &error,
                     path: self
                         .checkpoint_path
                         .to_str()
                         .unwrap_or("unknown")
                         .to_string(),
                 });
+                crate::sources::SourceError::from(error)
             })?;
 
         let checkpointer = SharedCheckpointer::new(checkpointer);

@@ -216,7 +216,7 @@ async fn demo_logs_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
     let mut interval = interval.map(time::interval);
 
@@ -268,7 +268,7 @@ async fn demo_logs_source(
 
                         event
                     });
-                    out.send_batch(events).await.map_err(|_| {
+                    out.send_batch(events).await.inspect_err(|_| {
                         emit!(StreamClosedError { count });
                     })?;
                 }
@@ -298,7 +298,7 @@ impl SourceConfig for DemoLogsConfig {
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
-        Ok(Box::pin(demo_logs_source(
+        Ok(crate::sources::source_with_error(demo_logs_source(
             self.interval,
             self.count,
             self.format.clone(),

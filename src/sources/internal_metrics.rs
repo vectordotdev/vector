@@ -113,7 +113,7 @@ impl SourceConfig for InternalMetricsConfig {
             .as_deref()
             .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
 
-        Ok(Box::pin(
+        Ok(crate::sources::source_with_error(
             InternalMetrics {
                 namespace,
                 host_key,
@@ -147,7 +147,7 @@ struct InternalMetrics<'a> {
 }
 
 impl InternalMetrics<'_> {
-    async fn run(mut self) -> Result<(), ()> {
+    async fn run(mut self) -> vector_lib::source_sender::SendResult {
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
         let mut interval =
@@ -182,9 +182,9 @@ impl InternalMetrics<'_> {
                 metric
             });
 
-            if (self.out.send_batch(batch).await).is_err() {
+            if let Err(error) = self.out.send_batch(batch).await {
                 emit!(StreamClosedError { count });
-                return Err(());
+                return Err(error);
             }
         }
 

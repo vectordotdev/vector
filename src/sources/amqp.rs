@@ -323,9 +323,9 @@ async fn receive_event(
     log_namespace: LogNamespace,
     finalizer: Option<&UnorderedFinalizer<FinalizerEntry>>,
     msg: Delivery,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-    let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
+    let decoder = config.decoder(log_namespace)?;
     let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
@@ -432,7 +432,7 @@ async fn run_amqp_source(
     channel: Channel,
     log_namespace: LogNamespace,
     acknowledgements: bool,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let (finalizer, mut ack_stream) =
         UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 
@@ -444,6 +444,7 @@ async fn run_amqp_source(
             .await
             .map_err(|error| {
                 error!(message = "Failed to apply basic_qos.", ?error);
+                crate::sources::SourceError::from(error)
             })?;
     }
 
@@ -458,6 +459,7 @@ async fn run_amqp_source(
         .await
         .map_err(|error| {
             error!(message = "Failed to consume.", ?error);
+            crate::sources::SourceError::from(error)
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
@@ -473,8 +475,8 @@ async fn run_amqp_source(
                 if let Some(try_m) = opt_m {
                     match try_m {
                         Err(error) => {
-                            emit!(AmqpEventError { error });
-                            return Err(());
+                            emit!(AmqpEventError { error: &error });
+                            return Err(crate::sources::SourceError::from(error));
                         }
                         Ok(msg) => {
                             receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?;

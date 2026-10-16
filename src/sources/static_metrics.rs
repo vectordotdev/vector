@@ -103,7 +103,7 @@ impl SourceConfig for StaticMetricsConfig {
 
         let metrics = self.metrics.clone();
 
-        Ok(Box::pin(
+        Ok(crate::sources::source_with_error(
             StaticMetrics {
                 namespace,
                 metrics,
@@ -133,7 +133,7 @@ struct StaticMetrics {
 }
 
 impl StaticMetrics {
-    async fn run(mut self) -> Result<(), ()> {
+    async fn run(mut self) -> vector_lib::source_sender::SendResult {
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::STATIC));
         let mut interval =
@@ -185,9 +185,9 @@ impl StaticMetrics {
                 .into_iter()
                 .map(|metric| metric.with_timestamp(Some(Utc::now())));
 
-            if (self.out.send_batch(batch).await).is_err() {
+            if let Err(error) = self.out.send_batch(batch).await {
                 emit!(StreamClosedError { count });
-                return Err(());
+                return Err(error);
             }
         }
 
@@ -223,6 +223,28 @@ mod tests {
             kind: MetricKind::Absolute,
             tags: BTreeMap::default(),
         }
+    }
+
+    #[tokio::test]
+    async fn send_error_retains_cause() {
+        let (out, receiver) = SourceSender::new_test();
+        drop(receiver);
+
+        let source = StaticMetrics {
+            namespace: "static".to_owned(),
+            metrics: vec![default_metric()],
+            interval: time::Duration::from_secs(1),
+            out,
+            shutdown: ShutdownSignal::noop(),
+        };
+
+        let error = crate::sources::source_with_error(source.run())
+            .await
+            .expect_err("sending to a closed output should fail");
+        assert_eq!(
+            error.downcast_ref::<vector_lib::source_sender::SendError>(),
+            Some(&vector_lib::source_sender::SendError::Closed)
+        );
     }
 
     #[tokio::test]

@@ -178,7 +178,7 @@ impl ValidatedSink for WebSocketListenerSinkConfig {
         let ws_sink = WebSocketListenerSink::from_validated(self.clone(), validated, tls, &cx)?;
 
         Ok((
-            VectorSink::from_event_streamsink(ws_sink),
+            VectorSink::from_detailed_event_streamsink(ws_sink),
             Box::pin(async move { Ok(()) }),
         ))
     }

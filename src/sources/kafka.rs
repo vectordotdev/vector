@@ -437,7 +437,7 @@ async fn kafka_source(
     shutdown: ShutdownSignal,
     eof: bool,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let span = info_span!("kafka_source");
     let consumer = Arc::new(consumer);
 
@@ -453,7 +453,7 @@ async fn kafka_source(
     let topics: Vec<&str> = config.topics.iter().map(String::as_str).collect();
     if let Err(e) = consumer.subscribe(&topics).context(SubscribeSnafu) {
         error!("{e}");
-        return Err(());
+        return Err(crate::sources::SourceError::from(e));
     }
 
     let coordination_task = {

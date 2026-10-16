@@ -156,7 +156,7 @@ fn apache_metrics(
     mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
-    Box::pin(async move {
+    crate::sources::source_with_error(async move {
         let mut stream = IntervalStream::new(tokio::time::interval(interval))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
@@ -269,13 +269,16 @@ fn apache_metrics(
             .flatten()
             .boxed();
 
-        if let Ok(()) = out.send_event_stream(&mut stream).await {
-            debug!("Finished sending.");
-            Ok(())
-        } else {
-            let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
-            Err(())
+        match out.send_event_stream(&mut stream).await {
+            Ok(()) => {
+                debug!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { count });
+                Err(error)
+            }
         }
     })
 }
