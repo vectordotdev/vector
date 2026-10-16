@@ -19,7 +19,6 @@ generated: components: sinks: influxdb_metrics: configuration: {
 	}
 	bucket: {
 		description:   "The name of the bucket to write into."
-		minimal:       true
 		relevant_when: "version = \"2\""
 		required:      true
 		type: string: examples: ["vector-bucket", "4d2225e4d3d49f75"]
@@ -57,7 +56,6 @@ generated: components: sinks: influxdb_metrics: configuration: {
 	}
 	org: {
 		description:   "The name of the organization to write into."
-		minimal:       true
 		relevant_when: "version = \"2\""
 		required:      true
 		type: string: examples: ["my-org", "33f2cff0a28e5b63"]
@@ -118,7 +116,6 @@ generated: components: sinks: influxdb_metrics: configuration: {
 
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
-		minimal:       true
 		relevant_when: "version = \"2\""
 		required:      true
 		type: string: examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]

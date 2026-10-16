@@ -82,13 +82,11 @@ pub struct InfluxDb2Settings {
     /// The name of the organization to write into.
     #[configurable(metadata(docs::examples = "my-org"))]
     #[configurable(metadata(docs::examples = "33f2cff0a28e5b63"))]
-    #[configurable(metadata(docs::minimal = true))]
     org: String,
 
     /// The name of the bucket to write into.
     #[configurable(metadata(docs::examples = "vector-bucket"))]
     #[configurable(metadata(docs::examples = "4d2225e4d3d49f75"))]
-    #[configurable(metadata(docs::minimal = true))]
     bucket: String,
 
     /// The [token][token_docs] to authenticate with.
@@ -96,7 +94,6 @@ pub struct InfluxDb2Settings {
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    #[configurable(metadata(docs::minimal = true))]
     token: SensitiveString,
 }
 
