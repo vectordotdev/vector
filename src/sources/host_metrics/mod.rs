@@ -328,7 +328,7 @@ impl HostMetricsConfig {
         self,
         mut out: SourceSender,
         shutdown: ShutdownSignal,
-    ) -> Result<(), vector_lib::source_sender::SendError> {
+    ) -> vector_lib::source_sender::SendResult {
         let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 

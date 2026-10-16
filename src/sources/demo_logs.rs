@@ -211,7 +211,7 @@ async fn demo_logs_source(
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     log_namespace: LogNamespace,
-) -> Result<(), vector_lib::source_sender::SendError> {
+) -> vector_lib::source_sender::SendResult {
     let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
     let mut interval = interval.map(time::interval);
 

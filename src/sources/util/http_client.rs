@@ -198,7 +198,7 @@ pub(crate) async fn call<
     context_builder: B,
     mut out: SourceSender,
     http_method: HttpMethod,
-) -> Result<(), vector_lib::source_sender::SendError> {
+) -> vector_lib::source_sender::SendResult {
     // Building the HttpClient should not fail as it is just setting up the client with the
     // proxy and tls settings.
     let client =

@@ -122,7 +122,7 @@ async fn process_stream(
     source_type: &'static str,
     hostname: Option<String>,
     log_namespace: LogNamespace,
-) -> Result<(), vector_lib::source_sender::SendError> {
+) -> vector_lib::source_sender::SendResult {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
     let events_received = register!(EventsReceived);
     let stream = receiver.inspect(|result| {

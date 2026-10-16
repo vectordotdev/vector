@@ -146,7 +146,7 @@ struct InternalMetrics<'a> {
 }
 
 impl InternalMetrics<'_> {
-    async fn run(mut self) -> Result<(), vector_lib::source_sender::SendError> {
+    async fn run(mut self) -> vector_lib::source_sender::SendResult {
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
         let mut interval =

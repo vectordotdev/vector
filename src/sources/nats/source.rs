@@ -137,7 +137,7 @@ pub async fn run_nats_jetstream(
     log_namespace: LogNamespace,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), vector_lib::source_sender::SendError> {
+) -> vector_lib::source_sender::SendResult {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     let mut backoff = ExponentialBackoff::default().max_delay(std::time::Duration::from_secs(30));
@@ -232,7 +232,7 @@ pub async fn run_nats_core(
     log_namespace: LogNamespace,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), vector_lib::source_sender::SendError> {
+) -> vector_lib::source_sender::SendResult {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
 

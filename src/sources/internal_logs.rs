@@ -145,7 +145,7 @@ async fn run(
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
-) -> Result<(), vector_lib::source_sender::SendError> {
+) -> vector_lib::source_sender::SendResult {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
