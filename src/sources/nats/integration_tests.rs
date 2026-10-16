@@ -612,7 +612,7 @@ struct JetStreamTestHarness {
     subject: String,
     stream_name: String,
     consumer_name: String,
-    _source_handle: tokio::task::JoinHandle<Result<(), ()>>,
+    _source_handle: tokio::task::JoinHandle<Result<(), crate::sources::SourceError>>,
 }
 
 impl JetStreamTestHarness {

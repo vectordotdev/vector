@@ -202,7 +202,7 @@ pub(crate) async fn call<
     context_builder: B,
     mut out: SourceSender,
     http_method: HttpMethod,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     // Building the HttpClient should not fail as it is just setting up the client with the
     // proxy and tls settings.
     let client =
@@ -340,13 +340,16 @@ pub(crate) async fn call<
         .flatten_unordered(None)
         .boxed();
 
-    if let Ok(()) = out.send_event_stream(&mut stream).await {
-        debug!("Finished sending.");
-        Ok(())
-    } else {
-        let (count, _) = stream.size_hint();
-        emit!(StreamClosedError { count });
-        Err(())
+    match out.send_event_stream(&mut stream).await {
+        Ok(()) => {
+            debug!("Finished sending.");
+            Ok(())
+        }
+        Err(error) => {
+            let (count, _) = stream.size_hint();
+            emit!(StreamClosedError { count });
+            Err(error)
+        }
     }
 }
 

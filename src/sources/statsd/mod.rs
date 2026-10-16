@@ -7,7 +7,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{SmallVec, smallvec};
@@ -350,16 +350,17 @@ async fn statsd_udp(
     config: UdpConfig,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), super::SourceError> {
     let listenfd = ListenFd::from_env();
     let socket = try_bind_udp_socket(config.address, listenfd)
+        .await
         .map_err(|error| {
             emit!(SocketBindError {
                 mode: SocketMode::Udp,
-                error
+                error: &error,
             });
-        })
-        .await?;
+            super::SourceError::from(error)
+        })?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
         && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)

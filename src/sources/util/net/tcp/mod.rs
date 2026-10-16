@@ -43,6 +43,7 @@ use crate::{
         TcpSocketTlsConnectionError, TcpSocketTlsHandshakeTimeout, TcpSourceConnectionClosed,
     },
     net::is_graceful_tls_shutdown,
+    sources::SourceError,
     sources::util::{AfterReadExt, LenientFramedRead},
 };
 
@@ -156,6 +157,7 @@ where
                         mode: SocketMode::Tcp,
                         error: &error,
                     });
+                    SourceError::from(error)
                 })?;
 
             info!(

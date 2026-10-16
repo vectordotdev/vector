@@ -233,7 +233,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
 
         let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
-        Ok(Box::pin(async move {
+        Ok(crate::sources::source_with_error(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
@@ -246,9 +246,9 @@ impl SourceConfig for PostgresqlMetricsConfig {
                 let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
                 let count = metrics.len();
 
-                if (cx.out.send_batch(metrics).await).is_err() {
+                if let Err(error) = cx.out.send_batch(metrics).await {
                     emit!(StreamClosedError { count });
-                    return Err(());
+                    return Err(error);
                 }
             }
 

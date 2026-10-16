@@ -14,7 +14,7 @@ use crate::{
     internal_events::{EndpointBytesReceived, StreamClosedError},
     serde::OneOrMany,
     shutdown::ShutdownSignal,
-    sources::{mqtt::MqttSourceConfig, util},
+    sources::{SourceError, mqtt::MqttSourceConfig, util},
 };
 
 pub struct MqttSource {
@@ -43,15 +43,16 @@ impl MqttSource {
         })
     }
 
-    pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub async fn run(
+        self,
+        mut out: SourceSender,
+        shutdown: ShutdownSignal,
+    ) -> Result<(), SourceError> {
         let (client, mut connection) = self.connector.connect();
 
         match &self.config.topic {
             OneOrMany::One(topic) => {
-                client
-                    .subscribe(topic, QoS::AtLeastOnce)
-                    .await
-                    .map_err(|_| ())?;
+                client.subscribe(topic, QoS::AtLeastOnce).await?;
             }
             OneOrMany::Many(topics) => {
                 client
@@ -61,8 +62,7 @@ impl MqttSource {
                             .cloned()
                             .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
                     )
-                    .await
-                    .map_err(|_| ())?;
+                    .await?;
             }
         }
 

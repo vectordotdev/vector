@@ -153,7 +153,7 @@ impl SourceConfig for OktaConfig {
 
         warn_if_interval_too_low(self.timeout, self.interval);
 
-        Ok(run(
+        Ok(crate::sources::source_with_error(run(
             url,
             tls,
             cx.proxy,
@@ -163,8 +163,7 @@ impl SourceConfig for OktaConfig {
             log_namespace,
             cx.shutdown,
             cx.out,
-        )
-        .boxed())
+        )))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -293,7 +292,7 @@ async fn run(
     log_namespace: LogNamespace,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), crate::Error> {
     let url_mutex = Arc::new(Mutex::new(url.clone()));
     let decoder = DecodingConfig::new(
         FramingConfig::Bytes,
@@ -301,15 +300,17 @@ async fn run(
         log_namespace,
     )
     .build()
-    .map_err(|ref e| {
+    .inspect_err(|e| {
         emit!(DecoderDeserializeError { error: e });
     })?;
 
     let client = HttpClient::new(tls, &proxy).map_err(|e| {
+        let error = Arc::new(e);
         emit!(HttpClientHttpError {
-            error: Box::new(e),
+            error: Box::new(Arc::clone(&error)),
             url: url.to_string()
         });
+        crate::Error::from(error)
     })?;
 
     let mut stream = IntervalStream::new(tokio::time::interval(interval))
@@ -384,13 +385,16 @@ async fn run(
         .flatten_unordered(None)
         .boxed();
 
-    if let Ok(()) = out.send_event_stream(&mut stream).await {
-        debug!("Finished sending.");
-        Ok(())
-    } else {
-        let (count, _) = stream.size_hint();
-        emit!(StreamClosedError { count });
-        Err(())
+    match out.send_event_stream(&mut stream).await {
+        Ok(()) => {
+            debug!("Finished sending.");
+            Ok(())
+        }
+        Err(error) => {
+            let (count, _) = stream.size_hint();
+            emit!(StreamClosedError { count });
+            Err(error.into())
+        }
     }
 }
 
