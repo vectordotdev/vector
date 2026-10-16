@@ -61,7 +61,7 @@ struct TcpStats {
     tx_queued_bytes: f64,
 }
 
-const fn tcp_state_to_string(state: TcpState) -> &'static str {
+const fn tcp_state_to_string(state: &TcpState) -> &'static str {
     match state {
         TcpState::Established => "established",
         TcpState::SynSent => "syn_sent",
@@ -80,7 +80,7 @@ const fn tcp_state_to_string(state: TcpState) -> &'static str {
 
 fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
     for entry in entries {
-        let state_str = tcp_state_to_string(entry.state);
+        let state_str = tcp_state_to_string(&entry.state);
         *tcp_stats
             .conn_states
             .entry(state_str.to_string())
@@ -143,21 +143,25 @@ mod tests {
     #[test]
     fn tcp_state_to_string_handles_all_variants() {
         // Verify all 12 TCP states map correctly
-        assert_eq!(tcp_state_to_string(TcpState::Established), "established");
-        assert_eq!(tcp_state_to_string(TcpState::SynSent), "syn_sent");
-        assert_eq!(tcp_state_to_string(TcpState::SynRecv), "syn_recv");
-        assert_eq!(tcp_state_to_string(TcpState::FinWait1), "fin_wait1");
-        assert_eq!(tcp_state_to_string(TcpState::FinWait2), "fin_wait2");
-        assert_eq!(tcp_state_to_string(TcpState::TimeWait), "time_wait");
-        assert_eq!(tcp_state_to_string(TcpState::Close), "close");
-        assert_eq!(tcp_state_to_string(TcpState::CloseWait), "close_wait");
-        assert_eq!(tcp_state_to_string(TcpState::LastAck), "last_ack");
-        assert_eq!(tcp_state_to_string(TcpState::Listen), "listen");
-        assert_eq!(tcp_state_to_string(TcpState::Closing), "closing");
-        assert_eq!(tcp_state_to_string(TcpState::NewSynRecv), "new_syn_recv");
+        assert_eq!(tcp_state_to_string(&TcpState::Established), "established");
+        assert_eq!(tcp_state_to_string(&TcpState::SynSent), "syn_sent");
+        assert_eq!(tcp_state_to_string(&TcpState::SynRecv), "syn_recv");
+        assert_eq!(tcp_state_to_string(&TcpState::FinWait1), "fin_wait1");
+        assert_eq!(tcp_state_to_string(&TcpState::FinWait2), "fin_wait2");
+        assert_eq!(tcp_state_to_string(&TcpState::TimeWait), "time_wait");
+        assert_eq!(tcp_state_to_string(&TcpState::Close), "close");
+        assert_eq!(tcp_state_to_string(&TcpState::CloseWait), "close_wait");
+        assert_eq!(tcp_state_to_string(&TcpState::LastAck), "last_ack");
+        assert_eq!(tcp_state_to_string(&TcpState::Listen), "listen");
+        assert_eq!(tcp_state_to_string(&TcpState::Closing), "closing");
+        assert_eq!(tcp_state_to_string(&TcpState::NewSynRecv), "new_syn_recv");
     }
 
     #[test]
+    #[expect(
+        clippy::float_cmp,
+        reason = "Empty input leaves the counters at exactly zero."
+    )]
     fn parse_tcp_entries_handles_empty_list() {
         use super::{TcpStats, parse_tcp_entries};
 

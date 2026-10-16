@@ -144,6 +144,10 @@ impl<'a> CGroupRecurser<'a> {
     }
 
     /// Try to load the `cpu` controller data file and emit metrics if it is found.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of cgroup counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn load_cpu(&mut self, cgroup: &CGroup, tags: &MetricTags) {
         if let Some(Some(cpu)) = filter_result_sync(
             cgroup.load_cpu(&mut self.buffer).await,
@@ -168,6 +172,10 @@ impl<'a> CGroupRecurser<'a> {
     }
 
     /// Try to load the `memory` controller data files and emit metrics if they are found.
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of cgroup counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn load_memory(&mut self, cgroup: &CGroup, tags: &MetricTags) {
         if let Some(Some(current)) = filter_result_sync(
             cgroup.load_memory_current(&mut self.buffer).await,
@@ -294,7 +302,7 @@ impl CGroupRoot {
         };
 
         let (path, name) = match &config.base {
-            Some(base) => (base.to_path_buf(), base.to_path_buf()),
+            Some(base) => (base.clone(), base.clone()),
             None => ("/".into(), "/".into()),
         };
         Some(Self { name, path, mode })
@@ -390,6 +398,10 @@ impl CGroup {
 macro_rules! define_stat_struct {
     ($name:ident ( $( $field:ident, )* )) => {
         #[derive(Clone, Copy, Debug, Default)]
+        #[allow(
+            clippy::struct_field_names,
+            reason = "Field names are matched against kernel cgroup file keys. https://github.com/vectordotdev/vector/issues/23659"
+        )]
         struct $name {
             $( $field: u64, )*
         }
@@ -700,7 +712,7 @@ mod tests {
             self.f(
                 subdir,
                 "memory.stat",
-                &format!("anon {anon}\nfile {file}\n",),
+                &format!("anon {anon}\nfile {file}\n"),
             );
         }
 

@@ -271,6 +271,10 @@ fn example_cgroups() -> FilterList {
     }
 }
 
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Non-Linux platforms omit cgroups outside schema generation. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn default_cgroups_config() -> Option<CGroupsConfig> {
     // Include the Linux-only default when generating docs on other platforms.
     if is_generating_root_schema() {
@@ -381,6 +385,7 @@ impl HostMetrics {
     }
 
     #[cfg(target_os = "linux")]
+    #[must_use]
     pub fn new(config: HostMetricsConfig) -> Self {
         let cgroups = config.cgroups.clone().unwrap_or_default();
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
@@ -602,26 +607,24 @@ fn init_roots() {
         static INIT: Once = Once::new();
 
         INIT.call_once(|| {
-            match std::env::var_os("PROCFS_ROOT") {
-                Some(procfs_root) => {
-                    info!(
-                        message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
-                        custom = ?procfs_root
-                    );
-                    heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
-                }
-                None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
-            };
+            if let Some(procfs_root) = std::env::var_os("PROCFS_ROOT") {
+                info!(
+                    message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
+                    custom = ?procfs_root
+                );
+                heim::os::linux::set_procfs_root(PathBuf::from(&procfs_root));
+            } else {
+                info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root.");
+            }
 
-            match std::env::var_os("SYSFS_ROOT") {
-                Some(sysfs_root) => {
-                    info!(
-                        message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
-                        custom = ?sysfs_root
-                    );
-                    heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
-                }
-                None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
+            if let Some(sysfs_root) = std::env::var_os("SYSFS_ROOT") {
+                info!(
+                    message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
+                    custom = ?sysfs_root
+                );
+                heim::os::linux::set_sysfs_root(PathBuf::from(&sysfs_root));
+            } else {
+                info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root.");
             }
         });
     };
