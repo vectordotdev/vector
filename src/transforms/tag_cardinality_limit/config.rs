@@ -42,9 +42,6 @@ pub struct Config {
     pub max_tracked_keys: Option<usize>,
 
     /// Tag cardinality limits configuration per metric name.
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual metric configuration."
-    ))]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
 
@@ -54,9 +51,6 @@ pub struct Config {
     ///
     /// See the "Per-tag overrides" section under "How it works" for a worked example
     /// and the precedence rules.
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual tag configuration."
-    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 }
@@ -141,9 +135,6 @@ pub struct PerMetricConfig {
     /// are inherited from the enclosing per-metric configuration, except
     /// `cache_size_per_key`, which can be overridden per tag in probabilistic mode.
     /// Tags not listed here use the per-metric configuration.
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual tag configuration."
-    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 
@@ -196,6 +187,7 @@ pub enum OverrideMode {
 
 impl OverrideMode {
     /// Returns the equivalent global `Mode` if this scope is tracked, or `None` if excluded.
+    #[must_use]
     pub const fn as_mode(&self) -> Option<Mode> {
         match self {
             OverrideMode::Exact => Some(Mode::Exact),
@@ -287,12 +279,12 @@ pub struct BloomFilterConfig {
     pub cache_size_per_key: usize,
 }
 
-/// Configuration of internal metrics for the TagCardinalityLimit transform.
+/// Configuration of internal metrics for the `TagCardinalityLimit` transform.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct InternalMetricsConfig {
-    /// Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+    /// Whether to include extended tags (`metric_name`, `tag_key`) in the `tag_value_limit_exceeded_total` metric.
     ///
     /// This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
     /// increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.

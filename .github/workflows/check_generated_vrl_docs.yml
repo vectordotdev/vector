@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -40,7 +40,7 @@ jobs:
 
   run-check-generated-vrl-docs:
     needs: changes
-    if: needs.changes.outputs.docs == 'true'
+    if: needs.changes.outputs.docs == 'true' && github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04-8core
     permissions:
       contents: write
@@ -97,7 +97,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "$COMMIT_MESSAGE"
-          git push origin HEAD:refs/heads/$HEAD_REF
+          git push origin "HEAD:refs/heads/$HEAD_REF"
 
       - name: Save PR number for comment workflow
         if: >
@@ -128,7 +128,7 @@ jobs:
 
   check-generated-vrl-docs:
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: run-check-generated-vrl-docs
     steps:
       - run: |

@@ -23,7 +23,7 @@ use vector_lib::{
     finalizer::OrderedFinalizer,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
@@ -39,7 +39,6 @@ use crate::{
         FileSourceInternalEventsEmitter, StreamClosedError,
     },
     line_agg::{self, LineAgg},
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
 };
 
@@ -220,7 +219,7 @@ pub struct FileConfig {
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -605,7 +604,7 @@ pub fn file_source(
                 });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
-                    Some(d) => d.decode_to_utf8(line.text),
+                    Some(d) => d.decode_to_utf8(&line.text),
                     None => line.text,
                 };
                 line
@@ -766,7 +765,7 @@ fn create_event(
         &mut event,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(FileConfig::NAME.as_bytes()),
+        Value::from_static_str(FileConfig::NAME),
     );
     log_namespace.insert_vector_metadata(
         &mut event,

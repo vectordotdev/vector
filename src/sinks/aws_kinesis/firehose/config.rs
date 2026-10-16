@@ -104,6 +104,10 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
+    /// Creates the AWS client.
+    ///
+    /// # Errors
+    /// Returns an error if region resolution, authentication, or HTTP client configuration fails.
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisFirehoseClientBuilder>(
             &KinesisFirehoseClientBuilder {},
@@ -182,9 +186,9 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
 impl GenerateConfig for KinesisFirehoseSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"stream_name: my-stream
+            r"stream_name: my-stream
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -225,6 +229,7 @@ impl RetryLogic for KinesisRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
 
     #[test]
     fn validate_produces_batch_settings() {
@@ -238,11 +243,11 @@ mod tests {
                 ),
                 encoding: vector_lib::codecs::JsonSerializerConfig::default().into(),
                 compression: crate::sinks::util::Compression::None,
-                request: Default::default(),
+                request: TowerRequestConfig::default(),
                 tls: None,
-                auth: Default::default(),
+                auth: AwsAuthentication::default(),
                 request_retry_partial: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
                 partition_key_field: None,
             },
         };

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     fs::{read_to_string, write},
     io::Result,
@@ -12,6 +14,7 @@ fn main() -> Result<()> {
         "proto/datadog/trace/span.proto",
         "proto/datadog/trace/idx/tracer_payload.proto",
         "proto/datadog/trace/idx/span.proto",
+        "proto/datadog/metrics/intake_v3.proto",
     ] {
         println!("cargo:rerun-if-changed={path}");
     }
@@ -27,6 +30,7 @@ fn main() -> Result<()> {
     prost_build.compile_protos(
         &[
             "proto/datadog/agentpayload.proto",
+            "proto/datadog/metrics/intake_v3.proto",
             "proto/datadog/trace/agent_payload.proto",
             "proto/datadog/trace/idx/tracer_payload.proto",
         ],

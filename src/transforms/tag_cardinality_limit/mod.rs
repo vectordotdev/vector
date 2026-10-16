@@ -61,12 +61,13 @@ enum TagSettings {
 pub struct TagCardinalityLimit {
     config: Config,
     accepted_tags: HashMap<Option<MetricId>, HashMap<String, AcceptedTagValueSet>>,
-    /// Total count of currently-tracked (metric_bucket, tag_key) pairs.
+    /// Total count of currently-tracked (`metric_bucket`, `tag_key`) pairs.
     /// Used to enforce `config.max_tracked_keys`.
     tracked_keys_count: usize,
 }
 
 impl TagCardinalityLimit {
+    #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -325,7 +326,7 @@ impl TagCardinalityLimit {
     pub fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let metric = event.as_mut_metric();
         let metric_name = metric.name().to_string();
-        let metric_namespace = metric.namespace().map(|n| n.to_string());
+        let metric_namespace = metric.namespace().map(std::string::ToString::to_string);
         let metric_key = match self.config.tracking_scope {
             TrackingScope::PerMetric => Some((metric_namespace, metric_name.clone())),
             TrackingScope::Global => {

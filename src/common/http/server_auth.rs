@@ -110,8 +110,7 @@ impl<'de> Deserialize<'de> for HttpServerAuthConfig {
                 // Default to "basic" if strategy is missing
                 let strategy = fields
                     .get("strategy")
-                    .map(String::as_str)
-                    .unwrap_or_else(|| "basic");
+                    .map_or_else(|| "basic", String::as_str);
 
                 match strategy {
                     "basic" => {
@@ -156,6 +155,11 @@ impl HttpServerAuthConfig {
     /// Builds an auth matcher based on provided configuration.
     /// Used to validate configuration if needed, before passing it to the
     /// actual component for usage.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -210,6 +214,11 @@ impl HttpServerAuthConfig {
     /// Validates the auth configuration against the given enrichment tables,
     /// compiling any custom VRL program so `vector validate --no-environment`
     /// catches syntax/type errors while resolving enrichment table names.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn validate(&self, enrichment_tables: &TableRegistry) -> crate::Result<()> {
         self.build(enrichment_tables, &MetricsStorage::default())
             .map(|_| ())
@@ -235,6 +244,11 @@ pub enum HttpServerAuthMatcher {
 impl HttpServerAuthMatcher {
     /// Validates the request. Returns `Ok(Some(enrichment))` when auth passes and the VRL program
     /// wrote `%field` values; returns `Ok(None)` when auth passes with no metadata enrichment.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn handle_auth(
         &self,
         address: Option<&SocketAddr>,
@@ -265,6 +279,15 @@ impl HttpServerAuthMatcher {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn handle_vrl_auth(
         &self,
         address: Option<&SocketAddr>,
@@ -353,10 +376,10 @@ mod tests {
 
     #[test]
     fn config_should_default_to_basic() {
-        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r"
             username: foo
             password: bar
-            "#
+            "
         })
         .unwrap();
 
@@ -370,11 +393,11 @@ mod tests {
 
     #[test]
     fn config_should_support_explicit_basic_strategy() {
-        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r"
             strategy: basic
             username: foo
             password: bar
-            "#
+            "
         })
         .unwrap();
 
@@ -410,7 +433,7 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default(), &Default::default());
+        let matcher = basic_auth.build(&TableRegistry::default(), &MetricsStorage::default());
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -427,7 +450,7 @@ mod tests {
         };
 
         let (_, error_message) = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap()
             .auth_header();
         assert_eq!("Invalid username/password", error_message);
@@ -443,7 +466,7 @@ mod tests {
         };
 
         let (header, _) = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap()
             .auth_header();
         assert_eq!(
@@ -454,10 +477,10 @@ mod tests {
 
     #[test]
     fn config_should_support_bearer_strategy() {
-        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r"
             strategy: bearer
             token: my-secret-token
-            "#
+            "
         })
         .unwrap();
 
@@ -474,7 +497,7 @@ mod tests {
             token: random_string(16).into(),
         };
 
-        let matcher = bearer_auth.build(&Default::default(), &Default::default());
+        let matcher = bearer_auth.build(&TableRegistry::default(), &MetricsStorage::default());
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -490,7 +513,7 @@ mod tests {
         };
 
         let (_, error_message) = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap()
             .auth_header();
         assert_eq!("Invalid token", error_message);
@@ -503,7 +526,7 @@ mod tests {
         };
 
         let matcher = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let (_guard, addr) = next_addr();
@@ -522,7 +545,7 @@ mod tests {
         };
 
         let matcher = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -547,7 +570,7 @@ mod tests {
         };
 
         let matcher = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -569,7 +592,7 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_err()
         );
     }
@@ -577,16 +600,16 @@ mod tests {
     #[test]
     fn build_custom_should_fail_on_non_boolean_return_type() {
         let custom_auth = HttpServerAuthConfig::Custom {
-            source: indoc! {r#"
+            source: indoc! {r"
                 .success = true
                 .
-                "#}
+                "}
             .to_string(),
         };
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_err()
         );
     }
@@ -602,7 +625,7 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_ok()
         );
     }
@@ -615,7 +638,7 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let (_guard, addr) = next_addr();
@@ -635,7 +658,7 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -659,7 +682,7 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -680,7 +703,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -700,7 +723,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -718,7 +741,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -734,7 +757,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -751,7 +774,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -768,7 +791,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -789,7 +812,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -812,7 +835,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -840,7 +863,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -868,7 +891,7 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_err(),
             "writing to event body (.field) must be rejected at compile time"
         );

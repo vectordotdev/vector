@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use vector_config::component::GenerateConfig;
 use vector_lib::configurable::configurable_component;
 
-use crate::{config::SourceAcknowledgementsConfig, serde::bool_or_struct};
+use crate::config::SourceAcknowledgementsConfig;
 
 // Validation constants
 const MAX_CHANNEL_NAME_LENGTH: usize = 256;
@@ -76,9 +76,6 @@ pub struct WindowsEventLogConfig {
     ///
     /// Maps event field names to custom formatting options.
     #[serde(default)]
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual event data format override."
-    ))]
     pub event_data_format: HashMap<String, EventDataFormat>,
 
     /// Ignore specific event IDs.
@@ -193,7 +190,7 @@ pub struct WindowsEventLogConfig {
     /// When disabled (default), checkpoints are updated immediately after reading
     /// events, which may result in data loss if Vector crashes before events are
     /// delivered to sinks.
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 

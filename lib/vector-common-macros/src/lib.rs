@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![warn(clippy::pedantic)]
 
 use proc_macro::TokenStream;
 

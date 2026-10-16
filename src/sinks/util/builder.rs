@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     convert::Infallible,
     fmt,

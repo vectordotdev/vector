@@ -25,6 +25,10 @@ website/cue/
 config/examples/docs_example.yaml
 config/examples/file_to_prometheus.yaml
 
+# Vendored upstream protocol definitions. Their YAML indentation is upstream's.
+lib/opentelemetry-proto/src/proto/opentelemetry-proto/
+lib/datadog-proto/proto/datadog/trace/
+
 # Lock files
 Cargo.lock
 website/yarn.lock

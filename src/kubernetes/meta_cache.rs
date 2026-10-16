@@ -8,6 +8,7 @@ pub struct MetaCache {
 }
 
 impl MetaCache {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cache: HashSet::new(),
@@ -19,6 +20,7 @@ impl MetaCache {
     pub fn delete(&mut self, meta_desc: &MetaDescribe) {
         self.cache.remove(meta_desc);
     }
+    #[must_use]
     pub fn contains(&self, meta_desc: &MetaDescribe) -> bool {
         self.cache.contains(meta_desc)
     }
@@ -34,6 +36,7 @@ pub struct MetaDescribe {
 }
 
 impl MetaDescribe {
+    #[must_use]
     pub fn from_meta(meta: &ObjectMeta) -> Self {
         let name = meta.name.clone().unwrap_or_default();
         let namespace = meta.namespace.clone().unwrap_or_default();

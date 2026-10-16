@@ -57,14 +57,14 @@ pub struct MqttSinkConfig {
 #[serde(rename_all = "lowercase")]
 #[allow(clippy::enum_variant_names)]
 pub enum MqttQoS {
-    /// AtLeastOnce.
+    /// `AtLeastOnce`.
     #[default]
     AtLeastOnce,
 
-    /// AtMostOnce.
+    /// `AtMostOnce`.
     AtMostOnce,
 
-    /// ExactlyOnce.
+    /// `ExactlyOnce`.
     ExactlyOnce,
 }
 
@@ -215,8 +215,10 @@ impl MqttSinkConfig {
                 .as_ref()
                 .and_then(|tls| tls.options.alpn_protocols.as_ref())
                 .filter(|protocols| !protocols.is_empty())
-                .map(|protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect())
-                .unwrap_or_else(|| vec![b"mqtt".to_vec()]);
+                .map_or_else(
+                    || vec![b"mqtt".to_vec()],
+                    |protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect(),
+                );
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,

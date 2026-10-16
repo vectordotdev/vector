@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 // High-level list of TODOS.
 //
 // TODO: `serde` supports defining a default at the struct level to fill in fields when no value is
