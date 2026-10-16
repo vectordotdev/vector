@@ -265,7 +265,7 @@ impl InputHandler {
                                 path!("key"),
                                 self.key.as_str(),
                             );
-                        };
+                        }
 
                         event
                     });

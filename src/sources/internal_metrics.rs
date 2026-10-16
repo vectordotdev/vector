@@ -220,6 +220,10 @@ mod tests {
         test_util::test_generate_config::<InternalMetricsConfig>();
     }
 
+    #[expect(
+        clippy::float_cmp,
+        reason = "These deterministic fixture values are compared exactly."
+    )]
     #[test]
     fn captures_internal_metrics() {
         test_util::trace_init();

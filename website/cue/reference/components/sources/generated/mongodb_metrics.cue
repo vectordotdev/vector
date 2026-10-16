@@ -3,7 +3,7 @@ package metadata
 generated: components: sources: mongodb_metrics: configuration: {
 	endpoints: {
 		description: """
-			A list of MongoDB instances to scrape.
+			A list of `MongoDB` instances to scrape.
 
 			Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
 			"""

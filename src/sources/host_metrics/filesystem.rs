@@ -47,6 +47,14 @@ fn example_mountpoints() -> FilterList {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn filesystem_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "filesystem";
         match heim::disk::partitions().await {
@@ -69,7 +77,7 @@ impl HostMetrics {
                         self.config
                             .filesystem
                             .devices
-                            .contains_path(partition.device().map(|d| d.as_ref()))
+                            .contains_path(partition.device().map(AsRef::as_ref))
                             .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -95,7 +103,7 @@ impl HostMetrics {
                                         .unwrap_or("unknown")
                                         .to_string(),
                                     error,
-                                })
+                                });
                             })
                             .map(|usage| (partition, usage))
                             .ok()
@@ -129,7 +137,7 @@ impl HostMetrics {
                     #[cfg(not(windows))]
                     output.gauge(
                         GaugeName::FilesystemUsedRatio,
-                        usage.ratio().get::<ratio>() as f64,
+                        f64::from(usage.ratio().get::<ratio>()),
                         tags.clone(),
                     );
 
@@ -140,8 +148,8 @@ impl HostMetrics {
                     // may pay a small extra cost.
                     #[cfg(unix)]
                     if let Ok(stat) = statvfs(partition.mount_point()) {
-                        let inodes_total = stat.files() as f64;
-                        let inodes_free = stat.files_free() as f64;
+                        let inodes_total = f64::from(stat.files());
+                        let inodes_free = f64::from(stat.files_free());
                         let inodes_used = (inodes_total - inodes_free).max(0.0);
                         let inodes_used_ratio = if inodes_total > 0.0 {
                             inodes_used / inodes_total

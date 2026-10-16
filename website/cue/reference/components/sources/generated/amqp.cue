@@ -75,7 +75,7 @@ generated: components: sources: amqp: configuration: {
 		description: """
 			Maximum number of unacknowledged messages the broker will deliver to this consumer.
 
-			This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
+			This controls flow control via AMQP `QoS` prefetch. Lower values limit memory usage and
 			prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
 			throughput but consume more memory.
 

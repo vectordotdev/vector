@@ -186,11 +186,8 @@ impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let multiline_config: Option<line_agg::Config> = self
-            .multiline
-            .as_ref()
-            .map(|config| config.try_into())
-            .transpose()?;
+        let multiline_config: Option<line_agg::Config> =
+            self.multiline.as_ref().map(TryInto::try_into).transpose()?;
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
@@ -334,11 +331,10 @@ async fn s3_object_decoder(
     content_type: Option<&str>,
     mut body: ByteStream,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    let first = match body.next().await {
-        Some(first) => first,
-        _ => {
-            return Box::new(tokio::io::empty());
-        }
+    use Compression::{Auto, Gzip, None, Zstd};
+
+    let Some(first) = body.next().await else {
+        return Box::new(tokio::io::empty());
     };
 
     let r = tokio::io::BufReader::new(StreamReader::new(
@@ -356,7 +352,6 @@ async fn s3_object_decoder(
         _ => compression,
     };
 
-    use Compression::*;
     match compression {
         Auto => unreachable!(), // is mapped above
         None => Box::new(r),
@@ -403,11 +398,12 @@ fn content_type_to_compression(content_type: &str) -> Option<Compression> {
 }
 
 fn object_key_to_compression(key: &str) -> Option<Compression> {
+    use Compression::{Gzip, Zstd};
+
     let extension = std::path::Path::new(key)
         .extension()
         .and_then(std::ffi::OsStr::to_str);
 
-    use Compression::*;
     extension.and_then(|extension| match extension {
         "gz" => Some(Gzip),
         "zst" => Some(Zstd),
@@ -537,7 +533,7 @@ mod integration_tests {
 
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(
+        Box::pin(test_event(
             None,
             None,
             None,
@@ -548,7 +544,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -566,7 +562,7 @@ mod integration_tests {
             })
             .collect();
 
-        test_event(
+        Box::pin(test_event(
             None,
             None,
             None,
@@ -577,7 +573,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Json(JsonDeserializerConfig::default()),
             None,
-        )
+        ))
         .await;
     }
 
@@ -587,7 +583,7 @@ mod integration_tests {
 
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(
+        Box::pin(test_event(
             None,
             None,
             None,
@@ -598,7 +594,7 @@ mod integration_tests {
             true,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -609,7 +605,7 @@ mod integration_tests {
         let key = "key with spaces".to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(
+        Box::pin(test_event(
             Some(key),
             None,
             None,
@@ -620,7 +616,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -631,7 +627,7 @@ mod integration_tests {
         let key = format!("special:{}", uuid::Uuid::new_v4());
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(
+        Box::pin(test_event(
             Some(key),
             None,
             None,
@@ -642,7 +638,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -661,7 +657,7 @@ mod integration_tests {
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(
+        Box::pin(test_event(
             None,
             Some("gzip"),
             None,
@@ -672,7 +668,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -692,7 +688,7 @@ mod integration_tests {
             data
         };
 
-        test_event(
+        Box::pin(test_event(
             None,
             Some("gzip"),
             None,
@@ -703,7 +699,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -723,7 +719,7 @@ mod integration_tests {
             data
         };
 
-        test_event(
+        Box::pin(test_event(
             None,
             Some("zstd"),
             None,
@@ -734,7 +730,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -747,7 +743,7 @@ mod integration_tests {
             .map(ToOwned::to_owned)
             .collect();
 
-        test_event(
+        Box::pin(test_event(
             None,
             None,
             None,
@@ -755,7 +751,7 @@ mod integration_tests {
                 start_pattern: "abc".to_owned(),
                 mode: line_agg::Mode::HaltWith,
                 condition_pattern: "geh".to_owned(),
-                timeout_ms: Duration::from_millis(1000),
+                timeout_ms: Duration::from_secs(1),
             }),
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],
@@ -763,20 +759,20 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
     // TODO: re-enable this after figuring out why it is so flakey in CI
     //       https://github.com/vectordotdev/vector/issues/17456
-    #[ignore]
+    #[ignore = "Flaky in CI; see https://github.com/vectordotdev/vector/issues/17456"]
     #[tokio::test]
     async fn handles_errored_status() {
         trace_init();
 
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(
+        Box::pin(test_event(
             None,
             None,
             None,
@@ -787,7 +783,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -797,7 +793,7 @@ mod integration_tests {
 
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(
+        Box::pin(test_event(
             None,
             None,
             None,
@@ -808,7 +804,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             None,
-        )
+        ))
         .await;
     }
 
@@ -821,7 +817,7 @@ mod integration_tests {
         let mut custom_options: HashMap<String, Box<dyn Any>> = HashMap::new();
         custom_options.insert("delete_failed_message".to_string(), Box::new(false));
 
-        test_event(
+        Box::pin(test_event(
             None,
             None,
             None,
@@ -832,7 +828,7 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             Some(custom_options),
-        )
+        ))
         .await;
     }
 
@@ -867,6 +863,10 @@ mod integration_tests {
     }
 
     // puts an object and asserts that the logs it gets back match
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[allow(clippy::too_many_arguments)]
     async fn test_event(
         key: Option<String>,
@@ -880,7 +880,7 @@ mod integration_tests {
         decoding: DeserializerConfig,
         custom_options: Option<HashMap<String, Box<dyn Any>>>,
     ) {
-        assert_source_compliance(&SOURCE_TAGS, async move {
+        Box::pin(assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
             let s3 = s3_client().await;
@@ -906,8 +906,8 @@ mod integration_tests {
                 .bucket(bucket.clone())
                 .key(key.clone())
                 .body(ByteStream::from(payload))
-                .set_content_type(content_type.map(|t| t.to_owned()))
-                .set_content_encoding(content_encoding.map(|t| t.to_owned()))
+                .set_content_type(content_type.map(ToOwned::to_owned))
+                .set_content_encoding(content_encoding.map(ToOwned::to_owned))
                 .send()
                 .await
                 .expect("Could not put object");
@@ -1015,8 +1015,8 @@ mod integration_tests {
                 _ => {
                     assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
                 }
-            };
-        }).await;
+            }
+        })).await;
     }
 
     /// creates a new SQS queue
@@ -1047,10 +1047,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        sqs_result
-            .messages
-            .map(|messages| messages.len())
-            .unwrap_or(0)
+        sqs_result.messages.map_or(0, |messages| messages.len())
     }
 
     /// creates a new S3 bucket

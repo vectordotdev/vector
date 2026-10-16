@@ -38,6 +38,10 @@ pub trait FileDescriptorConfig: NamedComponent {
     fn decoding(&self) -> DeserializerConfig;
     fn description(&self) -> String;
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured decoder cannot be built.
     fn source<R>(
         &self,
         reader: R,
@@ -185,24 +189,21 @@ async fn process_stream(
     }
     .boxed();
 
-    match out.send_event_stream(&mut stream).await {
-        Ok(()) => {
-            debug!("Finished sending.");
-            Ok(())
-        }
-        Err(_) => {
-            let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { count });
-            Err(())
-        }
+    if let Ok(()) = out.send_event_stream(&mut stream).await {
+        debug!("Finished sending.");
+        Ok(())
+    } else {
+        let (count, _) = stream.size_hint();
+        emit!(StreamClosedError { count });
+        Err(())
     }
 }
 
 /// Builds the `vector_lib::config::Outputs` for stdin and
-/// file_descriptor sources.
+/// `file_descriptor` sources.
 fn outputs(
     log_namespace: LogNamespace,
-    host_key: &Option<OptionalValuePath>,
+    host_key: Option<&OptionalValuePath>,
     decoding: &DeserializerConfig,
     source_name: &'static str,
 ) -> Vec<SourceOutput> {
@@ -211,7 +212,7 @@ fn outputs(
         .with_source_metadata(
             source_name,
             host_key
-                .clone()
+                .cloned()
                 .map_or(log_schema().host_key().cloned(), |key| key.path)
                 .map(LegacyKey::Overwrite),
             &owned_value_path!("host"),
