@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::io;
 
 use async_stream::stream;

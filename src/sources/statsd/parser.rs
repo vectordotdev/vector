@@ -22,7 +22,6 @@ pub struct Parser {
 }
 
 impl Parser {
-    #[must_use]
     pub const fn new(sanitize_keys: bool, convert_to: ConversionUnit) -> Self {
         Self {
             sanitize: sanitize_keys,
@@ -30,15 +29,6 @@ impl Parser {
         }
     }
 
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the packet contains an invalid `StatsD` metric.
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     pub fn parse(&self, packet: &str) -> Result<Metric, ParseError> {
         // https://docs.datadoghq.com/developers/dogstatsd/datagram_shell/#datagram-format
         let key_and_body = packet.splitn(2, ':').collect::<Vec<_>>();
@@ -88,7 +78,7 @@ impl Parser {
                 )
                 .with_tags(tags)
             }
-            unit @ ("h" | "ms" | "d") => {
+            unit @ "h" | unit @ "ms" | unit @ "d" => {
                 let val: f64 = parts[0].parse()?;
                 let converted_val = match unit {
                     "ms" => match self.convert_to {
@@ -190,13 +180,13 @@ fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
 }
 
 fn sanitize_key(key: &str, sanitize: bool) -> String {
-    if sanitize {
+    if !sanitize {
+        key.to_owned()
+    } else {
         let s = key.replace('/', "'-");
         let s = WHITESPACE.replace_all(&s, "_");
         let s = NONALPHANUM.replace_all(&s, "");
         s.into()
-    } else {
-        key.to_owned()
     }
 }
 
@@ -253,10 +243,6 @@ mod test {
     };
 
     const SANITIZING_PARSER: Parser = Parser::new(true, ConversionUnit::Seconds);
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the packet contains an invalid `StatsD` metric.
     fn parse(packet: &str) -> Result<Metric, ParseError> {
         SANITIZING_PARSER.parse(packet)
     }
@@ -496,10 +482,6 @@ mod test {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[test]
     fn sanitizing_sampling() {
         assert_eq!(1.0, sanitize_sampling(0.0));

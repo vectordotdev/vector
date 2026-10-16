@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{future::ready, time::Duration};
 
 use chrono::Utc;

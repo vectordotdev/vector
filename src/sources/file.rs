@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{convert::TryInto, future, path::PathBuf, time::Duration};
 
 use bytes::Bytes;

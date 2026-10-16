@@ -133,10 +133,6 @@ struct StaticMetrics {
 }
 
 impl StaticMetrics {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     async fn run(mut self) -> Result<(), ()> {
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::STATIC));
@@ -222,7 +218,7 @@ mod tests {
 
     fn default_metric() -> StaticMetricConfig {
         StaticMetricConfig {
-            name: String::new(),
+            name: "".to_string(),
             value: MetricValue::Gauge { value: 0.0 },
             kind: MetricKind::Absolute,
             tags: BTreeMap::default(),

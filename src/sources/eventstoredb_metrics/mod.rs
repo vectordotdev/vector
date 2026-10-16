@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::time::Duration;
 
 use futures::{FutureExt, StreamExt};

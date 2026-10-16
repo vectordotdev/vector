@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::BuildHasher};
+use std::collections::HashMap;
 
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
@@ -8,10 +8,10 @@ use vector_lib::{
 
 use crate::sources::http_server::HttpConfigParamKind;
 
-pub fn add_query_parameters<S: BuildHasher>(
+pub fn add_query_parameters(
     events: &mut [Event],
     query_parameters_config: &[HttpConfigParamKind],
-    query_parameters: &HashMap<String, String, S>,
+    query_parameters: &HashMap<String, String>,
     log_namespace: LogNamespace,
     source_name: &'static str,
 ) {
@@ -58,7 +58,7 @@ pub fn add_query_parameters<S: BuildHasher>(
                     }
                 }
             }
-        }
+        };
     }
 }
 

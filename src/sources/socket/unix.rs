@@ -17,10 +17,6 @@ use crate::{
     },
 };
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "The Unix socket callback supplies an owned peer name."
-)]
 /// Function to pass to `build_unix_*_source`, specific to the basic unix source
 /// Takes a single line of a received message and handles an `Event` object.
 fn handle_events(
@@ -73,7 +69,7 @@ pub(super) fn unix_datagram(
         max_length,
         decoder,
         move |events, received_from| {
-            handle_events(events, &config.host_key, received_from, log_namespace);
+            handle_events(events, &config.host_key, received_from, log_namespace)
         },
         shutdown,
         out,
@@ -92,7 +88,7 @@ pub(super) fn unix_stream(
         config.socket_file_mode,
         decoder,
         move |events, received_from| {
-            handle_events(events, &config.host_key, received_from, log_namespace);
+            handle_events(events, &config.host_key, received_from, log_namespace)
         },
         shutdown,
         out,

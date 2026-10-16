@@ -324,10 +324,6 @@ mod tests {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn omitted_controls_allow_concurrent_requests_without_timeout() {
         init_metrics();
@@ -353,7 +349,7 @@ mod tests {
         }
         let mut grpc_request = Box::pin(grpc.oneshot(Request::new(Body::empty())));
         assert!(futures::poll!(&mut grpc_request).is_pending());
-        tokio::time::advance(Duration::from_mins(1)).await;
+        tokio::time::advance(Duration::from_secs(60)).await;
         for request in &mut requests {
             assert!(futures::poll!(request).is_pending());
         }
@@ -370,10 +366,6 @@ mod tests {
         assert_eq!(active_requests(), 0.0);
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn concurrency_limit_without_timeout() {
         init_metrics();
@@ -391,7 +383,7 @@ mod tests {
             }));
         let mut request = Box::pin(grpc.oneshot(Request::new(Body::empty())));
         assert!(futures::poll!(&mut request).is_pending());
-        tokio::time::advance(Duration::from_mins(1)).await;
+        tokio::time::advance(Duration::from_secs(60)).await;
         assert!(futures::poll!(&mut request).is_pending());
         assert_eq!(active_requests(), 1.0);
         let rejected = http
@@ -418,10 +410,6 @@ mod tests {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn timeout_without_concurrency_limit() {
         init_metrics();
@@ -465,10 +453,6 @@ mod tests {
         assert_metric_absent(CounterName::ComponentLoadShedRequestsTotal.as_str());
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test]
     async fn processing_error_releases_capacity() {
         init_metrics();
@@ -488,10 +472,6 @@ mod tests {
         assert_eq!(active_requests(), 0.0);
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test]
     async fn http_and_grpc_share_capacity() {
         init_metrics();
@@ -549,10 +529,6 @@ mod tests {
         assert_eq!(response.headers()["grpc-status"], "0");
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn timeout_and_cancellation_release_capacity() {
         init_metrics();
@@ -590,10 +566,6 @@ mod tests {
         assert_eq!(active_requests(), 0.0);
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn timeout_includes_waiting_for_readiness() {
         init_metrics();
@@ -620,10 +592,6 @@ mod tests {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[tokio::test(start_paused = true)]
     async fn grpc_timeout_is_counted() {
         init_metrics();

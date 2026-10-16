@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use futures::FutureExt;

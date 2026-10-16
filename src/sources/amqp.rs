@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 //! `AMQP` source.
 //! Handles version AMQP 0.9.1 which is used by `RabbitMQ`.
 use std::{io::Cursor, pin::Pin};

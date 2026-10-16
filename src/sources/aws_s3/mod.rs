@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::convert::TryInto;
 
 use async_compression::tokio::bufread;

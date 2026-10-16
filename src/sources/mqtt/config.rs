@@ -154,10 +154,8 @@ impl MqttSourceConfig {
                 .as_ref()
                 .and_then(|tls| tls.options.alpn_protocols.as_ref())
                 .filter(|protocols| !protocols.is_empty())
-                .map_or_else(
-                    || vec![b"mqtt".to_vec()],
-                    |protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect(),
-                );
+                .map(|protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect())
+                .unwrap_or_else(|| vec![b"mqtt".to_vec()]);
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,

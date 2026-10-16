@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::task::Poll;
 
 use chrono::Utc;

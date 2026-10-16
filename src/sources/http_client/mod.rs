@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #[cfg(feature = "sources-http_client")]
 pub mod client;
 

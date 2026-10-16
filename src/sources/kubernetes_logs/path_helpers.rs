@@ -92,7 +92,7 @@ mod tests {
             (("", "", ""), "/var/log/pods/__"),
         ];
 
-        for ((in_namespace, in_name, in_uid), expected) in cases {
+        for ((in_namespace, in_name, in_uid), expected) in cases.into_iter() {
             assert_eq!(
                 build_pod_logs_directory(in_namespace, in_name, in_uid),
                 PathBuf::from(expected)
@@ -137,7 +137,7 @@ mod tests {
             ("", None),
         ];
 
-        for (input, expected) in cases {
+        for (input, expected) in cases.into_iter() {
             assert_eq!(parse_log_file_path(input), expected);
         }
     }

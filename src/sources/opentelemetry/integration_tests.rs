@@ -1,6 +1,3 @@
-use crate::config::SourceAcknowledgementsConfig;
-use crate::http::KeepaliveConfig;
-use crate::sources::util::grpc::GrpcKeepaliveConfig;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
@@ -55,19 +52,19 @@ async fn receive_logs_legacy_namespace() {
         let config = OpentelemetryConfig {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
-                tls: Option::default(),
-                keepalive: GrpcKeepaliveConfig::default(),
+                tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
-                tls: Option::default(),
-                keepalive: KeepaliveConfig::default(),
+                tls: Default::default(),
+                keepalive: Default::default(),
                 headers: vec![],
             },
-            acknowledgements: SourceAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
-            log_namespace: Option::default(),
+            log_namespace: Default::default(),
             decoding: None,
             use_otlp_decoding: None,
         };
@@ -135,8 +132,8 @@ async fn receive_trace() {
                     flags: 0,
                     name: "span".to_string(),
                     kind: 1,
-                    start_time_unix_nano: 1_713_525_203_000_000_000,
-                    end_time_unix_nano: 1_713_525_205_000_000_000,
+                    start_time_unix_nano: 1713525203000000000,
+                    end_time_unix_nano: 1713525205000000000,
                     attributes: vec![],
                     dropped_attributes_count: 0,
                     events: vec![],
@@ -144,11 +141,11 @@ async fn receive_trace() {
                     links: vec![],
                     dropped_links_count: 0,
                     status: None,
-                    trace_state: String::new(),
+                    trace_state: "".to_string(),
                 }],
-                schema_url: String::new(),
+                schema_url: "".to_string(),
             }],
-            schema_url: String::new(),
+            schema_url: "".to_string(),
         }],
     };
     let body = req.encode_to_vec();
@@ -159,19 +156,19 @@ async fn receive_trace() {
         let config = OpentelemetryConfig {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
-                tls: Option::default(),
-                keepalive: GrpcKeepaliveConfig::default(),
+                tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
-                tls: Option::default(),
-                keepalive: KeepaliveConfig::default(),
+                tls: Default::default(),
+                keepalive: Default::default(),
                 headers: vec![],
             },
-            acknowledgements: SourceAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
-            log_namespace: Option::default(),
+            log_namespace: Default::default(),
             decoding: None,
             use_otlp_decoding: None,
         };
@@ -202,10 +199,6 @@ async fn receive_trace() {
     .await;
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
-)]
 #[tokio::test]
 async fn receive_metric() {
     // generate a metrics gauge request
@@ -220,7 +213,7 @@ async fn receive_metric() {
                 }],
                 dropped_attributes_count: 0,
             }),
-            schema_url: String::new(),
+            schema_url: "".to_string(),
             scope_metrics: vec![ScopeMetrics {
                 scope: Some(InstrumentationScope {
                     name: "vector-collector-instrumentation".to_string(),
@@ -228,7 +221,7 @@ async fn receive_metric() {
                     attributes: vec![],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 metrics: vec![Metric {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
@@ -273,19 +266,19 @@ async fn receive_metric() {
         let config = OpentelemetryConfig {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
-                tls: Option::default(),
-                keepalive: GrpcKeepaliveConfig::default(),
+                tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
-                tls: Option::default(),
-                keepalive: KeepaliveConfig::default(),
+                tls: Default::default(),
+                keepalive: Default::default(),
                 headers: vec![],
             },
-            acknowledgements: SourceAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
-            log_namespace: Option::default(),
+            log_namespace: Default::default(),
             decoding: None,
             use_otlp_decoding: None,
         };

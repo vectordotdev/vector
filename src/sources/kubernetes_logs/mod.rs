@@ -1,7 +1,7 @@
 //! This mod implements `kubernetes_logs` source.
 //! The scope of this source is to consume the log files that a kubelet keeps
 //! at "/var/log/pods" on the host of the Kubernetes Node when Vector itself is
-//! running inside the cluster as a `DaemonSet`.
+//! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
 use std::{
@@ -83,10 +83,6 @@ use self::{
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "Restructuring these source configuration fields is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
-)]
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
 #[configurable_component(source("kubernetes_logs", "Collect Pod logs from Kubernetes Nodes."))]
@@ -322,11 +318,11 @@ impl GenerateConfig for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            extra_label_selector: String::new(),
-            extra_namespace_label_selector: String::new(),
+            extra_label_selector: "".to_string(),
+            extra_namespace_label_selector: "".to_string(),
             insert_namespace_fields: true,
             self_node_name: default_self_node_name_env_template(),
-            extra_field_selector: String::new(),
+            extra_field_selector: "".to_string(),
             auto_partial_merge: true,
             data_dir: None,
             pod_annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
@@ -349,7 +345,7 @@ impl Default for Config {
             use_apiserver_cache: false,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
-            internal_metrics: FileInternalMetricsConfig::default(),
+            internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
         }
     }
@@ -373,10 +369,6 @@ impl SourceConfig for Config {
         ))
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = BytesDeserializerConfig
@@ -605,10 +597,6 @@ impl SourceConfig for Config {
     }
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "Restructuring these source configuration fields is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
-)]
 #[derive(Clone)]
 struct Source {
     client: Client,
@@ -734,10 +722,6 @@ impl Source {
         })
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     async fn run(
         self,
         mut out: SourceSender,
@@ -1035,16 +1019,18 @@ impl Source {
                 shutdown,
                 Duration::from_secs(30), // more than enough time to propagate
             )
-            .map(|result| match result {
-                Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                Ok(Err(_)) => emit!(StreamClosedError {
-                    count: events_count
-                }),
-                Err(error) => emit!(KubernetesLifecycleError {
-                    error,
-                    message: "Event processing loop timed out during the shutdown.",
-                    count: events_count,
-                }),
+            .map(|result| {
+                match result {
+                    Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
+                    Ok(Err(_)) => emit!(StreamClosedError {
+                        count: events_count
+                    }),
+                    Err(error) => emit!(KubernetesLifecycleError {
+                        error,
+                        message: "Event processing loop timed out during the shutdown.",
+                        count: events_count,
+                    }),
+                };
             });
             slot.bind(Box::pin(fut));
         }
@@ -1144,11 +1130,11 @@ fn create_event(
         }
         // When LogNamespace::Legacy, only set when the `ingestion_timestamp_field` is configured.
         (LogNamespace::Legacy, Some(ingestion_timestamp_field)) => {
-            log.try_insert(ingestion_timestamp_field, Utc::now());
+            log.try_insert(ingestion_timestamp_field, Utc::now())
         }
         // The CRI/Docker parsers handle inserting the `log_schema().timestamp_key()` value.
         (LogNamespace::Legacy, None) => (),
-    }
+    };
 
     log.into()
 }
@@ -1196,7 +1182,7 @@ const fn default_max_line_bytes() -> usize {
 }
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
-    Duration::from_mins(1)
+    Duration::from_millis(60_000)
 }
 
 const fn default_fingerprint_lines() -> usize {
@@ -1204,7 +1190,7 @@ const fn default_fingerprint_lines() -> usize {
 }
 
 const fn default_delay_deletion_ms() -> Duration {
-    Duration::from_mins(1)
+    Duration::from_millis(60_000)
 }
 
 const fn default_rotate_wait() -> Duration {
@@ -1249,10 +1235,6 @@ fn prepare_glob_patterns(paths: &[PathBuf], op: &str) -> crate::Result<Vec<glob:
 
 // This function constructs the effective field selector to use, based on
 // the specified configuration.
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
-)]
 fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Result<String> {
     info!(
         message = "Obtained Kubernetes Node name to collect logs for (self).",
@@ -1269,10 +1251,6 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
 }
 
 // This function constructs the selector for a node to annotate entries with a node metadata.
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
-)]
 fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
     Ok(format!("metadata.name={self_node_name}"))
 }
@@ -1393,9 +1371,9 @@ mod tests {
     #[test]
     fn test_config_serialization_insert_namespace_fields() {
         // Test that the flag serializes/deserializes correctly from YAML
-        let yaml_config = indoc! {r"
+        let yaml_config = indoc! {r#"
             insert_namespace_fields: false
-        "};
+        "#};
         let config: Config = serde_yaml::from_str(yaml_config).unwrap();
         assert_eq!(config.insert_namespace_fields, false);
 
@@ -1485,7 +1463,7 @@ mod tests {
             (
                 Config {
                     self_node_name: "qwe".to_owned(),
-                    extra_field_selector: String::new(),
+                    extra_field_selector: "".to_owned(),
                     ..Default::default()
                 },
                 "spec.nodeName=qwe",
@@ -1519,7 +1497,7 @@ mod tests {
             ),
             (
                 Config {
-                    extra_label_selector: String::new(),
+                    extra_label_selector: "".to_owned(),
                     ..Default::default()
                 }
                 .extra_label_selector,
@@ -1527,7 +1505,7 @@ mod tests {
             ),
             (
                 Config {
-                    extra_namespace_label_selector: String::new(),
+                    extra_namespace_label_selector: "".to_owned(),
                     ..Default::default()
                 }
                 .extra_namespace_label_selector,
@@ -1557,10 +1535,6 @@ mod tests {
         }
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     #[test]
     fn test_output_schema_definition_vector_namespace() {
         let definitions = serde_yaml::from_str::<Config>("")
@@ -1685,13 +1659,9 @@ mod tests {
                     )
                     .with_meaning(OwnedTargetPath::event_root(), "message")
             )
-        );
+        )
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
         let definitions = serde_yaml::from_str::<Config>("")
@@ -1805,7 +1775,7 @@ mod tests {
                     None
                 )
             )
-        );
+        )
     }
 
     #[test]

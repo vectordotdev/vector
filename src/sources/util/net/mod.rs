@@ -68,14 +68,12 @@ impl SocketListenAddr {
 
     /// Gets this listen address as a `Resource`, specifically for TCP.
     #[cfg(feature = "sources-utils-net-tcp")]
-    #[must_use]
     pub const fn as_tcp_resource(self) -> Resource {
         self.as_resource(Protocol::Tcp)
     }
 
     /// Gets this listen address as a `Resource`, specifically for UDP.
     #[cfg(feature = "sources-utils-net-udp")]
-    #[must_use]
     pub const fn as_udp_resource(self) -> Resource {
         self.as_resource(Protocol::Udp)
     }
@@ -107,22 +105,25 @@ impl TryFrom<String> for SocketListenAddr {
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
         // first attempt to parse the string into a SocketAddr directly
-        if let Ok(socket_addr) = input.parse::<SocketAddr>() {
-            Ok(socket_addr.into())
-        } else {
-            let fd: usize = match input.as_str() {
-                "systemd" => Ok(0),
-                s if let Some(rest) = s.strip_prefix("systemd#") => rest
-                    .parse::<usize>()
-                    .map_err(|_| Self::Error::UsizeParse)?
-                    .checked_sub(1)
-                    .ok_or(Self::Error::OneBased),
+        match input.parse::<SocketAddr>() {
+            Ok(socket_addr) => Ok(socket_addr.into()),
 
-                // otherwise fail
-                _ => Err(Self::Error::UnableToParse),
-            }?;
+            // then attempt to parse a systemd file descriptor
+            Err(_) => {
+                let fd: usize = match input.as_str() {
+                    "systemd" => Ok(0),
+                    s if let Some(rest) = s.strip_prefix("systemd#") => rest
+                        .parse::<usize>()
+                        .map_err(|_| Self::Error::UsizeParse)?
+                        .checked_sub(1)
+                        .ok_or(Self::Error::OneBased),
 
-            Ok(fd.into())
+                    // otherwise fail
+                    _ => Err(Self::Error::UnableToParse),
+                }?;
+
+                Ok(fd.into())
+            }
         }
     }
 }

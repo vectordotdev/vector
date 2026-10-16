@@ -193,7 +193,7 @@ impl WebSocketSource {
                 Ok(())
             }
             Message::Ping(_) => Ok(()),
-            Message::Close(frame) => Self::handle_close_frame(frame),
+            Message::Close(frame) => self.handle_close_frame(frame),
             Message::Frame(_) => {
                 warn!("Unsupported message type received: frame.");
                 Ok(())
@@ -345,12 +345,15 @@ impl WebSocketSource {
                 self.process_message(&bin, WebSocketKind::Binary, out).await;
                 Ok(())
             }
-            Message::Close(frame) => Self::handle_close_frame(frame),
+            Message::Close(frame) => self.handle_close_frame(frame),
             _ => Ok(()),
         }
     }
 
-    fn handle_close_frame(frame: Option<CloseFrame<'_>>) -> Result<(), WebSocketSourceError> {
+    fn handle_close_frame(
+        &self,
+        frame: Option<CloseFrame<'_>>,
+    ) -> Result<(), WebSocketSourceError> {
         let (error_message, specific_error) = match frame {
             Some(frame) => {
                 let msg = format!(
@@ -430,7 +433,6 @@ impl PingManager {
 #[cfg(test)]
 mod tests {
     use std::{borrow::Cow, num::NonZeroU64};
-    use vector_lib::codecs::decoding::JsonDeserializerConfig;
 
     use futures::{StreamExt, sink::SinkExt};
     use tokio::{net::TcpListener, time::Duration};
@@ -586,7 +588,7 @@ mod tests {
     async fn websocket_source_consume_binary_event() {
         let server_addr = start_binary_push_server().await;
         let mut config = make_config(&server_addr);
-        let decoding = DeserializerConfig::Json(JsonDeserializerConfig::default());
+        let decoding = DeserializerConfig::Json(Default::default());
         config.decoding = decoding;
 
         let events =

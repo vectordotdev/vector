@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader},

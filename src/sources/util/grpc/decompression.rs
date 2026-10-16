@@ -107,7 +107,7 @@ impl CompressionScheme {
         req.headers()
             .get(GRPC_ENCODING_HEADER)
             .map(|s| {
-                s.to_str().map(ToString::to_string).map_err(|_| {
+                s.to_str().map(|s| s.to_string()).map_err(|_| {
                     Status::unimplemented(format!(
                         "`{GRPC_ENCODING_HEADER}` contains non-visible characters and is not a valid encoding"
                     ))
@@ -150,7 +150,6 @@ enum State {
 /// returned `internal` status a stage-specific prefix so failures stay diagnosable.
 #[derive(strum::Display)]
 #[strum(serialize_all = "lowercase")]
-#[derive(Clone, Copy)]
 enum DecompressStage {
     Initialize,
     Write,
@@ -213,10 +212,6 @@ enum Decompressor {
 }
 
 impl Decompressor {
-    #[allow(
-        clippy::unnecessary_wraps,
-        reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     fn new(scheme: &CompressionScheme) -> Result<Self, io::Error> {
         // Create the backing buffer for the decompressor and set the compression flag to false (0)
         // and pre-allocate the space for the length prefix, which we'll fill out once we've
@@ -280,10 +275,6 @@ impl Decompressor {
     }
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-)]
 async fn drive_body_decompression(
     mut source: Body,
     mut destination: Sender,
@@ -546,7 +537,7 @@ where
         Err(error) => {
             emit!(GrpcError { error: &error });
         }
-    }
+    };
 
     // Advertise the set of compression schemes this layer can accept to the client.
     // Since this layer is the single owner of compression negotiation, individual

@@ -1,9 +1,6 @@
 use futures::TryFutureExt;
 use prost::Message;
-use smallvec::SmallVec;
 use tonic::{Request, Response, Status, body::BoxBody};
-use vector_lib::opentelemetry::proto::metrics::v1::ResourceMetrics;
-use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
@@ -59,13 +56,13 @@ impl TraceService for Service {
             deserializer
                 .parse(bytes, self.log_namespace)
                 .map_err(|e| Status::invalid_argument(e.to_string()))
-                .map(SmallVec::into_vec)?
+                .map(|buf| buf.into_vec())?
         } else {
             request
                 .into_inner()
                 .resource_spans
                 .into_iter()
-                .flat_map(ResourceSpans::into_event_iter)
+                .flat_map(|v| v.into_event_iter())
                 .collect()
         };
         let receiver = self.handle_events(events, TRACES).await?;
@@ -91,7 +88,7 @@ impl LogsService for Service {
             deserializer
                 .parse(bytes, self.log_namespace)
                 .map_err(|e| Status::invalid_argument(e.to_string()))
-                .map(SmallVec::into_vec)?
+                .map(|buf| buf.into_vec())?
         } else {
             request
                 .into_inner()
@@ -124,13 +121,13 @@ impl MetricsService for Service {
             deserializer
                 .parse(bytes, self.log_namespace)
                 .map_err(|e| Status::invalid_argument(e.to_string()))
-                .map(SmallVec::into_vec)?
+                .map(|buf| buf.into_vec())?
         } else {
             request
                 .into_inner()
                 .resource_metrics
                 .into_iter()
-                .flat_map(ResourceMetrics::into_event_iter)
+                .flat_map(|v| v.into_event_iter())
                 .collect()
         };
 

@@ -58,28 +58,16 @@ macro_rules! tags {
 
 macro_rules! counter {
     ($value:expr_2021) => {
-        {
-            #[allow(
-                clippy::cast_precision_loss,
-                clippy::cast_lossless,
-                reason = "The metric macro accepts integer and floating-point counters; preserve their existing conversion. https://github.com/vectordotdev/vector/issues/23659"
-            )]
-            let value = $value as f64;
-            MetricValue::Counter { value }
+        MetricValue::Counter {
+            value: $value as f64,
         }
     };
 }
 
 macro_rules! gauge {
     ($value:expr_2021) => {
-        {
-            #[allow(
-                clippy::cast_precision_loss,
-                clippy::cast_lossless,
-                reason = "The metric macro accepts integer and floating-point counters; preserve their existing conversion. https://github.com/vectordotdev/vector/issues/23659"
-            )]
-            let value = $value as f64;
-            MetricValue::Gauge { value }
+        MetricValue::Gauge {
+            value: $value as f64,
         }
     };
 }
@@ -197,12 +185,10 @@ impl Default for PostgresqlMetricsConfig {
 
 impl_generate_config_from_default!(PostgresqlMetricsConfig);
 
-#[must_use]
 pub const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
-#[must_use]
 pub fn default_namespace() -> String {
     "postgresql".to_owned()
 }
@@ -222,7 +208,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
             .iter()
             .map(|endpoint| {
                 PostgresqlMetrics::new(
-                    endpoint,
+                    endpoint.clone(),
                     datname_filter.clone(),
                     namespace.clone(),
                     self.tls.clone(),
@@ -236,7 +222,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
-                let metrics = join_all(sources.iter_mut().map(PostgresqlMetrics::collect)).await;
+                let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
@@ -296,33 +282,35 @@ impl PostgresqlClient {
 
     async fn build_client(&self) -> Result<(Client, usize), ConnectError> {
         // Create postgresql client
-        let client = if let Some(tls_config) = &self.tls_config {
-            let mut builder =
-                SslConnector::builder(SslMethod::tls_client()).context(TlsFailedSnafu)?;
-            builder
-                .set_ca_file(tls_config.ca_file.clone())
-                .context(TlsFailedSnafu)?;
-            let connector = MakeTlsConnector::new(builder.build());
+        let client = match &self.tls_config {
+            Some(tls_config) => {
+                let mut builder =
+                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailedSnafu)?;
+                builder
+                    .set_ca_file(tls_config.ca_file.clone())
+                    .context(TlsFailedSnafu)?;
+                let connector = MakeTlsConnector::new(builder.build());
 
-            let (client, connection) =
-                self.config
-                    .connect(connector)
-                    .await
-                    .with_context(|_| ConnectionFailedSnafu {
-                        endpoint: &self.endpoint,
+                let (client, connection) =
+                    self.config.connect(connector).await.with_context(|_| {
+                        ConnectionFailedSnafu {
+                            endpoint: &self.endpoint,
+                        }
                     })?;
-            crate::spawn_in_current_span(connection);
-            client
-        } else {
-            let (client, connection) =
-                self.config
-                    .connect(NoTls)
-                    .await
-                    .with_context(|_| ConnectionFailedSnafu {
-                        endpoint: &self.endpoint,
-                    })?;
-            crate::spawn_in_current_span(connection);
-            client
+                crate::spawn_in_current_span(connection);
+                client
+            }
+            None => {
+                let (client, connection) =
+                    self.config
+                        .connect(NoTls)
+                        .await
+                        .with_context(|_| ConnectionFailedSnafu {
+                            endpoint: &self.endpoint,
+                        })?;
+                crate::spawn_in_current_span(connection);
+                client
+            }
         };
 
         // Log version if required
@@ -401,7 +389,7 @@ impl DatnameFilter {
                 pg_stat_database_sql += " datname IS NULL";
             }
             // Exclude tracking objects not in database, precedence over include
-            (false | true, true) => {
+            (false, true) | (true, true) => {
                 pg_stat_database_sql += if match_sql.is_empty() {
                     " WHERE"
                 } else {
@@ -469,7 +457,7 @@ impl DatnameFilter {
     fn get_match_params(&self) -> Vec<&(dyn tokio_postgres::types::ToSql + Sync)> {
         let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
             Vec::with_capacity(self.match_params.len());
-        for item in &self.match_params {
+        for item in self.match_params.iter() {
             params.push(item);
         }
         params
@@ -511,7 +499,7 @@ struct PostgresqlMetrics {
 
 impl PostgresqlMetrics {
     fn new(
-        endpoint: &str,
+        endpoint: String,
         datname_filter: DatnameFilter,
         namespace: Option<String>,
         tls_config: Option<PostgresqlMetricsTlsConfig>,
@@ -610,10 +598,6 @@ impl PostgresqlMetrics {
         }
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     async fn collect_pg_stat_database(
         &self,
         client: &Client,
@@ -627,7 +611,7 @@ impl PostgresqlMetrics {
 
         let mut metrics = Vec::with_capacity(20 * rows.len());
         let mut reader = RowReader::default();
-        for row in &rows {
+        for row in rows.iter() {
             let db = reader.read::<Option<&str>>(row, "datname")?.unwrap_or("");
 
             metrics.extend_from_slice(&[
@@ -707,7 +691,7 @@ impl PostgresqlMetrics {
                     tags!(self.tags, "db" => db),
                 ),
             ]);
-            if client_version >= 120_000 {
+            if client_version >= 120000 {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
@@ -723,7 +707,8 @@ impl PostgresqlMetrics {
                         gauge!(
                             reader
                                 .read::<Option<DateTime<Utc>>>(row, "checksum_last_failure")?
-                                .map_or(0, |t| t.timestamp())
+                                .map(|t| t.timestamp())
+                                .unwrap_or(0)
                         ),
                         tags!(self.tags, "db" => db),
                     ),
@@ -745,7 +730,8 @@ impl PostgresqlMetrics {
                     gauge!(
                         reader
                             .read::<Option<DateTime<Utc>>>(row, "stats_reset")?
-                            .map_or(0, |t| t.timestamp())
+                            .map(|t| t.timestamp())
+                            .unwrap_or(0)
                     ),
                     tags!(self.tags, "db" => db),
                 ),
@@ -766,7 +752,7 @@ impl PostgresqlMetrics {
 
         let mut metrics = Vec::with_capacity(5 * rows.len());
         let mut reader = RowReader::default();
-        for row in &rows {
+        for row in rows.iter() {
             let db = reader.read::<&str>(row, "datname")?;
 
             metrics.extend_from_slice(&[
@@ -934,12 +920,12 @@ fn config_to_endpoint(config: &Config) -> String {
         _ => {
             warn!("Unknown variant of \"SslMode\".");
         }
-    }
+    };
 
     // host
     for host in config.get_hosts() {
         match host {
-            Host::Tcp(host) => params.push(("host", host.clone())),
+            Host::Tcp(host) => params.push(("host", host.to_string())),
             #[cfg(unix)]
             Host::Unix(path) => params.push(("host", path.to_string_lossy().to_string())),
         }
@@ -970,7 +956,7 @@ fn config_to_endpoint(config: &Config) -> String {
     match config.get_target_session_attrs() {
         TargetSessionAttrs::Any => {} // default, ignore
         TargetSessionAttrs::ReadWrite => {
-            params.push(("target_session_attrs", "read-write".to_owned()));
+            params.push(("target_session_attrs", "read-write".to_owned()))
         }
         // non_exhaustive enum
         _ => {
@@ -1060,7 +1046,7 @@ mod integration_tests {
                 .await
                 .unwrap()
                 .await
-                .unwrap();
+                .unwrap()
             });
 
             let event = time::timeout(time::Duration::from_secs(3), recv.next())
@@ -1068,10 +1054,12 @@ mod integration_tests {
                 .expect("fetch metrics timeout")
                 .expect("failed to get metrics from a stream");
             let mut events = vec![event];
-            while let Ok(Some(event)) =
-                time::timeout(time::Duration::from_millis(10), recv.next()).await
-            {
-                events.push(event);
+            loop {
+                match time::timeout(time::Duration::from_millis(10), recv.next()).await {
+                    Ok(Some(event)) => events.push(event),
+                    Ok(None) => break,
+                    Err(_) => break,
+                }
             }
 
             assert!(events.len() > 1);
@@ -1080,7 +1068,7 @@ mod integration_tests {
             assert_eq!(
                 events
                     .iter()
-                    .map(Event::as_metric)
+                    .map(|e| e.as_metric())
                     .find(|e| e.name() == "up")
                     .unwrap()
                     .value(),
@@ -1181,7 +1169,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_host_exclude_databases_empty() {
-        test_postgresql_metrics(pg_url(), None, None, Some(vec![String::new()])).await;
+        test_postgresql_metrics(pg_url(), None, None, Some(vec!["".to_owned()])).await;
     }
 
     #[tokio::test]

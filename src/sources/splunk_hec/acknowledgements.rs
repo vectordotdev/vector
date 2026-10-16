@@ -99,10 +99,6 @@ pub struct IndexerAcknowledgement {
 }
 
 impl IndexerAcknowledgement {
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "Changing this source helper signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     pub fn new(config: HecAcknowledgementsConfig, shutdown: ShutdownSignal) -> Self {
         let channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>> =
             Arc::new(tokio::sync::Mutex::new(HashMap::new()));
@@ -134,10 +130,6 @@ impl IndexerAcknowledgement {
         }
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     /// Creates a channel with the specified id if it does not exist.
     async fn create_or_get_channel(&self, id: String) -> Result<Arc<Channel>, Rejection> {
         let mut channels = self.channels.lock().await;
@@ -481,12 +473,12 @@ mod tests {
             .await
             .unwrap();
 
-        let (batch_notifier, batch_rx) = BatchNotifier::new_with_receiver();
+        let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
         let channel_one_ack_id = channel_one.get_ack_id(batch_rx);
-        drop(batch_notifier);
-        let (batch_notifier, batch_rx) = BatchNotifier::new_with_receiver();
+        drop(_tx);
+        let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
         let channel_two_ack_id = channel_two.get_ack_id(batch_rx);
-        drop(batch_notifier);
+        drop(_tx);
 
         assert_eq!(0, channel_one_ack_id);
         assert_eq!(0, channel_two_ack_id);

@@ -1,8 +1,5 @@
-use crate::config::SourceAcknowledgementsConfig;
 mod decoding;
 
-use crate::http::KeepaliveConfig;
-use crate::sources::util::grpc::GrpcKeepaliveConfig;
 use std::{
     net,
     sync::Arc,
@@ -123,7 +120,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                 }],
                 dropped_attributes_count: 0,
             }),
-            schema_url: String::new(),
+            schema_url: "".to_string(),
             scope_metrics: vec![ScopeMetrics {
                 scope: Some(InstrumentationScope {
                     name: "vector-collector-instrumentation".to_string(),
@@ -131,7 +128,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                     attributes: vec![],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 metrics: vec![Metric {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
@@ -193,8 +190,8 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     flags: 0,
                     name: "span".to_string(),
                     kind: 1,
-                    start_time_unix_nano: 1_713_525_203_000_000_000,
-                    end_time_unix_nano: 1_713_525_205_000_000_000,
+                    start_time_unix_nano: 1713525203000000000,
+                    end_time_unix_nano: 1713525205000000000,
                     attributes: vec![],
                     dropped_attributes_count: 0,
                     events: vec![],
@@ -202,11 +199,11 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     links: vec![],
                     dropped_links_count: 0,
                     status: None,
-                    trace_state: String::new(),
+                    trace_state: "".to_string(),
                 }],
-                schema_url: String::new(),
+                schema_url: "".to_string(),
             }],
-            schema_url: String::new(),
+            schema_url: "".to_string(),
         }],
     }
 }
@@ -654,7 +651,7 @@ async fn receive_sum_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -662,7 +659,7 @@ async fn receive_sum_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: String::new(),
+                    schema_url: "".to_string(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -747,7 +744,7 @@ async fn receive_sum_non_monotonic_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -755,7 +752,7 @@ async fn receive_sum_non_monotonic_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: String::new(),
+                    schema_url: "".to_string(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -840,7 +837,7 @@ async fn receive_gauge_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -848,7 +845,7 @@ async fn receive_gauge_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: String::new(),
+                    schema_url: "".to_string(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -908,10 +905,6 @@ async fn receive_gauge_metric() {
         .await;
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-)]
 #[tokio::test]
 async fn receive_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -934,7 +927,7 @@ async fn receive_histogram_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -942,7 +935,7 @@ async fn receive_histogram_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: String::new(),
+                    schema_url: "".to_string(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1040,10 +1033,6 @@ async fn receive_histogram_metric() {
     .await;
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-)]
 #[tokio::test]
 async fn receive_histogram_delta_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -1066,7 +1055,7 @@ async fn receive_histogram_delta_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1074,7 +1063,7 @@ async fn receive_histogram_delta_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: String::new(),
+                    schema_url: "".to_string(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1172,10 +1161,6 @@ async fn receive_histogram_delta_metric() {
     .await;
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-)]
 #[tokio::test]
 async fn receive_exponential_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -1198,7 +1183,7 @@ async fn receive_exponential_histogram_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1206,7 +1191,7 @@ async fn receive_exponential_histogram_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: String::new(),
+                    schema_url: "".to_string(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1282,7 +1267,7 @@ async fn receive_exponential_histogram_metric() {
                     buckets: vec![
                         Bucket {
                             count: 1,
-                            upper_limit: -0.840_896_415_253_714_6,
+                            upper_limit: -0.8408964152537146,
                         },
                         Bucket {
                             count: 2,
@@ -1294,11 +1279,11 @@ async fn receive_exponential_histogram_metric() {
                         },
                         Bucket {
                             count: 2,
-                            upper_limit: 1.189_207_115_002_721,
+                            upper_limit: 1.189207115002721,
                         },
                         Bucket {
                             count: 1,
-                            upper_limit: 1.414_213_562_373_095_1,
+                            upper_limit: 1.4142135623730951,
                         },
                     ],
                     count: 7,
@@ -1317,10 +1302,6 @@ async fn receive_exponential_histogram_metric() {
     .await;
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
-)]
 #[tokio::test]
 async fn receive_summary_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
@@ -1343,7 +1324,7 @@ async fn receive_summary_metric() {
                     }],
                     dropped_attributes_count: 0,
                 }),
-                schema_url: String::new(),
+                schema_url: "".to_string(),
                 scope_metrics: vec![ScopeMetrics {
                     scope: Some(InstrumentationScope {
                         name: "vector-collector-instrumentation".to_string(),
@@ -1351,7 +1332,7 @@ async fn receive_summary_metric() {
                         attributes: vec![],
                         dropped_attributes_count: 0,
                     }),
-                    schema_url: String::new(),
+                    schema_url: "".to_string(),
                     metrics: vec![Metric {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
@@ -1461,23 +1442,23 @@ fn get_source_config_with_headers(
     OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Option::default(),
-            keepalive: GrpcKeepaliveConfig::default(),
+            tls: Default::default(),
+            keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Option::default(),
-            keepalive: KeepaliveConfig::default(),
+            tls: Default::default(),
+            keepalive: Default::default(),
             headers: vec![
                 "User-Agent".to_string(),
                 "X-*".to_string(),
                 "AbsentHeader".to_string(),
             ],
         },
-        acknowledgements: SourceAcknowledgementsConfig::default(),
+        acknowledgements: Default::default(),
         max_concurrent_requests: None,
         request_timeout_secs: None,
-        log_namespace: Option::default(),
+        log_namespace: Default::default(),
         decoding: preserve_otlp.then(|| super::config::DecodingConfig::Otlp {
             signal_types: [
                 vector_lib::codecs::decoding::OtlpSignalType::Logs,
@@ -1913,16 +1894,16 @@ async fn build_otlp_test_env_with(
     let config = OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Option::default(),
-            keepalive: GrpcKeepaliveConfig::default(),
+            tls: Default::default(),
+            keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Option::default(),
-            keepalive: KeepaliveConfig::default(),
-            headers: Vec::default(),
+            tls: Default::default(),
+            keepalive: Default::default(),
+            headers: Default::default(),
         },
-        acknowledgements: SourceAcknowledgementsConfig::default(),
+        acknowledgements: Default::default(),
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace,
@@ -2021,16 +2002,16 @@ async fn http_logs_preserve_otlp_emits_metric() {
     let source = OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
-            tls: Option::default(),
-            keepalive: GrpcKeepaliveConfig::default(),
+            tls: Default::default(),
+            keepalive: Default::default(),
         },
         http: HttpConfig {
             address: http_addr,
-            tls: Option::default(),
-            keepalive: KeepaliveConfig::default(),
-            headers: Vec::default(),
+            tls: Default::default(),
+            keepalive: Default::default(),
+            headers: Default::default(),
         },
-        acknowledgements: SourceAcknowledgementsConfig::default(),
+        acknowledgements: Default::default(),
         max_concurrent_requests: None,
         request_timeout_secs: None,
         log_namespace: None,
@@ -2113,9 +2094,6 @@ async fn http_logs_preserve_otlp_emits_metric() {
 
 #[cfg(test)]
 mod otlp_decoding_config_tests {
-    use crate::config::SourceAcknowledgementsConfig;
-    use crate::http::KeepaliveConfig;
-    use crate::sources::util::grpc::GrpcKeepaliveConfig;
     use indoc::indoc;
 
     use crate::config::{DataType, LogNamespace, SourceConfig};
@@ -2264,15 +2242,15 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
-                keepalive: GrpcKeepaliveConfig::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
-                keepalive: KeepaliveConfig::default(),
+                keepalive: Default::default(),
                 headers: vec![],
             },
-            acknowledgements: SourceAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
@@ -2314,15 +2292,15 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
-                keepalive: GrpcKeepaliveConfig::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
-                keepalive: KeepaliveConfig::default(),
+                keepalive: Default::default(),
                 headers: vec![],
             },
-            acknowledgements: SourceAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
@@ -2361,15 +2339,15 @@ mod otlp_decoding_config_tests {
             grpc: GrpcConfig {
                 address: "0.0.0.0:4317".parse().unwrap(),
                 tls: None,
-                keepalive: GrpcKeepaliveConfig::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
-                keepalive: KeepaliveConfig::default(),
+                keepalive: Default::default(),
                 headers: vec![],
             },
-            acknowledgements: SourceAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
