@@ -272,8 +272,8 @@ impl ValidatedSink for VectorConfig {
             endpoints,
         } = validated.clone();
         let uris = endpoints
-            .iter()
-            .map(|endpoint| endpoint.as_uri().clone())
+            .into_iter()
+            .map(HttpEndpoint::into_uri)
             .collect::<Vec<_>>();
         let endpoint_strategy = self
             .routing
