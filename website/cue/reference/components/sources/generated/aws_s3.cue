@@ -43,6 +43,20 @@ generated: components: sources: aws_s3: configuration: {
 			}
 		}
 	}
+	connect_timeout_seconds: {
+		description: """
+			The connection timeout for AWS requests
+
+			Limits the amount of time allowed to initiate a socket connection.
+			"""
+		required: false
+		type: uint: {
+			examples: [
+				20
+			]
+			unit: "seconds"
+		}
+	}
 	decoding: {
 		description: """
 			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
@@ -148,6 +162,47 @@ generated: components: sources: aws_s3: configuration: {
 			"""
 		required: false
 		type:     _schemaDefinitions["core::option::Option<vector::sources::util::multiline_config::MultilineConfig>"]
+	}
+	operation_timeout_seconds: {
+		description: """
+			The operation timeout for AWS requests
+
+			Limits the amount of time allowed for an operation to be fully serviced; an
+			operation represents the full request/response lifecycle of a call to a service.
+
+			For operations with a streaming response body, such as S3 `GetObject`, the operation
+			completes once the response headers are received, so this does not limit the time
+			spent downloading the body.
+
+			For SQS, take care to allow enough time for the long-polling interval configured in
+			`poll_secs`.
+			"""
+		required: false
+		type: uint: {
+			examples: [
+				20
+			]
+			unit: "seconds"
+		}
+	}
+	read_timeout_seconds: {
+		description: """
+			The read timeout for AWS requests
+
+			Limits the amount of time allowed to read the first byte of a response from the
+			time the request is initiated. It does not apply to reading the rest of a streaming
+			response body, such as an S3 object.
+
+			For SQS, take care to allow enough time for the long-polling interval configured in
+			`poll_secs`.
+			"""
+		required: false
+		type: uint: {
+			examples: [
+				20
+			]
+			unit: "seconds"
+		}
 	}
 	region: {
 		description: """
@@ -272,8 +327,13 @@ generated: components: sources: aws_s3: configuration: {
 
 					Limits the amount of time allowed for an operation to be fully serviced; an
 					operation represents the full request/response lifecycle of a call to a service.
-					Take care when configuring this settings to allow enough time for the polling
-					interval configured in `poll_secs`
+
+					For operations with a streaming response body, such as S3 `GetObject`, the operation
+					completes once the response headers are received, so this does not limit the time
+					spent downloading the body.
+
+					For SQS, take care to allow enough time for the long-polling interval configured in
+					`poll_secs`.
 					"""
 				required: false
 				type: uint: {
@@ -304,8 +364,11 @@ generated: components: sources: aws_s3: configuration: {
 					The read timeout for AWS requests
 
 					Limits the amount of time allowed to read the first byte of a response from the
-					time the request is initiated. Take care when configuring this settings to allow
-					enough time for the polling interval configured in `poll_secs`
+					time the request is initiated. It does not apply to reading the rest of a streaming
+					response body, such as an S3 object.
+
+					For SQS, take care to allow enough time for the long-polling interval configured in
+					`poll_secs`.
 					"""
 				required: false
 				type: uint: {
