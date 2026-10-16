@@ -81,7 +81,7 @@ pub use self::message_decoding::decode_message;
 
 /// Extract a tag and it's value from input string delimited by a colon character.
 ///
-/// Note: the behavior of `StatsD` if more than one colon is found (which would presumably
+/// Note: the behavior of StatsD if more than one colon is found (which would presumably
 /// be part of the tag value), is to remove any additional colons from the tag value.
 /// Thus Vector expects only one colon character to be present per chunk, so the `find()`
 /// operation locating the first position is sufficient.

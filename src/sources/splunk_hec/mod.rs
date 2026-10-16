@@ -1728,9 +1728,9 @@ enum Time {
     Provided(DateTime<Utc>),
 }
 
-#[expect(
+#[allow(
     clippy::needless_pass_by_value,
-    reason = "Request handlers own payload and token values at this boundary."
+    reason = "Borrowing request-handler inputs where possible is deferred to keep this cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
 )]
 #[allow(
     clippy::too_many_lines,

@@ -837,9 +837,9 @@ pub fn build_framestream_unix_source(
     Ok(Box::pin(fut))
 }
 
-#[expect(
+#[allow(
     clippy::needless_pass_by_value,
-    reason = "Preserve the owned frame handler lifetime while its clones process events."
+    reason = "Borrowing frame-handler inputs where possible is deferred to keep this cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
 )]
 #[allow(clippy::too_many_arguments)]
 fn build_framestream_source<T: Send + 'static>(

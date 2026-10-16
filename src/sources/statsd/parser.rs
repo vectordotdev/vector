@@ -33,7 +33,7 @@ impl Parser {
     ///
     /// # Errors
     ///
-    /// Returns an error if the packet contains an invalid `StatsD` metric.
+    /// Returns an error if the packet contains an invalid StatsD metric.
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -256,7 +256,7 @@ mod test {
     ///
     /// # Errors
     ///
-    /// Returns an error if the packet contains an invalid `StatsD` metric.
+    /// Returns an error if the packet contains an invalid StatsD metric.
     fn parse(packet: &str) -> Result<Metric, ParseError> {
         SANITIZING_PARSER.parse(packet)
     }

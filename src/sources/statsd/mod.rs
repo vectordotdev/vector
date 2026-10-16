@@ -83,7 +83,7 @@ pub struct UnixConfig {
     pub convert_to: ConversionUnit,
 }
 
-/// Specifies the target unit for converting incoming `StatsD` timing values. When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to "milliseconds", the original timing values are preserved.
+/// Specifies the target unit for converting incoming StatsD timing values. When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to "milliseconds", the original timing values are preserved.
 #[configurable_component]
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]

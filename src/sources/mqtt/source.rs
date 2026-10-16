@@ -75,6 +75,7 @@ impl MqttSource {
                     // delivery guarantees.
                     // We need this issue resolved first:
                     // https://github.com/bytebeamio/rumqtt/issues/349
+                    // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
                     if let Ok(MqttEvent::Incoming(Incoming::Publish(publish))) = mqtt_event {
                         self.process_message(publish, &mut out).await;
                     }

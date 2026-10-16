@@ -95,7 +95,7 @@ enum CollectError {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MongoDbMetricsConfig {
-    /// A list of `MongoDB` instances to scrape.
+    /// A list of MongoDB instances to scrape.
     ///
     /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
     #[configurable(metadata(docs::examples = "mongodb://localhost:27017"))]
