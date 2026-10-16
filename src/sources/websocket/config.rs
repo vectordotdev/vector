@@ -172,7 +172,7 @@ impl SourceConfig for WebSocketConfig {
 
         let source = WebSocketSource::new(self.clone(), params);
 
-        Ok(Box::pin(source.run(cx).map_err(|_err| ())))
+        Ok(Box::pin(source.run(cx).map_err(Into::into)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

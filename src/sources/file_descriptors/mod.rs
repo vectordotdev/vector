@@ -74,7 +74,7 @@ pub trait FileDescriptorConfig: NamedComponent {
             read_from_fd(reader, sender);
         });
 
-        Ok(Box::pin(process_stream(
+        Ok(crate::sources::source_with_error(process_stream(
             receiver,
             decoder,
             out,
@@ -122,7 +122,7 @@ async fn process_stream(
     source_type: &'static str,
     hostname: Option<String>,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
     let events_received = register!(EventsReceived);
     let stream = receiver.inspect(|result| {
@@ -190,10 +190,10 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(_) => {
+        Err(error) => {
             let (count, _) = stream.size_hint();
             emit!(StreamClosedError { count });
-            Err(())
+            Err(error)
         }
     }
 }

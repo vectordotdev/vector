@@ -233,6 +233,7 @@ impl SourceConfig for VectorConfig {
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);
+            crate::sources::SourceError::from(error)
         });
 
         Ok(Box::pin(source))

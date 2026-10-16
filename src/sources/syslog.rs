@@ -354,7 +354,8 @@ pub fn udp(
             emit!(SocketBindError {
                 mode: SocketMode::Udp,
                 error: &error,
-            })
+            });
+            super::SourceError::from(error)
         })?;
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes
@@ -415,10 +416,10 @@ pub fn udp(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(_) => {
+            Err(error) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Err(())
+                Err(error.into())
             }
         }
     })
@@ -1232,6 +1233,34 @@ mod test {
             assert_eq!(output_messages, input_messages);
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn test_udp_syslog_send_error_retains_cause() {
+        let (_guard, in_addr) = next_addr();
+        let config = SyslogConfig::from_mode(Mode::Udp {
+            address: in_addr.into(),
+            receive_buffer_bytes: None,
+        });
+
+        let key = ComponentKey::from("in");
+        let (tx, rx) = SourceSender::new_test();
+        drop(rx);
+        let (context, _shutdown) = SourceContext::new_shutdown(&key, tx);
+        let source = config.build(context).await.unwrap();
+        let source = tokio::spawn(source);
+
+        sleep(Duration::from_millis(150)).await;
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let message = SyslogMessageRfc5424::random(0, 30, 4, 3, 3).to_string();
+        socket.send_to(message.as_bytes(), in_addr).await.unwrap();
+
+        let error = tokio::time::timeout(Duration::from_secs(5), source)
+            .await
+            .expect("source error timed out")
+            .unwrap()
+            .expect_err("source should fail when its output is closed");
+        assert_eq!(error.to_string(), "Sender is closed.");
     }
 
     #[tokio::test]
