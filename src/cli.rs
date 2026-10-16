@@ -338,7 +338,7 @@ impl RootOpts {
         if !self.openssl_no_probe {
             // SAFETY: Initialization runs before worker threads start.
             unsafe {
-                openssl_probe::init_openssl_env_vars();
+                openssl_probe::try_init_openssl_env_vars();
             }
         }
 
