@@ -20,7 +20,7 @@ use crate::{
         TlsSnafu,
     },
     config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
-    serde::{OneOrMany, bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{OneOrMany, default_decoding, default_framing_message_based},
 };
 
 /// Configuration for the `mqtt` source.
@@ -75,7 +75,7 @@ pub struct MqttSourceConfig {
     /// can be resumed after a restart.
     ///
     /// [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 

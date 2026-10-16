@@ -22,7 +22,7 @@ generated: components: sources: mqtt: configuration: {
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	client_id: {
 		description: "MQTT client ID."
