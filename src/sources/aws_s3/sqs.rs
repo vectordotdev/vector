@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     future::ready,
     num::NonZeroUsize,
     panic,
@@ -348,7 +349,7 @@ impl Ingestor {
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         log_namespace: LogNamespace,
-    ) -> Result<(), ()> {
+    ) -> Result<(), Infallible> {
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {

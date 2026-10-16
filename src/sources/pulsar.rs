@@ -2,7 +2,7 @@
 //! Accepts log events streamed from [`Apache Pulsar`][pulsar].
 //!
 //! [pulsar]: https://pulsar.apache.org/
-use std::path::Path;
+use std::{convert::Infallible, path::Path};
 
 use chrono::TimeZone;
 use futures_util::StreamExt;
@@ -205,7 +205,7 @@ impl SourceConfig for PulsarSourceConfig {
                 .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
-        Ok(crate::sources::opaque_source(pulsar_source(
+        Ok(crate::sources::source_with_error(pulsar_source(
             consumer,
             decoder,
             cx.shutdown,
@@ -326,7 +326,7 @@ async fn pulsar_source(
     mut out: SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> Result<(), Infallible> {
     let (finalizer, mut ack_stream) =
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
 

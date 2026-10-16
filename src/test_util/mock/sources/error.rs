@@ -4,7 +4,7 @@ use vector_lib::{
     config::{DataType, LogNamespace, SourceOutput},
     configurable::configurable_component,
     schema::Definition,
-    source::Source,
+    source::{Source, SourceError},
 };
 
 use crate::config::{SourceConfig, SourceContext};
@@ -23,7 +23,8 @@ impl_generate_config_from_default!(ErrorSourceConfig);
 #[typetag::serde(name = "test_error")]
 impl SourceConfig for ErrorSourceConfig {
     async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
-        Ok(vector_lib::source::opaque_source(err(())))
+        let error: SourceError = "the test_error source always fails".into();
+        Ok(Box::pin(err(error)))
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

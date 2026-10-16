@@ -111,7 +111,7 @@ impl SourceConfig for AwsSqsConfig {
                 .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
-        Ok(crate::sources::opaque_source(
+        Ok(crate::sources::source_with_error(
             SqsSource {
                 client,
                 queue_url: self.queue_url.clone(),

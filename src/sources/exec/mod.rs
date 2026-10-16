@@ -1,4 +1,6 @@
-use std::{collections::HashMap, io::Error, path::PathBuf, process::ExitStatus};
+use std::{
+    collections::HashMap, convert::Infallible, io::Error, path::PathBuf, process::ExitStatus,
+};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -255,7 +257,7 @@ impl SourceConfig for ExecConfig {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
 
-                Ok(crate::sources::opaque_source(run_scheduled(
+                Ok(crate::sources::source_with_error(run_scheduled(
                     self.clone(),
                     hostname,
                     exec_interval_secs,
@@ -269,7 +271,7 @@ impl SourceConfig for ExecConfig {
                 let respawn_on_exit = self.respawn_on_exit_or_default();
                 let respawn_interval_secs = self.respawn_interval_secs_or_default();
 
-                Ok(crate::sources::opaque_source(run_streaming(
+                Ok(crate::sources::source_with_error(run_streaming(
                     self.clone(),
                     hostname,
                     respawn_on_exit,
@@ -342,7 +344,7 @@ async fn run_scheduled(
     shutdown: ShutdownSignal,
     out: SourceSender,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> Result<(), Infallible> {
     debug!("Starting scheduled exec runs.");
     let schedule = Duration::from_secs(exec_interval_secs);
 
@@ -396,7 +398,7 @@ async fn run_streaming(
     mut shutdown: ShutdownSignal,
     out: SourceSender,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> Result<(), Infallible> {
     if respawn_on_exit {
         let duration = Duration::from_secs(respawn_interval_secs);
 
