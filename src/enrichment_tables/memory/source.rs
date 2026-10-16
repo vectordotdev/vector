@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    convert::Infallible,
+    time::{Duration, Instant},
+};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -33,7 +36,7 @@ pub(crate) struct MemorySource {
 }
 
 impl MemorySource {
-    pub(crate) async fn run(mut self) -> Result<(), ()> {
+    pub(crate) async fn run(mut self) -> Result<(), Infallible> {
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
         let source_config = self

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{
     Client as SqsClient,
@@ -43,7 +43,7 @@ pub struct SqsSource {
 }
 
 impl SqsSource {
-    pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), Infallible> {
         let mut task_handles = vec![];
         let finalizer = self.acknowledgements.then(|| {
             let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
