@@ -416,10 +416,10 @@ mod tests {
         // to ensure interoperability.
         let sink_config = match compression {
             Some(c) => indoc::formatdoc! {r#"
-                address: "{addr}"
+                address: "http://{addr}"
                 compression: "{c}"
             "#},
-            None => format!("address: \"{addr}\"\n"),
+            None => format!("address: \"http://{addr}\"\n"),
         };
         let sink: SinkConfig = serde_yaml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
