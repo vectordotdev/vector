@@ -20,8 +20,10 @@ generated: components: sinks: postgres: configuration: {
 			a single event in the batch can make the whole batch to fail. For example, if a single event within the batch triggers
 			a unique constraint violation in the destination table, the whole event batch will fail.
 
-			As a workaround, [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html) on constraint violations
-			can be defined at a database level to change the behavior of the insert operation on specific tables.
+			To skip rows that violate a unique constraint without failing the batch, set `on_conflict` to `do_nothing`.
+
+			For other kinds of constraint violations, [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html)
+			on constraint violations can be defined at a database level to change the behavior of the insert operation on specific tables.
 			Alternatively, setting `max_events` batch setting to `1` will make each event to be inserted independently,
 			so events that trigger a constraint violation will not affect the rest of the events.
 			"""
@@ -36,6 +38,25 @@ generated: components: sinks: postgres: configuration: {
 			"""
 		required: true
 		type: string: {}
+	}
+	on_conflict: {
+		description: "How the sink handles rows that violate a unique or exclusion constraint on insert."
+		required:    false
+		type: string: {
+			default: "error"
+			enum: {
+				do_nothing: """
+					Skip rows that conflict with an existing row and insert the rest of the batch.
+
+					This appends `ON CONFLICT DO NOTHING` to the insert statement. Skipped rows are reported
+					as intentionally discarded events.
+
+					PostgreSQL rejects this statement on a table that has a `DEFERRABLE` unique or exclusion
+					constraint, even when no row conflicts. Keep the default for such tables.
+					"""
+				error: "Fail the whole batch when any row conflicts with an existing row."
+			}
+		}
 	}
 	pool_size: {
 		description: """

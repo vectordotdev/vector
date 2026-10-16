@@ -4,5 +4,6 @@ sinks:
     inputs:
       - my-source-or-transform-id
     endpoint: postgres://localhost:5432
+    on_conflict: error
     pool_size: 5
     table: my_table
