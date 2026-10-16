@@ -145,6 +145,12 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
     let mut skipped_bytes = 0;
     while skipped_bytes < n {
         let chunk = reader.fill_buf().await?;
+        if chunk.is_empty() {
+            return Err(std::io::Error::new(
+                ErrorKind::UnexpectedEof,
+                "header is incomplete",
+            ));
+        }
         let bytes_to_skip = std::cmp::min(chunk.len(), n - skipped_bytes);
         reader.consume(bytes_to_skip);
         skipped_bytes += bytes_to_skip;
@@ -539,6 +545,42 @@ mod test {
     }
 
     #[tokio::test]
+    async fn incomplete_header_can_be_retried_after_append() {
+        use std::io::Write;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 4,
+                lines: 1,
+            },
+            64,
+            false,
+        );
+
+        for contents in [b"".as_slice(), b"hdr"] {
+            fs::write(&path, contents).unwrap();
+            assert_eq!(
+                fingerprinter.fingerprint(&path).await.unwrap_err().kind(),
+                std::io::ErrorKind::UnexpectedEof
+            );
+        }
+
+        // Finish the header and append a complete record to the same file.
+        let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
+        file.write_all(b"!record\n").unwrap();
+        let fingerprint = fingerprinter.fingerprint(&path).await.unwrap();
+        // The expected checksum includes only the record, not its header.
+        assert_eq!(
+            fingerprint,
+            super::FileFingerprint::FirstLinesChecksum(
+                super::FINGERPRINT_CRC.checksum(b"record\n")
+            )
+        );
+    }
+
+    #[tokio::test]
     async fn test_first_two_lines_checksum_fingerprint_with_headers() {
         let max_line_length = 64;
         let mut fingerprinter = Fingerprinter::new(
@@ -666,7 +708,7 @@ mod test {
             panic!();
         }
 
-        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+        fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
 
         fn emit_file_deleted(&self, _: &Path) {}
 

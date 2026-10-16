@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 // No `use inventory` here — the whole point is that callers of the macro must
 // not need a direct inventory dependency.
 vector_lib::register_extra_span_field!("lib_integration_label");

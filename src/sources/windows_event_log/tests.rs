@@ -310,7 +310,7 @@ mod parser_tests {
         );
         assert_eq!(
             log_event.get(event_path!("level")),
-            Some(&Value::Bytes("Information".into()))
+            Some(&Value::from("Information"))
         );
         assert_eq!(
             log_event.get(event_path!("level_value")),
@@ -318,15 +318,15 @@ mod parser_tests {
         );
         assert_eq!(
             log_event.get(event_path!("channel")),
-            Some(&Value::Bytes("Security".into()))
+            Some(&Value::from("Security"))
         );
         assert_eq!(
             log_event.get(event_path!("provider_name")),
-            Some(&Value::Bytes("Microsoft-Windows-Security-Auditing".into()))
+            Some(&Value::from("Microsoft-Windows-Security-Auditing"))
         );
         assert_eq!(
             log_event.get(event_path!("computer")),
-            Some(&Value::Bytes("WIN-SERVER-01".into()))
+            Some(&Value::from("WIN-SERVER-01"))
         );
         assert_eq!(
             log_event.get(event_path!("process_id")),
@@ -350,8 +350,8 @@ mod parser_tests {
 
         // XML should be included
         assert!(log_event.get(event_path!("xml")).is_some());
-        if let Some(Value::Bytes(xml_bytes)) = log_event.get(event_path!("xml")) {
-            let xml_string = String::from_utf8_lossy(xml_bytes);
+        if let Some(xml_value) = log_event.get(event_path!("xml")) {
+            let xml_string = xml_value.to_string_lossy();
             assert!(xml_string.contains("<Event xmlns"));
             assert!(xml_string.contains("EventID>4624<"));
         }
@@ -371,9 +371,9 @@ mod parser_tests {
         if let Some(Value::Object(event_data)) = log_event.get(event_path!("event_data")) {
             assert_eq!(
                 event_data.get("TargetUserName"),
-                Some(&Value::Bytes("admin".into()))
+                Some(&Value::from("admin"))
             );
-            assert_eq!(event_data.get("LogonType"), Some(&Value::Bytes("2".into())));
+            assert_eq!(event_data.get("LogonType"), Some(&Value::from("2")));
         } else {
             panic!("event_data should be present and be an object");
         }
@@ -397,7 +397,7 @@ mod parser_tests {
         // event_id should be formatted as string
         assert_eq!(
             log_event.get(event_path!("event_id")),
-            Some(&Value::Bytes("4624".into()))
+            Some(&Value::from("4624"))
         );
 
         // process_id should be formatted as float
@@ -1582,10 +1582,10 @@ mod truncation_tests {
 
         let log_event = parser.parse_event(event).unwrap();
 
-        if let Some(Value::Bytes(xml)) = log_event.get(event_path!("xml")) {
+        if let Some(xml_value) = log_event.get(event_path!("xml")) {
             // XML should be truncated or limited
             assert!(
-                xml.len() <= 40000,
+                xml_value.as_bytes().map_or(0, |xml| xml.len()) <= 40000,
                 "XML should be handled without memory issues"
             );
         }

@@ -36,7 +36,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: inputs.if || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}

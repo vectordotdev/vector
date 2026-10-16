@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 pub mod logs;
 pub mod metrics;
 
@@ -222,10 +224,9 @@ fn healthcheck(
         client
             .call(request)
             .await
-            .map_err(|error| error.into())
+            .map_err(Into::into)
             .and_then(|response| match response.status() {
-                StatusCode::OK => Ok(()),
-                StatusCode::NO_CONTENT => Ok(()),
+                StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
                 other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
             })
     }
@@ -254,7 +255,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     let unwrapped_tags = tags.unwrap_or_default();
     if !unwrapped_tags.is_empty() {
         line_protocol.put_u8(b',');
-        encode_tags(unwrapped_tags, line_protocol);
+        encode_tags(&unwrapped_tags, line_protocol);
     }
     line_protocol.put_u8(b' ');
 
@@ -268,7 +269,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     Ok(())
 }
 
-fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
+fn encode_tags(tags: &MetricTags, output: &mut BytesMut) {
     let original_len = output.len();
     // `tags` is already sorted
     for (key, value) in tags.iter_single() {
@@ -293,7 +294,7 @@ fn encode_fields(
     output: &mut BytesMut,
 ) {
     let original_len = output.len();
-    for (key, value) in fields.into_iter() {
+    for (key, value) in fields {
         encode_string(&key, output);
         output.put_u8(b'=');
         match value {
@@ -325,7 +326,7 @@ fn encode_fields(
             Field::Bool(b) => {
                 output.put_slice(&b.to_string().into_bytes());
             }
-        };
+        }
         output.put_u8(b',');
     }
 
@@ -409,16 +410,16 @@ pub mod test_util {
         )
     }
 
-    pub(crate) fn assert_fields(value: String, fields: Vec<&str>) {
+    pub(crate) fn assert_fields(value: &str, fields: Vec<&str>) {
         let encoded_fields: Vec<&str> = value.split(',').collect();
 
         assert_eq!(fields.len(), encoded_fields.len());
 
-        for field in fields.into_iter() {
+        for field in fields {
             assert!(
                 encoded_fields.contains(&field),
                 "Fields: {value} has to have: {field}"
-            )
+            );
         }
     }
 
@@ -551,6 +552,10 @@ pub mod test_util {
     }
 
     // InfluxDB strips off trailing zeros in timestamps in metrics
+    #[expect(
+        clippy::case_sensitive_file_extension_comparisons,
+        reason = "Match timestamp suffixes exactly."
+    )]
     fn strip_timestamp(timestamp: String) -> String {
         #[expect(
             clippy::string_slice,
@@ -610,7 +615,7 @@ mod tests {
         assert_eq!(
             "http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns",
             uri.to_string()
-        )
+        );
     }
 
     #[test]
@@ -627,7 +632,7 @@ mod tests {
         assert_eq!(
             "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns",
             uri.to_string()
-        )
+        );
     }
 
     #[test]
@@ -643,7 +648,7 @@ mod tests {
         let uri = settings
             .healthcheck_uri(HttpEndpoint::parse("http://localhost:8086").unwrap())
             .unwrap();
-        assert_eq!("http://localhost:8086/ping", uri.to_string())
+        assert_eq!("http://localhost:8086/ping", uri.to_string());
     }
 
     #[test]
@@ -657,13 +662,13 @@ mod tests {
         let uri = settings
             .healthcheck_uri(HttpEndpoint::parse("http://localhost:9999").unwrap())
             .unwrap();
-        assert_eq!("http://localhost:9999/ping", uri.to_string())
+        assert_eq!("http://localhost:9999/ping", uri.to_string());
     }
 
     #[test]
     fn test_encode_tags() {
         let mut value = BytesMut::new();
-        encode_tags(tags(), &mut value);
+        encode_tags(&tags(), &mut value);
 
         assert_eq!(value, "normal_tag=value,true_tag=true");
 
@@ -677,7 +682,7 @@ mod tests {
         .collect();
 
         let mut value = BytesMut::new();
-        encode_tags(tags_to_escape, &mut value);
+        encode_tags(&tags_to_escape, &mut value);
         assert_eq!(
             value,
             "a_first_place=10,name\\ escape=true,tag=val\\=ue,value_escape=value\\ escape"
@@ -688,7 +693,7 @@ mod tests {
     fn tags_order() {
         let mut value = BytesMut::new();
         encode_tags(
-            vec![
+            &vec![
                 ("a", "value"),
                 ("b", "value"),
                 ("c", "value"),
@@ -713,7 +718,7 @@ mod tests {
             ),
             ("field_float".into(), Field::Float(123.45)),
             ("field_unsigned_int".into(), Field::UnsignedInt(657)),
-            ("field_int".into(), Field::Int(657646)),
+            ("field_int".into(), Field::Int(657_646)),
             ("field_bool_true".into(), Field::Bool(true)),
             ("field_bool_false".into(), Field::Bool(false)),
             ("escape key".into(), Field::Float(10.0)),
@@ -725,7 +730,7 @@ mod tests {
         encode_fields(ProtocolVersion::V1, fields, &mut value);
         let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
         assert_fields(
-            value,
+            &value,
             [
                 "escape\\ key=10",
                 "field_float=123.45",
@@ -737,7 +742,7 @@ mod tests {
                 "field_bool_false=false",
             ]
             .to_vec(),
-        )
+        );
     }
 
     #[test]
@@ -750,7 +755,7 @@ mod tests {
             ),
             ("field_float".into(), Field::Float(123.45)),
             ("field_unsigned_int".into(), Field::UnsignedInt(657)),
-            ("field_int".into(), Field::Int(657646)),
+            ("field_int".into(), Field::Int(657_646)),
             ("field_bool_true".into(), Field::Bool(true)),
             ("field_bool_false".into(), Field::Bool(false)),
             ("escape key".into(), Field::Float(10.0)),
@@ -762,7 +767,7 @@ mod tests {
         encode_fields(ProtocolVersion::V2, fields, &mut value);
         let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
         assert_fields(
-            value,
+            &value,
             [
                 "escape\\ key=10",
                 "field_float=123.45",
@@ -774,7 +779,7 @@ mod tests {
                 "field_bool_false=false",
             ]
             .to_vec(),
-        )
+        );
     }
 
     #[test]
@@ -801,8 +806,8 @@ mod tests {
         let start = Utc::now()
             .timestamp_nanos_opt()
             .expect("Timestamp out of range");
-        assert_eq!(encode_timestamp(Some(ts())), 1542182950000000011);
-        assert!(encode_timestamp(None) >= start)
+        assert_eq!(encode_timestamp(Some(ts())), 1_542_182_950_000_000_011);
+        assert!(encode_timestamp(None) >= start);
     }
 
     #[test]
@@ -883,11 +888,11 @@ mod integration_tests {
         healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value")]
     async fn influxdb2_healthchecks_fail() {
         let endpoint = "http://127.0.0.1:9999".to_string();
         onboarding_v2(&endpoint).await;
@@ -927,7 +932,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value")]
     async fn influxdb1_healthchecks_fail() {
         let endpoint = "http://127.0.0.1:8086".to_string();
         let settings = InfluxDbSettings::V1(InfluxDb1Settings {

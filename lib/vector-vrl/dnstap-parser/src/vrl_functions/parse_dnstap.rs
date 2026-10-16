@@ -56,6 +56,11 @@ impl Function for ParseDnstap {
         &PARAMETERS
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "keep the dnstap examples together; splitting is deferred"
+    )]
     fn examples(&self) -> &'static [Example] {
         &[example!(
             title: "Parse dnstap query message",

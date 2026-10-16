@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Drive one logical event into the pipeline source under fault injection.
 //!
 //! On a 2xx we relay an ack-back so the oracle expects the id to come back

@@ -52,7 +52,7 @@ impl DorisCommon {
     }
     pub fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
         let mut commons = Vec::new();
-        for endpoint in config.endpoints.iter() {
+        for endpoint in &config.endpoints {
             commons.push(Self::parse_config(config, endpoint)?);
         }
         Ok(commons)

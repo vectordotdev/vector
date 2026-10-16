@@ -14,6 +14,7 @@ pub enum CounterName {
     ComponentErrorsTotal,
     ComponentTimedOutEventsTotal,
     ComponentTimedOutRequestsTotal,
+    ComponentLoadShedRequestsTotal,
     BufferReceivedEventsTotal,
     BufferReceivedBytesTotal,
     BufferSentEventsTotal,
@@ -47,7 +48,9 @@ pub enum CounterName {
     FilesAddedTotal,
     FilesDeletedTotal,
     FilesResumedTotal,
+    FilesUnwatchedBytesUnreadTotal,
     FilesUnwatchedTotal,
+    FilesUnwatchedWithUnknownBytesTotal,
     GrpcServerMessagesReceivedTotal,
     GrpcServerMessagesSentTotal,
     HttpClientErrorsTotal,
@@ -107,6 +110,7 @@ pub enum CounterName {
     MemoryEnrichmentTableTtlExpirations,
     MemoryEnrichmentTableTtlExpirationsTotal,
     ComponentCpuUsageNsTotal,
+    DatadogLogsEventsTruncatedTotal,
     DatadogLogsReservedAttributeConflictsTotal,
     // Data-plane counter names emitted by the `host_metrics` source.
     CpuSecondsTotal,
@@ -202,6 +206,8 @@ impl HistogramName {
 #[strum(serialize_all = "snake_case")]
 pub enum GaugeName {
     ComponentLatencyMeanSeconds,
+    ComponentRequestActive,
+    ComponentRequestConcurrencyLimit,
     SourceBufferMaxSizeEvents,
     SourceBufferMaxSizeBytes,
     SourceBufferMaxEventSize,
@@ -289,6 +295,8 @@ impl GaugeName {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ComponentLatencyMeanSeconds => "component_latency_mean_seconds",
+            Self::ComponentRequestActive => "component_request_active",
+            Self::ComponentRequestConcurrencyLimit => "component_request_concurrency_limit",
             Self::SourceBufferMaxSizeEvents => "source_buffer_max_size_events",
             Self::SourceBufferMaxSizeBytes => "source_buffer_max_size_bytes",
             Self::SourceBufferMaxEventSize => "source_buffer_max_event_size",
@@ -387,6 +395,7 @@ impl CounterName {
             Self::ComponentErrorsTotal => "component_errors_total",
             Self::ComponentTimedOutEventsTotal => "component_timed_out_events_total",
             Self::ComponentTimedOutRequestsTotal => "component_timed_out_requests_total",
+            Self::ComponentLoadShedRequestsTotal => "component_load_shed_requests_total",
             Self::BufferReceivedEventsTotal => "buffer_received_events_total",
             Self::BufferReceivedBytesTotal => "buffer_received_bytes_total",
             Self::BufferSentEventsTotal => "buffer_sent_events_total",
@@ -423,7 +432,9 @@ impl CounterName {
             Self::FilesAddedTotal => "files_added_total",
             Self::FilesDeletedTotal => "files_deleted_total",
             Self::FilesResumedTotal => "files_resumed_total",
+            Self::FilesUnwatchedBytesUnreadTotal => "files_unwatched_bytes_unread_total",
             Self::FilesUnwatchedTotal => "files_unwatched_total",
+            Self::FilesUnwatchedWithUnknownBytesTotal => "files_unwatched_with_unknown_bytes_total",
             Self::GrpcServerMessagesReceivedTotal => "grpc_server_messages_received_total",
             Self::GrpcServerMessagesSentTotal => "grpc_server_messages_sent_total",
             Self::HttpClientErrorsTotal => "http_client_errors_total",
@@ -495,6 +506,7 @@ impl CounterName {
                 "memory_enrichment_table_ttl_expirations_total"
             }
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
+            Self::DatadogLogsEventsTruncatedTotal => "datadog_logs_events_truncated_total",
             Self::DatadogLogsReservedAttributeConflictsTotal => {
                 "datadog_logs_reserved_attribute_conflicts_total"
             }

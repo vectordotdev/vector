@@ -98,6 +98,10 @@ inputs:
     description: "Install vdev CLI tool via cargo binstall (version from vdev/Cargo.toml)."
 
   # prepare.sh - npm
+  actionlint:
+    required: false
+    default: false
+    description: "Install kjanat/actionlint (npm)."
   markdownlint-cli2:
     required: false
     default: false
@@ -237,6 +241,7 @@ runs:
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
         [[ "${{ inputs.vdev }}" == "true" ]] && mods+=("vdev")
+        [[ "${{ inputs.actionlint }}" == "true" ]] && mods+=("actionlint")
         [[ "${{ inputs.markdownlint-cli2 }}" == "true" ]] && mods+=("markdownlint-cli2")
         [[ "${{ inputs.prettier }}" == "true" ]] && mods+=("prettier")
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")

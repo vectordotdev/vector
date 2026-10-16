@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read # Restrictive default
 
+cache-mode: none
+
 jobs:
   # Reads which "preview: <app>" labels were present on the PR at trigger time (captured into
   # the artifact by preview_site_trigger.yml) so each deploy job below can be gated individually.

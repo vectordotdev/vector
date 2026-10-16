@@ -8,6 +8,7 @@ use ordered_float::NotNan;
 use prost::Message;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    event::TraceLayout,
     internal_event::{CountByteSize, InternalEventHandle as _},
 };
 use vrl::event_path;
@@ -140,7 +141,7 @@ fn handle_dd_trace_payload_v1(
             }
             trace_event.insert(
                 &source.log_schema_source_type_key,
-                Bytes::from("datadog_agent"),
+                Value::from_static_str("datadog_agent"),
             );
             trace_event.insert(event_path!("payload_version"), "v2".to_string());
             trace_event.insert(&source.log_schema_host_key, hostname.clone());
@@ -165,13 +166,21 @@ fn handle_dd_trace_payload_v1(
     Ok(enriched_events)
 }
 
+fn new_trace_event() -> TraceEvent {
+    let mut trace_event = TraceEvent::default();
+    trace_event
+        .metadata_mut()
+        .set_trace_layout(TraceLayout::Datadog);
+    trace_event
+}
+
 fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<TraceEvent> {
     let tags = convert_tags(payload.tags);
     payload
         .chunks
         .into_iter()
         .map(|trace| {
-            let mut trace_event = TraceEvent::default();
+            let mut trace_event = new_trace_event();
             trace_event.insert(event_path!("priority"), trace.priority as i64);
             trace_event.insert(event_path!("origin"), trace.origin);
             trace_event.insert(event_path!("dropped"), trace.dropped_trace);

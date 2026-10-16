@@ -39,7 +39,7 @@ fn saturating_add(instant: Instant, duration: Duration) -> Instant {
     if let Some(result) = instant.checked_add(duration) {
         return result;
     }
-    let mut fallback = Duration::from_secs(u32::MAX as u64);
+    let mut fallback = Duration::from_secs(u64::from(u32::MAX));
     while !fallback.is_zero() {
         if let Some(result) = instant.checked_add(fallback) {
             return result;
@@ -54,15 +54,14 @@ fn saturating_add(instant: Instant, duration: Duration) -> Instant {
 /// Caps `generations` to at most one slice per second of TTL (so each slice is
 /// `>= 1s` when `ttl >= 1s`) and to the caller's `ttl_generations` request.
 /// Uses `Duration` division for `slice` so non-divisible TTLs (e.g. 10s / 4)
-/// still sum to the configured window. `ttl.as_secs()` is kept in `u64` when
-/// deriving the per-second cap so values `>= 2^32` seconds are not truncated
-/// to zero by a premature `u32` cast.
-fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u32, Duration) {
-    let requested = u32::from(ttl_generations.max(1));
-    let ttl_secs = ttl.as_secs().max(1);
-    let max_for_ttl = ttl_secs.min(u32::MAX as u64) as u32;
-    let generations = requested.min(max_for_ttl).max(1);
-    let slice = ttl / generations;
+/// still sum to the configured window. The per-second cap saturates at
+/// `u8::MAX` rather than wrapping, so a TTL of `>= 2^8` seconds never clamps
+/// the requested generation count.
+fn compute_ttl_slices(ttl: Duration, ttl_generations: u8) -> (u8, Duration) {
+    let requested = ttl_generations.max(1);
+    let max_for_ttl = u8::try_from(ttl.as_secs().max(1)).unwrap_or(u8::MAX);
+    let generations = requested.min(max_for_ttl);
+    let slice = ttl / u32::from(generations);
     (generations, slice)
 }
 
@@ -317,14 +316,14 @@ impl RollingBloomStorage {
         let max_shards = if generations == 1 && requested <= 1 {
             1
         } else {
-            generations as usize + 1
+            usize::from(generations) + 1
         };
         let mut shards = VecDeque::with_capacity(max_shards);
         shards.push_back(BloomFilterStorage::new(cache_size_per_key));
         let now = Instant::now();
         Self {
             shards,
-            generations: generations as u8,
+            generations,
             max_shards,
             slice,
             cache_size_per_key,
@@ -412,7 +411,7 @@ impl RollingBloomStorage {
     fn len(&mut self) -> usize {
         let now = Instant::now();
         self.rotate_if_needed(now);
-        self.shards.iter().map(|s| s.count()).sum()
+        self.shards.iter().map(BloomFilterStorage::count).sum()
     }
 }
 
@@ -573,7 +572,7 @@ impl AcceptedTagValueSet {
             TagValueSetStorage::RollingBloom(s) => {
                 s.insert(&value);
             }
-        };
+        }
     }
 
     /// Test-only accessor: true iff this set uses a TTL-enabled backend.
@@ -652,7 +651,7 @@ mod tests {
 
     #[test]
     fn ttl_exact_expires_values_past_ttl() {
-        let ttl = Duration::from_secs(60);
+        let ttl = Duration::from_mins(1);
         let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
         s.map.insert(v("a"), t0);
@@ -667,7 +666,7 @@ mod tests {
     fn ttl_exact_contains_does_not_refresh_expired_entry() {
         // Between sweeps, `contains` must not extend a value whose own
         // `last_seen + ttl` has passed, even if `maybe_sweep` has not run yet.
-        let ttl = Duration::from_secs(60);
+        let ttl = Duration::from_mins(1);
         let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
         s.map.insert(v("a"), t0);
@@ -692,7 +691,7 @@ mod tests {
         // cheap paths — not a full-bucket retain (that made filling
         // `value_limit` O(N²)). Seed directly so `insert`'s maybe_sweep cannot
         // drop stale early.
-        let ttl = Duration::from_secs(60);
+        let ttl = Duration::from_mins(1);
         let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
         s.map.insert(v("stale"), t0);
@@ -717,7 +716,7 @@ mod tests {
     fn ttl_exact_refresh_on_contains_extends_lease() {
         // Short sleep guarantees `Instant::now()` is strictly after `t_insert`
         // on every platform.
-        let mut s = TtlExactStorage::new(Duration::from_secs(60), 4);
+        let mut s = TtlExactStorage::new(Duration::from_mins(1), 4);
         let t_insert = Instant::now();
         s.map.insert(v("a"), t_insert);
         s.last_sweep = t_insert;
@@ -734,7 +733,7 @@ mod tests {
 
     #[test]
     fn ttl_exact_contains_no_refresh_does_not_extend_lease() {
-        let ttl = Duration::from_secs(60);
+        let ttl = Duration::from_mins(1);
         let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
         s.map.insert(v("a"), t0);
@@ -776,9 +775,9 @@ mod tests {
         // A value inserted just before a rotation is the worst case: it occupies
         // the least of the shard it lands in. Retiring at `generations` shards
         // would drop it after `ttl - slice`, cutting the configured window short.
-        let ttl = Duration::from_secs(3600);
+        let ttl = Duration::from_hours(1);
         let mut s = RollingBloomStorage::new(default_cache_size(), 4, ttl);
-        assert_eq!(s.slice, Duration::from_secs(900));
+        assert_eq!(s.slice, Duration::from_mins(15));
 
         let t0 = Instant::now();
         // Land `edge` in the open shard one second before the first rotation.
@@ -786,7 +785,7 @@ mod tests {
         s.shards.back_mut().unwrap().insert(&v("edge"));
 
         // One second short of the TTL it must still be there.
-        let almost = t0 + ttl - Duration::from_secs(1);
+        let almost = (t0 + ttl).checked_sub(Duration::from_secs(1)).unwrap();
         s.rotate_if_needed(almost);
         assert!(
             s.shards.iter().any(|sh| sh.contains(&v("edge"))),
@@ -810,7 +809,7 @@ mod tests {
         let t0 = Instant::now();
         s.next_rotate = t0 + Duration::from_secs(1);
         s.shards.back_mut().unwrap().insert(&v("stale"));
-        s.rotate_if_needed(t0 + Duration::from_secs(3600));
+        s.rotate_if_needed(t0 + Duration::from_hours(1));
         assert_eq!(
             s.shards.len(),
             s.max_shards,
@@ -856,7 +855,7 @@ mod tests {
 
     #[test]
     fn rolling_bloom_single_generation_is_a_tumbling_window() {
-        let ttl = Duration::from_secs(60);
+        let ttl = Duration::from_mins(1);
         let mut s = RollingBloomStorage::new(default_cache_size(), 1, ttl);
         let t0 = Instant::now();
         s.shards.back_mut().unwrap().insert(&v("old"));
@@ -878,7 +877,7 @@ mod tests {
         // can raise the summed per-shard count even though no novel value was
         // admitted — the accept path must observe that transition for
         // `value_limit_reached_total`.
-        let mut s = RollingBloomStorage::new(default_cache_size(), 2, Duration::from_secs(120));
+        let mut s = RollingBloomStorage::new(default_cache_size(), 2, Duration::from_mins(2));
         let hot = v("hot");
         s.shards.back_mut().unwrap().insert(&hot);
         assert_eq!(s.len(), 1);
@@ -905,15 +904,15 @@ mod tests {
     #[test]
     fn compute_ttl_slices_preserves_window_and_backend_wiring() {
         // One table covers: generation caps when ttl < generations, fractional
-        // slices for non-divisible TTLs, and u64→u32 truncation avoidance.
+        // slices for non-divisible TTLs, and long TTLs saturating the cap.
         // Also smoke-checks that both backends consume the helper.
         for (ttl_secs, requested, expected_generations) in [
-            (1u64, 4u8, 1u32),
+            (1u64, 4u8, 1u8),
             (2, 8, 2),
             (10, 4, 4),
             (60, 0, 1), // `generations: 0` must not divide by zero / empty deque
             (3600, 4, 4),
-            (4294967296, 4, 4),
+            (4_294_967_296, 4, 4),
         ] {
             let ttl = Duration::from_secs(ttl_secs);
             let (generations, slice) = compute_ttl_slices(ttl, requested);
@@ -922,7 +921,7 @@ mod tests {
                 "ttl_secs={ttl_secs}, requested={requested}"
             );
             assert_eq!(
-                slice * generations,
+                slice * u32::from(generations),
                 ttl,
                 "ttl_secs={ttl_secs}, requested={requested}: window must equal ttl"
             );
@@ -932,12 +931,12 @@ mod tests {
             );
 
             let rolling = RollingBloomStorage::new(default_cache_size(), requested, ttl);
-            assert_eq!(rolling.generations, expected_generations as u8);
+            assert_eq!(rolling.generations, expected_generations);
             assert_eq!(rolling.slice, slice);
             let expected_shards = if expected_generations == 1 && requested <= 1 {
                 1
             } else {
-                expected_generations as usize + 1
+                usize::from(expected_generations) + 1
             };
             assert_eq!(
                 rolling.max_shards, expected_shards,
@@ -961,7 +960,7 @@ mod tests {
         // verify a front-shard-only value survives rotation after `contains()`
         // refresh.
         const TINY: usize = 128;
-        let mut s = RollingBloomStorage::new(TINY, 2, Duration::from_secs(120));
+        let mut s = RollingBloomStorage::new(TINY, 2, Duration::from_mins(2));
         let hot = v("hot-value-survivor");
         s.shards.back_mut().unwrap().insert(&hot);
         let t0 = Instant::now();
@@ -998,7 +997,7 @@ mod tests {
         let advanced = saturating_add(now, Duration::from_secs(u64::MAX));
         let gain = advanced.duration_since(now);
         assert!(
-            gain >= Duration::from_secs(60 * 60 * 24 * 365),
+            gain >= Duration::from_hours(24 * 365),
             "saturating_add must push the deadline at least a year out on \
              overflow; got {gain:?}",
         );
@@ -1028,7 +1027,7 @@ mod tests {
         let mut s =
             RollingBloomStorage::new(default_cache_size(), generations, Duration::from_secs(4));
         s.shards.clear();
-        let per_shard = value_limit / generations as usize;
+        let per_shard = value_limit / usize::from(generations);
         let mut next = 0usize;
         for _ in 0..generations {
             let mut shard = BloomFilterStorage::new(default_cache_size());
@@ -1038,7 +1037,7 @@ mod tests {
             }
             s.shards.push_back(shard);
         }
-        s.next_rotate = Instant::now() + Duration::from_secs(3600);
+        s.next_rotate = Instant::now() + Duration::from_hours(1);
         assert_eq!(
             s.len(),
             value_limit,

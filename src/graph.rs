@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write as _,
@@ -11,6 +12,7 @@ use vector_lib::{config::OutputId, id::ComponentKey};
 use crate::config::{
     self,
     dot_graph::{EdgeAttributes, GraphConfig},
+    enrichment_table_sinks, enrichment_table_sources,
 };
 
 #[derive(Parser, Debug)]
@@ -56,7 +58,7 @@ pub struct Opts {
 
     /// Set the output format
     ///
-    /// See https://mermaid.js.org/syntax/flowchart.html#styling-and-classes for
+    /// See <https://mermaid.js.org/syntax/flowchart.html#styling-and-classes> for
     /// information on the `mermaid` format.
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
@@ -89,7 +91,7 @@ impl Opts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
@@ -115,9 +117,8 @@ fn edge_attributes_to_string(attributes: &EdgeAttributes, default_label: Option<
 
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
-    let paths = match config::process_paths(&paths) {
-        Some(paths) => paths,
-        None => return exitcode::CONFIG,
+    let Some(paths) = config::process_paths(&paths) else {
+        return exitcode::CONFIG;
     };
 
     let config = match config::load_from_paths(&paths) {
@@ -133,21 +134,17 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let format = opts.format;
     match format {
-        OutputFormat::Dot => render_dot(config),
-        OutputFormat::Mermaid => render_mermaid(config),
+        OutputFormat::Dot => render_dot(&config),
+        OutputFormat::Mermaid => render_mermaid(&config),
     }
 }
 
-fn render_dot(config: config::Config) -> exitcode::ExitCode {
+fn render_dot(config: &config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
     let mut written_tables = HashSet::<ComponentKey>::new();
 
-    for (id, table) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_source(key))
-    {
+    for (id, table) in enrichment_table_sources(&config.enrichment_tables) {
         writeln!(
             dot,
             "  \"{id}\" [{}]",
@@ -157,11 +154,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         written_tables.insert(id);
     }
 
-    for (id, table) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_sink(key))
-    {
+    for (id, table) in enrichment_table_sinks(&config.enrichment_tables) {
         if !written_tables.contains(&id) {
             writeln!(
                 dot,
@@ -171,7 +164,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
             .expect("write to String never fails");
         }
 
-        for input in table.inputs.iter() {
+        for input in &table.inputs {
             render_dot_edge(&mut dot, &id, input, &table.graph);
         }
     }
@@ -193,7 +186,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         )
         .expect("write to String never fails");
 
-        for input in transform.inputs.iter() {
+        for input in &transform.inputs {
             render_dot_edge(&mut dot, id, input, &transform.graph);
         }
     }
@@ -249,31 +242,23 @@ fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph
     }
 }
 
-fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
+fn render_mermaid(config: &config::Config) -> exitcode::ExitCode {
     let mut mermaid = String::from("flowchart TD;\n");
 
     writeln!(mermaid, "\n  %% Enrichment tables").unwrap();
     let mut written_tables = HashSet::<ComponentKey>::new();
 
-    for (id, _) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_source(key))
-    {
+    for (id, _) in enrichment_table_sources(&config.enrichment_tables) {
         writeln!(mermaid, "  {id}[({id})]").unwrap();
         written_tables.insert(id);
     }
 
-    for (id, table) in config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_sink(key))
-    {
+    for (id, table) in enrichment_table_sinks(&config.enrichment_tables) {
         if !written_tables.contains(&id) {
             writeln!(mermaid, "  {id}[({id})]").unwrap();
         }
 
-        for input in table.inputs.iter() {
+        for input in &table.inputs {
             if let Some(port) = &input.port {
                 writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {
@@ -291,7 +276,7 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     for (id, transform) in config.transforms() {
         writeln!(mermaid, "  {id}{{{id}}}").unwrap();
 
-        for input in transform.inputs.iter() {
+        for input in &transform.inputs {
             if let Some(port) = &input.port {
                 writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {

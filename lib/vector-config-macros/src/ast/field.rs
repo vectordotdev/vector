@@ -12,7 +12,7 @@ use super::{
     LazyCustomAttribute, Metadata,
     util::{
         err_field_implicit_transparent, find_delegated_serde_deser_ty, get_serde_default_value,
-        try_extract_doc_title_description,
+        is_bool_or_struct_deserializer, try_extract_doc_title_description,
     },
 };
 
@@ -20,6 +20,7 @@ use super::{
 pub struct Field<'a> {
     original: &'a syn::Field,
     name: String,
+    aliases: Vec<String>,
     default_value: Option<ExprPath>,
     attrs: Attributes,
 }
@@ -33,6 +34,13 @@ impl<'a> Field<'a> {
         let original = serde.original;
 
         let name = serde.attrs.name().deserialize_name().to_string();
+        let aliases = serde
+            .attrs
+            .aliases()
+            .iter()
+            .map(ToString::to_string)
+            .filter(|alias| alias != &name)
+            .collect();
         let default_value = get_serde_default_value(&serde.ty, serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
@@ -40,9 +48,15 @@ impl<'a> Field<'a> {
             .map(|attrs| Field {
                 original,
                 name,
+                aliases,
                 default_value,
                 attrs,
             })
+    }
+
+    /// Alternative names accepted when deserializing this field.
+    pub fn aliases(&self) -> &[String] {
+        &self.aliases
     }
 
     /// Name of the field, if any.
@@ -202,7 +216,7 @@ impl<'a> Field<'a> {
     /// Whether or not this field is visible during either serialization or deserialization.
     ///
     /// This is derived from whether any of the `serde` visibility attributes are applied: `skip`,
-    /// `skip_serializing, and `skip_deserializing`. Unless the field is skipped entirely, it will
+    /// `skip_serializing`, and `skip_deserializing`. Unless the field is skipped entirely, it will
     /// be considered visible and part of the schema.
     pub fn visible(&self) -> bool {
         self.attrs.visible
@@ -216,6 +230,14 @@ impl<'a> Field<'a> {
     /// type when (de)serializing.
     pub fn flatten(&self) -> bool {
         self.attrs.flatten
+    }
+
+    /// Whether the field uses Vector's boolean-or-struct input helper.
+    pub fn bool_or_struct(&self) -> bool {
+        self.attrs
+            .deserialize_with
+            .as_ref()
+            .is_some_and(is_bool_or_struct_deserializer)
     }
 
     /// Whether this field is marked `#[serde(skip_deserializing)]`.
@@ -248,7 +270,7 @@ impl<'a> Field<'a> {
 
 impl ToTokens for Field<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.original.to_tokens(tokens)
+        self.original.to_tokens(tokens);
     }
 }
 
@@ -265,6 +287,8 @@ struct Attributes {
     flatten: bool,
     #[darling(skip)]
     skip_deserializing: bool,
+    #[darling(skip)]
+    deserialize_with: Option<ExprPath>,
     #[darling(multiple)]
     metadata: Vec<Metadata>,
     #[darling(multiple)]
@@ -285,6 +309,7 @@ impl Attributes {
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
         self.flatten = field.attrs.flatten();
         self.skip_deserializing = field.attrs.skip_deserializing();
+        self.deserialize_with = field.attrs.deserialize_with().cloned();
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in

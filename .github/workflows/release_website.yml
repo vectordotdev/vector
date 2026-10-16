@@ -1,0 +1,107 @@
+# Reset the `website` branch to the published release commit so https://vector.dev
+# serves the new release notes. This replaces the manual
+# `git reset --hard && git push --force-with-lease` step from the release checklists.
+name: Reset website branch to release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      release_commit:
+        required: true
+        type: string
+
+permissions:
+  contents: read # Restrictive default
+
+concurrency:
+  # Serialize resets and retain up to 100 pending runs instead of replacing them.
+  group: release-website-reset
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  reset-website:
+    name: Reset website to release commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_commit }}
+          persist-credentials: false
+
+      # The published vdev binary may predate the website check helper. Build the
+      # checkout's vdev from source, like the other release validators.
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          vdev: true
+
+      # Complete successfully for non-stable tags so housekeeping can handle them.
+      - name: Check release tag
+        id: preflight
+        env:
+          TAG: ${{ inputs.tag }}
+        run: >-
+          vdev release workflow website-preflight --tag "$TAG"
+
+      - name: Create Vector bot token
+        if: steps.preflight.outputs.skip != 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          # contents:write is required to update the website branch. The bot is a bypass
+          # actor for the website-pushes and website-prs rulesets, so the force push is
+          # allowed without a pull request.
+          permission-contents: write
+
+      - name: Reset website branch to the release commit
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ inputs.tag }}
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+        run: |
+          set -euo pipefail
+          # All remote git operations go through the token-authenticated URL. The
+          # checkout ran with persist-credentials: false, so origin has no credentials
+          # and the token must be used explicitly for fetch, ls-remote, and push.
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          # The checkout fetched only the release commit, so pull the tag explicitly
+          # and verify both the checkout and the tag identify it.
+          git fetch --no-tags "$remote" "refs/tags/$TAG:refs/tags/$TAG"
+          [[ "$(git rev-parse HEAD)" == "$RELEASE_COMMIT" ]]
+          [[ "$(git rev-parse "$TAG^{commit}")" == "$RELEASE_COMMIT" ]]
+
+          # Resolve the current website tip for the lease. An empty value means the
+          # branch does not exist yet and the lease requires it to stay absent.
+          existing=$(git ls-remote "$remote" refs/heads/website)
+          existing=${existing%%$'\t'*}
+
+          # Validate the candidate even when the website branch is absent or unchanged.
+          # The lease guards concurrent pushes, not a retry of an older release.
+          check_args=(--tag "$TAG" --release-commit "$RELEASE_COMMIT")
+          if [[ -n "$existing" ]]; then
+            git fetch --no-tags --depth=1 "$remote" "$existing"
+            check_args+=(--website-commit "$existing")
+          fi
+          vdev release workflow website-check "${check_args[@]}"
+
+          # If website already identifies the release commit there is nothing to do.
+          # This keeps workflow re-runs idempotent.
+          if [[ "$existing" == "$RELEASE_COMMIT" ]]; then
+            echo "Website branch already points to $RELEASE_COMMIT; nothing to do."
+            exit 0
+          fi
+
+          # The explicit lease prevents a concurrent website push from being overwritten.
+          git push "$remote" --force-with-lease="refs/heads/website:$existing" \
+            "$RELEASE_COMMIT:refs/heads/website"
+          echo "Reset the website branch to $RELEASE_COMMIT ($TAG)." >> "$GITHUB_STEP_SUMMARY"

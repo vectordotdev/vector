@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use vector_lib::{event::Event, partition::Partitioner};
 
 use crate::{
@@ -63,6 +65,7 @@ pub struct KeyPartitioner {
 }
 
 impl KeyPartitioner {
+    #[must_use]
     pub const fn new(
         key_prefix_template: ConfinedTemplate,
         dead_letter_key_prefix: Option<String>,

@@ -282,7 +282,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketTlsConnectionError { error });
+                emit!(TcpSocketTlsConnectionError { error, peer_addr });
                 return;
             }
         },
@@ -447,7 +447,7 @@ async fn handle_stream<T>(
                                                 error = %error,
                                             );
                                         } else {
-                                            emit!(TcpSendAckError { error });
+                                            emit!(TcpSendAckError { error, peer_addr });
                                         }
                                         break;
                                     }

@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
@@ -15,7 +14,7 @@ use vector_lib::{
     },
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
@@ -250,7 +249,7 @@ impl InputHandler {
                                 log,
                                 log_schema().source_type_key(),
                                 path!("source_type"),
-                                Bytes::from(RedisSourceConfig::NAME),
+                                Value::from_static_str(RedisSourceConfig::NAME),
                             );
                             self.log_namespace.insert_vector_metadata(
                                 log,

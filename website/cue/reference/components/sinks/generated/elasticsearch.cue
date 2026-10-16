@@ -10,7 +10,7 @@ generated: components: sinks: elasticsearch: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	api_version: {
 		description: """
@@ -529,7 +529,7 @@ generated: components: sinks: elasticsearch: configuration: {
 				"X-Powered-By": "Vector"
 			}]
 			options: "*": {
-				description: "A query string parameter."
+				description: "Configuration of the query parameter value for HTTP requests."
 				required:    true
 				type:        _schemaDefinitions["vector::http::ParameterValue"]
 			}

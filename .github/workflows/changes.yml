@@ -48,8 +48,12 @@ on:
         value: ${{ jobs.source.outputs.scripts }}
       website_only:
         value: ${{ jobs.source.outputs.website_only }}
+      website_tests:
+        value: ${{ jobs.source.outputs.website_tests }}
       install:
         value: ${{ jobs.source.outputs.install }}
+      actionlint:
+        value: ${{ jobs.source.outputs.actionlint }}
       prettier:
         value: ${{ jobs.source.outputs.prettier }}
       test-yml:
@@ -185,6 +189,8 @@ jobs:
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
+      website_tests: ${{ steps.website_filter.outputs.website_tests }}
+      actionlint: ${{ steps.filter.outputs.actionlint }}
       prettier: ${{ steps.filter.outputs.prettier }}
       test-yml: ${{ steps.filter.outputs.test-yml }}
       integration-yml: ${{ steps.filter.outputs.integration-yml }}
@@ -290,6 +296,13 @@ jobs:
               - "website/**"
             not_website:
               - "!website/**"
+            actionlint:
+              - ".github/workflows/**"
+              - ".github/actions/**"
+              - ".github/actionlint.yaml"
+              - "scripts/environment/prepare.sh"
+              - "scripts/environment/npm-tools/*"
+              - "Makefile"
             prettier:
               - "**/*.yml"
               - "**/*.yaml"
@@ -329,6 +342,22 @@ jobs:
               - ".github/actions/setup/**"
             unit_windows-yml:
               - ".github/workflows/unit_windows.yml"
+              - ".github/workflows/changes.yml"
+
+      # Separate step because `predicate-quantifier` applies to every filter, and
+      # `some-with-excludes` would make negation-only filters like `not_website` never match.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: website_filter
+        with:
+          base: ${{ env.BASE_SHA }}
+          ref: ${{ env.HEAD_SHA }}
+          predicate-quantifier: some-with-excludes
+          filters: |
+            website_tests:
+              - "website/**"
+              - "!website/cue/**"
+              - ".github/workflows/website-tests.yml"
+              - ".github/actions/install-vrl-doc-builder/**"
               - ".github/workflows/changes.yml"
 
   # Detects changes that are specific to integration tests
@@ -450,7 +479,7 @@ jobs:
 
           # Check if at least one integration test has changes
           any_changed=$(jq -r 'to_entries | map(select(.value == true)) | length > 0' int_tests_changes.json)
-          echo "any=$any_changed" >> $GITHUB_OUTPUT
+          echo "any=$any_changed" >> "$GITHUB_OUTPUT"
 
       - name: Upload JSON artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -515,7 +544,7 @@ jobs:
 
           # Check if at least one e2e test has changes
           any_changed=$(jq -r 'to_entries | map(select(.value == true)) | length > 0' e2e_tests_changes.json)
-          echo "any=$any_changed" >> $GITHUB_OUTPUT
+          echo "any=$any_changed" >> "$GITHUB_OUTPUT"
 
       - name: Upload JSON artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -224,7 +224,7 @@ where
     }
 }
 
-/// Future for HealthService.
+/// Future for `HealthService`.
 #[pin_project]
 pub struct HealthFuture<F, L> {
     #[pin]
@@ -259,7 +259,7 @@ where
     }
 }
 
-/// Tracker of response health, incremented by HealthFuture and used by HealthService.
+/// Tracker of response health, incremented by `HealthFuture` and used by `HealthService`.
 struct HealthCounters {
     healthy: AtomicUsize,
     unhealthy: AtomicUsize,

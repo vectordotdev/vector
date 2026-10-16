@@ -22,7 +22,7 @@ use vector_lib::{
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
     lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use crate::{
     SourceSender,
@@ -34,7 +34,7 @@ use crate::{
         StreamClosedError,
         source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
 };
 
@@ -97,7 +97,7 @@ pub struct AmqpSourceConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub(crate) decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 
     /// Maximum number of unacknowledged messages the broker will deliver to this consumer.
@@ -286,7 +286,7 @@ fn populate_log_event(
         log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(AmqpSourceConfig::NAME.as_bytes()),
+        Value::from_static_str(AmqpSourceConfig::NAME),
     );
 
     // This handles the transition from the original timestamp logic. Originally the

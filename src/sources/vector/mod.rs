@@ -5,6 +5,7 @@ use chrono::Utc;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
 use tonic_health::server::health_reporter;
+use tower::layer::util::Identity;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::NativeDeserializerConfig,
@@ -22,7 +23,6 @@ use crate::{
     },
     internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
-    serde::bool_or_struct,
     sources::{
         Source,
         util::{
@@ -144,7 +144,7 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -229,6 +229,7 @@ impl SourceConfig for VectorConfig {
             builder.routes(),
             self.keepalive.clone(),
             cx.shutdown,
+            Identity::new(),
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);
