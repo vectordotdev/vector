@@ -31,6 +31,7 @@ pub mod test;
 pub mod topology;
 
 pub(crate) mod variants;
+pub use variants::disk_v2::DiskBufferUsageSnapshot;
 
 /// `disk_v2`'s write-buffer size, re-exported under `test` so the harness can
 /// size payloads against the real value instead of hardcoding it.

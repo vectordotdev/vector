@@ -25,6 +25,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use super::{
+    DiskBufferUsageSnapshot,
     common::{DiskBufferConfig, create_crc32c_hasher},
     io::Filesystem,
     ledger::Ledger,
@@ -909,6 +910,18 @@ where
             next_record_id,
             unflushed_events: 0,
             _t: PhantomData,
+        }
+    }
+
+    /// Gets the current published usage of the buffer.
+    ///
+    /// Writes are included after they are flushed and reads after they are acknowledged, matching
+    /// the ledger's existing published-data semantics. The two counters are sampled separately, so
+    /// the result is approximate when reads and writes are being published concurrently.
+    pub fn usage_snapshot(&self) -> DiskBufferUsageSnapshot {
+        DiskBufferUsageSnapshot {
+            event_count: self.ledger.get_total_records(),
+            byte_size: self.ledger.get_total_buffer_size(),
         }
     }
 
