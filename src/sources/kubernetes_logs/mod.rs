@@ -999,17 +999,25 @@ impl Source {
 
         let event_processing_loop = out.send_event_stream(&mut stream);
 
+        // An error in either of these stops the source: without the file server and the
+        // event processing loop the source cannot deliver events.
+        let mut file_server_error: Option<sources::SourceError> = None;
+        let mut event_processing_error: Option<sources::SourceError> = None;
+
         let mut lifecycle = Lifecycle::new();
         {
             let (slot, shutdown) = lifecycle.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => emit!(KubernetesLifecycleError {
-                        message: "File server exited with an error.",
-                        error,
-                        count: events_count,
-                    }),
+                    Err(error) => {
+                        emit!(KubernetesLifecycleError {
+                            message: "File server exited with an error.",
+                            error: &error,
+                            count: events_count,
+                        });
+                        file_server_error = Some(error);
+                    }
                 });
             slot.bind(Box::pin(fut));
         }
@@ -1023,9 +1031,12 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(_)) => emit!(StreamClosedError {
-                        count: events_count
-                    }),
+                    Ok(Err(error)) => {
+                        emit!(StreamClosedError {
+                            count: events_count
+                        });
+                        event_processing_error = Some(sources::SourceError::from(error));
+                    }
                     Err(error) => emit!(KubernetesLifecycleError {
                         error,
                         message: "Event processing loop timed out during the shutdown.",
@@ -1064,7 +1075,13 @@ impl Source {
             reflector.abort();
         }
         info!(message = "Done.");
-        Ok(())
+
+        // The event processing loop observes a closed output before the file server does,
+        // and its error carries the cause.
+        match event_processing_error.or(file_server_error) {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
 }
 

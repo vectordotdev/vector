@@ -2,7 +2,7 @@ use std::{convert::TryInto, future, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
+use futures::{FutureExt, Stream, StreamExt};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -584,7 +584,7 @@ pub fn file_source(
 
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
-    crate::sources::opaque_source(async move {
+    super::source_with_error(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
@@ -653,7 +653,7 @@ pub fn file_source(
             }
             event
         });
-        tokio::spawn(async move {
+        let event_sender_task = tokio::spawn(async move {
             match out
                 .send_event_stream(&mut messages)
                 .instrument(span.or_current())
@@ -661,28 +661,58 @@ pub fn file_source(
             {
                 Ok(()) => {
                     debug!("Finished sending.");
+                    None
                 }
-                Err(_) => {
+                Err(error) => {
                     let (count, _) = messages.size_hint();
                     emit!(StreamClosedError { count });
+                    let error: super::SourceError = error.into();
+                    Some(error)
                 }
             }
         });
 
         let span = info_span!("file_server");
-        tokio::task::spawn_blocking(move || {
+        let file_server_task = tokio::task::spawn_blocking(move || {
             let _enter = span.enter();
             let rt = tokio::runtime::Handle::current();
-            let result =
-                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
+            // Return the error instead of panicking on it, so that this source reports the
+            // failure with its cause.
+            let result: Result<_, super::SourceError> = rt
+                .block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer))
+                .map_err(Into::into);
             emit!(FileOpen { count: 0 });
-            // Panic if we encounter any error originating from the file server.
-            // We're at the `spawn_blocking` call, the panic will be caught and
-            // passed to the `JoinHandle` error, similar to the usual threads.
-            result.expect("file server exited with an error");
-        })
-        .map_err(|error| error!(message="File server unexpectedly stopped.", %error, internal_log_rate_limit = false))
-        .await
+            result.map(|_shutdown| ())
+        });
+
+        let file_server_error = match file_server_task.await {
+            Ok(result) => result.err(),
+            Err(join_error) => {
+                // Keep a panic in the file server reportable as a component panic.
+                if join_error.is_panic() {
+                    std::panic::resume_unwind(join_error.into_panic());
+                }
+                None
+            }
+        };
+
+        let event_sender_error = match event_sender_task.await {
+            Ok(error) => error,
+            Err(join_error) => {
+                if join_error.is_panic() {
+                    std::panic::resume_unwind(join_error.into_panic());
+                }
+                None
+            }
+        };
+
+        // The file server only fails once its consumer is gone, which the event sender
+        // observes first and so retains the cause of. The event sender failing while the
+        // file server stops on request is not a failure of this source.
+        match file_server_error {
+            Some(error) => Err(event_sender_error.unwrap_or(error)),
+            None => Ok(()),
+        }
     })
 }
 
