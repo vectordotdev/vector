@@ -14,10 +14,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, Input, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{EventRef, LogEvent, Value},
     http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
@@ -60,6 +57,7 @@ pub enum OpenSearchServiceType {
 }
 
 impl OpenSearchServiceType {
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             OpenSearchServiceType::Managed => "es",
@@ -114,7 +112,6 @@ pub struct ElasticsearchConfig {
     ///
     /// Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
     #[serde(default)]
-    #[configurable(derived)]
     pub api_version: ElasticsearchApiVersion,
 
     /// Whether or not to send the `type` field to Elasticsearch.
@@ -152,36 +149,28 @@ pub struct ElasticsearchConfig {
     pub pipeline: Option<String>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub mode: ElasticsearchMode,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: Compression,
 
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
-    #[configurable(derived)]
     pub encoding: Transformer,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub request: RequestConfig,
 
-    #[configurable(derived)]
     pub auth: Option<ElasticsearchAuthConfig>,
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: Option<QueryParameters>,
 
     #[serde(default)]
-    #[configurable(derived)]
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
@@ -190,11 +179,9 @@ pub struct ElasticsearchConfig {
     pub opensearch_service_type: OpenSearchServiceType,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     #[serde(default)]
-    #[configurable(derived)]
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
 
@@ -203,15 +190,12 @@ pub struct ElasticsearchConfig {
     // `DataStreamConfig` into the `mode` enum variants. Doing so would remove them from the root
     // of the config here and thus any post serde config parsing manual error prone logic.
     #[serde(alias = "normal", default)]
-    #[configurable(derived)]
     pub bulk: BulkConfig,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub data_stream: Option<DataStreamConfig>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub metrics: Option<MetricToLogConfig>,
 
     #[serde(
@@ -219,10 +203,8 @@ pub struct ElasticsearchConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -241,27 +223,27 @@ impl Default for ElasticsearchConfig {
             endpoint: None,
             endpoints: vec![],
             doc_type: default_doc_type(),
-            api_version: Default::default(),
+            api_version: ElasticsearchApiVersion::default(),
             suppress_type_name: false,
             request_retry_partial: false,
             id_key: None,
             pipeline: None,
-            mode: Default::default(),
-            compression: Default::default(),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            mode: ElasticsearchMode::default(),
+            compression: Compression::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: RequestConfig::default(),
             auth: None,
             query: None,
             #[cfg(feature = "aws-core")]
             aws: None,
-            opensearch_service_type: Default::default(),
+            opensearch_service_type: OpenSearchServiceType::default(),
             tls: None,
             endpoint_health: None,
             bulk: BulkConfig::default(), // the default mode is Bulk
             data_stream: None,
             metrics: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }
     }
@@ -272,6 +254,9 @@ impl ElasticsearchConfig {
     /// active mode. `common_mode()` ignores the inactive branch, so a leftover unused template
     /// (e.g. a `bulk.index` in a config that runs in `data_stream` mode) is never confined and
     /// cannot reject an otherwise-valid config.
+    ///
+    /// # Errors
+    /// Returns an error if an active routing template fails confinement validation.
     pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
@@ -356,8 +341,8 @@ impl Default for BulkConfig {
         Self {
             action: default_bulk_action(),
             index: default_index(),
-            template_fallback_index: Default::default(),
-            version: Default::default(),
+            template_fallback_index: Option::default(),
+            version: Option::default(),
             version_type: default_version_type(),
         }
     }
@@ -442,6 +427,9 @@ impl DataStreamConfig {
     ///
     /// This is the only way to obtain a `DataStreamMode`, so the `data_stream.*` templates can
     /// never be rendered without first passing through confinement.
+    ///
+    /// # Errors
+    /// Returns an error if any data stream template fails confinement validation.
     pub fn confine(
         self,
         confinement: &ConfinementConfig,
@@ -529,6 +517,10 @@ impl DataStreamMode {
             .ok()
     }
 
+    /// Fills missing data stream fields from the configured templates.
+    ///
+    /// # Panics
+    /// Panics if an existing `data_stream` field is not an object and field sync is enabled.
     pub fn sync_fields(&self, log: &mut LogEvent) {
         if !self.sync_fields {
             return;
@@ -565,10 +557,9 @@ impl DataStreamMode {
         }
     }
 
+    #[must_use]
     pub fn index(&self, log: &LogEvent) -> Option<String> {
-        let (dtype, dataset, namespace) = if !self.auto_routing {
-            (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
-        } else {
+        let (dtype, dataset, namespace) = if self.auto_routing {
             let data_stream = log
                 .get(event_path!("data_stream"))
                 .and_then(|ds| ds.as_object());
@@ -591,6 +582,8 @@ impl DataStreamMode {
                 || self.namespace(log),
             )?;
             (dtype, dataset, namespace)
+        } else {
+            (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         };
 
         let name = [dtype, dataset, namespace]
@@ -686,16 +679,16 @@ where
 /// out of the joined name, so an event field explicitly overriding one
 /// part to `""` just skips it.
 fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
+    // Forbidden anywhere in the string.
+    const FORBIDDEN: &[char] = &[
+        '\0', '/', '\\', '*', '?', '"', '<', '>', '|', ',', '#', ':', ' ',
+    ];
     if s.is_empty() {
         return true;
     }
     if s.len() > 100 {
         return false;
     }
-    // Forbidden anywhere in the string.
-    const FORBIDDEN: &[char] = &[
-        '\0', '/', '\\', '*', '?', '"', '<', '>', '|', ',', '#', ':', ' ',
-    ];
     if s.contains(FORBIDDEN) {
         return false;
     }
@@ -711,7 +704,7 @@ fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
         return false;
     }
     // Control characters have no place in a routing identifier.
-    if s.chars().any(|c| c.is_control()) {
+    if s.chars().any(char::is_control) {
         return false;
     }
     // `-` is the separator inside the composed data-stream name
@@ -740,10 +733,6 @@ impl SinkConfig for ElasticsearchConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
@@ -793,7 +782,11 @@ impl ValidatedSink for ElasticsearchConfig {
         // of failing at build time.
         #[cfg(feature = "aws-core")]
         if matches!(self.auth, Some(ElasticsearchAuthConfig::Aws(_)))
-            && self.aws.as_ref().and_then(|aws| aws.region()).is_none()
+            && self
+                .aws
+                .as_ref()
+                .and_then(crate::aws::region::RegionOrEndpoint::region)
+                .is_none()
         {
             return Err(ParseError::RegionRequired.into());
         }
@@ -865,16 +858,16 @@ impl ValidatedSink for ElasticsearchConfig {
             .collect::<Vec<_>>();
 
         let service = validated.request_limits.clone().distributed_service(
-            ElasticsearchRetryLogic {
+            &ElasticsearchRetryLogic {
                 retry_partial: self.request_retry_partial,
             },
             services,
-            health_config,
-            ElasticsearchHealthLogic,
+            &health_config,
+            &ElasticsearchHealthLogic,
             1,
         );
 
-        let sink = ElasticsearchSink::new(&common, self, service, validated.batch_settings)?;
+        let sink = ElasticsearchSink::new(&common, self, service, validated.batch_settings);
 
         let stream = VectorSink::from_event_streamsink(sink);
 

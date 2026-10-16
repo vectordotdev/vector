@@ -49,7 +49,7 @@ use crate::{
         GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util,
     tls::{TlsConfig, TlsSettings},
@@ -68,10 +68,6 @@ const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
-// prost emits some generated code that includes clones on `Arc`
-// objects, which causes a clippy ding on this block. We don't
-// directly control the generated code, so allow this lint here.
-#[allow(clippy::clone_on_ref_ptr)]
 // https://github.com/hyperium/tonic/issues/1350
 #[allow(clippy::missing_const_for_fn)]
 #[allow(warnings)]
@@ -146,7 +142,6 @@ pub struct PubsubConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The maximum number of concurrent stream connections to open at once.
@@ -210,18 +205,15 @@ pub struct PubsubConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
@@ -626,7 +618,7 @@ impl PubsubSource {
         self.bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-        let (events, ids) = self.parse_messages(response.received_messages, batch).await;
+        let (events, ids) = self.parse_messages(response.received_messages, batch);
 
         let count = events.len();
         match self.out.send_batch(events).await {
@@ -647,7 +639,7 @@ impl PubsubSource {
         }
     }
 
-    async fn parse_messages(
+    fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
         batch: Option<BatchNotifier>,
@@ -675,7 +667,7 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::from(value)))
                 .collect(),
         );
         let log_namespace = self.log_namespace;
@@ -874,7 +866,7 @@ mod integration_tests {
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: LazyLock<String> =
-        LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
+        LazyLock::new(|| format!("{}/v1/projects/{PROJECT}", *gcp::PUBSUB_ADDRESS));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
@@ -1055,7 +1047,7 @@ mod integration_tests {
             this.request(Method::PUT, "topics/{topic}", json!({})).await;
 
             let body = json!({
-                "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
+                "topic": format!("projects/{PROJECT}/topics/{}", this.topic),
                 "ackDeadlineSeconds": *ACK_DEADLINE,
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;

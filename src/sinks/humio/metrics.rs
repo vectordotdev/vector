@@ -17,8 +17,8 @@ use super::{
 };
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        TransformContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformContext,
+        ValidatedSink,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -120,22 +120,17 @@ pub struct HumioMetricsConfig {
     ))]
     index: Option<Template>,
 
-    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<SplunkHecDefaultBatchSettings>,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -153,10 +148,10 @@ fn default_endpoint() -> HttpEndpoint {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             host_key: hostname
             token: ${HUMIO_TOKEN}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -174,10 +169,6 @@ impl SinkConfig for HumioMetricsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
@@ -239,7 +230,7 @@ impl HumioMetricsConfig {
             batch: self.batch,
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             // hard coded as humio expects this format so no sense in making it configurable
             timestamp_key: OptionalTargetPath::from(
                 vrl::path::PathPrefix::Event,
@@ -316,8 +307,8 @@ mod tests {
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            confinement: crate::template::ConfinementConfig::default(),
         };
 
         let result = config.validate();

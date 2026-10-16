@@ -45,13 +45,13 @@ const GROUP_COMMIT_HEADER: &str = "group_commit";
 const GROUP_COMMIT_SYNC_MODE: &str = "sync_mode";
 
 /// Group commit async mode - data written to WAL first, returns immediately.
-/// Data is visible after async commit based on group_commit_interval.
+/// Data is visible after async commit based on `group_commit_interval`.
 const GROUP_COMMIT_ASYNC_MODE: &str = "async_mode";
 
-/// Thread-safe version of the DorisSinkClient, wrapped in an Arc
+/// Thread-safe version of the `DorisSinkClient`, wrapped in an Arc
 pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
 
-/// DorisSinkClient handles the HTTP communication with Doris server
+/// `DorisSinkClient` handles the HTTP communication with Doris server
 /// This client is thread-safe by design
 #[derive(Clone, Debug)]
 pub struct DorisSinkClient {
@@ -64,7 +64,7 @@ pub struct DorisSinkClient {
 }
 
 impl DorisSinkClient {
-    pub async fn new(
+    pub fn new(
         http_client: HttpClient,
         base_url: Uri,
         auth: Option<Auth>,
@@ -86,7 +86,7 @@ impl DorisSinkClient {
         }
     }
 
-    /// Converts a DorisSinkClient into a thread-safe version
+    /// Converts a `DorisSinkClient` into a thread-safe version
     pub fn into_thread_safe(self) -> ThreadSafeDorisSinkClient {
         Arc::new(self)
     }
@@ -94,10 +94,8 @@ impl DorisSinkClient {
     /// Generate a unique label for the stream load
     fn generate_label(&self, database: &str, table: &str) -> String {
         format!(
-            "{}_{}_{}_{}_{}",
+            "{}_{database}_{table}_{}_{}",
             self.label_prefix,
-            database,
-            table,
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -108,9 +106,9 @@ impl DorisSinkClient {
 
     /// Check if group commit is enabled in the custom headers
     /// Group commit has three modes:
-    /// - off_mode: disabled, label is required
-    /// - sync_mode: enabled, label should be skipped
-    /// - async_mode: enabled, label should be skipped
+    /// - `off_mode`: disabled, label is required
+    /// - `sync_mode`: enabled, label should be skipped
+    /// - `async_mode`: enabled, label should be skipped
     fn is_group_commit_enabled(&self) -> bool {
         self.headers.iter().any(|(k, v)| {
             k.eq_ignore_ascii_case(GROUP_COMMIT_HEADER)
@@ -120,7 +118,7 @@ impl DorisSinkClient {
     }
 
     /// Build a request for the Doris stream load
-    async fn build_request(
+    fn build_request(
         &self,
         database: &str,
         table: &str,
@@ -140,12 +138,14 @@ impl DorisSinkClient {
         } else {
             // Build original URL using Uri components to avoid trailing slash issues
             let scheme = self.base_url.scheme_str().unwrap_or("http");
-            let authority = self.base_url.authority().map(|a| a.as_str()).unwrap_or("");
+            let authority = self
+                .base_url
+                .authority()
+                .map_or("", http::uri::Authority::as_str);
             let encoded_database = utf8_percent_encode(database, PATH_SEGMENT);
             let encoded_table = utf8_percent_encode(table, PATH_SEGMENT);
             let stream_load_url = format!(
-                "{}://{}/api/{}/{}/_stream_load",
-                scheme, authority, encoded_database, encoded_table
+                "{scheme}://{authority}/api/{encoded_database}/{encoded_table}/_stream_load"
             );
 
             stream_load_url.parse::<Uri>().map_err(|source| {
@@ -174,7 +174,7 @@ impl DorisSinkClient {
             let label = self.generate_label(database, table);
             debug!(%uri, %label, "Building request.");
             builder = builder.header("label", &label);
-        };
+        }
 
         // Add compression headers if needed
         if let Some(ce) = self.compression.content_encoding() {
@@ -222,19 +222,18 @@ impl DorisSinkClient {
         table: String,
         payload: Bytes,
     ) -> Result<DorisStreamLoadResponse, crate::Error> {
-        // Track visited URLs to prevent redirect loops
-        let mut visited_urls = HashSet::new();
-        let mut redirect_count = 0;
         // Doris Stream Load typically redirects once (FE -> BE), but we allow up to 3
         // redirects to handle potential multi-hop scenarios while preventing infinite loops.
         const MAX_REDIRECTS: u8 = 3;
 
+        // Track visited URLs to prevent redirect loops
+        let mut visited_urls = HashSet::new();
+        let mut redirect_count = 0;
+
         let payload_ref = &payload;
 
         // Build and send initial request
-        let request = self
-            .build_request(&database, &table, payload_ref, None)
-            .await?;
+        let request = self.build_request(&database, &table, payload_ref, None)?;
         let endpoint = request.uri().to_string();
         let byte_size = payload.len();
 
@@ -270,9 +269,8 @@ impl DorisSinkClient {
                     }
 
                     // Build and send redirect request
-                    let redirect_req = self
-                        .build_request(&database, &table, payload_ref, Some(location_str))
-                        .await?;
+                    let redirect_req =
+                        self.build_request(&database, &table, payload_ref, Some(location_str))?;
 
                     response = self.http_client.send(redirect_req).await?;
                     status = response.status();
@@ -340,8 +338,10 @@ impl DorisSinkClient {
     pub async fn healthcheck_fenode(&self, endpoint: &Uri) -> crate::Result<()> {
         // Use Doris bootstrap API endpoint for health check, GET method
         let scheme = endpoint.scheme_str().unwrap_or("http");
-        let authority = endpoint.authority().map(|a| a.as_str()).unwrap_or("");
-        let uri_str = format!("{}://{}/api/bootstrap", scheme, authority);
+        let authority = endpoint
+            .authority()
+            .map_or("", http::uri::Authority::as_str);
+        let uri_str = format!("{scheme}://{authority}/api/bootstrap");
 
         let uri = uri_str.parse::<Uri>().map_err(|source| {
             debug!(
@@ -389,17 +389,16 @@ impl DorisSinkClient {
                                 node = %endpoint
                             );
                             return Ok(());
-                        } else {
-                            debug!(
-                                message = "Doris FE node returned non-success message.",
-                                node = %endpoint,
-                                message = %msg
-                            );
-                            return Err(HealthCheckError::HealthCheckFailed {
-                                message: msg.to_string(),
-                            }
-                            .into());
                         }
+                        debug!(
+                            message = "Doris FE node returned non-success message.",
+                            node = %endpoint,
+                            message = %msg
+                        );
+                        return Err(HealthCheckError::HealthCheckFailed {
+                            message: msg.to_string(),
+                        }
+                        .into());
                     }
                 }
                 Err(source) => {
@@ -415,7 +414,7 @@ impl DorisSinkClient {
         );
 
         Err(HealthCheckError::HealthCheckFailed {
-            message: format!("HTTP status: {}", status),
+            message: format!("HTTP status: {status}"),
         }
         .into())
     }

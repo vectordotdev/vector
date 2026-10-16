@@ -34,7 +34,7 @@ releases: "0.41.0": {
 			description: """
 				VRL was updated to v0.18.0. This includes the following changes:
 
-				### New Features
+				### New Features {#vrl-new-features}
 
 				- Added `unflatten` function to inverse the result of the `flatten` function. This function is useful when you want to convert a flattened object back to its original form.
 				- The `parse_json` function now accepts an optional `lossy` parameter (which defaults to `true`).
@@ -45,12 +45,12 @@ releases: "0.41.0": {
 				- Added casing functions `camelcase`, `kebabcase`, `screamingsnakecase`, `snakecase`, `pascalcase` (https://github.com/vectordotdev/vrl/pull/973)
 				- Added `parse_influxdb` function to parse events encoded using the [InfluxDB line protocol](https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/).
 
-				### Enhancements
+				### Enhancements {#vrl-enhancements}
 
 				- The `match_datadog_query` function now accepts `||` in place of `OR` and `&&` in
 				place of `AND` in the query string, which is common Datadog syntax. (https://github.com/vectordotdev/vrl/pull/1001)
 
-				### Fixes
+				### Fixes {#vrl-fixes}
 
 				- `decode_base64` no longer requires canonical padding. (https://github.com/vectordotdev/vrl/pull/960)
 				- The assumption of a Datadog Logs-based intake event structure has been removed

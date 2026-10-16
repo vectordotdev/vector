@@ -70,7 +70,7 @@ pub trait FileDescriptorConfig: NamedComponent {
         // until another newline is entered. See
         // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
         std::thread::spawn(move || {
-            info!("Capturing {}.", description);
+            info!("Capturing {description}.");
             read_from_fd(reader, sender);
         });
 

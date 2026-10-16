@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use futures::future::BoxFuture;
 use snafu::Snafu;
@@ -38,7 +39,7 @@ pub mod clickhouse;
 pub mod console;
 #[cfg(feature = "sinks-databend")]
 pub mod databend;
-#[cfg(feature = "sinks-databricks-zerobus")]
+#[cfg(feature = "sinks-databricks_zerobus")]
 pub mod databricks_zerobus;
 #[cfg(any(
     feature = "sinks-datadog_events",
@@ -116,7 +117,7 @@ pub mod vector;
 pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
-#[cfg(feature = "sinks-websocket-server")]
+#[cfg(feature = "sinks-websocket_server")]
 pub mod websocket_server;
 
 pub use vector_lib::{config::Input, sink::VectorSink};
@@ -136,6 +137,8 @@ pub enum BuildError {
     UriParseError { source: ::http::uri::InvalidUri },
     #[snafu(display("HTTP request build error: {}", source))]
     HTTPRequestBuilderError { source: ::http::Error },
+    #[snafu(display("HTTP request build error: {}", source))]
+    HTTPV1RequestBuilderError { source: ::http_1::Error },
 }
 
 /// Common healthcheck errors

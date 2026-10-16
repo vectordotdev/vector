@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::{body::Body, client::connect::Connect};
@@ -75,11 +77,9 @@ pub struct LocalDatadogCommonConfig {
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -89,6 +89,7 @@ pub struct LocalDatadogCommonConfig {
 }
 
 impl LocalDatadogCommonConfig {
+    #[must_use]
     pub fn new(
         endpoint: Option<String>,
         site: Option<String>,
@@ -102,6 +103,11 @@ impl LocalDatadogCommonConfig {
         }
     }
 
+    /// Combines local options with the global Datadog configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if neither configuration supplies an API key.
     pub fn with_globals(
         &self,
         config: datadog::Options,
@@ -136,6 +142,10 @@ pub struct DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the validation endpoint cannot be parsed.
     pub fn build_healthcheck<C>(&self, client: HttpClient<Body, C>) -> crate::Result<Healthcheck>
     where
         C: Connect + Clone + Send + Sync + 'static,
@@ -204,8 +214,11 @@ pub enum DatadogApiError {
 }
 
 impl DatadogApiError {
-    /// Common DatadogApiError handling for HTTP Responses.
-    /// Returns Ok(response) if the response was Ok/Accepted.
+    /// Converts a Datadog HTTP response into an API result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a failed request or a non-success HTTP status.
     pub fn from_result(
         result: Result<http::Response<Body>, HttpError>,
     ) -> Result<http::Response<Body>, DatadogApiError> {
@@ -244,6 +257,7 @@ impl DatadogApiError {
         }
     }
 
+    #[must_use]
     pub const fn is_retriable(&self) -> bool {
         match self {
             // This retry logic will be expanded further, but specifically retrying unauthorized
@@ -326,7 +340,7 @@ mod tests {
             endpoint: Some("localhost:8080".to_string()),
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             config
@@ -340,7 +354,7 @@ mod tests {
             endpoint: None,
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
             default

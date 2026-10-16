@@ -1,9 +1,9 @@
-#![allow(clippy::let_underscore_must_use)]
+#![warn(clippy::pedantic)]
 
 use std::{any::Any, sync::Arc};
 
-use derivative::Derivative;
 use enum_dispatch::enum_dispatch;
+use indexmap::IndexMap;
 use serde::Serialize;
 use vector_lib::{
     config::GlobalOptions,
@@ -16,18 +16,15 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct EnrichmentTableOuter<T>
 where
     T: Configurable + Serialize + 'static + ToValue + Clone,
 {
     #[serde(flatten)]
     pub inner: EnrichmentTables,
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
-    #[configurable(derived)]
     #[serde(
         default = "Inputs::<T>::default",
         skip_serializing_if = "Inputs::is_empty"
@@ -40,7 +37,7 @@ where
     /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
     /// the derived `SinkOuter` without cloning the underlying value.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
@@ -55,7 +52,7 @@ where
     {
         Self {
             inner: inner.into(),
-            graph: Default::default(),
+            graph: GraphConfig::default(),
             inputs: Inputs::from_iter(inputs),
             validated: None,
         }
@@ -73,6 +70,12 @@ where
     // components to deserialization and build up the components and the topology in a more granular
     // way, with each having "modules" for inputs (making them valid as sinks), for healthchecks,
     // for providing outputs, etc.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn as_sink(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SinkOuter<T>)> {
         self.inner.sink_config(default_key).map(|(key, sink)| {
             (
@@ -91,6 +94,12 @@ where
         })
     }
 
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn as_source(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SourceOuter)> {
         self.inner.source_config(default_key).map(|(key, source)| {
             (
@@ -125,6 +134,28 @@ where
             validated: self.validated,
         }
     }
+}
+
+/// Derives source components in table order, retaining their configured source keys.
+pub(crate) fn enrichment_table_sources<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SourceOuter)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+}
+
+/// Derives sink components in table order, retaining their inputs and validated state.
+pub(crate) fn enrichment_table_sinks<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SinkOuter<T>)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables.iter().filter_map(|(key, table)| table.as_sink(key))
 }
 
 /// Generalized interface for describing and building enrichment table components.

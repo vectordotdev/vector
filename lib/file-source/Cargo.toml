@@ -8,15 +8,11 @@ license = "MIT"
 
 [lints]
 workspace = true
-
-[target.'cfg(windows)'.dependencies]
-libc.workspace = true
-winapi = { version = "0.3", features = ["winioctl"] }
-
 [dependencies]
 glob.workspace = true
 chrono.workspace = true
 tokio = { workspace = true, features = ["full"] }
+tokio-util = { version = "0.7", default-features = false, features = ["join-map"] }
 tracing.workspace = true
 indexmap = { version = "2.11.0", default-features = false, features = ["serde"] }
 bytes.workspace = true

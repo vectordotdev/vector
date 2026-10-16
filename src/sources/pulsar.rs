@@ -39,7 +39,7 @@ use crate::{
     internal_events::{
         PulsarErrorEvent, PulsarErrorEventData, PulsarErrorEventType, StreamClosedError,
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
 };
 
 /// Configuration for the `pulsar` source.
@@ -75,24 +75,19 @@ pub struct PulsarSourceConfig {
     /// Max count of messages in a batch.
     batch_size: Option<u32>,
 
-    #[configurable(derived)]
     auth: Option<AuthConfig>,
 
-    #[configurable(derived)]
     dead_letter_queue_policy: Option<DeadLetterQueuePolicy>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -100,7 +95,6 @@ pub struct PulsarSourceConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsOptions>,
 }
@@ -130,10 +124,7 @@ enum AuthConfig {
     },
 
     /// OAuth authentication.
-    OAuth {
-        #[configurable(derived)]
-        oauth2: OAuth2Config,
-    },
+    OAuth { oauth2: OAuth2Config },
 }
 
 /// OAuth2-specific authentication configuration.
@@ -564,7 +555,7 @@ mod integration_tests {
     }
 
     fn pulsar_address(scheme: &str, port: u16) -> String {
-        format!("{}://{}:{}", scheme, pulsar_host(), port)
+        format!("{scheme}://{}:{port}", pulsar_host())
     }
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {

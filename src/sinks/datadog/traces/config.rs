@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
@@ -60,24 +60,21 @@ pub struct DatadogTracesConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Option<Compression>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogTracesDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 impl GenerateConfig for DatadogTracesConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_api_key: ${DATADOG_API_KEY_ENV_VAR}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -110,12 +107,11 @@ impl DatadogTracesConfig {
     fn traces_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
         endpoint.map_or_else(
             || format!("https://trace.agent.{site}"),
-            |endpoint| endpoint.to_string(),
+            std::string::ToString::to_string,
         )
     }
 
     fn generate_traces_endpoint_configuration(
-        &self,
         dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogTracesEndpointConfiguration> {
         let base_uri = Self::traces_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site);
@@ -128,6 +124,11 @@ impl DatadogTracesConfig {
         })
     }
 
+    /// Builds the trace sink and its APM stats flusher.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either trace intake endpoint cannot be parsed.
     pub fn build_sink(
         &self,
         dd_common: &DatadogCommonConfig,
@@ -136,7 +137,7 @@ impl DatadogTracesConfig {
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.into_settings();
-        let endpoints = self.generate_traces_endpoint_configuration(dd_common)?;
+        let endpoints = Self::generate_traces_endpoint_configuration(dd_common)?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, TraceApiRetry)
@@ -154,7 +155,7 @@ impl DatadogTracesConfig {
             compression,
             PAYLOAD_LIMIT,
             Arc::clone(&apm_stats_aggregator),
-        )?;
+        );
 
         // shutdown= Sender that the sink signals when input stream is exhausted.
         // tripwire= Receiver that APM stats flush thread listens for exit signal on.
@@ -182,16 +183,20 @@ impl DatadogTracesConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
+    /// Creates an HTTP client using this sink's TLS settings and the supplied proxy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TLS settings or HTTP client cannot be constructed.
     pub fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let default_tls_config;
 
         let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
+            Some(if let Some(config) = self.local_dd_common.tls.as_ref() {
+                config
+            } else {
+                default_tls_config = TlsEnableableConfig::enabled();
+                &default_tls_config
             }),
             false,
         )?;
@@ -208,10 +213,6 @@ impl SinkConfig for DatadogTracesConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -10,10 +10,7 @@ use clap::Args;
 use serde_json::{Map, Value};
 use tempfile::Builder;
 
-use crate::{
-    app,
-    utils::paths::{find_repo_root, npm_tool_path, resolve_repo_relative_path},
-};
+use crate::utils::paths::{find_repo_root, prettier, resolve_repo_relative_path};
 
 use super::docs_json;
 
@@ -39,7 +36,7 @@ impl Cli {
             serde_json::from_slice(&docs).context("CUE did not produce valid JSON")?;
 
         generate(&mut docs, &output)?;
-        format_examples(&repo_root, &output)?;
+        format_examples(&output)?;
         sync_formatted_yaml_examples(&mut docs, &output)?;
         let rendered =
             serde_json::to_vec(&docs).context("Failed to serialize documentation JSON")?;
@@ -75,19 +72,9 @@ pub(crate) fn generate(docs: &mut Value, output: &Path) -> Result<()> {
         .with_context(|| format!("Failed to replace {}", output.display()))
 }
 
-pub(crate) fn format_examples(repo_root: &Path, output: &Path) -> Result<()> {
+pub(crate) fn format_examples(output: &Path) -> Result<()> {
     info!("Formatting generated component examples with prettier...");
-    let prettier = npm_tool_path(repo_root, "prettier")?;
-    app::exec(
-        prettier,
-        [
-            OsStr::new("--ignore-path"),
-            OsStr::new(".prettierignore"),
-            OsStr::new("--write"),
-            output.as_os_str(),
-        ],
-        true,
-    )
+    prettier([OsStr::new("--write"), output.as_os_str()], true)
 }
 
 fn sync_formatted_yaml_examples(docs: &mut Value, output: &Path) -> Result<()> {

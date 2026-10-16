@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use http::{
-    Request, StatusCode,
+use http::StatusCode;
+use http_1::{
+    Request,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
-use hyper::Body;
 use snafu::ResultExt;
 use vector_lib::codecs::encoding::Framer;
 
@@ -13,14 +13,14 @@ use crate::{
     Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    http::{Auth, HttpClient, HttpError},
+    http::{
+        Auth,
+        client_v1::{HttpClient, empty_body},
+    },
     sinks::{
-        HTTPRequestBuilderSnafu, HealthcheckError,
+        HTTPV1RequestBuilderSnafu, HealthcheckError,
         prelude::*,
-        util::{
-            HttpEndpoint,
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
-        },
+        util::{HttpEndpoint, http::HttpRequest, http_v1::HttpServiceRequestBuilder},
     },
 };
 
@@ -33,7 +33,7 @@ pub(super) struct PartitionKey {
     pub pipeline_version: Option<String>,
 }
 
-/// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
+/// `KeyPartitioner` that partitions events by (dbname, table, `pipeline_name`, `pipeline_version`) pair.
 pub(super) struct KeyPartitioner {
     dbname: ConfinedTemplate,
     table: ConfinedTemplate,
@@ -129,7 +129,7 @@ fn prepare_log_ingester_url(
     db: &str,
     table: &str,
     metadata: &PartitionKey,
-    extra_params: &Option<HashMap<String, String>>,
+    extra_params: Option<&HashMap<String, String>>,
 ) -> String {
     let path = endpoint
         .append_path("/v1/events/logs")
@@ -146,8 +146,8 @@ fn prepare_log_ingester_url(
         url_builder.append_pair("pipeline_version", pipeline_version);
     }
 
-    if let Some(extra_params) = extra_params.as_ref() {
-        for (key, value) in extra_params.iter() {
+    if let Some(extra_params) = extra_params {
+        for (key, value) in extra_params {
             url_builder.append_pair(key, value);
         }
     }
@@ -162,8 +162,13 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
         let db = metadata.dbname.clone();
 
         // prepare url
-        let url =
-            prepare_log_ingester_url(&self.endpoint, &db, &table, metadata, &self.extra_params);
+        let url = prepare_log_ingester_url(
+            &self.endpoint,
+            &db,
+            &table,
+            metadata,
+            self.extra_params.as_ref(),
+        );
 
         // prepare body
         let payload = request.take_payload();
@@ -173,7 +178,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             .header(CONTENT_LENGTH, payload.len());
 
         if let Some(extra_headers) = self.extra_headers.as_ref() {
-            for (key, value) in extra_headers.iter() {
+            for (key, value) in extra_headers {
                 builder = builder.header(key, value);
             }
         }
@@ -182,14 +187,15 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             builder = builder.header(CONTENT_ENCODING, ce);
         }
 
-        if let Some(auth) = self.auth.clone() {
-            builder = auth.apply_builder(builder);
+        let mut request = builder
+            .body(payload)
+            .context(HTTPV1RequestBuilderSnafu)
+            .map_err(crate::Error::from)?;
+        if let Some(auth) = &self.auth {
+            auth.apply_v1(&mut request);
         }
 
-        builder
-            .body(payload)
-            .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::into)
+        Ok(request)
     }
 }
 
@@ -250,37 +256,19 @@ pub(super) async fn http_healthcheck(
         .append_path("/health")
         .expect("static health path should be a valid URL")
         .to_string();
-    let mut request = Request::get(uri).body(Body::empty())?;
+    let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply(&mut request);
+        auth.apply_v1(&mut request);
     }
 
     let response = client.send(request).await?;
 
-    match response.status() {
+    let status = StatusCode::from_u16(response.status().as_u16())
+        .expect("HTTP status codes are valid u16 values");
+    match status {
         StatusCode::OK => Ok(()),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-    }
-}
-
-/// GreptimeDB HTTP retry logic.
-#[derive(Clone, Default)]
-pub(super) struct GreptimeDBHttpRetryLogic {
-    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
-}
-
-impl RetryLogic for GreptimeDBHttpRetryLogic {
-    type Error = HttpError;
-    type Request = HttpRequest<PartitionKey>;
-    type Response = HttpResponse;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_retriable()
-    }
-
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        self.inner.should_retry_response(&response.http_response)
     }
 }
 
@@ -307,7 +295,7 @@ mod tests {
                 .collect(),
         );
 
-        let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, &extra_params);
+        let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, extra_params.as_ref());
         let url = url::Url::parse(&url).unwrap();
         assert_eq!(
             url.path(),

@@ -39,7 +39,7 @@ use vector_lib::{
 };
 use vrl::{
     event_path,
-    value::{Kind, Value, kind::Collection},
+    value::{Kind, Value, kind::Collection, value::simdutf_bytes_utf8_lossy},
 };
 
 use crate::{
@@ -54,7 +54,6 @@ use crate::{
         JournaldInvalidRecordError, JournaldReadError, JournaldStartJournalctlError,
         StreamClosedError,
     },
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
 };
 
@@ -204,8 +203,7 @@ pub struct JournaldConfig {
     #[serde(default)]
     pub journal_namespace: Option<String>,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// Enables remapping the `PRIORITY` field from an integer to string value.
@@ -875,7 +873,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
 
     let timestamp = timestamp_value
         .filter(|&ts| ts.is_bytes())
-        .and_then(|ts| ts.as_str().unwrap().parse::<u64>().ok())
+        .and_then(|ts| ts.to_str_lossy().unwrap().parse::<u64>().ok())
         .map(|ts| {
             chrono::Utc
                 .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)
@@ -917,7 +915,7 @@ fn create_log_event_from_record(
         LogNamespace::Vector => {
             let message_value = record
                 .remove(MESSAGE)
-                .map(|msg| Value::Bytes(Bytes::from(msg)))
+                .map(Value::from)
                 .unwrap_or(Value::Null);
 
             let mut log = LogEvent::from(message_value).with_batch_notifier_option(batch);
@@ -954,7 +952,7 @@ fn fixup_unit(unit: &str) -> String {
 }
 
 fn decode_record(line: &[u8], remap: bool) -> Result<Record, JsonError> {
-    let mut record = serde_json::from_str::<JsonValue>(&String::from_utf8_lossy(line))?;
+    let mut record = serde_json::from_str::<JsonValue>(&simdutf_bytes_utf8_lossy(line))?;
     // journalctl will output non-ASCII values using an array
     // of integers. Look for those values and re-parse them.
     if let Some(record) = record.as_object_mut() {
@@ -981,14 +979,9 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
     // array was not a valid byte.
     array
         .iter()
-        .map(|item| {
-            item.as_u64().and_then(|num| match num {
-                num if num <= u8::MAX as u64 => Some(num as u8),
-                _ => None,
-            })
-        })
+        .map(|item| item.as_u64().and_then(|num| u8::try_from(num).ok()))
         .collect::<Option<Vec<u8>>>()
-        .map(|array| String::from_utf8_lossy(&array).into())
+        .map(|array| simdutf_bytes_utf8_lossy(&array).into())
 }
 
 fn remap_priority(priority: &mut JsonValue) {

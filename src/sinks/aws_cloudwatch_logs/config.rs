@@ -15,8 +15,8 @@ use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     codecs::{Encoder, EncodingConfig},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -29,7 +29,7 @@ use crate::{
             http::{OrderedHeaderName, RequestConfig, validate_headers},
         },
     },
-    template::{ConfinedTemplate, ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
     tls::TlsConfig,
 };
 
@@ -46,6 +46,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 /// Retention policy configuration for AWS CloudWatch Log Group
+#[expect(clippy::doc_markdown, reason = "Service name")]
 pub struct Retention {
     /// Whether or not to set a retention policy when creating a new Log Group.
     #[serde(default)]
@@ -64,15 +65,15 @@ fn retention_days<'de, D>(deserializer: D) -> Result<u32, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let days: u32 = Deserialize::deserialize(deserializer)?;
     const ALLOWED_VALUES: &[u32] = &[
         1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557,
         2922, 3288, 3653,
     ];
+    let days: u32 = Deserialize::deserialize(deserializer)?;
     if ALLOWED_VALUES.contains(&days) {
         Ok(days)
     } else {
-        let msg = format!("one of allowed values: {ALLOWED_VALUES:?}").to_owned();
+        let msg = format!("one of allowed values: {ALLOWED_VALUES:?}");
         let expected: &str = msg.as_str();
         Err(de::Error::invalid_value(
             de::Unexpected::Signed(days.into()),
@@ -92,6 +93,7 @@ pub struct CloudwatchLogsSinkConfig {
     /// The [group name][group_name] of the target CloudWatch Logs stream.
     ///
     /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "group-name"))]
     #[configurable(metadata(docs::examples = "group-{{ file }}"))]
     pub group_name: Template,
@@ -103,10 +105,11 @@ pub struct CloudwatchLogsSinkConfig {
     /// unique per instance.
     ///
     /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "stream-{{ host }}"))]
     #[configurable(metadata(docs::examples = "%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "stream-name"))]
-    pub stream_name: Template,
+    pub stream_name: UnconfinedTemplate,
 
     /// The [AWS region][aws_region] of the target service.
     ///
@@ -129,26 +132,20 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default = "crate::serde::default_true")]
     pub create_missing_stream: bool,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retention: Retention,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
@@ -158,11 +155,9 @@ pub struct CloudwatchLogsSinkConfig {
     #[configurable(metadata(docs::hidden))]
     pub assume_role: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -174,26 +169,26 @@ pub struct CloudwatchLogsSinkConfig {
     ///
     /// [arn]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
     /// [kms_key]: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
-    #[configurable(derived)]
     #[serde(default)]
     pub kms_key: Option<String>,
 
     /// The Key-value pairs to be applied as [tags][tags] to the log group and stream.
     ///
     /// [tags]: https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/what-are-tags.html
-    #[configurable(derived)]
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "A tag represented as a key-value pair"
     ))]
     pub tags: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
 
 impl CloudwatchLogsSinkConfig {
+    /// # Errors
+    /// Returns an error if the region cannot be resolved or the credentials or HTTP client
+    /// cannot be configured.
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
         create_client::<CloudwatchLogsClientBuilder>(
             &CloudwatchLogsClientBuilder {},
@@ -226,16 +221,11 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct ValidatedCloudwatchLogs {
     group_template: ConfinedTemplate,
-    stream_template: ConfinedTemplate,
     batcher_settings: BatcherSettings,
     headers: BTreeMap<OrderedHeaderName, HeaderValue>,
 }
@@ -249,16 +239,12 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
             self.group_name
                 .clone()
                 .confine(&self.confinement, Self::NAME, "group_name")?;
-        let stream_template =
-            self.stream_name
-                .clone()
-                .confine(&self.confinement, Self::NAME, "stream_name")?;
         let batcher_settings = self.batch.into_batcher_settings()?;
         let headers = validate_headers(&self.request.headers)?;
+        self.encoding.validate()?;
 
         Ok(ValidatedCloudwatchLogs {
             group_template,
-            stream_template,
             batcher_settings,
             headers,
         })
@@ -271,7 +257,6 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedCloudwatchLogs {
             group_template,
-            stream_template,
             batcher_settings,
             headers,
         } = validated.clone();
@@ -292,7 +277,7 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
             batcher_settings,
             request_builder: CloudwatchRequestBuilder {
                 group_template,
-                stream_template,
+                stream_template: self.stream_name.clone(),
                 transformer,
                 encoder,
             },
@@ -312,22 +297,22 @@ impl GenerateConfig for CloudwatchLogsSinkConfig {
 fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
         encoding,
-        group_name: Default::default(),
-        stream_name: Default::default(),
-        region: Default::default(),
+        group_name: Template::default(),
+        stream_name: UnconfinedTemplate::default(),
+        region: RegionOrEndpoint::default(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
-        assume_role: Default::default(),
-        auth: Default::default(),
-        acknowledgements: Default::default(),
-        kms_key: Default::default(),
-        tags: Default::default(),
-        confinement: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
+        assume_role: None,
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        kms_key: None,
+        tags: None,
+        confinement: ConfinementConfig::default(),
     }
 }
 
@@ -355,7 +340,6 @@ mod tests {
 
         let validated = config.validate().expect("preparation should succeed");
         assert_eq!(validated.group_template.to_string(), "group-{{ file }}");
-        assert_eq!(validated.stream_template.to_string(), "stream");
         assert_eq!(validated.batcher_settings.item_limit, 10_000);
     }
 

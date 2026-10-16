@@ -67,7 +67,6 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

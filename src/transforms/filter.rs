@@ -21,7 +21,6 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
-    #[configurable(derived)]
     /// The condition that every input event is matched against.
     ///
     /// If an event is matched by the condition, it is forwarded. Otherwise, the event is dropped.
@@ -142,7 +141,7 @@ mod test {
 
     #[tokio::test]
     async fn filter_basic() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let transform_config = FilterConfig::from(AnyCondition::from(ConditionConfig::IsLog));
 
             let (tx, rx) = mpsc::channel(1);
@@ -166,7 +165,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 }

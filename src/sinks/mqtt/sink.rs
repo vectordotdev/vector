@@ -52,7 +52,7 @@ impl MqttSink {
                     error: missing_keys,
                     field: Some("topic"),
                     drop_event: true,
-                })
+                });
             })
             .ok()?;
 
@@ -100,7 +100,7 @@ impl MqttSink {
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build MQTT request: {:?}.", e);
+                        error!("Failed to build MQTT request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),

@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use std::path::{Path, PathBuf};
 
@@ -43,10 +44,8 @@ pub enum KafkaCompression {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct KafkaAuthConfig {
-    #[configurable(derived)]
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
-    #[configurable(derived)]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 

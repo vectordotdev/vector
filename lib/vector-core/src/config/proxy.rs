@@ -1,11 +1,13 @@
 use headers::{Authorization, authorization::Credentials};
 use http::{header::PROXY_AUTHORIZATION, uri::InvalidUri};
 use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
-use no_proxy::NoProxy;
 use url::Url;
 use vector_config::configurable_component;
 
 use crate::serde::is_default;
+
+mod no_proxy;
+pub use no_proxy::NoProxy;
 
 // suggestion of standardization coming from https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/
 fn from_env(key: &str) -> Option<String> {

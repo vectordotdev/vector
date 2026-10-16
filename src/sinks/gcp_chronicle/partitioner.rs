@@ -16,6 +16,7 @@ pub struct ChroniclePartitioner {
 }
 
 impl ChroniclePartitioner {
+    #[must_use]
     pub const fn new(
         log_type: UnconfinedTemplate,
         fallback_log_type: Option<String>,

@@ -22,7 +22,7 @@ use crate::{
         SourceOutput,
     },
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::http_server::{build_param_matcher, remove_duplicates},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -63,7 +63,6 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// If set to `true`, when incoming requests contains an access key sent by AWS Firehose, it is kept in the
     /// event secrets as "aws_kinesis_firehose_access_key".
-    #[configurable(derived)]
     store_access_key: bool,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
@@ -80,19 +79,15 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default)]
     record_compression: Compression,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -100,7 +95,6 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -198,7 +192,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         );
 
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls
+            .bind(&self.address)
+            .await?
+            .with_keepalive(self.keepalive.tcp_keepalive);
 
         let keepalive_settings = self.keepalive.clone();
         let shutdown = cx.shutdown;
@@ -223,7 +220,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?;
 
             Ok(())
@@ -476,7 +473,7 @@ mod tests {
         builder.send().await
     }
 
-    async fn spawn_send(
+    fn spawn_send(
         address: SocketAddr,
         timestamp: DateTime<Utc>,
         records: Vec<&'static [u8]>,
@@ -599,8 +596,7 @@ mod tests {
                 false,
                 record_compression,
                 None,
-            )
-            .await;
+            );
 
             if success {
                 let events = collect_n(rx, 1).await;
@@ -611,7 +607,7 @@ mod tests {
                 assert_event_data_eq!(
                     events,
                     vec![log_event! {
-                        "source_type" => Bytes::from("aws_kinesis_firehose"),
+                        "source_type" => "aws_kinesis_firehose",
                         "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                         "message" => Bytes::from(expected),
                         "request_id" => REQUEST_ID,
@@ -709,8 +705,7 @@ mod tests {
                 false,
                 record_compression,
                 None,
-            )
-            .await;
+            );
 
             if success {
                 let events = collect_n(rx, 1).await;
@@ -788,8 +783,7 @@ mod tests {
                 true,
                 Compression::None,
                 None,
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -798,7 +792,7 @@ mod tests {
             assert_event_data_eq!(
                 events,
                 vec![log_event! {
-                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "source_type" => "aws_kinesis_firehose",
                     "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                     "message"=> RECORD,
                     "request_id" => REQUEST_ID,
@@ -836,8 +830,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -846,7 +839,7 @@ mod tests {
             assert_event_data_eq!(
                 events,
                 vec![log_event! {
-                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "source_type" => "aws_kinesis_firehose",
                     "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                     "message"=> RECORD,
                     "request_id" => REQUEST_ID,
@@ -885,8 +878,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -974,8 +966,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -984,7 +975,7 @@ mod tests {
             assert_event_data_eq!(
                 events,
                 vec![log_event! {
-                    "source_type" => Bytes::from("aws_kinesis_firehose"),
+                    "source_type" => "aws_kinesis_firehose",
                     "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                     "message"=> RECORD,
                     "request_id" => REQUEST_ID,
@@ -1030,8 +1021,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some(COMMON_ATTRIBUTES),
-            )
-            .await;
+            );
 
             let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -1107,8 +1097,7 @@ mod tests {
                 true,
                 Compression::None,
                 Some("malformed-common-attributes"),
-            )
-            .await;
+            );
 
             let mut events = collect_n(rx, 1).await;
             let res = res.await.unwrap().unwrap();
@@ -1310,8 +1299,7 @@ mod tests {
             false,
             Compression::None,
             None,
-        )
-        .await;
+        );
 
         let events = collect_n(rx, 1).await;
 
@@ -1321,7 +1309,7 @@ mod tests {
         assert_event_data_eq!(
             events,
             vec![log_event! {
-                "source_type" => Bytes::from("aws_kinesis_firehose"),
+                "source_type" => "aws_kinesis_firehose",
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                 "message"=> Bytes::from(expected),
                 "request_id" => REQUEST_ID,
@@ -1356,8 +1344,7 @@ mod tests {
             false,
             Compression::None,
             None,
-        )
-        .await;
+        );
 
         let events = collect_n(rx, 1).await;
         let access_key = events[0]
@@ -1383,8 +1370,7 @@ mod tests {
             false,
             Compression::None,
             None,
-        )
-        .await;
+        );
 
         let events = collect_n(rx, 1).await;
 

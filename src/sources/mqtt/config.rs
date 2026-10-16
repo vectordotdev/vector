@@ -33,17 +33,14 @@ pub struct MqttSourceConfig {
     pub common: MqttCommonConfig,
 
     /// MQTT topic or topics from which messages are to be read.
-    #[configurable(derived)]
     #[serde(default = "default_topic")]
     #[derivative(Default(value = "default_topic()"))]
     pub topic: OneOrMany<String>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -83,7 +80,7 @@ impl SourceConfig for MqttSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(connector.clone(), decoder, log_namespace, self.clone())?;
+        let sink = MqttSource::new(connector, decoder, log_namespace, self.clone())?;
         Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
     }
 

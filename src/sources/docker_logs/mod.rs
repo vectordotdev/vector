@@ -165,10 +165,8 @@ pub struct DockerLogsConfig {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
-    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
-    #[configurable(derived)]
     tls: Option<DockerTlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -1184,7 +1182,7 @@ impl ContainerLogInfo {
             &mut log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(DockerLogsConfig::NAME.as_bytes()),
+            Value::from_static_str(DockerLogsConfig::NAME),
         );
 
         // This handles the transition from the original timestamp logic. Originally the

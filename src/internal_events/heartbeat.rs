@@ -13,6 +13,8 @@ pub struct Heartbeat {
 }
 
 impl InternalEvent for Heartbeat {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         trace!(target: "vector", message = "Beep.");
         gauge!(GaugeName::UptimeSeconds).set(self.since.elapsed().as_secs() as f64);

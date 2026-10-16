@@ -15,8 +15,8 @@ use super::{
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     sinks::{
         Healthcheck, VectorSink,
@@ -72,7 +72,6 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
     pub base: KinesisSinkBaseConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
 }
@@ -105,6 +104,10 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
+    /// Creates the AWS client.
+    ///
+    /// # Errors
+    /// Returns an error if region resolution, authentication, or HTTP client configuration fails.
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisFirehoseClientBuilder>(
             &KinesisFirehoseClientBuilder {},
@@ -129,10 +132,6 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.base.acknowledgements()
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -151,6 +150,7 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
             .limit_max_bytes(MAX_PAYLOAD_SIZE)?
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
+        self.base.encoding.validate()?;
 
         Ok(ValidatedKinesisFirehose { batch_settings })
     }
@@ -186,9 +186,9 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
 impl GenerateConfig for KinesisFirehoseSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"stream_name: my-stream
+            r"stream_name: my-stream
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -229,6 +229,7 @@ impl RetryLogic for KinesisRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
 
     #[test]
     fn validate_produces_batch_settings() {
@@ -242,11 +243,11 @@ mod tests {
                 ),
                 encoding: vector_lib::codecs::JsonSerializerConfig::default().into(),
                 compression: crate::sinks::util::Compression::None,
-                request: Default::default(),
+                request: TowerRequestConfig::default(),
                 tls: None,
-                auth: Default::default(),
+                auth: AwsAuthentication::default(),
                 request_retry_partial: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
                 partition_key_field: None,
             },
         };

@@ -68,6 +68,7 @@ pub struct MetricToLogConfig {
 }
 
 impl MetricToLogConfig {
+    #[must_use]
     pub fn build_transform(&self, context: &TransformContext) -> MetricToLog {
         MetricToLog::new(
             self.host_tag.as_deref(),
@@ -123,6 +124,10 @@ impl TransformConfig for MetricToLogConfig {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn schema_definition(log_namespace: LogNamespace) -> Definition {
     let mut schema_definition = Definition::default_for_namespace(&BTreeSet::from([log_namespace]))
         .with_event_field(&owned_value_path!("name"), Kind::bytes(), None)
@@ -263,6 +268,7 @@ pub struct MetricToLog {
 }
 
 impl MetricToLog {
+    #[must_use]
     pub fn new(
         host_tag: Option<&str>,
         timezone: TimeZone,
@@ -283,6 +289,7 @@ impl MetricToLog {
         }
     }
 
+    #[must_use]
     pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
         if self.tag_values == MetricTagValues::Single {
             metric.reduce_tags_to_single();
@@ -340,8 +347,8 @@ impl FunctionTransform for MetricToLog {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let retval: Option<Event> = self
             .transform_one(event.into_metric())
-            .map(|log| log.into());
-        output.extend(retval.into_iter())
+            .map(std::convert::Into::into);
+        output.extend(retval.into_iter());
     }
 }
 
@@ -350,7 +357,6 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
-    use futures::executor::block_on;
     use proptest::prelude::*;
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
@@ -373,7 +379,7 @@ mod tests {
     }
 
     async fn do_transform(metric: Metric) -> Option<LogEvent> {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = MetricToLogConfig {
                 host_tag: Some("host".into()),
                 timezone: None,
@@ -392,9 +398,9 @@ mod tests {
             assert_eq!(out.recv().await, None);
 
             result
-        })
+        }))
         .await
-        .map(|e| e.into_log())
+        .map(Event::into_log)
     }
 
     fn ts() -> DateTime<Utc> {
@@ -430,7 +436,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(counter).await.unwrap();
+        let log = Box::pin(do_transform(counter)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -461,7 +467,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(gauge).await.unwrap();
+        let log = Box::pin(do_transform(gauge)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -492,7 +498,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(set).await.unwrap();
+        let log = Box::pin(do_transform(set)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -525,7 +531,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(distro).await.unwrap();
+        let log = Box::pin(do_transform(distro)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -577,7 +583,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(histo).await.unwrap();
+        let log = Box::pin(do_transform(histo)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -633,7 +639,7 @@ mod tests {
         metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
-        let log = do_transform(summary).await.unwrap();
+        let log = Box::pin(do_transform(summary)).await.unwrap();
         let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
@@ -676,12 +682,12 @@ mod tests {
         #[test]
         fn transform_tag_single_encoding(values: TagValueSet) {
             let name = random_string(16);
-            let tags = block_on(transform_tags(
+            let tags = transform_tags(
                 MetricTagValues::Single,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
-            ));
+            );
             // The resulting tag must be either a single string value or not present.
             let value = values.into_single().map(|value| Value::Bytes(value.into()));
             assert_eq!(tags.get(vrl::path!(&*name)), value.as_ref());
@@ -690,12 +696,12 @@ mod tests {
         #[test]
         fn transform_tag_full_encoding(values: TagValueSet) {
             let name = random_string(16);
-            let tags = block_on(transform_tags(
+            let tags = transform_tags(
                 MetricTagValues::Full,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
-            ));
+            );
             let tag = tags.get(vrl::path!(&*name));
             match values.len() {
                 // Empty tag set => missing tag
@@ -712,7 +718,7 @@ mod tests {
         tag.into_option().into()
     }
 
-    async fn transform_tags(metric_tag_values: MetricTagValues, tags: MetricTags) -> Value {
+    fn transform_tags(metric_tag_values: MetricTagValues, tags: MetricTags) -> Value {
         let counter = Metric::new(
             "counter",
             MetricKind::Absolute,

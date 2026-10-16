@@ -67,7 +67,6 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

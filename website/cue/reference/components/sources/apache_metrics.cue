@@ -42,7 +42,6 @@ components: sources: apache_metrics: {
 			""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {

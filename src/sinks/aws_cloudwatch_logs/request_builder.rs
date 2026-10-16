@@ -15,7 +15,7 @@ use crate::{
     event::{Event, Value},
     internal_events::AwsCloudwatchLogsMessageSizeError,
     sinks::{aws_cloudwatch_logs::CloudwatchKey, util::metadata::RequestMetadataBuilder},
-    template::ConfinedTemplate,
+    template::{ConfinedTemplate, UnconfinedTemplate},
 };
 
 // Estimated maximum size of InputLogEvent is 50 bytes with an empty message
@@ -52,7 +52,7 @@ impl MetaDescriptive for CloudwatchRequest {
 
 pub struct CloudwatchRequestBuilder {
     pub group_template: ConfinedTemplate,
-    pub stream_template: ConfinedTemplate,
+    pub stream_template: UnconfinedTemplate,
     pub transformer: Transformer,
     pub encoder: Encoder<()>,
 }
@@ -123,7 +123,7 @@ impl CloudwatchRequestBuilder {
     }
 }
 
-/// ByteSizeOf is being abused to represent the encoded size of a request for the Partitioned Batcher
+/// `ByteSizeOf` is being abused to represent the encoded size of a request for the Partitioned Batcher
 ///
 /// The maximum batch size is 1,048,576 bytes. This size is calculated as the sum of all event messages in UTF-8, plus 26 bytes for each log event.
 /// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
@@ -143,7 +143,10 @@ mod tests {
     use vector_lib::{config::log_schema, event::LogEvent};
 
     use super::{CloudwatchRequestBuilder, MAX_MESSAGE_SIZE};
-    use crate::template::{ConfinedTemplate, ConfinementConfig, Template};
+    use crate::{
+        codecs::{Encoder, Transformer},
+        template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
+    };
 
     fn confined(src: &str, field: &'static str) -> ConfinedTemplate {
         Template::try_from(src)
@@ -152,13 +155,17 @@ mod tests {
             .unwrap()
     }
 
+    fn unconfined(src: &str) -> UnconfinedTemplate {
+        UnconfinedTemplate::try_from(src).unwrap()
+    }
+
     #[test]
     fn test() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),
-            stream_template: confined("stream", "stream_name"),
-            transformer: Default::default(),
-            encoder: Default::default(),
+            stream_template: unconfined("stream"),
+            transformer: Transformer::default(),
+            encoder: Encoder::default(),
         };
         let timestamp = Utc::now();
         let message = "event message";
@@ -174,9 +181,9 @@ mod tests {
     fn test_rejects_oversized_log_event() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),
-            stream_template: confined("stream", "stream_name"),
-            transformer: Default::default(),
-            encoder: Default::default(),
+            stream_template: unconfined("stream"),
+            transformer: Transformer::default(),
+            encoder: Encoder::default(),
         };
 
         let timestamp = Utc::now();

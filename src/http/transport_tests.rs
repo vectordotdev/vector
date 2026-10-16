@@ -12,8 +12,8 @@ use rstest::rstest;
 use tokio::{io::copy_bidirectional, net::TcpStream, task::JoinHandle, time::timeout};
 
 use super::{
-    HttpClient,
-    client_v1::{HttpClientV1, empty_body},
+    HttpClient as LegacyHttpClient,
+    client_v1::{HttpClient, empty_body},
 };
 use crate::{
     config::ProxyConfig,
@@ -100,17 +100,17 @@ impl ClientVersion {
     ) -> Result<Box<dyn TestClient>, String> {
         match self {
             Self::Legacy => Ok(Box::new(
-                HttpClient::new(tls, proxy).map_err(|error| error.to_string())?,
+                LegacyHttpClient::new(tls, proxy).map_err(|error| error.to_string())?,
             )),
             Self::V1 => Ok(Box::new(
-                HttpClientV1::new(tls, proxy).map_err(|error| error.to_string())?,
+                HttpClient::new(tls, proxy).map_err(|error| error.to_string())?,
             )),
         }
     }
 }
 
 #[async_trait]
-impl TestClient for HttpClient {
+impl TestClient for LegacyHttpClient {
     async fn get(&self, uri: &str) -> Result<TestResponse, String> {
         self.get_with_headers(uri, &[]).await
     }
@@ -150,7 +150,7 @@ impl TestClient for HttpClient {
 }
 
 #[async_trait]
-impl TestClient for HttpClientV1 {
+impl TestClient for HttpClient {
     async fn get(&self, uri: &str) -> Result<TestResponse, String> {
         self.get_with_headers(uri, &[]).await
     }
@@ -196,6 +196,11 @@ fn no_tls() -> MaybeTlsSettings {
     MaybeTlsSettings::from_config(None, false).unwrap()
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn client_tls(config: TlsConfig) -> MaybeTlsSettings {
     TlsSettings::from_options(Some(&config)).unwrap().into()
 }
@@ -427,6 +432,11 @@ fn proxy_config(proxy: &TestServer, tls: bool, auth: bool) -> ProxyConfig {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn assert_success(response: TestResponse) {
     assert_eq!(response.status, StatusCode::OK.as_u16());
     assert_eq!(response.body, b"origin response");

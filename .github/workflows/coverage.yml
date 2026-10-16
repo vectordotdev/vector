@@ -32,6 +32,7 @@ env:
 
 jobs:
   tests:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: read
       id-token: write
@@ -44,6 +45,7 @@ jobs:
       vector-api: true
 
   integration-tests:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: read
       packages: write
@@ -61,12 +63,12 @@ jobs:
     needs:
       - tests
       - integration-tests
-    if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && github.repository == 'vectordotdev/vector' }}
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
@@ -77,10 +79,15 @@ jobs:
           path: coverage-artifacts
           merge-multiple: false
 
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          vdev: false
+          datadog-ci: true
+          lcov: true
+
       - name: Merge coverage reports
         run: |
-          timeout 30m sudo apt-get install -y --no-install-recommends lcov
-
           mapfile -t FILES < <(find coverage-artifacts -name '*.info')
           echo "Merging ${#FILES[@]} coverage file(s)"
 
@@ -98,11 +105,6 @@ jobs:
           path: merged-lcov.info
           retention-days: 90
           overwrite: true
-
-      - uses: ./.github/actions/setup
-        with:
-          vdev: false
-          datadog-ci: true
 
       - uses: ./.github/actions/dd-token
 

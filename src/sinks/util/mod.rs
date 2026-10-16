@@ -9,6 +9,14 @@ pub mod compressor;
 pub mod datagram;
 pub mod encoding;
 pub mod http;
+#[cfg(any(
+    feature = "sinks-clickhouse",
+    feature = "sinks-gcp",
+    feature = "sinks-greptimedb_logs",
+    feature = "sinks-honeycomb",
+    feature = "sinks-keep",
+))]
+pub(crate) mod http_v1;
 pub mod metadata;
 pub mod normalizer;
 pub mod partitioner;
@@ -81,7 +89,7 @@ impl<I> EncodedEvent<I> {
     pub fn new(item: I, byte_size: usize, json_byte_size: JsonSize) -> Self {
         Self {
             item,
-            finalizers: Default::default(),
+            finalizers: EventFinalizers::default(),
             byte_size,
             json_byte_size,
         }
@@ -122,9 +130,10 @@ pub fn encode_namespace<'a>(
     name: impl Into<Cow<'a, str>>,
 ) -> String {
     let name = name.into();
-    namespace
-        .map(|namespace| format!("{namespace}{delimiter}{name}"))
-        .unwrap_or_else(|| name.into_owned())
+    match namespace {
+        Some(namespace) => format!("{namespace}{delimiter}{name}"),
+        None => name.into_owned(),
+    }
 }
 
 /// Marker trait for types that can hold a batch of events
@@ -138,6 +147,7 @@ impl<T> ElementCount for Vec<T> {
     }
 }
 
+#[must_use]
 pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
     match tz {
         TimeZone::Local => Some(*Utc::now().with_timezone(&chrono::Local).offset()),

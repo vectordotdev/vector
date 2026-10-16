@@ -7,21 +7,24 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
-    http::{Auth, HttpClient},
+    config::ValidatedSink,
+    http::{Auth, client_v1::HttpClient},
     sinks::{
         greptimedb::{
             GreptimeDBDefaultBatchSettings, default_dbname_template, default_pipeline_template,
             logs::{
                 http_request_builder::{
-                    GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder, PartitionKey,
-                    http_healthcheck,
+                    GreptimeDBLogsHttpRequestBuilder, PartitionKey, http_healthcheck,
                 },
                 sink::{GreptimeDBLogsHttpSink, LogsSinkSetting},
             },
         },
         prelude::*,
-        util::{HttpEndpoint, http::HttpService},
+        util::{
+            HttpEndpoint,
+            http::RetryStrategy,
+            http_v1::{HttpService, http_response_retry_logic},
+        },
     },
     template::ConfinementConfig,
 };
@@ -91,11 +94,9 @@ pub struct GreptimeDBLogsConfig {
     pub password: Option<SensitiveString>,
     /// Set http compression encoding for the request
     /// Default to none, `gzip` or `zstd` is supported.
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
@@ -113,18 +114,14 @@ pub struct GreptimeDBLogsConfig {
     ))]
     pub extra_headers: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -132,7 +129,6 @@ pub struct GreptimeDBLogsConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -152,10 +148,6 @@ impl SinkConfig for GreptimeDBLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
@@ -227,7 +219,7 @@ impl ValidatedSink for GreptimeDBLogsConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
             endpoint: self.endpoint.clone(),
@@ -250,7 +242,10 @@ impl ValidatedSink for GreptimeDBLogsConfig {
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, GreptimeDBHttpRetryLogic::default())
+            .settings(
+                request_limits,
+                http_response_retry_logic(RetryStrategy::default()),
+            )
             .service(service);
 
         let logs_sink_setting = LogsSinkSetting {

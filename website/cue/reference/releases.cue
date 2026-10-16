@@ -23,6 +23,8 @@ releases: {
 		type: #SemanticType
 		scopes: [string, ...string] | *[]
 		breaking:    bool | *false
+		title?:      string
+		anchor?:     string
 		description: string
 		pr_numbers: [uint, ...uint] | *[]
 		contributors: [string, ...string] | *[]
@@ -48,7 +50,7 @@ releases: {
 		commits?: [#Commit, ...#Commit]
 		changelog: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
 		vrl_changelog?: string
-		whats_next: #Any | *[]
+		whats_next?: [...{title: string, description: string}]
 	}
 
 	{[Version=string]: #Release & {version: Version}}

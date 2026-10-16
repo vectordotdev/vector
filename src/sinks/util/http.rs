@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 #[cfg(feature = "aws-core")]
 use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
@@ -10,7 +12,7 @@ use http_body::Body as _;
 use tracing::debug;
 
 /// Maximum number of response body bytes to include in a non-retriable error's reason.
-const MAX_ERROR_BODY_BYTES: usize = 1024;
+pub(crate) const MAX_ERROR_BODY_BYTES: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -145,7 +147,7 @@ where
     pub fn new(
         sink: T,
         batch: B,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -173,7 +175,7 @@ where
         sink: T,
         batch: B,
         retry_logic: RL,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -291,7 +293,7 @@ where
     pub fn new(
         sink: T,
         batch: B,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -321,7 +323,7 @@ where
         sink: T,
         batch: B,
         retry_logic: RL,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -346,6 +348,7 @@ where
     }
 
     /// Enforces per partition ordering of request.
+    #[must_use]
     pub fn ordered(mut self) -> Self {
         self.inner.ordered();
         self
@@ -420,11 +423,11 @@ pub struct SigV4Config {
     pub(crate) service: String,
 }
 
-/// @struct HttpBatchService
+/// @struct `HttpBatchService`
 ///
 /// NOTE: This has been deprecated, please do not use directly when creating new sinks.
 ///       The `HttpService` currently wraps this structure. Eventually all sinks currently using the
-///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
+///       `HttpBatchService` directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.
 pub struct HttpBatchService<F, B = Bytes> {
     inner: HttpClient<Body>,
@@ -721,36 +724,70 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
 /// A more generic version of `HttpRetryLogic` that accepts anything that can be converted
 /// to a status code
 #[derive(Debug)]
-pub struct HttpStatusRetryLogic<F, Req, Res> {
+pub struct HttpStatusRetryLogic<F, Req, Res, E = HttpError> {
     func: F,
     request: PhantomData<Req>,
     response: PhantomData<Res>,
+    error: PhantomData<E>,
     retry_strategy: RetryStrategy,
 }
 
-impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res>
+// TODO: Remove this compatibility trait, the generic error parameter on
+// `HttpStatusRetryLogic`, and `new_with_error` once the HTTP v1 migration is complete:
+// https://github.com/vectordotdev/vector/issues/19179
+pub trait HttpErrorClassify {
+    fn is_retriable(&self) -> bool;
+}
+
+impl HttpErrorClassify for HttpError {
+    fn is_retriable(&self) -> bool {
+        HttpError::is_retriable(self)
+    }
+}
+
+impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
 where
     F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
-    pub const fn new(func: F, retry_strategy: RetryStrategy) -> HttpStatusRetryLogic<F, Req, Res> {
+    pub const fn new(func: F, retry_strategy: RetryStrategy) -> Self {
         HttpStatusRetryLogic {
             func,
             request: PhantomData,
             response: PhantomData,
+            error: PhantomData,
             retry_strategy,
         }
     }
 }
 
-impl<F, Req, Res> RetryLogic for HttpStatusRetryLogic<F, Req, Res>
+impl<F, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
 where
     F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
+    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
 {
-    type Error = HttpError;
+    pub const fn new_with_error(func: F, retry_strategy: RetryStrategy) -> Self {
+        HttpStatusRetryLogic {
+            func,
+            request: PhantomData,
+            response: PhantomData,
+            error: PhantomData,
+            retry_strategy,
+        }
+    }
+}
+
+impl<F, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
+where
+    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    Req: Send + Sync + 'static,
+    Res: Send + Sync + 'static,
+    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
+{
+    type Error = E;
     type Request = Req;
     type Response = Res;
 
@@ -772,7 +809,7 @@ where
     }
 }
 
-impl<F, Req, Res> Clone for HttpStatusRetryLogic<F, Req, Res>
+impl<F, Req, Res, E> Clone for HttpStatusRetryLogic<F, Req, Res, E>
 where
     F: Clone,
 {
@@ -781,6 +818,7 @@ where
             func: self.func.clone(),
             request: PhantomData,
             response: PhantomData,
+            error: PhantomData,
             retry_strategy: self.retry_strategy.clone(),
         }
     }
@@ -813,6 +851,7 @@ fn headers_examples() -> BTreeMap<String, String> {
 
 impl RequestConfig {
     /// Split headers into static (non-dynamic) and template (dynamic) maps.
+    #[must_use]
     pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
@@ -849,6 +888,11 @@ pub enum HeaderValidationError {
     },
 }
 
+/// Validates HTTP header names and values.
+///
+/// # Errors
+///
+/// Returns an error if a header name or value is invalid.
 pub fn validate_headers(
     headers: &BTreeMap<String, String>,
 ) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
@@ -949,6 +993,7 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Creates a `RetryLogic` for use with `HttpResponse`.
+#[must_use]
 pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: RetryStrategy,
 ) -> HttpStatusRetryLogic<
@@ -986,6 +1031,9 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
 
 /// HTTP request builder for HTTP stream sinks using the generic `HttpService`
 pub trait HttpServiceRequestBuilder<T: Send> {
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be built.
     fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
 }
 
@@ -1134,7 +1182,7 @@ mod test {
             retry_strategy: RetryStrategy::None,
         };
         let status_logic =
-            HttpStatusRetryLogic::<_, (), ()>::new(|_: &()| StatusCode::OK, RetryStrategy::None);
+            HttpStatusRetryLogic::<_, (), ()>::new(|(): &()| StatusCode::OK, RetryStrategy::None);
 
         assert!(!logic.is_retriable_timeout());
         assert!(!status_logic.is_retriable_timeout());

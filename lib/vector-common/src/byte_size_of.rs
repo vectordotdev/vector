@@ -183,6 +183,7 @@ impl ByteSizeOf for Value {
     fn allocated_bytes(&self) -> usize {
         match self {
             Value::Bytes(bytes) => bytes.len(),
+            Value::String(string) => string.len(),
             Value::Object(map) => map.size_of(),
             Value::Array(arr) => arr.size_of(),
             _ => 0,
@@ -213,5 +214,17 @@ where
 {
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_values_count_their_utf8_bytes() {
+        let value = Value::from("café");
+        assert_eq!(value.allocated_bytes(), 5);
+        assert_eq!(value.size_of(), Value::Bytes("café".into()).size_of());
     }
 }

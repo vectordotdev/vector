@@ -27,7 +27,6 @@ pub(super) enum BuildError {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(super) struct BaseSSSinkConfig {
-    #[configurable(derived)]
     pub(super) encoding: EncodingConfig,
 
     /// The tag that specifies that a message belongs to a specific message group.
@@ -43,11 +42,9 @@ pub(super) struct BaseSSSinkConfig {
     /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
     pub(super) message_deduplication_id: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
@@ -57,11 +54,9 @@ pub(super) struct BaseSSSinkConfig {
     #[configurable(metadata(docs::hidden))]
     pub(super) assume_role: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) auth: AwsAuthentication,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -70,13 +65,21 @@ pub(super) struct BaseSSSinkConfig {
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "FIFO suffix is case-sensitive"
+)]
+pub(super) fn is_fifo(name: &str) -> bool {
+    name.ends_with(".fifo")
+}
+
 pub(super) fn message_group_id(
-    message_group_id: Option<String>,
+    message_group_id: Option<&str>,
     fifo: bool,
 ) -> crate::Result<Option<UnconfinedTemplate>> {
-    match (message_group_id.as_ref(), fifo) {
+    match (message_group_id, fifo) {
         (Some(value), true) => Ok(Some(
-            UnconfinedTemplate::try_from(value.clone()).context(TopicTemplateSnafu)?,
+            UnconfinedTemplate::try_from(value).context(TopicTemplateSnafu)?,
         )),
         (Some(_), false) => Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
         (None, true) => Err(Box::new(BuildError::MessageGroupIdMissing)),
@@ -87,7 +90,6 @@ pub(super) fn message_deduplication_id(
     message_deduplication_id: Option<String>,
 ) -> crate::Result<Option<UnconfinedTemplate>> {
     Ok(message_deduplication_id
-        .clone()
         .map(UnconfinedTemplate::try_from)
         .transpose()?)
 }

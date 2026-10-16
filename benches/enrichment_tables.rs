@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::time::SystemTime;
 
 use chrono::prelude::*;
@@ -19,6 +21,11 @@ criterion_group!(
 criterion_main!(benches);
 
 /// Returns the text of the column at the given position.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn column(col: usize, row: usize) -> Value {
     if col == 0 {
         // A column that is duplicated across 10 rows.
@@ -35,6 +42,15 @@ fn column(col: usize, row: usize) -> Value {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     let mut group = c.benchmark_group("enrichment_tables_file");
 
@@ -111,7 +127,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 assert_eq!(
                     Ok(expected),
                     file.find_table_row(Case::Sensitive, condition, None, None, index)
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -125,7 +141,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 assert_eq!(
                     Ok(expected),
                     file.find_table_row(Case::Sensitive, condition, None, None, index)
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -139,7 +155,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 assert_eq!(
                     Ok(expected),
                     file.find_table_row(Case::Insensitive, condition, None, None, index)
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -153,7 +169,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 assert_eq!(
                     Ok(expected),
                     file.find_table_row(Case::Sensitive, condition, None, None, index)
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -167,7 +183,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 assert_eq!(
                     Ok(expected),
                     file.find_table_row(Case::Sensitive, condition, None, None, index)
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -181,7 +197,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 assert_eq!(
                     Ok(expected),
                     file.find_table_row(Case::Insensitive, condition, None, None, index)
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -195,7 +211,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 assert_eq!(
                     Ok(expected),
                     file.find_table_row(Case::Sensitive, condition, None, None, index)
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -211,7 +227,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                     assert_eq!(
                         Ok(expected),
                         file.find_table_row(Case::Sensitive, condition, None, None, index)
-                    )
+                    );
                 },
                 BatchSize::SmallInput,
             );
@@ -228,7 +244,7 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                     assert_eq!(
                         Ok(expected),
                         file.find_table_row(Case::Insensitive, condition, None, None, index)
-                    )
+                    );
                 },
                 BatchSize::SmallInput,
             );
@@ -273,7 +289,7 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
                         None,
                         None,
                     )
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -310,7 +326,7 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
                         None,
                         None,
                     )
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -348,7 +364,7 @@ fn benchmark_enrichment_tables_mmdb(c: &mut Criterion) {
                         None,
                         None,
                     )
-                )
+                );
             },
             BatchSize::SmallInput,
         );
@@ -385,7 +401,7 @@ fn benchmark_enrichment_tables_mmdb(c: &mut Criterion) {
                         None,
                         None,
                     )
-                )
+                );
             },
             BatchSize::SmallInput,
         );

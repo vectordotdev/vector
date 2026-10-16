@@ -105,7 +105,7 @@ pub(super) async fn firehose(
                                 log,
                                 log_schema().source_type_key(),
                                 path!("source_type"),
-                                Bytes::from_static(AwsKinesisFirehoseConfig::NAME.as_bytes()),
+                                Value::from_static_str(AwsKinesisFirehoseConfig::NAME),
                             );
                             // This handles the transition from the original timestamp logic. Originally the
                             // `timestamp_key` was always populated by the `request.timestamp` time.

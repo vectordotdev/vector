@@ -91,6 +91,7 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketTlsConnectionError {
     pub error: TlsError,
+    pub peer_addr: SocketAddr,
 }
 
 impl InternalEvent for TcpSocketTlsConnectionError {
@@ -106,12 +107,14 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                 debug!(
                     message = "Connection error, probably a healthcheck.",
                     error = %self.error,
+                    peer_addr = %self.peer_addr,
                 );
             }
             _ => {
                 error!(
                     message = "Connection error.",
                     error = %self.error,
+                    peer_addr = %self.peer_addr,
                     error_code = "connection_failed",
                     error_type = error_type::WRITER_FAILED,
                     stage = error_stage::SENDING,
@@ -166,6 +169,7 @@ impl InternalEvent for TcpSocketTlsHandshakeTimeout {
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,
+    pub peer_addr: SocketAddr,
 }
 
 impl InternalEvent for TcpSendAckError {
@@ -173,6 +177,7 @@ impl InternalEvent for TcpSendAckError {
         error!(
             message = "Error writing acknowledgement, dropping connection.",
             error = %self.error,
+            peer_addr = %self.peer_addr,
             error_code = "ack_failed",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
@@ -234,11 +239,10 @@ mod tests {
                         .iter()
                         .all(|(k, v)| m.tags().is_some_and(|t| t.get(k) == Some(*v)))
             })
-            .map(|m| match m.value() {
+            .map_or(0.0, |m| match m.value() {
                 MetricValue::Counter { value } => *value,
                 other => panic!("expected counter for {name}, got {other:?}"),
             })
-            .unwrap_or(0.0)
     }
 
     /// `TcpSourceConnectionClosed` MUST bump `connection_shutdown_total{mode="tcp"}`
@@ -246,6 +250,8 @@ mod tests {
     /// connection-close counter on the source side.
     #[test]
     #[serial]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::float_cmp, reason = "Counters are exact integers")]
     fn tcp_source_connection_closed_increments_shutdown_total() {
         crate::test_util::trace_init();
         let before = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
@@ -258,9 +264,11 @@ mod tests {
 
     /// `TcpSendAckError` is an `*Error` event and per the instrumentation spec MUST
     /// only emit on real errors — bumping `component_errors_total` with the
-    /// `ack_failed` error_code.
+    /// `ack_failed` `error_code`.
     #[test]
     #[serial]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::float_cmp, reason = "Counters are exact integers")]
     fn tcp_send_ack_error_emit_always_increments_component_errors_total() {
         crate::test_util::trace_init();
         let errors_before = counter_value(
@@ -276,6 +284,7 @@ mod tests {
 
         TcpSendAckError {
             error: io::Error::from(io::ErrorKind::ConnectionReset),
+            peer_addr: "192.0.2.10:54321".parse().unwrap(),
         }
         .emit();
 

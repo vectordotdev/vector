@@ -56,6 +56,8 @@ pub enum MetricValue {
         count: u64,
 
         /// The sum of all observations contained within this histogram.
+        // Tolerate payloads that omit an unreported sum, reading it as zero.
+        #[serde(default)]
         sum: f64,
     },
 
@@ -80,10 +82,7 @@ pub enum MetricValue {
     /// Sketches represent the data in a way that queries over it have bounded error guarantees without needing to hold
     /// every single sample in memory. They are also, typically, able to be merged with other sketches of the same type
     /// such that client-side _and_ server-side aggregation can be accomplished without loss of accuracy in the queries.
-    Sketch {
-        #[configurable(derived)]
-        sketch: MetricSketch,
-    },
+    Sketch { sketch: MetricSketch },
 }
 
 impl MetricValue {

@@ -5,6 +5,7 @@ use chrono::Utc;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
 use tonic_health::server::health_reporter;
+use tower::layer::util::Identity;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::NativeDeserializerConfig,
@@ -20,9 +21,8 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
-    serde::bool_or_struct,
     sources::{
         Source,
         util::{
@@ -55,12 +55,20 @@ impl proto::Service for Service {
         &self,
         request: Request<proto::PushEventsRequest>,
     ) -> Result<Response<proto::PushEventsResponse>, Status> {
-        let mut events: Vec<Event> = request
-            .into_inner()
-            .events
-            .into_iter()
-            .map(Event::from)
-            .collect();
+        let request = request.into_inner();
+        let mut events = Vec::with_capacity(request.events.len());
+        for wrapper in request.events {
+            match Event::try_from(wrapper) {
+                Ok(event) => events.push(event),
+                Err(error) => {
+                    emit!(GrpcEventDecodeError { error: &error });
+                    return Err(Status::invalid_argument(error.to_string()));
+                }
+            }
+        }
+        if events.is_empty() {
+            return Ok(Response::new(proto::PushEventsResponse {}));
+        }
 
         let now = Utc::now();
         for event in &mut events {
@@ -133,15 +141,12 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: GrpcKeepaliveConfig,
 
@@ -224,6 +229,7 @@ impl SourceConfig for VectorConfig {
             builder.routes(),
             self.keepalive.clone(),
             cx.shutdown,
+            Identity::new(),
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);
@@ -428,7 +434,7 @@ mod tests {
             );
         }
 
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_event_data_eq!(events, output);
     }
 

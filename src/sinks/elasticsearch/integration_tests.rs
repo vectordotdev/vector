@@ -112,7 +112,7 @@ impl ElasticsearchCommon {
                         provider,
                         Some(region),
                     )
-                    .await?
+                    .await?;
                 }
             }
         }
@@ -140,7 +140,7 @@ async fn flush(common: ElasticsearchCommon) -> crate::Result<()> {
 
 async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
     let client = create_http_client();
-    let uri = format!("{}/_index_template/{}", common.base_url, name);
+    let uri = format!("{}/_index_template/{name}", common.base_url);
     let response = client
         .put(uri)
         .json(&json!({
@@ -200,7 +200,7 @@ async fn ensure_pipeline_in_params() {
 #[tokio::test]
 async fn ensure_empty_pipeline_not_in_params() {
     let index = gen_index();
-    let pipeline = String::from("");
+    let pipeline = String::new();
 
     let config = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -553,8 +553,8 @@ async fn insert_events_with_failure_and_gzip_compression() {
 async fn insert_events_in_data_stream() {
     trace_init();
     let index = gen_index();
-    let template_index = format!("my-template-{}", index);
-    let stream_index = format!("my-stream-{}", index);
+    let template_index = format!("my-template-{index}");
+    let stream_index = format!("my-stream-{index}");
 
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -581,7 +581,12 @@ async fn insert_events_in_data_stream() {
         .await
         .expect("Data stream creation error");
 
-    run_insert_tests_with_config(&cfg, TestType::Normal, BatchStatus::Delivered).await;
+    Box::pin(run_insert_tests_with_config(
+        &cfg,
+        TestType::Normal,
+        BatchStatus::Delivered,
+    ))
+    .await;
 
     delete_data_stream(&common, &stream_index)
         .await
@@ -675,7 +680,7 @@ async fn run_insert_tests(
     if test_type == TestType::Error {
         config.id_key = Some("_id".into());
     }
-    run_insert_tests_with_config(&config, test_type, status).await;
+    Box::pin(run_insert_tests_with_config(&config, test_type, status)).await;
 }
 
 fn create_http_client() -> reqwest::Client {
@@ -893,7 +898,7 @@ fn gen_index() -> Template {
 
 async fn create_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
     let client = create_http_client();
-    let uri = format!("{}/_data_stream/{}", common.base_url, name);
+    let uri = format!("{}/_data_stream/{name}", common.base_url);
     let response = client
         .put(uri)
         .header("Content-Type", "application/json")

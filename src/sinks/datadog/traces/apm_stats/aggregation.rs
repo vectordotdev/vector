@@ -116,11 +116,13 @@ pub struct Aggregator {
     /// API key associated with the Agent.
     api_key: Option<Arc<str>>,
 
-    /// Default API key to use if api_key not set.
+    /// Default API key to use if `api_key` not set.
     default_api_key: Arc<str>,
 }
 
 impl Aggregator {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_sign_loss, reason = "Preserve timestamp conversions.")]
     pub fn new(default_api_key: Arc<str>) -> Self {
         Self {
             buckets: BTreeMap::new(),
@@ -204,21 +206,25 @@ impl Aggregator {
         };
         let synthetics = trace
             .get(event_path!("origin"))
-            .map(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS))
-            .unwrap_or(false);
+            .is_some_and(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS));
 
-        spans.iter().for_each(|span| {
+        for span in &spans {
             let is_top = has_top_level(span);
             if !(is_top || is_measured(span) || is_partial_snapshot(span)) {
-                return;
+                continue;
             }
 
             self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
-        });
+        }
     }
 
     /// Aggregates statistics per key over 10 seconds windows.
     /// The key is constructed from various span/trace properties (see `AggregationKey`).
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve timestamp and duration conversions."
+    )]
     fn handle_span(
         &mut self,
         span: &ObjectMap,
@@ -253,24 +259,21 @@ impl Aggregator {
 
         // If too far in the past, use the oldest-allowed time bucket instead
         if btime < self.oldest_timestamp {
-            btime = self.oldest_timestamp
+            btime = self.oldest_timestamp;
         }
 
-        match self.buckets.get_mut(&btime) {
-            Some(b) => {
-                b.add(span, weight, is_top, aggkey);
-            }
-            None => {
-                let mut b = Bucket {
-                    start: btime,
-                    duration: BUCKET_DURATION_NANOSECONDS,
-                    data: BTreeMap::new(),
-                };
-                b.add(span, weight, is_top, aggkey);
+        if let Some(b) = self.buckets.get_mut(&btime) {
+            b.add(span, weight, is_top, aggkey);
+        } else {
+            let mut b = Bucket {
+                start: btime,
+                duration: BUCKET_DURATION_NANOSECONDS,
+                data: BTreeMap::new(),
+            };
+            b.add(span, weight, is_top, aggkey);
 
-                debug!("Created {} start_time bucket.", btime);
-                self.buckets.insert(btime, b);
-            }
+            debug!("Created {btime} start_time bucket.");
+            self.buckets.insert(btime, b);
         }
     }
 
@@ -281,6 +284,8 @@ impl Aggregator {
     /// # Arguments
     ///
     /// * `force` - If true, all cached buckets are flushed.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_sign_loss, reason = "Preserve timestamp conversions.")]
     pub(crate) fn flush(&mut self, force: bool) -> Vec<ClientStatsPayload> {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L38-L41
         // , and https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L195-L207
@@ -305,14 +310,14 @@ impl Aggregator {
             align_timestamp(now) - ((BUCKET_WINDOW_LEN - 1) * BUCKET_DURATION_NANOSECONDS);
 
         if new_oldest_ts > self.oldest_timestamp {
-            debug!("Updated oldest_timestamp to {}.", new_oldest_ts);
+            debug!("Updated oldest_timestamp to {new_oldest_ts}.");
             self.oldest_timestamp = new_oldest_ts;
         }
 
         client_stats_payloads
     }
 
-    /// Builds the array of ClientStatsPayloads will be sent out as part of the StatsPayload.
+    /// Builds the array of `ClientStatsPayloads` sent out as part of the `StatsPayload`.
     ///
     /// # Arguments
     ///
@@ -331,12 +336,12 @@ impl Aggregator {
                     stats: csb,
                     // All the following fields are left unset by the trace-agent:
                     // https://github.com/DataDog/datadog-agent/blob/42e72dd/pkg/trace/stats/concentrator.go#L216-L227
-                    service: "".to_string(),
-                    agent_aggregation: "".to_string(),
+                    service: String::new(),
+                    agent_aggregation: String::new(),
                     sequence: 0,
-                    runtime_id: "".to_string(),
-                    lang: "".to_string(),
-                    tracer_version: "".to_string(),
+                    runtime_id: String::new(),
+                    lang: String::new(),
+                    tracer_version: String::new(),
                     tags: vec![],
                 }
             })
@@ -358,7 +363,7 @@ impl Aggregator {
             let retain = bucket_start > flush_cutoff_time;
 
             if !retain {
-                debug!("Flushing {} start_time bucket.", bucket_start);
+                debug!("Flushing {bucket_start} start_time bucket.");
 
                 bucket.export().into_iter().for_each(|(payload_key, csb)| {
                     match m.get_mut(&payload_key) {
@@ -368,8 +373,8 @@ impl Aggregator {
                         Some(s) => {
                             s.push(csb);
                         }
-                    };
-                })
+                    }
+                });
             }
             retain
         });
@@ -385,20 +390,21 @@ const fn align_timestamp(start: u64) -> u64 {
     start - (start % BUCKET_DURATION_NANOSECONDS)
 }
 
-/// Assumes that all metrics are all encoded as Value::Float.
+/// Assumes that all metrics are all encoded as `Value::Float`.
 /// Return the f64 of the specified key or None of key not present.
 fn get_metric_value_float(span: &ObjectMap, key: &str) -> Option<f64> {
     span.get("metrics")
         .and_then(|m| m.as_object())
-        .map(|m| match m.get(key) {
+        .and_then(|m| match m.get(key) {
             Some(Value::Float(f)) => Some(f.into_inner()),
             None => None,
             _ => panic!("`metric` values should be all be f64"),
         })
-        .unwrap_or(None)
 }
 
 /// Returns true if the value of this metric is equal to 1.0
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::float_cmp, reason = "Span markers use exact values.")]
 fn metric_value_is_1(span: &ObjectMap, key: &str) -> bool {
     match get_metric_value_float(span, key) {
         Some(f) => f == 1.0,
@@ -422,7 +428,7 @@ fn is_measured(span: &ObjectMap) -> bool {
 
 /// Returns true if the span is a partial snapshot.
 /// These types of spans are partial images of long-running spans.
-/// When incomplete, a partial snapshot has a metric _dd.partial_version which is a positive integer.
+/// When incomplete, a partial snapshot has a metric `_dd.partial_version` which is a positive integer.
 /// The metric usually increases each time a new version of the same span is sent by the tracer
 fn is_partial_snapshot(span: &ObjectMap) -> bool {
     // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L49-L52

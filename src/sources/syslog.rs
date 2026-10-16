@@ -1,8 +1,5 @@
-#[cfg(unix)]
-use std::path::PathBuf;
-use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 
-use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
@@ -20,7 +17,7 @@ use vector_lib::{
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
-use vrl::event_path;
+use vrl::{event_path, value::Value};
 
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
@@ -28,7 +25,8 @@ use crate::{
     SourceSender,
     codecs::Decoder,
     config::{
-        DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, log_schema,
+        DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, UnixOnly,
+        log_schema,
     },
     event::Event,
     internal_events::{
@@ -80,16 +78,12 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
-        #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
 
-        #[configurable(derived)]
         permit_origin: Option<IpAllowlistConfig>,
 
-        #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
         /// The size of the receive buffer used for each connection.
@@ -112,7 +106,6 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
         /// The size of the receive buffer used for the listening socket.
@@ -125,25 +118,29 @@ pub enum Mode {
     /// Listen on UDS (Unix domain socket). This only supports Unix stream sockets.
     ///
     /// For Unix datagram sockets, use the `socket` source instead.
-    #[cfg(unix)]
-    Unix {
-        /// The Unix socket path.
-        ///
-        /// This should be an absolute path.
-        #[configurable(metadata(docs::examples = "/path/to/socket"))]
-        path: PathBuf,
+    Unix(UnixOnly<UnixConfig>),
+}
 
-        /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
-        ///
-        /// The file mode value can be specified in any numeric format supported by your configuration
-        /// language, but it is most intuitive to use an octal number.
-        socket_file_mode: Option<u32>,
-    },
+/// Unix domain socket configuration for the `syslog` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    path: PathBuf,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    socket_file_mode: Option<u32>,
 }
 
 impl SyslogConfig {
     #[cfg(test)]
-    pub fn from_mode(mode: Mode) -> Self {
+    pub const fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
@@ -241,27 +238,43 @@ impl SourceConfig for SyslogConfig {
                 log_namespace,
                 cx.out,
             )),
-            #[cfg(unix)]
-            Mode::Unix {
-                path,
-                socket_file_mode,
-            } => {
-                let decoder = Decoder::new(
-                    Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
-                        self.max_length,
-                    )),
-                    Deserializer::Syslog(
-                        SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                    ),
-                );
-
-                build_unix_stream_source(
-                    path,
-                    socket_file_mode,
-                    decoder,
-                    move |events, host| handle_events(events, &host_key, host, log_namespace),
+            Mode::Unix(config) => {
+                let (max_length, host_key, log_namespace, shutdown, out) = (
+                    self.max_length,
+                    host_key,
+                    log_namespace,
                     cx.shutdown,
                     cx.out,
+                );
+                config.on_unix(
+                    (max_length, host_key, log_namespace, shutdown, out),
+                    #[cfg(unix)]
+                    |config, (max_length, host_key, log_namespace, shutdown, out)| {
+                        let decoder = Decoder::new(
+                            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
+                                max_length,
+                            )),
+                            Deserializer::Syslog(
+                                SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
+                            ),
+                        );
+
+                        build_unix_stream_source(
+                            config.path,
+                            config.socket_file_mode,
+                            decoder,
+                            move |events, host| {
+                                handle_events(
+                                    events,
+                                    &host_key,
+                                    host.map(Value::from),
+                                    log_namespace,
+                                )
+                            },
+                            shutdown,
+                            out,
+                        )
+                    },
                 )
             }
         }
@@ -283,8 +296,7 @@ impl SourceConfig for SyslogConfig {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.as_tcp_resource()],
             Mode::Udp { address, .. } => vec![address.as_udp_resource()],
-            #[cfg(unix)]
-            Mode::Unix { .. } => vec![],
+            Mode::Unix(_) => vec![],
         }
     }
 
@@ -317,7 +329,7 @@ impl TcpSource for SyslogTcpSource {
         handle_events(
             events,
             &self.host_key,
-            Some(host.ip().to_string().into()),
+            Some(Value::from(host.ip().to_string())),
             self.log_namespace,
         );
     }
@@ -382,7 +394,7 @@ pub fn udp(
                             byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
-                        let received_from = received_from.ip().to_string().into();
+                        let received_from = Value::from(received_from.ip().to_string());
                         handle_events(&mut events, &host_key, Some(received_from), log_namespace);
                         Some(events.remove(0))
                     }
@@ -415,7 +427,7 @@ pub fn udp(
 fn handle_events(
     events: &mut [Event],
     host_key: &Option<OwnedValuePath>,
-    default_host: Option<Bytes>,
+    default_host: Option<Value>,
     log_namespace: LogNamespace,
 ) {
     for event in events {
@@ -426,7 +438,7 @@ fn handle_events(
 fn enrich_syslog_event(
     event: &mut Event,
     host_key: &Option<OwnedValuePath>,
-    default_host: Option<Bytes>,
+    default_host: Option<Value>,
     log_namespace: LogNamespace,
 ) {
     let log = event.as_mut_log();
@@ -443,7 +455,7 @@ fn enrich_syslog_event(
 
     let parsed_hostname = log
         .get(event_path!("hostname"))
-        .map(|hostname| hostname.coerce_to_bytes());
+        .map(|hostname| Value::from(hostname.coerce_to_bytes()));
 
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
         let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
@@ -477,6 +489,7 @@ fn enrich_syslog_event(
 mod test {
     use std::{collections::HashMap, fmt, str::FromStr};
 
+    use bytes::Bytes;
     use chrono::prelude::*;
     use indoc::indoc;
     use rand::{RngExt, rng};
@@ -506,7 +519,7 @@ mod test {
 
     fn event_from_bytes(
         host_key: &str,
-        default_host: Option<Bytes>,
+        default_host: Option<Value>,
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> Option<Event> {
@@ -524,6 +537,17 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SyslogConfig>();
+    }
+
+    #[test]
+    fn unix_mode_deserializes_on_all_platforms() {
+        let config: SyslogConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            mode: unix
+            path: /tmp/vector-syslog.sock
+        "#})
+        .unwrap();
+
+        assert!(matches!(config.mode, Mode::Unix(_)));
     }
 
     #[test]
@@ -801,7 +825,7 @@ mod test {
             "#,
         })
         .unwrap();
-        assert!(matches!(config.mode, Mode::Unix { .. }));
+        assert!(matches!(config.mode, Mode::Unix(_)));
     }
 
     #[cfg(unix)]
@@ -816,10 +840,7 @@ mod test {
         })
         .unwrap();
         let socket_file_mode = match config.mode {
-            Mode::Unix {
-                path: _,
-                socket_file_mode,
-            } => socket_file_mode,
+            Mode::Unix(config) => config.platform_independent().socket_file_mode,
             _ => panic!("expected Mode::Unix"),
         };
 
@@ -831,10 +852,9 @@ mod test {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let msg = "i am foobar";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {}"#,
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {msg}"#,
             r#"[meta sequenceId="1" sysUpTime="37" language="EN"]"#,
-            r#"[origin ip="192.168.0.1" software="test"]"#,
-            msg
+            r#"[origin ip="192.168.0.1" software="test"]"#
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -871,7 +891,7 @@ mod test {
         assert_event_data_eq!(
             event_from_bytes(
                 "host",
-                Some(Bytes::from("192.168.0.254")),
+                Some(Value::from("192.168.0.254")),
                 raw.into(),
                 LogNamespace::Legacy
             )
@@ -884,8 +904,8 @@ mod test {
     fn handles_incorrect_sd_element() {
         let msg = "qwerty";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r"[incorrect x]", msg
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"[incorrect x]"
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -916,7 +936,7 @@ mod test {
 
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
@@ -924,13 +944,13 @@ mod test {
         assert_event_data_eq!(event, expected);
 
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r"[incorrect x=]", msg
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"[incorrect x=]"
         );
 
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
@@ -1019,7 +1039,7 @@ mod test {
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}"#);
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
@@ -1068,7 +1088,7 @@ mod test {
         );
         let event = event_from_bytes(
             "host",
-            Some(Bytes::from("192.168.0.254")),
+            Some(Value::from("192.168.0.254")),
             raw.into(),
             LogNamespace::Legacy,
         )
@@ -1296,10 +1316,13 @@ mod test {
             let in_path = tempfile::tempdir().unwrap().keep().join("stream_test");
 
             // Create and spawn the source.
-            let config = SyslogConfig::from_mode(Mode::Unix {
-                path: in_path.clone(),
-                socket_file_mode: None,
-            });
+            let config = SyslogConfig::from_mode(Mode::Unix(
+                UnixConfig {
+                    path: in_path.clone(),
+                    socket_file_mode: None,
+                }
+                .into(),
+            ));
 
             let key = ComponentKey::from("in");
             let (tx, rx) = SourceSender::new_test();
@@ -1406,7 +1429,7 @@ mod test {
                 .iter()
                 .map(|msg| {
                     let s = msg.to_string();
-                    format!("{} {}", s.len(), s).into()
+                    format!("{} {s}", s.len()).into()
                 })
                 .collect();
 

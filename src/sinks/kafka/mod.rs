@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 pub(crate) mod config;
 pub(crate) mod request_builder;
 pub(crate) mod service;

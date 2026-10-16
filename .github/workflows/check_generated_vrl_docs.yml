@@ -21,14 +21,14 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
       docs: ${{ steps.filter.outputs.docs }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -40,12 +40,12 @@ jobs:
 
   run-check-generated-vrl-docs:
     needs: changes
-    if: needs.changes.outputs.docs == 'true'
+    if: needs.changes.outputs.docs == 'true' && github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04-8core
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -97,7 +97,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "$COMMIT_MESSAGE"
-          git push origin HEAD:refs/heads/$HEAD_REF
+          git push origin "HEAD:refs/heads/$HEAD_REF"
 
       - name: Save PR number for comment workflow
         if: >
@@ -128,7 +128,7 @@ jobs:
 
   check-generated-vrl-docs:
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: run-check-generated-vrl-docs
     steps:
       - run: |
