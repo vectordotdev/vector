@@ -112,15 +112,15 @@ fn build_tcp_stats() -> Result<TcpStats, procfs::ProcError> {
     let mut tcp_stats = TcpStats::default();
 
     // Read IPv4 TCP sockets
-    let tcp_entries = procfs::net::tcp()?;
-    parse_tcp_entries(tcp_entries, &mut tcp_stats);
+    let ipv4_socket_table = procfs::net::tcp()?;
+    parse_tcp_entries(ipv4_socket_table, &mut tcp_stats);
 
     // Read IPv6 TCP sockets if IPv6 is enabled.
     // Failure here is fatal: silently returning IPv4-only metrics on an IPv6-enabled host
     // would undercount connections, matching the behavior of the prior implementation.
     if is_ipv6_enabled() {
-        let tcp6_entries = procfs::net::tcp6()?;
-        parse_tcp_entries(tcp6_entries, &mut tcp_stats);
+        let ipv6_connections = procfs::net::tcp6()?;
+        parse_tcp_entries(ipv6_connections, &mut tcp_stats);
     }
 
     Ok(tcp_stats)
@@ -180,8 +180,8 @@ mod tests {
 
         assert!(!metrics.is_empty());
 
-        let mut n_tx_queued_bytes_metric = 0;
-        let mut n_rx_queued_bytes_metric = 0;
+        let mut transmit_queue_metric_count = 0;
+        let mut received_bytes_metric_count = 0;
 
         for metric in &metrics {
             if metric.name() == TCP_CONNS_TOTAL.as_str() {
@@ -196,9 +196,9 @@ mod tests {
                     "Metric tcp_connections_total must have a state tag"
                 );
             } else if metric.name() == TCP_TX_QUEUED_BYTES_TOTAL.as_str() {
-                n_tx_queued_bytes_metric += 1;
+                transmit_queue_metric_count += 1;
             } else if metric.name() == TCP_RX_QUEUED_BYTES_TOTAL.as_str() {
-                n_rx_queued_bytes_metric += 1;
+                received_bytes_metric_count += 1;
             } else {
                 panic!("unrecognized metric name: {}", metric.name());
             }
@@ -206,11 +206,11 @@ mod tests {
 
         // Queue metrics should always be present (even if zero)
         assert_eq!(
-            n_tx_queued_bytes_metric, 1,
+            transmit_queue_metric_count, 1,
             "Expected exactly one tcp_tx_queued_bytes_total metric"
         );
         assert_eq!(
-            n_rx_queued_bytes_metric, 1,
+            received_bytes_metric_count, 1,
             "Expected exactly one tcp_rx_queued_bytes_total metric"
         );
 

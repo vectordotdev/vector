@@ -52,8 +52,9 @@ impl HostMetrics {
         reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
     #[allow(
+        clippy::cast_lossless,
         clippy::cast_precision_loss,
-        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+        reason = "Native inode counter widths differ across platforms; preserve conversion of filesystem counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
     )]
     pub async fn filesystem_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "filesystem";
@@ -148,8 +149,8 @@ impl HostMetrics {
                     // may pay a small extra cost.
                     #[cfg(unix)]
                     if let Ok(stat) = statvfs(partition.mount_point()) {
-                        let inodes_total = f64::from(stat.files());
-                        let inodes_free = f64::from(stat.files_free());
+                        let inodes_total = stat.files() as f64;
+                        let inodes_free = stat.files_free() as f64;
                         let inodes_used = (inodes_total - inodes_free).max(0.0);
                         let inodes_used_ratio = if inodes_total > 0.0 {
                             inodes_used / inodes_total
