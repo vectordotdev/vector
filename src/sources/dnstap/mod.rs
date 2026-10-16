@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::path::PathBuf;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};

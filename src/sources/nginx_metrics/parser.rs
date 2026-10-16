@@ -52,17 +52,26 @@ impl<'a> TryFrom<&'a str> for NginxStubStatus {
         ))
         .parse(input)
         {
-            Ok((_, (active, accepts, handled, requests, reading, writing, waiting))) => {
-                Ok(NginxStubStatus {
+            Ok((
+                _,
+                (
                     active,
                     accepts,
                     handled,
                     requests,
                     reading,
-                    writing,
-                    waiting,
-                })
-            }
+                    writing_connections,
+                    idle_connections,
+                ),
+            )) => Ok(NginxStubStatus {
+                active,
+                accepts,
+                handled,
+                requests,
+                reading,
+                writing: writing_connections,
+                waiting: idle_connections,
+            }),
             Err(error) => match error {
                 nom::Err::Error(error) => {
                     Err(ParseError::NginxStubStatusParseError { kind: error.code })
@@ -88,9 +97,9 @@ mod tests {
             NginxStubStatus::try_from(data).expect("valid data"),
             NginxStubStatus {
                 active: 291,
-                accepts: 16630948,
-                handled: 16630948,
-                requests: 31070465,
+                accepts: 16_630_948,
+                handled: 16_630_948,
+                requests: 31_070_465,
                 reading: 6,
                 writing: 179,
                 waiting: 106

@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{collections::HashMap, io, net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};

@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{
     error::Error as _,
     future::Future,

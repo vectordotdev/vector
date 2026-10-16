@@ -764,8 +764,7 @@ impl JetStreamTestHarness {
                         return true;
                     }
                 }
-                Ok(None) => return false,
-                Err(_) => return false,
+                Ok(None) | Err(_) => return false,
             }
         }
         false

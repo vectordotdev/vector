@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #[cfg(all(test, feature = "datadog-agent-integration-tests"))]
 mod integration_tests;
 #[cfg(test)]

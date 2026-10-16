@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod common;
 mod config;
 pub mod encoder;

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{
     fs::{read_to_string, write},
     io::Result,

@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use chrono::Utc;
 use futures::{StreamExt, stream};
 use vector_lib::{

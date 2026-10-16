@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{collections::HashMap, io::Error, path::PathBuf, process::ExitStatus};
 
 use chrono::Utc;

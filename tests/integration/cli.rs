@@ -130,11 +130,11 @@ fn validate_failing_healthcheck() {
 #[test]
 fn validate_ignore_healthcheck() {
     assert_eq!(
-        validate(&formatdoc! {r#"
+        validate(&formatdoc! {r"
             healthchecks:
               enabled: false
             {FAILING_HEALTHCHECK}
-        "#}),
+        "}),
         exitcode::OK
     );
 }

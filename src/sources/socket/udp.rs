@@ -130,12 +130,13 @@ impl UdpConfig {
         self.host_key.clone().unwrap_or(default_host_key())
     }
 
+    #[must_use]
     pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
-    pub(super) const fn framing(&self) -> &Option<FramingConfig> {
-        &self.framing
+    pub(super) const fn framing(&self) -> Option<&FramingConfig> {
+        self.framing.as_ref()
     }
 
     pub(super) const fn decoding(&self) -> &DeserializerConfig {
@@ -146,6 +147,7 @@ impl UdpConfig {
         self.address
     }
 
+    #[must_use]
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -167,6 +169,10 @@ impl UdpConfig {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(super) fn udp(
     config: UdpConfig,
     decoder: Decoder,
