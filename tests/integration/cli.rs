@@ -342,3 +342,95 @@ fn validate_output_with_args(config: &str, args: &[&str]) -> std::process::Outpu
     );
     output
 }
+
+#[test]
+fn validate_data_dir_override_from_flag_or_environment() {
+    let directory = tempfile::tempdir().unwrap();
+    let config_path = directory.path().join("vector.yaml");
+    let second_path = directory.path().join("global.yaml");
+    let missing_dir = directory.path().join("missing-config-state");
+    let other_missing_dir = directory.path().join("other-missing-config-state");
+    std::fs::write(
+        &config_path,
+        formatdoc! {r#"
+        data_dir: {missing_dir:?}
+        sources:
+          in:
+            type: demo_logs
+            format: shuffle
+            lines: ["log"]
+        sinks:
+          out:
+            inputs: ["in"]
+            type: blackhole
+    "#},
+    )
+    .unwrap();
+    std::fs::write(&second_path, format!("data_dir: {other_missing_dir:?}\n")).unwrap();
+
+    for from_flag in [true, false] {
+        for no_environment in [true, false] {
+            let mut cmd = Command::cargo_bin("vector").unwrap();
+            cmd.env_remove("VECTOR_DATA_DIR").arg("validate");
+            if from_flag {
+                cmd.arg("--data-dir").arg(directory.path());
+            } else {
+                cmd.env("VECTOR_DATA_DIR", directory.path());
+            }
+            if no_environment {
+                cmd.arg("--no-environment");
+            }
+            cmd.arg(&config_path).arg(&second_path).assert().success();
+        }
+    }
+    assert!(!missing_dir.exists());
+    assert!(!other_missing_dir.exists());
+}
+
+#[test]
+fn graph_and_test_data_dir_override_precedes_split_config_merge() {
+    let directory = tempfile::tempdir().unwrap();
+    let first = directory.path().join("first.yaml");
+    let second = directory.path().join("second.yaml");
+    std::fs::write(
+        &first,
+        indoc! {r#"
+        data_dir: first-state
+        sources:
+          in:
+            type: demo_logs
+            format: shuffle
+            lines: ["log"]
+        sinks:
+          out:
+            inputs: ["in"]
+            type: blackhole
+    "#},
+    )
+    .unwrap();
+    std::fs::write(&second, "data_dir: second-state\n").unwrap();
+    for subcommand in ["graph", "test"] {
+        for override_enabled in [true, false] {
+            let mut command = Command::cargo_bin("vector").unwrap();
+            command.env_remove("VECTOR_DATA_DIR").arg(subcommand);
+            if override_enabled {
+                command.arg("--data-dir").arg(directory.path());
+            }
+            if subcommand == "graph" {
+                command
+                    .arg("--config")
+                    .arg(&first)
+                    .arg("--config")
+                    .arg(&second);
+            } else {
+                command.arg(&first).arg(&second);
+            }
+            let result = command.assert();
+            if override_enabled {
+                result.success();
+            } else {
+                result.failure();
+            }
+        }
+    }
+}
