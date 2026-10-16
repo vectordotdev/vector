@@ -250,7 +250,7 @@ fn merge_partial_events_with_custom_expiration(
 
             let file = event
                 .get(&file_path)
-                .and_then(|x| x.as_str())
+                .and_then(|x| x.to_str_lossy())
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 

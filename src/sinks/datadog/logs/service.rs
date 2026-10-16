@@ -108,6 +108,16 @@ impl<C> LogApiService<C>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
+    /// Creates a logs API service with validated user and Datadog origin headers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if user-provided or Datadog origin headers are invalid.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve the constructor's public signature and header ownership."
+    )]
     pub fn new(
         client: HttpClient<Body, C>,
         uri: Uri,

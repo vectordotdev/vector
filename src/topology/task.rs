@@ -40,7 +40,7 @@ impl TaskError {
         Self::Wrapped { source: e }
     }
 
-    pub fn panicked(payload: Box<dyn Any + Send>) -> Self {
+    pub fn panicked(payload: &(dyn Any + Send)) -> Self {
         let panic = payload
             .downcast_ref::<String>()
             .map(String::as_str)
@@ -68,7 +68,7 @@ impl From<JoinError> for TaskError {
         if e.is_cancelled() {
             Self::Cancelled
         } else {
-            Self::panicked(e.into_panic())
+            Self::panicked(e.into_panic().as_ref())
         }
     }
 }
@@ -120,6 +120,6 @@ impl fmt::Debug for Task {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
             .field("typetag", &self.typetag)
-            .finish()
+            .finish_non_exhaustive()
     }
 }

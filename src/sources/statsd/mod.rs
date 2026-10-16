@@ -605,7 +605,7 @@ mod test {
         let metrics = state.finish();
         assert_distribution(
             &metrics,
-            series!("timer"),
+            &series!("timer"),
             3200.0,
             10,
             &[(1.0, 0), (2.0, 0), (4.0, 0), (f64::INFINITY, 10)],
@@ -667,7 +667,7 @@ mod test {
 
         assert_counter(
             &metrics,
-            series!(
+            &series!(
                 "foo",
                 "a" => TagValue::Bare,
                 "b" => "b"
@@ -677,7 +677,7 @@ mod test {
 
         assert_counter(
             &metrics,
-            series!(
+            &series!(
                 "foo",
                 "a" => TagValue::Bare,
                 "b" => "c"
@@ -685,22 +685,22 @@ mod test {
             100.0,
         );
 
-        assert_gauge(&metrics, series!("bar"), 42.0);
+        assert_gauge(&metrics, &series!("bar"), 42.0);
         assert_distribution(
             &metrics,
-            series!("glork"),
+            &series!("glork"),
             3000.0,
             1000,
             &[(1.0, 0), (2.0, 0), (4.0, 1000), (f64::INFINITY, 1000)],
         );
         assert_distribution(
             &metrics,
-            series!("milliglork"),
+            &series!("milliglork"),
             1500.0,
             500,
             &[(1.0, 0), (2.0, 0), (4.0, 500), (f64::INFINITY, 500)],
         );
-        assert_set(&metrics, series!("set"), &["0", "1"]);
+        assert_set(&metrics, &series!("set"), &["0", "1"]);
     }
 
     async fn test_invalid_statsd(

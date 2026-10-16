@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 //! Topology contains all topology based types.
 //!
@@ -65,7 +66,7 @@ async fn handle_errors(
     AssertUnwindSafe(task)
         .catch_unwind()
         .await
-        .map_err(TaskError::panicked)
+        .map_err(|payload| TaskError::panicked(payload.as_ref()))
         .and_then(|res| res)
         .map_err(|e| {
             let panic = match &e {

@@ -54,7 +54,6 @@ use crate::{
         JournaldInvalidRecordError, JournaldReadError, JournaldStartJournalctlError,
         StreamClosedError,
     },
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
 };
 
@@ -204,7 +203,7 @@ pub struct JournaldConfig {
     #[serde(default)]
     pub journal_namespace: Option<String>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// Enables remapping the `PRIORITY` field from an integer to string value.
@@ -878,7 +877,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
 
     let timestamp = timestamp_value
         .filter(|&ts| ts.is_bytes())
-        .and_then(|ts| ts.as_str().unwrap().parse::<u64>().ok())
+        .and_then(|ts| ts.to_str_lossy().unwrap().parse::<u64>().ok())
         .map(|ts| {
             chrono::Utc
                 .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)

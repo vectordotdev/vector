@@ -45,7 +45,7 @@ fn count_items_inner(resource: &Value, array_id: &str, inner_id: &str) -> usize 
 }
 
 /// Counts individual log records, metrics, or spans within OTLP batch events.
-/// When use_otlp_decoding is enabled, events contain entire OTLP batches, but
+/// When OTLP preservation is enabled, events contain entire OTLP batches, but
 /// we want to count the individual items for metric consistency with other sources.
 /// This iterates through the Value structure, which is less efficient than
 /// counting from the typed protobuf request, but avoids decoding twice.

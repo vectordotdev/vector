@@ -30,6 +30,7 @@ impl GenerateConfig for TripwireSourceConfig {
 }
 
 impl TripwireSourceConfig {
+    #[must_use]
     pub fn new() -> (Trigger, Self) {
         let (trigger, tripwire) = Tripwire::new();
         (

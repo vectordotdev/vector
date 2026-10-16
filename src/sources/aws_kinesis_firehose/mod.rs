@@ -22,7 +22,7 @@ use crate::{
         SourceOutput,
     },
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::http_server::{build_param_matcher, remove_duplicates},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -87,7 +87,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
