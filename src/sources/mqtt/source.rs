@@ -48,10 +48,7 @@ impl MqttSource {
 
         match &self.config.topic {
             OneOrMany::One(topic) => {
-                client
-                    .subscribe(topic, QoS::AtLeastOnce)
-                    .await
-                    .map_err(SourceError::from)?;
+                client.subscribe(topic, QoS::AtLeastOnce).await?;
             }
             OneOrMany::Many(topics) => {
                 client
@@ -61,8 +58,7 @@ impl MqttSource {
                             .cloned()
                             .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
                     )
-                    .await
-                    .map_err(SourceError::from)?;
+                    .await?;
             }
         }
 

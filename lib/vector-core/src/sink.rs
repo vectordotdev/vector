@@ -133,9 +133,7 @@ impl VectorSink {
 
     /// Converts a stream sink with opaque runtime errors into a `VectorSink`.
     pub fn from_streamsink(sink: impl StreamSink<EventArray> + Send + 'static) -> Self {
-        Self::Stream(Box::new(OpaqueStream {
-            sink: Box::new(sink),
-        }))
+        Self::Stream(Box::new(OpaqueStream(Box::new(sink))))
     }
 
     /// Converts a sink that retains its runtime errors into a `VectorSink`.
@@ -160,9 +158,7 @@ pub trait StreamSink<T, E = ()> {
     async fn run(self: Box<Self>, input: stream::BoxStream<'_, T>) -> Result<(), E>;
 }
 
-struct OpaqueStream<T> {
-    sink: Box<T>,
-}
+struct OpaqueStream<T>(Box<T>);
 
 #[async_trait::async_trait]
 impl<T> StreamSink<EventArray, SinkError> for OpaqueStream<T>
@@ -173,10 +169,7 @@ where
         self: Box<Self>,
         input: stream::BoxStream<'_, EventArray>,
     ) -> Result<(), SinkError> {
-        self.sink
-            .run(input)
-            .await
-            .map_err(|()| SinkError::default())
+        self.0.run(input).await.map_err(|()| SinkError::default())
     }
 }
 

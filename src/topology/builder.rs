@@ -473,7 +473,7 @@ impl<'a> Builder<'a> {
                     Ok(TaskOutput::Source)
                 }
                 Err(e) => {
-                    debug!("Source finished with an error.");
+                    debug!(error = %e, "Source finished with an error.");
                     Err(e)
                 }
             }
@@ -756,7 +756,7 @@ impl<'a> Builder<'a> {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .inspect_err(|_| debug!("Sink finished with an error."))
+            .inspect_err(|error| debug!(%error, "Sink finished with an error."))
             .map_err(Into::into)
         };
 
