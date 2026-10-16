@@ -63,12 +63,12 @@ pub struct AwsKinesisFirehoseConfig {
     /// Whether or not to store the AWS Firehose Access Key in event secrets.
     ///
     /// If set to `true`, when incoming requests contains an access key sent by AWS Firehose, it is kept in the
-    /// event secrets as "`aws_kinesis_firehose_access_key`".
+    /// event secrets as `aws_kinesis_firehose_access_key`.
     store_access_key: bool,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
-    /// Some services, like AWS `CloudWatch` Logs, [compresses the events with gzip][events_with_gzip],
+    /// Some services, like AWS CloudWatch Logs, [compresses the events with gzip][events_with_gzip],
     /// before sending them AWS Kinesis Firehose. This option can be used to automatically decompress
     /// them before forwarding them to the next component.
     ///
@@ -130,7 +130,7 @@ pub enum Compression {
     /// as [magic bytes][magic_bytes].
     ///
     /// If the record fails to decompress with the discovered format, the record is forwarded as is.
-    /// Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS `CloudWatch` Logs),
+    /// Thus, if you know the records are always gzip encoded (for example, if they are coming from AWS CloudWatch Logs),
     /// set `gzip` in this field so that any records that are not-gzipped are rejected.
     ///
     /// [magic_bytes]: https://en.wikipedia.org/wiki/List_of_file_signatures
