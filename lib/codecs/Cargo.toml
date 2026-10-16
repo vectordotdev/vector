@@ -65,6 +65,7 @@ toml = { version = "0.9.8", optional = true }
 criterion.workspace = true
 futures.workspace = true
 indoc.workspace = true
+opentelemetry-proto = { path = "../opentelemetry-proto", features = ["typed-trace"] }
 proptest.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true

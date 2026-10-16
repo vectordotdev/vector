@@ -59,6 +59,10 @@ mod unknown {
         pub const fn message(&self) -> &str {
             self.message.as_str()
         }
+
+        pub(super) fn into_message(self) -> String {
+            self.message
+        }
     }
 
     /// Datadog sampling-priority wire number outside the known set.
@@ -232,6 +236,17 @@ impl SpanStatus {
             Self::Unset | Self::Ok => "",
             Self::Error(message) => message,
             Self::Other(status) => status.message(),
+        }
+    }
+
+    /// Status message for `Error` and `Other`, consuming the status; empty for `Unset` and
+    /// `Ok`.
+    #[must_use]
+    pub fn into_message(self) -> String {
+        match self {
+            Self::Unset | Self::Ok => String::new(),
+            Self::Error(message) => message,
+            Self::Other(status) => status.into_message(),
         }
     }
 }

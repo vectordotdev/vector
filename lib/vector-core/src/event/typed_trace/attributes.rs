@@ -104,6 +104,53 @@ pub enum AttrValue {
     Null,
 }
 
+impl AttrValue {
+    /// Returns the string, or `None` for any other variant.
+    #[must_use]
+    pub fn into_string(self) -> Option<String> {
+        match self {
+            Self::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Returns the boolean, or `None` for any other variant.
+    #[must_use]
+    pub fn into_bool(self) -> Option<bool> {
+        match self {
+            Self::Bool(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Returns the integer, or `None` for any other variant.
+    #[must_use]
+    pub fn into_integer(self) -> Option<i64> {
+        match self {
+            Self::Integer(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Returns the float, or `None` for any other variant.
+    #[must_use]
+    pub fn into_float(self) -> Option<f64> {
+        match self {
+            Self::Float(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Returns the map, or `None` for any other variant.
+    #[must_use]
+    pub fn into_map(self) -> Option<AttrMap> {
+        match self {
+            Self::Map(map) => Some(map),
+            _ => None,
+        }
+    }
+}
+
 impl PartialEq for AttrValue {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -174,11 +221,29 @@ impl From<f64> for AttrValue {
 mod tests {
     use similar_asserts::assert_eq;
 
-    use super::AttrValue;
+    use super::{AttrMap, AttrValue};
 
     #[test]
     fn equality_uses_float_bits() {
         assert_eq!(AttrValue::Float(f64::NAN), AttrValue::Float(f64::NAN));
         assert_ne!(AttrValue::Float(0.0), AttrValue::Float(-0.0));
+    }
+
+    #[test]
+    fn variant_accessors_return_only_their_variant() {
+        assert_eq!(AttrValue::from("s").into_string(), Some("s".to_owned()));
+        assert_eq!(AttrValue::from(true).into_bool(), Some(true));
+        assert_eq!(AttrValue::from(3_i64).into_integer(), Some(3));
+        assert_eq!(AttrValue::from(0.5).into_float(), Some(0.5));
+        assert_eq!(
+            AttrValue::Map(AttrMap::new()).into_map(),
+            Some(AttrMap::new())
+        );
+
+        assert_eq!(AttrValue::from(1_i64).into_string(), None);
+        assert_eq!(AttrValue::from("true").into_bool(), None);
+        assert_eq!(AttrValue::from(1.0).into_integer(), None);
+        assert_eq!(AttrValue::from(1_i64).into_float(), None);
+        assert_eq!(AttrValue::Null.into_map(), None);
     }
 }
