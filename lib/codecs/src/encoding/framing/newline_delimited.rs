@@ -10,11 +10,13 @@ pub struct NewlineDelimitedEncoderConfig;
 
 impl NewlineDelimitedEncoderConfig {
     /// Creates a new `NewlineDelimitedEncoderConfig`.
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        NewlineDelimitedEncoderConfig
     }
 
     /// Build the `NewlineDelimitedEncoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> NewlineDelimitedEncoder {
         NewlineDelimitedEncoder::default()
     }
@@ -33,7 +35,7 @@ impl Default for NewlineDelimitedEncoder {
 impl Encoder<()> for NewlineDelimitedEncoder {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
+    fn encode(&mut self, (): (), buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
         self.0.encode((), buffer)
     }
 }

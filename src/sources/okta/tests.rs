@@ -112,7 +112,7 @@ async fn okta_compliance() {
         log_event
             .get(vrl::event_path!("data"))
             .expect("data must be available")
-            .as_str()
+            .to_str_lossy()
             .unwrap(),
         "foo"
     );
@@ -175,8 +175,8 @@ async fn okta_follows_rel() {
             OktaConfig::NAME.into()
         );
     }
-    assert_eq!(events[0].as_log()["data"].as_str().unwrap(), "foo");
-    assert_eq!(events[1].as_log()["data"].as_str().unwrap(), "bar");
+    assert_eq!(events[0].as_log()["data"].to_str_lossy().unwrap(), "foo");
+    assert_eq!(events[1].as_log()["data"].to_str_lossy().unwrap(), "bar");
 }
 
 #[tokio::test]

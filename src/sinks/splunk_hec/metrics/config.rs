@@ -27,7 +27,7 @@ use crate::{
             http::HttpRetryLogic,
         },
     },
-    template::{ConfinedTemplate, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -140,8 +140,8 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
+            confinement: ConfinementConfig::default(),
         })
         .unwrap()
     }
@@ -179,8 +179,11 @@ impl ValidatedSink for HecMetricsSinkConfig {
     fn validate(&self) -> crate::Result<ValidatedHecMetricsSink> {
         // The endpoint is validated at config load as an absolute http(s) URL.
 
-        let templated_field_keys =
-            compute_templated_field_keys(&self.index, &self.source, &self.sourcetype);
+        let templated_field_keys = compute_templated_field_keys(
+            self.index.as_ref(),
+            self.source.as_ref(),
+            self.sourcetype.as_ref(),
+        );
 
         let confined_sourcetype = self
             .sourcetype
@@ -221,32 +224,34 @@ impl ValidatedSink for HecMetricsSinkConfig {
             client.clone(),
         )
         .boxed();
-        let sink = self.build_processor(client, cx, validated)?;
+        let sink = self.build_processor(client, cx, validated);
         Ok((sink, healthcheck))
     }
 }
 
 pub(super) fn compute_templated_field_keys(
-    index: &Option<Template>,
-    source: &Option<Template>,
-    sourcetype: &Option<Template>,
+    index: Option<&Template>,
+    source: Option<&Template>,
+    sourcetype: Option<&Template>,
 ) -> Box<[String]> {
     [index, source, sourcetype]
-        .iter()
-        .filter_map(|t| t.as_ref())
-        .filter_map(|t| t.get_fields())
+        .into_iter()
+        .flatten()
+        .filter_map(Template::get_fields)
         .flatten()
         .map(|f| f.replace("tags.", ""))
         .collect()
 }
 
 impl HecMetricsSinkConfig {
+    /// Builds the sink processor from validated settings.
+    #[must_use]
     pub fn build_processor(
         &self,
         client: HttpClient,
         _: SinkContext,
         validated: &ValidatedHecMetricsSink,
-    ) -> crate::Result<VectorSink> {
+    ) -> VectorSink {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
@@ -290,7 +295,7 @@ impl HecMetricsSinkConfig {
             default_namespace: self.default_namespace.clone(),
         };
 
-        Ok(VectorSink::from_event_streamsink(sink))
+        VectorSink::from_event_streamsink(sink)
     }
 }
 
@@ -310,11 +315,11 @@ mod tests {
             sourcetype: None,
             source: None,
             compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         let validated = config.validate().expect("validation should succeed");

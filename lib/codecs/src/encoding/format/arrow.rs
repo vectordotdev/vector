@@ -65,7 +65,8 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
 }
 
 impl ArrowStreamSerializerConfig {
-    /// Create a new ArrowStreamSerializerConfig with a schema
+    /// Create a new `ArrowStreamSerializerConfig` with a schema
+    #[must_use]
     pub fn new(schema: arrow::datatypes::Schema) -> Self {
         Self {
             schema: Some(schema),
@@ -74,11 +75,13 @@ impl ArrowStreamSerializerConfig {
     }
 
     /// The data type of events that are accepted by `ArrowStreamEncoder`.
+    #[must_use]
     pub fn input_type(&self) -> vector_core::config::DataType {
         vector_core::config::DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> vector_core::schema::Requirement {
         vector_core::schema::Requirement::empty()
     }
@@ -92,6 +95,11 @@ pub struct ArrowStreamSerializer {
 
 impl ArrowStreamSerializer {
     /// Encode events into a `RecordBatch` without writing to IPC stream format.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn encode_to_record_batch(
         &self,
         events: &[Event],
@@ -104,7 +112,12 @@ impl ArrowStreamSerializer {
         build_record_batch(self.schema.clone(), &values)
     }
 
-    /// Create a new ArrowStreamSerializer with the given configuration
+    /// Create a new `ArrowStreamSerializer` with the given configuration
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
         let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
 
@@ -287,6 +300,7 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
 
 /// Returns true if the field is absent from the value's object map, or explicitly null.
 /// Find non-nullable schema fields that are missing or null in any of the given events.
+#[must_use]
 pub fn find_null_non_nullable_fields<'a>(
     schema: &'a Schema,
     values: &[serde_json::Value],
@@ -317,7 +331,7 @@ pub(crate) fn vector_log_events_to_json_values(
         .collect()
 }
 
-/// Build an Arrow RecordBatch from a slice of events using the provided schema.
+/// Build an Arrow `RecordBatch` from a slice of events using the provided schema.
 pub(crate) fn build_record_batch(
     schema: SchemaRef,
     values: &[serde_json::Value],
@@ -384,7 +398,12 @@ mod tests {
     use vector_core::event::{LogEvent, Value};
     use vrl::event_path;
 
-    /// Helper to encode events and return the decoded RecordBatch
+    /// Helper to encode events and return the decoded `RecordBatch`
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     fn encode_and_decode(
         events: Vec<Event>,
         schema: SchemaRef,
@@ -411,6 +430,11 @@ mod tests {
         use super::*;
 
         #[test]
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::too_many_lines,
+            reason = "Keep this codec mapping together during the lint rollout."
+        )]
         fn test_encode_all_types() {
             use arrow::datatypes::{
                 Decimal128Type, Float32Type, Float64Type, Int8Type, Int16Type, Int32Type,
@@ -447,12 +471,12 @@ mod tests {
             log.insert(event_path!("string_field"), "test");
             log.insert(event_path!("int8_field"), 127);
             log.insert(event_path!("int16_field"), 32000);
-            log.insert(event_path!("int32_field"), 1000000);
+            log.insert(event_path!("int32_field"), 1_000_000);
             log.insert(event_path!("int64_field"), 42);
             log.insert(event_path!("uint8_field"), 255);
             log.insert(event_path!("uint16_field"), 65535);
-            log.insert(event_path!("uint32_field"), 4000000);
-            log.insert(event_path!("uint64_field"), 9000000000_i64);
+            log.insert(event_path!("uint32_field"), 4_000_000);
+            log.insert(event_path!("uint64_field"), 9_000_000_000_i64);
             log.insert(event_path!("float32_field"), 3.15);
             log.insert(event_path!("float64_field"), 3.15);
             log.insert(event_path!("bool_field"), true);
@@ -534,18 +558,18 @@ mod tests {
             assert_eq!(batch.column(2).as_primitive::<Int16Type>().value(0), 32000);
             assert_eq!(
                 batch.column(3).as_primitive::<Int32Type>().value(0),
-                1000000
+                1_000_000
             );
             assert_eq!(batch.column(4).as_primitive::<Int64Type>().value(0), 42);
             assert_eq!(batch.column(5).as_primitive::<UInt8Type>().value(0), 255);
             assert_eq!(batch.column(6).as_primitive::<UInt16Type>().value(0), 65535);
             assert_eq!(
                 batch.column(7).as_primitive::<UInt32Type>().value(0),
-                4000000
+                4_000_000
             );
             assert_eq!(
                 batch.column(8).as_primitive::<UInt64Type>().value(0),
-                9000000000
+                9_000_000_000
             );
             assert!((batch.column(9).as_primitive::<Float32Type>().value(0) - 3.15).abs() < 0.001);
             assert!((batch.column(10).as_primitive::<Float64Type>().value(0) - 3.15).abs() < 0.001);
@@ -705,7 +729,7 @@ mod tests {
             log2.insert(event_path!("ts"), now); // Native Timestamp
 
             let mut log3 = LogEvent::default();
-            log3.insert(event_path!("ts"), 1729594724256000000_i64); // Integer (nanoseconds)
+            log3.insert(event_path!("ts"), 1_729_594_724_256_000_000_i64); // Integer (nanoseconds)
 
             let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
@@ -738,7 +762,7 @@ mod tests {
             assert_eq!(ts_array.value(1), now.timestamp_nanos_opt().unwrap());
 
             // Third one should match the integer
-            assert_eq!(ts_array.value(2), 1729594724256000000_i64);
+            assert_eq!(ts_array.value(2), 1_729_594_724_256_000_000_i64);
         }
     }
 

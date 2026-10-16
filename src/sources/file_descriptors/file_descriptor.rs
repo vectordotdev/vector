@@ -94,6 +94,7 @@ pub(crate) fn null_fd() -> crate::Result<RawFd> {
 #[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
+        // SAFETY: The configured descriptor is open and its ownership is transferred here.
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
         let log_namespace = cx.log_namespace(self.log_namespace);
 

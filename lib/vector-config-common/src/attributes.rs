@@ -37,6 +37,9 @@ impl CustomAttribute {
         Self::Flag(name.to_string())
     }
 
+    /// # Panics
+    ///
+    /// Panics if `value` cannot be serialized to JSON.
     pub fn kv<K, V>(key: K, value: V) -> Self
     where
         K: fmt::Display,
@@ -48,10 +51,12 @@ impl CustomAttribute {
         }
     }
 
+    #[must_use]
     pub const fn is_flag(&self) -> bool {
         matches!(self, Self::Flag(_))
     }
 
+    #[must_use]
     pub const fn is_kv(&self) -> bool {
         matches!(self, Self::KeyValue { .. })
     }

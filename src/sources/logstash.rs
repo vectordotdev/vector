@@ -31,7 +31,6 @@ use crate::{
         SourceContext, SourceOutput, log_schema,
     },
     event::{Event, LogEvent, Value},
-    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
     types,
@@ -66,7 +65,7 @@ pub struct LogstashConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     tls_handshake_timeout_secs: Option<NonZeroU64>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -222,7 +221,7 @@ impl TcpSource for LogstashSource {
                 log,
                 log_schema().source_type_key(),
                 path!("source_type"),
-                Bytes::from_static(LogstashConfig::NAME.as_bytes()),
+                Value::from_static_str(LogstashConfig::NAME),
             );
 
             let log_timestamp = log.get(event_path!("@timestamp")).and_then(|timestamp| {

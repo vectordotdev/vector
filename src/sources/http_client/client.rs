@@ -24,6 +24,7 @@ use vector_lib::{
 use vrl::{
     compiler::{CompileConfig, Function, Program, runtime::Runtime},
     prelude::TypeState,
+    value::Value,
 };
 
 use crate::{
@@ -37,8 +38,8 @@ use crate::{
         http::HttpMethod,
         http_client,
         http_client::{
-            GenericHttpClientInputs, HttpClientBuilder, build_url, call, default_interval,
-            default_timeout, warn_if_interval_too_low,
+            GenericHttpClientInputs, HttpClientBuilder, build_headers, build_url, call,
+            default_interval, default_timeout, warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -85,9 +86,6 @@ pub struct HttpClientConfig {
     /// use functions like `now()` to dynamically modify query
     /// parameter values.
     #[serde(default)]
-    #[configurable(metadata(
-        docs::additional_props_description = "A query string parameter and its value(s)."
-    ))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: QueryParameters,
 
@@ -356,6 +354,7 @@ impl SourceConfig for HttpClientConfig {
         let decoder = self.get_decoding_config(Some(log_namespace)).build()?;
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
+        let headers = build_headers(&self.headers)?;
 
         // Create context with the config for dynamic query parameter and body evaluation
         let context = HttpClientContext {
@@ -371,7 +370,7 @@ impl SourceConfig for HttpClientConfig {
             urls,
             interval: self.interval,
             timeout: self.timeout,
-            headers: self.headers.clone(),
+            headers,
             content_type,
             auth: self.auth.clone(),
             tls,
@@ -581,7 +580,7 @@ impl http_client::HttpClientContext for HttpClientContext {
                 }
                 Event::Trace(trace) => {
                     trace.maybe_insert(log_schema().source_type_key_target_path(), || {
-                        Bytes::from(HttpClientConfig::NAME).into()
+                        Value::from_static_str(HttpClientConfig::NAME)
                     });
                 }
             }

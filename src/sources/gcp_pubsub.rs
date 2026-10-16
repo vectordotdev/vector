@@ -49,7 +49,7 @@ use crate::{
         GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util,
     tls::{TlsConfig, TlsSettings},
@@ -213,7 +213,7 @@ pub struct PubsubConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
@@ -618,7 +618,7 @@ impl PubsubSource {
         self.bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-        let (events, ids) = self.parse_messages(response.received_messages, batch).await;
+        let (events, ids) = self.parse_messages(response.received_messages, batch);
 
         let count = events.len();
         match self.out.send_batch(events).await {
@@ -639,7 +639,7 @@ impl PubsubSource {
         }
     }
 
-    async fn parse_messages(
+    fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
         batch: Option<BatchNotifier>,
@@ -667,7 +667,7 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::from(value)))
                 .collect(),
         );
         let log_namespace = self.log_namespace;

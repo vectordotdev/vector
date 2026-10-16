@@ -97,6 +97,6 @@ impl fmt::Debug for Task {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
             .field("typetag", &self.typetag)
-            .finish()
+            .finish_non_exhaustive()
     }
 }

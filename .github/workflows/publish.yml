@@ -52,7 +52,7 @@ jobs:
       vector_release_channel: ${{ steps.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
 
@@ -65,6 +65,7 @@ jobs:
 
   build-linux-gnu-native:
     name: Build Vector for ${{ matrix.target }} (native)
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ${{ matrix.runner }}
     container:
       image: almalinux:8@sha256:ca871b110064fe81bff0250ed5cc56fbb0a9840715f09811c33bbf9d72cef56c
@@ -118,7 +119,7 @@ jobs:
           rm -rf /tmp/cmark-gfm
           cmark-gfm --version
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - uses: ./.github/actions/setup
@@ -127,7 +128,20 @@ jobs:
           cargo-deb: true
           protoc: true
       - name: Build Vector
+        env:
+          # openssl-devel pulls in krb5-devel and keyutils-libs-devel on EL8. The vendored krb5
+          # (`gssapi-vendored`) then links libkeyutils, which makes the vendored Cyrus SASL
+          # configure link check fail, and Cyrus SASL silently drops its GSSAPI plugin.
+          # https://github.com/vectordotdev/vector/issues/26568
+          ac_cv_header_keyutils_h: "no"
         run: make NATIVE=true package-${{ matrix.target }}-all
+      - name: Verify GSSAPI support
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          if ! grep -q gssapiv2_client_plug_init target/${{ matrix.target }}/release/vector; then
+            echo "::error::vector binary for ${{ matrix.target }} is missing the Cyrus SASL GSSAPI plugin"
+            exit 1
+          fi
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -136,6 +150,7 @@ jobs:
 
   build-linux-cross:
     name: Build Vector for ${{ matrix.target }}
+    if: github.repository == 'vectordotdev/vector'
     runs-on: release-builder-linux
     timeout-minutes: 60
     needs: generate-publish-metadata
@@ -154,7 +169,7 @@ jobs:
           - target: arm-unknown-linux-musleabi # .tar.gz
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - uses: ./.github/actions/setup
@@ -177,6 +192,7 @@ jobs:
 
   build-apple-darwin-packages:
     name: Build Vector for ${{ matrix.architecture }}-apple-darwin (.tar.gz)
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     needs: generate-publish-metadata
@@ -201,7 +217,7 @@ jobs:
             exit 1
           fi
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
 
@@ -225,6 +241,7 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
+    if: github.repository == 'vectordotdev/vector'
     runs-on: windows-2025-8core
     timeout-minutes: 90
     needs: generate-publish-metadata
@@ -235,7 +252,7 @@ jobs:
       RELEASE_BUILDER: "true"
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Windows-specific)
@@ -310,7 +327,7 @@ jobs:
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - name: Set artifact name
@@ -322,7 +339,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of DEB package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_$(dpkg --print-architecture).deb"
+          ./scripts/verify-install.sh target/artifacts/*.deb
 
   rpm-verify:
     name: Verify RPM Packages
@@ -371,7 +388,7 @@ jobs:
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - name: Set artifact name
@@ -383,7 +400,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of RPM package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.$(uname -m).rpm"
+          ./scripts/verify-install.sh target/artifacts/*.rpm
 
   macos-verify:
     name: Verify macOS Package
@@ -402,7 +419,7 @@ jobs:
             runner: macos-14
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (${{ matrix.target }})
@@ -434,7 +451,7 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
@@ -449,12 +466,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
         with:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           version: latest
       - name: Download all Linux package artifacts
@@ -500,14 +517,14 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - uses: ./.github/actions/setup
         with:
           vdev: true
       - name: Configure credentials for COSE release artifacts
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::486234852809:role/vector-release-publisher-github-actions
           aws-region: us-east-1
@@ -546,12 +563,13 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - uses: ./.github/actions/setup
         with:
           vdev: true
+          cue: true
       - name: Download all package artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -577,7 +595,7 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download all package artifacts

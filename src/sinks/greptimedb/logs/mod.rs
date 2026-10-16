@@ -1,4 +1,4 @@
-//! `GreptimeDB` log sink for vector.
+//! GreptimeDB log sink for vector.
 //!
 //! This sink writes Vector's log data into
 //! [GreptimeDB](https://github.com/greptimeteam/greptimedb), a cloud-native

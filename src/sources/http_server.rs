@@ -21,7 +21,7 @@ use crate::{
     config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
-    serde::{bool_or_struct, default_decoding},
+    serde::default_decoding,
     sources::util::{
         HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
@@ -121,7 +121,7 @@ pub struct SimpleHttpConfig {
 
     decoding: Option<DeserializerConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -686,13 +686,13 @@ mod tests {
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -727,13 +727,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -769,7 +769,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "foo\nbar".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -848,13 +848,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -953,35 +953,35 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
-    async fn assert_event_metadata(log: &LogEvent) {
+    fn assert_event_metadata(log: &LogEvent) {
         assert!(log.get_timestamp().is_some());
 
         let source_type_key_value = log
             .get((PathPrefix::Event, log_schema().source_type_key().unwrap()))
             .unwrap()
-            .as_str()
+            .to_str_lossy()
             .unwrap();
         assert_eq!(source_type_key_value, SimpleHttpConfig::NAME);
         assert_eq!(log["http_path"], "/".into());
@@ -1034,7 +1034,7 @@ mod tests {
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["\"x-test-header\""], "true".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1079,7 +1079,7 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["\"user-agent\""], "test_client".into());
             assert_eq!(log["\"x-case-sensitive-value\""], "CaseSensitive".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1123,7 +1123,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1167,7 +1167,7 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1212,7 +1212,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 

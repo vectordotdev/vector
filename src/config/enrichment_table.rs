@@ -1,6 +1,9 @@
+#![warn(clippy::pedantic)]
+
 use std::{any::Any, sync::Arc};
 
 use enum_dispatch::enum_dispatch;
+use indexmap::IndexMap;
 use serde::Serialize;
 use vector_lib::{
     config::GlobalOptions,
@@ -49,7 +52,7 @@ where
     {
         Self {
             inner: inner.into(),
-            graph: Default::default(),
+            graph: GraphConfig::default(),
             inputs: Inputs::from_iter(inputs),
             validated: None,
         }
@@ -67,6 +70,12 @@ where
     // components to deserialization and build up the components and the topology in a more granular
     // way, with each having "modules" for inputs (making them valid as sinks), for healthchecks,
     // for providing outputs, etc.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn as_sink(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SinkOuter<T>)> {
         self.inner.sink_config(default_key).map(|(key, sink)| {
             (
@@ -85,6 +94,12 @@ where
         })
     }
 
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn as_source(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SourceOuter)> {
         self.inner.source_config(default_key).map(|(key, source)| {
             (
@@ -119,6 +134,28 @@ where
             validated: self.validated,
         }
     }
+}
+
+/// Derives source components in table order, retaining their configured source keys.
+pub(crate) fn enrichment_table_sources<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SourceOuter)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+}
+
+/// Derives sink components in table order, retaining their inputs and validated state.
+pub(crate) fn enrichment_table_sinks<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SinkOuter<T>)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables.iter().filter_map(|(key, table)| table.as_sink(key))
 }
 
 /// Generalized interface for describing and building enrichment table components.

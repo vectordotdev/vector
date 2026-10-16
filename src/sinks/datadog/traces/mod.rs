@@ -22,9 +22,6 @@ pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
 
-#[allow(warnings)]
-pub(crate) mod dd_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
+pub(crate) use datadog_proto::trace as dd_proto;
 
 pub use self::config::DatadogTracesConfig;

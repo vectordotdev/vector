@@ -21,6 +21,38 @@ use crate::{
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 
+/// Which legacy trace key layout an event was produced with.
+///
+/// This is an internal, unstable discriminator so Vector's own transforms and
+/// sinks can dispatch on layout after `source_type` is rewritten (for example
+/// across a vector sink/source hop). It names the original source layout so a
+/// converter can select a decoder; it is not a guarantee that the event object
+/// still has that shape. `remap` can rewrite or replace the payload while this
+/// field is retained, because it is not exposed to VRL. The converter that
+/// consumes the hint is still responsible for validating the payload.
+///
+/// It is not documented for users, is not a compatibility contract, and may
+/// change or be removed without a deprecation cycle. It is meaningful only on
+/// trace events; it is `None` on logs and metrics.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TraceLayout {
+    /// Layout written by the `datadog_agent` source.
+    Datadog,
+    /// Flattened per-span traces from the `opentelemetry` source.
+    ///
+    /// This is Vector's historical projection of an OTLP span (one event per
+    /// span), not an OTLP `resourceSpans` message.
+    OtelFlattened,
+    /// Raw OTLP `resourceSpans` batches from the `opentelemetry` source.
+    OtlpResourceSpans,
+    /// A protobuf value that is present but not a known layout.
+    ///
+    /// Conversion must treat this as an error rather than falling back to shape
+    /// detection. The original wire number is preserved so a later Vector that
+    /// understands it can still decode the record.
+    Unrecognized(i32),
+}
+
 /// The event metadata structure is a `Arc` wrapper around the actual metadata to avoid cloning the
 /// underlying data until it becomes necessary to provide a `mut` copy.
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -83,6 +115,11 @@ pub(super) struct Inner {
     /// Only a small set of Vector sources and transforms explicitly set this field.
     #[serde(default)]
     pub(crate) datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
+
+    /// Which legacy trace key layout produced this event. `None` means unmarked.
+    /// Meaningful only on traces; always `None` for logs and metrics.
+    #[serde(default)]
+    pub(crate) trace_layout: Option<TraceLayout>,
 
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
@@ -204,6 +241,26 @@ impl EventMetadata {
         self.get_mut().source_type = Some(source_type.into());
     }
 
+    /// Sets the internal, unstable trace-layout hint.
+    pub fn set_trace_layout(&mut self, layout: TraceLayout) {
+        self.get_mut().trace_layout = Some(layout);
+    }
+
+    /// Returns the internal, unstable trace-layout marker, if present.
+    #[must_use]
+    pub fn trace_layout(&self) -> Option<TraceLayout> {
+        self.inner.trace_layout
+    }
+
+    /// Removes the internal trace-layout marker.
+    ///
+    /// Call this when converting a trace to a log. The marker is only meaningful
+    /// to components that consume traces as traces; leaving it would let a later
+    /// `TraceEvent` reconstructed from that log inherit a stale layout.
+    pub fn clear_trace_layout(&mut self) {
+        self.get_mut().trace_layout = None;
+    }
+
     /// Sets the `upstream_id` in the metadata to the provided value.
     pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
         self.get_mut().upstream_id = Some(upstream_id);
@@ -276,6 +333,7 @@ impl Default for Inner {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
+            trace_layout: None,
             source_event_id: Some(Uuid::new_v4()),
         }
     }
@@ -561,6 +619,38 @@ mod test {
 
     const SECRET: &str = "secret";
     const SECRET2: &str = "secret2";
+
+    #[test]
+    fn trace_layout_round_trip() {
+        let mut metadata = EventMetadata::default();
+        assert_eq!(metadata.trace_layout(), None);
+        metadata.set_trace_layout(TraceLayout::Datadog);
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Datadog));
+        metadata.set_trace_layout(TraceLayout::OtelFlattened);
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::OtelFlattened));
+        metadata.set_trace_layout(TraceLayout::OtlpResourceSpans);
+        assert_eq!(
+            metadata.trace_layout(),
+            Some(TraceLayout::OtlpResourceSpans)
+        );
+    }
+
+    #[test]
+    fn clear_trace_layout() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_trace_layout(TraceLayout::Datadog);
+        metadata.clear_trace_layout();
+        assert_eq!(metadata.trace_layout(), None);
+    }
+
+    #[test]
+    fn unrecognized_trace_layout_is_preserved() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_trace_layout(TraceLayout::Unrecognized(99));
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Unrecognized(99)));
+        metadata.set_trace_layout(TraceLayout::Unrecognized(0));
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Unrecognized(0)));
+    }
 
     #[test]
     fn metadata_hardcoded_secrets_get_set() {

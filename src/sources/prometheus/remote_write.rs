@@ -17,7 +17,6 @@ use crate::{
     event::Event,
     http::KeepaliveConfig,
     internal_events::PrometheusRemoteWriteParseError,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, decompress_body, http::HttpMethod},
@@ -64,7 +63,7 @@ pub struct PrometheusRemoteWriteConfig {
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -571,7 +570,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we only received the valid metric (NaN metric should be filtered)
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -642,7 +641,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received both metrics (including NaN metric)
-        let mut output = test_util::collect_ready(rx).await;
+        let mut output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 2);
 
         // Sort by name for predictable testing
@@ -783,7 +782,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received the metric data
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -864,7 +863,7 @@ mod test {
         );
 
         // Verify we received the metric data
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();

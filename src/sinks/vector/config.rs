@@ -14,6 +14,10 @@ use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use tokio::sync::Semaphore;
+use tonic::Code::{
+    AlreadyExists, DataLoss, InvalidArgument, NotFound, OutOfRange, PermissionDenied,
+    Unauthenticated, Unimplemented,
+};
 use tonic::body::BoxBody;
 use tower::{Service, ServiceBuilder};
 use vector_lib::configurable::configurable_component;
@@ -185,7 +189,7 @@ struct RoutingConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
-    pub fn from_address(addr: Uri) -> Self {
+    pub fn from_address(addr: &Uri) -> Self {
         let addr = addr.to_string();
         default_config(addr.as_str())
     }
@@ -210,7 +214,7 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         keepalive: None,
-        acknowledgements: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
     }
 }
 
@@ -339,7 +343,7 @@ impl ValidatedSink for VectorConfig {
 
         let client = new_client(&tls, cx.proxy(), self.keepalive)?;
 
-        let healthcheck = healthchecks(client.clone(), &uris, cx.healthcheck, endpoint_strategy);
+        let healthcheck = healthchecks(client.clone(), &uris, &cx.healthcheck, endpoint_strategy);
 
         let services = uris
             .into_iter()
@@ -363,13 +367,14 @@ impl ValidatedSink for VectorConfig {
             }
             EndpointStrategy::LoadBalance => {
                 let service = request_settings.distributed_service(
-                    VectorGrpcRetryLogic,
+                    &VectorGrpcRetryLogic,
                     services,
-                    self.routing
+                    &self
+                        .routing
                         .as_ref()
                         .and_then(|routing| routing.health.clone())
                         .unwrap_or_else(default_endpoint_health_config),
-                    VectorGrpcHealthLogic,
+                    &VectorGrpcHealthLogic,
                     1,
                 );
 
@@ -596,9 +601,15 @@ fn failover_request_settings(
     // timeout of slack so the final endpoint attempt is not aborted by
     // scheduling overhead after earlier attempts consume their per-endpoint
     // timeouts.
-    request_settings.timeout = endpoint_timeout
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing timeout calculation."
+    )]
+    let timeout = endpoint_timeout
         .checked_mul((max_endpoint_attempts + 1) as u32)
         .unwrap_or(endpoint_timeout);
+    request_settings.timeout = timeout;
     request_settings
 }
 
@@ -651,7 +662,7 @@ fn failover_next_index(
         })
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct FailoverAdvance {
     state: usize,
     advanced: bool,
@@ -678,15 +689,14 @@ fn failover_next_attempts(
             state: advance.state,
             rebuilt: false,
         };
-    } else {
-        *attempts = stale_failover_attempt_indices(
-            endpoint_strategy,
-            failover_state_index(advance.state, endpoints),
-            endpoints,
-            tried,
-        );
-        *attempt = 0;
     }
+    *attempts = stale_failover_attempt_indices(
+        endpoint_strategy,
+        failover_state_index(advance.state, endpoints),
+        endpoints,
+        tried,
+    );
+    *attempt = 0;
 
     FailoverNextAttempts {
         state: advance.state,
@@ -810,18 +820,18 @@ async fn healthcheck(
 fn healthchecks(
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     uris: &[Uri],
-    options: SinkHealthcheckOptions,
+    options: &SinkHealthcheckOptions,
     endpoint_strategy: EndpointStrategy,
 ) -> Healthcheck {
     if !options.enabled {
         return Box::pin(futures::future::ok(()));
     }
 
-    let healthcheck_uris = healthcheck_uris_for_strategy(uris, &options, endpoint_strategy);
+    let healthcheck_uris = healthcheck_uris_for_strategy(uris, options, endpoint_strategy);
 
+    let timeout = options.timeout;
     let healthchecks = healthcheck_uris.into_iter().map(move |uri| {
         let service = VectorService::new(client.clone(), uri, VectorCompression::None);
-        let timeout = options.timeout;
         healthcheck(
             service,
             SinkHealthcheckOptions {
@@ -867,7 +877,7 @@ fn healthcheck_uris_for_strategy(
 const fn default_endpoint_health_config() -> HealthConfig {
     HealthConfig {
         retry_initial_backoff_secs: 1,
-        retry_max_duration_secs: Duration::from_secs(60 * 60),
+        retry_max_duration_secs: Duration::from_hours(1),
     }
 }
 
@@ -904,8 +914,6 @@ impl RetryLogic for VectorGrpcRetryLogic {
     type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
-        use tonic::Code::*;
-
         match err {
             VectorSinkError::Request { source } => !matches!(
                 source.code(),
@@ -1486,7 +1494,7 @@ mod tests {
 
     #[test]
     fn validate_returns_usable_values() {
-        let config = VectorConfig::from_address("http://127.0.0.1:6000".parse().unwrap());
+        let config = VectorConfig::from_address(&"http://127.0.0.1:6000".parse().unwrap());
 
         let validated = config.validate().expect("validation should succeed");
         assert!(validated.request_settings.timeout > Duration::ZERO);
@@ -1552,7 +1560,7 @@ mod tests {
 
     #[test]
     fn build_does_not_warn_on_explicit_scheme() {
-        let config = VectorConfig::from_address("http://127.0.0.1:6000".parse().unwrap());
+        let config = VectorConfig::from_address(&"http://127.0.0.1:6000".parse().unwrap());
         let validated = config.validate().expect("validation should succeed");
 
         let warnings = capture_warn_logs(|| validated.warn_on_scheme_defaulted_endpoints(false));

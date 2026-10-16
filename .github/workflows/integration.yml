@@ -75,7 +75,8 @@ jobs:
       (needs.changes.outputs.dependencies == 'true' ||
       needs.changes.outputs.integration-yml == 'true' ||
       needs.changes.outputs.int-tests-any == 'true' ||
-      needs.changes.outputs.e2e-tests-any == 'true')))
+      needs.changes.outputs.e2e-tests-any == 'true'))) &&
+      github.repository == 'vectordotdev/vector'
       }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
@@ -91,8 +92,12 @@ jobs:
       - changes
       - build-test-runner
 
-    if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) }}
+    if: &integration_gate >-
+      always() && !failure() && !cancelled() &&
+      needs.build-test-runner.result == 'success' &&
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' ||
+       github.event_name == 'workflow_call' || inputs.run_all == true) &&
+      github.repository == 'vectordotdev/vector'
     strategy:
       fail-fast: false
       matrix:
@@ -161,7 +166,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"
@@ -208,8 +213,7 @@ jobs:
     needs:
       - changes
       - build-test-runner
-    if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
-      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || inputs.run_all == true) }}
+    if: *integration_gate
     strategy:
       fail-fast: false
       matrix:
@@ -219,7 +223,8 @@ jobs:
             "datadog-metrics",
             "opentelemetry-logs",
             "opentelemetry-metrics",
-            "opentelemetry-metrics-native"
+            "opentelemetry-metrics-native",
+            "opentelemetry-traces"
           ]
     timeout-minutes: 90
 
@@ -248,7 +253,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.check.outputs.should_run == 'true'
         with:
           submodules: "recursive"

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;
@@ -108,7 +110,7 @@ fn check_response(res: &HttpResponse) -> bool {
 }
 
 /// Creates the http connector that has been configured to use the given proxy and TLS settings.
-/// All AWS requests should use this connector as the aws crates by default use RustTLS which we
+/// All AWS requests should use this connector as the aws crates by default use `RustTLS` which we
 /// have turned off as we want to consistently use openssl.
 fn connector(
     proxy: &ProxyConfig,
@@ -135,6 +137,11 @@ pub trait ClientBuilder {
 }
 
 /// Provides the configured AWS region.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
@@ -171,6 +178,11 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub async fn create_client<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -189,6 +201,11 @@ where
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
 pub async fn create_client_and_region<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -223,7 +240,7 @@ where
     let mut config_builder = SdkConfig::builder()
         .http_client(connector)
         .sleep_impl(Arc::new(TokioSleep::new()))
-        .identity_cache(auth.credentials_cache().await?)
+        .identity_cache(auth.credentials_cache()?)
         .credentials_provider(
             auth.credentials_provider(region.clone(), proxy, tls_options)
                 .await?,
@@ -273,6 +290,15 @@ enum SigningError {
 
 /// Sign the request prior to sending to AWS.
 /// The signature is added to the provided `request`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::missing_errors_doc,
+    reason = "Audit and document the existing error contracts separately from lint enforcement."
+)]
+#[allow(
+    clippy::missing_panics_doc,
+    reason = "Audit and document the existing panic conditions separately from lint enforcement."
+)]
 pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
@@ -311,7 +337,7 @@ pub async fn sign_request(
 
     let signing_params_builder = v4::SigningParams::builder()
         .identity(&identity)
-        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
+        .region(region.as_ref().map_or("", std::convert::AsRef::as_ref))
         .name(service_name)
         .time(SystemTime::now())
         .settings(signing_settings);
@@ -332,7 +358,7 @@ struct AwsHttpClient<T> {
     http: T,
     region: Region,
     /// When `false`, the connector skips `AwsBytesSent` so that control-plane
-    /// traffic (STS AssumeRole, IMDS, SSO token exchange) does not inflate
+    /// traffic (STS `AssumeRole`, IMDS, SSO token exchange) does not inflate
     /// `component_sent_bytes_total`.
     emit_bytes_sent: bool,
 }
@@ -417,7 +443,7 @@ impl HttpResponseTelemetry for HttpResponse {
 ///
 /// - `x-amz-security-token`    — STS temporary session token
 /// - `x-amz-sso_bearer_token`  — IAM Identity Center access token (exchangeable for role credentials)
-/// - `x-aws-ec2-metadata-token` — IMDSv2 session token (valid for up to 6 h)
+/// - `x-aws-ec2-metadata-token` — `IMDSv2` session token (valid for up to 6 h)
 static AWS_EXTRA_SENSITIVE_HEADERS: [HeaderName; 3] = [
     HeaderName::from_static("x-amz-security-token"),
     HeaderName::from_static("x-amz-sso_bearer_token"),
@@ -512,7 +538,7 @@ where
                     byte_size,
                     region: Some(region),
                 });
-            };
+            }
 
             result
         })

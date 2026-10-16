@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use futures::future::BoxFuture;
 use snafu::Snafu;

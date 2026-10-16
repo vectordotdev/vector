@@ -103,8 +103,11 @@ td_nightly="$(mktemp -d)"
 cp -av "target/artifacts/." "$td_nightly"
 
 for f in "$td_nightly"/*; do
-    a="$(echo "$f" | sed -r -e "s/$VERSION/nightly/")"
-    mv "$f" "$a"
+    # RPM artifacts use `~` instead of `-` in their version (see
+    # scripts/package-rpm.sh), so substitute both spellings when renaming
+    # artifacts for the nightly bucket.
+    a="$(echo "$f" | sed -r -e "s/$VERSION/nightly/" -e "s/${VERSION//-/\~}/nightly/")"
+    [[ "$a" != "$f" ]] && mv "$f" "$a"
 done
 ls "$td_nightly"
 

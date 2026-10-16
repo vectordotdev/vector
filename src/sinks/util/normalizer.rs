@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     pin::Pin,
     task::{Context, Poll, ready},

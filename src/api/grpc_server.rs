@@ -42,6 +42,19 @@ impl GrpcServer {
     /// is dropped.
     ///
     /// Returns an error if the server fails to bind to the configured address.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "Audit and document the existing panic conditions separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::used_underscore_binding,
+        reason = "Keep the existing binding names and resource lifetimes during the lint rollout."
+    )]
     pub async fn start(config: &Config, watch_rx: WatchRx) -> crate::Result<Self> {
         let addr = config.api.address.ok_or_else(|| {
             crate::Error::from("API address not configured in config.api.address")
@@ -143,6 +156,7 @@ impl GrpcServer {
     }
 
     /// Get the address the server is listening on
+    #[must_use]
     pub const fn addr(&self) -> SocketAddr {
         self.addr
     }

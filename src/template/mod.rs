@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Functionality for managing template fields used by Vector's sinks.
 mod configurable;
 mod confined;
@@ -92,6 +94,7 @@ pub const CONFINED_PREVIEW_BYTES: usize = 32;
 
 /// Build a bounded preview of a rendered value for inclusion in
 /// [`TemplateRenderingError::Confined`]. Truncates on a UTF-8 char boundary.
+#[must_use]
 pub fn confined_preview(rendered: &str) -> String {
     if rendered.len() <= CONFINED_PREVIEW_BYTES {
         return rendered.to_string();

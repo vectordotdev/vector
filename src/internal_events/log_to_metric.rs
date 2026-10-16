@@ -31,7 +31,7 @@ impl InternalEvent for LogToMetricFieldNullError<'_> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -61,7 +61,7 @@ impl InternalEvent for LogToMetricParseFloatError<'_> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -92,7 +92,7 @@ impl InternalEvent for MetricMetadataInvalidFieldValueError<'_> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -121,7 +121,7 @@ impl InternalEvent for MetricMetadataParseError<'_> {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -145,6 +145,6 @@ impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
