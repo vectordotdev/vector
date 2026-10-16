@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 use vector_lib::codecs::decoding::JsonDeserializerConfig;
+#[cfg(feature = "codecs-syslog")]
 use vector_lib::codecs::decoding::SyslogDeserializerConfig;
 use vector_lib::codecs::decoding::framing::OversizedAction;
 
