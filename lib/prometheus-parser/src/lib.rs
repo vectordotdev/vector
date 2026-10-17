@@ -91,6 +91,11 @@ pub struct SummaryMetric {
     pub quantiles: Vec<SummaryQuantile>,
     pub sum: f64,
     pub count: u64,
+    /// Set when a NaN sample belonging to this series was skipped.
+    ///
+    /// The remaining fields then describe only part of the series, so emitting it would
+    /// report a count the sender never sent. Consumers must drop the whole metric.
+    pub has_skipped_nan: bool,
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd)]
@@ -104,6 +109,11 @@ pub struct HistogramMetric {
     pub buckets: Vec<HistogramBucket>,
     pub sum: f64,
     pub count: u64,
+    /// Set when a NaN sample belonging to this series was skipped.
+    ///
+    /// The remaining fields then describe only part of the series, so emitting it would
+    /// report a count the sender never sent. Consumers must drop the whole metric.
+    pub has_skipped_nan: bool,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -156,6 +166,7 @@ impl GroupKind {
         &mut self,
         prefix_len: usize,
         metric: Metric,
+        skip_nan_values: bool,
     ) -> Result<Option<Metric>, ParserError> {
         #[expect(
             clippy::string_slice,
@@ -183,6 +194,13 @@ impl GroupKind {
             Self::Histogram(metrics) => match suffix {
                 "_bucket" => {
                     let bucket = key.labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
+                    // A NaN bucket count is unusable. Skip the sample rather than failing
+                    // the whole request, but mark the series so it is not emitted with the
+                    // buckets that did parse.
+                    if skip_nan_values && value.is_nan() {
+                        matching_group(metrics, key).has_skipped_nan = true;
+                        return Ok(None);
+                    }
                     let (_, bucket) = line::Metric::parse_value(&bucket)
                         .map_err(Into::into)
                         .context(ParseLabelValueSnafu)?;
@@ -196,6 +214,13 @@ impl GroupKind {
                     matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
+                    // A NaN count is unusable. Skip the sample rather than failing the
+                    // whole request, but mark the series: leaving `count` at its default
+                    // would report a zero the sender never sent.
+                    if skip_nan_values && value.is_nan() {
+                        matching_group(metrics, key).has_skipped_nan = true;
+                        return Ok(None);
+                    }
                     let count = try_f64_to_u64(metric.value)?;
                     matching_group(metrics, key).count = count;
                 }
@@ -227,6 +252,13 @@ impl GroupKind {
                     matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
+                    // A NaN count is unusable. Skip the sample rather than failing the
+                    // whole request, but mark the series: leaving `count` at its default
+                    // would report a zero the sender never sent.
+                    if skip_nan_values && value.is_nan() {
+                        matching_group(metrics, key).has_skipped_nan = true;
+                        return Ok(None);
+                    }
                     let count = try_f64_to_u64(metric.value)?;
                     matching_group(metrics, key).count = count;
                 }
@@ -296,7 +328,9 @@ impl MetricGroup {
         if !metric.name.starts_with(&self.name) {
             return Ok(Some(metric));
         }
-        self.metrics.try_push(self.name.len(), metric)
+        // The text exposition format has no `skip_nan_values` option, so NaN
+        // counts keep their previous behaviour of surfacing a parse error.
+        self.metrics.try_push(self.name.len(), metric, false)
     }
 }
 
@@ -396,6 +430,7 @@ impl MetricGroupSet {
         name: &str,
         labels: &BTreeMap<String, String>,
         sample: &proto::Sample,
+        skip_nan_values: bool,
     ) -> Result<(), ParserError> {
         let (_, basename, group) = self.get_group(name);
         if let Some(metric) = group.try_push(
@@ -406,6 +441,7 @@ impl MetricGroupSet {
                 value: sample.value,
                 timestamp: Some(sample.timestamp),
             },
+            skip_nan_values,
         )? {
             let key = GroupKey {
                 timestamp: metric.timestamp,
@@ -445,6 +481,7 @@ impl MetricGroupSet {
 pub fn parse_request(
     request: proto::WriteRequest,
     metadata_conflict_strategy: MetadataConflictStrategy,
+    skip_nan_values: bool,
 ) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = MetricGroupSet::default();
 
@@ -467,7 +504,7 @@ pub fn parse_request(
         };
 
         for sample in timeseries.samples {
-            groups.insert_sample(&name, &labels, &sample)?;
+            groups.insert_sample(&name, &labels, &sample, skip_nan_values)?;
         }
     }
 
@@ -625,6 +662,7 @@ mod test {
                     ],
                     count: 144_320,
                     sum: 53423.0,
+                    has_skipped_nan: false,
                 },
             ));
         });
@@ -641,6 +679,7 @@ mod test {
                     ],
                     count: 10,
                     sum: 5.0,
+                    has_skipped_nan: false,
                 },
             ));
         });
@@ -661,6 +700,7 @@ mod test {
                     ],
                     count: 4_588_206_224,
                     sum: 1.756_047_3e+07,
+                    has_skipped_nan: false,
                 },
             ));
         });
@@ -810,8 +850,12 @@ mod test {
 
     #[test]
     fn parse_request_empty() {
-        let parsed =
-            parse_request(write_request!([], []), MetadataConflictStrategy::Ignore).unwrap();
+        let parsed = parse_request(
+            write_request!([], []),
+            MetadataConflictStrategy::Ignore,
+            false,
+        )
+        .unwrap();
         assert!(parsed.is_empty());
     }
 
@@ -820,6 +864,7 @@ mod test {
         let parsed = parse_request(
             write_request!(["one" = Counter, "two" = Gauge], []),
             MetadataConflictStrategy::Ignore,
+            false,
         )
         .unwrap();
         assert_eq!(parsed.len(), 2);
@@ -836,6 +881,7 @@ mod test {
         let parsed = parse_request(
             write_request!([], [ [__name__ => "one", big => "small"] => [123 @ 1_395_066_367_500] ]),
             MetadataConflictStrategy::Ignore,
+            false,
         )
         .unwrap();
 
@@ -860,6 +906,7 @@ mod test {
                 ]
             ),
             MetadataConflictStrategy::Ignore,
+            false,
         )
         .unwrap();
 
@@ -897,7 +944,7 @@ mod test {
             proto::MetricType::Counter as i32
         );
 
-        let parsed = parse_request(request, MetadataConflictStrategy::Ignore).unwrap();
+        let parsed = parse_request(request, MetadataConflictStrategy::Ignore, false).unwrap();
 
         assert_eq!(parsed.len(), 1);
         match_group!(parsed[0], "requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
@@ -917,6 +964,7 @@ mod test {
                 [[__name__ => "requests_total"] => [12 @ 1_395_066_367_600]]
             ),
             MetadataConflictStrategy::Ignore,
+            false,
         )
         .unwrap();
 
@@ -938,6 +986,7 @@ mod test {
                 [[__name__ => "requests_total"] => [12 @ 1_395_066_367_600]]
             ),
             MetadataConflictStrategy::Ignore,
+            false,
         )
         .unwrap();
 
@@ -965,6 +1014,7 @@ mod test {
                 ]
             ),
             MetadataConflictStrategy::Ignore,
+            false,
         )
         .unwrap();
 
@@ -984,6 +1034,7 @@ mod test {
                         ],
                         count: 19,
                         sum: 12.0,
+                        has_skipped_nan: false,
                     })
             );
         });
@@ -1007,6 +1058,7 @@ mod test {
                 ]
             ),
             MetadataConflictStrategy::Ignore,
+            false,
         )
         .unwrap();
 
@@ -1026,6 +1078,7 @@ mod test {
                         ],
                         count: 21,
                         sum: 12.0,
+                        has_skipped_nan: false,
                     })
             );
         });
@@ -1033,6 +1086,152 @@ mod test {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1_395_066_367_700), labels!(), 24.0));
         });
+    }
+
+    /// One timeseries carrying a single sample, optionally with one extra label.
+    fn series(name: &str, extra: Option<(&str, &str)>, value: f64) -> proto::TimeSeries {
+        let mut labels = vec![proto::Label {
+            name: METRIC_NAME_LABEL.into(),
+            value: name.into(),
+        }];
+        if let Some((label_name, label_value)) = extra {
+            labels.push(proto::Label {
+                name: label_name.into(),
+                value: label_value.into(),
+            });
+        }
+        proto::TimeSeries {
+            labels,
+            samples: vec![proto::Sample {
+                value,
+                timestamp: 1395066367700,
+            }],
+        }
+    }
+
+    /// Build a `WriteRequest` for a single metric family whose samples are all
+    /// NaN, i.e. what a sender emits as a stale marker.
+    fn stale_marker_request(kind: proto::MetricType, suffixes: &[&str]) -> proto::WriteRequest {
+        proto::WriteRequest {
+            metadata: vec![proto::MetricMetadata {
+                r#type: kind as i32,
+                metric_family_name: "one".into(),
+                help: String::default(),
+                unit: String::default(),
+            }],
+            timeseries: suffixes
+                .iter()
+                .map(|suffix| {
+                    let mut labels = vec![proto::Label {
+                        name: METRIC_NAME_LABEL.into(),
+                        value: format!("one{suffix}"),
+                    }];
+                    if *suffix == "_bucket" {
+                        labels.push(proto::Label {
+                            name: "le".into(),
+                            value: "1".into(),
+                        });
+                    }
+                    if kind == proto::MetricType::Summary && suffix.is_empty() {
+                        labels.push(proto::Label {
+                            name: "quantile".into(),
+                            value: "0.5".into(),
+                        });
+                    }
+                    proto::TimeSeries {
+                        labels,
+                        samples: vec![proto::Sample {
+                            value: f64::NAN,
+                            timestamp: 1395066367700,
+                        }],
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    /// A NaN `_count`/`_bucket` sample must not fail the whole write request
+    /// when `skip_nan_values` is enabled.
+    #[test]
+    fn parse_request_histogram_skips_nan_counts() {
+        let request =
+            stale_marker_request(proto::MetricType::Histogram, &["_bucket", "_count", "_sum"]);
+
+        let parsed = parse_request(request, MetadataConflictStrategy::Ignore, true).unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "one", Histogram => |metrics: &MetricMap<HistogramMetric>| {
+            assert_eq!(metrics.len(), 1);
+            let (_, metric) = metrics.get_index(0).unwrap();
+            // The NaN bucket and count are dropped rather than rejected, and the
+            // NaN sum is left for the source to filter out downstream.
+            assert!(metric.buckets.is_empty());
+            assert_eq!(metric.count, 0);
+            assert!(metric.sum.is_nan());
+        });
+    }
+
+    #[test]
+    fn parse_request_summary_skips_nan_counts() {
+        let request = stale_marker_request(proto::MetricType::Summary, &["", "_count", "_sum"]);
+
+        let parsed = parse_request(request, MetadataConflictStrategy::Ignore, true).unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "one", Summary => |metrics: &MetricMap<SummaryMetric>| {
+            assert_eq!(metrics.len(), 1);
+            let (_, metric) = metrics.get_index(0).unwrap();
+            assert_eq!(metric.count, 0);
+            assert!(metric.sum.is_nan());
+        });
+    }
+
+    /// A NaN count alongside finite buckets and sum must not leave the series looking
+    /// complete: `count` would keep its default of zero and report a total the sender
+    /// never sent.
+    #[test]
+    fn parse_request_marks_partially_nan_histogram() {
+        let request = proto::WriteRequest {
+            metadata: vec![proto::MetricMetadata {
+                r#type: proto::MetricType::Histogram as i32,
+                metric_family_name: "one".into(),
+                help: String::default(),
+                unit: String::default(),
+            }],
+            timeseries: vec![
+                series("one_bucket", Some(("le", "1")), 3.0),
+                series("one_sum", None, 7.5),
+                series("one_count", None, f64::NAN),
+            ],
+        };
+
+        let parsed = parse_request(request, MetadataConflictStrategy::Ignore, true).unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "one", Histogram => |metrics: &MetricMap<HistogramMetric>| {
+            let (_, metric) = metrics.get_index(0).unwrap();
+            assert!(
+                metric.has_skipped_nan,
+                "series must be marked so the source drops it instead of reporting count 0"
+            );
+            assert_eq!(metric.count, 0);
+            assert_eq!(metric.sum, 7.5);
+        });
+    }
+
+    /// Without `skip_nan_values` the previous behaviour is preserved.
+    #[test]
+    fn parse_request_nan_count_errors_when_not_skipping() {
+        for kind in [proto::MetricType::Histogram, proto::MetricType::Summary] {
+            let request = stale_marker_request(kind, &["_count"]);
+
+            let err = parse_request(request, MetadataConflictStrategy::Ignore, false).unwrap_err();
+
+            assert!(
+                matches!(err, ParserError::ValueOutOfRange { value, .. } if value.is_nan()),
+                "unexpected error for {kind:?}: {err:?}"
+            );
+        }
     }
 
     #[test]
@@ -1065,7 +1264,8 @@ mod test {
         };
 
         // Should succeed and use the first metadata entry (Gauge)
-        let parsed = parse_request(request.clone(), MetadataConflictStrategy::Ignore).unwrap();
+        let parsed =
+            parse_request(request.clone(), MetadataConflictStrategy::Ignore, false).unwrap();
         assert_eq!(parsed.len(), 1);
         match_group!(parsed[0], "go_memstats_alloc_bytes", Gauge => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
@@ -1076,7 +1276,7 @@ mod test {
         });
 
         // Should fail when conflicts are rejected
-        let err = parse_request(request, MetadataConflictStrategy::Reject).unwrap_err();
+        let err = parse_request(request, MetadataConflictStrategy::Reject, false).unwrap_err();
         assert!(matches!(
             err,
             ParserError::MultipleMetricKinds { name } if name == "go_memstats_alloc_bytes"
