@@ -60,6 +60,7 @@ impl Default for BasicSourceConfig {
 impl_generate_config_from_default!(BasicSourceConfig);
 
 impl BasicSourceConfig {
+    #[must_use]
     pub fn new(receiver: LimitedReceiver<SourceSenderItem>) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
@@ -70,6 +71,7 @@ impl BasicSourceConfig {
         }
     }
 
+    #[must_use]
     pub fn new_with_data(receiver: LimitedReceiver<SourceSenderItem>, data: &str) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
@@ -127,7 +129,7 @@ impl SourceConfig for BasicSourceConfig {
 
                         if let Err(e) = out.send_event(array).await {
                             error!(message = "Error sending in sink..", %e);
-                            return Err(())
+                            return Err(e.into())
                         }
                     },
 

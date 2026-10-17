@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! Vector `generate-schema` command implementation.
 
 use std::{fs, path::PathBuf};

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! oracle: the conservation judge. Mints unique ids, records which ids the
 //! pipeline acked, and checks they all come back — an acked id that never
 //! returns is loss.

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::num::NonZeroUsize;
 
 use vector_lib::{

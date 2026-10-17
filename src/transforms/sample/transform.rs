@@ -17,17 +17,27 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn hash_ratio_threshold(ratio: f64) -> u64 {
-    (ratio * (u64::MAX as u128) as f64) as u64
+    (ratio * u128::from(u64::MAX) as f64) as u64
 }
 
 /// Approximate bytes retained for one cached group: the key (including its heap allocation), the
 /// sampling state, the LRU node's previous/next pointers, and the hash table slot pointing at it.
+#[expect(
+    clippy::ref_option,
+    reason = "Measure the owned Option and its heap allocation."
+)]
 pub(super) fn group_state_entry_bytes(group_by_key: &Option<String>) -> usize {
     group_by_key.size_of() + mem::size_of::<GroupState>() + 4 * mem::size_of::<usize>()
 }
 
-/// Exists only for backwards compatibility purposes so that the value of sample_rate_key is
+/// Exists only for backwards compatibility purposes so that the value of `sample_rate_key` is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
 /// of percentages
 #[derive(Clone, Debug)]
@@ -42,10 +52,12 @@ pub enum SampleMode {
 }
 
 impl SampleMode {
+    #[must_use]
     pub const fn new_rate(rate: u64) -> Self {
         Self::Rate { rate }
     }
 
+    #[must_use]
     pub fn new_ratio(ratio: f64) -> Self {
         Self::Ratio {
             ratio,
@@ -190,7 +202,7 @@ pub struct Sample {
     group_state_bytes: usize,
     max_state_bytes: usize,
     exclude: Option<Condition>,
-    sample_rate_key: OptionalValuePath,
+    rate_key: OptionalValuePath,
     include_group_tag: bool,
 }
 
@@ -199,6 +211,7 @@ impl Sample {
     // `transforms-sample`.
     #![allow(dead_code)]
     #[allow(clippy::too_many_arguments)]
+    #[must_use]
     pub fn new(
         name: String,
         static_mode: SampleMode,
@@ -224,6 +237,7 @@ impl Sample {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[must_use]
     pub fn new_with_dynamic(
         name: String,
         static_mode: SampleMode,
@@ -267,7 +281,7 @@ impl Sample {
             group_state_bytes: 0,
             max_state_bytes,
             exclude,
-            sample_rate_key,
+            rate_key: sample_rate_key,
             include_group_tag,
         }
     }
@@ -310,6 +324,10 @@ impl Sample {
     }
 
     #[cfg(test)]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn ratio(&self) -> f64 {
         match &self.static_mode {
             SampleMode::Rate { rate, .. } => 1.0f64 / *rate as f64,
@@ -317,13 +335,17 @@ impl Sample {
         }
     }
 
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn event_ratio(&self, event: &Event) -> Option<f64> {
         let ratio_field = match &self.key_source {
             SampleKeySource::Dynamic { fields, .. } => fields.ratio_field.as_ref()?,
             SampleKeySource::Static { .. } => return None,
         };
 
-        let value = self.get_event_value(event, ratio_field.as_str())?;
+        let value = Self::get_event_value(event, ratio_field.as_str())?;
 
         let ratio = match value {
             Value::Integer(value) => *value as f64,
@@ -342,7 +364,7 @@ impl Sample {
             SampleKeySource::Static { .. } => return None,
         };
 
-        let value = self.get_event_value(event, rate_field.as_str())?;
+        let value = Self::get_event_value(event, rate_field.as_str())?;
 
         match value {
             Value::Integer(value) => u64::try_from(*value).ok().and_then(NonZeroU64::new),
@@ -352,7 +374,7 @@ impl Sample {
         }
     }
 
-    fn get_event_value<'a>(&self, event: &'a Event, path: &str) -> Option<&'a Value> {
+    fn get_event_value<'a>(event: &'a Event, path: &str) -> Option<&'a Value> {
         match event {
             Event::Log(event) => event.parse_path_and_get_value(path).ok().flatten(),
             Event::Trace(event) => event.parse_path_and_get_value(path).ok().flatten(),
@@ -379,7 +401,7 @@ impl Sample {
                 error,
                 field: Some("group_by"),
                 drop_event: false,
-            })
+            });
         })
         .ok()
     }
@@ -390,7 +412,7 @@ impl Sample {
             SampleKeySource::Dynamic { .. } => return None,
         };
 
-        self.get_event_value(event, key_field)
+        Self::get_event_value(event, key_field)
     }
 }
 
@@ -402,9 +424,8 @@ impl FunctionTransform for Sample {
                 if result {
                     output.push(event);
                     return;
-                } else {
-                    event
                 }
+                event
             } else {
                 event
             }
@@ -420,22 +441,22 @@ impl FunctionTransform for Sample {
                 .hash_within_ratio(value.to_string_lossy().as_bytes())
         });
         let event_sample_mode = self.event_sample_mode(&event);
-        let sample_rate = event_sample_mode
-            .as_ref()
-            .map(EventSampleMode::sample_rate_label)
-            .unwrap_or_else(|| self.static_mode.to_string());
+        let sample_rate = event_sample_mode.as_ref().map_or_else(
+            || self.static_mode.to_string(),
+            EventSampleMode::sample_rate_label,
+        );
 
-        let should_sample =
-            self.sample_group(group_by_key, |group_state| match event_sample_mode {
-                Some(mode) => mode.sample(&mut group_state.dynamic_event_counter),
-                None => {
-                    let threshold_exceeded = group_state.static_state.sample();
-                    static_key_sample.unwrap_or(threshold_exceeded)
-                }
-            });
+        let should_sample = self.sample_group(group_by_key, |group_state| {
+            if let Some(mode) = event_sample_mode {
+                mode.sample(&mut group_state.dynamic_event_counter)
+            } else {
+                let threshold_exceeded = group_state.static_state.sample();
+                static_key_sample.unwrap_or(threshold_exceeded)
+            }
+        });
 
         if should_sample {
-            if let Some(path) = &self.sample_rate_key.path {
+            if let Some(path) = &self.rate_key.path {
                 match event {
                     Event::Log(ref mut event) => {
                         event.namespace().insert_source_metadata(
@@ -450,7 +471,7 @@ impl FunctionTransform for Sample {
                         event.insert(&OwnedTargetPath::event(path.clone()), sample_rate);
                     }
                     Event::Metric(_) => panic!("component can never receive metric events"),
-                };
+                }
             }
             output.push(event);
         } else {

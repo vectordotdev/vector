@@ -29,6 +29,7 @@ pub struct CompletionSinkConfig {
 impl_generate_config_from_default!(CompletionSinkConfig);
 
 impl CompletionSinkConfig {
+    #[must_use]
     pub fn new(expected: usize, completion_tx: Sender<bool>) -> Self {
         Self {
             expected,

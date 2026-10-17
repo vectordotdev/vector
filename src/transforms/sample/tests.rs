@@ -2,7 +2,9 @@ use approx::assert_relative_eq;
 use indoc::indoc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{enrichment::TableRegistry, lookup::lookup_v2::OptionalValuePath};
+use vector_vrl_metrics::MetricsStorage;
+use vrl::compiler::VrlRuntime;
 use vrl::{event_path, owned_value_path};
 
 use crate::{
@@ -14,7 +16,10 @@ use crate::{
     transforms::{
         FunctionTransform, OutputBuffer,
         sample::{
-            config::{SampleConfig, default_max_state_bytes, default_sample_rate_key},
+            config::{
+                SampleConfig, SampleInternalMetricsConfig, default_max_state_bytes,
+                default_sample_rate_key,
+            },
             transform::{DynamicSampleFields, Sample, SampleMode, group_state_entry_bytes},
         },
         test::{create_topology, transform_one},
@@ -23,7 +28,7 @@ use crate::{
 
 #[tokio::test]
 async fn emits_internal_events() {
-    assert_transform_compliance(async move {
+    Box::pin(assert_transform_compliance(async move {
         let config = SampleConfig {
             rate: None,
             ratio: Some(1.0),
@@ -34,7 +39,7 @@ async fn emits_internal_events() {
             max_state_bytes: default_max_state_bytes(),
             exclude: None,
             sample_rate_key: default_sample_rate_key(),
-            internal_metrics: Default::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -47,11 +52,15 @@ async fn emits_internal_events() {
         drop(tx);
         topology.stop().await;
         assert_eq!(out.recv().await, None);
-    })
-    .await
+    }))
+    .await;
 }
 
 #[test]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn hash_samples_at_roughly_the_configured_rate() {
     let num_events = 10000;
 
@@ -341,13 +350,13 @@ fn group_by_uses_independent_ratio_samplers() {
         false,
     );
 
-    let sampled = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
+    let decisions = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
         let mut event = LogEvent::from("event");
         event.insert(event_path!("service"), service);
         transform_one(&mut sampler, event.into()).is_some()
     });
 
-    assert_eq!(sampled, [true, false, false, true]);
+    assert_eq!(decisions, [true, false, false, true]);
 }
 
 #[test]
@@ -363,7 +372,7 @@ fn group_state_evicts_least_recently_used_group() {
         false,
     );
 
-    let sampled = [
+    let decisions = [
         "service-a",
         "service-b",
         "service-a",
@@ -377,7 +386,7 @@ fn group_state_evicts_least_recently_used_group() {
         transform_one(&mut sampler, event.into()).is_some()
     });
 
-    assert_eq!(sampled, [true, false, false, true, true, false]);
+    assert_eq!(decisions, [true, false, false, true, true, false]);
 }
 
 #[test]
@@ -397,14 +406,14 @@ fn capacity_thrashing_does_not_bypass_static_sampling() {
             false,
         );
 
-        let sampled = (0..6).map(|index| {
+        let decisions = (0..6).map(|index| {
             let mut event = LogEvent::from("event");
             event.insert(event_path!("service"), format!("service-{}", index % 3));
             transform_one(&mut sampler, event.into()).is_some()
         });
 
         assert_eq!(
-            sampled.collect::<Vec<_>>(),
+            decisions.collect::<Vec<_>>(),
             [true, false, true, false, true, false],
             "{name} sampling was bypassed",
         );
@@ -513,6 +522,11 @@ fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
 }
 
 #[test]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[expect(clippy::float_cmp, reason = "Fixture counts and rates are exact.")]
 fn sample_at_rates_higher_then_half() {
     // Retain 80% of the events of the stream
     let events = random_events(10000);
@@ -850,11 +864,11 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
 
 #[tokio::test]
 async fn dynamic_field_config_drives_dynamic_sampling() {
-    assert_transform_compliance(async move {
-        let config: SampleConfig = serde_yaml::from_str(indoc! {r#"
+    Box::pin(assert_transform_compliance(async move {
+        let config: SampleConfig = serde_yaml::from_str(indoc! {r"
             ratio_field: dynamic_ratio
             ratio: 1.0
-        "#})
+        "})
         .expect("config should deserialize");
 
         let (tx, rx) = mpsc::channel(1);
@@ -870,18 +884,18 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
         drop(tx);
         topology.stop().await;
         assert_eq!(out.recv().await, None);
-    })
-    .await
+    }))
+    .await;
 }
 
 fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
         source: format!(r#"contains!(."{key}", "{needle}")"#),
-        runtime: Default::default(),
+        runtime: VrlRuntime::default(),
     };
 
     vrl_config
-        .build(&Default::default(), &Default::default())
+        .build(&TableRegistry::default(), &MetricsStorage::default())
         .expect("should not fail to build VRL condition")
 }
 

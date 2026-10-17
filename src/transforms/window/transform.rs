@@ -25,6 +25,10 @@ pub struct Window {
 }
 
 impl Window {
+    ///
+    /// # Errors
+    ///
+    /// This constructor currently always succeeds.
     pub fn new(
         forward_when: Option<Condition>,
         flush_when: Condition,
@@ -97,6 +101,7 @@ impl FunctionTransform for Window {
 #[cfg(test)]
 mod test {
     use std::ops::RangeInclusive;
+    use vrl::compiler::VrlRuntime;
 
     use tokio::sync::{
         mpsc,
@@ -114,7 +119,7 @@ mod test {
 
     #[tokio::test]
     async fn test_flush() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 1, 0);
 
@@ -129,13 +134,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_pass() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let forward_when = get_condition("forward");
             let transform_config = get_transform_config(flush_when, Some(forward_when), 1, 0);
@@ -151,13 +156,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_10_in_50() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 50, 0);
 
@@ -178,13 +183,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_50_in_10() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 10, 0);
 
@@ -205,13 +210,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_before_and_after() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 10, 5);
 
@@ -234,13 +239,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_flush_and_pass() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let forward_when = get_condition("forward");
             let transform_config = get_transform_config(flush_when, Some(forward_when), 50, 5);
@@ -270,13 +275,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_zero_before() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 0, 5);
 
@@ -295,13 +300,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_zero_flush() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 0, 0);
 
@@ -320,13 +325,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_zero_pass() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let forward_when = get_condition("forward");
             let transform_config = get_transform_config(flush_when, Some(forward_when), 0, 0);
@@ -350,7 +355,7 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -361,8 +366,8 @@ mod test {
         num_events_after: usize,
     ) -> WindowConfig {
         WindowConfig {
-            flush_when,
             forward_when,
+            flush_when,
             num_events_before,
             num_events_after,
         }
@@ -371,7 +376,7 @@ mod test {
     fn get_condition(message: &str) -> AnyCondition {
         AnyCondition::from(ConditionConfig::Vrl(VrlConfig {
             source: format!(r#".message == "{message}""#),
-            runtime: Default::default(),
+            runtime: VrlRuntime::default(),
         }))
     }
 
