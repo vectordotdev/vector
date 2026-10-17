@@ -587,6 +587,11 @@ fn into_vector_metric(
     schema_definition: &Arc<schema::Definition>,
     split_metric_namespace: bool,
 ) -> Vec<Event> {
+    // Avoid copying large units or expanding tags for a series that cannot emit an event.
+    if dd_metric.points.is_empty() {
+        return Vec::new();
+    }
+
     let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
     let mut event_metadata = dd_metric
         .metadata

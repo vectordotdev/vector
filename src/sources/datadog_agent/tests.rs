@@ -2633,6 +2633,37 @@ async fn decode_series_v1_rejects_excessive_unit_event_expansion() {
     assert!(crate::test_util::collect_ready(rx).is_empty());
 }
 
+#[tokio::test]
+async fn decode_series_v1_skips_unit_materialization_for_zero_point_series() {
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, true).await;
+    let request = DatadogSeriesRequest {
+        series: vec![DatadogSeriesMetric {
+            metric: "empty".to_string(),
+            r#type: DatadogMetricType::Gauge,
+            interval: None,
+            points: Vec::new(),
+            tags: None,
+            host: None,
+            source_type_name: None,
+            device: None,
+            unit: Some("u".repeat(1024 * 1024)),
+            metadata: None,
+        }],
+    };
+
+    assert_eq!(
+        200,
+        send_with_path(
+            addr,
+            serde_json::to_vec(&request).unwrap(),
+            dd_api_key_headers(),
+            DD_API_SERIES_V1_PATH,
+        )
+        .await
+    );
+    assert!(crate::test_util::collect_ready(rx).is_empty());
+}
+
 fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
     values
         .iter()
