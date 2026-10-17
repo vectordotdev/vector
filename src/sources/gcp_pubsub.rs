@@ -767,9 +767,195 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+
+    use futures::stream::BoxStream;
+    use tokio_stream::wrappers::TcpListenerStream;
     use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
+    use crate::{config::ComponentKey, event::EventStatus, shutdown::SourceShutdownCoordinator};
+
+    type RecordedRequests = mpsc::UnboundedReceiver<(usize, proto::StreamingPullRequest)>;
+
+    /// A Pub/Sub server that reports every streaming pull request it
+    /// receives, tagged with the index of the stream it arrived on.
+    ///
+    /// The first stream delivers one message and is then closed by the
+    /// server, the way Pub/Sub closes streams with `UNAVAILABLE` to
+    /// rebalance them. Later streams stay open and deliver nothing.
+    struct FakeSubscriber {
+        streams: AtomicUsize,
+        requests: mpsc::UnboundedSender<(usize, proto::StreamingPullRequest)>,
+    }
+
+    #[tonic::async_trait]
+    impl proto::subscriber_server::Subscriber for FakeSubscriber {
+        type StreamingPullStream = BoxStream<'static, Result<proto::StreamingPullResponse, Status>>;
+
+        async fn streaming_pull(
+            &self,
+            request: Request<tonic::Streaming<proto::StreamingPullRequest>>,
+        ) -> Result<tonic::Response<Self::StreamingPullStream>, Status> {
+            let index = self.streams.fetch_add(1, Ordering::SeqCst);
+            let requests = self.requests.clone();
+            let mut inbound = request.into_inner();
+            tokio::spawn(async move {
+                while let Some(Ok(request)) = inbound.next().await {
+                    if requests.send((index, request)).is_err() {
+                        break;
+                    }
+                }
+            });
+
+            let responses = if index == 0 {
+                let message = proto::ReceivedMessage {
+                    ack_id: "ack-1".into(),
+                    message: Some(proto::PubsubMessage {
+                        data: b"hello".to_vec(),
+                        message_id: "message-1".into(),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+                let response = proto::StreamingPullResponse {
+                    received_messages: vec![message],
+                    ..Default::default()
+                };
+                // tonic discards an encoded response that is still buffered when the stream
+                // yields an error, so let the response go out before closing the stream.
+                let close = async {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    Err(Status::unavailable(
+                        "The service was unable to fulfill your request.",
+                    ))
+                };
+                stream::once(async { Ok(response) })
+                    .chain(stream::once(close))
+                    .boxed()
+            } else {
+                stream::pending().boxed()
+            };
+            Ok(tonic::Response::new(responses))
+        }
+    }
+
+    async fn serve_fake_subscriber() -> (SocketAddr, RecordedRequests) {
+        let (requests, recorded) = mpsc::unbounded_channel();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let subscriber = FakeSubscriber {
+            streams: AtomicUsize::new(0),
+            requests,
+        };
+        tokio::spawn(
+            tonic::transport::Server::builder()
+                .add_service(proto::subscriber_server::SubscriberServer::new(subscriber))
+                .serve_with_incoming(TcpListenerStream::new(listener)),
+        );
+        (address, recorded)
+    }
+
+    fn fake_subscriber_config(address: SocketAddr) -> PubsubConfig {
+        PubsubConfig {
+            project: "project".into(),
+            subscription: "subscription".into(),
+            endpoint: format!("http://{address}"),
+            auth: GcpAuthConfig {
+                skip_authentication: true,
+                ..Default::default()
+            },
+            max_concurrency: 1,
+            full_response_size: default_full_response(),
+            poll_time_seconds: default_poll_time(),
+            ack_deadline_secs: default_ack_deadline(),
+            retry_delay_secs: Duration::from_millis(100),
+            keepalive_secs: default_keepalive(),
+            ..Default::default()
+        }
+    }
+
+    async fn spawn_source(
+        config: PubsubConfig,
+    ) -> (impl Stream<Item = Event> + Unpin, SourceShutdownCoordinator) {
+        let (tx, rx) = SourceSender::new_test();
+        let (mut cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("gcp_pubsub"), tx);
+        cx.acknowledgements = true;
+        let source = config.build(cx).await.unwrap();
+        tokio::spawn(source);
+        (rx, shutdown)
+    }
+
+    async fn next_request_where(
+        recorded: &mut RecordedRequests,
+        expected: &str,
+        matches: impl Fn(usize, &proto::StreamingPullRequest) -> bool,
+    ) -> (usize, proto::StreamingPullRequest) {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let (index, request) = recorded.recv().await.unwrap();
+                if matches(index, &request) {
+                    return (index, request);
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("timed out waiting for {expected}"))
+    }
+
+    #[tokio::test]
+    async fn acknowledges_batches_finalized_after_their_stream_ended() {
+        // 1. Serve a subscription whose first stream ends right after delivering a message.
+        let (address, mut recorded) = serve_fake_subscriber().await;
+
+        // 2. Receive the message as an event and hold it without finalizing it.
+        let (mut events, _shutdown) = spawn_source(fake_subscriber_config(address)).await;
+        let mut event = tokio::time::timeout(Duration::from_secs(10), events.next())
+            .await
+            .expect("timed out waiting for the event")
+            .unwrap();
+
+        // 3. Wait until the source has opened its next stream, so that the batch is finalized
+        //    after the stream that delivered it has ended.
+        next_request_where(&mut recorded, "the next stream", |index, _| index > 0).await;
+
+        // 4. Deliver the event and expect its acknowledgement on the new stream.
+        event.metadata().update_status(EventStatus::Delivered);
+        event.metadata_mut().update_sources();
+        drop(event);
+        let (index, request) =
+            next_request_where(&mut recorded, "an acknowledgement", |_, request| {
+                !request.ack_ids.is_empty()
+            })
+            .await;
+        assert_eq!(index, 1);
+        assert_eq!(request.ack_ids, vec!["ack-1".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn shuts_down_after_its_pending_batches_are_finalized() {
+        // 1. Receive an event and hold it, with the source streaming on its second stream.
+        let (address, mut recorded) = serve_fake_subscriber().await;
+        let (mut events, mut coordinator) = spawn_source(fake_subscriber_config(address)).await;
+        let mut event = tokio::time::timeout(Duration::from_secs(10), events.next())
+            .await
+            .expect("timed out waiting for the event")
+            .unwrap();
+        next_request_where(&mut recorded, "the next stream", |index, _| index > 0).await;
+
+        // 2. Shut the source down while its batch is pending, and expect it to wait for the batch.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        let mut shut_down =
+            coordinator.shutdown_source(&ComponentKey::from("gcp_pubsub"), deadline);
+        let early = tokio::time::timeout(Duration::from_millis(500), &mut shut_down).await;
+        assert!(early.is_err(), "the source shut down with a batch pending");
+
+        // 3. Deliver the event and expect the source to finish before the deadline.
+        event.metadata().update_status(EventStatus::Delivered);
+        event.metadata_mut().update_sources();
+        drop(event);
+        assert!(shut_down.await, "the source did not shut down");
+    }
 
     #[test]
     fn generate_config() {
