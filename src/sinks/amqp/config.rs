@@ -29,7 +29,7 @@ pub struct AmqpPropertiesConfig {
 }
 
 impl AmqpPropertiesConfig {
-    pub(super) fn build(&self, event: &Event) -> Option<BasicProperties> {
+    pub(super) fn build(&self, event: &Event) -> BasicProperties {
         let mut prop = BasicProperties::default();
         if let Some(content_type) = &self.content_type {
             prop = prop.with_content_type(ShortString::from(content_type.clone()));
@@ -53,10 +53,10 @@ impl AmqpPropertiesConfig {
             });
 
             // Clamp the value to the range of 0-255, as AMQP priority is a u8.
-            let priority = priority.clamp(0, u8::MAX.into()) as u8;
+            let priority = u8::try_from(priority).unwrap_or(u8::MAX);
             prop = prop.with_priority(priority);
         }
-        Some(prop)
+        prop
     }
 }
 
@@ -321,7 +321,7 @@ mod tests {
                 .unwrap()
                 .render(event)
                 .unwrap(),
-            priority as u64
+            u64::from(priority)
         );
     }
 

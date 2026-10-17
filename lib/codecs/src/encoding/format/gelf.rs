@@ -1,4 +1,12 @@
-use crate::{VALID_FIELD_REGEX, encoding::GelfChunker, gelf::GELF_TARGET_PATHS, gelf_fields::*};
+use crate::{
+    VALID_FIELD_REGEX,
+    encoding::GelfChunker,
+    gelf::GELF_TARGET_PATHS,
+    gelf_fields::{
+        FACILITY, FILE, FULL_MESSAGE, GELF_VERSION, HOST, LEVEL, LINE, SHORT_MESSAGE, TIMESTAMP,
+        VERSION,
+    },
+};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
@@ -78,21 +86,25 @@ pub struct GelfSerializerConfig {
 
 impl GelfSerializerConfig {
     /// Creates a new `GelfSerializerConfig`.
+    #[must_use]
     pub const fn new(options: GelfSerializerOptions) -> Self {
         Self { options }
     }
 
     /// Build the `GelfSerializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> GelfSerializer {
         GelfSerializer::new(self.options.clone())
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // JSON, we don't want to enforce that limitation to users yet.
@@ -109,11 +121,17 @@ pub struct GelfSerializer {
 
 impl GelfSerializer {
     /// Creates a new `GelfSerializer`.
+    #[must_use]
     pub fn new(options: GelfSerializerOptions) -> Self {
         GelfSerializer { options }
     }
 
     /// Encode event and represent it as JSON value.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         // input_type() restricts the event type to LogEvents
         let log = to_gelf_event(event.into_log())?;
@@ -121,6 +139,7 @@ impl GelfSerializer {
     }
 
     /// Instantiates the GELF chunking configuration.
+    #[must_use]
     pub fn chunker(&self) -> GelfChunker {
         GelfChunker {
             max_chunk_size: self.options.max_chunk_size,
@@ -185,6 +204,11 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> 
 }
 
 /// Validates rules for field names and value types, coercing in some cases.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing floating-point representation of numeric values."
+)]
 fn coerce_field_names_and_values(
     mut log: LogEvent,
 ) -> vector_common::Result<(LogEvent, Vec<String>)> {
@@ -214,7 +238,7 @@ fn coerce_field_names_and_values(
                         } else {
                             // keep full range of representable time if no milliseconds are set
                             // but still convert to numeric according to GELF protocol
-                            *value = Value::Integer(ts.timestamp())
+                            *value = Value::Integer(ts.timestamp());
                         }
                     }
                 }
@@ -308,7 +332,9 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_success() {
-        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
+        let serializer = SerializerConfig::Gelf(GelfSerializerConfig::default())
+            .build()
+            .unwrap();
 
         let event_fields = btreemap! {
             VERSION => "1.1",
@@ -323,7 +349,9 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_failure_to_encode() {
-        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
+        let serializer = SerializerConfig::Gelf(GelfSerializerConfig::default())
+            .build()
+            .unwrap();
         let event_fields = btreemap! {};
         let log_event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
         assert!(serializer.supports_json());
@@ -379,6 +407,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert the exact floating-point value produced by this serialization fixture."
+    )]
     fn gelf_serializing_timestamp() {
         // floating point in case of sub second timestamp
         {

@@ -454,20 +454,14 @@ mod housekeeping {
         repo: TempDir,
         _remote: TempDir,
         release: String,
+        /// VRL main revision locked by the development base before preparation.
+        vrl_revision: String,
     }
 
     impl Fixture {
         fn new() -> Self {
-            let (repo, _) = preparation();
-            let release = git(repo.path(), &["rev-parse", "HEAD"]);
-            git(repo.path(), &["tag", "v0.59.0"]);
-            let remote = tempdir().unwrap();
-            git(remote.path(), &["init", "--bare"]);
-            git(
-                repo.path(),
-                &["remote", "add", "origin", remote.path().to_str().unwrap()],
-            );
-            git(repo.path(), &["push", "origin", "HEAD:refs/heads/master"]);
+            let (repo, base) = preparation();
+            let prepared = git(repo.path(), &["rev-parse", "HEAD"]);
 
             // Real Cargo git resolution, redirected to a tiny local VRL repository.
             let vrl = repo.path().join(".git/vrl-source");
@@ -486,7 +480,7 @@ mod housekeeping {
             ] {
                 git(&vrl, &["config", key, value]);
             }
-            commit(&vrl);
+            let vrl_revision = commit(&vrl);
             git(
                 repo.path(),
                 &[
@@ -497,6 +491,45 @@ mod housekeeping {
                     "https://github.com/vectordotdev/vrl.git",
                 ],
             );
+
+            // Like master, the development base locks VRL main; preparation then
+            // pins the registry release on top of it.
+            git(repo.path(), &["switch", "--detach", &base]);
+            write(
+                repo.path(),
+                "Cargo.lock",
+                &format!(
+                    "version = 4\n[[package]]\nname = \"vector\"\nversion = \"0.59.0-dev\"\ndependencies = [\"vrl\"]\n[[package]]\nname = \"vrl\"\nversion = \"0.28.0\"\nsource = \"git+https://github.com/vectordotdev/vrl.git?branch=main#{vrl_revision}\"\n"
+                ),
+            );
+            let base = commit(repo.path());
+            let release = git(
+                repo.path(),
+                &[
+                    "commit-tree",
+                    &format!("{prepared}^{{tree}}"),
+                    "-p",
+                    &base,
+                    "-m",
+                    "fixture",
+                ],
+            );
+            git(
+                repo.path(),
+                &["switch", "-C", "prepare-v-0-59-0-website", &release],
+            );
+            // VRL main moves on after the release; housekeeping must not adopt it.
+            write(&vrl, "src/lib.rs", "pub fn unadopted() {}\n");
+            commit(&vrl);
+
+            git(repo.path(), &["tag", "v0.59.0"]);
+            let remote = tempdir().unwrap();
+            git(remote.path(), &["init", "--bare"]);
+            git(
+                repo.path(),
+                &["remote", "add", "origin", remote.path().to_str().unwrap()],
+            );
+            git(repo.path(), &["push", "origin", "HEAD:refs/heads/master"]);
             write(repo.path(), ".git/associated-prs.json", &json!([[{
                 "merged_at": "2026-09-21T12:00:00Z",
                 "merge_commit_sha": release,
@@ -519,6 +552,7 @@ mod housekeeping {
                 repo,
                 _remote: remote,
                 release,
+                vrl_revision,
             }
         }
 
@@ -600,7 +634,10 @@ mod housekeeping {
         assert!(manifest.contains("git = \"https://github.com/vectordotdev/vrl.git\""));
         assert!(manifest.contains("branch = \"main\""));
         let lock = fs::read_to_string(repo.join("Cargo.lock")).unwrap();
-        assert!(lock.contains("git+https://github.com/vectordotdev/vrl.git?branch=main#"));
+        assert!(lock.contains(&format!(
+            "git+https://github.com/vectordotdev/vrl.git?branch=main#{}",
+            fixture.vrl_revision
+        )));
         write(repo, "LICENSE-3rdparty.csv", "Refreshed licenses\n");
         write(repo, "docs/generated/vrl.json", "{}\n");
         commit(repo);
@@ -737,7 +774,7 @@ mod autotag {
         })
     }
 
-    fn check_autotag(repo: &Path, base: &str, sha: &str, prs: Value) -> Output {
+    fn check_autotag(repo: &Path, base: &str, sha: &str, prs: &Value) -> Output {
         write(repo, ".git/associated-prs.json", &prs.to_string());
         write(
             repo,
@@ -778,7 +815,7 @@ mod autotag {
         let (temp, base) = preparation();
         let repo = temp.path();
         let sha = git(repo, &["rev-parse", "HEAD"]);
-        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        let result = check_autotag(repo, &base, &sha, &json!([[approved_pr(&sha)]]));
         assert!(
             result.status.success(),
             "{}",
@@ -793,7 +830,7 @@ mod autotag {
             "Another commit\n",
         );
         let sha = commit(repo);
-        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        let result = check_autotag(repo, &base, &sha, &json!([[approved_pr(&sha)]]));
         assert!(!result.status.success());
         assert!(String::from_utf8_lossy(&result.stderr).contains("single squash-merge commit"));
     }
@@ -814,7 +851,7 @@ mod autotag {
         ] {
             let mut pr = approved_pr(&sha);
             *pr.pointer_mut(pointer).unwrap() = value;
-            let result = check_autotag(repo, &base, &sha, json!([[pr]]));
+            let result = check_autotag(repo, &base, &sha, &json!([[pr]]));
             assert!(!result.status.success(), "accepted invalid {pointer}");
             assert!(
                 String::from_utf8_lossy(&result.stderr)
@@ -825,7 +862,7 @@ mod autotag {
             json!([[]]),
             json!([[approved_pr(&sha)], [approved_pr(&sha)]]),
         ] {
-            let result = check_autotag(repo, &base, &sha, prs);
+            let result = check_autotag(repo, &base, &sha, &prs);
             assert!(!result.status.success());
         }
     }
@@ -839,7 +876,7 @@ mod autotag {
             version(repo, new_version);
             write(repo, "README.md", "Ordinary change\n");
             let sha = commit(repo);
-            let result = check_autotag(repo, &before, &sha, json!("API must not be needed"));
+            let result = check_autotag(repo, &before, &sha, &json!("API must not be needed"));
             assert!(
                 result.status.success(),
                 "{}",
@@ -860,7 +897,7 @@ mod autotag {
         git(repo, &["add", "."]);
         git(repo, &["commit", "--amend", "--no-edit"]);
         let sha = git(repo, &["rev-parse", "HEAD"]);
-        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        let result = check_autotag(repo, &base, &sha, &json!([[approved_pr(&sha)]]));
         assert!(!result.status.success());
         assert!(
             String::from_utf8_lossy(&result.stderr).contains("unexpected release preparation file")
@@ -870,7 +907,7 @@ mod autotag {
     #[test]
     fn rejects_a_mismatched_checkout() {
         let (temp, base) = preparation();
-        let result = check_autotag(temp.path(), &base, &base, json!([[]]));
+        let result = check_autotag(temp.path(), &base, &base, &json!([[]]));
         assert!(!result.status.success());
         assert!(
             String::from_utf8_lossy(&result.stderr).contains("checkout must match the release SHA")

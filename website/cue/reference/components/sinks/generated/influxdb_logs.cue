@@ -10,7 +10,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -138,7 +138,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 	}
 	source_type_key: {
 		description: """
-			Use this option to customize the key containing the source_type.
+			Use this option to customize the key containing the `source_type`.
 
 			The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
 			"""

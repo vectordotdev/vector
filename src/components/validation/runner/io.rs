@@ -83,6 +83,11 @@ pub struct OutputEdge {
 }
 
 impl InputEdge {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     pub fn from_address(address: GrpcAddress) -> Self {
         let channel = Endpoint::from(address.as_uri()).connect_lazy();
         Self {
@@ -177,7 +182,7 @@ pub fn spawn_grpc_server<S>(
         loop {
             select! {
                 // Propagate our shutdown signal to the shutdown signal that `run_grpc_server` needs.
-                _ = shutdown_handle.wait(), if trigger_shutdown.is_some() => {
+                () = shutdown_handle.wait(), if trigger_shutdown.is_some() => {
                     trigger_shutdown.take().unwrap().cancel();
                 },
                 // TODO: Should we check the return value here to see if its an `Err`?

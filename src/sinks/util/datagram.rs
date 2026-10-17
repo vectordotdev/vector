@@ -110,9 +110,9 @@ async fn send_and_emit(
                     emit!(UnixSocketSendError {
                         path: path.as_path(),
                         error: &error
-                    })
+                    });
                 }
-            };
+            }
             false
         }
     }

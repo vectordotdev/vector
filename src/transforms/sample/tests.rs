@@ -2,7 +2,9 @@ use approx::assert_relative_eq;
 use indoc::indoc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{enrichment::TableRegistry, lookup::lookup_v2::OptionalValuePath};
+use vector_vrl_metrics::MetricsStorage;
+use vrl::compiler::VrlRuntime;
 use vrl::{event_path, owned_value_path};
 
 use crate::{
@@ -14,8 +16,11 @@ use crate::{
     transforms::{
         FunctionTransform, OutputBuffer,
         sample::{
-            config::{SampleConfig, default_sample_rate_key},
-            transform::{DynamicSampleFields, Sample, SampleMode},
+            config::{
+                SampleConfig, SampleInternalMetricsConfig, default_max_state_bytes,
+                default_sample_rate_key,
+            },
+            transform::{DynamicSampleFields, Sample, SampleMode, group_state_entry_bytes},
         },
         test::{create_topology, transform_one},
     },
@@ -23,7 +28,7 @@ use crate::{
 
 #[tokio::test]
 async fn emits_internal_events() {
-    assert_transform_compliance(async move {
+    Box::pin(assert_transform_compliance(async move {
         let config = SampleConfig {
             rate: None,
             ratio: Some(1.0),
@@ -31,8 +36,10 @@ async fn emits_internal_events() {
             rate_field: None,
             key_field: None,
             group_by: None,
+            max_state_bytes: default_max_state_bytes(),
             exclude: None,
             sample_rate_key: default_sample_rate_key(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -45,11 +52,15 @@ async fn emits_internal_events() {
         drop(tx);
         topology.stop().await;
         assert_eq!(out.recv().await, None);
-    })
-    .await
+    }))
+    .await;
 }
 
 #[test]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn hash_samples_at_roughly_the_configured_rate() {
     let num_events = 10000;
 
@@ -59,11 +70,13 @@ fn hash_samples_at_roughly_the_configured_rate() {
         SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
         None,
+        default_max_state_bytes().get(),
         Some(condition_contains(
             log_schema().message_key().unwrap().to_string().as_str(),
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
     let total_passed = events
         .into_iter()
@@ -82,11 +95,13 @@ fn hash_samples_at_roughly_the_configured_rate() {
         SampleMode::new_ratio(0.04),
         log_schema().message_key().map(ToString::to_string),
         None,
+        default_max_state_bytes().get(),
         Some(condition_contains(
             log_schema().message_key().unwrap().to_string().as_str(),
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
     let total_passed = events
         .into_iter()
@@ -108,11 +123,13 @@ fn hash_consistently_samples_the_same_events() {
         SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
         None,
+        default_max_state_bytes().get(),
         Some(condition_contains(
             log_schema().message_key().unwrap().to_string().as_str(),
             "na",
         )),
         default_sample_rate_key(),
+        false,
     );
 
     let first_run = events
@@ -145,11 +162,13 @@ fn always_passes_events_matching_pass_list() {
             SampleMode::new_rate(0),
             key_field.clone(),
             None,
+            default_max_state_bytes().get(),
             Some(condition_contains(
                 log_schema().message_key().unwrap().to_string().as_str(),
                 "important",
             )),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -175,11 +194,13 @@ fn handles_group_by() {
             SampleMode::new_rate(0),
             log_schema().message_key().map(ToString::to_string),
             group_by.clone(),
+            default_max_state_bytes().get(),
             Some(condition_contains(
                 log_schema().message_key().unwrap().to_string().as_str(),
                 "na",
             )),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -202,8 +223,10 @@ fn handles_key_field() {
             SampleMode::new_ratio(0.0),
             key_field.clone(),
             None,
+            default_max_state_bytes().get(),
             Some(condition_contains("other_field", "foo")),
             default_sample_rate_key(),
+            false,
         );
         let iterations = 0..1000;
         let total_passed = iterations
@@ -225,8 +248,10 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_ratio(0.1),
             key_field.clone(),
             None,
+            default_max_state_bytes().get(),
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
+            false,
         );
         let passing = events
             .into_iter()
@@ -241,8 +266,10 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_rate(25),
             key_field.clone(),
             None,
+            default_max_state_bytes().get(),
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("custom_sample_rate")),
+            false,
         );
         let passing = events
             .into_iter()
@@ -258,8 +285,10 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_rate(2),
             key_field.clone(),
             None,
+            default_max_state_bytes().get(),
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("")),
+            false,
         );
         let passing = events
             .into_iter()
@@ -274,8 +303,10 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_ratio(0.04),
             key_field.clone(),
             None,
+            default_max_state_bytes().get(),
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
+            false,
         );
         let event = Event::Log(LogEvent::from("nananana"));
         let passing = transform_one(&mut sampler, event).unwrap();
@@ -293,8 +324,10 @@ fn handles_trace_event() {
         SampleMode::new_rate(2),
         None,
         None,
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let iterations = 0..2;
@@ -311,20 +344,189 @@ fn group_by_uses_independent_ratio_samplers() {
         SampleMode::new_ratio(0.5),
         None,
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
-    let sampled = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
+    let decisions = ["service-a", "service-b", "service-a", "service-b"].map(|service| {
         let mut event = LogEvent::from("event");
         event.insert(event_path!("service"), service);
         transform_one(&mut sampler, event.into()).is_some()
     });
 
-    assert_eq!(sampled, [true, true, false, false]);
+    assert_eq!(decisions, [true, false, false, true]);
 }
 
 #[test]
+fn group_state_evicts_least_recently_used_group() {
+    let mut sampler = Sample::new(
+        "sample".to_string(),
+        SampleMode::new_rate(2),
+        None,
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        two_groups_bytes(),
+        None,
+        default_sample_rate_key(),
+        false,
+    );
+
+    let decisions = [
+        "service-a",
+        "service-b",
+        "service-a",
+        "service-c",
+        "service-a",
+        "service-b",
+    ]
+    .map(|service| {
+        let mut event = LogEvent::from("event");
+        event.insert(event_path!("service"), service);
+        transform_one(&mut sampler, event.into()).is_some()
+    });
+
+    assert_eq!(decisions, [true, false, false, true, true, false]);
+}
+
+#[test]
+fn capacity_thrashing_does_not_bypass_static_sampling() {
+    for (name, mode) in [
+        ("rate", SampleMode::new_rate(2)),
+        ("ratio", SampleMode::new_ratio(0.5)),
+    ] {
+        let mut sampler = Sample::new(
+            "sample".to_string(),
+            mode,
+            None,
+            Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+            two_groups_bytes(),
+            None,
+            default_sample_rate_key(),
+            false,
+        );
+
+        let decisions = (0..6).map(|index| {
+            let mut event = LogEvent::from("event");
+            event.insert(event_path!("service"), format!("service-{}", index % 3));
+            transform_one(&mut sampler, event.into()).is_some()
+        });
+
+        assert_eq!(
+            decisions.collect::<Vec<_>>(),
+            [true, false, true, false, true, false],
+            "{name} sampling was bypassed",
+        );
+    }
+}
+
+#[test]
+fn group_state_stays_within_max_state_bytes_for_large_keys() {
+    let max_state_bytes = 4096;
+    let mut sampler = Sample::new(
+        "sample".to_string(),
+        SampleMode::new_rate(2),
+        None,
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        max_state_bytes,
+        None,
+        default_sample_rate_key(),
+        false,
+    );
+    let make_event = |service: &str| {
+        let mut event = LogEvent::from("event");
+        event.insert(event_path!("service"), service);
+        event.into()
+    };
+
+    for index in 0..200 {
+        let service = format!("{index}-{}", "x".repeat(index * 37 % 3000));
+        transform_one(&mut sampler, make_event(&service));
+        assert!(sampler.retained_state_bytes() <= max_state_bytes);
+    }
+
+    // A group larger than the limit is not retained and does not evict other groups, but its
+    // events are still sampled at the configured rate.
+    let retained_before = sampler.retained_state_bytes();
+    let oversized = "y".repeat(max_state_bytes);
+    let passed = (0..10)
+        .filter(|_| transform_one(&mut sampler, make_event(&oversized)).is_some())
+        .count();
+    assert_eq!(sampler.retained_state_bytes(), retained_before);
+    assert_eq!(passed, 5);
+}
+
+#[test]
+fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
+    for (name, fields) in [
+        (
+            "rate",
+            DynamicSampleFields {
+                ratio_field: None,
+                rate_field: Some("dynamic_rate".to_string()),
+            },
+        ),
+        (
+            "ratio",
+            DynamicSampleFields {
+                ratio_field: Some("dynamic_ratio".to_string()),
+                rate_field: None,
+            },
+        ),
+    ] {
+        let make_sampler = || {
+            Sample::new_with_dynamic(
+                "sample".to_string(),
+                SampleMode::new_ratio(0.0),
+                fields.clone(),
+                Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+                two_groups_bytes(),
+                None,
+                default_sample_rate_key(),
+                false,
+            )
+        };
+        let make_event = |service: &str| {
+            let mut event = LogEvent::from("event");
+            event.insert(event_path!("service"), service);
+            if fields.rate_field.is_some() {
+                event.insert(event_path!("dynamic_rate"), 2);
+            } else {
+                event.insert(event_path!("dynamic_ratio"), 0.5);
+            }
+            event.into()
+        };
+
+        let mut sampler = make_sampler();
+        let retained = (0..30)
+            .filter(|index| {
+                let original = sampler.clone();
+                let service = (0..1000)
+                    .find_map(|attempt| {
+                        let service = format!("service-{index}-{attempt}");
+                        let mut candidate = original.clone();
+                        transform_one(&mut candidate, make_event(&service));
+                        transform_one(&mut candidate, make_event(&service))
+                            .is_some()
+                            .then_some(service)
+                    })
+                    .unwrap_or_else(|| format!("service-{index}-miss"));
+
+                transform_one(&mut sampler, make_event(&service));
+                transform_one(&mut sampler, make_event(&service)).is_some()
+            })
+            .count();
+
+        assert!(retained < 30, "{name} sampling was bypassed");
+    }
+}
+
+#[test]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[expect(clippy::float_cmp, reason = "Fixture counts and rates are exact.")]
 fn sample_at_rates_higher_then_half() {
     // Retain 80% of the events of the stream
     let events = random_events(10000);
@@ -335,8 +537,10 @@ fn sample_at_rates_higher_then_half() {
             SampleMode::new_ratio(ratio),
             None,
             None,
+            default_max_state_bytes().get(),
             None,
             default_sample_rate_key(),
+            false,
         );
         let total_observed = events
             .iter()
@@ -360,8 +564,10 @@ fn dynamic_ratio_field_overrides_static_ratio() {
             rate_field: None,
         },
         None,
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -382,8 +588,10 @@ fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
             rate_field: None,
         },
         None,
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let event = Event::Log(LogEvent::from("hello"));
@@ -401,8 +609,10 @@ fn dynamic_rate_field_overrides_static_ratio() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         None,
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -423,8 +633,10 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         None,
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let event = Event::Log(LogEvent::from("hello"));
@@ -442,8 +654,10 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         None,
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut event = Event::Log(LogEvent::from("hello"));
@@ -466,8 +680,10 @@ fn dynamic_ratio_honors_group_by_key() {
             rate_field: None,
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_service_a = 0;
@@ -511,8 +727,10 @@ fn dynamic_rate_honors_group_by_key() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_service_a = 0;
@@ -555,8 +773,10 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
             rate_field: None,
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_low_ratio = 0;
@@ -603,8 +823,10 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_state_bytes().get(),
         None,
         default_sample_rate_key(),
+        false,
     );
 
     let mut sampled_rate_2 = 0;
@@ -642,11 +864,11 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
 
 #[tokio::test]
 async fn dynamic_field_config_drives_dynamic_sampling() {
-    assert_transform_compliance(async move {
-        let config: SampleConfig = serde_yaml::from_str(indoc! {r#"
+    Box::pin(assert_transform_compliance(async move {
+        let config: SampleConfig = serde_yaml::from_str(indoc! {r"
             ratio_field: dynamic_ratio
             ratio: 1.0
-        "#})
+        "})
         .expect("config should deserialize");
 
         let (tx, rx) = mpsc::channel(1);
@@ -662,19 +884,25 @@ async fn dynamic_field_config_drives_dynamic_sampling() {
         drop(tx);
         topology.stop().await;
         assert_eq!(out.recv().await, None);
-    })
-    .await
+    }))
+    .await;
 }
 
 fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
         source: format!(r#"contains!(."{key}", "{needle}")"#),
-        runtime: Default::default(),
+        runtime: VrlRuntime::default(),
     };
 
     vrl_config
-        .build(&Default::default(), &Default::default())
+        .build(&TableRegistry::default(), &MetricsStorage::default())
         .expect("should not fail to build VRL condition")
+}
+
+/// Byte limit that holds exactly two groups whose rendered keys are 9 bytes long, such as
+/// `service-a`.
+fn two_groups_bytes() -> usize {
+    2 * group_state_entry_bytes(&Some("service-a".to_string()))
 }
 
 fn random_events(n: usize) -> Vec<Event> {
