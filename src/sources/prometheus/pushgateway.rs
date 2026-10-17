@@ -94,6 +94,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             http::StatusCode::OK,
             false,
             self.tls.as_ref(),
+            None,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,

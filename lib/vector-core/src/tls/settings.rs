@@ -4,21 +4,25 @@ use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
-    sync::{LazyLock, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, ClientCertVerifier,
+    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
+    NewStoreBuilderSnafu, ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
+    SetCertificateSnafu, SetPrivateKeySnafu, SetSessionIdContextSnafu, SetVerifyCertSnafu,
+    TlsError, X509ParseSnafu, client_cert_verifier::verify_client_cert,
 };
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::Pkcs12,
     pkey::{PKey, Private},
-    ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
+    ssl::{
+        AlpnError, ConnectConfiguration, SslContextBuilder, SslOptions, SslSessionCacheMode,
+        SslVerifyMode, select_next_proto,
+    },
     stack::Stack,
     x509::{X509, store::X509StoreBuilder, verify::X509CheckFlags},
 };
@@ -178,6 +182,7 @@ pub struct TlsSettings {
     pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
+    pub(super) client_cert_verifier: Option<Arc<dyn ClientCertVerifier>>,
 }
 
 /// Identity store in PEM format
@@ -220,7 +225,25 @@ impl TlsSettings {
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
             server_name: options.server_name.clone(),
+            client_cert_verifier: None,
         })
+    }
+
+    /// Authorize TLS clients with `verifier`, on top of chain validation.
+    ///
+    /// Only applies when these settings build a server acceptor. Installing a verifier makes the
+    /// server request and require a client certificate, whatever `verify_certificate` says, so a
+    /// verifier can never be bypassed by connecting without one. It also disables session
+    /// resumption, which would skip the verifier. Building the acceptor fails unless the settings
+    /// have a CA to validate client chains against.
+    ///
+    /// A [`TlsAcceptorReloader`](super::TlsAcceptorReloader) created from these settings keeps the
+    /// verifier across reloads, so settings rebuilt from configuration on certificate rotation need
+    /// not carry it.
+    #[must_use]
+    pub fn with_client_cert_verifier(mut self, verifier: Arc<dyn ClientCertVerifier>) -> Self {
+        self.client_cert_verifier = Some(verifier);
+        self
     }
 
     /// The configured SNI server name override, if any.
@@ -281,11 +304,39 @@ impl TlsSettings {
         context: &mut SslContextBuilder,
         for_server: bool,
     ) -> Result<()> {
-        context.set_verify(if self.verify_certificate {
-            SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
-        } else {
-            SslVerifyMode::NONE
-        });
+        match &self.client_cert_verifier {
+            Some(verifier) if for_server => {
+                // Without a CA, client chains would be checked against the system roots, which
+                // accept any publicly issued certificate, or against an empty store, which rejects
+                // every client.
+                if self.authorities.is_empty() {
+                    return Err(TlsError::ClientCertVerifierWithoutCa);
+                }
+                let verifier = Arc::clone(verifier);
+                context.set_verify_callback(
+                    SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
+                    move |preverified, store_context| {
+                        verify_client_cert(verifier.as_ref(), preverified, store_context)
+                    },
+                );
+                // A resumed session skips certificate verification, so the verifier would not run.
+                context.set_session_cache_mode(SslSessionCacheMode::OFF);
+                context.set_options(SslOptions::NO_TICKET);
+            }
+            _ => context.set_verify(if self.verify_certificate {
+                SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
+            } else {
+                SslVerifyMode::NONE
+            }),
+        }
+        if for_server {
+            // When it requests client certificates, OpenSSL fails the handshake of any client
+            // resuming a session unless a session id context is set. Each context has its own
+            // session cache and ticket keys, so a constant is enough.
+            context
+                .set_session_id_context(b"vector")
+                .context(SetSessionIdContextSnafu)?;
+        }
         if let Some(identity) = &self.identity {
             context
                 .set_certificate(&identity.cert)
@@ -609,6 +660,10 @@ impl fmt::Debug for TlsSettings {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
+            .field(
+                "has_client_cert_verifier",
+                &self.client_cert_verifier.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }

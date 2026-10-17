@@ -12,7 +12,7 @@ use futures::{FutureExt, Stream, future::BoxFuture, stream};
 use ipnet::IpNet;
 use openssl::{
     ssl::{Ssl, SslAcceptor, SslMethod},
-    x509::X509,
+    x509::{X509, X509VerifyResult},
 };
 use snafu::ResultExt;
 use tokio::{
@@ -24,8 +24,8 @@ use tokio_openssl::SslStream;
 use tonic::transport::{Certificate, server::Connected};
 
 use super::{
-    CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
-    SslBuildSnafu, TcpBindSnafu, TlsAcceptorReloader, TlsError, TlsSettings,
+    CreateAcceptorSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream, SslBuildSnafu,
+    TcpBindSnafu, TlsAcceptorReloader, TlsError, TlsSettings,
 };
 use crate::tcp::{self, TcpKeepaliveConfig};
 
@@ -59,21 +59,25 @@ impl MaybeTlsSettings {
     }
 
     /// Bind a listener, optionally sharing a [`TlsAcceptorReloader`] so its acceptor can be swapped
-    /// at runtime. When `reloader` is `Some` and TLS is enabled, connections accepted by the
-    /// returned listener use the acceptor the reloader currently holds; otherwise the acceptor is
-    /// fixed for the lifetime of the listener.
+    /// at runtime. When `reloader` is `Some`, connections accepted by the returned listener use the
+    /// acceptor the reloader currently holds; otherwise the acceptor is fixed for the lifetime of
+    /// the listener.
+    ///
+    /// Returns [`TlsError::ReloaderWithoutTls`] when `reloader` is `Some` but TLS is disabled:
+    /// silently serving plaintext would bypass whatever the reloader's acceptor enforces, such as
+    /// client certificate verification.
     pub async fn bind_reloadable(
         &self,
         addr: &SocketAddr,
         reloader: Option<TlsAcceptorReloader>,
     ) -> crate::tls::Result<MaybeTlsListener> {
-        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
-
         let acceptor = match (self, reloader) {
-            (Self::Raw(()), _) => None,
+            (Self::Raw(()), Some(_)) => return Err(TlsError::ReloaderWithoutTls),
+            (Self::Raw(()), None) => None,
             (Self::Tls(_), Some(reloader)) => Some(reloader.shared()),
             (Self::Tls(tls), None) => Some(Arc::new(ArcSwap::from_pointee(tls.acceptor()?))),
         };
+        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
 
         Ok(MaybeTlsListener {
             listener,
@@ -286,10 +290,15 @@ impl MaybeTlsIncomingStream<TcpStream> {
                 async move {
                     let ssl = Ssl::new(acceptor.context()).context(SslBuildSnafu)?;
                     let mut stream = SslStream::new(ssl, stream).context(SslBuildSnafu)?;
-                    Pin::new(&mut stream)
-                        .accept()
-                        .await
-                        .context(HandshakeSnafu)?;
+                    if let Err(source) = Pin::new(&mut stream).accept().await {
+                        // The error itself only says verification failed; the verify result says why.
+                        let reason = stream.ssl().verify_result();
+                        return Err(if reason == X509VerifyResult::OK {
+                            TlsError::Handshake { source }
+                        } else {
+                            TlsError::PeerCertificateRejected { source, reason }
+                        });
+                    }
                     Ok(stream)
                 }
                 .boxed(),
