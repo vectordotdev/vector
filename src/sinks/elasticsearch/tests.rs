@@ -782,3 +782,45 @@ async fn test_parse_config_with_conflicting_auth() {
     // Should fail due to auth being specified in both places
     assert!(result.is_err());
 }
+
+#[tokio::test]
+async fn auto_version_distinguishes_opensearch_from_elasticsearch() {
+    use hyper::Body;
+
+    use crate::{sinks::util::test::build_test_server_generic, test_util::addr::next_addr};
+
+    for (version, suppress_type_name) in [
+        (serde_json::json!({"number": "6.8.23"}), false),
+        (serde_json::json!({"number": "7.17.0"}), true),
+        (serde_json::json!({"number": "8.0.0"}), true),
+        (
+            serde_json::json!({"number": "1.3.0", "distribution": "opensearch"}),
+            true,
+        ),
+        (
+            serde_json::json!({"number": "2.19.0", "distribution": "opensearch"}),
+            true,
+        ),
+        (
+            serde_json::json!({"number": "3.6.0", "distribution": "opensearch"}),
+            true,
+        ),
+    ] {
+        let (_guard, addr) = next_addr();
+        let body = serde_json::json!({"version": version}).to_string();
+        let (_rx, _trigger, server) =
+            build_test_server_generic(addr, move || http::Response::new(Body::from(body.clone())));
+        let server = tokio::spawn(server);
+        let config = ElasticsearchConfig {
+            endpoints: vec![HttpEndpoint::parse(&format!("http://{addr}")).unwrap()],
+            api_version: ElasticsearchApiVersion::Auto,
+            ..Default::default()
+        };
+        let common = ElasticsearchCommon::parse_single(&config).await.unwrap();
+        assert_eq!(
+            common.request_builder.encoder.suppress_type_name, suppress_type_name,
+            "unexpected type handling for {version}"
+        );
+        server.abort();
+    }
+}
