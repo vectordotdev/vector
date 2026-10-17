@@ -1,9 +1,10 @@
 use std::{
     error::Error as _,
     future::Future,
+    iter,
     pin::Pin,
     sync::{
-        Arc, LazyLock,
+        Arc, LazyLock, Mutex, PoisonError,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
@@ -12,12 +13,14 @@ use std::{
 
 use chrono::DateTime;
 use derivative::Derivative;
-use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
+use futures::{
+    FutureExt, Stream, StreamExt, TryFutureExt, stream,
+    stream::{BoxStream, FuturesUnordered},
+};
 use http::uri::{InvalidUri, Scheme, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
-use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     Code, Request, Status,
     metadata::MetadataValue,
@@ -147,6 +150,27 @@ pub struct PubsubConfig {
     /// The maximum number of concurrent stream connections to open at once.
     #[serde(default = "default_max_concurrency")]
     pub max_concurrency: usize,
+
+    /// The maximum number of messages that the server sends on a stream
+    /// before it waits for some of them to be acknowledged.
+    ///
+    /// Each message sent on a stream holds a lease until it is acknowledged, and the
+    /// lease expires after `ack_deadline_secs`. Limiting the outstanding messages keeps
+    /// the source from leasing more messages than the pipeline can deliver within the
+    /// ack deadline, which would cause those messages to be redelivered. The limit
+    /// applies to each stream, so the source holds at most `max_concurrency` times this
+    /// many messages. Set to `0` for no limit.
+    #[serde(default)]
+    pub max_outstanding_messages: u64,
+
+    /// The maximum number of bytes of messages that the server sends on a stream before
+    /// it waits for some of them to be acknowledged.
+    ///
+    /// The limit applies to each stream, like `max_outstanding_messages`. Set to `0`
+    /// for no limit.
+    #[serde(default)]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_outstanding_bytes: u64,
 
     /// The number of messages in a response to mark a stream as
     /// "busy". This is used to determine if more streams should be
@@ -321,6 +345,11 @@ impl SourceConfig for PubsubConfig {
             keepalive: self.keepalive_secs,
             concurrency: Arc::default(),
             full_response_size: self.full_response_size,
+            // The server treats values above `i64::MAX` like any other
+            // large limit, so saturating does not change behavior.
+            max_outstanding_messages: i64::try_from(self.max_outstanding_messages)
+                .unwrap_or(i64::MAX),
+            max_outstanding_bytes: i64::try_from(self.max_outstanding_bytes).unwrap_or(i64::MAX),
             log_namespace,
             bytes_received: register!(BytesReceived::from(protocol)),
             events_received: register!(EventsReceived),
@@ -392,6 +421,8 @@ struct PubsubSource {
     // would result in repeatedly re-opening the stream on idle.
     concurrency: Arc<AtomicUsize>,
     full_response_size: usize,
+    max_outstanding_messages: i64,
+    max_outstanding_bytes: i64,
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
@@ -452,8 +483,9 @@ impl PubsubSource {
     }
 
     async fn run(mut self, busy_flag: Arc<AtomicBool>) {
+        let mut acks = AckState::new(self.acknowledgements, self.shutdown.clone());
         loop {
-            match self.run_once(&busy_flag).await {
+            match self.run_once(&busy_flag, &mut acks).await {
                 State::RetryNow => debug!("Retrying immediately."),
                 State::RetryDelay => {
                     info!(
@@ -467,7 +499,7 @@ impl PubsubSource {
         }
     }
 
-    async fn run_once(&mut self, busy_flag: &Arc<AtomicBool>) -> State {
+    async fn run_once(&mut self, busy_flag: &Arc<AtomicBool>, acks: &mut AckState) -> State {
         let connection = match self.endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
@@ -494,60 +526,54 @@ impl PubsubSource {
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
 
-        let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
-
-        // Handle shutdown during startup, the streaming pull doesn't
-        // start if there is no data in the subscription.
-        let request_stream = self.request_stream(ack_ids_receiver);
+        // Handle shutdown and acknowledgements during startup, the
+        // streaming pull doesn't start if there is no data in the
+        // subscription. The request stream is already sent, so batches
+        // finalized in the meantime are acknowledged on this stream.
+        let request_stream = self.request_stream(&acks.queue);
         debug!("Starting streaming pull.");
-        let stream = tokio::select! {
-            _ = &mut self.shutdown => return State::Shutdown,
-            result = client.streaming_pull(request_stream) => match result {
-                Ok(stream) => stream,
-                Err(error) => {
-                    emit!(GcpPubsubStreamingPullError { error });
-                    return State::RetryDelay;
+        let stream = {
+            let streaming_pull = client.streaming_pull(request_stream);
+            tokio::pin!(streaming_pull);
+            loop {
+                tokio::select! {
+                    biased;
+                    finalized = acks.ack_stream.next(), if acks.pending > 0 => {
+                        acks.handle_finalized(finalized).await;
+                    },
+                    result = &mut streaming_pull => match result {
+                        Ok(stream) => break stream,
+                        Err(error) => {
+                            emit!(GcpPubsubStreamingPullError { error });
+                            return State::RetryDelay;
+                        }
+                    },
+                    _ = &mut self.shutdown, if acks.pending == 0 => return State::Shutdown,
                 }
             }
         };
         let mut stream = stream.into_inner();
 
-        let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
-        let mut pending_acks = 0;
-
         loop {
             tokio::select! {
                 biased;
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
-                    pending_acks -= 1;
-                    if status == BatchStatus::Delivered {
-                        ack_ids_sender
-                            .send(receipts)
-                            .await
-                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
-                    }
+                finalized = acks.ack_stream.next(), if acks.pending > 0 => {
+                    acks.handle_finalized(finalized).await;
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
-                        self.handle_response(
-                            response,
-                            &finalizer,
-                            &ack_ids_sender,
-                            &mut pending_acks,
-                            busy_flag,
-                        ).await;
+                        self.handle_response(response, acks, busy_flag).await;
                     }
                     Some(Err(error)) => break translate_error(error),
                     None => break State::RetryNow,
                 },
-                _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
+                _ = &mut self.shutdown, if acks.pending == 0 => return State::Shutdown,
                 _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
                 () = tokio::time::sleep(self.keepalive) => {
-                    if pending_acks == 0 {
+                    if acks.pending == 0 && acks.queue.is_empty() {
                         // No pending acks, and no new data, so drop
                         // this stream if we aren't the only active
                         // one.
@@ -565,10 +591,7 @@ impl PubsubSource {
                     // other activity has happened. This will result
                     // in a new request with empty fields, effectively
                     // a keepalive.
-                    ack_ids_sender
-                        .send(Vec::new())
-                        .await
-                        .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                    acks.queue.send(AckUpdate::default()).await;
                 }
             }
         }
@@ -580,12 +603,14 @@ impl PubsubSource {
     )]
     fn request_stream(
         &self,
-        ack_ids: mpsc::Receiver<Vec<String>>,
+        queue: &AckQueue,
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static + use<> {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_secs.as_secs() as i32;
-        let ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
+        let max_outstanding_messages = self.max_outstanding_messages;
+        let max_outstanding_bytes = self.max_outstanding_bytes;
+        let updates = queue.take_updates().ready_chunks(ACK_QUEUE_SIZE);
 
         stream::once(async move {
             // These fields are only valid on the first request in the
@@ -594,32 +619,35 @@ impl PubsubSource {
                 subscription,
                 client_id,
                 stream_ack_deadline_seconds,
+                max_outstanding_messages,
+                max_outstanding_bytes,
                 ..Default::default()
             }
         })
-        .chain(ack_ids.map(|chunks| {
+        .chain(updates.map(|updates| {
             // These "requests" serve only to send updates about
             // acknowledgements to the server. None of the above
             // fields need to be repeated and, in fact, will cause
             // an stream error and cancellation if they are
             // present.
-            proto::StreamingPullRequest {
-                ack_ids: chunks.into_iter().flatten().collect(),
-                ..Default::default()
+            let mut request = proto::StreamingPullRequest::default();
+            for update in updates {
+                request.ack_ids.extend(update.ack_ids);
+                // A deadline of zero makes the message available for
+                // redelivery immediately.
+                request
+                    .modify_deadline_seconds
+                    .extend(iter::repeat_n(0, update.release_ids.len()));
+                request.modify_deadline_ack_ids.extend(update.release_ids);
             }
+            request
         }))
     }
 
-    #[allow(
-        clippy::ref_option,
-        reason = "Keep optional batch notifiers consistent with the event finalization API. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
-        finalizer: &Option<Finalizer>,
-        ack_ids: &mpsc::Sender<Vec<String>>,
-        pending_acks: &mut usize,
+        acks: &mut AckState,
         busy_flag: &Arc<AtomicBool>,
     ) {
         if response.received_messages.len() >= self.full_response_size {
@@ -632,18 +660,20 @@ impl PubsubSource {
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(_) => emit!(StreamClosedError { count }),
+            Err(_) => {
+                emit!(StreamClosedError { count });
+                // These messages were not emitted, so release their
+                // leases instead of holding them until they expire.
+                acks.queue.send(AckUpdate::release(ids)).await;
+            }
             Ok(()) => match notifier {
-                None => ack_ids
-                    .send(ids)
-                    .await
-                    .unwrap_or_else(|_| unreachable!("request stream never closes")),
+                None => acks.queue.send(AckUpdate::acknowledge(ids)).await,
                 Some(notifier) => {
-                    finalizer
+                    acks.finalizer
                         .as_ref()
                         .expect("Finalizer must have been set up for acknowledgements")
                         .add(ids, notifier);
-                    *pending_acks += 1;
+                    acks.pending += 1;
                 }
             },
         }
@@ -726,6 +756,138 @@ impl PubsubSource {
     }
 }
 
+/// Acknowledgement state of one stream task.
+///
+/// Pub/Sub accepts acknowledgement IDs on any stream of the
+/// subscription, so this state outlives the individual streaming
+/// pulls of the task. When a stream ends (the server closes it, it
+/// fails, or the authentication token is refreshed), batches that are
+/// still in the pipeline are acknowledged on the next stream once they
+/// are finalized, instead of being redelivered after their ack
+/// deadline expires.
+struct AckState {
+    finalizer: Option<Finalizer>,
+    ack_stream: BoxStream<'static, (BatchStatus, Vec<String>)>,
+    /// The number of batches added to the finalizer and not yet finalized.
+    pending: usize,
+    queue: AckQueue,
+}
+
+impl AckState {
+    fn new(acknowledgements: bool, shutdown: ShutdownSignal) -> Self {
+        let (finalizer, ack_stream) = Finalizer::maybe_new(acknowledgements, Some(shutdown));
+        Self {
+            finalizer,
+            ack_stream,
+            pending: 0,
+            queue: AckQueue::new(),
+        }
+    }
+
+    /// Queues the acknowledgement of a finalized batch.
+    ///
+    /// The finalizer stream ends after shutdown, and an ended stream
+    /// is always ready, so callers poll it only while batches are
+    /// pending.
+    async fn handle_finalized(&mut self, finalized: Option<(BatchStatus, Vec<String>)>) {
+        if let Some((status, receipts)) = finalized {
+            self.pending -= 1;
+            if status == BatchStatus::Delivered {
+                self.queue.send(AckUpdate::acknowledge(receipts)).await;
+            }
+        }
+    }
+}
+
+/// Acknowledgement IDs to send to the server.
+#[derive(Debug, Default)]
+struct AckUpdate {
+    /// Messages to acknowledge.
+    ack_ids: Vec<String>,
+    /// Messages whose leases to release for immediate redelivery.
+    release_ids: Vec<String>,
+}
+
+impl AckUpdate {
+    const fn acknowledge(ack_ids: Vec<String>) -> Self {
+        Self {
+            ack_ids,
+            release_ids: Vec::new(),
+        }
+    }
+
+    const fn release(release_ids: Vec<String>) -> Self {
+        Self {
+            ack_ids: Vec::new(),
+            release_ids,
+        }
+    }
+}
+
+/// The queue of acknowledgement updates of one stream task.
+///
+/// Each streaming pull takes the queued updates through
+/// [`AckQueue::take_updates`]. Updates that the request stream of an
+/// ended streaming pull had not yet taken stay queued for the next one.
+struct AckQueue {
+    sender: mpsc::Sender<AckUpdate>,
+    receiver: Arc<Mutex<AckReceiver>>,
+}
+
+struct AckReceiver {
+    updates: mpsc::Receiver<AckUpdate>,
+    /// Identifies the only request stream that may take updates.
+    current_stream: u64,
+}
+
+impl AckQueue {
+    fn new() -> Self {
+        let (sender, updates) = mpsc::channel(ACK_QUEUE_SIZE);
+        let receiver = AckReceiver {
+            updates,
+            current_stream: 0,
+        };
+        Self {
+            sender,
+            receiver: Arc::new(Mutex::new(receiver)),
+        }
+    }
+
+    async fn send(&self, update: AckUpdate) {
+        self.sender
+            .send(update)
+            .await
+            .unwrap_or_else(|_| unreachable!("the queue owns its receiver"));
+    }
+
+    fn is_empty(&self) -> bool {
+        self.sender.capacity() == self.sender.max_capacity()
+    }
+
+    /// Returns the updates for a new streaming pull, and ends the
+    /// stream returned by the previous call.
+    fn take_updates(&self) -> impl Stream<Item = AckUpdate> + Send + 'static + use<> {
+        let receiver = Arc::clone(&self.receiver);
+        // The lock is held only to bump the current stream or to poll
+        // the channel, neither of which can leave the receiver
+        // inconsistent, so a poisoned lock is still usable.
+        let stream = {
+            let mut receiver = receiver.lock().unwrap_or_else(PoisonError::into_inner);
+            receiver.current_stream += 1;
+            receiver.current_stream
+        };
+        stream::poll_fn(move |cx| {
+            let mut receiver = receiver.lock().unwrap_or_else(PoisonError::into_inner);
+            if receiver.current_stream == stream {
+                receiver.updates.poll_recv(cx)
+            } else {
+                // A newer streaming pull has taken over the queue.
+                Poll::Ready(None)
+            }
+        })
+    }
+}
+
 fn translate_error(error: tonic::Status) -> State {
     // GCP occasionally issues a connection reset
     // in the middle of the streaming pull. This
@@ -767,9 +929,230 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+
+    use futures::stream::BoxStream;
+    use tokio_stream::wrappers::TcpListenerStream;
     use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
+    use crate::{config::ComponentKey, event::EventStatus, shutdown::SourceShutdownCoordinator};
+
+    type RecordedRequests = mpsc::UnboundedReceiver<(usize, proto::StreamingPullRequest)>;
+
+    /// A Pub/Sub server that reports every streaming pull request it
+    /// receives, tagged with the index of the stream it arrived on.
+    ///
+    /// The first stream delivers one message and is then closed by the
+    /// server, the way Pub/Sub closes streams with `UNAVAILABLE` to
+    /// rebalance them. Later streams stay open and deliver nothing.
+    struct FakeSubscriber {
+        streams: AtomicUsize,
+        requests: mpsc::UnboundedSender<(usize, proto::StreamingPullRequest)>,
+    }
+
+    #[tonic::async_trait]
+    impl proto::subscriber_server::Subscriber for FakeSubscriber {
+        type StreamingPullStream = BoxStream<'static, Result<proto::StreamingPullResponse, Status>>;
+
+        async fn streaming_pull(
+            &self,
+            request: Request<tonic::Streaming<proto::StreamingPullRequest>>,
+        ) -> Result<tonic::Response<Self::StreamingPullStream>, Status> {
+            let index = self.streams.fetch_add(1, Ordering::SeqCst);
+            let requests = self.requests.clone();
+            let mut inbound = request.into_inner();
+            tokio::spawn(async move {
+                while let Some(Ok(request)) = inbound.next().await {
+                    if requests.send((index, request)).is_err() {
+                        break;
+                    }
+                }
+            });
+
+            let responses = if index == 0 {
+                let message = proto::ReceivedMessage {
+                    ack_id: "ack-1".into(),
+                    message: Some(proto::PubsubMessage {
+                        data: b"hello".to_vec(),
+                        message_id: "message-1".into(),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+                let response = proto::StreamingPullResponse {
+                    received_messages: vec![message],
+                    ..Default::default()
+                };
+                // tonic discards an encoded response that is still buffered when the stream
+                // yields an error, so let the response go out before closing the stream.
+                let close = async {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    Err(Status::unavailable(
+                        "The service was unable to fulfill your request.",
+                    ))
+                };
+                stream::once(async { Ok(response) })
+                    .chain(stream::once(close))
+                    .boxed()
+            } else {
+                stream::pending().boxed()
+            };
+            Ok(tonic::Response::new(responses))
+        }
+    }
+
+    async fn serve_fake_subscriber() -> (SocketAddr, RecordedRequests) {
+        let (requests, recorded) = mpsc::unbounded_channel();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let subscriber = FakeSubscriber {
+            streams: AtomicUsize::new(0),
+            requests,
+        };
+        tokio::spawn(
+            tonic::transport::Server::builder()
+                .add_service(proto::subscriber_server::SubscriberServer::new(subscriber))
+                .serve_with_incoming(TcpListenerStream::new(listener)),
+        );
+        (address, recorded)
+    }
+
+    fn fake_subscriber_config(address: SocketAddr) -> PubsubConfig {
+        PubsubConfig {
+            project: "project".into(),
+            subscription: "subscription".into(),
+            endpoint: format!("http://{address}"),
+            auth: GcpAuthConfig {
+                skip_authentication: true,
+                ..Default::default()
+            },
+            max_concurrency: 1,
+            full_response_size: default_full_response(),
+            poll_time_seconds: default_poll_time(),
+            ack_deadline_secs: default_ack_deadline(),
+            retry_delay_secs: Duration::from_millis(100),
+            keepalive_secs: default_keepalive(),
+            ..Default::default()
+        }
+    }
+
+    async fn spawn_source(
+        config: PubsubConfig,
+    ) -> (impl Stream<Item = Event> + Unpin, SourceShutdownCoordinator) {
+        let (tx, rx) = SourceSender::new_test();
+        let (mut cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("gcp_pubsub"), tx);
+        cx.acknowledgements = true;
+        let source = config.build(cx).await.unwrap();
+        tokio::spawn(source);
+        (rx, shutdown)
+    }
+
+    async fn next_request_where(
+        recorded: &mut RecordedRequests,
+        expected: &str,
+        matches: impl Fn(usize, &proto::StreamingPullRequest) -> bool,
+    ) -> (usize, proto::StreamingPullRequest) {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let (index, request) = recorded.recv().await.unwrap();
+                if matches(index, &request) {
+                    return (index, request);
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("timed out waiting for {expected}"))
+    }
+
+    #[tokio::test]
+    async fn acknowledges_batches_finalized_after_their_stream_ended() {
+        // 1. Serve a subscription whose first stream ends right after delivering a message.
+        let (address, mut recorded) = serve_fake_subscriber().await;
+
+        // 2. Receive the message as an event and hold it without finalizing it.
+        let (mut events, _shutdown) = spawn_source(fake_subscriber_config(address)).await;
+        let mut event = tokio::time::timeout(Duration::from_secs(10), events.next())
+            .await
+            .expect("timed out waiting for the event")
+            .unwrap();
+
+        // 3. Wait until the source has opened its next stream, so that the batch is finalized
+        //    after the stream that delivered it has ended.
+        next_request_where(&mut recorded, "the next stream", |index, _| index > 0).await;
+
+        // 4. Deliver the event and expect its acknowledgement on the new stream.
+        event.metadata().update_status(EventStatus::Delivered);
+        event.metadata_mut().update_sources();
+        drop(event);
+        let (index, request) =
+            next_request_where(&mut recorded, "an acknowledgement", |_, request| {
+                !request.ack_ids.is_empty()
+            })
+            .await;
+        assert_eq!(index, 1);
+        assert_eq!(request.ack_ids, vec!["ack-1".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn shuts_down_after_its_pending_batches_are_finalized() {
+        // 1. Receive an event and hold it, with the source streaming on its second stream.
+        let (address, mut recorded) = serve_fake_subscriber().await;
+        let (mut events, mut coordinator) = spawn_source(fake_subscriber_config(address)).await;
+        let mut event = tokio::time::timeout(Duration::from_secs(10), events.next())
+            .await
+            .expect("timed out waiting for the event")
+            .unwrap();
+        next_request_where(&mut recorded, "the next stream", |index, _| index > 0).await;
+
+        // 2. Shut the source down while its batch is pending, and expect it to wait for the batch.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        let mut shut_down =
+            coordinator.shutdown_source(&ComponentKey::from("gcp_pubsub"), deadline);
+        let early = tokio::time::timeout(Duration::from_millis(500), &mut shut_down).await;
+        assert!(early.is_err(), "the source shut down with a batch pending");
+
+        // 3. Deliver the event and expect the source to finish before the deadline.
+        event.metadata().update_status(EventStatus::Delivered);
+        event.metadata_mut().update_sources();
+        drop(event);
+        assert!(shut_down.await, "the source did not shut down");
+    }
+
+    #[tokio::test]
+    async fn requests_the_configured_flow_control() {
+        let (address, mut recorded) = serve_fake_subscriber().await;
+        let config = PubsubConfig {
+            max_outstanding_messages: 20_000,
+            max_outstanding_bytes: 64 * 1024 * 1024,
+            ..fake_subscriber_config(address)
+        };
+        let (_events, _shutdown) = spawn_source(config).await;
+
+        let (_, request) = next_request_where(&mut recorded, "the first request", |_, request| {
+            !request.subscription.is_empty()
+        })
+        .await;
+        assert_eq!(
+            request.subscription,
+            "projects/project/subscriptions/subscription"
+        );
+        assert_eq!(request.max_outstanding_messages, 20_000);
+        assert_eq!(request.max_outstanding_bytes, 64 * 1024 * 1024);
+    }
+
+    #[test]
+    fn flow_control_is_unlimited_by_default() {
+        let config: PubsubConfig = toml::from_str(
+            r#"
+            project = "project"
+            subscription = "subscription"
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.max_outstanding_messages, 0);
+        assert_eq!(config.max_outstanding_bytes, 0);
+    }
 
     #[test]
     fn generate_config() {
