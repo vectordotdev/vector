@@ -26,7 +26,7 @@ use crate::{
         HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
     },
-    tls::TlsEnableableConfig,
+    tls::{TlsAcceptorReloader, TlsEnableableConfig},
 };
 
 /// Configuration for the `http_server` source.
@@ -288,10 +288,24 @@ pub fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParam
         .collect::<crate::Result<Vec<HttpConfigParamKind>>>()
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "http_server")]
-impl SourceConfig for SimpleHttpConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+impl SimpleHttpConfig {
+    /// The source's TLS configuration, if any. Exposed so a wrapping source can build a
+    /// [`TlsAcceptorReloader`] and watch the certificate files for rotation.
+    #[must_use]
+    pub const fn tls_config(&self) -> Option<&TlsEnableableConfig> {
+        self.tls.as_ref()
+    }
+
+    /// Build the source serving a runtime-swappable TLS acceptor when `tls_reloader` is set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder, TLS, or authentication cannot be built.
+    pub fn build_with_tls_reloader(
+        &self,
+        cx: SourceContext,
+        tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder = self
             .get_decoding_config()?
@@ -309,18 +323,27 @@ impl SourceConfig for SimpleHttpConfig {
             decoder,
             log_namespace,
         };
-        source.run(
+        source.run_with_tls_reloader(
             self.address,
             self.path.as_str(),
             self.method,
             self.response_code,
             self.strict_path,
             self.tls.as_ref(),
+            tls_reloader,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,
             self.keepalive.clone(),
         )
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "http_server")]
+impl SourceConfig for SimpleHttpConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.build_with_tls_reloader(cx, None)
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

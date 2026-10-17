@@ -12,12 +12,14 @@ use tokio_openssl::SslStream;
 
 use crate::tcp::{self, TcpKeepaliveConfig};
 
+mod client_cert_verifier;
 mod incoming;
 mod maybe_tls;
 mod outgoing;
 mod reload;
 mod settings;
 
+pub use client_cert_verifier::ClientCertVerifier;
 pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub use maybe_tls::MaybeTls;
 pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};

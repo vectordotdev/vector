@@ -4,14 +4,15 @@ use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
-    sync::{LazyLock, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, ClientCertVerifier,
+    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
+    NewStoreBuilderSnafu, ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
+    SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    client_cert_verifier::verify_client_cert,
 };
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
@@ -178,6 +179,7 @@ pub struct TlsSettings {
     pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
+    client_cert_verifier: Option<Arc<dyn ClientCertVerifier>>,
 }
 
 /// Identity store in PEM format
@@ -220,7 +222,23 @@ impl TlsSettings {
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
             server_name: options.server_name.clone(),
+            client_cert_verifier: None,
         })
+    }
+
+    /// Authorize TLS clients with `verifier`, on top of chain validation.
+    ///
+    /// Only applies when these settings build a server acceptor. Installing a verifier makes the
+    /// server request and require a client certificate, whatever `verify_certificate` says, so a
+    /// verifier can never be bypassed by connecting without one.
+    ///
+    /// The verifier is part of these settings: an acceptor rebuilt from other settings, e.g. by
+    /// [`TlsAcceptorReloader::reload`](super::TlsAcceptorReloader::reload), only applies the
+    /// verifier those settings carry.
+    #[must_use]
+    pub fn with_client_cert_verifier(mut self, verifier: Arc<dyn ClientCertVerifier>) -> Self {
+        self.client_cert_verifier = Some(verifier);
+        self
     }
 
     /// The configured SNI server name override, if any.
@@ -281,11 +299,22 @@ impl TlsSettings {
         context: &mut SslContextBuilder,
         for_server: bool,
     ) -> Result<()> {
-        context.set_verify(if self.verify_certificate {
-            SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
-        } else {
-            SslVerifyMode::NONE
-        });
+        match &self.client_cert_verifier {
+            Some(verifier) if for_server => {
+                let verifier = Arc::clone(verifier);
+                context.set_verify_callback(
+                    SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
+                    move |preverified, store_context| {
+                        verify_client_cert(verifier.as_ref(), preverified, store_context)
+                    },
+                );
+            }
+            _ => context.set_verify(if self.verify_certificate {
+                SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
+            } else {
+                SslVerifyMode::NONE
+            }),
+        }
         if let Some(identity) = &self.identity {
             context
                 .set_certificate(&identity.cert)
@@ -609,6 +638,10 @@ impl fmt::Debug for TlsSettings {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
+            .field(
+                "has_client_cert_verifier",
+                &self.client_cert_verifier.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }

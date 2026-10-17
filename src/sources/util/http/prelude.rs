@@ -32,7 +32,7 @@ use crate::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -111,6 +111,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         decompress_body(encoding_header, body)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or authentication cannot be configured.
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -120,6 +124,46 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         response_code: StatusCode,
         strict_path: bool,
         tls: Option<&TlsEnableableConfig>,
+        auth: Option<&HttpServerAuthConfig>,
+        cx: SourceContext,
+        acknowledgements: SourceAcknowledgementsConfig,
+        keepalive_settings: KeepaliveConfig,
+    ) -> crate::Result<crate::sources::Source> {
+        self.run_with_tls_reloader(
+            address,
+            path,
+            method,
+            response_code,
+            strict_path,
+            tls,
+            None,
+            auth,
+            cx,
+            acknowledgements,
+            keepalive_settings,
+        )
+    }
+
+    /// Like [`run`](Self::run), but serves the acceptor held by `tls_reloader` when set, so the
+    /// caller can swap in new TLS material at runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or authentication cannot be configured.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(clippy::too_many_arguments)]
+    fn run_with_tls_reloader(
+        self,
+        address: SocketAddr,
+        path: &str,
+        method: HttpMethod,
+        response_code: StatusCode,
+        strict_path: bool,
+        tls: Option<&TlsEnableableConfig>,
+        tls_reloader: Option<TlsAcceptorReloader>,
         auth: Option<&HttpServerAuthConfig>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
@@ -270,7 +314,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             info!(message = "Building HTTP server.", address = %address);
 
             let listener = tls
-                .bind(&address)
+                .bind_reloadable(&address, tls_reloader)
                 .await
                 .map_err(|err| {
                     error!("An error occurred: {err:?}.");
