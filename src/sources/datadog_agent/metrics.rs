@@ -347,6 +347,13 @@ fn decode_ddseries(
         .into_iter()
         .enumerate()
         .flat_map(|(index, serie)| {
+            // A series without points cannot emit an event. Skip it before expanding its tags
+            // into a MetricTags map, since a compressed v3 payload can otherwise make this an
+            // arbitrarily large allocation that is immediately discarded.
+            if serie.points.is_empty() {
+                return Vec::new();
+            }
+
             let (namespace, name) = if split_metric_namespace {
                 namespace_name_from_dd_metric(&serie.metric)
             } else {

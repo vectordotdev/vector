@@ -2890,6 +2890,27 @@ fn decode_v3_accepts_many_distinct_metadata_tags() {
 }
 
 #[test]
+fn decode_v3_skips_tag_expansion_for_zero_point_series() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 0;
+    data.timestamps.clear();
+    data.vals_float64.clear();
+    let payload = ddmetric_v3_proto::Payload {
+        metadata: Some(ddmetric_v3_proto::Metadata {
+            tags: (0..100_000).map(|index| format!("tag:{index}")).collect(),
+            resources: Vec::new(),
+        }),
+        metric_data: Some(data),
+    };
+    let mut body = Vec::new();
+    payload.encode(&mut body).unwrap();
+
+    let events = super::metrics::decode_ddseries_v3(Bytes::from(body), &None, false).unwrap();
+
+    assert!(events.is_empty());
+}
+
+#[test]
 fn decode_v3_rejects_excessive_metadata_string_entries_before_decode() {
     let metadata_entry_count = 16 * 1024 * 1024 / std::mem::size_of::<String>() + 1;
     let mut metadata = Vec::with_capacity(metadata_entry_count * 2);

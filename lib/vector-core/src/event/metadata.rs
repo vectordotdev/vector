@@ -481,12 +481,6 @@ impl EventMetadata {
         let other = other.into_owned();
         inner.finalizers.merge(other.finalizers);
         inner.secrets.merge(other.secrets);
-        if inner.datadog_origin_metadata.is_none() {
-            inner.datadog_origin_metadata = other.datadog_origin_metadata;
-        }
-        if inner.datadog_metric_unit.is_none() {
-            inner.datadog_metric_unit = other.datadog_metric_unit;
-        }
 
         // Update `source_event_id` if necessary.
         if inner.source_event_id.is_none() {
