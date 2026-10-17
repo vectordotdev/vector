@@ -28,10 +28,6 @@ cmd_fmt() {
   list-docs-files | grep -v "${CUE_SOURCES}/reference/remap/functions/" | xargs cue fmt "$@"
 }
 
-cmd_vet() {
-  list-docs-files | xargs cue vet --concrete --all-errors "$@"
-}
-
 cmd_eval() {
   list-docs-files | xargs cue eval --concrete --all-errors "$@"
 }
@@ -53,7 +49,7 @@ cmd_build() {
 
 usage() {
   cat >&2 <<-EOF
-Usage: $0 [build|check|fmt|list|vet|eval|export]
+Usage: $0 [build|check|fmt|list|eval|export]
 
 Modes:
   build   - build all of the CUE sources and export them into a Hugo-processable
@@ -61,7 +57,6 @@ Modes:
   check   - check for the CUE sources' correctness
   fmt     - format all CUE files using the built-in formatter
   list    - list all the documentation files
-  vet     - check the documentation files and print errors
   eval    - print the evaluated documentation,
             optionally pass the expression to evaluate via "-e EXPRESSION"
   export  - export the documentation,
@@ -92,7 +87,7 @@ EOF
 
 MODE="${1:-}"
 case "$MODE" in
-  build|check|fmt|list|vet|eval|export)
+  build|check|fmt|list|eval|export)
     shift
     "cmd_$MODE" "$@"
     ;;
