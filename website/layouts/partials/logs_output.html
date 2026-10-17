@@ -73,6 +73,54 @@
                   </div>
                 {{ end }}
               {{ end }}
+
+              {{ with index $v.type "object" }}
+                {{ with .options }}
+                  <div class="mt-3 border rounded flex flex-col divide-y dark:divide-gray-700 dark:border-gray-700">
+                    {{ range $name, $opt := . }}
+                      <div class="py-2.5 px-3.5">
+                        <span class="flex justify-between items-center">
+                          <span class="font-mono font-semibold">
+                            {{ $name }}
+                          </span>
+
+                          <span class="flex space-x-1">
+                            {{ if $opt.required }}
+                              {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+                            {{ else }}
+                              {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
+                            {{ end }}
+
+                            {{ range $t, $tv := $opt.type }}
+                              {{ partial "badge.html" (dict "word" $t "color" "gray") }}
+                            {{ end }}
+                          </span>
+                        </span>
+
+                        {{ with $opt.description }}
+                          <div class="mt-2 prose dark:prose-invert">
+                            {{ . | markdownify }}
+                          </div>
+                        {{ end }}
+
+                        {{ range $t, $tv := $opt.type }}
+                          {{ with $tv.examples }}
+                            <div class="mt-2">
+                              <span> Examples </span>
+
+                              <div class="mt-1.5 flex flex-col space-y-1 text-sm">
+                                {{ range . }}
+                                  <span class="font-mono text-sm text-secondary dark:text-primary">{{ . }}</span>
+                                {{ end }}
+                              </div>
+                            </div>
+                          {{ end }}
+                        {{ end }}
+                      </div>
+                    {{ end }}
+                  </div>
+                {{ end }}
+              {{ end }}
             </div>
           {{ end }}
         </div>
