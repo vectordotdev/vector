@@ -300,13 +300,27 @@ mod test {
 
 #[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+
+    use futures::StreamExt;
     use redis::AsyncCommands;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+        time::Instant,
+    };
     use vrl::value;
 
     use super::*;
     use crate::{
         SourceSender,
-        config::log_schema,
+        config::{ComponentKey, log_schema},
         test_util::{
             collect_n,
             components::{SOURCE_TAGS, run_and_assert_source_compliance_n},
@@ -314,12 +328,14 @@ mod integration_test {
         },
     };
 
-    const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
+    fn redis_url() -> String {
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
+    }
 
     #[tokio::test]
     async fn redis_source_list_rpop() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
@@ -335,7 +351,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Rpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -362,7 +378,7 @@ mod integration_test {
     #[tokio::test]
     async fn redis_source_list_rpop_with_log_namespace() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
@@ -376,7 +392,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Rpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: Some(OptionalValuePath::from(owned_value_path!("remapped_key"))),
             framing: default_framing_message_based(),
@@ -401,7 +417,7 @@ mod integration_test {
     #[tokio::test]
     async fn redis_source_list_lpop() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
@@ -417,7 +433,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Lpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -441,6 +457,157 @@ mod integration_test {
         );
     }
 
+    /// Stops the source while it is reading a long list and checks that every entry is either
+    /// emitted or still in the list.
+    async fn assert_no_entries_lost_on_shutdown(method: Method) {
+        const ENTRIES: usize = 4_000;
+        const ROUNDS: usize = 5;
+
+        let client = redis::Client::open(redis_url()).unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
+
+        for _ in 0..ROUNDS {
+            let key = format!("test-key-{}", random_string(10));
+            let values: Vec<String> = (1..=ENTRIES).map(|i| i.to_string()).collect();
+            for chunk in values.chunks(1000) {
+                let _: i64 = conn.rpush(&key, chunk).await.unwrap();
+            }
+
+            let config = RedisSourceConfig {
+                data_type: DataTypeConfig::List,
+                list: Some(ListOption { method }),
+                url: redis_url(),
+                key: key.clone(),
+                redis_key: None,
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
+                log_namespace: Some(false),
+            };
+
+            let (tx, rx) = SourceSender::new_test();
+            let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+            let source = tokio::spawn(config.build(cx).await.unwrap());
+            // Consume concurrently so the source is busy popping, not waiting on a full channel.
+            let received = tokio::spawn(rx.count());
+
+            // Stop the source part-way through the list, while it is still popping entries.
+            loop {
+                let remaining: usize = conn.llen(&key).await.unwrap();
+                if remaining < ENTRIES / 2 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(10)))
+                .await;
+            source.await.unwrap().unwrap();
+
+            let received = received.await.unwrap();
+            let remaining: usize = conn.llen(&key).await.unwrap();
+            assert_eq!(
+                received + remaining,
+                ENTRIES,
+                "received {received} + remaining {remaining} != pushed {ENTRIES}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_lpop_loses_no_entries_on_shutdown() {
+        assert_no_entries_lost_on_shutdown(Method::Lpop).await;
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_rpop_loses_no_entries_on_shutdown() {
+        assert_no_entries_lost_on_shutdown(Method::Rpop).await;
+    }
+
+    /// Starts a TCP proxy to the test Redis server whose replies can be frozen, which makes the
+    /// connection look half-open to the client. Returns the proxy URL and the freeze switch.
+    async fn freezable_redis_proxy() -> (String, Arc<AtomicBool>) {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let redis::ConnectionAddr::Tcp(host, port) = client.get_connection_info().addr.clone()
+        else {
+            panic!("test Redis must be reachable over plain TCP");
+        };
+        let db = client.get_connection_info().redis.db;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_url = format!("redis://{}/{db}", listener.local_addr().unwrap());
+        let frozen = Arc::new(AtomicBool::new(false));
+
+        let frozen_replies = Arc::clone(&frozen);
+        tokio::spawn(async move {
+            loop {
+                let (inbound, _) = listener.accept().await.unwrap();
+                let outbound = TcpStream::connect((host.as_str(), port)).await.unwrap();
+                let (mut client_read, mut client_write) = inbound.into_split();
+                let (mut server_read, mut server_write) = outbound.into_split();
+                tokio::spawn(async move {
+                    _ = tokio::io::copy(&mut client_read, &mut server_write).await;
+                });
+                let frozen = Arc::clone(&frozen_replies);
+                tokio::spawn(async move {
+                    let mut buf = vec![0; 16 * 1024];
+                    loop {
+                        let Ok(n @ 1..) = server_read.read(&mut buf).await else {
+                            return;
+                        };
+                        if frozen.load(Ordering::SeqCst) {
+                            // Swallow this and every later reply.
+                            std::future::pending::<()>().await;
+                        }
+                        if client_write.write_all(&buf[..n]).await.is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+
+        (proxy_url, frozen)
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_shutdown_is_bounded_when_replies_stop() {
+        let (proxy_url, frozen) = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method: Method::Lpop,
+            }),
+            url: proxy_url,
+            key: format!("test-key-{}", random_string(10)),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let source = tokio::spawn(config.build(cx).await.unwrap());
+        let _received = tokio::spawn(rx.count());
+
+        // Let the source connect and block on the empty list, then stop delivering replies so
+        // its in-flight pop never completes.
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        frozen.store(true, Ordering::SeqCst);
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        let stopped = tokio::time::timeout(Duration::from_secs(10), async {
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(30)))
+                .await;
+            source.await.unwrap().unwrap();
+        })
+        .await;
+        assert!(
+            stopped.is_ok(),
+            "source did not stop while its Redis connection was unresponsive"
+        );
+    }
+
     #[tokio::test]
     async fn redis_source_channel_consume_event() {
         let key = format!("test-channel-{}", random_string(10));
@@ -450,7 +617,7 @@ mod integration_test {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Channel,
             list: None,
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -474,7 +641,7 @@ mod integration_test {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
 
         let mut async_conn = client
             .get_multiplexed_async_connection()
