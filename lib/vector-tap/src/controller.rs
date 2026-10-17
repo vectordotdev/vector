@@ -14,7 +14,8 @@ use uuid::Uuid;
 use vector_buffers::{WhenFull, topology::builder::TopologyBuilder};
 use vector_common::config::ComponentKey;
 use vector_core::{
-    event::{EventArray, LogArray, MetricArray, TraceArray},
+    config::OutputId,
+    event::{EventArray, EventContainer, LogArray, MetricArray, TraceArray},
     fanout,
 };
 
@@ -170,18 +171,28 @@ impl TapTransformer {
     }
 
     pub fn try_send(&mut self, events: EventArray) {
+        let count = events.len();
         let payload = match events {
             EventArray::Logs(logs) => TapPayload::Log(self.output.clone(), logs),
             EventArray::Metrics(metrics) => TapPayload::Metric(self.output.clone(), metrics),
             EventArray::Traces(traces) => TapPayload::Trace(self.output.clone(), traces),
         };
 
-        if let Err(TrySendError::Closed(payload)) = self.tap_tx.try_send(payload) {
-            debug!(
+        match self.tap_tx.try_send(payload) {
+            Ok(()) => {}
+            // The tap is best-effort and must never apply backpressure to the topology, so a
+            // client that can't keep up loses events; say so instead of dropping them silently.
+            Err(TrySendError::Full(_)) => warn!(
+                message = "Tap channel is full, dropping events.",
+                count,
+                component_id = %self.output.output_id,
+                internal_log_rate_limit = true,
+            ),
+            Err(TrySendError::Closed(payload)) => debug!(
                 message = "Couldn't send event.",
                 payload = ?payload,
                 component_id = ?self.output.output_id,
-            );
+            ),
         }
     }
 }
@@ -289,9 +300,10 @@ async fn tap_handler(
 ) {
     debug!(message = "Started tap.", outputs_patterns = ?patterns.for_outputs, inputs_patterns = ?patterns.for_inputs);
 
-    // Sinks register for the current tap. Contains the id of the matched component, and
-    // a shutdown trigger for sending a remove control message when matching sinks change.
-    let mut sinks: HashMap<ComponentKey, _> = HashMap::new();
+    // Sinks registered for the current tap, keyed by the matched output. Each entry holds the
+    // fanout control channel the sink was attached to, and a shutdown trigger for sending a
+    // remove control message when matching sinks change.
+    let mut sinks: HashMap<OutputId, (fanout::ControlChannel, ShutdownTx)> = HashMap::new();
 
     // Recording user-provided patterns for later use in sending notifications
     // (determining patterns which did not match)
@@ -319,15 +331,6 @@ async fn tap_handler(
                     ..
                 } = watch_rx.borrow().clone();
 
-                // Remove tap sinks from components that have gone away/can no longer match.
-                let output_keys = outputs.keys().map(|output| output.output_id.component.clone()).collect::<HashSet<_>>();
-                sinks.retain(|key, _| {
-                    !removals.contains(key) && output_keys.contains(key) || {
-                        debug!(message = "Removing component.", component_id = %key);
-                        false
-                    }
-                });
-
                 let mut component_id_patterns = patterns.for_outputs.iter()
                                                                     .filter_map(|p| glob::Pattern::new(p).ok())
                                                                     .map(Pattern::OutputPattern).collect::<HashSet<_>>();
@@ -349,6 +352,18 @@ async fn tap_handler(
                     }
                 }
 
+                // Remove tap sinks from outputs that have gone away/can no longer match.
+                let output_ids = outputs.keys().map(|output| &output.output_id).collect::<HashSet<_>>();
+                sinks.retain(|output_id, _| {
+                    let still_tapped = !removals.contains(&output_id.component)
+                        && output_ids.contains(output_id)
+                        && component_id_patterns.iter().any(|pattern| pattern.matches_glob(&output_id.to_string()));
+                    if !still_tapped {
+                        debug!(message = "Removing component.", component_id = %output_id);
+                    }
+                    still_tapped
+                });
+
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
                 for (output, control_tx) in &outputs {
@@ -362,6 +377,24 @@ async fn tap_handler(
                                 message="Component matched.",
                                 ?output.output_id, ?component_id_patterns, matched = ?found
                             );
+
+                            matched.extend(found.iter().map(|pattern| {
+                                match pattern {
+                                    Pattern::OutputPattern(p) => p.to_string(),
+                                    Pattern::InputPattern(p, _) => p.to_owned(),
+                                }
+                            }));
+
+                            // Skip outputs that are already tapped through the same fanout, which
+                            // keeps its attached sinks across topology reloads. A different control
+                            // channel means the component was rebuilt, so the sink is reattached.
+                            if sinks
+                                .get(&output.output_id)
+                                .is_some_and(|(tapped_tx, _)| tapped_tx.same_channel(control_tx))
+                            {
+                                debug!(message = "Component already tapped.", ?output.output_id);
+                                continue;
+                            }
 
                             // Build a new intermediate buffer pair that we can insert as a sink
                             // target for the component, and spawn our transformer task which will
@@ -397,10 +430,12 @@ async fn tap_handler(
                                     );
 
                                     // Create a sink shutdown trigger to remove the sink
-                                    // when matched components change.
-                                    sinks.entry(output.output_id.component.clone()).or_insert_with(Vec::new).push(
-                                        shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str()))
-                                    );
+                                    // when matched components change. Replacing a previous
+                                    // entry drops its trigger, removing the stale sink.
+                                    sinks.insert(output.output_id.clone(), (
+                                        control_tx.clone(),
+                                        shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())),
+                                    ));
                                 }
                                 Err(error) => {
                                     error!(
@@ -411,13 +446,6 @@ async fn tap_handler(
                                     );
                                 }
                             }
-
-                            matched.extend(found.iter().map(|pattern| {
-                                match pattern {
-                                    Pattern::OutputPattern(p) => p.to_string(),
-                                    Pattern::InputPattern(p, _) => p.to_owned(),
-                                }
-                            }));
                         }
                         _ => {
                             debug!(
@@ -473,12 +501,243 @@ async fn tap_handler(
     debug!(message = "Stopped tap.", outputs_patterns = ?patterns.for_outputs, inputs_patterns = ?patterns.for_inputs);
 }
 
+#[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use tokio::{
+        sync::{mpsc, watch},
+        time::timeout,
+    };
+    use tracing_test::traced_test;
+    use vector_core::event::LogEvent;
+
+    use super::*;
+    use crate::notification::Notification;
+
+    const TIMEOUT: Duration = Duration::from_secs(5);
+
+    fn tap_output(id: &str) -> TapOutput {
+        TapOutput {
+            output_id: OutputId::from(ComponentKey::from(id)),
+            component_kind: "transform",
+            component_type: "remap".to_string(),
+        }
+    }
+
+    fn resource(
+        outputs: Vec<(&str, &fanout::ControlChannel)>,
+        inputs: Vec<(&str, &str)>,
+    ) -> TapResource {
+        TapResource {
+            outputs: outputs
+                .into_iter()
+                .map(|(id, control_tx)| (tap_output(id), control_tx.clone()))
+                .collect(),
+            inputs: inputs
+                .into_iter()
+                .map(|(key, input)| {
+                    (
+                        ComponentKey::from(key),
+                        vec![OutputId::from(ComponentKey::from(input))].into(),
+                    )
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    /// Waits until the tap handler has processed a topology change. Every change results in a
+    /// `not_matched` notification for the `missing` pattern.
+    async fn wait_for_change(tap_rx: &mut mpsc::Receiver<TapPayload>) {
+        loop {
+            let payload = timeout(TIMEOUT, tap_rx.recv()).await.unwrap().unwrap();
+            if let TapPayload::Notification(Notification::NotMatched(not_matched)) = payload
+                && not_matched.pattern == "missing"
+            {
+                return;
+            }
+        }
+    }
+
+    async fn recv_control_message(
+        control_rx: &mut mpsc::UnboundedReceiver<fanout::ControlMessage>,
+    ) -> fanout::ControlMessage {
+        timeout(TIMEOUT, control_rx.recv()).await.unwrap().unwrap()
+    }
+
+    fn patterns(for_outputs: &[&str], for_inputs: &[&str]) -> TapPatterns {
+        TapPatterns::new(
+            for_outputs.iter().map(ToString::to_string).collect(),
+            for_inputs.iter().map(ToString::to_string).collect(),
+        )
+    }
+
+    #[tokio::test]
+    async fn does_not_reattach_unchanged_outputs_on_reload() {
+        let (control_tx, mut control_rx) = mpsc::unbounded_channel();
+        let (watch_tx, watch_rx) = watch::channel(TapResource::default());
+        let (tap_tx, mut tap_rx) = mpsc::channel(10);
+        let _controller = TapController::new(watch_rx, tap_tx, patterns(&["in", "missing"], &[]));
+
+        for _ in 0..3 {
+            watch_tx
+                .send(resource(vec![("in", &control_tx)], vec![]))
+                .unwrap();
+            wait_for_change(&mut tap_rx).await;
+        }
+
+        assert!(matches!(
+            control_rx.try_recv(),
+            Ok(fanout::ControlMessage::Add(..))
+        ));
+        assert!(control_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn reattaches_output_when_fanout_changes() {
+        let (old_control_tx, mut old_control_rx) = mpsc::unbounded_channel();
+        let (new_control_tx, mut new_control_rx) = mpsc::unbounded_channel();
+        let (watch_tx, watch_rx) = watch::channel(TapResource::default());
+        let (tap_tx, mut tap_rx) = mpsc::channel(10);
+        let _controller = TapController::new(watch_rx, tap_tx, patterns(&["in", "missing"], &[]));
+
+        watch_tx
+            .send(resource(vec![("in", &old_control_tx)], vec![]))
+            .unwrap();
+        wait_for_change(&mut tap_rx).await;
+        let fanout::ControlMessage::Add(sink_id, _) =
+            recv_control_message(&mut old_control_rx).await
+        else {
+            panic!("expected an add control message");
+        };
+
+        watch_tx
+            .send(resource(vec![("in", &new_control_tx)], vec![]))
+            .unwrap();
+        wait_for_change(&mut tap_rx).await;
+        assert!(matches!(
+            recv_control_message(&mut new_control_rx).await,
+            fanout::ControlMessage::Add(..)
+        ));
+        assert!(matches!(
+            recv_control_message(&mut old_control_rx).await,
+            fanout::ControlMessage::Remove(id) if id == sink_id
+        ));
+    }
+
+    #[tokio::test]
+    async fn detaches_outputs_that_no_longer_match() {
+        let (a_control_tx, mut a_control_rx) = mpsc::unbounded_channel();
+        let (b_control_tx, mut b_control_rx) = mpsc::unbounded_channel();
+        let (watch_tx, watch_rx) = watch::channel(TapResource::default());
+        let (tap_tx, mut tap_rx) = mpsc::channel(10);
+        let _controller = TapController::new(watch_rx, tap_tx, patterns(&["missing"], &["out"]));
+        let outputs = vec![("a", &a_control_tx), ("b", &b_control_tx)];
+
+        watch_tx
+            .send(resource(outputs.clone(), vec![("out", "a")]))
+            .unwrap();
+        wait_for_change(&mut tap_rx).await;
+        let fanout::ControlMessage::Add(sink_id, _) = recv_control_message(&mut a_control_rx).await
+        else {
+            panic!("expected an add control message");
+        };
+
+        watch_tx
+            .send(resource(outputs, vec![("out", "b")]))
+            .unwrap();
+        wait_for_change(&mut tap_rx).await;
+        assert!(matches!(
+            recv_control_message(&mut b_control_rx).await,
+            fanout::ControlMessage::Add(..)
+        ));
+        assert!(matches!(
+            recv_control_message(&mut a_control_rx).await,
+            fanout::ControlMessage::Remove(id) if id == sink_id
+        ));
+    }
+
+    #[tokio::test]
+    async fn tracks_named_outputs_of_the_same_component_independently() {
+        let (a_control_tx, mut a_control_rx) = mpsc::unbounded_channel();
+        let (b_control_tx, mut b_control_rx) = mpsc::unbounded_channel();
+        let (watch_tx, watch_rx) = watch::channel(TapResource::default());
+        let (tap_tx, mut tap_rx) = mpsc::channel(10);
+        let _controller =
+            TapController::new(watch_rx, tap_tx, patterns(&["route.*", "missing"], &[]));
+        let named_outputs = |ports: &[(&str, &fanout::ControlChannel)]| TapResource {
+            outputs: ports
+                .iter()
+                .map(|(port, control_tx)| {
+                    let output = TapOutput {
+                        output_id: OutputId::from(("route".to_string(), Some(port.to_string()))),
+                        component_kind: "transform",
+                        component_type: "route".to_string(),
+                    };
+                    (output, (*control_tx).clone())
+                })
+                .collect(),
+            ..Default::default()
+        };
+
+        watch_tx
+            .send(named_outputs(&[("a", &a_control_tx), ("b", &b_control_tx)]))
+            .unwrap();
+        wait_for_change(&mut tap_rx).await;
+        assert!(matches!(
+            recv_control_message(&mut a_control_rx).await,
+            fanout::ControlMessage::Add(..)
+        ));
+        let fanout::ControlMessage::Add(b_sink_id, _) =
+            recv_control_message(&mut b_control_rx).await
+        else {
+            panic!("expected an add control message");
+        };
+
+        // Unchanged reload: neither output is tapped again.
+        watch_tx
+            .send(named_outputs(&[("a", &a_control_tx), ("b", &b_control_tx)]))
+            .unwrap();
+        wait_for_change(&mut tap_rx).await;
+        assert!(a_control_rx.try_recv().is_err());
+        assert!(b_control_rx.try_recv().is_err());
+
+        // Only `route.b` goes away: its tap is detached, `route.a`'s is kept.
+        watch_tx
+            .send(named_outputs(&[("a", &a_control_tx)]))
+            .unwrap();
+        wait_for_change(&mut tap_rx).await;
+        assert!(matches!(
+            recv_control_message(&mut b_control_rx).await,
+            fanout::ControlMessage::Remove(id) if id == b_sink_id
+        ));
+        assert!(a_control_rx.try_recv().is_err());
+    }
+
+    #[test]
+    #[traced_test]
+    fn warns_when_tap_channel_is_full() {
+        let (tap_tx, mut tap_rx) = mpsc::channel(1);
+        let mut transformer = TapTransformer::new(tap_tx, tap_output("in"));
+        let events = || EventArray::from(LogEvent::default());
+
+        transformer.try_send(events());
+        assert!(!logs_contain("Tap channel is full"));
+
+        // The channel is full: this one is dropped rather than waited on, with a warning.
+        transformer.try_send(events());
+        assert!(matches!(tap_rx.try_recv(), Ok(TapPayload::Log(..))));
+        assert!(tap_rx.try_recv().is_err());
+        assert!(logs_contain("Tap channel is full, dropping events."));
+        assert!(logs_contain("count=1"));
+        assert!(logs_contain("component_id=in"));
+        assert!(logs_contain("internal_log_rate_limit=true"));
+    }
+
     #[test]
     /// Patterns should accept globbing.
     fn matches() {
-        use super::GlobMatcher;
-
         let patterns = ["ab*", "12?", "xy?"];
 
         // Should find.
