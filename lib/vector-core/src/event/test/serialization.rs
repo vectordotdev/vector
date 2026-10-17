@@ -875,3 +875,46 @@ fn nan_float_is_rejected_by_encodable_decode() {
         "NaN float should be NanFloat, got {error:?}"
     );
 }
+
+// Splitting an EventArray for the disk buffer keeps every event, in order, and rejoining the
+// halves gives back the original array.
+#[test]
+fn eventarray_split_in_half_round_trips() {
+    fn inner(events: EventArray) -> TestResult {
+        let expected = events.clone();
+        let count = events.event_count();
+
+        match events.split_in_half() {
+            Ok((front, back)) => {
+                assert!(count >= 2, "an array of {count} events must not split");
+                assert_eq!(front.event_count(), count / 2);
+                assert_eq!(back.event_count(), count - count / 2);
+                assert_eq!(front.rejoin(back), expected);
+            }
+            Err(unsplit) => {
+                assert!(count < 2, "an array of {count} events should split");
+                assert_eq!(unsplit, expected);
+            }
+        }
+
+        TestResult::passed()
+    }
+
+    QuickCheck::new()
+        .tests(1_000)
+        .max_tests(10_000)
+        .quickcheck(inner as fn(EventArray) -> TestResult);
+}
+
+#[test]
+fn eventarray_split_in_half_keeps_event_order() {
+    let logs: Vec<LogEvent> = (0..5)
+        .map(|i| LogEvent::from(format!("line {i}")))
+        .collect();
+    let (front, back) = EventArray::Logs(logs.clone())
+        .split_in_half()
+        .expect("five events should split");
+
+    assert_eq!(front, EventArray::Logs(logs[..2].to_vec()));
+    assert_eq!(back, EventArray::Logs(logs[2..].to_vec()));
+}
