@@ -930,6 +930,7 @@ sinks-logs = [
   "sinks-nats",
   "sinks-new_relic",
   "sinks-new_relic_logs",
+  "sinks-opensearch",
   "sinks-opentelemetry",
   "sinks-papertrail",
   "sinks-postgres",
@@ -1001,6 +1002,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
+sinks-opensearch = ["sinks-elasticsearch"]
 sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
@@ -1053,6 +1055,7 @@ all-integration-tests = [
   "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "opensearch-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
   "postgres_sink-integration-tests",
@@ -1106,6 +1109,7 @@ datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_trac
 docker-logs-integration-tests = ["sources-docker_logs"]
 doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
+opensearch-integration-tests = ["es-integration-tests", "sinks-opensearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]

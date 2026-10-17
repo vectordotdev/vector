@@ -15,10 +15,10 @@ use vrl::event_path;
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
-    config::{ProxyConfig, SinkConfig, SinkContext},
+    config::{BoxedSink, ProxyConfig, SinkContext},
     http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
-        HealthcheckError,
+        Healthcheck, HealthcheckError, VectorSink,
         util::{BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, auth::Auth},
     },
     template::Template,
@@ -32,6 +32,19 @@ use crate::{
     },
     tls::{self, TlsConfig},
 };
+
+// Exercise the registered sink type, including configuration deserialization, in both suites.
+async fn build_sink(
+    config: &ElasticsearchConfig,
+    cx: SinkContext,
+) -> crate::Result<(VectorSink, Healthcheck)> {
+    let mut value = serde_json::to_value(config)?;
+    value["type"] = std::env::var("ELASTICSEARCH_SINK_TYPE")
+        .unwrap_or_else(|_| "elasticsearch".into())
+        .into();
+    let config: BoxedSink = serde_json::from_value(value)?;
+    config.build(cx).await
+}
 
 fn http_username() -> String {
     std::env::var("ELASTICSEARCH_USERNAME").unwrap_or_else(|_| "elastic".into())
@@ -242,7 +255,7 @@ async fn structures_events_correctly() {
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::default();
-    let (sink, _hc) = config.build(cx.clone()).await.unwrap();
+    let (sink, _hc) = build_sink(&config, cx.clone()).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut input_event = LogEvent::from("raw log line").with_batch_notifier(&batch);
@@ -384,6 +397,46 @@ async fn insert_events_over_http() {
             doc_type: "log_lines".into(),
             compression: Compression::None,
             api_version: api_version(),
+            batch: batch_settings(),
+            ..Default::default()
+        },
+        TestType::Normal,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_with_auto_api_version_over_http() {
+    trace_init();
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![http_server()],
+            api_version: ElasticsearchApiVersion::Auto,
+            batch: batch_settings(),
+            ..Default::default()
+        },
+        TestType::Normal,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn insert_events_with_auto_api_version_over_https() {
+    trace_init();
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoints: vec![https_server()],
+            auth: Some(ElasticsearchAuthConfig::Basic {
+                user: http_username(),
+                password: http_password().into(),
+            }),
+            tls: Some(TlsConfig {
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            }),
+            api_version: ElasticsearchApiVersion::Auto,
             batch: batch_settings(),
             ..Default::default()
         },
@@ -716,8 +769,7 @@ async fn run_insert_tests_with_config(
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::default();
-    let (sink, healthcheck) = config
-        .build(cx.clone())
+    let (sink, healthcheck) = build_sink(config, cx.clone())
         .await
         .expect("Building config failed");
 
@@ -835,8 +887,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
         ElasticsearchMode::Bulk => config.bulk.index.to_string(),
     };
 
-    let (sink, healthcheck) = config
-        .build(cx.clone())
+    let (sink, healthcheck) = build_sink(config, cx.clone())
         .await
         .expect("Building config failed");
 

@@ -1,9 +1,10 @@
 features:
-  - es-integration-tests
+  - opensearch-integration-tests
 
 test_filter: "::elasticsearch::integration_tests::"
 
 env:
+  ELASTICSEARCH_SINK_TYPE: opensearch
   AWS_ACCESS_KEY_ID: dummy
   AWS_SECRET_ACCESS_KEY: dummy
   ELASTICSEARCH_AWS_ADDRESS: http://opensearch:9200
@@ -20,6 +21,7 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
   - "src/sinks/elasticsearch/**"
+  - "src/sinks/opensearch.rs"
   - "src/sinks/util/**"
   - "tests/data/ca/**"
   - "tests/integration/opensearch/**"

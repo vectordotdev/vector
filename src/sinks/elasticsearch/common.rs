@@ -394,6 +394,7 @@ async fn get_version(
     #[derive(Deserialize)]
     struct Version {
         number: Option<String>,
+        distribution: Option<String>,
     }
     #[derive(Deserialize)]
     struct ResponsePayload {
@@ -417,6 +418,11 @@ async fn get_version(
     let mut body = body.collect().await?.aggregate();
     let body = body.copy_to_bytes(body.remaining());
     let ResponsePayload { version } = serde_json::from_slice(&body)?;
+    // OpenSearch's own major version is unrelated to the Elasticsearch API version.
+    // Its bulk API is compatible with Elasticsearch 7 and must not include `_type`.
+    if version.as_ref().and_then(|v| v.distribution.as_deref()) == Some("opensearch") {
+        return Ok(7);
+    }
     if let Some(version) = version
         && let Some(number) = version.number
     {
