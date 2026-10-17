@@ -81,7 +81,7 @@ fn remove_docs(output: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn cue_files(source_dir: &std::path::Path) -> Result<Vec<PathBuf>> {
+pub(crate) fn cue_files(source_dir: &std::path::Path) -> Result<Vec<PathBuf>> {
     let pattern = format!(
         "{}{}**{}*.cue",
         source_dir.display(),

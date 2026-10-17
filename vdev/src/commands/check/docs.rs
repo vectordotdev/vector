@@ -1,8 +1,18 @@
-use crate::app;
-use crate::app::CommandExt;
-use crate::utils::git;
-use anyhow::{Result, bail};
-use std::process::Command;
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+use anyhow::{Context, Result, bail};
+
+use crate::{
+    app,
+    app::CommandExt,
+    commands::build::docs_json::cue_files,
+    utils::paths::find_repo_root,
+};
 
 #[derive(clap::Args, Debug)]
 #[command()]
@@ -44,15 +54,79 @@ impl Cli {
     }
 
     fn get_unformatted_cue_files() -> Result<Vec<String>> {
-        app::exec(CUE_SCRIPT, ["fmt"], true)?;
+        let repo_root = find_repo_root()?;
+        Self::find_unformatted_cue_files(&repo_root, || app::exec(CUE_SCRIPT, ["fmt"], true))
+    }
 
-        let file_names = git::run_and_check_output(&["diff", "--name-only", CUE_DIR])?
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty())
-            .map(String::from)
+    fn find_unformatted_cue_files<F>(repo_root: &Path, run_fmt: F) -> Result<Vec<String>>
+    where
+        F: FnOnce() -> Result<()>,
+    {
+        let source_dir = repo_root.join(CUE_DIR);
+        let before = snapshot_cue_files(repo_root, &source_dir)?;
+
+        run_fmt()?;
+
+        let after = snapshot_cue_files(repo_root, &source_dir)?;
+
+        let mut modified: Vec<String> = after
+            .into_iter()
+            .filter(|(path, content)| before.get(path) != Some(content))
+            .map(|(path, _)| path)
             .collect();
+        modified.sort();
 
-        Ok(file_names)
+        Ok(modified)
+    }
+}
+
+fn snapshot_cue_files(repo_root: &Path, source_dir: &Path) -> Result<BTreeMap<String, Vec<u8>>> {
+    let files = cue_files(source_dir)?;
+    let mut snapshot = BTreeMap::new();
+
+    for path in files {
+        let content =
+            fs::read(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+        let rel_path = relative_repo_path(repo_root, &path);
+        snapshot.insert(rel_path, content);
+    }
+
+    Ok(snapshot)
+}
+
+fn relative_repo_path(repo_root: &Path, path: &Path) -> String {
+    let rel: &Path = path.strip_prefix(repo_root).unwrap_or(path);
+    let mut normalized = PathBuf::new();
+    for component in rel.components() {
+        normalized.push(component);
+    }
+    normalized.to_string_lossy().replace('\\', "/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ignores_preexisting_formatted_edits_and_reports_only_formatter_changes() {
+        let temp = tempfile::tempdir().expect("create tempdir");
+        let cue_dir = temp.path().join("website").join("cue");
+        fs::create_dir_all(&cue_dir).expect("create cue dir");
+
+        let clean_edited = cue_dir.join("already_formatted.cue");
+        let unformatted = cue_dir.join("needs_fmt.cue");
+
+        fs::write(&clean_edited, "package metadata\n\nfoo: \"bar\"\n").expect("write clean file");
+        fs::write(&unformatted, "package metadata\nfoo:   \"baz\"\n")
+            .expect("write unformatted file");
+
+        let modified = Cli::find_unformatted_cue_files(temp.path(), || {
+            // Simulate `cue fmt` leaving `already_formatted.cue` untouched while formatting `needs_fmt.cue`
+            fs::write(&unformatted, "package metadata\n\nfoo: \"baz\"\n")?;
+            Ok(())
+        })
+        .expect("check cue formatting");
+
+        assert_eq!(modified, vec!["website/cue/needs_fmt.cue".to_string()]);
     }
 }
