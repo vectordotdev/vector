@@ -408,7 +408,10 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         let events_flushed = self.unflushed_events as u64;
         let bytes_flushed = self.buf.len() as u64;
 
-        let result = self.inner.write_all(&self.buf[..]).await;
+        let mut result = self.inner.write_all(&self.buf[..]).await;
+        if result.is_ok() {
+            result = self.inner.flush().await;
+        }
         self.unflushed_events = 0;
         self.buf.clear();
 
