@@ -2,6 +2,7 @@ transforms:
   lua_unversioned:
     inputs: []
     type: "lua"
+    version: "1"
     source: |
       event["a"], event["b"] = nil, event["a"]
 
