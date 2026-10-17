@@ -151,6 +151,27 @@ pub struct PubsubConfig {
     #[serde(default = "default_max_concurrency")]
     pub max_concurrency: usize,
 
+    /// The maximum number of messages that the server sends on a stream
+    /// before it waits for some of them to be acknowledged.
+    ///
+    /// Each message sent on a stream holds a lease until it is acknowledged, and the
+    /// lease expires after `ack_deadline_secs`. Limiting the outstanding messages keeps
+    /// the source from leasing more messages than the pipeline can deliver within the
+    /// ack deadline, which would cause those messages to be redelivered. The limit
+    /// applies to each stream, so the source holds at most `max_concurrency` times this
+    /// many messages. Set to `0` for no limit.
+    #[serde(default)]
+    pub max_outstanding_messages: u64,
+
+    /// The maximum number of bytes of messages that the server sends on a stream before
+    /// it waits for some of them to be acknowledged.
+    ///
+    /// The limit applies to each stream, like `max_outstanding_messages`. Set to `0`
+    /// for no limit.
+    #[serde(default)]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_outstanding_bytes: u64,
+
     /// The number of messages in a response to mark a stream as
     /// "busy". This is used to determine if more streams should be
     /// started.
@@ -324,6 +345,11 @@ impl SourceConfig for PubsubConfig {
             keepalive: self.keepalive_secs,
             concurrency: Arc::default(),
             full_response_size: self.full_response_size,
+            // The server treats values above `i64::MAX` like any other
+            // large limit, so saturating does not change behavior.
+            max_outstanding_messages: i64::try_from(self.max_outstanding_messages)
+                .unwrap_or(i64::MAX),
+            max_outstanding_bytes: i64::try_from(self.max_outstanding_bytes).unwrap_or(i64::MAX),
             log_namespace,
             bytes_received: register!(BytesReceived::from(protocol)),
             events_received: register!(EventsReceived),
@@ -395,6 +421,8 @@ struct PubsubSource {
     // would result in repeatedly re-opening the stream on idle.
     concurrency: Arc<AtomicUsize>,
     full_response_size: usize,
+    max_outstanding_messages: i64,
+    max_outstanding_bytes: i64,
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
@@ -580,6 +608,8 @@ impl PubsubSource {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_secs.as_secs() as i32;
+        let max_outstanding_messages = self.max_outstanding_messages;
+        let max_outstanding_bytes = self.max_outstanding_bytes;
         let updates = queue.take_updates().ready_chunks(ACK_QUEUE_SIZE);
 
         stream::once(async move {
@@ -589,6 +619,8 @@ impl PubsubSource {
                 subscription,
                 client_id,
                 stream_ack_deadline_seconds,
+                max_outstanding_messages,
+                max_outstanding_bytes,
                 ..Default::default()
             }
         })
@@ -1085,6 +1117,41 @@ mod tests {
         event.metadata_mut().update_sources();
         drop(event);
         assert!(shut_down.await, "the source did not shut down");
+    }
+
+    #[tokio::test]
+    async fn requests_the_configured_flow_control() {
+        let (address, mut recorded) = serve_fake_subscriber().await;
+        let config = PubsubConfig {
+            max_outstanding_messages: 20_000,
+            max_outstanding_bytes: 64 * 1024 * 1024,
+            ..fake_subscriber_config(address)
+        };
+        let (_events, _shutdown) = spawn_source(config).await;
+
+        let (_, request) = next_request_where(&mut recorded, "the first request", |_, request| {
+            !request.subscription.is_empty()
+        })
+        .await;
+        assert_eq!(
+            request.subscription,
+            "projects/project/subscriptions/subscription"
+        );
+        assert_eq!(request.max_outstanding_messages, 20_000);
+        assert_eq!(request.max_outstanding_bytes, 64 * 1024 * 1024);
+    }
+
+    #[test]
+    fn flow_control_is_unlimited_by_default() {
+        let config: PubsubConfig = toml::from_str(
+            r#"
+            project = "project"
+            subscription = "subscription"
+            "#,
+        )
+        .unwrap();
+        assert_eq!(config.max_outstanding_messages, 0);
+        assert_eq!(config.max_outstanding_bytes, 0);
     }
 
     #[test]

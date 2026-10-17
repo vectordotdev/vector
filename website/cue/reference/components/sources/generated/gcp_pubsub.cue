@@ -129,6 +129,35 @@ generated: components: sources: gcp_pubsub: configuration: {
 		required:    false
 		type: uint: default: 10
 	}
+	max_outstanding_bytes: {
+		description: """
+			The maximum number of bytes of messages that the server sends on a stream before
+			it waits for some of them to be acknowledged.
+
+			The limit applies to each stream, like `max_outstanding_messages`. Set to `0`
+			for no limit.
+			"""
+		required: false
+		type: uint: {
+			default: 0
+			unit:    "bytes"
+		}
+	}
+	max_outstanding_messages: {
+		description: """
+			The maximum number of messages that the server sends on a stream
+			before it waits for some of them to be acknowledged.
+
+			Each message sent on a stream holds a lease until it is acknowledged, and the
+			lease expires after `ack_deadline_secs`. Limiting the outstanding messages keeps
+			the source from leasing more messages than the pipeline can deliver within the
+			ack deadline, which would cause those messages to be redelivered. The limit
+			applies to each stream, so the source holds at most `max_concurrency` times this
+			many messages. Set to `0` for no limit.
+			"""
+		required: false
+		type: uint: default: 0
+	}
 	poll_time_seconds: {
 		description: """
 			How often to poll the currently active streams to see if they
