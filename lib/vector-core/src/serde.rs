@@ -25,14 +25,14 @@ pub fn is_default<E: Default + PartialEq>(e: &E) -> bool {
 /// Returns the error from deserializing the underlying struct.
 pub fn bool_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
-    T: Deserialize<'de> + From<bool>,
+    T: Deserialize<'de> + From<bool> + Configurable,
     D: Deserializer<'de>,
 {
     struct BoolOrStruct<T>(PhantomData<fn() -> T>);
 
     impl<'de, T> de::Visitor<'de> for BoolOrStruct<T>
     where
-        T: Deserialize<'de> + From<bool>,
+        T: Deserialize<'de> + From<bool> + Configurable,
     {
         type Value = T;
 
@@ -44,9 +44,12 @@ where
         where
             E: de::Error,
         {
-            tracing::warn!(
-                "DEPRECATED: Boolean shorthand for an object-valued configuration option. Use the object form instead. See https://vector.dev/deprecations/ for migration instructions."
-            );
+            // Already-deprecated types retain their existing migration guidance.
+            if !T::metadata().deprecated() {
+                tracing::warn!(
+                    "DEPRECATED: Boolean shorthand for an object-valued configuration option. Use the object form instead. See https://vector.dev/deprecations/ for migration instructions."
+                );
+            }
             Ok(value.into())
         }
 
