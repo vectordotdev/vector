@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #[cfg(all(test, feature = "opentelemetry-integration-tests"))]
 mod integration_tests;
 #[cfg(test)]

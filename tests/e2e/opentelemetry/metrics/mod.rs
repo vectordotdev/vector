@@ -162,7 +162,7 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
 }
 
 /// Asserts that metrics have the expected names and counts by type
-/// Expected: 100 gauge_metric (50 gRPC + 50 HTTP), 100 sum_metric, 100 histogram_metric, 100 exponential_histogram_metric
+/// Expected: 100 `gauge_metric` (50 gRPC + 50 HTTP), 100 `sum_metric`, 100 `histogram_metric`, 100 `exponential_histogram_metric`
 fn assert_metric_names_and_types(request: &ExportMetricsServiceRequest) {
     use std::collections::HashMap;
 

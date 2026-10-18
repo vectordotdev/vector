@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{
     convert::TryFrom,
     time::{Duration, Instant},

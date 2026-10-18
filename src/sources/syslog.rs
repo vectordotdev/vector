@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 
 use chrono::Utc;

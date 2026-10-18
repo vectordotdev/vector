@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};

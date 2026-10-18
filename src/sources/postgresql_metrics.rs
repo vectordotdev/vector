@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{
     collections::HashSet,
     fmt::Write as _,

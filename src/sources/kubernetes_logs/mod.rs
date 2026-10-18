@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! This mod implements `kubernetes_logs` source.
 //! The scope of this source is to consume the log files that a kubelet keeps
 //! at "/var/log/pods" on the host of the Kubernetes Node when Vector itself is

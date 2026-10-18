@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};

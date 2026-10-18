@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
