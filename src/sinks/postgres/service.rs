@@ -38,10 +38,27 @@ impl RetryLogic for PostgresRetryLogic {
             return false;
         };
 
-        matches!(
+        if matches!(
             postgres_error,
             sqlx::Error::Io(_) | sqlx::Error::PoolTimedOut
-        )
+        ) {
+            return true;
+        }
+
+        if let sqlx::Error::Database(db_err) = postgres_error {
+            if let Some(code) = db_err.code() {
+                // Class 08: connection exception
+                // Class 57: 57P01 admin_shutdown, 57P02 crash_shutdown, 57P03 cannot_connect_now
+                // Class 40: 40001 serialization_failure, 40P01 deadlock_detected
+                if code.starts_with("08")
+                    || matches!(code.as_ref(), "57P01" | "57P02" | "57P03" | "40001" | "40P01")
+                {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
 
@@ -171,3 +188,94 @@ impl Service<PostgresRequest> for PostgresService {
         Box::pin(future)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{borrow::Cow, error::Error as StdError, fmt};
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct MockDbError {
+        code: &'static str,
+        message: &'static str,
+    }
+
+    impl fmt::Display for MockDbError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}: {}", self.code, self.message)
+        }
+    }
+
+    impl StdError for MockDbError {}
+
+    impl sqlx::error::DatabaseError for MockDbError {
+        fn message(&self) -> &str {
+            self.message
+        }
+
+        fn as_error(&self) -> &(dyn StdError + Send + Sync + 'static) {
+            self
+        }
+
+        fn as_error_mut(&mut self) -> &mut (dyn StdError + Send + Sync + 'static) {
+            self
+        }
+
+        fn into_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync + 'static> {
+            self
+        }
+
+        fn code(&self) -> Option<Cow<'_, str>> {
+            Some(Cow::Borrowed(self.code))
+        }
+    }
+
+    fn make_db_error(code: &'static str) -> PostgresServiceError {
+        PostgresServiceError::Postgres {
+            source: sqlx::Error::Database(Box::new(MockDbError {
+                code,
+                message: "mock database error",
+            })),
+        }
+    }
+
+    #[test]
+    fn test_postgres_retry_logic() {
+        let logic = PostgresRetryLogic;
+
+        // Session termination errors (SQLSTATE 57P01, 57P02, 57P03)
+        assert!(logic.is_retriable_error(&make_db_error("57P01")));
+        assert!(logic.is_retriable_error(&make_db_error("57P02")));
+        assert!(logic.is_retriable_error(&make_db_error("57P03")));
+
+        // Connection exceptions (Class 08)
+        assert!(logic.is_retriable_error(&make_db_error("08006")));
+        assert!(logic.is_retriable_error(&make_db_error("08001")));
+        assert!(logic.is_retriable_error(&make_db_error("08003")));
+
+        // Concurrency conflicts (Class 40)
+        assert!(logic.is_retriable_error(&make_db_error("40001")));
+        assert!(logic.is_retriable_error(&make_db_error("40P01")));
+
+        // IO and PoolTimedOut errors
+        let io_err = PostgresServiceError::Postgres {
+            source: sqlx::Error::Io(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "reset",
+            )),
+        };
+        assert!(logic.is_retriable_error(&io_err));
+
+        let pool_err = PostgresServiceError::Postgres {
+            source: sqlx::Error::PoolTimedOut,
+        };
+        assert!(logic.is_retriable_error(&pool_err));
+
+        // Non-retriable database errors
+        assert!(!logic.is_retriable_error(&make_db_error("23505"))); // unique_violation
+        assert!(!logic.is_retriable_error(&make_db_error("42P01"))); // undefined_table
+        assert!(!logic.is_retriable_error(&make_db_error("22001"))); // string_data_right_truncation
+    }
+}
+
