@@ -13,9 +13,27 @@ fixture-based trace tests.
 
 ## Input and destination
 
-![Trace test architecture: application traces pass through Vector between two Collectors; input and output captures are compared after each run.](architecture.png)
+```mermaid
+flowchart LR
+    demo["OpenTelemetry Demo"] --> ingress["OTel Collector (input)"]
+    ingress --> input["input.jsonl"]
+    ingress -->|"OTLP/HTTP or gRPC (separate sequential runs)"| source
+    subgraph vector["Vector"]
+        source["OpenTelemetry source"] -->|"otel.traces (no transforms)"| sink["OpenTelemetry sink"]
+    end
+    sink -->|"OTLP/HTTP"| egress["OTel Collector (output)"]
+    egress --> output["output.jsonl"]
+    subgraph validation["Rust validation"]
+        coverage["Required services and trace shapes"]
+        preservation["Compare spans, resources, scopes, schema URLs and duplicate counts"]
+    end
+    input -.-> coverage
+    input -.-> preservation
+    output -.-> preservation
+```
 
-Trace and span counts in the diagram are examples from local runs, not assertions.
+Rust validates the captures after each run. The comparison allows batching, span order,
+and attribute-map order to differ.
 
 [scenario.py](data/scenario.py) runs one simulated shopper through three rounds of ad,
 recommendation, cart, and multi-item checkout requests. Checkout also exercises
