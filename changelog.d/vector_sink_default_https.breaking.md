@@ -36,6 +36,6 @@ sinks:
       endpoints: ["http://127.0.0.1:6000", "http://127.0.0.1:6001"]
 ```
 
-The same applies to `address`, for example `address: http://127.0.0.1:6000`.
+The same applies to `address`, for example, `address: http://127.0.0.1:6000`.
 
 authors: JinchengCao
