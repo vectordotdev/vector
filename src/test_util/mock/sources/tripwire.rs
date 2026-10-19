@@ -30,6 +30,7 @@ impl GenerateConfig for TripwireSourceConfig {
 }
 
 impl TripwireSourceConfig {
+    #[must_use]
     pub fn new() -> (Trigger, Self) {
         let (trigger, tripwire) = Tripwire::new();
         (
@@ -60,8 +61,10 @@ impl SourceConfig for TripwireSourceConfig {
                     .then(crate::shutdown::tripwire_handler)
                     .boxed(),
             )
-            .map(|_| drop(out))
-            .unit_error(),
+            .map(|_| {
+                drop(out);
+                Ok(())
+            }),
         ))
     }
 

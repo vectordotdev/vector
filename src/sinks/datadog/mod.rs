@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::{body::Body, client::connect::Connect};

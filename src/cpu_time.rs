@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! Per-component CPU-time measurement primitives.
 //!
 //! This module provides the building blocks for attributing CPU time to

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Loki sink
 //!
 //! This sink provides downstream support for `Loki` via

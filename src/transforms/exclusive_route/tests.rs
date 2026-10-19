@@ -4,7 +4,7 @@ use indoc::indoc;
 use vector_lib::transform::TransformOutputsBuf;
 
 use crate::{
-    config::{ConfigBuilder, DataType, TransformOutput, build_unit_tests},
+    config::{ConfigBuilder, DataType, TransformContext, TransformOutput, build_unit_tests},
     event::{Event, LogEvent},
     test_util::components::{COMPONENT_MULTIPLE_OUTPUTS_TESTS, init_test},
     transforms::{
@@ -46,7 +46,7 @@ fn exclusive_routes() {
         "#})
     .unwrap();
 
-    let mut transform = ExclusiveRoute::new(&config, &Default::default()).unwrap();
+    let mut transform = ExclusiveRoute::new(&config, &TransformContext::default()).unwrap();
 
     let (output_names, mut outputs) = get_outputs_buf();
     for service in ["a", "b", "c"] {

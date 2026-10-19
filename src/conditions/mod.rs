@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use vector_lib::configurable::configurable_component;
 use vector_vrl_metrics::MetricsStorage;

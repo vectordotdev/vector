@@ -5,7 +5,9 @@
 use super::{common::*, harness::*};
 use indoc::indoc;
 use std::time::{Duration, Instant};
+use tokio::time::error::Elapsed;
 use tokio_stream::StreamExt;
+use vector_lib::api_client::proto::stream_output_events_response::Event;
 use vector_lib::api_client::proto::{StreamOutputEventsRequest, StreamOutputEventsResponse};
 
 pub const TAP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -23,7 +25,7 @@ impl TestHarness {
         const DEFAULT_INTERVAL_MS: i32 = 100;
 
         let request = StreamOutputEventsRequest {
-            outputs_patterns: outputs_patterns.iter().map(|s| s.to_string()).collect(),
+            outputs_patterns: outputs_patterns.iter().map(ToString::to_string).collect(),
             inputs_patterns: vec![],
             limit: DEFAULT_LIMIT,
             interval_ms: DEFAULT_INTERVAL_MS,
@@ -46,7 +48,12 @@ impl TestHarness {
                 ));
             }
 
-            match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+            match tokio::time::timeout(
+                TAP_TIMEOUT.checked_sub(start.elapsed()).unwrap(),
+                stream.next(),
+            )
+            .await
+            {
                 Ok(Some(Ok(event))) => {
                     events.push(event);
                 }
@@ -89,7 +96,6 @@ async fn tap_receives_events() {
     assert!(!events.is_empty(), "Should receive at least one event");
 
     // Verify we got at least one tapped event (not just notifications)
-    use vector_lib::api_client::proto::stream_output_events_response::Event;
     let tapped_events: Vec<_> = events
         .iter()
         .filter_map(|e| match &e.event {
@@ -124,7 +130,6 @@ async fn tap_specific_component() {
         .expect("Should receive events");
 
     // Verify we only got events from demo1
-    use vector_lib::api_client::proto::stream_output_events_response::Event;
     let tapped_events: Vec<_> = events
         .iter()
         .filter_map(|e| match &e.event {
@@ -146,8 +151,6 @@ async fn tap_specific_component() {
 
 #[tokio::test]
 async fn tap_survives_config_reload() {
-    use vector_lib::api_client::proto::stream_output_events_response::Event;
-
     let config = single_source_config("demo", 0.05, None); // No count limit - runs continuously
     let mut harness = TestHarness::new(&config)
         .await
@@ -176,11 +179,16 @@ async fn tap_survives_config_reload() {
             start.elapsed() < TAP_TIMEOUT,
             "Timeout waiting for pre-reload events"
         );
-        match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+        match tokio::time::timeout(
+            TAP_TIMEOUT.checked_sub(start.elapsed()).unwrap(),
+            stream.next(),
+        )
+        .await
+        {
             Ok(Some(Ok(_))) => pre_reload_count += 1,
             Ok(Some(Err(e))) => panic!("Stream error before reload: {e}"),
             Ok(None) => panic!("Stream ended unexpectedly before reload"),
-            Err(_) => panic!("Timeout before reload"),
+            Err(Elapsed { .. }) => panic!("Timeout before reload"),
         }
     }
 
@@ -218,7 +226,12 @@ async fn tap_survives_config_reload() {
             start.elapsed() < TAP_TIMEOUT,
             "Stream did not survive reload: only received {post_reload_count} tapped events after reload"
         );
-        match tokio::time::timeout(TAP_TIMEOUT - start.elapsed(), stream.next()).await {
+        match tokio::time::timeout(
+            TAP_TIMEOUT.checked_sub(start.elapsed()).unwrap(),
+            stream.next(),
+        )
+        .await
+        {
             Ok(Some(Ok(event))) => {
                 if matches!(&event.event, Some(Event::TappedEvent(_))) {
                     post_reload_count += 1;
@@ -227,11 +240,15 @@ async fn tap_survives_config_reload() {
             }
             Ok(Some(Err(e))) => panic!("Stream error after reload: {e}"),
             Ok(None) => panic!("Stream was closed on reload - tap subscription was dropped"),
-            Err(_) => panic!("Timeout waiting for post-reload tapped events"),
+            Err(Elapsed { .. }) => panic!("Timeout waiting for post-reload tapped events"),
         }
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this integration test is deferred to keep the cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn multiple_concurrent_subscriptions() {
     let config = dual_source_config("demo1", "demo2", 0.01, Some(100));
@@ -266,7 +283,6 @@ async fn multiple_concurrent_subscriptions() {
     );
 
     // Verify tap1 only sees demo1
-    use vector_lib::api_client::proto::stream_output_events_response::Event;
     let tapped_events1: Vec<_> = events1
         .iter()
         .filter_map(|e| match &e.event {

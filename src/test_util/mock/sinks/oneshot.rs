@@ -26,6 +26,7 @@ pub struct OneshotSinkConfig {
 impl_generate_config_from_default!(OneshotSinkConfig);
 
 impl OneshotSinkConfig {
+    #[must_use]
     pub fn new(tx: Sender<EventArray>) -> Self {
         Self {
             tx: Arc::new(Mutex::new(Some(tx))),
@@ -62,11 +63,11 @@ impl ValidatedSink for OneshotSinkConfig {
             let mut guard = self.tx.lock().expect("who cares if the lock is poisoned");
             guard.take()
         };
-        let sink = Box::new(OneshotSink { tx });
+        let sink = OneshotSink { tx };
 
         let healthcheck = Box::pin(async { Ok(()) });
 
-        Ok((VectorSink::Stream(sink), healthcheck))
+        Ok((VectorSink::from_streamsink(sink), healthcheck))
     }
 }
 

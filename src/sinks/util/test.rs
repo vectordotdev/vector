@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{
     io::{BufRead, BufReader},
     net::SocketAddr,

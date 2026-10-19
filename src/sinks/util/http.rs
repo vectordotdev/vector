@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 #[cfg(feature = "aws-core")]
 use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]

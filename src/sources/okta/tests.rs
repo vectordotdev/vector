@@ -81,7 +81,7 @@ async fn okta_compliance() {
                         "link",
                         format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
                     )
-                    .body(r#"[]"#)
+                    .body(r"[]")
                     .unwrap(),
             }
         });
@@ -101,7 +101,7 @@ async fn okta_compliance() {
 
     assert_eq!(events.len(), 2);
 
-    for event in events.iter() {
+    for event in &events {
         assert_eq!(
             event.as_log()[log_schema().source_type_key().unwrap().to_string()],
             OktaConfig::NAME.into()
@@ -148,7 +148,7 @@ async fn okta_follows_rel() {
                         "link",
                         format!("<http://{addr}/api/v1/logs?after=quux>; rel=\"next\""),
                     )
-                    .body(r#"[]"#)
+                    .body(r"[]")
                     .unwrap(),
                 Some(_) => panic!("following Link header with zero length reply"),
             }
@@ -169,7 +169,7 @@ async fn okta_follows_rel() {
 
     assert_eq!(events.len(), 2);
 
-    for event in events.iter() {
+    for event in &events {
         assert_eq!(
             event.as_log()[log_schema().source_type_key().unwrap().to_string()],
             OktaConfig::NAME.into()
@@ -203,16 +203,7 @@ async fn okta_persists_rel() {
                     .unwrap(),
                 Some(after) if after == "test" => {
                     let initialized = init_guard.swap(true, Ordering::Relaxed);
-                    if !initialized {
-                        warp::http::Response::builder()
-                            .header("Content-Type", "application/json")
-                            .header(
-                                "link",
-                                format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
-                            )
-                            .body(r#"[]"#)
-                            .unwrap()
-                    } else {
+                    if initialized {
                         warp::http::Response::builder()
                             .header("Content-Type", "application/json")
                             .header(
@@ -221,11 +212,20 @@ async fn okta_persists_rel() {
                             )
                             .body(r#"[{"initialized":"true"}]"#)
                             .unwrap()
+                    } else {
+                        warp::http::Response::builder()
+                            .header("Content-Type", "application/json")
+                            .header(
+                                "link",
+                                format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
+                            )
+                            .body(r"[]")
+                            .unwrap()
                     }
                 }
                 Some(_) => warp::http::Response::builder()
                     .header("Content-Type", "application/json")
-                    .body(r#"[]"#)
+                    .body(r"[]")
                     .unwrap(),
             }
         });

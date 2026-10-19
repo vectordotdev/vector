@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 pub mod logs;
 pub mod metrics;
 

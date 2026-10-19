@@ -53,24 +53,32 @@ pub enum RequestError {
 impl warp::reject::Reject for RequestError {}
 
 impl RequestError {
+    #[must_use]
     pub const fn status(&self) -> StatusCode {
-        use RequestError::*;
+        use RequestError::{
+            AccessKeyInvalid, AccessKeyMissing, Decode, DeliveryErrored, DeliveryFailed, Parse,
+            ParseRecords, ShuttingDown, UnsupportedEncoding, UnsupportedProtocolVersion,
+        };
         match *self {
-            AccessKeyMissing { .. } => StatusCode::UNAUTHORIZED,
-            AccessKeyInvalid { .. } => StatusCode::UNAUTHORIZED,
-            Parse { .. } => StatusCode::UNAUTHORIZED,
-            UnsupportedEncoding { .. } => StatusCode::BAD_REQUEST,
-            ParseRecords { .. } => StatusCode::BAD_REQUEST,
-            Decode { .. } => StatusCode::BAD_REQUEST,
+            AccessKeyMissing { .. } | AccessKeyInvalid { .. } | Parse { .. } => {
+                StatusCode::UNAUTHORIZED
+            }
+            UnsupportedEncoding { .. }
+            | ParseRecords { .. }
+            | Decode { .. }
+            | UnsupportedProtocolVersion { .. } => StatusCode::BAD_REQUEST,
             ShuttingDown { .. } => StatusCode::SERVICE_UNAVAILABLE,
-            UnsupportedProtocolVersion { .. } => StatusCode::BAD_REQUEST,
             DeliveryErrored { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             DeliveryFailed { .. } => StatusCode::NOT_ACCEPTABLE,
         }
     }
 
+    #[must_use]
     pub const fn request_id(&self) -> Option<&str> {
-        use RequestError::*;
+        use RequestError::{
+            AccessKeyInvalid, AccessKeyMissing, Decode, DeliveryErrored, DeliveryFailed, Parse,
+            ParseRecords, ShuttingDown, UnsupportedEncoding, UnsupportedProtocolVersion,
+        };
         match self {
             AccessKeyMissing { request_id, .. }
             | AccessKeyInvalid { request_id, .. }

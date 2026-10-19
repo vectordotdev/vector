@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
 struct TrackedEnv {

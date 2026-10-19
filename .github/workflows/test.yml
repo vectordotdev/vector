@@ -56,7 +56,7 @@ jobs:
 
   check-clippy:
     name: Check clippy
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -96,7 +96,7 @@ jobs:
 
   check-events:
     name: Check events
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -151,7 +151,7 @@ jobs:
 
   check-generated-docs:
     name: Check Generated Docs
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -168,7 +168,7 @@ jobs:
 
   test-vrl:
     name: VRL - Linux
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -183,7 +183,7 @@ jobs:
 
   build-vrl-playground:
     name: Build VRL Playground
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
