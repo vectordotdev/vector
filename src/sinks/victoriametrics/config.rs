@@ -533,6 +533,25 @@ mod tests {
     }
 
     #[test]
+    fn rejects_headers_set_by_the_sink() {
+        for header in [
+            "Content-Type",
+            "content-encoding",
+            "X-VictoriaMetrics-Remote-Write-Version",
+        ] {
+            let error = validate_err(&format!(
+                "endpoint: http://vm:8428\nrequest: {{headers: {{{header}: x}}}}"
+            ));
+            assert!(error.contains("can not be overridden"), "{header}: {error}");
+        }
+        assert!(
+            parse("endpoint: http://vm:8428\nrequest: {headers: {X-Custom: x}}")
+                .validate()
+                .is_ok()
+        );
+    }
+
+    #[test]
     fn validates_compression_level() {
         let level = |config: &str| parse(config).validate().map(|v| v.compression_level);
 

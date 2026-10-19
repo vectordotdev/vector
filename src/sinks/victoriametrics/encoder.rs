@@ -937,6 +937,49 @@ mod tests {
     }
 
     #[test]
+    fn empty_sketch_writes_no_quantiles() {
+        let request = encode(
+            &encoder(),
+            vec![item(metric(
+                "latency",
+                MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(AgentDDSketch::with_agent_defaults()),
+                },
+            ))],
+        );
+
+        let names = rows(&request)
+            .into_iter()
+            .map(|(labels, _, _)| labels["__name__"].clone())
+            .collect::<Vec<_>>();
+        assert_eq!(names, vec!["latency_count"]);
+    }
+
+    #[test]
+    fn metadata_is_written_per_type_of_family() {
+        let request = encode(
+            &metadata_encoder(),
+            vec![
+                item(metric("temp", MetricValue::Gauge { value: 1.0 })),
+                item(metric("temp", MetricValue::Counter { value: 1.0 })),
+            ],
+        );
+
+        let types = request
+            .metadata
+            .iter()
+            .map(|metadata| metadata.r#type)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            types,
+            vec![
+                proto::MetricType::Gauge as i32,
+                proto::MetricType::Counter as i32
+            ]
+        );
+    }
+
+    #[test]
     fn estimate_bounds_encoded_size() {
         let mut histogram = VmHistogram::default();
         let mut value = 1e-9;

@@ -222,6 +222,25 @@ mod tests {
     }
 
     #[test]
+    fn snapshots_are_not_changed_by_later_events() {
+        let mut normalizer = VmNormalizer::new(None);
+
+        let first = normalizer
+            .normalize(distribution(MetricKind::Incremental, &[0.5]))
+            .unwrap()
+            .histogram
+            .unwrap();
+        let second = normalizer
+            .normalize(distribution(MetricKind::Incremental, &[0.5]))
+            .unwrap()
+            .histogram
+            .unwrap();
+
+        assert_eq!(first.count(), 1);
+        assert_eq!(second.count(), 2);
+    }
+
+    #[test]
     fn expires_distribution_state() {
         let ttl = Duration::from_secs(60);
         let mut set = HistogramSet::new(Some(ttl));
