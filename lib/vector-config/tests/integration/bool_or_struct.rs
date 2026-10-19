@@ -136,6 +136,7 @@ fn shared_schema_preserves_defaults_descriptions_and_deprecation() {
         .unwrap();
     assert_eq!(shared["deprecated"], true);
     assert_eq!(shared["_metadata"]["docs::enum_tagging"], "untagged");
+    assert_eq!(shared["oneOf"][0]["deprecated"], true);
 }
 
 #[test]

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod batch;
 mod config;
 mod encoder;

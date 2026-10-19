@@ -101,7 +101,7 @@ async fn mqtt_one_topic_happy() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -121,9 +121,10 @@ async fn mqtt_one_topic_happy() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
     })
@@ -169,7 +170,7 @@ async fn mqtt_redelivers_unacknowledged_messages() {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     });
 
     // Wait for the subscription to be established before publishing.
@@ -206,7 +207,7 @@ async fn mqtt_redelivers_unacknowledged_messages() {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     });
 
     let redelivered = timeout(Duration::from_secs(10), rx2.next())
@@ -312,7 +313,7 @@ async fn mqtt_forces_reconnect_after_withheld_ack() {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     });
 
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -379,7 +380,7 @@ async fn mqtt_recovers_from_server_side_disconnect() {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     });
     tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -446,7 +447,7 @@ async fn mqtt_resubscribes_after_broker_discards_the_session() {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     });
     tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -518,7 +519,7 @@ async fn mqtt_does_not_lose_messages_across_server_side_disconnect_without_acks(
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     });
     tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -585,7 +586,7 @@ async fn mqtt_many_topics_happy() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -607,9 +608,10 @@ async fn mqtt_many_topics_happy() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
     })

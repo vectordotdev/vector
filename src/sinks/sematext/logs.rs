@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
-use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vector_lib::{
+    configurable::configurable_component, sensitive_string::SensitiveString, sink::SinkError,
+};
 use vrl::event_path;
 
 use super::Region;
@@ -161,12 +163,12 @@ impl SematextLogsConfig {
 }
 
 struct MapTimestampStream {
-    inner: Box<dyn StreamSink<EventArray> + Send>,
+    inner: Box<dyn StreamSink<EventArray, SinkError> + Send>,
 }
 
 #[async_trait]
-impl StreamSink<EventArray> for MapTimestampStream {
-    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), ()> {
+impl StreamSink<EventArray, SinkError> for MapTimestampStream {
+    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), SinkError> {
         let mapped_input = input.map(map_timestamp).boxed();
         self.inner.run(mapped_input).await
     }

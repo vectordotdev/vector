@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 // should match vector-unit-test-tests feature
 #[cfg(all(
     test,

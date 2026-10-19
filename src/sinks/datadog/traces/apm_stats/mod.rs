@@ -28,7 +28,7 @@ mod integration_tests;
 /// The duration of time in nanoseconds that a bucket covers.
 pub(crate) const BUCKET_DURATION_NANOSECONDS: u64 = 10_000_000_000;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
+#[allow(warnings, clippy::trivially_copy_pass_by_ref, clippy::nursery)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }

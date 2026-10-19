@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(clippy::unwrap_used)]
 
 use std::{num::NonZeroU32, sync::Arc};

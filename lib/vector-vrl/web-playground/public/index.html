@@ -88,6 +88,9 @@
             </datalist>
           </div>
           <div class="toolbar-group">
+            <select id="examples-select" title="Load an example program and input" aria-label="Examples">
+              <option value="" disabled selected>Examples</option>
+            </select>
             <select id="history-select" title="Run history (stored locally in your browser)">
               <option value="" disabled selected>History</option>
             </select>
@@ -97,7 +100,7 @@
           </div>
         </div>
         </div>
-      <div id="main-split">
+      <div id="main-split" aria-busy="true">
         <div id="input-section">
           <div id="cell">
             <div id="input-cell-title">
@@ -123,6 +126,13 @@
               </p>
             </div>
             <div id="container-output"></div>
+          </div>
+
+          <div id="returned-value-cell">
+            <div id="returned-value-cell-title">
+              <p class="cell-title" title="The value of the program's last expression">Returned value</p>
+            </div>
+            <div id="container-returned-value"></div>
           </div>
         </div>
       </div>

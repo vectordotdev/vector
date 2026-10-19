@@ -18,7 +18,7 @@ use crate::{
     internal_events::{EndpointBytesReceived, StreamClosedError},
     serde::OneOrMany,
     shutdown::ShutdownSignal,
-    sources::{mqtt::MqttSourceConfig, util},
+    sources::{SourceError, mqtt::MqttSourceConfig, util},
 };
 
 const SUBSCRIPTION_QOS: QoS = QoS::AtLeastOnce;
@@ -65,6 +65,10 @@ struct FinalizerEntry {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Independent protocol flags, each with its own transition rules; the exhaustive model check enumerates their combinations."
+)]
 struct ProtocolState {
     connected: bool,
     /// A (re)subscribe is needed and has not yet been confirmed by a SUBACK.
@@ -97,6 +101,10 @@ struct LoopActions {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Independent actions the ConnAck handler performs; a flag set keeps on_connack pure and testable."
+)]
 struct ConnAckActions {
     warn_session_not_resumed: bool,
     clear_pending_acks: bool,
@@ -322,7 +330,7 @@ fn publish_supports_end_to_end_acknowledgements(qos: QoS) -> bool {
 ///   `partition_buffered_events` already routed it into `orphaned_publishes`.
 ///   This arm is an unreachable-in-practice defensive fallback; it still
 ///   returns the safe default (drop) if one somehow survives.
-/// - Everything else is stale control traffic; most importantly a SubAck,
+/// - Everything else is stale control traffic; most importantly a `SubAck`,
 ///   which would falsely confirm the new connection's (re)subscribe. Dropped.
 fn keep_buffered_event_after_disconnect(event: &MqttEvent, acknowledgements: bool) -> bool {
     match event {
@@ -336,7 +344,7 @@ fn keep_buffered_event_after_disconnect(event: &MqttEvent, acknowledgements: boo
 /// Splits buffered incoming events into what `keep_buffered_event_after_disconnect`
 /// should judge as usual, and manual-ack QoS 1/2 publishes that must instead
 /// wait for the next reconnect's session outcome (see `orphaned_publishes`
-/// and the ConnAck handler in `run`) before it's known whether they're safe
+/// and the `ConnAck` handler in `run`) before it's known whether they're safe
 /// to drop.
 ///
 /// Only reachable with `acknowledgements` on: with it off, rumqttc auto-acks
@@ -375,6 +383,10 @@ fn partition_buffered_events(
 /// `PubComp` -- the previous `!matches!(request, A | B | C)` form kept
 /// everything not explicitly named, the wrong default for a connection-
 /// scoped packet).
+#[allow(
+    clippy::match_same_arms,
+    reason = "Drop arms are grouped by *why* each variant is dropped, with a rationale per group."
+)]
 const fn keep_pending_request_after_disconnect(request: &rumqttc::Request) -> bool {
     match request {
         // Each of these carries connection-scoped state: a packet id that's
@@ -518,6 +530,10 @@ struct ConnectionAuxState<'a> {
 }
 
 impl MqttSource {
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn new(
         connector: MqttConnector,
         decoder: Decoder,
@@ -534,7 +550,15 @@ impl MqttSource {
         })
     }
 
-    pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "One select! loop over the connection, ack stream and timers; its arms already delegate to helpers."
+    )]
+    pub async fn run(
+        self,
+        mut out: SourceSender,
+        shutdown: ShutdownSignal,
+    ) -> Result<(), SourceError> {
         let (client, mut connection) = self.connector.connect();
 
         // Finalizer drives end-to-end acknowledgements: each in-flight publish is
@@ -639,7 +663,7 @@ impl MqttSource {
                 // `unexpected_sock_close` error that stopped delivery
                 // entirely, whereas an explicit `Disconnect` is a normal,
                 // expected client-initiated close.
-                _ = tokio::time::sleep_until(
+                () = tokio::time::sleep_until(
                     forced_reconnect.due_at().unwrap_or_else(tokio::time::Instant::now)
                 ), if forced_reconnect.due_at().is_some() && protocol_state.connected => {
                     let now = tokio::time::Instant::now();
@@ -658,7 +682,7 @@ impl MqttSource {
                 // was already ended gracefully by the `Disconnect` packet, so
                 // this is not the mid-session socket drop that upset brokers
                 // when tried previously (see the comment on the branch above).
-                _ = tokio::time::sleep_until(
+                () = tokio::time::sleep_until(
                     forced_reconnect.escalate_at().unwrap_or_else(tokio::time::Instant::now)
                 ), if forced_reconnect.escalate_at().is_some() => {
                     forced_reconnect.escalated();
@@ -677,7 +701,7 @@ impl MqttSource {
                 },
                 // The broker rejected a (re)subscribe earlier; the pacing
                 // delay has passed, so try again.
-                _ = tokio::time::sleep_until(
+                () = tokio::time::sleep_until(
                     resubscribe_retry_at.unwrap_or_else(tokio::time::Instant::now)
                 ), if resubscribe_retry_at.is_some() => {
                     resubscribe_retry_at = None;
@@ -865,7 +889,7 @@ impl MqttSource {
     ///   broker delivering QoS 2 to our QoS 1 subscription), or when the
     ///   escalation path calls `clean()` on a live connection mid-drain.
     ///   Split by `partition_buffered_events` (unprocessed manual-ack
-    ///   QoS 1/2 publishes wait for the next ConnAck's session outcome) and
+    ///   QoS 1/2 publishes wait for the next `ConnAck`'s session outcome) and
     ///   filtered by `keep_buffered_event_after_disconnect`.
     ///
     /// Persists, safe by construction (do NOT "fix" these without a reason):
@@ -983,13 +1007,11 @@ impl MqttSource {
     }
 
     fn try_subscribe(&self, client: &rumqttc::AsyncClient) -> bool {
-        match self.subscribe(client) {
-            Ok(()) => true,
-            Err(()) => {
-                warn_resubscribe_failed();
-                false
-            }
+        let queued = self.subscribe(client).is_ok();
+        if !queued {
+            warn_resubscribe_failed();
         }
+        queued
     }
 
     fn subscribe(&self, client: &rumqttc::AsyncClient) -> Result<(), ()> {
@@ -1067,7 +1089,7 @@ impl MqttSource {
                 // (ack only uses the packet id), so clear it before retaining the
                 // entry to avoid pinning payloads in memory while sinks process.
                 if let Some((finalizer, receiver)) = finalizer.zip(batch_receiver) {
-                    publish.payload = Default::default();
+                    publish.payload = bytes::Bytes::default();
                     finalizer.add(
                         FinalizerEntry {
                             publish,
@@ -1245,6 +1267,10 @@ mod tests {
     // expected values are derived from the state inventory documented on
     // `handle_connection_lost`.
     #[test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "One end-to-end scenario: set up every piece of cross-reconnect state, run the handler, assert each postcondition."
+    )]
     fn connection_lost_scrubs_the_rumqttc_seam() {
         let publish_with_qos = |pkid, qos| {
             let mut publish = publish(pkid);
@@ -1766,9 +1792,9 @@ mod tests {
 
         // An out-of-generation (stale) entry never signals, even if its
         // status would otherwise suppress.
-        let stale = state.finalize_publish(BatchStatus::Rejected, 1);
-        assert!(!stale.should_ack);
-        assert!(!stale.just_suppressed);
+        let stale_entry = state.finalize_publish(BatchStatus::Rejected, 1);
+        assert!(!stale_entry.should_ack);
+        assert!(!stale_entry.just_suppressed);
     }
 
     // A suppression that lands inside the cooldown window must reschedule the
@@ -1849,7 +1875,7 @@ mod tests {
 
         // Alternate path: the broker closes in time, the resulting poll error
         // cancels both the schedule and the escalation.
-        schedule.sent(t0 + Duration::from_secs(60));
+        schedule.sent(t0 + Duration::from_mins(1));
         assert!(schedule.disconnect_sent());
         schedule.cancel();
         assert!(!schedule.disconnect_sent());
@@ -1921,7 +1947,7 @@ mod tests {
 
     #[derive(Clone, Copy, Debug)]
     enum ModelEvent {
-        /// `poll()` yielded ConnAck; `subscribe_queued` is the outcome of the
+        /// `poll()` yielded `ConnAck`; `subscribe_queued` is the outcome of the
         /// `try_subscribe` the handler issues when `actions.resubscribe`.
         ConnAck {
             session_present: bool,
@@ -1932,7 +1958,7 @@ mod tests {
         ReceivePublish,
         /// The ack stream yielded a finalization for a current-generation
         /// entry (stale-generation entries cannot be yielded: the finalizer
-        /// is recreated on every ConnAck and disconnect).
+        /// is recreated on every `ConnAck` and disconnect).
         FinalizePublish { status: BatchStatus },
         /// `poll()` yielded a SUBACK for the outstanding (re)subscribe.
         SubAck { all_granted: bool },

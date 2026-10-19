@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
