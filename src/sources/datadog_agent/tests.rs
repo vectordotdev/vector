@@ -1430,7 +1430,7 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
         &["dd.traces"],
         serde_yaml::from_str::<VectorSinkConfig>(&format!(
             r#"
-                address: "{relay_addr}"
+                address: "http://{relay_addr}"
                 batch:
                   max_events: 1
             "#
