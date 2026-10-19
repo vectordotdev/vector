@@ -40,7 +40,6 @@ pub enum CounterName {
     ContainersWatchedTotal,
     DecoderBomRemovalsTotal,
     DecoderMalformedReplacementWarningsTotal,
-    DiskBufferLifecycleEventsTotal,
     DorisBytesLoadedTotal,
     DorisRowsFilteredTotal,
     DorisRowsLoadedTotal,
@@ -83,6 +82,7 @@ pub enum CounterName {
     StoppedTotal,
     TagCardinalityUntrackedEventsTotal,
     TagValueLimitExceededTotal,
+    TopologyDiskBufferLifecycleEventsTotal,
     ValueLimitReachedTotal,
     WebsocketBytesSentTotal,
     WebsocketMessagesSentTotal,
@@ -422,7 +422,6 @@ impl CounterName {
             Self::DecoderMalformedReplacementWarningsTotal => {
                 "decoder_malformed_replacement_warnings_total"
             }
-            Self::DiskBufferLifecycleEventsTotal => "disk_buffer_lifecycle_events_total",
             Self::DorisBytesLoadedTotal => "doris_bytes_loaded_total",
             Self::DorisRowsFilteredTotal => "doris_rows_filtered_total",
             Self::DorisRowsLoadedTotal => "doris_rows_loaded_total",
@@ -467,6 +466,9 @@ impl CounterName {
             Self::StoppedTotal => "stopped_total",
             Self::TagCardinalityUntrackedEventsTotal => "tag_cardinality_untracked_events_total",
             Self::TagValueLimitExceededTotal => "tag_value_limit_exceeded_total",
+            Self::TopologyDiskBufferLifecycleEventsTotal => {
+                "topology_disk_buffer_lifecycle_events_total"
+            }
             Self::ValueLimitReachedTotal => "value_limit_reached_total",
             Self::WebsocketBytesSentTotal => "websocket_bytes_sent_total",
             Self::WebsocketMessagesSentTotal => "websocket_messages_sent_total",

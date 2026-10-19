@@ -51,7 +51,7 @@ impl InternalEvent for TopologyDiskBufferRemoved<'_> {
             );
         }
         counter!(
-            CounterName::DiskBufferLifecycleEventsTotal,
+            CounterName::TopologyDiskBufferLifecycleEventsTotal,
             "event" => "removed",
         )
         .increment(1);
@@ -87,7 +87,7 @@ impl InternalEvent for TopologyDiskBufferReplacementUnreferenced<'_> {
             );
         }
         counter!(
-            CounterName::DiskBufferLifecycleEventsTotal,
+            CounterName::TopologyDiskBufferLifecycleEventsTotal,
             "event" => "replacement_unreferenced",
         )
         .increment(1);
@@ -108,7 +108,7 @@ impl InternalEvent for TopologyDiskBufferUnreferenced<'_> {
             message = "Found disk buffer not referenced by the current configuration. It may still be draining through a detached sink instance; otherwise its buffered bytes are not being processed.",
         );
         counter!(
-            CounterName::DiskBufferLifecycleEventsTotal,
+            CounterName::TopologyDiskBufferLifecycleEventsTotal,
             "event" => "unreferenced",
         )
         .increment(1);
