@@ -16,6 +16,7 @@ concurrency:
 jobs:
   validate:
     name: Validate approved release
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
