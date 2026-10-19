@@ -1,5 +1,7 @@
 use itertools::Itertools;
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
+use rumqttc::{
+    AsyncClient, ClientError, Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter,
+};
 use vector_lib::{
     codecs::Decoder,
     config::{LegacyKey, LogNamespace},
@@ -11,7 +13,7 @@ use crate::{
     SourceSender,
     common::mqtt::MqttConnector,
     event::{BatchNotifier, Event},
-    internal_events::{EndpointBytesReceived, StreamClosedError},
+    internal_events::{EndpointBytesReceived, MqttSubscribeError, StreamClosedError},
     serde::OneOrMany,
     shutdown::ShutdownSignal,
     sources::{SourceError, mqtt::MqttSourceConfig, util},
@@ -49,22 +51,8 @@ impl MqttSource {
         shutdown: ShutdownSignal,
     ) -> Result<(), SourceError> {
         let (client, mut connection) = self.connector.connect();
-
-        match &self.config.topic {
-            OneOrMany::One(topic) => {
-                client.subscribe(topic, QoS::AtLeastOnce).await?;
-            }
-            OneOrMany::Many(topics) => {
-                client
-                    .subscribe_many(
-                        topics
-                            .iter()
-                            .cloned()
-                            .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
-                    )
-                    .await?;
-            }
-        }
+        self.subscribe(&client)?;
+        let mut connected_before = false;
 
         loop {
             tokio::select! {
@@ -76,11 +64,35 @@ impl MqttSource {
                     // We need this issue resolved first:
                     // https://github.com/bytebeamio/rumqtt/issues/349
                     // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
-                    if let Ok(MqttEvent::Incoming(Incoming::Publish(publish))) = mqtt_event {
-                        self.process_message(publish, &mut out).await;
+                    match mqtt_event {
+                        Ok(MqttEvent::Incoming(Incoming::Publish(publish))) => {
+                            self.process_message(publish, &mut out).await;
+                        }
+                        Ok(MqttEvent::Incoming(Incoming::ConnAck(connack))) => {
+                            if connected_before
+                                && !connack.session_present
+                                && let Err(error) = self.subscribe(&client)
+                            {
+                                emit!(MqttSubscribeError { error });
+                            }
+                            connected_before = true;
+                        }
+                        _ => {}
                     }
                 }
             }
+        }
+    }
+
+    fn subscribe(&self, client: &AsyncClient) -> Result<(), ClientError> {
+        match &self.config.topic {
+            OneOrMany::One(topic) => client.try_subscribe(topic, QoS::AtLeastOnce),
+            OneOrMany::Many(topics) => client.try_subscribe_many(
+                topics
+                    .iter()
+                    .cloned()
+                    .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
+            ),
         }
     }
 
