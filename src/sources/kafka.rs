@@ -261,11 +261,11 @@ impl KafkaSourceConfig {
 }
 
 const fn default_session_timeout_ms() -> Duration {
-    Duration::from_millis(10000) // default in librdkafka
+    Duration::from_secs(10) // default in librdkafka
 }
 
 const fn default_socket_timeout_ms() -> Duration {
-    Duration::from_millis(60000) // default in librdkafka
+    Duration::from_mins(1) // default in librdkafka
 }
 
 const fn default_fetch_wait_max_ms() -> Duration {
@@ -273,7 +273,7 @@ const fn default_fetch_wait_max_ms() -> Duration {
 }
 
 const fn default_commit_interval_ms() -> Duration {
-    Duration::from_millis(5000)
+    Duration::from_secs(5)
 }
 
 fn default_auto_offset_reset() -> String {
@@ -436,7 +436,7 @@ async fn kafka_source(
     shutdown: ShutdownSignal,
     eof: bool,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let span = info_span!("kafka_source");
     let consumer = Arc::new(consumer);
 
@@ -449,10 +449,10 @@ async fn kafka_source(
     // EOF signal allowing the coordination task to tell the kafka client task when all partitions have reached EOF
     let (eof_tx, eof_rx) = eof.then(oneshot::channel::<()>).unzip();
 
-    let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
+    let topics: Vec<&str> = config.topics.iter().map(String::as_str).collect();
     if let Err(e) = consumer.subscribe(&topics).context(SubscribeSnafu) {
         error!("{e}");
-        return Err(());
+        return Err(crate::sources::SourceError::from(e));
     }
 
     let coordination_task = {
@@ -495,21 +495,21 @@ async fn kafka_source(
     Ok(())
 }
 
-/// ConsumerStateInner implements a small struct/enum-based state machine.
+/// `ConsumerStateInner` implements a small struct/enum-based state machine.
 ///
-/// With a ConsumerStateInner<Consuming>, the client is able to spawn new tasks
+/// With a `ConsumerStateInner`<Consuming>, the client is able to spawn new tasks
 /// when partitions are assigned. When a shutdown signal is received, or
 /// partitions are being revoked, the Consuming state is traded for a Draining
 /// state (and associated drain deadline future) via the `begin_drain` method
 ///
-/// A ConsumerStateInner<Draining> keeps track of partitions that are expected
+/// A `ConsumerStateInner`<Draining> keeps track of partitions that are expected
 /// to complete, and also owns the signal that, when dropped, indicates to the
 /// client driver task that it is safe to proceed with the rebalance or shutdown.
 /// When draining is complete, or the deadline is reached, Draining is traded in for
 /// either a Consuming (after a revoke) or Complete (in the case of shutdown) state,
 /// via the `finish_drain` method.
 ///
-/// A ConsumerStateInner<Complete> is the final state, reached after a shutdown
+/// A `ConsumerStateInner`<Complete> is the final state, reached after a shutdown
 /// signal is received. This can not be traded for another state, and the
 /// coordination task should exit when this state is reached.
 struct ConsumerStateInner<S> {
@@ -568,6 +568,10 @@ impl Draining {
 }
 
 impl<C> ConsumerStateInner<C> {
+    #[expect(
+        clippy::unused_self,
+        reason = "Consuming this state drops its resources as the consumer completes."
+    )]
     fn complete(self, _deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         (None.into(), ConsumerState::Complete)
     }
@@ -592,9 +596,9 @@ impl ConsumerStateInner<Consuming> {
         }
     }
 
-    /// Spawn a task on the provided JoinSet to consume the kafka StreamPartitionQueue, and handle
+    /// Spawn a task on the provided `JoinSet` to consume the kafka `StreamPartitionQueue`, and handle
     /// acknowledgements for the messages consumed Returns a channel sender that can be used to
-    /// signal that the consumer should stop and drain pending acknowledgements, and an AbortHandle
+    /// signal that the consumer should stop and drain pending acknowledgements, and an `AbortHandle`
     /// that can be used to forcefully end the task.
     fn consume_partition(
         &self,
@@ -672,15 +676,15 @@ impl ConsumerStateInner<Consuming> {
                             parse_message(msg, decoder.clone(), decompressor.as_ref(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
                         }
                     },
-                )
+                );
             }
             (tp, status)
         }.instrument(self.consumer_state.span.clone()));
         (end_tx, handle)
     }
 
-    /// Consume self, and return a "Draining" ConsumerState, along with a Future
-    /// representing a drain deadline, based on max_drain_ms
+    /// Consume self, and return a "Draining" `ConsumerState`, along with a Future
+    /// representing a drain deadline, based on `max_drain_ms`
     fn begin_drain(
         self,
         max_drain_ms: Duration,
@@ -707,7 +711,7 @@ impl ConsumerStateInner<Consuming> {
 }
 
 impl ConsumerStateInner<Draining> {
-    /// Mark the given TopicPartition as being revoked, adding it to the set of
+    /// Mark the given `TopicPartition` as being revoked, adding it to the set of
     /// partitions expected to drain
     fn revoke_partition(&mut self, tp: TopicPartition, end_signal: oneshot::Sender<()>) {
         // Note that if this send() returns Err, it means the task has already
@@ -717,14 +721,14 @@ impl ConsumerStateInner<Draining> {
         self.consumer_state.expect_drain.insert(tp);
     }
 
-    /// Add the given TopicPartition to the set of known "drained" partitions,
+    /// Add the given `TopicPartition` to the set of known "drained" partitions,
     /// i.e. the consumer has drained the acknowledgement channel. A signal is
     /// sent on the signal channel, indicating to the client that offsets may be committed
-    fn partition_drained(&mut self, tp: TopicPartition) {
+    fn partition_drained(&mut self, tp: &TopicPartition) {
         // This send() will only return Err if the receiver has already been disconnected (i.e. the
         // kafka client task is no longer running)
         _ = self.consumer_state.signal.send(());
-        self.consumer_state.expect_drain.remove(&tp);
+        self.consumer_state.expect_drain.remove(tp);
     }
 
     /// Return true if all expected partitions have drained
@@ -733,7 +737,7 @@ impl ConsumerStateInner<Draining> {
     }
 
     /// Finish partition drain mode. Consumes self and the drain deadline
-    /// future, and returns a "Consuming" or "Complete" ConsumerState
+    /// future, and returns a "Consuming" or "Complete" `ConsumerState`
     fn finish_drain(self, deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
         if self.consumer_state.shutdown {
             self.complete(deadline)
@@ -759,6 +763,10 @@ impl ConsumerStateInner<Draining> {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn coordinate_kafka_callbacks(
     consumer: Arc<StreamConsumer<KafkaSourceContext>>,
     mut callbacks: UnboundedReceiver<KafkaCallback>,
@@ -778,7 +786,7 @@ async fn coordinate_kafka_callbacks(
     // processing the corresponding acknowledgement stream. A consumer task
     // should completely drain its acknowledgement stream after receiving an end signal
     let mut partition_consumers: JoinSet<(TopicPartition, PartitionConsumerStatus)> =
-        Default::default();
+        JoinSet::default();
 
     // Handles that will let us end any consumer task that exceeds a drain deadline
     let mut abort_handles: HashMap<TopicPartition, tokio::task::AbortHandle> = HashMap::new();
@@ -796,7 +804,7 @@ async fn coordinate_kafka_callbacks(
                 (drain_deadline, consumer_state) = match consumer_state {
                     ConsumerState::Complete => unreachable!("Partition consumer finished after completion."),
                     ConsumerState::Draining(mut state) => {
-                        state.partition_drained(finished_partition);
+                        state.partition_drained(&finished_partition);
 
                         if state.is_drain_complete() {
                             debug!("All expected partitions have drained.");
@@ -914,7 +922,7 @@ async fn coordinate_kafka_callbacks(
                 },
             },
 
-            Some(_) = &mut drain_deadline => (drain_deadline, consumer_state) = match consumer_state {
+            Some(()) = &mut drain_deadline => (drain_deadline, consumer_state) = match consumer_state {
                 ConsumerState::Complete => unreachable!("Drain deadline received after completion."),
                 ConsumerState::Consuming(state) => {
                     warn!("A drain deadline fired outside of draining mode.");
@@ -968,6 +976,10 @@ fn drive_kafka_consumer(
     });
 }
 
+#[allow(
+    clippy::ref_option,
+    reason = "Keep optional batch notifiers consistent with the event finalization API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[allow(clippy::too_many_arguments)]
 async fn parse_message(
     msg: BorrowedMessage<'_>,
@@ -991,17 +1003,14 @@ async fn parse_message(
                 event
             }
         });
-        match out.send_event_stream(&mut stream).await {
-            Err(_) => {
-                emit!(StreamClosedError { count });
-            }
-            Ok(_) => {
-                // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
-                // here, when `stream` is dropped and runs the destructor [...]".
-                drop(stream);
-                if let Some(f) = finalizer.as_ref() {
-                    f.add(msg.into(), receiver)
-                }
+        if out.send_event_stream(&mut stream).await.is_err() {
+            emit!(StreamClosedError { count });
+        } else {
+            // Drop stream to avoid borrowing `msg`: "[...] borrow might be used
+            // here, when `stream` is dropped and runs the destructor [...]".
+            drop(stream);
+            if let Some(f) = finalizer.as_ref() {
+                f.add(msg.into(), receiver);
             }
         }
     }
@@ -1113,8 +1122,7 @@ impl ReceivedMessage {
 
         let key = msg
             .key()
-            .map(|key| Value::from(Bytes::from(key.to_owned())))
-            .unwrap_or(Value::Null);
+            .map_or(Value::Null, |key| Value::from(Bytes::from(key.to_owned())));
 
         let mut headers_map = ObjectMap::new();
         if let Some(headers) = msg.headers() {
@@ -1341,7 +1349,7 @@ impl KafkaSourceContext {
         }
     }
 
-    /// Emit a PartitionsAssigned callback with the topic-partitions to be consumed,
+    /// Emit a `PartitionsAssigned` callback with the topic-partitions to be consumed,
     /// and block until confirmation is received that a stream and consumer for
     /// each topic-partition has been set up. This function blocks until the
     /// rendezvous channel sender is dropped by the callback handler.
@@ -1366,7 +1374,7 @@ impl KafkaSourceContext {
         }
     }
 
-    /// Emit a PartitionsRevoked callback and block until confirmation is
+    /// Emit a `PartitionsRevoked` callback and block until confirmation is
     /// received that acknowledgements have been processed for each of them.
     /// The rendezvous channel used in the callback can send multiple times to
     /// signal individual partitions completing. This function blocks until the
@@ -1396,7 +1404,7 @@ impl KafkaSourceContext {
             .upgrade()
         {
             match consumer.commit_consumer_state(CommitMode::Sync) {
-                Ok(_) | Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
+                Ok(()) | Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
                     /* Success, or nothing to do - yay \0/ */
                 }
                 Err(error) => emit!(KafkaOffsetUpdateError { error }),
@@ -1407,7 +1415,7 @@ impl KafkaSourceContext {
 
 impl ClientContext for KafkaSourceContext {
     fn stats(&self, statistics: Statistics) {
-        self.stats.stats(statistics)
+        self.stats.stats(statistics);
     }
 }
 
@@ -1501,7 +1509,7 @@ mod test {
             topics: vec![topic.into()],
             group_id: group.into(),
             auto_offset_reset: "beginning".into(),
-            session_timeout_ms: Duration::from_millis(6000),
+            session_timeout_ms: Duration::from_secs(6),
             commit_interval_ms: Duration::from_millis(1),
             librdkafka_options,
             key_field: default_key_field(),
@@ -1509,7 +1517,7 @@ mod test {
             partition_key: default_partition_key(),
             offset_key: default_offset_key(),
             headers_key: default_headers_key(),
-            socket_timeout_ms: Duration::from_millis(60000),
+            socket_timeout_ms: Duration::from_mins(1),
             fetch_wait_max_ms: Duration::from_millis(100),
             log_namespace: Some(log_namespace == LogNamespace::Vector),
             ..Default::default()
@@ -1561,7 +1569,7 @@ mod test {
                         None
                     )
             )
-        )
+        );
     }
 
     #[test]
@@ -1597,7 +1605,7 @@ mod test {
                     )
                     .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[tokio::test]
@@ -1875,6 +1883,10 @@ mod integration_test {
         assert_eq!(messages, expected);
     }
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn advances_offset_past_poison_messages() {
         const SEND_COUNT: usize = 5;
@@ -1916,6 +1928,10 @@ mod integration_test {
         );
     }
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn send_receive(
         acknowledgements: bool,
         error_at: impl Fn(usize) -> bool,
@@ -2127,7 +2143,12 @@ mod integration_test {
     // - Consumer B is assigned a partition
     // - Consumer A stores an order on the revoked partition
     // - Consumer B skips receiving messages?
-    #[ignore]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[ignore = "This fixture does not reliably trigger a rebalance"]
     #[tokio::test]
     async fn handles_rebalance() {
         // The test plan here is to:
@@ -2182,14 +2203,14 @@ mod integration_test {
 
         match fetch_tpl_offset(&group_id, &topic, 0) {
             Offset::Offset(offset) => {
-                assert!((offset as isize - events1.len() as isize).abs() <= 1)
+                assert!((offset as isize - events1.len() as isize).abs() <= 1);
             }
             o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         match fetch_tpl_offset(&group_id, &topic, 1) {
             Offset::Offset(offset) => {
-                assert!((offset as isize - events2.len() as isize).abs() <= 1)
+                assert!((offset as isize - events2.len() as isize).abs() <= 1);
             }
             o => panic!("Invalid offset for partition 0 {o:?}"),
         }
@@ -2233,7 +2254,7 @@ mod integration_test {
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
             let (trigger_shutdown, shutdown_done) =
                 spawn_kafka(tx, config, true, false, LogNamespace::Legacy);
-            let (events, _) = tokio::join!(rx.collect::<Vec<Event>>(), async move {
+            let (events, ()) = tokio::join!(rx.collect::<Vec<Event>>(), async move {
                 sleep(Duration::from_millis(delay_ms)).await;
                 drop(trigger_shutdown);
             });
@@ -2279,6 +2300,10 @@ mod integration_test {
         assert_eq!(total, expect_count);
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn consume_with_rebalance(rebalance_strategy: String) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         // A larger backlog gives the later consumers a bigger margin against being starved

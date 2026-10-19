@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! Expiring Hash Map and related types. See [`ExpiringHashMap`].
 #![warn(missing_docs)]
 

@@ -13421,7 +13421,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.31"
+version = "0.3.32"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -13459,7 +13459,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.60.0-dev"
+version = "0.61.0-dev"
 dependencies = [
  "antithesis-instrumentation",
  "approx",

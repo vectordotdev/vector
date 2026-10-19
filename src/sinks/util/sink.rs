@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! This module contains all our internal sink utilities
 //!
 //! All vector "sinks" are built around the `Sink` type which

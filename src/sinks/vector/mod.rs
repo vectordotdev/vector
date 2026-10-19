@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 

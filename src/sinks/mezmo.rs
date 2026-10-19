@@ -109,8 +109,8 @@ fn default_env() -> String {
 impl GenerateConfig for MezmoConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"hostname: hostname
-            api_key: ${LOGDNA_API_KEY}"#,
+            r"hostname: hostname
+            api_key: ${LOGDNA_API_KEY}",
         })
         .unwrap()
     }
@@ -202,17 +202,13 @@ impl MezmoEventEncoder {
             .hostname
             .render_string(event)
             .map_err(|e| (Some("hostname"), e))?;
-        let tags = self
-            .tags
-            .as_ref()
-            .map(|tags| {
-                let mut vec = Vec::with_capacity(tags.len());
-                for tag in tags {
-                    vec.push(tag.render_string(event).map_err(|e| (None, e))?);
-                }
-                Ok(Some(vec))
-            })
-            .unwrap_or(Ok(None))?;
+        let tags = self.tags.as_ref().map_or(Ok(None), |tags| {
+            let mut vec = Vec::with_capacity(tags.len());
+            for tag in tags {
+                vec.push(tag.render_string(event).map_err(|e| (None, e))?);
+            }
+            Ok(Some(vec))
+        })?;
         Ok(PartitionKey { hostname, tags })
     }
 }
@@ -241,7 +237,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
             .cloned()
             .as_ref()
             .and_then(|path| log.remove(path))
-            .unwrap_or_else(|| String::from("").into());
+            .unwrap_or_else(|| String::new().into());
 
         let timestamp: Value = log
             .timestamp_path()

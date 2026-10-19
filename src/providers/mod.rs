@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::{NamedComponent, configurable_component};

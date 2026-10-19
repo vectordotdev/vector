@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{
     marker::PhantomData,
     sync::Arc,

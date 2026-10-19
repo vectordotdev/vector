@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.60.0-dev"
+version = "0.61.0-dev"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -143,6 +143,7 @@ members = [
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(ddsketch_extended)'] }
 
 [workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
 string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"
