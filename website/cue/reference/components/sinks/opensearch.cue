@@ -80,7 +80,7 @@ components: sinks: opensearch: {
 				Existing OpenSearch configurations can switch from `type: elasticsearch` to
 				`type: opensearch` without changing the other options.
 
-				For self-managed OpenSearch, the default `api_version: auto` detects the
+				For self-managed OpenSearch, the default `api_version: auto` selects the
 				compatible bulk API version:
 
 				```yaml

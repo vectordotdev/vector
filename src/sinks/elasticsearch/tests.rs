@@ -10,7 +10,7 @@ use crate::{
     event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
-            BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
+            BulkAction, BulkConfig, DataStreamConfig, Distribution, ElasticsearchApiVersion,
             ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
             VersionType, sink::process_log,
         },
@@ -702,7 +702,14 @@ async fn test_parse_config_with_uri_auth() {
     let mut version = None;
     let endpoint = HttpEndpoint::parse("http://user:pass@localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        Distribution::Elasticsearch,
+        &endpoint,
+        &proxy,
+        &mut version,
+    )
+    .await;
     assert!(result.is_ok());
     let common = result.unwrap();
 
@@ -742,7 +749,14 @@ async fn test_parse_config_with_config_auth() {
     let mut version = None;
     let endpoint = HttpEndpoint::parse("http://localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        Distribution::Elasticsearch,
+        &endpoint,
+        &proxy,
+        &mut version,
+    )
+    .await;
     assert!(result.is_ok());
     let common = result.unwrap();
 
@@ -777,61 +791,117 @@ async fn test_parse_config_with_conflicting_auth() {
     let mut version = None;
     let endpoint = HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        Distribution::Elasticsearch,
+        &endpoint,
+        &proxy,
+        &mut version,
+    )
+    .await;
 
     // Should fail due to auth being specified in both places
     assert!(result.is_err());
 }
 
 #[tokio::test]
-async fn auto_version_distinguishes_opensearch_from_elasticsearch() {
+async fn api_version_uses_selected_distribution() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
     use hyper::Body;
 
     use crate::{sinks::util::test::build_test_server_generic, test_util::addr::next_addr};
 
-    for (version, suppress_type_name) in [
-        (serde_json::json!({"number": "6.8.23"}), false),
-        (serde_json::json!({"number": "7.17.0"}), true),
-        (serde_json::json!({"number": "8.0.0"}), true),
+    for (distribution, api_version, server_version, expected_version) in [
         (
-            serde_json::json!({"number": "6.8.23", "distribution": "custom"}),
-            false,
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::Auto,
+            "6.8.23",
+            6,
         ),
         (
-            serde_json::json!({"number": "8.0.0", "distribution": "custom"}),
-            true,
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::Auto,
+            "7.17.0",
+            7,
         ),
         (
-            serde_json::json!({"number": "6.8.23", "distribution": null}),
-            false,
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::Auto,
+            "8.0.0",
+            8,
         ),
         (
-            serde_json::json!({"number": "1.3.0", "distribution": "opensearch"}),
-            true,
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::Auto,
+            "1.3.0",
+            7,
         ),
         (
-            serde_json::json!({"number": "2.19.0", "distribution": "opensearch"}),
-            true,
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::Auto,
+            "2.19.0",
+            7,
         ),
         (
-            serde_json::json!({"number": "3.6.0", "distribution": "opensearch"}),
-            true,
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::Auto,
+            "3.6.0",
+            7,
+        ),
+        (
+            Distribution::Elasticsearch,
+            ElasticsearchApiVersion::V7,
+            "3.6.0",
+            7,
+        ),
+        (
+            Distribution::OpenSearch,
+            ElasticsearchApiVersion::V8,
+            "3.6.0",
+            8,
         ),
     ] {
         let (_guard, addr) = next_addr();
-        let body = serde_json::json!({"version": version}).to_string();
-        let (_rx, _trigger, server) =
-            build_test_server_generic(addr, move || http::Response::new(Body::from(body.clone())));
+        let body = serde_json::json!({"version": {"number": server_version}}).to_string();
+        let probes = Arc::new(AtomicUsize::new(0));
+        let server_probes = Arc::clone(&probes);
+        let (_rx, _trigger, server) = build_test_server_generic(addr, move || {
+            server_probes.fetch_add(1, Ordering::Relaxed);
+            http::Response::new(Body::from(body.clone()))
+        });
         let server = tokio::spawn(server);
+        let endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
         let config = ElasticsearchConfig {
-            endpoints: vec![HttpEndpoint::parse(&format!("http://{addr}")).unwrap()],
-            api_version: ElasticsearchApiVersion::Auto,
+            endpoints: vec![endpoint.clone()],
+            api_version,
             ..Default::default()
         };
-        let common = ElasticsearchCommon::parse_single(&config).await.unwrap();
+        let mut version = None;
+        let common = ElasticsearchCommon::parse_config(
+            &config,
+            distribution,
+            &endpoint,
+            &ProxyConfig::default(),
+            &mut version,
+        )
+        .await
+        .unwrap();
         assert_eq!(
-            common.request_builder.encoder.suppress_type_name, suppress_type_name,
-            "unexpected type handling for {version}"
+            version,
+            Some(expected_version),
+            "{distribution:?} with {:?} and server {server_version}",
+            config.api_version
+        );
+        let should_probe = distribution == Distribution::Elasticsearch
+            && config.api_version == ElasticsearchApiVersion::Auto;
+        assert_eq!(probes.load(Ordering::Relaxed), usize::from(should_probe));
+        assert_eq!(
+            common.request_builder.encoder.suppress_type_name,
+            expected_version >= 7
         );
         server.abort();
     }

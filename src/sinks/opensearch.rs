@@ -4,15 +4,18 @@ use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
-    sinks::{Healthcheck, VectorSink, elasticsearch::ElasticsearchConfig},
+    sinks::{
+        Healthcheck, VectorSink,
+        elasticsearch::{Distribution, ElasticsearchConfig},
+    },
     template::ConfinementConfig,
 };
 
 /// Configuration for the `opensearch` sink.
 ///
 /// Uses the Elasticsearch-compatible bulk API supported by OpenSearch. Configuration options
-/// and defaults are shared with the `elasticsearch` sink, including automatic API version
-/// detection and support for Amazon OpenSearch Service and OpenSearch Serverless.
+/// and delivery behavior are shared with the `elasticsearch` sink. The default API version
+/// is selected for OpenSearch, including Amazon OpenSearch Service and OpenSearch Serverless.
 #[configurable_component(sink("opensearch", "Index observability events in OpenSearch."))]
 #[derive(Clone, Debug, Default)]
 pub struct OpenSearchConfig(ElasticsearchConfig);
@@ -52,7 +55,9 @@ impl ValidatedSink for OpenSearchConfig {
         validated: &Self::Validated,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        ValidatedSink::build(&self.0, validated, cx).await
+        self.0
+            .build_with_distribution(validated, cx, Distribution::OpenSearch)
+            .await
     }
 }
 
@@ -94,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn defaults_to_managed_with_automatic_api_detection() {
+    fn defaults_to_managed_with_auto_api_version() {
         let config: OpenSearchConfig =
             serde_yaml::from_str("endpoints: [http://localhost:9200]").unwrap();
         assert_eq!(config.0.api_version, ElasticsearchApiVersion::Auto);

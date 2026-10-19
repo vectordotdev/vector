@@ -432,7 +432,7 @@ mod opensearch {
             });
             config["tls"] = json!({ "ca_file": tls::TEST_PEM_CA_PATH });
         }
-        // Omit api_version to exercise the default automatic detection.
+        // Omit api_version to exercise the constructor-selected OpenSearch API version.
         let config: BoxedSink = serde_json::from_value(config).unwrap();
         let (sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
         healthcheck.await.unwrap();
@@ -906,7 +906,7 @@ async fn run_insert_tests_with_config(
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
     let cx = SinkContext::default();
-    let commons = ElasticsearchCommon::parse_many(config, cx.proxy())
+    let commons = ElasticsearchCommon::parse_many(config, Distribution::Elasticsearch, cx.proxy())
         .await
         .expect("Config error");
     let index = match config.mode {

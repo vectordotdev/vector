@@ -21,7 +21,7 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         elasticsearch::{
-            ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
+            Distribution, ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
             ElasticsearchCommonMode, ElasticsearchMode, ParseError, VersionType,
             health::ElasticsearchHealthLogic,
             retry::ElasticsearchRetryLogic,
@@ -834,11 +834,23 @@ impl ValidatedSink for ElasticsearchConfig {
         validated: &ValidatedElasticsearch,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_with_distribution(validated, cx, Distribution::Elasticsearch)
+            .await
+    }
+}
+
+impl ElasticsearchConfig {
+    pub(crate) async fn build_with_distribution(
+        &self,
+        validated: &ValidatedElasticsearch,
+        cx: SinkContext,
+        distribution: Distribution,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         // Confinement of the active mode's routing templates happens in
         // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
         // parsing (which performs I/O: AWS credential resolution and API-version autodetection).
         // The pure request/health settings were resolved during `validate`.
-        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
+        let commons = ElasticsearchCommon::parse_many(self, distribution, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
