@@ -47,7 +47,7 @@ impl ValidatedSink for OpenSearchConfig {
     type Validated = <ElasticsearchConfig as ValidatedSink>::Validated;
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        self.0.validate()
+        self.0.validate_with_distribution(Distribution::OpenSearch)
     }
 
     async fn build(
@@ -96,6 +96,73 @@ mod tests {
         assert_eq!(value["bulk"]["index"], "logs-%Y.%m.%d");
         let roundtrip: BoxedSink = serde_json::from_value(value.clone()).unwrap();
         assert_eq!(serde_json::to_value(roundtrip).unwrap(), value);
+    }
+
+    #[tokio::test]
+    async fn confinement_warnings_use_actual_sink_type() {
+        use std::io::{Read, Seek, SeekFrom};
+
+        use tracing::instrument::WithSubscriber;
+
+        for sink_type in ["elasticsearch", "opensearch"] {
+            for (mode, expected_fields) in [
+                ("bulk", vec!["bulk.index"]),
+                (
+                    "data_stream",
+                    vec![
+                        "data_stream.type",
+                        "data_stream.dataset",
+                        "data_stream.namespace",
+                    ],
+                ),
+            ] {
+                let config: BoxedSink = serde_yaml::from_str(&format!(
+                    "type: {sink_type}\nendpoints: [http://localhost:9200]\napi_version: v7\n\
+                     mode: {mode}\ndangerously_allow_unconfined_template_resolution: true"
+                ))
+                .unwrap();
+                let mut logs = tempfile::tempfile().unwrap();
+                let subscriber = tracing::Dispatch::new(
+                    tracing_subscriber::fmt()
+                        .json()
+                        .with_max_level(tracing::Level::WARN)
+                        .with_writer(logs.try_clone().unwrap())
+                        .finish(),
+                );
+                let validated = tracing::dispatcher::with_default(&subscriber, || {
+                    config.validate_dyn().unwrap()
+                });
+                let validation_end = logs.stream_position().unwrap();
+                // An explicit API version avoids network I/O; the healthcheck is not polled.
+                let (_sink, _healthcheck) = config
+                    .build_dyn(validated.as_ref(), SinkContext::default())
+                    .with_subscriber(subscriber)
+                    .await
+                    .unwrap();
+                logs.seek(SeekFrom::Start(0)).unwrap();
+                let mut output = String::new();
+                logs.read_to_string(&mut output).unwrap();
+                let (validation_logs, build_logs) =
+                    output.split_at(validation_end.try_into().unwrap());
+                for phase_logs in [validation_logs, build_logs] {
+                    let warnings: Vec<serde_json::Value> = phase_logs
+                        .lines()
+                        .map(|line| serde_json::from_str(line).unwrap())
+                        .filter(|event: &serde_json::Value| {
+                            event["fields"]["message"]
+                                .as_str()
+                                .is_some_and(|message| message.starts_with("SECURITY:"))
+                        })
+                        .collect();
+                    assert_eq!(warnings.len(), expected_fields.len(), "{phase_logs}");
+                    for (warning, field) in warnings.iter().zip(&expected_fields) {
+                        assert_eq!(warning["fields"]["component_kind"], "sink");
+                        assert_eq!(warning["fields"]["component_type"], sink_type);
+                        assert_eq!(warning["fields"]["field"], *field);
+                    }
+                }
+            }
+        }
     }
 
     #[test]

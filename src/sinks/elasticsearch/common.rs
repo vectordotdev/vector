@@ -30,6 +30,15 @@ pub enum Distribution {
     OpenSearch,
 }
 
+impl Distribution {
+    pub(super) const fn component_name(self) -> &'static str {
+        match self {
+            Self::Elasticsearch => "elasticsearch",
+            Self::OpenSearch => "opensearch",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
@@ -77,7 +86,7 @@ impl ElasticsearchCommon {
 
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
-        let mode = config.common_mode()?;
+        let mode = config.common_mode(distribution.component_name())?;
 
         let tower_request = config.request.tower.into_settings();
 
