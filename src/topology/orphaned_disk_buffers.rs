@@ -81,8 +81,8 @@ where
         let result = scan(&request.data_dir);
         match receiver.has_changed() {
             Err(_) => return,
-            Ok(true) => continue,
             Ok(false) => report(&request, result),
+            Ok(true) => {}
         }
     }
 }
@@ -123,7 +123,7 @@ fn report_orphaned_disk_buffers(
 }
 
 pub(super) fn referenced_disk_buffer_directories(config: &Config) -> HashSet<PathBuf> {
-    let data_dir = config.global.data_dir.clone();
+    let data_dir = config.global.data_dir.as_deref();
     let sinks = config
         .sinks()
         .map(|(id, sink)| (id.clone(), sink.buffer.clone()));
@@ -136,7 +136,7 @@ pub(super) fn referenced_disk_buffer_directories(config: &Config) -> HashSet<Pat
 }
 
 fn disk_buffer_directories(
-    data_dir: Option<PathBuf>,
+    data_dir: Option<&Path>,
     buffers: impl Iterator<Item = (ComponentKey, BufferConfig)>,
 ) -> HashSet<PathBuf> {
     buffers
@@ -144,7 +144,7 @@ fn disk_buffer_directories(
             buffer
                 .stages()
                 .iter()
-                .filter_map(|stage| stage.disk_usage(data_dir.clone(), &id))
+                .filter_map(|stage| stage.disk_usage(data_dir.map(Path::to_path_buf), &id))
                 .map(|usage| usage.data_dir().to_path_buf())
                 .collect::<Vec<_>>()
         })

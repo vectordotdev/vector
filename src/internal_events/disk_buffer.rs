@@ -68,23 +68,30 @@ pub struct TopologyDiskBufferReplacementUnreferenced<'a> {
 
 impl InternalEvent for TopologyDiskBufferReplacementUnreferenced<'_> {
     fn emit(self) {
-        if let Some(usage) = self.usage {
-            warn!(
+        match self.usage {
+            Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => warn!(
                 component_id = %self.component_id,
                 buffer_dirs = ?self.buffer_dirs,
                 new_buffer_dirs = ?self.new_buffer_dirs,
                 buffered_events = usage.event_count,
                 buffered_bytes = usage.byte_size,
                 message = "Replacement sink does not use the previous disk buffer. If reload succeeds, its buffered bytes will be left unreferenced.",
-            );
-        } else {
-            warn!(
+            ),
+            Some(usage) => warn!(
+                component_id = %self.component_id,
+                buffer_dirs = ?self.buffer_dirs,
+                new_buffer_dirs = ?self.new_buffer_dirs,
+                buffered_events = usage.event_count,
+                buffered_bytes = usage.byte_size,
+                message = "Replacement sink does not use the previous disk buffer. No buffered bytes were observed, but additional writes may still be in flight until the old input is detached.",
+            ),
+            None => warn!(
                 component_id = %self.component_id,
                 buffer_dirs = ?self.buffer_dirs,
                 new_buffer_dirs = ?self.new_buffer_dirs,
                 usage_unavailable = true,
                 message = "Replacement sink does not use the previous disk buffer, and its buffered-byte count is unavailable. If reload succeeds, any buffered bytes will be left unreferenced.",
-            );
+            ),
         }
         counter!(
             CounterName::TopologyDiskBufferLifecycleEventsTotal,

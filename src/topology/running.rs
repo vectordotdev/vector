@@ -726,7 +726,7 @@ impl RunningTopology {
                         .any(|path| new_buffer_dirs.contains(path))
                 {
                     match usage {
-                        Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
+                        Some(usage) => {
                             emit!(TopologyDiskBufferReplacementUnreferenced {
                                 component_id: key,
                                 buffer_dirs: &buffer_dirs,
@@ -742,7 +742,6 @@ impl RunningTopology {
                                 usage: None,
                             });
                         }
-                        Some(_) => {}
                     }
                 }
             }
