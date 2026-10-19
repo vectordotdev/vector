@@ -9,8 +9,11 @@ permissions:
   contents: read
   pull-requests: read
 
+# By default a new run replaces a pending run in the group. `queue: max` keeps every
+# pending run, so a later `Cargo.toml` push cannot drop a release push before it is tagged.
 concurrency:
   group: release-autotag
+  queue: max
   cancel-in-progress: false
 
 jobs:
