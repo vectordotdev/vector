@@ -19,8 +19,8 @@ distributions. The sink targets single-node VictoriaMetrics, cluster `vminsert`,
   `prometheus_remote_write`.
 - Prior art:
   - `vmagent` remote write client (`app/vmagent/remotewrite/client.go`): zstd with
-    `X-VictoriaMetrics-Remote-Write-Version: 1`, 2xx is success, 400 and 409 are dropped,
-    everything else is retried with backoff.
+    `X-VictoriaMetrics-Remote-Write-Version: 1`, 2xx is success, 400, 409, and 415 are dropped,
+    everything else is retried with backoff. (`sendBlockHTTP`: 400, 409, and 415 are dropped.)
   - `VictoriaMetrics/metrics` `histogram.go`: the `vmrange` histogram layout.
   - Vector `datadog_*` and `splunk_hec` sinks: per-event credentials carried in event secrets
     (`datadog_api_key`, `splunk_hec_token`) that override a configured default.
@@ -62,7 +62,8 @@ distributions. The sink targets single-node VictoriaMetrics, cluster `vminsert`,
     for that request and `204` for successful writes.
   - Compression defaults to snappy. zstd has to be opted into and is not advertised with the
     VictoriaMetrics version header.
-- VictoriaMetrics reports 2x-5x lower network bandwidth for its zstd protocol compared to snappy.
+- VictoriaMetrics documents lower network bandwidth for its zstd protocol compared to snappy
+  (the claimed 2x-5x range still needs a citation, see Outstanding Questions).
 - Without this sink, VictoriaMetrics users keep hand-tuning a sink designed for Prometheus and
   Cortex, and multi-tenant setups need one sink per tenant.
 
@@ -127,9 +128,10 @@ Configuration reference:
 | `auth` | none | Shared HTTP auth: `basic`, `bearer`, `custom`, and `aws` where enabled. |
 | `default_namespace` | none | Prefix for metrics without a namespace, joined with `_`. |
 | `send_metadata` | `true` | Send metric type metadata, which VictoriaMetrics stores when `-enableMetadata` is set (the default), as `vmagent` does. |
+| `retry_strategy` | `default` | `default` matches `vmagent` (see Retries), or any standard HTTP sink strategy. |
 | `compression_level` | 3 | zstd level. Negative levels trade bandwidth for CPU, as in `vmagent`. |
 | `expire_metrics_secs` | none | TTL for incremental state. |
-| `batch`, `request`, `tls`, `buffer`, `acknowledgements` | standard | Standard sink options. `request.headers` adds static headers. |
+| `batch`, `request`, `tls`, `buffer`, `acknowledgements` | standard | Standard sink options. `request.headers` adds static headers, except `Content-Type`, `Content-Encoding`, and `X-VictoriaMetrics-Remote-Write-Version`, which the sink sets and which are rejected at validation. |
 
 Write path per tenant mode:
 
@@ -173,7 +175,8 @@ This is a new component. It does not change existing behavior.
 src/sinks/victoriametrics/
   mod.rs
   config.rs           # VictoriaMetricsConfig, TenantConfig, validation, build
-  sink.rs             # stream pipeline: normalize -> partition -> batch -> request
+  sink.rs             # stream pipeline: route tenant -> normalize -> partition -> batch -> request
+  request_builder.rs  # encodes a batch into a request
   normalize.rs        # sink-owned incremental state, including HistogramSet
   histogram.rs        # vmrange bucket math and label formatting
   encoder.rs          # direct protobuf writer for WriteRequest
@@ -203,7 +206,7 @@ X-VictoriaMetrics-Remote-Write-Version: 1
 ```rust
 #[derive(Clone, Eq, Hash, PartialEq)]
 struct PartitionKey {
-    tenant: Option<String>,        // rendered tenant.id in `path` mode
+    tenant: Option<Tenant>,        // parsed, normalized tenant.id in `path` mode
     token: Option<Arc<str>>,       // `victoriametrics_token` event secret
 }
 ```
@@ -217,7 +220,7 @@ controls through templates and VRL.
 | -------- | ------ |
 | 2xx (VictoriaMetrics returns 204) | success |
 | 400, 409, 415 | drop, emit error event |
-| any other status, timeout, connection error | retry with backoff |
+| any other status, timeout, connection error, failure while reading the response | retry with backoff |
 
 This matches `sendBlockHTTP` in `vmagent`, which drops blocks only on 400, 409, and 415 and retries
 everything else. In particular, 401 and 403 are retried because `vmauth` returns them during token
@@ -234,6 +237,11 @@ when `tenant.id` is static, and is skipped otherwise. Per-event tokens are not c
 are unknown at startup. `healthcheck.uri` overrides the target.
 
 #### Normalization
+
+The tenant is resolved first. A metric whose `tenant.id` fails to render or is not a valid tenant is
+rejected before it reaches any incremental state, so it never contributes to a cumulative value.
+Incremental state is held in memory: after a restart, counters and histograms start again from
+zero, which VictoriaMetrics treats as a counter reset.
 
 Counters, gauges, and sets keep using `MetricSet::make_absolute`, as in `prometheus_remote_write`.
 Distributions use a separate state map owned by the sink:
@@ -253,6 +261,10 @@ struct HistogramSet {
 }
 ```
 
+Expired entries are removed by a scan that runs at most once per tenth of the TTL (at least one
+second apart), so a series outlives its TTL by at most that much. The scan runs when a distribution
+arrives.
+
 - An incremental distribution is bucketed on arrival and added to the stored `VmHistogram`, so
   memory per series is bounded (at most 488 counters) and flush cost does not depend on history.
 - An absolute distribution is bucketed directly and is not stored.
@@ -262,7 +274,8 @@ struct HistogramSet {
 - Distributions become `vmrange` histograms regardless of their statistic, so summary-style
   distributions (for example statsd timers) become aggregatable too.
 - `Sketch` is encoded as a summary with the 0.5, 0.75, 0.9, 0.95, and 0.99 quantiles plus `_sum`,
-  `_count`, `_min`, and `_max`, matching how VictoriaMetrics stores Datadog sketches
+  `_count`, `_min`, and `_max`. An empty sketch writes only `_count`, never fabricated zero
+  quantiles, matching how VictoriaMetrics stores Datadog sketches
   (`lib/protoparser/datadogsketches`). A `vmrange` conversion may follow in a later phase.
 
 #### `vmrange` bucket math
@@ -310,7 +323,9 @@ that the bucket bounds are bit-identical.
   a reused per-thread compression context, as `vmagent` does. The frame therefore records its content
   size, which lets VictoriaMetrics decompress into a buffer of the right size instead of falling back
   to streaming decompression.
-- Metadata entries are written only when `send_metadata` is `true`.
+- Labels with an empty value are dropped, as `vmagent` does.
+- Metadata entries are written only when `send_metadata` is `true`, once per metric family, type, and
+  tenant, so two metrics with the same name and different types each announce their type.
 
 A Criterion benchmark in `benches/` will compare this encoder with the `prometheus_remote_write`
 encoder on counter-heavy and distribution-heavy batches.
@@ -324,6 +339,11 @@ encoder on counter-heavy and distribution-heavy batches.
 distribution can expand to 490 series that each repeat every tag, so in-memory size would let a
 batch exceed the VictoriaMetrics `-maxInsertRequestSize` limit (32 MiB by default), which rejects the
 whole request with 400. The estimate is an upper bound of the encoded size.
+
+#### Internal metrics
+
+The `endpoint` tag of `component_sent_bytes_total` is the base endpoint without the tenant path, so
+a dynamic `tenant.id` cannot create unbounded internal metric cardinality.
 
 ## Rationale
 
@@ -358,6 +378,9 @@ whole request with 400. The estimate is an upper bound of the encoded size.
 Drawbacks:
 
 - A new sink to maintain, overlapping with `prometheus_remote_write`.
+- The healthcheck performs a real write. A `vmauth` rate limit, or a proxy that rejects empty
+  bodies, can fail it and block startup when `require_healthy` is set. `healthcheck.enabled: false`
+  and `healthcheck.uri` are the escape hatches.
 - In `vmauth` setups, one failing credential applies backpressure to the whole sink, because all
   partitions share one service and concurrency limit.
 - `vmrange` series are not readable by plain Prometheus. The sink is for VictoriaMetrics only.
@@ -367,7 +390,9 @@ Drawbacks:
 - Confirm that VictoriaMetrics answers 2xx to an empty zstd `WriteRequest` on single-node,
   `vminsert`, and through `vmauth`. The source (`lib/protoparser/promremotewrite/stream`) decodes an
   empty frame into an empty request and returns 204; the integration tests run the healthcheck
-  against all three to confirm it.
+  against all three, but have not been run yet.
+- Cite the "2x-5x lower network bandwidth" claim and the `vminsert` version (v1.150) in which the
+  `AccountID`/`ProjectID` headers become the default, or remove them.
 - Decide whether custom auth header names (`vmauth -httpAuthHeader`) need a dedicated secret-safe
   option, or whether `request.headers` is enough.
 
@@ -379,6 +404,9 @@ Drawbacks:
 - [x] `vmrange` histograms and bounded distribution state, with golden tests against
   `VictoriaMetrics/metrics`.
 - [x] Direct protobuf encoder.
+- [x] Website reference (`victoriametrics.cue`) and changelog fragment.
+- [x] Test that the sink stores the same series, labels, values, and timestamps as `vmagent` for the
+  same data (`matches_vmagent`). It compiles but has not been run against the containers yet.
 - [ ] Criterion benchmarks against the `prometheus_remote_write` encoder.
 - [ ] `Sketch` to `vmrange` conversion.
 
