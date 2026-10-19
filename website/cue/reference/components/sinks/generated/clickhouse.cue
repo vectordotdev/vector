@@ -232,14 +232,12 @@ generated: components: sinks: clickhouse: configuration: {
 	}
 	request: {
 		description: """
-			Middleware settings for outbound requests.
+			HTTP request settings.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
-
-			Note that the retry backoff policy follows the Fibonacci sequence.
+			Header values support event templates for inserts. Schema discovery and healthchecks use only static headers.
 			"""
 		required: false
-		type:     _schemaDefinitions["vector::sinks::util::service::TowerRequestConfig"]
+		type:     _schemaDefinitions["vector::sinks::util::http::RequestConfig"]
 	}
 	skip_unknown_fields: {
 		description: """
