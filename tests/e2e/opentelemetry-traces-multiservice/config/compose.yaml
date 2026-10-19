@@ -790,8 +790,8 @@ services:
         condition: service_healthy
     volumes:
       - "../data/vector.yaml:/etc/vector/vector.yaml:ro"
-  # This completion dependency makes `compose up --detach` wait for the workload
-  # before the Rust tests start, then checks that the completion marker exists.
+  # Nothing uses this directly: depending on load-generator's completion makes
+  # `docker compose up --detach` wait for the workload before the test starts.
   demo-ready:
     image: alpine:3.20
     command:
