@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use notify::{EventKind, RecursiveMode, recommended_watcher};
 use std::{
     collections::{HashMap, HashSet},

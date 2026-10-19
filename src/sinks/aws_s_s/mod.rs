@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod client;
 mod config;
 mod request_builder;

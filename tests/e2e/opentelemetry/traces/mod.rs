@@ -308,27 +308,31 @@ fn vector_sink_otel_sink_traces_match() {
 
     let mut seen_span_ids = std::collections::HashSet::new();
     for rs in &collector_sink_request.resource_spans {
-        let mut deduped_rs = rs.clone();
-        deduped_rs.scope_spans.clear();
+        let mut deduplicated_resource_spans = rs.clone();
+        deduplicated_resource_spans.scope_spans.clear();
 
         for ss in &rs.scope_spans {
-            let mut deduped_ss = ss.clone();
-            deduped_ss.spans.clear();
+            let mut deduplicated_scope_spans = ss.clone();
+            deduplicated_scope_spans.spans.clear();
 
             for span in &ss.spans {
                 let span_id = span.span_id.as_slice();
                 if seen_span_ids.insert(span_id) {
-                    deduped_ss.spans.push(span.clone());
+                    deduplicated_scope_spans.spans.push(span.clone());
                 }
             }
 
-            if !deduped_ss.spans.is_empty() {
-                deduped_rs.scope_spans.push(deduped_ss);
+            if !deduplicated_scope_spans.spans.is_empty() {
+                deduplicated_resource_spans
+                    .scope_spans
+                    .push(deduplicated_scope_spans);
             }
         }
 
-        if !deduped_rs.scope_spans.is_empty() {
-            deduped_sink_request.resource_spans.push(deduped_rs);
+        if !deduplicated_resource_spans.scope_spans.is_empty() {
+            deduped_sink_request
+                .resource_spans
+                .push(deduplicated_resource_spans);
         }
     }
 

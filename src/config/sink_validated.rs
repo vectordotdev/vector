@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Validated sink infrastructure for the sinks-only lifecycle architecture.
 //!
 //! This module implements a split between the serde/typetag-facing `SinkConfig` role

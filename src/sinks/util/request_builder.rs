@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{io, num::NonZeroUsize};
 
 use bytes::Bytes;

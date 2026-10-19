@@ -1,5 +1,5 @@
 #![allow(clippy::clone_on_ref_ptr)]
-#![allow(warnings, clippy::pedantic, clippy::nursery)]
+#![allow(warnings, clippy::trivially_copy_pass_by_ref, clippy::nursery)]
 
 tonic::include_proto!("vector");
 

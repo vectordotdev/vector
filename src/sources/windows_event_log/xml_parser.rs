@@ -5,7 +5,7 @@ use metrics::counter;
 use quick_xml::{Reader, escape::unescape, events::Event as XmlEvent};
 
 use super::config::WindowsEventLogConfig;
-use super::error::*;
+use super::error::WindowsEventLogError;
 
 /// Truncate a string at a UTF-8 safe boundary, appending a suffix.
 pub(crate) fn truncate_utf8(s: &mut String, max_bytes: usize) {
@@ -44,7 +44,7 @@ pub struct SystemFields {
     pub system_time: Option<String>,
 }
 
-/// Result from EventData parsing (supports both named and positional formats).
+/// Result from `EventData` parsing (supports both named and positional formats).
 #[derive(Debug, Clone)]
 pub struct EventDataResult {
     pub structured_data: HashMap<String, String>,
@@ -78,7 +78,7 @@ pub struct WindowsEvent {
     pub task_name: Option<String>,
     pub opcode_name: Option<String>,
     pub keyword_names: Vec<String>,
-    /// Resolved account name from user_id SID (e.g. "NT AUTHORITY\SYSTEM").
+    /// Resolved account name from `user_id` SID (e.g. "NT AUTHORITY\SYSTEM").
     pub user_name: Option<String>,
     pub version: Option<u8>,
     pub qualifiers: Option<u16>,
@@ -89,15 +89,14 @@ impl WindowsEvent {
     /// Returns the human-readable level name for this event.
     ///
     /// Level 0 maps to "Information" per standard convention. Windows uses
-    /// Level=0 for "LogAlways" and for all Security audit events. Mapping it to
+    /// Level=0 for "`LogAlways`" and for all Security audit events. Mapping it to
     /// "Information" prevents SOC analysts from seeing "Unknown" on every logon event.
     pub const fn level_name(&self) -> &'static str {
         match self.level {
-            0 => "Information",
             1 => "Critical",
             2 => "Error",
             3 => "Warning",
-            4 => "Information",
+            0 | 4 => "Information",
             5 => "Verbose",
             _ => "Unknown",
         }
@@ -124,6 +123,8 @@ enum TextTarget {
 /// Replaces ~28 individual `extract_xml_value`/`extract_xml_attribute`/
 /// `extract_provider_name` calls with one `quick_xml::Reader` traversal.
 pub fn parse_system_section(xml: &str) -> SystemFields {
+    const MAX_ITERATIONS: usize = 2000;
+
     let mut fields = SystemFields::default();
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -132,7 +133,6 @@ pub fn parse_system_section(xml: &str) -> SystemFields {
     let mut text_target = TextTarget::None;
     let mut text_buf = String::new();
 
-    const MAX_ITERATIONS: usize = 2000;
     let mut iterations = 0;
 
     loop {
@@ -216,15 +216,14 @@ pub fn parse_system_section(xml: &str) -> SystemFields {
                     text_buf.clear();
                 }
             }
-            Ok(XmlEvent::Eof) => break,
-            Err(_) => break,
+            Ok(XmlEvent::Eof) | Err(_) => break,
             _ => {}
         }
     }
 
     fields
 }
-/// Commit collected element text into the appropriate SystemFields field.
+/// Commit collected element text into the appropriate `SystemFields` field.
 fn commit_text(target: &TextTarget, text: &str, fields: &mut SystemFields) {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -283,7 +282,7 @@ fn extract_correlation_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut
         match attr.key.local_name().as_ref() {
             "ActivityID" => fields.activity_id = Some(attr.value.clone().into_owned()),
             "RelatedActivityID" => {
-                fields.related_activity_id = Some(attr.value.clone().into_owned())
+                fields.related_activity_id = Some(attr.value.clone().into_owned());
             }
             _ => {}
         }
@@ -308,10 +307,18 @@ fn extract_security_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut Sy
     }
 }
 
-/// Build a WindowsEvent from pre-parsed SystemFields and raw XML.
+/// Build a `WindowsEvent` from pre-parsed `SystemFields` and raw XML.
 ///
 /// Applies event ID filters, age filters, and parses EventData/UserData.
 /// Returns `Ok(None)` for filtered events.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub fn build_event(
     xml: String,
     channel: &str,
@@ -355,7 +362,7 @@ pub fn build_event(
                 .or_else(|_| DateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%z"))
                 .ok()
         })
-        .map(|dt| {
+        .map_or_else(Utc::now, |dt| {
             let dt_utc = dt.with_timezone(&Utc);
             let diff = (Utc::now() - dt_utc).num_days().abs();
             if diff > 365 * 10 {
@@ -367,8 +374,7 @@ pub fn build_event(
                 );
             }
             dt_utc
-        })
-        .unwrap_or_else(Utc::now);
+        });
 
     // Apply age filter
     if let Some(max_age_secs) = config.max_event_age_secs {
@@ -406,7 +412,7 @@ pub fn build_event(
         rendered_message,
         raw_xml: if config.include_xml {
             let mut raw = xml;
-            truncate_utf8(&mut raw, 32768);
+            truncate_utf8(&mut raw, 32_768);
             raw
         } else {
             String::new()
@@ -437,7 +443,7 @@ pub fn parse_event_xml(
     build_event(xml, channel, config, rendered_message, system_fields)
 }
 
-/// Extract EventData and UserData sections from event XML.
+/// Extract `EventData` and `UserData` sections from event XML.
 pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDataResult {
     let mut structured_data = HashMap::new();
     let mut string_inserts = Vec::new();
@@ -454,7 +460,7 @@ pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDat
         for value in user_data.values_mut() {
             truncate_utf8(value, config.max_event_data_length);
         }
-        for value in string_inserts.iter_mut() {
+        for value in &mut string_inserts {
             truncate_utf8(value, config.max_event_data_length);
         }
     }
@@ -466,13 +472,17 @@ pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDat
     }
 }
 
-/// Parse a specific XML section (EventData or UserData).
+/// Parse a specific XML section (`EventData` or `UserData`).
 fn parse_section(
     xml: &str,
     section_name: &str,
     named_data: &mut HashMap<String, String>,
     inserts: &mut Vec<String>,
 ) {
+    const MAX_FIELDS: usize = 100;
+
+    const MAX_ITERATIONS: usize = 500;
+
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
 
@@ -481,8 +491,6 @@ fn parse_section(
     let mut current_data_name = String::new();
     let mut current_data_value = String::new();
 
-    const MAX_ITERATIONS: usize = 500;
-    const MAX_FIELDS: usize = 100;
     let mut iterations = 0;
 
     loop {
@@ -539,8 +547,7 @@ fn parse_section(
                     }
                 }
             }
-            Ok(XmlEvent::Eof) => break,
-            Err(_) => break,
+            Ok(XmlEvent::Eof) | Err(_) => break,
             _ => {}
         }
     }
@@ -557,13 +564,14 @@ pub fn is_valid_bookmark_xml(xml: &str) -> bool {
 /// This function is retained for one-off lookups outside the hot path.
 #[cfg(test)]
 pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
+    const MAX_ITERATIONS: usize = 5000;
+
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
 
     let mut inside_target = false;
     let mut current_element = String::new();
 
-    const MAX_ITERATIONS: usize = 5000;
     let mut iterations = 0;
 
     loop {
@@ -668,17 +676,17 @@ mod tests {
             Some("{A68CA8B7-004F-D7B6-A698-07E2DE0F1F5D}")
         );
         assert_eq!(fields.event_id, 1);
-        assert_eq!(fields.qualifiers, Some(16384));
+        assert_eq!(fields.qualifiers, Some(16_384));
         assert_eq!(fields.version, Some(2));
         assert_eq!(fields.level, 4);
         assert_eq!(fields.task, 100);
         assert_eq!(fields.opcode, 1);
-        assert_eq!(fields.keywords, 0x8000000000000000);
+        assert_eq!(fields.keywords, 0x8000_0000_0000_0000);
         assert_eq!(
             fields.system_time.as_deref(),
             Some("2025-08-29T00:15:41.123456Z")
         );
-        assert_eq!(fields.record_id, 12345);
+        assert_eq!(fields.record_id, 12_345);
         assert_eq!(fields.activity_id.as_deref(), Some("{AAAA-BBBB}"));
         assert_eq!(fields.related_activity_id.as_deref(), Some("{CCCC-DDDD}"));
         assert_eq!(fields.process_id, 1234);
@@ -829,9 +837,9 @@ mod tests {
             record_id: 1,
             event_id: 4624,
             level: 0,
-            task: 12544,
+            task: 12_544,
             opcode: 0,
-            keywords: 0x0020000000000000,
+            keywords: 0x0020_0000_0000_0000,
             time_created: Utc::now(),
             provider_name: "Microsoft-Windows-Security-Auditing".to_string(),
             provider_guid: None,
@@ -864,14 +872,14 @@ mod tests {
     #[test]
     fn test_security_limits() {
         let large_xml = format!(
-            r#"
+            r"
         <Event>
             <System>
                 <EventID>{}</EventID>
             </System>
         </Event>
-        "#,
-            "x".repeat(10000)
+        ",
+            "x".repeat(10_000)
         );
 
         let result = extract_xml_value(&large_xml, "EventID");
@@ -956,9 +964,9 @@ mod tests {
 
     #[test]
     fn test_is_valid_bookmark_xml() {
-        let valid = r#"<BookmarkList>
+        let valid = r"<BookmarkList>
   <Bookmark Channel='Application' RecordId='12345' IsCurrent='true'/>
-</BookmarkList>"#;
+</BookmarkList>";
         assert!(
             is_valid_bookmark_xml(valid),
             "Should accept valid bookmark with RecordId"
@@ -1007,7 +1015,7 @@ mod tests {
 
         let event = result.unwrap().unwrap();
         assert_eq!(event.event_id, 1000);
-        assert_eq!(event.record_id, 12345);
+        assert_eq!(event.record_id, 12_345);
         assert_eq!(event.provider_name, "TestProvider");
         assert_eq!(event.channel, "Application");
         assert_eq!(event.computer, "TEST-PC");
@@ -1048,11 +1056,20 @@ mod tests {
 
     #[test]
     fn test_keywords_hex_parsing() {
-        assert_eq!(parse_keywords_hex("0x8000000000000000"), 0x8000000000000000);
-        assert_eq!(parse_keywords_hex("0X8000000000000000"), 0x8000000000000000);
-        assert_eq!(parse_keywords_hex("12345"), 12345);
+        assert_eq!(
+            parse_keywords_hex("0x8000000000000000"),
+            0x8000_0000_0000_0000
+        );
+        assert_eq!(
+            parse_keywords_hex("0X8000000000000000"),
+            0x8000_0000_0000_0000
+        );
+        assert_eq!(parse_keywords_hex("12345"), 12_345);
         assert_eq!(parse_keywords_hex("invalid"), 0);
-        assert_eq!(parse_keywords_hex("0x0020000000000000"), 0x0020000000000000);
+        assert_eq!(
+            parse_keywords_hex("0x0020000000000000"),
+            0x0020_0000_0000_0000
+        );
     }
 
     #[test]

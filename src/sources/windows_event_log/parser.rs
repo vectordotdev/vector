@@ -8,11 +8,11 @@ use vector_lib::event::LogEvent;
 
 use super::{
     config::{EventDataFormat, WindowsEventLogConfig},
-    error::*,
+    error::WindowsEventLogError,
     xml_parser::WindowsEvent,
 };
 
-/// Parser for converting Windows Event Log events to Vector LogEvents
+/// Parser for converting Windows Event Log events to Vector `LogEvents`
 pub struct EventLogParser {
     config: WindowsEventLogConfig,
     log_namespace: LogNamespace,
@@ -27,7 +27,11 @@ impl EventLogParser {
         }
     }
 
-    /// Parse a Windows event into a Vector LogEvent
+    /// Parse a Windows event into a Vector `LogEvent`
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn parse_event(&self, event: WindowsEvent) -> Result<LogEvent, WindowsEventLogError> {
         let mut log_event = LogEvent::default();
 
@@ -66,8 +70,7 @@ impl EventLogParser {
         if let Some(message_key) = log_schema.message_key_target_path() {
             let message = event
                 .rendered_message
-                .as_ref()
-                .cloned()
+                .clone()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
             log_event.try_insert(message_key, Value::from(message));
@@ -100,8 +103,7 @@ impl EventLogParser {
         if let Some(message_key) = log_schema.message_key_target_path() {
             let message = event
                 .rendered_message
-                .as_ref()
-                .cloned()
+                .clone()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
             log_event.try_insert(message_key, Value::from(message));
@@ -117,6 +119,18 @@ impl EventLogParser {
         Ok(())
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn set_windows_fields(
         &self,
         log_event: &mut LogEvent,
@@ -125,7 +139,7 @@ impl EventLogParser {
         // Core Windows Event Log fields
         log_event.insert(
             event_path!("event_id"),
-            Value::Integer(event.event_id as i64),
+            Value::Integer(i64::from(event.event_id)),
         );
 
         log_event.insert(
@@ -137,7 +151,7 @@ impl EventLogParser {
 
         log_event.insert(
             event_path!("level_value"),
-            Value::Integer(event.level as i64),
+            Value::Integer(i64::from(event.level)),
         );
 
         log_event.insert(event_path!("channel"), Value::from(event.channel.clone()));
@@ -166,16 +180,16 @@ impl EventLogParser {
 
         log_event.insert(
             event_path!("process_id"),
-            Value::Integer(event.process_id as i64),
+            Value::Integer(i64::from(event.process_id)),
         );
 
         log_event.insert(
             event_path!("thread_id"),
-            Value::Integer(event.thread_id as i64),
+            Value::Integer(i64::from(event.thread_id)),
         );
 
         if event.task != 0 {
-            log_event.insert(event_path!("task"), Value::Integer(event.task as i64));
+            log_event.insert(event_path!("task"), Value::Integer(i64::from(event.task)));
 
             if let Some(ref task_name) = event.task_name {
                 log_event.insert(event_path!("task_name"), Value::from(task_name.clone()));
@@ -183,7 +197,10 @@ impl EventLogParser {
         }
 
         if event.opcode != 0 {
-            log_event.insert(event_path!("opcode"), Value::Integer(event.opcode as i64));
+            log_event.insert(
+                event_path!("opcode"),
+                Value::Integer(i64::from(event.opcode)),
+            );
 
             if let Some(ref opcode_name) = event.opcode_name {
                 log_event.insert(event_path!("opcode_name"), Value::from(opcode_name.clone()));
@@ -219,11 +236,14 @@ impl EventLogParser {
 
         // New FluentBit-compatible fields
         if let Some(version) = event.version {
-            log_event.insert(event_path!("version"), Value::Integer(version as i64));
+            log_event.insert(event_path!("version"), Value::Integer(i64::from(version)));
         }
 
         if let Some(qualifiers) = event.qualifiers {
-            log_event.insert(event_path!("qualifiers"), Value::Integer(qualifiers as i64));
+            log_event.insert(
+                event_path!("qualifiers"),
+                Value::Integer(i64::from(qualifiers)),
+            );
         }
 
         // StringInserts field for FluentBit compatibility
@@ -279,14 +299,12 @@ impl EventLogParser {
             return match fmt {
                 EventDataFormat::Integer => value
                     .parse::<i64>()
-                    .map(Value::Integer)
-                    .unwrap_or_else(|_| as_string()),
+                    .map_or_else(|_| as_string(), Value::Integer),
                 EventDataFormat::Float => value
                     .parse::<f64>()
                     .ok()
                     .and_then(|f| ordered_float::NotNan::new(f).ok())
-                    .map(Value::Float)
-                    .unwrap_or_else(as_string),
+                    .map_or_else(as_string, Value::Float),
                 EventDataFormat::Boolean => {
                     let lower = value.to_lowercase();
                     Value::Boolean(matches!(lower.as_str(), "true" | "1" | "yes" | "on"))
@@ -298,6 +316,10 @@ impl EventLogParser {
         as_string()
     }
 
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn extract_message_from_event_data(&self, event: &WindowsEvent) -> String {
         // Try to find a message in named event data fields
         for (key, value) in &event.event_data {
@@ -320,6 +342,10 @@ impl EventLogParser {
         )
     }
 
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn apply_field_filtering(&self, log_event: &mut LogEvent) -> Result<(), WindowsEventLogError> {
         let filter = &self.config.field_filter;
 
@@ -334,14 +360,14 @@ impl EventLogParser {
             // Remove fields not in include set
             let keys_to_remove: Vec<String> = log_event
                 .all_event_fields()
-                .map(|iter| iter.collect::<Vec<_>>())
+                .map(Iterator::collect::<Vec<_>>)
                 .unwrap_or_default()
                 .into_iter()
                 .filter_map(|(key, _)| {
-                    if !include_set.contains(key.as_str()) {
-                        Some(key.to_string())
-                    } else {
+                    if include_set.contains(key.as_str()) {
                         None
+                    } else {
+                        Some(key.to_string())
                     }
                 })
                 .collect();
@@ -382,6 +408,15 @@ impl EventLogParser {
         Ok(())
     }
 
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn format_value(
         &self,
         value: &Value,
@@ -465,16 +500,16 @@ mod tests {
     use std::collections::HashMap;
 
     /// Creates a generic test event for parser unit tests.
-    /// Note: tests.rs has a separate create_test_event() with realistic Security audit data.
+    /// Note: tests.rs has a separate `create_test_event()` with realistic Security audit data.
     /// This version uses simple generic values to isolate parser logic testing.
     fn create_test_event() -> WindowsEvent {
         WindowsEvent {
-            record_id: 12345,
+            record_id: 12_345,
             event_id: 1000,
             level: 4,
             task: 1,
             opcode: 2,
-            keywords: 0x8000000000000000,
+            keywords: 0x8000_0000_0000_0000,
             time_created: Utc::now(),
             provider_name: "TestProvider".to_string(),
             provider_guid: Some("{12345678-1234-1234-1234-123456789012}".to_string()),
@@ -527,7 +562,7 @@ mod tests {
         );
         assert_eq!(
             log_event.get(event_path!("record_id")).unwrap(),
-            &Value::Integer(12345)
+            &Value::Integer(12_345)
         );
         assert_eq!(
             log_event.get(event_path!("level")).unwrap(),
@@ -567,12 +602,12 @@ mod tests {
         let parser = EventLogParser::new(&config, LogNamespace::Legacy);
 
         let event = WindowsEvent {
-            record_id: 99999,
+            record_id: 99_999,
             event_id: 4624,
             level: 0, // Security audit events use level 0
-            task: 12544,
+            task: 12_544,
             opcode: 0,
-            keywords: 0x0020000000000000, // Audit Success
+            keywords: 0x0020_0000_0000_0000, // Audit Success
             time_created: Utc::now(),
             provider_name: "Microsoft-Windows-Security-Auditing".to_string(),
             provider_guid: Some("{54849625-5478-4994-A5BA-3E3B0328C30D}".to_string()),

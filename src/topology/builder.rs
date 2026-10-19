@@ -459,17 +459,12 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|()| TaskError::Opaque),
+                result = server => result.map_err(Into::into),
             };
 
-            // Even though we already tried to receive any pump task error above, we may have exited
-            // on the source itself returning an error due to task scheduling, where the pump task
-            // encountered an error, sent it over the oneshot, but we were polling the source
-            // already and hit an error trying to send to the now-shutdown pump task.
-            //
-            // Since the error from the source is opaque at the moment (i.e. `()`), we try a final
-            // time to see if the pump task encountered an error, using _that_ instead if so, to
-            // propagate the true error that caused the source to have to stop.
+            // The pump may fail while the source is being polled, before its error is received
+            // above. Prefer the pump error if both tasks fail: a source send error can be a
+            // consequence of the pump stopping, even when the source reports its cause.
             if let Ok(e) = pump_error_rx.try_recv() {
                 result = Err(e);
             }
@@ -480,7 +475,7 @@ impl<'a> Builder<'a> {
                     Ok(TaskOutput::Source)
                 }
                 Err(e) => {
-                    debug!("Source finished with an error.");
+                    debug!(error = %e, "Source finished with an error.");
                     Err(e)
                 }
             }
@@ -763,10 +758,8 @@ impl<'a> Builder<'a> {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .map_err(|()| {
-                debug!("Sink finished with an error.");
-                TaskError::Opaque
-            })
+            .inspect_err(|error| debug!(%error, "Sink finished with an error."))
+            .map_err(Into::into)
         };
 
         let task = Task::new(key.clone(), typetag, sink);
@@ -1378,7 +1371,8 @@ impl Runner {
                             self.send_outputs(&mut outputs_buf).await
                                 .map_err(TaskError::wrapped)?;
                         }
-                        _ => unreachable!("join error or bad poll"),
+                        Some(Err(error)) => return Err(TaskError::from(error)),
+                        None => unreachable!("bad poll"),
                     }
                 }
 
