@@ -392,9 +392,16 @@ async fn get_version(
     proxy_config: &ProxyConfig,
 ) -> crate::Result<usize> {
     #[derive(Deserialize)]
+    enum Distribution {
+        #[serde(rename = "opensearch")]
+        OpenSearch,
+        #[serde(other)]
+        Other,
+    }
+    #[derive(Deserialize)]
     struct Version {
         number: Option<String>,
-        distribution: Option<String>,
+        distribution: Option<Distribution>,
     }
     #[derive(Deserialize)]
     struct ResponsePayload {
@@ -420,7 +427,10 @@ async fn get_version(
     let ResponsePayload { version } = serde_json::from_slice(&body)?;
     // OpenSearch's own major version is unrelated to the Elasticsearch API version.
     // Its bulk API is compatible with Elasticsearch 7 and must not include `_type`.
-    if version.as_ref().and_then(|v| v.distribution.as_deref()) == Some("opensearch") {
+    if matches!(
+        version.as_ref().and_then(|v| v.distribution.as_ref()),
+        Some(Distribution::OpenSearch)
+    ) {
         return Ok(7);
     }
     if let Some(version) = version

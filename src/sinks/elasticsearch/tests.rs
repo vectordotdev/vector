@@ -794,6 +794,18 @@ async fn auto_version_distinguishes_opensearch_from_elasticsearch() {
         (serde_json::json!({"number": "7.17.0"}), true),
         (serde_json::json!({"number": "8.0.0"}), true),
         (
+            serde_json::json!({"number": "6.8.23", "distribution": "custom"}),
+            false,
+        ),
+        (
+            serde_json::json!({"number": "8.0.0", "distribution": "custom"}),
+            true,
+        ),
+        (
+            serde_json::json!({"number": "6.8.23", "distribution": null}),
+            false,
+        ),
+        (
             serde_json::json!({"number": "1.3.0", "distribution": "opensearch"}),
             true,
         ),
