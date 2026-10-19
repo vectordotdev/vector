@@ -913,15 +913,15 @@ where
         }
     }
 
-    /// Gets the current published usage of the buffer.
+    /// Gets the current approximate usage of the buffer.
     ///
-    /// Writes are included after they are flushed and reads after they are acknowledged, matching
-    /// the ledger's existing published-data semantics. The two counters are sampled separately, so
-    /// the result is approximate when reads and writes are being published concurrently.
+    /// Includes both usage published to the ledger and writes buffered locally by this writer. The
+    /// two ledger counters are sampled separately, so the result is approximate when reads are
+    /// being acknowledged concurrently.
     pub fn usage_snapshot(&self) -> DiskBufferUsageSnapshot {
         DiskBufferUsageSnapshot {
-            event_count: self.ledger.get_total_records(),
-            byte_size: self.ledger.get_total_buffer_size(),
+            event_count: self.ledger.get_total_records() + self.unflushed_events,
+            byte_size: self.ledger.get_total_buffer_size() + self.unflushed_bytes,
         }
     }
 
