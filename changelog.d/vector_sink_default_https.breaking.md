@@ -5,9 +5,11 @@
 `address` and `routing.endpoints` values in the `vector` sink that omit the scheme (for example,
 `127.0.0.1:6000` instead of `http://127.0.0.1:6000`) now default to `https`. Previously they
 defaulted to `http` unless TLS was enabled. The `http` default was
-[deprecated in 0.59.0](https://vector.dev/deprecations/). Endpoints that already specify a scheme,
-and scheme-less endpoints in configurations that enable TLS, are unaffected. A scheme-less endpoint
-pointing at a plaintext `vector` source now fails the TLS handshake.
+[deprecated in 0.59.0](https://vector.dev/deprecations/).
+
+Endpoints that already specify a scheme, and scheme-less endpoints in configurations that enable
+TLS, are unaffected. A scheme-less endpoint pointing at a plaintext `vector` source now fails the
+TLS handshake.
 
 ## Migration
 
