@@ -4,8 +4,9 @@
 # are run. If the workflow is triggered in a PR commit, then the files changed in the PR are evaluated to determine
 # if any integration tests will run.
 #
-# Release preparation PRs (`prepare-v-*` branches in this repository) run all integration and e2e tests on
-# every PR commit, because they are squash-merged directly and never go through the merge queue.
+# Release preparation PRs (`prepare-v-*` branches in this repository opened by `vectordotdev-bot[bot]`) run all
+# integration and e2e tests on every PR commit, because they are squash-merged directly and never go through the
+# merge queue. Manually opened preparation PRs use the `/ci-run-integration-all` and `/ci-run-e2e-all` review commands.
 
 name: Integration Test Suite
 
@@ -75,6 +76,7 @@ jobs:
       inputs.run_all == true ||
       (github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
       startsWith(github.head_ref, 'prepare-v-')) ||
       (github.event_name == 'merge_group' &&
       needs.changes.result == 'success' &&
@@ -105,6 +107,7 @@ jobs:
        github.event_name == 'workflow_call' || inputs.run_all == true ||
        (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
         startsWith(github.head_ref, 'prepare-v-'))) &&
       github.repository == 'vectordotdev/vector'
     strategy:
