@@ -11,8 +11,12 @@ pointing at a plaintext `vector` source now fails the TLS handshake.
 
 ## Migration
 
-Specify `http://` explicitly to keep connecting without TLS. Setting `tls.enabled: false` alone
-does not restore the old default.
+Where possible, enable TLS on the receiving `vector` source and connect using `https://`, which is
+now the default when the scheme is omitted. See the source's
+[TLS configuration](https://vector.dev/docs/reference/configuration/sources/vector/#tls).
+
+To retain plaintext connections, specify `http://` explicitly. Setting `tls.enabled: false` alone
+does not restore the previous `http` default. For example:
 
 #### Old
 
