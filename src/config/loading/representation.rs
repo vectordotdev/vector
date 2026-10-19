@@ -682,8 +682,7 @@ mod tests {
     }
 
     #[test]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
+    #[expect(
         clippy::too_many_lines,
         reason = "Keep related merge cases together in one table-driven test"
     )]
