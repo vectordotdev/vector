@@ -9,6 +9,12 @@
 //! The encoded request is compressed with a single zstd call, as `vmagent` does, so the frame
 //! records its content size and VictoriaMetrics can decompress it into a buffer of the right size.
 
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "Sample counts are written as `f64` and negative timestamps use the protobuf varint wrap"
+)]
+
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -875,7 +881,7 @@ mod tests {
         let mut buf = body;
         while buf.has_remaining() {
             let (tag, _) = decode_key(&mut buf).unwrap();
-            let len = decode_varint(&mut buf).unwrap() as usize;
+            let len = usize::try_from(decode_varint(&mut buf).unwrap()).unwrap();
             let (mut message, rest) = buf.split_at(len);
             buf = rest;
             if tag != WRITE_REQUEST_METADATA {
@@ -894,7 +900,7 @@ mod tests {
                         }
                     }
                     WireType::LengthDelimited => {
-                        let len = decode_varint(&mut message).unwrap() as usize;
+                        let len = usize::try_from(decode_varint(&mut message).unwrap()).unwrap();
                         message.advance(len);
                     }
                     other => panic!("unexpected wire type {other:?}"),

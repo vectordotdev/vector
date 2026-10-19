@@ -10,6 +10,13 @@
 //!
 //! [histogram_go]: https://github.com/VictoriaMetrics/metrics/blob/master/histogram.go
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "Bucket indexes are bounded by `BUCKETS_COUNT` and the math mirrors the Go library"
+)]
+
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use vector_lib::{ByteSizeOf, event::metric::Sample};

@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn expires_distribution_state() {
-        let ttl = Duration::from_secs(60);
+        let ttl = Duration::from_mins(1);
         let mut set = HistogramSet::new(Some(ttl));
         let series = distribution(MetricKind::Incremental, &[]).series().clone();
 

@@ -342,6 +342,8 @@ async fn accumulates_incremental_distributions_as_vmrange() {
     );
 }
 
+const MAX_BYTES: usize = 200_000;
+
 #[tokio::test]
 async fn bounds_request_size_by_encoded_bytes() {
     // Each distribution spans most `vmrange` buckets, so it expands to hundreds of series.
@@ -361,7 +363,6 @@ async fn bounds_request_size_by_encoded_bytes() {
             },
         )
     };
-    const MAX_BYTES: usize = 200_000;
     let captured = run_compliant(
         &format!("batch: {{max_bytes: {MAX_BYTES}}}"),
         events((0..20).map(wide_distribution)),

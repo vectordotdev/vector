@@ -185,16 +185,14 @@ fn route_metric(
                     return None;
                 }
             };
-            match Tenant::parse(&rendered) {
-                Some(tenant) => Some(tenant),
-                None => {
-                    emit!(VictoriaMetricsInvalidTenantError { tenant: &rendered });
-                    metric
-                        .take_finalizers()
-                        .update_status(EventStatus::Rejected);
-                    return None;
-                }
-            }
+            let Some(tenant) = Tenant::parse(&rendered) else {
+                emit!(VictoriaMetricsInvalidTenantError { tenant: &rendered });
+                metric
+                    .take_finalizers()
+                    .update_status(EventStatus::Rejected);
+                return None;
+            };
+            Some(tenant)
         }
     };
 

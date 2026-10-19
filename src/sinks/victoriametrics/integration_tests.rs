@@ -13,7 +13,7 @@ use vector_lib::{
     metric_tags,
 };
 
-use super::{TOKEN_SECRET_KEY, config::VictoriaMetricsConfig};
+use super::{TOKEN_SECRET_KEY, config::VictoriaMetricsConfig, histogram::VmHistogram};
 use crate::{
     config::{SinkConfig, SinkContext},
     event::Event,
@@ -314,16 +314,8 @@ fn by_labels(series: Vec<ExportedSeries>) -> BTreeMap<String, (Vec<String>, Vec<
         .collect()
 }
 
-/// The sink must store exactly what `vmagent` stores for the same data: the same series, labels,
-/// values, and timestamps.
-#[tokio::test]
-async fn matches_vmagent() {
-    trace_init();
-    let prefix = prefix();
-    let timestamp = DateTime::from_timestamp_millis(Utc::now().timestamp_millis()).unwrap();
-    let ms = timestamp.timestamp_millis();
-
-    let distribution_samples = vec![
+fn distribution_samples() -> Vec<Sample> {
+    vec![
         Sample {
             value: 0.5,
             rate: 2,
@@ -332,7 +324,11 @@ async fn matches_vmagent() {
             value: 20.0,
             rate: 1,
         },
-    ];
+    ]
+}
+
+/// The fixture in the Prometheus text format that `vmagent` ingests.
+fn vmagent_lines(prefix: &str, ms: i64) -> Vec<String> {
     let mut lines = vec![
         // Empty labels are dropped by `vmagent`.
         format!("{prefix}_gauge{{host=\"a\",empty=\"\"}} 1.5 {ms}"),
@@ -349,19 +345,21 @@ async fn matches_vmagent() {
         format!("{prefix}_dist_sum 21 {ms}"),
         format!("{prefix}_dist_count 3 {ms}"),
     ];
-    for (range, count) in
-        super::histogram::VmHistogram::from_samples(&distribution_samples).buckets()
-    {
+    for (range, count) in VmHistogram::from_samples(&distribution_samples()).buckets() {
         lines.push(format!(
             "{prefix}_dist_bucket{{vmrange=\"{range}\"}} {count} {ms}"
         ));
     }
+    lines
+}
 
+/// The same data as Vector metrics.
+fn vector_events(prefix: &str, timestamp: DateTime<Utc>) -> Vec<Event> {
     let metric = |name: &str, value: MetricValue| {
         Metric::new(format!("{prefix}_{name}"), MetricKind::Absolute, value)
             .with_timestamp(Some(timestamp))
     };
-    let events: Vec<Event> = vec![
+    vec![
         metric("gauge", MetricValue::Gauge { value: 1.5 })
             .with_tags(Some(metric_tags!("host" => "a", "empty" => "")))
             .into(),
@@ -411,12 +409,23 @@ async fn matches_vmagent() {
         metric(
             "dist",
             MetricValue::Distribution {
-                samples: distribution_samples,
+                samples: distribution_samples(),
                 statistic: StatisticKind::Histogram,
             },
         )
         .into(),
-    ];
+    ]
+}
+
+/// The sink must store exactly what `vmagent` stores for the same data: the same series, labels,
+/// values, and timestamps.
+#[tokio::test]
+async fn matches_vmagent() {
+    trace_init();
+    let prefix = prefix();
+    let timestamp = DateTime::from_timestamp_millis(Utc::now().timestamp_millis()).unwrap();
+    let lines = vmagent_lines(&prefix, timestamp.timestamp_millis());
+    let events = vector_events(&prefix, timestamp);
 
     let expected_series = lines.len();
     reqwest::Client::new()
