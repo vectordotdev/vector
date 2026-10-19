@@ -4,7 +4,6 @@ features:
 test_filter: "::elasticsearch::integration_tests::"
 
 env:
-  ELASTICSEARCH_SINK_TYPE: opensearch
   AWS_ACCESS_KEY_ID: dummy
   AWS_SECRET_ACCESS_KEY: dummy
   ELASTICSEARCH_AWS_ADDRESS: http://opensearch:9200
