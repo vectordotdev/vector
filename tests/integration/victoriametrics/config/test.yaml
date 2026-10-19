@@ -9,6 +9,8 @@ env:
   VMSELECT_ADDRESS: http://vmselect:8481
   VMSTORAGE_ADDRESS: http://vmstorage:8482
   VMAUTH_ADDRESS: http://vmauth:8427
+  VMAGENT_ADDRESS: http://vmagent:8429
+  REFERENCE_ADDRESS: http://victoriametrics-reference:8428
 
 matrix:
   version: ["v1.127.0"]

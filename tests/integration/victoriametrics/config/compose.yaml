@@ -3,6 +3,17 @@ version: "3"
 services:
   victoriametrics:
     image: docker.io/victoriametrics/victoria-metrics:${CONFIG_VERSION}
+  # Receives what `vmagent` writes, to compare with what the sink writes to `victoriametrics`.
+  victoriametrics-reference:
+    image: docker.io/victoriametrics/victoria-metrics:${CONFIG_VERSION}
+  vmagent:
+    image: docker.io/victoriametrics/vmagent:${CONFIG_VERSION}
+    command:
+      - -remoteWrite.url=http://victoriametrics-reference:8428/api/v1/write
+      - -remoteWrite.flushInterval=1s
+      - -remoteWrite.tmpDataPath=/tmp/vmagent
+    depends_on:
+      - victoriametrics-reference
   vmstorage:
     image: docker.io/victoriametrics/vmstorage:${CONFIG_VERSION}-cluster
   vminsert:

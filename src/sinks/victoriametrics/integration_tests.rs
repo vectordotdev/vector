@@ -6,7 +6,10 @@ use chrono::{DateTime, Utc};
 use futures::stream;
 use serde::Deserialize;
 use vector_lib::{
-    event::{Metric, MetricKind, MetricValue, StatisticKind, metric::Sample},
+    event::{
+        Metric, MetricKind, MetricValue, StatisticKind,
+        metric::{Bucket, Quantile, Sample},
+    },
     metric_tags,
 };
 
@@ -44,6 +47,14 @@ fn vmauth_address() -> String {
     address("VMAUTH_ADDRESS", "http://localhost:8427")
 }
 
+fn vmagent_address() -> String {
+    address("VMAGENT_ADDRESS", "http://localhost:8429")
+}
+
+fn reference_address() -> String {
+    address("REFERENCE_ADDRESS", "http://localhost:8429")
+}
+
 /// A metric name prefix unique to one test run.
 fn prefix() -> String {
     format!("vector_it_{}", random_string(8).to_lowercase())
@@ -53,6 +64,7 @@ fn prefix() -> String {
 struct ExportedSeries {
     metric: BTreeMap<String, String>,
     values: Vec<f64>,
+    timestamps: Vec<i64>,
 }
 
 async fn build_and_send(config: &str, events: Vec<Event>) {
@@ -283,4 +295,151 @@ async fn vmauth_healthcheck_rejects_unknown_token() {
     let (_, healthcheck) = config.build(SinkContext::default()).await.unwrap();
     let error = healthcheck.await.unwrap_err().to_string();
     assert!(error.contains("401"), "{error}");
+}
+
+/// Exported series as `labels -> (values, timestamps)`.
+fn by_labels(series: Vec<ExportedSeries>) -> BTreeMap<String, (Vec<String>, Vec<i64>)> {
+    series
+        .into_iter()
+        .map(|series| {
+            let labels = series
+                .metric
+                .iter()
+                .map(|(name, value)| format!("{name}={value}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let values = series.values.iter().map(f64::to_string).collect();
+            (labels, (values, series.timestamps))
+        })
+        .collect()
+}
+
+/// The sink must store exactly what `vmagent` stores for the same data: the same series, labels,
+/// values, and timestamps.
+#[tokio::test]
+async fn matches_vmagent() {
+    trace_init();
+    let prefix = prefix();
+    let timestamp = DateTime::from_timestamp_millis(Utc::now().timestamp_millis()).unwrap();
+    let ms = timestamp.timestamp_millis();
+
+    let distribution_samples = vec![
+        Sample {
+            value: 0.5,
+            rate: 2,
+        },
+        Sample {
+            value: 20.0,
+            rate: 1,
+        },
+    ];
+    let mut lines = vec![
+        // Empty labels are dropped by `vmagent`.
+        format!("{prefix}_gauge{{host=\"a\",empty=\"\"}} 1.5 {ms}"),
+        format!("{prefix}_counter{{host=\"a\"}} 7 {ms}"),
+        format!("{prefix}_hist_bucket{{le=\"1\"}} 2 {ms}"),
+        format!("{prefix}_hist_bucket{{le=\"5\"}} 5 {ms}"),
+        format!("{prefix}_hist_bucket{{le=\"+Inf\"}} 6 {ms}"),
+        format!("{prefix}_hist_sum 12.5 {ms}"),
+        format!("{prefix}_hist_count 6 {ms}"),
+        format!("{prefix}_summary{{quantile=\"0.5\"}} 1 {ms}"),
+        format!("{prefix}_summary{{quantile=\"0.99\"}} 4 {ms}"),
+        format!("{prefix}_summary_sum 30 {ms}"),
+        format!("{prefix}_summary_count 10 {ms}"),
+        format!("{prefix}_dist_sum 21 {ms}"),
+        format!("{prefix}_dist_count 3 {ms}"),
+    ];
+    for (range, count) in
+        super::histogram::VmHistogram::from_samples(&distribution_samples).buckets()
+    {
+        lines.push(format!(
+            "{prefix}_dist_bucket{{vmrange=\"{range}\"}} {count} {ms}"
+        ));
+    }
+
+    let metric = |name: &str, value: MetricValue| {
+        Metric::new(format!("{prefix}_{name}"), MetricKind::Absolute, value)
+            .with_timestamp(Some(timestamp))
+    };
+    let events: Vec<Event> = vec![
+        metric("gauge", MetricValue::Gauge { value: 1.5 })
+            .with_tags(Some(metric_tags!("host" => "a", "empty" => "")))
+            .into(),
+        metric("counter", MetricValue::Counter { value: 7.0 })
+            .with_tags(Some(metric_tags!("host" => "a")))
+            .into(),
+        metric(
+            "hist",
+            MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 2,
+                    },
+                    Bucket {
+                        upper_limit: 5.0,
+                        count: 3,
+                    },
+                    Bucket {
+                        upper_limit: f64::INFINITY,
+                        count: 1,
+                    },
+                ],
+                count: 6,
+                sum: 12.5,
+            },
+        )
+        .into(),
+        metric(
+            "summary",
+            MetricValue::AggregatedSummary {
+                quantiles: vec![
+                    Quantile {
+                        quantile: 0.5,
+                        value: 1.0,
+                    },
+                    Quantile {
+                        quantile: 0.99,
+                        value: 4.0,
+                    },
+                ],
+                count: 10,
+                sum: 30.0,
+            },
+        )
+        .into(),
+        metric(
+            "dist",
+            MetricValue::Distribution {
+                samples: distribution_samples,
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .into(),
+    ];
+
+    let expected_series = lines.len();
+    reqwest::Client::new()
+        .post(format!("{}/api/v1/import/prometheus", vmagent_address()))
+        .body(lines.join("\n") + "\n")
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    build_and_send(&format!("endpoint: {}", single_node_address()), events).await;
+
+    // `vmagent` forwards asynchronously.
+    let mut reference = Vec::new();
+    for _ in 0..20 {
+        reference = export(&reference_address(), &reference_address(), &prefix).await;
+        if reference.len() >= expected_series {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    let sink = export(&single_node_address(), &single_node_address(), &prefix).await;
+
+    assert_eq!(by_labels(sink), by_labels(reference));
 }
