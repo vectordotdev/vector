@@ -1,0 +1,14 @@
+name: Restore package repository tools
+description: Restore the publisher image and vdev built by this workflow run.
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: package-repository-tools
+        path: ${{ runner.temp }}/package-repository-tools
+    - shell: bash
+      run: |
+        gzip -dc "$RUNNER_TEMP/package-repository-tools/image.tar.gz" | docker load
+        chmod +x "$RUNNER_TEMP/package-repository-tools/vdev"
+        echo "VDEV=$RUNNER_TEMP/package-repository-tools/vdev" >> "$GITHUB_ENV"

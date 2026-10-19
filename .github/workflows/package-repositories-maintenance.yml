@@ -1,0 +1,90 @@
+name: Package Repository Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect state, restore signed metadata, or recover an abandoned lock
+        type: choice
+        options: [status, rollback, recover-lock]
+        default: status
+      snapshot:
+        description: Exact archived snapshot SHA-256 for rollback
+        type: string
+      expected_version:
+        description: Exact control-object S3 version reported by status, for lock recovery
+        type: string
+      confirm_owner_stopped:
+        description: The previous workflow/process and its in-flight writes have stopped
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: package-repositories
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    if: github.repository_id == '146327667' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: package-repositories-publishing
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate the requested maintenance operation
+        env:
+          OPERATION: ${{ inputs.operation }}
+          SNAPSHOT: ${{ inputs.snapshot }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          OWNER_STOPPED: ${{ inputs.confirm_owner_stopped }}
+        run: |
+          case "$OPERATION" in
+            status) ;;
+            rollback) [[ "$SNAPSHOT" =~ ^[0-9a-f]{64}$ ]] ;;
+            recover-lock) test -n "$EXPECTED_VERSION" && test "$OWNER_STOPPED" = true ;;
+            *) exit 1 ;;
+          esac
+      - name: Build the reviewed maintenance tools
+        run: |
+          cargo build --locked --package vdev
+          target/debug/vdev release repositories build-image
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 900
+          role-session-name: package-maintenance-${{ github.run_id }}
+          allowed-account-ids: "486234852809"
+          unset-current-credentials: true
+      - name: Run maintenance and record the resulting state
+        env:
+          PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          OPERATION: ${{ inputs.operation }}
+          SNAPSHOT: ${{ inputs.snapshot }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          case "$OPERATION" in
+            status) ;;
+            rollback)
+              target/debug/vdev release repositories rollback "$SNAPSHOT"
+              ;;
+            recover-lock)
+              target/debug/vdev release repositories recover-lock \
+                --expected-version "$EXPECTED_VERSION" --confirm-owner-stopped
+              ;;
+          esac
+          target/debug/vdev release repositories status > target/package-repository-status.json
+          cat target/package-repository-status.json
+          {
+            echo '```json'
+            cat target/package-repository-status.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
