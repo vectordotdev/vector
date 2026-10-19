@@ -38,6 +38,7 @@ use crate::{
     },
     event::EventArray,
     extra_context::ExtraContext,
+    internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
@@ -667,32 +668,20 @@ impl RunningTopology {
                 let drain_in_background = !wait_for_sinks.contains(*key);
                 match usage {
                     Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
-                        let message = if drain_in_background {
-                            "Removing disk-buffered sink with remaining accounted data; its current instance will continue processing in the background before shutdown."
-                        } else {
-                            "Removing disk-buffered sink with remaining accounted data; reload will wait while its current instance finishes processing."
-                        };
-                        warn!(
-                            component_id = %key,
-                            ?buffer_dirs,
-                            accounted_events = usage.event_count,
-                            accounted_bytes = usage.byte_size,
+                        emit!(TopologyDiskBufferRemoved {
+                            component_id: key,
+                            buffer_dirs: &buffer_dirs,
+                            usage: Some(usage),
                             drain_in_background,
-                            message,
-                        );
+                        });
                     }
                     None => {
-                        let message = if drain_in_background {
-                            "Removing disk-buffered sink while its usage is unavailable; its current instance will continue processing in the background before shutdown."
-                        } else {
-                            "Removing disk-buffered sink while its usage is unavailable; reload will wait while its current instance finishes processing."
-                        };
-                        warn!(
-                            component_id = %key,
-                            ?buffer_dirs,
+                        emit!(TopologyDiskBufferRemoved {
+                            component_id: key,
+                            buffer_dirs: &buffer_dirs,
+                            usage: None,
                             drain_in_background,
-                            message,
-                        );
+                        });
                     }
                     Some(_) => {}
                 }
@@ -738,22 +727,20 @@ impl RunningTopology {
                 {
                     match usage {
                         Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
-                            warn!(
-                                component_id = %key,
-                                ?buffer_dirs,
-                                ?new_buffer_dirs,
-                                accounted_events = usage.event_count,
-                                accounted_bytes = usage.byte_size,
-                                message = "Replacement sink does not use the previous disk buffer. If reload succeeds, its remaining accounted data will be left unreferenced.",
-                            );
+                            emit!(TopologyDiskBufferReplacementUnreferenced {
+                                component_id: key,
+                                buffer_dirs: &buffer_dirs,
+                                new_buffer_dirs: &new_buffer_dirs,
+                                usage: Some(usage),
+                            });
                         }
                         None => {
-                            warn!(
-                                component_id = %key,
-                                ?buffer_dirs,
-                                ?new_buffer_dirs,
-                                message = "Replacement sink does not use the previous disk buffer, and its remaining usage is unavailable. If reload succeeds, any remaining data will be left unreferenced.",
-                            );
+                            emit!(TopologyDiskBufferReplacementUnreferenced {
+                                component_id: key,
+                                buffer_dirs: &buffer_dirs,
+                                new_buffer_dirs: &new_buffer_dirs,
+                                usage: None,
+                            });
                         }
                         Some(_) => {}
                     }

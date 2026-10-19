@@ -40,6 +40,7 @@ pub enum CounterName {
     ContainersWatchedTotal,
     DecoderBomRemovalsTotal,
     DecoderMalformedReplacementWarningsTotal,
+    DiskBufferLifecycleEventsTotal,
     DorisBytesLoadedTotal,
     DorisRowsFilteredTotal,
     DorisRowsLoadedTotal,
@@ -421,6 +422,7 @@ impl CounterName {
             Self::DecoderMalformedReplacementWarningsTotal => {
                 "decoder_malformed_replacement_warnings_total"
             }
+            Self::DiskBufferLifecycleEventsTotal => "disk_buffer_lifecycle_events_total",
             Self::DorisBytesLoadedTotal => "doris_bytes_loaded_total",
             Self::DorisRowsFilteredTotal => "doris_rows_filtered_total",
             Self::DorisRowsLoadedTotal => "doris_rows_loaded_total",

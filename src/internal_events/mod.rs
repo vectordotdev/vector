@@ -43,6 +43,7 @@ mod datadog_traces;
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
 mod demo_logs;
+mod disk_buffer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
@@ -203,6 +204,7 @@ pub(crate) use self::datadog_traces::*;
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
 pub(crate) use self::demo_logs::*;
+pub(crate) use self::disk_buffer::*;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]

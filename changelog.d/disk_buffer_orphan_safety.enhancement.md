@@ -1,3 +1,3 @@
-Vector now detects orphaned disk buffers and provides lifecycle visibility when disk-buffered sinks continue draining in the background during configuration reloads.
+Vector now detects unreferenced disk buffers and reports disk-buffer lifecycle events during configuration reloads through logs and the `disk_buffer_lifecycle_events_total` counter.
 
 authors: Jansen-w

@@ -9,7 +9,7 @@ use futures::executor;
 use tokio::sync::watch;
 use vector_lib::{buffers::BufferConfig, config::ComponentKey};
 
-use crate::config::Config;
+use crate::{config::Config, internal_events::TopologyDiskBufferUnreferenced};
 
 #[derive(Clone)]
 struct ScanRequest {
@@ -115,11 +115,10 @@ fn report_orphaned_disk_buffers(
             );
             continue;
         };
-        warn!(
-            buffer_id = orphaned_buffer_id.to_string_lossy().as_ref(),
-            buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
-            message = "Found disk buffer not referenced by the current configuration. It may still be draining through a detached sink instance; otherwise any remaining data is not being processed.",
-        );
+        emit!(TopologyDiskBufferUnreferenced {
+            buffer_id: orphaned_buffer_id,
+            buffer_dir: &orphaned_buffer,
+        });
     }
 }
 
