@@ -78,18 +78,16 @@ impl NotificationBatch {
 
 /// Batches from one notification, processed in order until an error occurs.
 ///
-/// The source finishes each batch before requesting the next. Return an error as
-/// the first item if the whole message is invalid. An empty iterator means no work.
-pub type NotificationBatches = Box<
-    dyn Iterator<Item = Result<NotificationBatch, Box<dyn std::error::Error + Send + Sync>>>
-        + Send
-        + 'static,
->;
+/// The parser prepares all results before returning. The source processes each
+/// batch before starting the next. Return an error as the first item if the whole
+/// message is invalid. An empty list means no work.
+pub type NotificationBatches =
+    Vec<Result<NotificationBatch, Box<dyn std::error::Error + Send + Sync>>>;
 
 /// Parses SQS notifications into batches of S3 objects.
 ///
 /// Replaces the built-in S3/SNS parsing, including any message wrappers.
-/// Parsing and iteration should not make network requests.
+/// Parsing should not make network requests.
 pub trait NotificationParser: Send + Sync {
     /// Parse the original SQS message body.
     /// On error, the source does not delete the message. Retries may repeat

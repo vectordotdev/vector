@@ -636,6 +636,7 @@ impl IngestorProcess {
                 Box::new(
                     parser
                         .parse(message.body.as_deref().unwrap_or_default())
+                        .into_iter()
                         .map(move |result| {
                             result.map_err(|source| {
                                 Box::new(ProcessingError::MessageParseError {
@@ -1262,11 +1263,11 @@ async fn parser_error_preserves_source_and_message_id() {
     struct JsonParser;
     impl NotificationParser for JsonParser {
         fn parse(&self, body: &str) -> super::NotificationBatches {
-            Box::new(std::iter::once(
+            vec![
                 serde_json::from_str::<serde_json::Value>(body)
                     .map(|_| NotificationBatch::new(Vec::new(), None))
                     .map_err(Into::into),
-            ))
+            ]
         }
     }
 

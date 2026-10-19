@@ -60,7 +60,7 @@ impl NotificationParser for TestParser {
                 )
             })
             .map_err(Into::into);
-        Box::new(std::iter::once(batch))
+        vec![batch]
     }
 }
 
@@ -317,44 +317,40 @@ async fn invalid_or_empty_custom_notifications_do_not_download() {
     }
 }
 
-struct OrderedParser {
-    next_calls: Arc<AtomicUsize>,
-}
+struct OrderedParser;
 
 impl NotificationParser for OrderedParser {
     fn parse(&self, _body: &str) -> NotificationBatches {
-        let next_calls = Arc::clone(&self.next_calls);
-        Box::new(std::iter::from_fn(move || {
-            match next_calls.fetch_add(1, Ordering::SeqCst) {
-                0 => Some(Ok(NotificationBatch::new(
-                    vec![S3ObjectReference::new(
-                        "synthetic".into(),
-                        "one.gz".into(),
-                        "us-east-1".into(),
-                    )],
-                    None,
-                ))),
-                1 => Some(Err(std::io::Error::other("invalid second batch").into())),
-                _ => panic!("must not advance after a batch error"),
-            }
-        }))
+        let batch = |key: &str| {
+            NotificationBatch::new(
+                vec![S3ObjectReference::new(
+                    "synthetic".into(),
+                    key.to_owned(),
+                    "us-east-1".into(),
+                )],
+                None,
+            )
+        };
+        vec![
+            Ok(batch("one.gz")),
+            Err(std::io::Error::other("invalid second batch").into()),
+            Ok(batch("three.gz")),
+        ]
     }
 }
 
 #[tokio::test]
-async fn parser_or_delivery_failure_stops_iteration_and_preserves_receipt() {
-    for (status, expected_calls) in [(EventStatus::Delivered, 2), (EventStatus::Rejected, 1)] {
+async fn parser_or_delivery_failure_stops_processing_and_preserves_receipt() {
+    for status in [EventStatus::Delivered, EventStatus::Rejected] {
         let fixture = Fixture::new(vec!["application envelope".into()]).await;
         fixture.object("one.gz", 1).await;
-        let next_calls = Arc::new(AtomicUsize::new(0));
-        let parser = Arc::new(OrderedParser {
-            next_calls: Arc::clone(&next_calls),
-        });
+        fixture.object("three.gz", 3).await;
         let mut config = fixture.config(false);
         config.sqs.as_mut().unwrap().delete_failed_message = false;
-        let events = fixture.process(&config, Some(parser), status).await;
+        let events = fixture
+            .process(&config, Some(Arc::new(OrderedParser)), status)
+            .await;
         assert_eq!(events.len(), 1);
-        assert_eq!(next_calls.load(Ordering::SeqCst), expected_calls);
         assert_eq!(fixture.downloads().await, ["/synthetic/one.gz"]);
         assert!(
             fixture
