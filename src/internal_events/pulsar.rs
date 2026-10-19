@@ -1,18 +1,21 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 #[cfg(feature = "sources-pulsar")]
 use metrics::Counter;
-use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+use vector_lib::counter;
+use vector_lib::internal_event::{CounterName, error_stage, error_type};
+#[cfg(feature = "sinks-pulsar")]
+use vector_lib::{
+    NamedInternalEvent,
+    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
 };
-use vector_lib::{NamedInternalEvent, counter};
 
+#[cfg(feature = "sinks-pulsar")]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PulsarSendingError {
     pub count: usize,
     pub error: vector_lib::Error,
 }
 
+#[cfg(feature = "sinks-pulsar")]
 impl InternalEvent for PulsarSendingError {
     fn emit(self) {
         let reason = "A Pulsar sink generated an error.";
@@ -35,11 +38,13 @@ impl InternalEvent for PulsarSendingError {
     }
 }
 
+#[cfg(feature = "sinks-pulsar")]
 #[derive(NamedInternalEvent)]
 pub struct PulsarPropertyExtractionError<F: std::fmt::Display> {
     pub property_field: F,
 }
 
+#[cfg(feature = "sinks-pulsar")]
 impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
     fn emit(self) {
         error!(
