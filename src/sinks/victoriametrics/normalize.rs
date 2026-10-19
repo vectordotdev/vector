@@ -7,6 +7,7 @@
 
 use std::{
     collections::HashMap,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -22,7 +23,7 @@ use crate::sinks::util::buffer::metrics::{MetricSet, TtlPolicy};
 pub(super) struct NormalizedMetric {
     pub(super) metric: Metric,
     /// The cumulative histogram of a distribution metric.
-    pub(super) histogram: Option<VmHistogram>,
+    pub(super) histogram: Option<Arc<VmHistogram>>,
 }
 
 pub(super) struct VmNormalizer {
@@ -41,7 +42,7 @@ impl VmNormalizer {
     pub(super) fn normalize(&mut self, metric: Metric) -> Option<NormalizedMetric> {
         let histogram = match metric.value() {
             MetricValue::Distribution { samples, .. } => Some(match metric.kind() {
-                MetricKind::Absolute => VmHistogram::from_samples(samples),
+                MetricKind::Absolute => Arc::new(VmHistogram::from_samples(samples)),
                 MetricKind::Incremental => self.histograms.record(metric.series(), samples),
             }),
             _ => None,
@@ -71,7 +72,7 @@ struct HistogramSet {
 }
 
 struct HistogramEntry {
-    histogram: VmHistogram,
+    histogram: Arc<VmHistogram>,
     last_seen: Instant,
 }
 
@@ -85,33 +86,35 @@ impl HistogramSet {
     }
 
     /// Records `samples` into the histogram of `series` and returns the updated histogram.
-    fn record(&mut self, series: &MetricSeries, samples: &[Sample]) -> VmHistogram {
+    fn record(&mut self, series: &MetricSeries, samples: &[Sample]) -> Arc<VmHistogram> {
         let now = Instant::now();
         self.cleanup(now);
 
         if let Some(entry) = self.series.get_mut(series) {
-            entry.histogram.record_samples(samples);
+            // Copies only while an earlier snapshot is still waiting in an unsent batch.
+            Arc::make_mut(&mut entry.histogram).record_samples(samples);
             entry.last_seen = now;
-            return entry.histogram.clone();
+            return Arc::clone(&entry.histogram);
         }
 
-        let histogram = VmHistogram::from_samples(samples);
+        let histogram = Arc::new(VmHistogram::from_samples(samples));
         self.series.insert(
             series.clone(),
             HistogramEntry {
-                histogram: histogram.clone(),
+                histogram: Arc::clone(&histogram),
                 last_seen: now,
             },
         );
         histogram
     }
 
-    /// Drops series not updated within the TTL. Runs at most once per TTL period.
+    /// Drops series not updated within the TTL. Scans at most once per tenth of the TTL, so a series
+    /// outlives its TTL by at most that much.
     fn cleanup(&mut self, now: Instant) {
         let Some(ttl) = self.ttl else {
             return;
         };
-        if now.duration_since(self.last_cleanup) < ttl {
+        if now.duration_since(self.last_cleanup) < (ttl / 10).max(Duration::from_secs(1)).min(ttl) {
             return;
         }
         self.series

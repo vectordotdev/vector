@@ -1,12 +1,16 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use http::{HeaderValue, Method, Uri, header::AUTHORIZATION};
+use http::{
+    HeaderValue, Method, Uri,
+    header::{AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE},
+};
 
 use super::{
     Tenant,
     encoder::{VmEncoder, compress},
     request_builder::VmRequestBuilder,
     retry::VmRetryLogic,
+    service::REMOTE_WRITE_VERSION_HEADER,
     service::{
         MULTITENANT_WRITE_PATH, RequestSettings, VmService, WRITE_PATH, WriteEndpoint,
         tenant_write_path,
@@ -275,6 +279,20 @@ fn validate_headers(
     configures_auth: bool,
 ) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
     let headers = crate::sinks::util::http::validate_headers(headers)?;
+    if let Some(name) = headers.keys().find(|name| {
+        let name = name.inner();
+        name == CONTENT_TYPE
+            || name == CONTENT_ENCODING
+            || name
+                .as_str()
+                .eq_ignore_ascii_case(REMOTE_WRITE_VERSION_HEADER)
+    }) {
+        return Err(format!(
+            "The `{}` header is set by the sink and can not be overridden.",
+            name.inner()
+        )
+        .into());
+    }
     if configures_auth && headers.keys().any(|name| name.inner() == AUTHORIZATION) {
         return Err("Authorization header can not be used with defined auth options".into());
     }

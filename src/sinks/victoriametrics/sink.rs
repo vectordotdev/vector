@@ -1,4 +1,4 @@
-use std::{fmt, time::Duration};
+use std::{fmt, sync::Arc, time::Duration};
 
 use vector_lib::{
     byte_size_of::ByteSizeOf, event::Metric, stream::batcher::limiter::ItemBatchSize,
@@ -18,7 +18,7 @@ use crate::{internal_events::VictoriaMetricsInvalidTenantError, sinks::prelude::
 pub(super) struct VmMetric {
     pub(super) metric: Metric,
     /// The cumulative histogram of a distribution metric.
-    pub(super) histogram: Option<VmHistogram>,
+    pub(super) histogram: Option<Arc<VmHistogram>>,
     /// The tenant written as `vm_account_id`/`vm_project_id` labels (`labels` mode).
     pub(super) labels_tenant: Option<Tenant>,
     key: PartitionKey,
@@ -27,7 +27,7 @@ pub(super) struct VmMetric {
 impl VmMetric {
     pub(super) fn new(
         metric: Metric,
-        histogram: Option<VmHistogram>,
+        histogram: Option<Arc<VmHistogram>>,
         labels_tenant: Option<Tenant>,
         path_tenant: Option<Tenant>,
     ) -> Self {
@@ -64,7 +64,11 @@ impl EstimatedJsonEncodedSizeOf for VmMetric {
 
 impl ByteSizeOf for VmMetric {
     fn allocated_bytes(&self) -> usize {
-        self.metric.allocated_bytes() + self.histogram.allocated_bytes()
+        self.metric.allocated_bytes()
+            + self
+                .histogram
+                .as_deref()
+                .map_or(0, ByteSizeOf::allocated_bytes)
     }
 }
 
@@ -114,9 +118,13 @@ where
 
         input
             .filter_map(|event| future::ready(event.try_into_metric()))
-            .filter_map(move |metric| future::ready(normalizer.normalize(metric)))
-            .filter_map(move |normalized| {
-                future::ready(route_metric(normalized, tenant_mode, tenant_id.as_ref()))
+            .filter_map(move |metric| {
+                // Routing comes first so that rejected metrics never reach the cumulative state.
+                let routed = route_metric(metric, tenant_mode, tenant_id.as_ref());
+                future::ready(routed.and_then(|(metric, labels_tenant, path_tenant)| {
+                    let NormalizedMetric { metric, histogram } = normalizer.normalize(metric)?;
+                    Some(VmMetric::new(metric, histogram, labels_tenant, path_tenant))
+                }))
             })
             .batched_partitioned(VmPartitioner, batch_settings.timeout, |_| {
                 batch_settings.as_item_size_config(VmItemSize)
@@ -153,17 +161,13 @@ where
     }
 }
 
-/// Resolves the tenant of a metric. Metrics whose tenant cannot be resolved are rejected.
+/// Resolves the tenant of a metric, as `(metric, labels tenant, path tenant)`. Metrics whose tenant
+/// cannot be resolved are rejected.
 fn route_metric(
-    normalized: NormalizedMetric,
+    mut metric: Metric,
     tenant_mode: TenantMode,
     tenant_id: Option<&ConfinedTemplate>,
-) -> Option<VmMetric> {
-    let NormalizedMetric {
-        mut metric,
-        histogram,
-    } = normalized;
-
+) -> Option<(Metric, Option<Tenant>, Option<Tenant>)> {
     let tenant = match tenant_id {
         None => None,
         Some(template) => {
@@ -195,8 +199,8 @@ fn route_metric(
     };
 
     Some(match tenant_mode {
-        TenantMode::None => VmMetric::new(metric, histogram, None, None),
-        TenantMode::Path => VmMetric::new(metric, histogram, None, tenant),
-        TenantMode::Labels => VmMetric::new(metric, histogram, tenant, None),
+        TenantMode::None => (metric, None, None),
+        TenantMode::Path => (metric, None, tenant),
+        TenantMode::Labels => (metric, tenant, None),
     })
 }

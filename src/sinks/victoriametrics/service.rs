@@ -9,7 +9,7 @@ use http::{HeaderValue, Method, Uri, header};
 
 use super::{Tenant, request_builder::VmRequest};
 use crate::{
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, HttpError},
     internal_events::EndpointBytesSent,
     sinks::{
         prelude::*,
@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-const REMOTE_WRITE_VERSION_HEADER: &str = "X-VictoriaMetrics-Remote-Write-Version";
+pub(super) const REMOTE_WRITE_VERSION_HEADER: &str = "X-VictoriaMetrics-Remote-Write-Version";
 const REMOTE_WRITE_VERSION: &str = "1";
 const CONTENT_TYPE_PROTOBUF: &str = "application/x-protobuf";
 const CONTENT_ENCODING_ZSTD: &str = "zstd";
@@ -50,6 +50,16 @@ impl WriteEndpoint {
             (Self::PerTenant(_), None) => {
                 Err("A tenant is required to build the write URL.".into())
             }
+        }
+    }
+}
+
+impl WriteEndpoint {
+    /// The `endpoint` tag of internal metrics. It omits the tenant to keep cardinality bounded.
+    fn metrics_tag(&self, resolved: &Uri) -> String {
+        match self {
+            Self::Static(_) => resolved.to_string(),
+            Self::PerTenant(base) => base.as_uri().to_string(),
         }
     }
 }
@@ -140,7 +150,10 @@ impl Service<VmRequest> for VmService {
 
             let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
-            let body = http_body::Body::collect(body).await?.to_bytes();
+            let body = http_body::Body::collect(body)
+                .await
+                .map_err(|source| HttpError::CallRequest { source })?
+                .to_bytes();
             let http_response = hyper::Response::from_parts(parts, body);
 
             if http_response.status().is_success() {
@@ -148,7 +161,7 @@ impl Service<VmRequest> for VmService {
                 emit!(EndpointBytesSent {
                     byte_size: raw_byte_size,
                     protocol: "http",
-                    endpoint: &uri.to_string(),
+                    endpoint: &endpoint.metrics_tag(&uri),
                 });
             }
 

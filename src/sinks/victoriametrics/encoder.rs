@@ -53,7 +53,7 @@ const METADATA_ACCOUNT_ID: u32 = 11;
 const METADATA_PROJECT_ID: u32 = 12;
 
 /// `MetricMetadata.MetricType` values.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum MetricType {
     Counter = 1,
     Gauge = 2,
@@ -109,7 +109,7 @@ impl VmEncoder {
     ) {
         let mut output = SeriesWriter::new(buf, Utc::now().timestamp_millis());
         // Metric families whose metadata was written, per tenant.
-        let mut metadata: Option<HashMap<Option<(u32, u32)>, HashSet<String>>> =
+        let mut metadata: Option<HashMap<Option<(u32, u32)>, HashSet<(String, MetricType)>>> =
             self.send_metadata.then(HashMap::new);
 
         for item in input {
@@ -127,9 +127,9 @@ impl VmEncoder {
                 let families = metadata
                     .entry(tenant.map(|t| (t.account_id(), t.project_id())))
                     .or_default();
-                if !families.contains(name.as_str()) {
-                    output.write_metadata(&name, MetricType::of(item.metric.value()), tenant);
-                    families.insert(name.clone());
+                let metric_type = MetricType::of(item.metric.value());
+                if families.insert((name.clone(), metric_type)) {
+                    output.write_metadata(&name, metric_type, tenant);
                 }
             }
             encode_metric(&mut output, item, &name);
@@ -266,12 +266,17 @@ fn encode_metric(output: &mut SeriesWriter<'_>, item: &VmMetric, name: &str) {
         MetricValue::Sketch {
             sketch: MetricSketch::AgentDDSketch(sketch),
         } => {
-            for q in SKETCH_QUANTILES {
-                let label = q.to_string();
-                let value = sketch.quantile(q).unwrap_or(0.0);
-                output.write(&series, "", Some(("quantile", &label)), value);
+            if sketch.count() > 0 {
+                for q in SKETCH_QUANTILES {
+                    if let Some(value) = sketch.quantile(q) {
+                        let label = q.to_string();
+                        output.write(&series, "", Some(("quantile", &label)), value);
+                    }
+                }
+                if let Some(sum) = sketch.sum() {
+                    output.write(&series, "_sum", None, sum);
+                }
             }
-            output.write(&series, "_sum", None, sketch.sum().unwrap_or(0.0));
             output.write(&series, "_count", None, f64::from(sketch.count()));
             if let Some(min) = sketch.min() {
                 output.write(&series, "_min", None, min);
@@ -461,7 +466,9 @@ mod tests {
     use bytes::Buf;
     use chrono::{TimeZone, Utc};
     use prost::Message;
+    use std::sync::Arc;
     use vector_common::decompression::CappedDecoder;
+
     use vector_lib::{
         event::{
             Metric, MetricKind, StatisticKind,
@@ -650,7 +657,7 @@ mod tests {
 
         let request = encode(
             &encoder(),
-            vec![VmMetric::new(metric, Some(histogram), None, None)],
+            vec![VmMetric::new(metric, Some(Arc::new(histogram)), None, None)],
         );
         let rows = rows(&request);
 
@@ -692,7 +699,7 @@ mod tests {
             &encoder(),
             vec![VmMetric::new(
                 metric,
-                Some(VmHistogram::default()),
+                Some(Arc::new(VmHistogram::default())),
                 None,
                 None,
             )],
@@ -948,10 +955,15 @@ mod tests {
         };
         let cases = vec![
             item(metric("cpu", MetricValue::Gauge { value: 1.0 })),
-            VmMetric::new(distribution(), Some(histogram.clone()), None, None),
             VmMetric::new(
                 distribution(),
-                Some(histogram),
+                Some(Arc::new(histogram.clone())),
+                None,
+                None,
+            ),
+            VmMetric::new(
+                distribution(),
+                Some(Arc::new(histogram)),
                 Tenant::parse("4294967295:4294967295"),
                 None,
             ),
