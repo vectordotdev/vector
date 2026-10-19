@@ -1,6 +1,13 @@
 //! End-to-end tests for the `victoriametrics` sink against a local HTTP server.
 
-use std::{collections::BTreeMap, io::Read};
+use std::{
+    collections::BTreeMap,
+    io::Read,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 use bytes::{Buf, Bytes};
 use futures::StreamExt;
@@ -17,7 +24,7 @@ use super::{TOKEN_SECRET_KEY, config::VictoriaMetricsConfig};
 use crate::{
     config::{SinkConfig, SinkContext},
     event::Event,
-    sinks::util::test::{build_test_server, build_test_server_status},
+    sinks::util::test::{build_test_server, build_test_server_generic, build_test_server_status},
     test_util::{
         self,
         components::{HTTP_SINK_TAGS, assert_sink_compliance},
@@ -427,4 +434,52 @@ async fn healthcheck_skipped_for_dynamic_tenant() {
     .await;
     assert!(result.is_ok());
     assert!(requests.is_empty());
+}
+
+/// Runs one metric against a server answering with `statuses` in order, then 204.
+/// Returns the number of attempts and the number of requests the server accepted.
+async fn run_with_statuses(statuses: &'static [u16]) -> (usize, usize) {
+    let (_guard, addr) = test_util::addr::next_addr();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let (rx, trigger, server) = build_test_server_generic(addr, {
+        let attempts = Arc::clone(&attempts);
+        move || {
+            let attempt = attempts.fetch_add(1, Ordering::SeqCst);
+            let status = statuses.get(attempt).copied().unwrap_or(204);
+            http::Response::builder()
+                .status(status)
+                .body(hyper::Body::empty())
+                .unwrap()
+        }
+    });
+    tokio::spawn(server);
+
+    let config: VictoriaMetricsConfig = serde_yaml::from_str(&format!(
+        "endpoint: http://{addr}\nrequest: {{retry_initial_backoff_secs: 1, retry_max_duration_secs: 1}}"
+    ))
+    .unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+    sink.run_events(events([gauge("cpu", 1.0)])).await.unwrap();
+    drop(trigger);
+
+    let accepted = rx.collect::<Vec<_>>().await.len();
+    (attempts.load(Ordering::SeqCst), accepted)
+}
+
+#[tokio::test]
+async fn retries_server_errors_until_accepted() {
+    assert_eq!(run_with_statuses(&[503, 429]).await, (3, 1));
+}
+
+#[tokio::test]
+async fn retries_authentication_errors_like_vmagent() {
+    assert_eq!(run_with_statuses(&[401]).await, (2, 1));
+}
+
+#[tokio::test]
+async fn drops_requests_vmagent_drops() {
+    for status in [400, 409, 415] {
+        let statuses: &'static [u16] = Box::leak(vec![status].into_boxed_slice());
+        assert_eq!(run_with_statuses(statuses).await, (1, 0), "{status}");
+    }
 }

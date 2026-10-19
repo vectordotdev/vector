@@ -393,7 +393,12 @@ fn for_each_label<'a>(
     mut f: impl FnMut(&'a str, &'a str),
 ) {
     let mut fixed = fixed.iter().copied().peekable();
-    for (name, value) in tags.into_iter().flat_map(MetricTags::iter_single) {
+    // Labels with an empty value are dropped, as `vmagent` does.
+    for (name, value) in tags
+        .into_iter()
+        .flat_map(MetricTags::iter_single)
+        .filter(|(_, value)| !value.is_empty())
+    {
         let mut replaced = false;
         while let Some((fixed_name, fixed_value)) =
             fixed.next_if(|(fixed_name, _)| *fixed_name <= name)
@@ -977,6 +982,48 @@ mod tests {
                 proto::MetricType::Counter as i32
             ]
         );
+    }
+
+    #[test]
+    fn matches_vmagent_label_and_value_edge_cases() {
+        let tagged = Metric::new(
+            "edge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: f64::NAN },
+        )
+        .with_tags(Some(
+            metric_tags!("empty" => "", "ok" => "1", "__name__" => "spoofed"),
+        ));
+        let set = Metric::new(
+            "unique",
+            MetricKind::Absolute,
+            MetricValue::Set {
+                values: ["a", "b", "a"].into_iter().map(String::from).collect(),
+            },
+        );
+        let infinite = Metric::new(
+            "infinite",
+            MetricKind::Absolute,
+            MetricValue::Gauge {
+                value: f64::INFINITY,
+            },
+        );
+
+        let request = encode(&encoder(), vec![item(tagged), item(set), item(infinite)]);
+
+        let rows = rows(&request);
+        // Empty labels are dropped and `__name__` always holds the metric name.
+        assert_eq!(
+            rows[0].0,
+            BTreeMap::from([
+                ("__name__".to_owned(), "edge".to_owned()),
+                ("ok".to_owned(), "1".to_owned()),
+            ])
+        );
+        assert!(rows[0].1.is_nan());
+        // A set is its cardinality.
+        assert_eq!(rows[1].1, 2.0);
+        assert_eq!(rows[2].1, f64::INFINITY);
     }
 
     #[test]
