@@ -1,6 +1,12 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    fmt,
+    sync::{Arc, LazyLock},
+    time::Instant,
+};
 
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
@@ -383,11 +389,15 @@ impl Default for EventMetadata {
     }
 }
 
-pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
+static DEFAULT_SCHEMA_DEFINITION: LazyLock<Arc<schema::Definition>> = LazyLock::new(|| {
     Arc::new(schema::Definition::new_with_default_metadata(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
     ))
+});
+
+pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
+    Arc::clone(&*DEFAULT_SCHEMA_DEFINITION)
 }
 
 impl ByteSizeOf for EventMetadata {

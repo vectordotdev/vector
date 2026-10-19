@@ -31,7 +31,6 @@ use crate::{
         SourceContext, SourceOutput, log_schema,
     },
     event::{Event, LogEvent, Value},
-    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
     types,
@@ -66,7 +65,7 @@ pub struct LogstashConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     tls_handshake_timeout_secs: Option<NonZeroU64>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -126,7 +125,7 @@ impl Default for LogstashConfig {
             permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             connection_limit: None,
             tls_handshake_timeout_secs: None,
             log_namespace: None,
@@ -384,7 +383,7 @@ impl LogstashDecoder {
     /// completed window later.
     ///
     /// If a sender omits `WindowSize`, we keep the previous behavior and treat
-    /// each standalone frame as ACKable on its own.
+    /// each standalone frame as `ACKable` on its own.
     const fn annotate_frame(&mut self, frame: &mut LogstashEventFrame) {
         match self.window_events_remaining {
             Some(remaining) if remaining.get() == 1 => {
@@ -453,7 +452,7 @@ enum LogstashProtocolVersion {
 
 impl From<LogstashProtocolVersion> for u8 {
     fn from(frame_type: LogstashProtocolVersion) -> u8 {
-        use LogstashProtocolVersion::*;
+        use LogstashProtocolVersion::{V1, V2};
 
         match frame_type {
             V1 => b'1',
@@ -466,7 +465,7 @@ impl TryFrom<u8> for LogstashProtocolVersion {
     type Error = DecodeError;
 
     fn try_from(frame_type: u8) -> Result<LogstashProtocolVersion, DecodeError> {
-        use LogstashProtocolVersion::*;
+        use LogstashProtocolVersion::{V1, V2};
 
         match frame_type {
             b'1' => Ok(V1),
@@ -489,7 +488,7 @@ enum LogstashFrameType {
 
 impl From<LogstashFrameType> for u8 {
     fn from(frame_type: LogstashFrameType) -> u8 {
-        use LogstashFrameType::*;
+        use LogstashFrameType::{Ack, Compressed, Data, Json, WindowSize};
 
         match frame_type {
             Ack => b'A',
@@ -505,7 +504,7 @@ impl TryFrom<u8> for LogstashFrameType {
     type Error = DecodeError;
 
     fn try_from(frame_type: u8) -> Result<LogstashFrameType, DecodeError> {
-        use LogstashFrameType::*;
+        use LogstashFrameType::{Ack, Compressed, Data, Json, WindowSize};
 
         match frame_type {
             b'A' => Ok(Ack),
@@ -554,21 +553,21 @@ impl Decoder for LogstashDecoder {
                 LogstashDecoderReadState::PendingDecompressed {
                     ref mut buf,
                     ref mut decoder,
-                } => match decoder.decode(buf)? {
-                    Some(frame) => return Ok(Some(frame)),
-                    None => {
-                        // Payload exhausted: carry the window countdown back across the
-                        // compression boundary before dropping the nested decoder.
-                        self.window_events_remaining = decoder.window_events_remaining;
-                        LogstashDecoderReadState::ReadProtocol
+                } => {
+                    if let Some(frame) = decoder.decode(buf)? {
+                        return Ok(Some(frame));
                     }
-                },
+                    // Payload exhausted: carry the window countdown back across the
+                    // compression boundary before dropping the nested decoder.
+                    self.window_events_remaining = decoder.window_events_remaining;
+                    LogstashDecoderReadState::ReadProtocol
+                }
                 LogstashDecoderReadState::ReadProtocol => {
+                    use LogstashProtocolVersion::{V1, V2};
+
                     if src.remaining() < 1 {
                         return Ok(None);
                     }
-
-                    use LogstashProtocolVersion::*;
 
                     match LogstashProtocolVersion::try_from(src.get_u8())? {
                         V1 => LogstashDecoderReadState::ReadType(V1),
@@ -576,11 +575,11 @@ impl Decoder for LogstashDecoder {
                     }
                 }
                 LogstashDecoderReadState::ReadType(protocol) => {
+                    use LogstashFrameType::{Ack, Compressed, Data, Json, WindowSize};
+
                     if src.remaining() < 1 {
                         return Ok(None);
                     }
-
-                    use LogstashFrameType::*;
 
                     match LogstashFrameType::try_from(src.get_u8())? {
                         WindowSize => LogstashDecoderReadState::ReadFrame(protocol, WindowSize),
@@ -974,6 +973,10 @@ mod test {
         assert!(log.get(event_path!("timestamp")).is_some());
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn push_req(req: &mut BytesMut, seq: u32, pairs: &[(&str, &str)]) {
         req.put_u8(b'2');
         req.put_u8(b'D');
@@ -999,6 +1002,10 @@ mod test {
         req.put_u32(size);
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn push_compressed(req: &mut BytesMut, inner: &[u8]) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(inner).unwrap();
@@ -1039,28 +1046,28 @@ mod test {
         acknowledgements
     }
 
-    fn decoded_sequence_numbers(decoded: &[(LogstashEventFrame, usize)]) -> Vec<u32> {
-        decoded
+    fn decoded_sequence_numbers(decoded_frames: &[(LogstashEventFrame, usize)]) -> Vec<u32> {
+        decoded_frames
             .iter()
             .map(|(frame, _)| frame.sequence_number)
             .collect::<Vec<_>>()
     }
 
     fn assert_decoded_sequences(
-        decoded: &[(LogstashEventFrame, usize)],
+        decoded_frames: &[(LogstashEventFrame, usize)],
         expected_sequences: &[u32],
     ) {
-        assert_eq!(decoded_sequence_numbers(decoded), expected_sequences);
+        assert_eq!(decoded_sequence_numbers(decoded_frames), expected_sequences);
     }
 
     async fn assert_acknowledgements_for_ready_frames(
-        decoded: Vec<(LogstashEventFrame, usize)>,
+        decoded_frames: Vec<(LogstashEventFrame, usize)>,
         expected_sequences: &[u32],
         expected_acknowledgements: &[u32],
     ) {
-        assert_decoded_sequences(&decoded, expected_sequences);
+        assert_decoded_sequences(&decoded_frames, expected_sequences);
 
-        let stream = stream::iter(decoded.into_iter().map(Ok::<_, DecodeError>));
+        let stream = stream::iter(decoded_frames.into_iter().map(Ok::<_, DecodeError>));
         let mut ready = ReadyFrames::with_capacity(stream, 16);
         let (frames, _) = ready.next().await.unwrap().unwrap();
 
@@ -1079,9 +1086,9 @@ mod test {
         src: BytesMut,
         expected_sequences: &[u32],
     ) -> Vec<(LogstashEventFrame, usize)> {
-        let decoded = decode_frames(src);
-        assert_decoded_sequences(&decoded, expected_sequences);
-        decoded
+        let decoded_frames = decode_frames(src);
+        assert_decoded_sequences(&decoded_frames, expected_sequences);
+        decoded_frames
     }
 
     fn decode_frames_with_decoder(
@@ -1103,9 +1110,9 @@ mod test {
         src: BytesMut,
         expected_sequences: &[u32],
     ) -> Vec<(LogstashEventFrame, usize)> {
-        let decoded = decode_frames_with_decoder(decoder, src);
-        assert_decoded_sequences(&decoded, expected_sequences);
-        decoded
+        let decoded_frames = decode_frames_with_decoder(decoder, src);
+        assert_decoded_sequences(&decoded_frames, expected_sequences);
+        decoded_frames
     }
 
     #[test]
@@ -1126,6 +1133,10 @@ mod test {
     // This matches upstream logstash-input-beats, which closes the channel on
     // any decode exception.
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn malformed_json_frame_is_a_fatal_decode_error() {
         let mut decoder = LogstashDecoder::new();
@@ -1145,6 +1156,10 @@ mod test {
         );
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn malformed_compressed_frame_is_a_fatal_decode_error() {
         let mut decoder = LogstashDecoder::new();
@@ -1309,8 +1324,8 @@ mod test {
         let mut req = BytesMut::new();
         push_req(&mut req, 1, &[("message", "hello")]);
 
-        let decoded = decode_frames_with_decoder(&mut decoder, req);
-        assert_decoded_sequences(&decoded, &[1]);
+        let decoded_frames = decode_frames_with_decoder(&mut decoder, req);
+        assert_decoded_sequences(&decoded_frames, &[1]);
     }
 
     #[test]
@@ -1321,16 +1336,20 @@ mod test {
         let full = encode_req(7, &[("message", "hello")]);
 
         let mut src = BytesMut::new();
-        let mut decoded = Vec::new();
-        for byte in full.iter() {
+        let mut decoded_frames = Vec::new();
+        for byte in &full {
             src.put_u8(*byte);
             if let Some(frame) = decoder.decode(&mut src).unwrap() {
-                decoded.push(frame);
+                decoded_frames.push(frame);
             }
         }
-        assert_decoded_sequences(&decoded, &[7]);
+        assert_decoded_sequences(&decoded_frames, &[7]);
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn malformed_frame_closes_connection_without_ack() {
         let (address, _recv) = start_logstash(EventStatus::Delivered).await;
@@ -1370,8 +1389,8 @@ mod test {
         push_req(&mut req, 1, &[("message", "second window first")]);
         push_req(&mut req, 2, &[("message", "second window second")]);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 1, 2]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 1, 2], &[1, 2]).await;
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1, 1, 2]);
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1, 1, 2], &[1, 2]).await;
     }
 
     #[tokio::test]
@@ -1384,8 +1403,8 @@ mod test {
         push_req(&mut req, 3, &[("message", "second window first")]);
         push_req(&mut req, 4, &[("message", "second window second")]);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 3, 4], &[2, 4]).await;
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1, 2, 3, 4], &[2, 4]).await;
     }
 
     #[tokio::test]
@@ -1401,8 +1420,8 @@ mod test {
         push_window_size(&mut req, 4);
         push_req(&mut req, 1, &[("message", "only event in partial window")]);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1], &[]).await;
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1]);
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1], &[]).await;
     }
 
     #[tokio::test]
@@ -1431,14 +1450,15 @@ mod test {
         push_compressed(&mut req, &first);
         push_compressed(&mut req, &second);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 3, 4], &[4]).await;
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1, 2, 3, 4], &[4]).await;
     }
 
     #[tokio::test]
     async fn window_larger_than_ready_frames_capacity_in_one_compressed_frame_acks_once() {
         const WINDOW: u32 = 5;
         const CAPACITY: usize = 2;
+        const SMALL_WINDOW: u32 = 2;
 
         let mut inner = BytesMut::new();
         for seq in 1..=WINDOW {
@@ -1451,7 +1471,6 @@ mod test {
         // ACK only the oversized window (seq 5); the small window's retained first
         // event must NOT produce a second ACK until the small window's own final
         // event arrives.
-        const SMALL_WINDOW: u32 = 2;
         let mut small_inner = BytesMut::new();
         for seq in 1..=SMALL_WINDOW {
             push_req(
@@ -1469,9 +1488,9 @@ mod test {
         push_window_size(&mut req, SMALL_WINDOW);
         push_compressed(&mut req, &small_inner);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4, 5, 1, 2]);
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4, 5, 1, 2]);
 
-        let stream = stream::iter(decoded.into_iter().map(Ok::<_, DecodeError>));
+        let stream = stream::iter(decoded_frames.into_iter().map(Ok::<_, DecodeError>));
         let mut ready = ReadyFrames::with_capacity(stream, CAPACITY);
         let mut acknowledgements = Vec::new();
 
@@ -1517,8 +1536,8 @@ mod test {
         push_req(&mut req, 2, &[("message", "partial window second")]);
         push_req(&mut req, 3, &[("message", "partial window third")]);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 1, 2, 3]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 2, 1, 2, 3], &[2]).await;
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1, 2, 1, 2, 3]);
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1, 2, 1, 2, 3], &[2]).await;
     }
 
     #[tokio::test]
@@ -1531,8 +1550,8 @@ mod test {
         let mut req = BytesMut::new();
         push_compressed(&mut req, &inner);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1, 2], &[2]).await;
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1, 2]);
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1, 2], &[2]).await;
     }
 
     #[tokio::test]
@@ -1548,9 +1567,9 @@ mod test {
         push_req(&mut req, 3, &[("message", "third")]);
         push_req(&mut req, 4, &[("message", "fourth")]);
 
-        let decoded = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
+        let decoded_frames = decode_frames_and_assert_sequences(req, &[1, 2, 3, 4]);
 
-        let stream = stream::iter(decoded.into_iter().map(Ok::<_, DecodeError>));
+        let stream = stream::iter(decoded_frames.into_iter().map(Ok::<_, DecodeError>));
         let mut ready = ReadyFrames::with_capacity(stream, 2);
         let mut acknowledgements = Vec::new();
 
@@ -1581,9 +1600,9 @@ mod test {
         let mut first_batch = BytesMut::new();
         push_window_size(&mut first_batch, 1);
         push_req(&mut first_batch, 1, &[("message", "first window")]);
-        let decoded =
+        let decoded_frames =
             decode_frames_with_decoder_and_assert_sequences(&mut decoder, first_batch, &[1]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1], &[1]).await;
 
         let mut second_batch = BytesMut::new();
         push_window_size(&mut second_batch, 1);
@@ -1592,9 +1611,9 @@ mod test {
             1,
             &[("message", "fresh window after completion")],
         );
-        let decoded =
+        let decoded_frames =
             decode_frames_with_decoder_and_assert_sequences(&mut decoder, second_batch, &[1]);
-        assert_acknowledgements_for_ready_frames(decoded, &[1], &[1]).await;
+        assert_acknowledgements_for_ready_frames(decoded_frames, &[1], &[1]).await;
     }
 
     async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
@@ -1656,7 +1675,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1681,7 +1700,7 @@ mod test {
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"));
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -1716,7 +1735,7 @@ mod integration_tests {
         let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let out = source(heartbeat_address(), None).await;
 
-            timeout(Duration::from_secs(60), collect_n(out, 1))
+            timeout(Duration::from_mins(1), collect_n(out, 1))
                 .await
                 .unwrap()
         })
@@ -1762,7 +1781,7 @@ mod integration_tests {
             )
             .await;
 
-            timeout(Duration::from_secs(60), collect_n(out, 1))
+            timeout(Duration::from_mins(1), collect_n(out, 1))
                 .await
                 .unwrap()
         })
@@ -1806,7 +1825,7 @@ mod integration_tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
         recv

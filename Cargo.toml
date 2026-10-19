@@ -143,6 +143,7 @@ members = [
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(ddsketch_extended)'] }
 
 [workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
 string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"

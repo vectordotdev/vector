@@ -1,10 +1,15 @@
+use crate::config::SourceAcknowledgementsConfig;
+use crate::http::KeepaliveConfig;
 use std::{
     collections::{BTreeMap, HashMap},
-    iter::FromIterator,
     net::SocketAddr,
     sync::Arc,
     time::Duration,
 };
+use vector_lib::codecs::decoding::JsonDeserializerConfig;
+#[cfg(feature = "codecs-syslog")]
+use vector_lib::codecs::decoding::SyslogDeserializerConfig;
+use vector_lib::codecs::decoding::framing::OversizedAction;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -107,7 +112,7 @@ impl Arbitrary for LogMsg {
             message: Bytes::from(String::arbitrary(g)),
             status: Bytes::from(String::arbitrary(g)),
             timestamp: Utc
-                .timestamp_millis_opt(u32::arbitrary(g) as i64)
+                .timestamp_millis_opt(i64::from(u32::arbitrary(g)))
                 .single()
                 .expect("invalid timestamp"),
             hostname: Bytes::from(String::arbitrary(g)),
@@ -244,6 +249,10 @@ fn generate_config() {
     crate::test_util::test_generate_config::<DatadogAgentConfig>();
 }
 
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn source(
     status: EventStatus,
     acknowledgements: bool,
@@ -270,6 +279,10 @@ async fn source(
     (recv, logs_output, metrics_output, address, guard)
 }
 
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn source_with_timeout(
     status: EventStatus,
     acknowledgements: bool,
@@ -298,6 +311,10 @@ async fn source_with_timeout(
     (recv, logs_output, metrics_output, address, guard)
 }
 
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn source_with_sender(
     mut sender: SourceSender,
     status: EventStatus,
@@ -967,6 +984,10 @@ async fn ignores_api_key() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_series_endpoint_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -980,8 +1001,8 @@ async fn decode_series_endpoint_v1() {
                     r#type: DatadogMetricType::Gauge,
                     interval: None,
                     points: vec![
-                        DatadogPoint(1542182950, 3.14),
-                        DatadogPoint(1542182951, 3.1415),
+                        DatadogPoint(1_542_182_950, 3.14),
+                        DatadogPoint(1_542_182_951, 3.1415),
                     ],
                     tags: Some(vec!["foo:bar".to_string()]),
                     host: Some("random_host".to_string()),
@@ -994,7 +1015,7 @@ async fn decode_series_endpoint_v1() {
                     metric: "dd_rate".to_string(),
                     r#type: DatadogMetricType::Rate,
                     interval: Some(10),
-                    points: vec![DatadogPoint(1542182950, 3.14)],
+                    points: vec![DatadogPoint(1_542_182_950, 3.14)],
                     tags: Some(vec!["foo:bar:baz".to_string()]),
                     host: Some("another_random_host".to_string()),
                     source_type_name: None,
@@ -1006,7 +1027,7 @@ async fn decode_series_endpoint_v1() {
                     metric: "dd_count".to_string(),
                     r#type: DatadogMetricType::Count,
                     interval: None,
-                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    points: vec![DatadogPoint(1_542_182_955, 16_777_216_f64)],
                     tags: Some(vec!["foobar".to_string()]),
                     host: Some("a_host".to_string()),
                     source_type_name: None,
@@ -1018,7 +1039,7 @@ async fn decode_series_endpoint_v1() {
                     metric: "system.disk.free".to_string(),
                     r#type: DatadogMetricType::Count,
                     interval: None,
-                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    points: vec![DatadogPoint(1_542_182_955, 16_777_216_f64)],
                     tags: None,
                     host: None,
                     source_type_name: None,
@@ -1030,7 +1051,7 @@ async fn decode_series_endpoint_v1() {
                     metric: "system.disk".to_string(),
                     r#type: DatadogMetricType::Count,
                     interval: None,
-                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    points: vec![DatadogPoint(1_542_182_955, 16_777_216_f64)],
                     tags: None,
                     host: None,
                     source_type_name: None,
@@ -1148,7 +1169,7 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(
                 *metric.value(),
                 MetricValue::Counter {
-                    value: 16777216_f64
+                    value: 16_777_216_f64
                 }
             );
             assert_tags(
@@ -1193,7 +1214,7 @@ async fn decode_sketches() {
             host: "a_host".to_string(),
             distributions: Vec::new(),
             dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
-                ts: 1542182950,
+                ts: 1_542_182_950,
                 cnt: 2,
                 min: 16.0,
                 max: 31.0,
@@ -1270,6 +1291,10 @@ async fn decode_sketches() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_traces() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -1288,8 +1313,12 @@ async fn decode_traces() {
             start: 1_431_648_000_000_001i64,
             duration: 1_000_000_000i64,
             error: 404i32,
-            meta: BTreeMap::from_iter([("foo".to_string(), "bar".to_string())].into_iter()),
-            metrics: BTreeMap::from_iter([("a_metrics".to_string(), 0.577f64)].into_iter()),
+            meta: [("foo".to_string(), "bar".to_string())]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
+            metrics: [("a_metrics".to_string(), 0.577f64)]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
             r#type: "a_type".to_string(),
             ..Default::default()
         };
@@ -1301,7 +1330,9 @@ async fn decode_traces() {
             origin: "an_origin".to_string(),
             dropped_trace: false,
             spans: vec![span],
-            tags: BTreeMap::from_iter([("a".to_string(), "tag".to_string())].into_iter()),
+            tags: [("a".to_string(), "tag".to_string())]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
         };
 
         let tracer_payload = ddtrace_proto::TracerPayload {
@@ -1312,7 +1343,9 @@ async fn decode_traces() {
             runtime_id: "123abc".to_string(),
             chunks: vec![chunk],
             env: "env".to_string(),
-            tags: BTreeMap::from_iter([("another".to_string(), "tag".to_string())].into_iter()),
+            tags: [("another".to_string(), "tag".to_string())]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
             hostname: "hostname".to_string(),
             app_version: "v314".to_string(),
             ..Default::default()
@@ -1466,6 +1499,10 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
     topology.stop().await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_traces_span_links_and_events() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -1657,6 +1694,10 @@ async fn decode_traces_idx_only_payload_emits_error() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn split_outputs() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -1696,8 +1737,8 @@ async fn split_outputs() {
                 r#type: DatadogMetricType::Gauge,
                 interval: None,
                 points: vec![
-                    DatadogPoint(1542182950, 3.14),
-                    DatadogPoint(1542182951, 3.1415),
+                    DatadogPoint(1_542_182_950, 3.14),
+                    DatadogPoint(1_542_182_951, 3.1415),
                 ],
                 tags: Some(vec!["foo:bar".to_string()]),
                 host: Some("random_host".to_string()),
@@ -1774,8 +1815,16 @@ async fn split_outputs() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[test]
 fn test_config_outputs_with_disabled_data_types() {
+    #[allow(
+        clippy::struct_excessive_bools,
+        reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     struct TestCase {
         multiple_outputs: bool,
         disable_logs: bool,
@@ -1847,7 +1896,7 @@ fn test_config_outputs_with_disabled_data_types() {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
             disable_logs,
             disable_metrics,
@@ -1856,7 +1905,7 @@ fn test_config_outputs_with_disabled_data_types() {
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
         };
 
@@ -2062,7 +2111,7 @@ fn test_config_outputs() {
         (
             "json / single output",
             TestCase {
-                decoding: DeserializerConfig::Json(Default::default()),
+                decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -2087,7 +2136,7 @@ fn test_config_outputs() {
         (
             "json / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Json(Default::default()),
+                decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -2129,7 +2178,7 @@ fn test_config_outputs() {
         (
             "syslog / single output",
             TestCase {
-                decoding: DeserializerConfig::Syslog(Default::default()),
+                decoding: DeserializerConfig::Syslog(SyslogDeserializerConfig::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -2204,7 +2253,7 @@ fn test_config_outputs() {
         (
             "syslog / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Syslog(Default::default()),
+                decoding: DeserializerConfig::Syslog(SyslogDeserializerConfig::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -2295,7 +2344,7 @@ fn test_config_outputs() {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
             disable_logs: false,
             disable_metrics: false,
@@ -2304,7 +2353,7 @@ fn test_config_outputs() {
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
         };
 
@@ -2324,6 +2373,10 @@ fn test_config_outputs() {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_series_endpoint_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -2341,15 +2394,15 @@ async fn decode_series_endpoint_v2() {
                 points: vec![
                     ddmetric_proto::metric_payload::MetricPoint {
                         value: 3.14,
-                        timestamp: 1542182950,
+                        timestamp: 1_542_182_950,
                     },
                     ddmetric_proto::metric_payload::MetricPoint {
                         value: 3.1415,
-                        timestamp: 1542182951,
+                        timestamp: 1_542_182_951,
                     },
                 ],
                 r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
-                unit: "".to_string(),
+                unit: String::new(),
                 source_type_name: "a_random_source_type_name".to_string(),
                 interval: 10, // Dogstatsd sets Gauge interval to 10 by default
                 metadata: None,
@@ -2363,10 +2416,10 @@ async fn decode_series_endpoint_v2() {
                 tags: vec!["foo:bar:baz".to_string(), "foo:bizbaz".to_string()],
                 points: vec![ddmetric_proto::metric_payload::MetricPoint {
                     value: 3.14,
-                    timestamp: 1542182950,
+                    timestamp: 1_542_182_950,
                 }],
                 r#type: ddmetric_proto::metric_payload::MetricType::Rate as i32,
-                unit: "".to_string(),
+                unit: String::new(),
                 source_type_name: "another_random_source_type_name".to_string(),
                 interval: 10,
                 metadata: None,
@@ -2379,11 +2432,11 @@ async fn decode_series_endpoint_v2() {
                 metric: "dd_count".to_string(),
                 tags: vec!["foobar".to_string()],
                 points: vec![ddmetric_proto::metric_payload::MetricPoint {
-                    value: 16777216_f64,
-                    timestamp: 1542182955,
+                    value: 16_777_216_f64,
+                    timestamp: 1_542_182_955,
                 }],
                 r#type: ddmetric_proto::metric_payload::MetricType::Count as i32,
-                unit: "".to_string(),
+                unit: String::new(),
                 source_type_name: "a_very_random_source_type_name".to_string(),
                 interval: 0,
                 metadata: Some(ddmetric_proto::Metadata {
@@ -2523,7 +2576,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(
                 *metric.value(),
                 MetricValue::Counter {
-                    value: 16777216_f64
+                    value: 16_777_216_f64
                 }
             );
             assert_tags(
@@ -3196,7 +3249,7 @@ fn test_output_schema_definition_json_vector_namespace() {
                     None
                 )
         )
-    )
+    );
 }
 
 #[test]
@@ -3257,7 +3310,7 @@ fn test_output_schema_definition_bytes_vector_namespace() {
                 )
                 .with_meaning(OwnedTargetPath::event_root(), "message")
         )
-    )
+    );
 }
 
 #[test]
@@ -3288,7 +3341,7 @@ fn test_output_schema_definition_json_legacy_namespace() {
                 .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
                 .with_event_field(&owned_value_path!("status"), Kind::json(), None)
         )
-    )
+    );
 }
 
 #[test]
@@ -3339,9 +3392,13 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
                 Some("timestamp")
             )
         )
-    )
+    );
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Expected tags are constructed as owned fixtures at the assertion call sites."
+)]
 fn assert_tags(metric: &Metric, tags: MetricTags) {
     assert_eq!(metric.tags().expect("Missing tags"), &tags);
 }
@@ -3358,7 +3415,7 @@ async fn test_series_v1_split_metric_namespace_impl(
             metric: "system.disk.free".to_string(),
             r#type: DatadogMetricType::Gauge,
             interval: None,
-            points: vec![DatadogPoint(1542182950, 42.0)],
+            points: vec![DatadogPoint(1_542_182_950, 42.0)],
             tags: Some(vec!["foo:bar".to_string()]),
             host: Some("test_host".to_string()),
             source_type_name: None,
@@ -3415,11 +3472,11 @@ async fn test_series_v2_split_metric_namespace_impl(
         tags: vec!["foo:bar".to_string()],
         points: vec![ddmetric_proto::metric_payload::MetricPoint {
             value: 42.0,
-            timestamp: 1542182950,
+            timestamp: 1_542_182_950,
         }],
         r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
-        unit: "".to_string(),
-        source_type_name: "".to_string(),
+        unit: String::new(),
+        source_type_name: String::new(),
         interval: 10,
         metadata: None,
     }];
@@ -3491,11 +3548,11 @@ async fn series_v2_resources_preserved_as_tags() {
             ],
             points: vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: 100.0,
-                timestamp: 1542182950,
+                timestamp: 1_542_182_950,
             }],
             r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
-            unit: "".to_string(),
-            source_type_name: "".to_string(),
+            unit: String::new(),
+            source_type_name: String::new(),
             interval: 0,
             metadata: None,
         }];
@@ -3555,7 +3612,7 @@ async fn test_sketches_split_metric_namespace_impl(
         host: "test_host".to_string(),
         distributions: Vec::new(),
         dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
-            ts: 1542182950,
+            ts: 1_542_182_950,
             cnt: 2,
             min: 16.0,
             max: 31.0,
@@ -3609,12 +3666,12 @@ impl ValidatableComponent for DatadogAgentConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: vector_lib::serde::AsciiChar::new(','),
                     max_length: Some(usize::MAX),
-                    oversized_action: Default::default(),
+                    oversized_action: OversizedAction::default(),
                 },
             }
             .into(),
             decoding: BytesDeserializerConfig::new().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs: false,
             disable_logs: false,
             disable_metrics: false,
@@ -3623,7 +3680,7 @@ impl ValidatableComponent for DatadogAgentConfig {
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
         };
 
@@ -3636,7 +3693,7 @@ impl ValidatableComponent for DatadogAgentConfig {
 
         let decoder = DecodingConfig::new(
             config.framing.clone(),
-            DeserializerConfig::Json(Default::default()),
+            DeserializerConfig::Json(JsonDeserializerConfig::default()),
             false.into(),
         );
 

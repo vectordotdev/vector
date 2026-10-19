@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use std::{
     collections::{HashMap, HashSet},
@@ -16,7 +15,7 @@ use tokio::sync::{
     broadcast::{self, Receiver, Sender},
     oneshot,
 };
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
@@ -27,8 +26,11 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
-use vector_lib::SpanField;
-use vector_lib::lookup::event_path;
+use vector_lib::{
+    SpanField,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    lookup::event_path,
+};
 use vrl::value::Value;
 
 use crate::event::LogEvent;
@@ -308,10 +310,34 @@ impl TraceSubscription {
     }
 
     /// Converts this subscription into a raw stream of log events.
+    ///
+    /// Events dropped because the underlying broadcast receiver lagged are reported via
+    /// `ComponentEventsDropped` when the next event is received, not when the lag is detected.
+    /// After a lag, the receiver points at the oldest slot of a full buffer, so any log emitted
+    /// before the next receive (including the `ComponentEventsDropped` error itself) overwrites
+    /// that slot and lags the receiver again, indefinitely. Once an event has been received, that
+    /// slot is consumed and the drop can be logged safely.
     pub fn into_stream(self) -> impl Stream<Item = LogEvent> + Unpin {
-        // We ignore errors because the only error we get is when the broadcast receiver lags, and there's nothing we
-        // can actually do about that so there's no reason to force callers to even deal with it.
-        BroadcastStream::new(self.trace_rx).filter_map(|event| ready(event.ok()))
+        BroadcastStream::new(self.trace_rx)
+            .scan(0u64, |dropped, event| {
+                ready(Some(match event {
+                    Ok(log) => {
+                        let count = std::mem::take(dropped);
+                        if count > 0 {
+                            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                                count: usize::try_from(count).unwrap_or(usize::MAX),
+                                reason: "Internal logs broadcast receiver lagged.",
+                            });
+                        }
+                        Some(log)
+                    }
+                    Err(BroadcastStreamRecvError::Lagged(n)) => {
+                        *dropped += n;
+                        None
+                    }
+                }))
+            })
+            .filter_map(ready)
     }
 }
 

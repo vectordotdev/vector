@@ -60,7 +60,7 @@ impl HecMetricsEncoder {
         let fields = metric
             .tags()
             .into_iter()
-            .flat_map(|tags| tags.iter_single())
+            .flat_map(vector_lib::event::MetricTags::iter_single)
             // skip the metric tags used for templating
             .filter(|(k, _)| !self.templated_field_keys.iter().any(|f| f == k))
             .map(|(k, v)| (k, HecFieldValue::Str(v)))
@@ -73,6 +73,10 @@ impl HecMetricsEncoder {
                 HecFieldValue::Float(metadata.metric_value),
             )))
             .collect::<HecFieldMap>();
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "HEC timestamps use floating-point seconds."
+        )]
         let time = metric
             .timestamp()
             .unwrap_or_else(chrono::Utc::now)

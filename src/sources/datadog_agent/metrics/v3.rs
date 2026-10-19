@@ -41,6 +41,10 @@ const V3_VALUE_TYPE_SINT64: u64 = 0x10;
 const V3_VALUE_TYPE_FLOAT32: u64 = 0x20;
 const V3_VALUE_TYPE_FLOAT64: u64 = 0x30;
 
+#[allow(
+    clippy::ref_option,
+    reason = "Match the v2 decoder API while the shared signature remains unchanged. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_ddseries_v3(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
@@ -258,6 +262,10 @@ impl<'a> V3PointDecoder<'a> {
         Ok(())
     }
 
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "Vector metrics store protocol integer samples as f64 values."
+    )]
     fn decode_points(
         &mut self,
         value_type: u64,
@@ -308,6 +316,7 @@ struct V3AllocationBudget {
     event_bytes: usize,
 }
 
+#[derive(Clone, Copy)]
 struct V3TagResourceSize {
     tag_bytes: usize,
     tag_count: usize,
@@ -391,6 +400,10 @@ impl V3AllocationBudget {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the cursor advances and allocation-budget checks together so their ordering remains auditable."
+)]
 pub(crate) fn decode_v3_metric_data(
     data: &MetricDataV3,
     metadata: Option<&MetricMetadataV3>,
@@ -829,8 +842,10 @@ fn decode_v3_tagsets(
                 }
                 tags.extend(referenced.iter().cloned());
             } else {
+                let index =
+                    usize::try_from(reference).map_err(|_| "invalid Datadog v3 tag reference")?;
                 let tag = dictionary
-                    .get(reference as usize)
+                    .get(index)
                     .ok_or("invalid Datadog v3 tag reference")?;
                 expanded_bytes = expanded_bytes
                     .checked_add(std::mem::size_of::<String>())
@@ -905,11 +920,15 @@ fn decode_v3_resources(
             if type_ref < 0 || name_ref < 0 {
                 return Err("invalid Datadog v3 resource reference".into());
             }
+            let type_index =
+                usize::try_from(type_ref).map_err(|_| "invalid Datadog v3 resource reference")?;
+            let name_index =
+                usize::try_from(name_ref).map_err(|_| "invalid Datadog v3 resource reference")?;
             let resource_type = dictionary
-                .get(type_ref as usize)
+                .get(type_index)
                 .ok_or("invalid Datadog v3 resource reference")?;
             let resource_name = dictionary
-                .get(name_ref as usize)
+                .get(name_index)
                 .ok_or("invalid Datadog v3 resource reference")?;
             expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_type)?;
             expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_name)?;

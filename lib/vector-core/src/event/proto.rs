@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::{MetricTags, WithMetadata};
 use crate::{event, metrics::AgentDDSketch};
 
-#[allow(warnings, clippy::all, clippy::pedantic)]
+#[allow(warnings, clippy::all)]
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }

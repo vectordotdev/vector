@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use async_trait::async_trait;

@@ -211,6 +211,10 @@ fn series_v3_service(
         .boxed()
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
 fn decode_datadog_sketches(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -238,6 +242,10 @@ fn decode_datadog_sketches(
     Ok(metrics)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
 fn decode_datadog_series_v2(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -265,6 +273,10 @@ fn decode_datadog_series_v2(
     Ok(metrics)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
 fn decode_datadog_series_v3(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -322,6 +334,19 @@ fn get_event_metadata(metadata: Option<&Metadata>, metric_type: Option<i32>) -> 
     }
 }
 
+#[allow(
+    clippy::ref_option,
+    reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_ddseries_v2(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
@@ -331,6 +356,19 @@ pub(crate) fn decode_ddseries_v2(
     decode_ddseries(payload.series, api_key, split_metric_namespace, None)
 }
 
+#[allow(
+    clippy::ref_option,
+    reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn decode_ddseries(
     series: Vec<metric_payload::MetricSeries>,
     api_key: &Option<Arc<str>>,
@@ -471,13 +509,12 @@ fn decode_ddseries(
                     .map(|dd_point| {
                         let i = Some(serie.interval)
                             .filter(|v| *v != 0)
-                            .map(|v| v as u32)
-                            .unwrap_or(1);
+                            .map_or(1, |v| v as u32);
                         Metric::new_with_metadata(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
-                                value: dd_point.value * (i as f64),
+                                value: dd_point.value * f64::from(i),
                             },
                             event_metadata.clone(),
                         )
@@ -523,6 +560,10 @@ fn validate_unit_event_expansion<'a>(
     Ok(())
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
 fn decode_datadog_series_v1(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -578,7 +619,9 @@ fn decode_datadog_series_v1(
 }
 
 fn into_metric_tags(tags: Vec<String>) -> MetricTags {
-    tags.iter().map(extract_tag_key_and_value).collect()
+    tags.into_iter()
+        .map(|tag| extract_tag_key_and_value(&tag))
+        .collect()
 }
 
 fn into_vector_metric(
@@ -677,7 +720,7 @@ fn into_vector_metric(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: dd_point.1 * (i as f64),
+                        value: dd_point.1 * f64::from(i),
                     },
                     event_metadata.clone(),
                 )
@@ -708,6 +751,15 @@ fn namespace_name_from_dd_metric(dd_metric_name: &str) -> (Option<&str>, &str) {
     }
 }
 
+#[allow(
+    clippy::ref_option,
+    reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,

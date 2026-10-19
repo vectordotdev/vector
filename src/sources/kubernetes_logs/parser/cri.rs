@@ -96,7 +96,7 @@ impl FunctionTransform for Cri {
                                 log_schema().timestamp_key().map(LegacyKey::Overwrite),
                                 path!(TIMESTAMP_KEY),
                                 Value::Timestamp(dt.with_timezone(&Utc)),
-                            )
+                            );
                         }
                         Err(e) => {
                             emit!(ParserConversionError {

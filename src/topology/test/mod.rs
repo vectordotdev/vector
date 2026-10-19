@@ -20,6 +20,7 @@ use vector_lib::{
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{Event, EventArray, EventContainer, LogEvent, into_event_stream},
+    extra_context::ExtraContext,
     schema::Definition,
     test_util::{
         mock::{
@@ -43,6 +44,7 @@ mod doesnt_reload;
 #[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
 mod end_to_end;
 mod latency_metrics;
+mod panic;
 #[cfg(all(
     feature = "sources-prometheus",
     feature = "sinks-prometheus",
@@ -73,6 +75,10 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
     config.build().unwrap()
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Stream adapters consume each event."
+)]
 fn into_message(event: Event) -> String {
     let message_key = crate::config::log_schema()
         .message_key_target_path()
@@ -200,11 +206,11 @@ async fn topology_multiple_sources() {
 
     in1.send_event(event1.clone()).await.unwrap();
 
-    let out_event1: Option<EventArray> = out1.next().await.map(|item| item.into());
+    let out_event1: Option<EventArray> = out1.next().await.map(Into::into);
 
     in2.send_event(event2.clone()).await.unwrap();
 
-    let out_event2: Option<EventArray> = out1.next().await.map(|item| item.into());
+    let out_event2: Option<EventArray> = out1.next().await.map(Into::into);
 
     topology.stop().await;
 
@@ -301,7 +307,7 @@ async fn topology_remove_one_source() {
     config.add_sink("out1", &["in1"], sink1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -345,7 +351,7 @@ async fn topology_remove_one_sink() {
     config.add_sink("out1", &["in1"], basic_sink(10).1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -393,7 +399,7 @@ async fn topology_remove_one_transform() {
     config.add_sink("out1", &["t2"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -442,7 +448,7 @@ async fn topology_swap_source() {
     config.add_sink("out1", &["in2"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -503,7 +509,7 @@ async fn topology_swap_transform() {
     config.add_sink("out1", &["t1"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -555,7 +561,7 @@ async fn topology_swap_sink() {
     config.add_sink("out1", &["in1"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -639,7 +645,7 @@ async fn topology_swap_transform_is_atomic() {
     config.add_sink("out1", &["t1"], basic_sink(10).1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -675,7 +681,7 @@ async fn topology_rebuild_connected() {
     config.add_sink("out1", &["in1"], sink1);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -725,7 +731,7 @@ async fn topology_rebuild_connected_transform() {
     config.add_sink("out1", &["t2"], sink2);
 
     topology
-        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 
@@ -754,7 +760,7 @@ async fn topology_required_healthcheck_fails_start() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
     assert!(
-        RunningTopology::start_init_validated(config, Default::default())
+        RunningTopology::start_init_validated(config, ExtraContext::default())
             .await
             .is_none()
     );
@@ -764,7 +770,7 @@ async fn topology_required_healthcheck_fails_start() {
 async fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
     assert!(
-        RunningTopology::start_init_validated(config, Default::default())
+        RunningTopology::start_init_validated(config, ExtraContext::default())
             .await
             .is_some()
     );
@@ -776,7 +782,7 @@ async fn topology_optional_healthcheck_does_not_fail_reload() {
     let (mut topology, _) = start_topology(config, false).await;
     let config = basic_config_with_sink_failing_healthcheck();
     topology
-        .reload_config_and_respawn(config, Default::default())
+        .reload_config_and_respawn(config, ExtraContext::default())
         .await
         .unwrap();
 }
@@ -789,7 +795,7 @@ async fn topology_healthcheck_not_run_on_unchanged_reload() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
     topology
-        .reload_config_and_respawn(config, Default::default())
+        .reload_config_and_respawn(config, ExtraContext::default())
         .await
         .unwrap();
 }
@@ -815,7 +821,7 @@ async fn topology_healthcheck_run_for_changes_on_reload() {
     let mut config = config.build().unwrap();
     config.healthchecks.require_healthy = true;
     let result = topology
-        .reload_config_and_respawn(config, Default::default())
+        .reload_config_and_respawn(config, ExtraContext::default())
         .await;
 
     // Should fail with TopologyBuildFailed error due to healthcheck failure
@@ -843,7 +849,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
         sink1,
     );
     sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV2 {
-        max_size: std::num::NonZeroU64::new(268435488).unwrap(),
+        max_size: std::num::NonZeroU64::new(268_435_488).unwrap(),
         when_full: WhenFull::DropNewest,
     });
     config.add_sink_outer("out1", sink1_outer);
@@ -890,9 +896,8 @@ async fn topology_transform_error_definition() {
 
     let config = config.build().unwrap();
     let diff = ConfigDiff::initial(&config);
-    let errors = match TopologyPiecesBuilder::new(&config, &diff).build().await {
-        Ok(_) => panic!("build pieces should not succeed"),
-        Err(err) => err,
+    let Err(errors) = TopologyPiecesBuilder::new(&config, &diff).build().await else {
+        panic!("build pieces should not succeed")
     };
 
     assert_eq!(

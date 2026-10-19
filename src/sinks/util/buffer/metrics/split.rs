@@ -15,6 +15,7 @@ pub struct SplitIterator {
 
 impl SplitIterator {
     /// Creates an iterator for a single metric.
+    #[must_use]
     pub const fn single(metric: Metric) -> Self {
         Self {
             state: SplitState::Single(Some(metric)),
@@ -125,13 +126,13 @@ impl MetricSplit for AggregatedSummarySplitter {
             MetricValue::AggregatedSummary { .. } => {
                 // Further extract the aggregated summary components so we can generate our multiple metrics.
                 let (time, kind, value) = data.into_parts();
-                let (quantiles, count, sum) = match value {
-                    MetricValue::AggregatedSummary {
-                        quantiles,
-                        count,
-                        sum,
-                    } => (quantiles, count, sum),
-                    _ => unreachable!("metric value must be aggregated summary to be here"),
+                let MetricValue::AggregatedSummary {
+                    quantiles,
+                    count,
+                    sum,
+                } = value
+                else {
+                    unreachable!("metric value must be aggregated summary to be here");
                 };
 
                 // We generate one metric for the count, one metric for the sum, and one metric for each quantile. We
@@ -140,6 +141,8 @@ impl MetricSplit for AggregatedSummarySplitter {
 
                 let mut count_series = series.clone();
                 count_series.name_mut().name_mut().push_str("_count");
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(clippy::cast_precision_loss, reason = "Preserve f64 count rounding.")]
                 let count_data = MetricData::from_parts(
                     time,
                     kind,
@@ -197,6 +200,8 @@ mod tests {
     use super::{AggregatedSummarySplitter, MetricSplitter};
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep summary assertions together.")]
     fn test_agg_summary_split() {
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
 

@@ -336,7 +336,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
         let sink = BatchedHttpSink::new(
             sink,
             Buffer::new(batch.size, Compression::None),
-            request,
+            &request,
             batch.timeout,
             client,
         )
