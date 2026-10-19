@@ -10,6 +10,7 @@ use bollard::{
     query_parameters::{ListContainersOptionsBuilder, StopContainerOptionsBuilder},
 };
 use prost::Message;
+use serde::Serialize;
 use vector_lib::opentelemetry::proto::{
     collector::trace::v1::ExportTraceServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -144,7 +145,32 @@ fn service(rs: &ResourceSpans) -> &str {
         .unwrap_or("<missing>")
 }
 
-fn coverage(request: &ExportTraceServiceRequest) -> serde_json::Value {
+#[derive(Serialize)]
+struct Coverage<'a> {
+    services: BTreeMap<&'a str, usize>,
+    scopes: BTreeMap<&'a str, usize>,
+    spans: usize,
+    traces: usize,
+    multi_span_traces: usize,
+    root_spans: usize,
+    children_with_captured_parent: usize,
+    cross_service_parent_relationships: usize,
+    error_spans: usize,
+    events: usize,
+    links: usize,
+    scope_groups_with_multiple_trace_ids: usize,
+}
+
+fn span_count(request: &ExportTraceServiceRequest) -> usize {
+    request
+        .resource_spans
+        .iter()
+        .flat_map(|resource| &resource.scope_spans)
+        .map(|scope| scope.spans.len())
+        .sum()
+}
+
+fn coverage(request: &ExportTraceServiceRequest) -> Coverage<'_> {
     let mut services = BTreeMap::<&str, usize>::new();
     let mut scopes = BTreeMap::<&str, usize>::new();
     let mut traces = BTreeMap::<&[u8], usize>::new();
@@ -196,15 +222,20 @@ fn coverage(request: &ExportTraceServiceRequest) -> serde_json::Value {
             }
         }
     }
-    serde_json::json!({
-        "services": services, "scopes": scopes,
-        "spans": services.values().sum::<usize>(), "traces": traces.len(),
-        "multi_span_traces": traces.values().filter(|count| **count > 1).count(),
-        "root_spans": roots, "children_with_captured_parent": children,
-        "cross_service_parent_relationships": cross_service,
-        "error_spans": errors, "events": events, "links": links,
-        "scope_groups_with_multiple_trace_ids": mixed_scopes,
-    })
+    Coverage {
+        spans: services.values().sum(),
+        services,
+        scopes,
+        traces: traces.len(),
+        multi_span_traces: traces.values().filter(|count| **count > 1).count(),
+        root_spans: roots,
+        children_with_captured_parent: children,
+        cross_service_parent_relationships: cross_service,
+        error_spans: errors,
+        events,
+        links,
+        scope_groups_with_multiple_trace_ids: mixed_scopes,
+    }
 }
 
 async fn stop_containers(docker: &Docker, filter: &str) -> Result<(), String> {
@@ -274,7 +305,7 @@ async fn validate_multiservice_traces() -> Result<(), String> {
     let mut failures = Vec::new();
     loop {
         if let Ok(output) = read_capture(&directory, "output.jsonl")
-            && coverage(&output)["spans"].as_u64() >= input_coverage["spans"].as_u64()
+            && span_count(&output) >= input_coverage.spans
         {
             break;
         }
@@ -290,18 +321,24 @@ async fn validate_multiservice_traces() -> Result<(), String> {
     fs::write(directory.join("differences.txt"), differences.join("\n\n"))
         .map_err(|error| error.to_string())?;
     for name in REQUIRED_SERVICES {
-        if input_coverage["services"][*name].as_u64().unwrap_or(0) == 0 {
+        if input_coverage.services.get(*name).copied().unwrap_or(0) == 0 {
             failures.push(format!("Missing service: {name}"));
         }
     }
-    for field in [
-        "root_spans",
-        "multi_span_traces",
-        "children_with_captured_parent",
-        "cross_service_parent_relationships",
-        "error_spans",
+    for (field, count) in [
+        ("root_spans", input_coverage.root_spans),
+        ("multi_span_traces", input_coverage.multi_span_traces),
+        (
+            "children_with_captured_parent",
+            input_coverage.children_with_captured_parent,
+        ),
+        (
+            "cross_service_parent_relationships",
+            input_coverage.cross_service_parent_relationships,
+        ),
+        ("error_spans", input_coverage.error_spans),
     ] {
-        if input_coverage[field].as_u64().unwrap_or(0) == 0 {
+        if count == 0 {
             failures.push(format!("Missing trace shape: {field}"));
         }
     }
@@ -360,6 +397,35 @@ mod tests {
                 ..Default::default()
             }],
         }
+    }
+
+    #[test]
+    fn coverage_preserves_json_fields_and_counts() {
+        let mut input = request();
+        let spans = &mut input.resource_spans[0].scope_spans[0].spans;
+        spans.push(Span {
+            trace_id: vec![1; 16],
+            span_id: vec![3; 8],
+            ..Default::default()
+        });
+        spans.push(Span {
+            trace_id: vec![4; 16],
+            span_id: vec![5; 8],
+            ..Default::default()
+        });
+        assert_eq!(span_count(&input), 3);
+        assert_eq!(span_count(&ExportTraceServiceRequest::default()), 0);
+        assert_eq!(
+            serde_json::to_value(coverage(&input)).unwrap(),
+            serde_json::json!({
+                "services": {"<missing>": 3}, "scopes": {"<missing>": 3},
+                "spans": 3, "traces": 2, "multi_span_traces": 1,
+                "root_spans": 2, "children_with_captured_parent": 1,
+                "cross_service_parent_relationships": 0,
+                "error_spans": 0, "events": 0, "links": 0,
+                "scope_groups_with_multiple_trace_ids": 1,
+            })
+        );
     }
 
     #[test]
