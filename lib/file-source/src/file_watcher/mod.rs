@@ -145,6 +145,9 @@ pub struct FileWatcher {
     inode: u64,
     is_dead: bool,
     reached_eof: bool,
+    /// Set when the file was older than `ignore_older` and its existing content was
+    /// skipped. Cleared once a read returns data.
+    skipped_unread: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
     read_retry_delay: Duration,
@@ -261,6 +264,7 @@ impl FileWatcher {
             inode: ino,
             is_dead: false,
             reached_eof: false,
+            skipped_unread: too_old,
             last_read_attempt: ts,
             last_read_success: ts,
             read_retry_delay: EOF_READ_BACKOFF_MIN,
@@ -448,6 +452,7 @@ impl FileWatcher {
     #[inline]
     fn track_read_success(&mut self) {
         self.reached_eof = false;
+        self.skipped_unread = false;
         self.read_retry_delay = EOF_READ_BACKOFF_MIN;
         self.last_read_success = Instant::now();
     }
@@ -463,6 +468,14 @@ impl FileWatcher {
             EOF_READ_BACKOFF_MIN
         };
         self.reached_eof = true;
+    }
+
+    /// Whether the file was skipped by `ignore_older` and nothing has been read from it
+    /// since. Such a file has not really been read to EOF, so `remove_after` must not
+    /// delete it.
+    #[inline]
+    pub fn skipped_unread(&self) -> bool {
+        self.skipped_unread
     }
 
     #[inline]
