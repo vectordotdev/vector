@@ -59,6 +59,7 @@ use crate::{
     sources::aws_s3::AwsS3Config,
     tls::TlsConfig,
 };
+use vrl::value::Value;
 
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -158,7 +159,7 @@ pub(super) struct Config {
     /// Defaults to 10
     ///
     /// Should be set to a smaller value when the files are large to help prevent the ingestion of
-    /// one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+    /// one file from causing the other files to exceed the `visibility_timeout`. Valid values are 1 - 10
     // NOTE: We restrict this to u32 for safe conversion to i32 later.
     #[serde(default = "default_max_number_of_messages")]
     #[derivative(Default(value = "default_max_number_of_messages()"))]
@@ -301,6 +302,10 @@ pub(super) struct Ingestor {
 }
 
 impl Ingestor {
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub(super) fn new(
         region: Region,
         sqs_client: SqsClient,
@@ -329,8 +334,7 @@ impl Ingestor {
             max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
-                .map(|n| n.get())
-                .unwrap_or_else(crate::num_threads),
+                .map_or_else(crate::num_threads, NonZeroUsize::get),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
             delete_failed_message: config.delete_failed_message,
@@ -416,25 +420,26 @@ impl IngestorProcess {
             select! {
                 _ = &mut shutdown => break,
                 result = self.run_once() => {
-                    match result {
-                        Ok(()) => {
-                            // Reset backoff on successful receive
-                            self.backoff.reset();
-                        }
-                        Err(_) => {
-                            let delay = self.backoff.next().expect("backoff never ends");
-                            trace!(
-                                delay_ms = delay.as_millis(),
-                                "`run_once` failed, will retry after delay.",
-                            );
-                            tokio::time::sleep(delay).await;
-                        }
+                    if let Ok(()) = result {
+                        // Reset backoff on successful receive
+                        self.backoff.reset();
+                    } else {
+                        let delay = self.backoff.next().expect("backoff never ends");
+                        trace!(
+                            delay_ms = delay.as_millis(),
+                            "`run_once` failed, will retry after delay.",
+                        );
+                        tokio::time::sleep(delay).await;
                     }
                 },
             }
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn run_once(&mut self) -> Result<(), ()> {
         let messages = match self.receive_messages().await {
             Ok(messages) => {
@@ -551,13 +556,13 @@ impl IngestorProcess {
                     if !result.successful.is_empty() {
                         emit!(SqsMessageSentSucceeded {
                             message_ids: result.successful,
-                        })
+                        });
                     }
 
                     if !result.failed.is_empty() {
                         emit!(SqsMessageSentPartialError {
                             entries: result.failed
-                        })
+                        });
                     }
                 }
                 Err(err) => {
@@ -623,11 +628,19 @@ impl IngestorProcess {
     async fn handle_s3_event(&mut self, s3_event: S3Event) -> Result<(), ProcessingError> {
         for record in s3_event.records {
             self.handle_s3_event_record(record, self.log_namespace)
-                .await?
+                .await?;
         }
         Ok(())
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn handle_s3_event_record(
         &mut self,
         s3_event: S3EventRecord,
@@ -773,7 +786,7 @@ impl IngestorProcess {
                             log_event,
                             log_namespace,
                             &s3_event,
-                            &metadata,
+                            metadata.as_ref(),
                             timestamp,
                         );
                     }
@@ -785,7 +798,7 @@ impl IngestorProcess {
         });
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
-            Ok(_) => None,
+            Ok(()) => None,
             Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
@@ -912,7 +925,7 @@ fn handle_single_log(
     log: &mut LogEvent,
     log_namespace: LogNamespace,
     s3_event: &S3EventRecord,
-    metadata: &Option<HashMap<String, String>>,
+    metadata: Option<&HashMap<String, String>>,
     timestamp: Option<DateTime<Utc>>,
 ) {
     log_namespace.insert_source_metadata(
@@ -920,7 +933,7 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!("bucket"))),
         path!("bucket"),
-        Bytes::from(s3_event.s3.bucket.name.as_bytes().to_vec()),
+        Value::from(s3_event.s3.bucket.name.clone()),
     );
 
     log_namespace.insert_source_metadata(
@@ -928,14 +941,14 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!("object"))),
         path!("object"),
-        Bytes::from(s3_event.s3.object.key.as_bytes().to_vec()),
+        Value::from(s3_event.s3.object.key.clone()),
     );
     log_namespace.insert_source_metadata(
         AwsS3Config::NAME,
         log,
         Some(LegacyKey::Overwrite(path!("region"))),
         path!("region"),
-        Bytes::from(s3_event.aws_region.as_bytes().to_vec()),
+        Value::from(s3_event.aws_region.clone()),
     );
 
     if let Some(metadata) = metadata {
@@ -954,7 +967,7 @@ fn handle_single_log(
         log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(AwsS3Config::NAME.as_bytes()),
+        Value::from_static_str(AwsS3Config::NAME),
     );
 
     // This handles the transition from the original timestamp logic. Originally the
@@ -976,7 +989,7 @@ fn handle_single_log(
                 );
             }
         }
-    };
+    }
 }
 
 // https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html

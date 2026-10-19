@@ -353,6 +353,14 @@ where
     }
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the listener cannot be bound or the gRPC server fails.
+///
+/// # Panics
+///
+/// Panics if the shutdown token receiver is dropped before shutdown.
 pub async fn run_grpc_server<S>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -403,6 +411,14 @@ where
 
 // This is a bit of a ugly hack to allow us to run two services on the same port.
 // I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
+///
+/// # Errors
+///
+/// Returns an error if the listener cannot be bound or the gRPC server fails.
+///
+/// # Panics
+///
+/// Panics if the shutdown token receiver is dropped before shutdown.
 pub async fn run_grpc_server_with_routes<L>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -443,9 +459,10 @@ where
     Ok(())
 }
 
-/// Builds a [TraceLayer] configured for a gRPC server.
+/// Builds a [`TraceLayer`] configured for a gRPC server.
 ///
 /// This layer emits gPRC specific telemetry for messages received/sent and handler duration.
+#[must_use]
 pub fn build_grpc_trace_layer(
     span: Span,
 ) -> TraceLayer<

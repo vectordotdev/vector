@@ -18,7 +18,7 @@ pub struct Opts {
     #[arg(default_value = "1000", short = 'i', long, value_parser = clap::value_parser!(u32).range(100..))]
     interval: u32,
 
-    /// gRPC API server endpoint (e.g. http://localhost:8686)
+    /// gRPC API server endpoint (e.g. <http://localhost:8686>)
     #[arg(short, long)]
     url: Option<Url>,
 

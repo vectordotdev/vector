@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use snafu::Snafu;
 use vector_lib::{
     config::LegacyKey,
@@ -136,9 +138,24 @@ pub struct SampleConfig {
     /// independently per rendered group value.
     #[configurable(metadata(
         docs::examples = "{{ service }}",
-        docs::examples = "{{ hostname }}-{{ service }}"
+        docs::examples = "{{ hostname }}-{{ service }}",
+        docs::warnings = "Prefer grouping by fields with a small, stable set of values, such as \
+        `service` or `host`. When the template interpolates event content (for example \
+        `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new \
+        group: exceeding `max_state_bytes` then evicts the least recently used groups' sampling \
+        state."
     ))]
     pub group_by: Option<UnconfinedTemplate>,
+
+    /// The maximum number of bytes of per-group sampling state that is retained.
+    ///
+    /// Each group is counted by the size of its rendered `group_by` value plus a fixed per-group
+    /// overhead for its sampling state and cache bookkeeping. When this limit is reached, the least
+    /// recently used groups' state is evicted. A group whose state alone exceeds this limit is
+    /// sampled but not retained.
+    #[serde(default = "default_max_state_bytes")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_state_bytes: NonZeroUsize,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
@@ -146,6 +163,14 @@ pub struct SampleConfig {
     /// Configuration of internal metrics for the Sample transform.
     #[serde(default)]
     pub internal_metrics: SampleInternalMetricsConfig,
+}
+
+#[must_use]
+/// # Panics
+///
+/// Panics if the fixed non-zero default is changed to zero.
+pub const fn default_max_state_bytes() -> NonZeroUsize {
+    NonZeroUsize::new(128 * 1024 * 1024).expect("static non-zero number")
 }
 
 impl SampleConfig {
@@ -192,9 +217,10 @@ impl GenerateConfig for SampleConfig {
             rate_field: None,
             key_field: None,
             group_by: None,
+            max_state_bytes: default_max_state_bytes(),
             exclude: None::<AnyCondition>,
             sample_rate_key: default_sample_rate_key(),
-            internal_metrics: Default::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         })
         .unwrap()
     }
@@ -220,6 +246,7 @@ impl TransformConfig for SampleConfig {
                     rate_field: self.rate_field.clone(),
                 },
                 self.group_by.clone(),
+                self.max_state_bytes.get(),
                 exclude,
                 self.sample_rate_key.clone(),
                 self.internal_metrics.include_group_tag,
@@ -230,6 +257,7 @@ impl TransformConfig for SampleConfig {
                 sample_mode,
                 self.key_field.clone(),
                 self.group_by.clone(),
+                self.max_state_bytes.get(),
                 exclude,
                 self.sample_rate_key.clone(),
                 self.internal_metrics.include_group_tag,
@@ -287,12 +315,14 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+#[must_use]
 pub fn default_sample_rate_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("sample_rate"))
 }
 
 #[cfg(test)]
 mod tests {
+    use super::SampleInternalMetricsConfig;
     use crate::{
         config::TransformConfig,
         transforms::sample::config::{SampleConfig, SampleError},
@@ -327,10 +357,11 @@ mod tests {
             ratio_field: Some("sample_rate".to_string()),
             rate_field: None,
             key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -345,10 +376,11 @@ mod tests {
             ratio_field: None,
             rate_field: Some("sample_rate_n".to_string()),
             key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -363,10 +395,11 @@ mod tests {
             ratio_field: None,
             rate_field: Some("sample_rate_n".to_string()),
             key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         assert!(config.validate_structure().is_ok());
@@ -380,10 +413,11 @@ mod tests {
             ratio_field: Some("sample_rate".to_string()),
             rate_field: Some("sample_rate_n".to_string()),
             key_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();
@@ -397,11 +431,12 @@ mod tests {
             ratio: None,
             ratio_field: Some("sample_ratio".to_string()),
             rate_field: None,
+            max_state_bytes: super::default_max_state_bytes(),
             key_field: Some("trace_id".to_string()),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
-            internal_metrics: Default::default(),
+            internal_metrics: SampleInternalMetricsConfig::default(),
         };
 
         let err = config.sample_rate().unwrap_err();

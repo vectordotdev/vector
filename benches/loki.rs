@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::convert::TryFrom;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};

@@ -20,7 +20,7 @@ use vector_common::{Error, Result, internal_event::emit};
 use vector_core::event::{LogEvent, Value};
 use vrl::{owned_value_path, path};
 
-#[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
+#[allow(warnings, clippy::all, clippy::nursery)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }

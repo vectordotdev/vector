@@ -12,6 +12,28 @@ use crate::{
     test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
 };
 
+#[derive(Serialize)]
+struct QueryRequest {
+    apl: String,
+    #[serde(rename = "endTime")]
+    end_time: DateTime<Utc>,
+    #[serde(rename = "startTime")]
+    start_time: DateTime<Utc>,
+    // ...
+}
+
+#[derive(Deserialize, Debug)]
+struct QueryResponseMatch {
+    data: serde_json::Value,
+    // ...
+}
+
+#[derive(Deserialize, Debug)]
+struct QueryResponse {
+    matches: Vec<QueryResponseMatch>,
+    // ...
+}
+
 #[tokio::test]
 async fn axiom_logs_put_data() {
     let client = reqwest::Client::new();
@@ -41,58 +63,36 @@ async fn axiom_logs_put_data() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
-    let mut event1 = LogEvent::from("message_1").with_batch_notifier(&batch);
-    event1.insert(vrl::event_path!("host"), "aws.cloud.eur");
-    event1.insert(vrl::event_path!("source_type"), "file");
-    event1.insert(vrl::event_path!("test_id"), test_id.clone());
+    let mut first_log = LogEvent::from("message_1").with_batch_notifier(&batch);
+    first_log.insert(vrl::event_path!("host"), "aws.cloud.eur");
+    first_log.insert(vrl::event_path!("source_type"), "file");
+    first_log.insert(vrl::event_path!("test_id"), test_id.clone());
 
-    let mut event2 = LogEvent::from("message_2").with_batch_notifier(&batch);
-    event2.insert(vrl::event_path!("host"), "aws.cloud.eur");
-    event2.insert(vrl::event_path!("source_type"), "file");
-    event2.insert(vrl::event_path!("test_id"), test_id.clone());
+    let mut second_log = LogEvent::from("message_2").with_batch_notifier(&batch);
+    second_log.insert(vrl::event_path!("host"), "aws.cloud.eur");
+    second_log.insert(vrl::event_path!("source_type"), "file");
+    second_log.insert(vrl::event_path!("test_id"), test_id.clone());
 
     drop(batch);
 
-    let events = vec![Event::Log(event1), Event::Log(event2)];
+    let events = vec![Event::Log(first_log), Event::Log(second_log)];
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-    #[derive(Serialize)]
-    struct QueryRequest {
-        apl: String,
-        #[serde(rename = "endTime")]
-        end_time: DateTime<Utc>,
-        #[serde(rename = "startTime")]
-        start_time: DateTime<Utc>,
-        // ...
-    }
-
-    #[derive(Deserialize, Debug)]
-    struct QueryResponseMatch {
-        data: serde_json::Value,
-        // ...
-    }
-
-    #[derive(Deserialize, Debug)]
-    struct QueryResponse {
-        matches: Vec<QueryResponseMatch>,
-        // ...
-    }
-
-    let query_req = QueryRequest {
+    let query = QueryRequest {
         apl: format!(
             "['{dataset}'] | where test_id == '{test_id}' | order by _time desc | limit 2"
         ),
         start_time: Utc::now() - Duration::minutes(10),
         end_time: Utc::now() + Duration::minutes(10),
     };
-    let query_res: QueryResponse = client
+    let response: QueryResponse = client
         .post(format!("{url}/v1/datasets/_apl?format=legacy"))
         .header("X-Axiom-Org-Id", org_id)
         .header("Authorization", format!("Bearer {token}"))
-        .json(&query_req)
+        .json(&query)
         .send()
         .await
         .unwrap()
@@ -102,18 +102,19 @@ async fn axiom_logs_put_data() {
         .await
         .unwrap();
 
-    assert_eq!(2, query_res.matches.len());
+    assert_eq!(2, response.matches.len());
 
-    let fst = match query_res.matches[0].data {
-        serde_json::Value::Object(ref obj) => obj,
-        _ => panic!("Unexpected value, expected object"),
+    let serde_json::Value::Object(ref first) = response.matches[0].data else {
+        panic!("Unexpected value, expected object");
     };
     // Note that we order descending, so message_2 comes first
-    assert_eq!("message_2", fst.get("message").unwrap().as_str().unwrap());
+    assert_eq!("message_2", first.get("message").unwrap().as_str().unwrap());
 
-    let snd = match query_res.matches[1].data {
-        serde_json::Value::Object(ref obj) => obj,
-        _ => panic!("Unexpected value, expected object"),
+    let serde_json::Value::Object(ref second) = response.matches[1].data else {
+        panic!("Unexpected value, expected object");
     };
-    assert_eq!("message_1", snd.get("message").unwrap().as_str().unwrap());
+    assert_eq!(
+        "message_1",
+        second.get("message").unwrap().as_str().unwrap()
+    );
 }

@@ -21,6 +21,12 @@ pub struct DistributionStatistic {
 }
 
 impl DistributionStatistic {
+    /// Computes distribution statistics from weighted samples.
+    ///
+    /// # Panics
+    ///
+    /// Panics if cumulative sample rates overflow or a quantile selects beyond the histogram.
+    #[must_use]
     pub fn from_samples(source: &[Sample], quantiles: &[f64]) -> Option<Self> {
         let mut bins = source
             .iter()
@@ -38,8 +44,8 @@ impl DistributionStatistic {
                     max: val,
                     median: val,
                     avg: val,
-                    sum: val * count as f64,
-                    count: count as u64,
+                    sum: val * f64::from(count),
+                    count: u64::from(count),
                     quantiles: quantiles.iter().map(|&p| (p, val)).collect(),
                 }
             }),
@@ -50,7 +56,7 @@ impl DistributionStatistic {
                 let max = bins.last().unwrap().value;
                 let sum = bins
                     .iter()
-                    .map(|sample| sample.value * sample.rate as f64)
+                    .map(|sample| sample.value * f64::from(sample.rate))
                     .sum::<f64>();
 
                 for i in 1..bins.len() {
@@ -58,7 +64,7 @@ impl DistributionStatistic {
                 }
 
                 let count = bins.last().unwrap().rate;
-                let avg = sum / count as f64;
+                let avg = sum / f64::from(count);
 
                 let median = find_quantile(&bins, 0.5);
                 let quantiles = quantiles
@@ -72,7 +78,7 @@ impl DistributionStatistic {
                     median,
                     avg,
                     sum,
-                    count: count as u64,
+                    count: u64::from(count),
                     quantiles,
                 }
             }),
@@ -88,7 +94,14 @@ impl DistributionStatistic {
 /// <https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample>
 fn find_quantile(bins: &[Sample], p: f64) -> f64 {
     let count = bins.last().expect("bins is empty").rate;
-    find_sample(bins, (p * count as f64).round() as u32)
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Preserve rounded index conversion."
+    )]
+    let index = (p * f64::from(count)).round() as u32;
+    find_sample(bins, index)
 }
 
 /// `bins` is a cumulative histogram
@@ -97,12 +110,16 @@ fn find_quantile(bins: &[Sample], p: f64) -> f64 {
 /// i == 0 is equivalent to i == 1.
 fn find_sample(bins: &[Sample], i: u32) -> f64 {
     let index = match bins.binary_search_by_key(&i, |sample| sample.rate) {
-        Ok(index) => index,
-        Err(index) => index,
+        Ok(index) | Err(index) => index,
     };
     bins[index].value
 }
 
+/// Validates that quantiles lie within the unit interval.
+///
+/// # Errors
+///
+/// Returns an error for quantiles outside `[0, 1]`, including NaN.
 pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {
     if quantiles
         .iter()
@@ -225,7 +242,7 @@ mod test {
 
     #[test]
     fn sort_unstable_doesnt_panic() {
-        let to_float = |v: i32| -> f64 { v as f64 };
+        let to_float = f64::from;
 
         let v: Vec<f64> = (0..=15)
             .map(to_float)
@@ -239,6 +256,9 @@ mod test {
 
         let rates: Vec<u32> = std::iter::repeat([1]).flatten().take(v.len()).collect();
         let s: Vec<(f64, u32)> = v.into_iter().zip(rates).collect();
-        DistributionStatistic::from_samples(&samples(&s), &[0.0, 1.0]);
+        drop(DistributionStatistic::from_samples(
+            &samples(&s),
+            &[0.0, 1.0],
+        ));
     }
 }

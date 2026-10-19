@@ -35,6 +35,7 @@ impl ComponentHint {
 
     /// Joins a component sub-folder to a provided path, for traversal. Since `Self` is a
     /// `Copy`, this is more efficient to pass by value than ref.
+    #[must_use]
     pub fn join_path(self, path: &Path) -> PathBuf {
         path.join(self.as_component_field())
     }
@@ -49,7 +50,10 @@ impl ComponentHint {
 pub(super) mod process {
     use std::io::Read;
 
-    use super::*;
+    use super::{
+        ComponentHint, ConfigMap, Format, Path, Value, component_name, deserialize_config,
+        merge_with_value, open_file, read_dir,
+    };
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why
@@ -71,6 +75,12 @@ pub(super) mod process {
 
         /// Helper method used by other methods to recursively handle file/dir loading, merging
         /// values against a provided configuration map.
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(clippy::manual_let_else, reason = "Preserve existing control flow")]
+        #[allow(
+            clippy::unnecessary_debug_formatting,
+            reason = "Preserve diagnostic text and escaping"
+        )]
         fn load_dir_into(
             &mut self,
             path: &Path,
@@ -94,8 +104,7 @@ pub(super) mod process {
                             if !entry
                                 .file_name()
                                 .and_then(|name| name.to_str())
-                                .map(|name| name.starts_with('.'))
-                                .unwrap_or(false)
+                                .is_some_and(|name| name.starts_with('.'))
                             {
                                 folders.push(entry);
                             }
@@ -106,7 +115,7 @@ pub(super) mod process {
                             "Could not read entry in config dir: {path:?}, {err}."
                         ));
                     }
-                };
+                }
             }
 
             for entry in files {
@@ -217,6 +226,8 @@ where
     /// Consumes Self, and returns the final, deserialized `T`.
     fn take(self) -> T;
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn load_from_str<R: std::io::Read>(
         &mut self,
         input: R,
@@ -230,6 +241,8 @@ where
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<(), Vec<String>> {
         if let Some((_, map)) = self.load_file(path, format)? {
             self.merge(map, None)?;
@@ -241,6 +254,8 @@ where
 
     /// Deserializes a dir with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn load_from_dir(&mut self, path: &Path) -> Result<(), Vec<String>> {
         // Iterator containing component-specific sub-folders to attempt traversing into.
         let hints = [

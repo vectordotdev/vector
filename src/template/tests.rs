@@ -116,7 +116,7 @@ fn render_log_static() {
     let event = Event::Log(LogEvent::from("hello world"));
     let template = UnconfinedTemplate::try_from("foo").unwrap();
 
-    assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("foo")), template.render(&event));
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn render_log_unsigned_number() {
     let event = Event::Log(LogEvent::from("hello world"));
     let template = UnsignedIntTemplate::from(123);
 
-    assert_eq!(Ok(123), template.render(&event))
+    assert_eq!(Ok(123), template.render(&event));
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn render_log_unsigned_number_dynamic() {
     event.as_mut_log().insert(event_path!("foo"), 123);
 
     let template = UnsignedIntTemplate::try_from("{{ foo }}").unwrap();
-    assert_eq!(Ok(123), template.render(&event))
+    assert_eq!(Ok(123), template.render(&event));
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn render_log_dynamic() {
         .insert(event_path!("log_stream"), "stream");
     let template = UnconfinedTemplate::try_from("{{log_stream}}").unwrap();
 
-    assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("stream")), template.render(&event));
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn render_log_metadata() {
         .insert(metadata_path!("metadata_key"), "metadata_value");
     let template = UnconfinedTemplate::try_from("{{%metadata_key}}").unwrap();
 
-    assert_eq!(Ok(Bytes::from("metadata_value")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("metadata_value")), template.render(&event));
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn render_log_dynamic_with_prefix() {
         .insert(event_path!("log_stream"), "stream");
     let template = UnconfinedTemplate::try_from("abcd-{{log_stream}}").unwrap();
 
-    assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event));
 }
 
 #[test]
@@ -177,7 +177,7 @@ fn render_log_dynamic_with_postfix() {
         .insert(event_path!("log_stream"), "stream");
     let template = UnconfinedTemplate::try_from("{{log_stream}}-abcd").unwrap();
 
-    assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event));
 }
 
 #[test]
@@ -203,7 +203,7 @@ fn render_log_dynamic_multiple_keys() {
     assert_eq!(
         Ok(Bytes::from("stream-bar-quux.log")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -216,7 +216,7 @@ fn render_log_dynamic_weird_junk() {
     assert_eq!(
         Ok(Bytes::from(r"{stream}{\{{}}}-bar-quux.log")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -233,7 +233,7 @@ fn render_log_timestamp_strftime_style() {
 
     let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
 
-    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event));
 }
 
 #[test]
@@ -266,7 +266,7 @@ fn render_log_timestamp_strftime_style_namespace() {
 
     let template = UnconfinedTemplate::try_from("abcd-%F").unwrap();
 
-    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
+    assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event));
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn render_log_timestamp_multiple_strftime_style() {
     assert_eq!(
         Ok(Bytes::from("abcd-2001-02-03_04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -308,7 +308,7 @@ fn render_log_dynamic_with_strftime() {
     assert_eq!(
         Ok(Bytes::from("butts-2001-02-03_04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -330,7 +330,7 @@ fn render_log_dynamic_with_nested_strftime() {
     assert_eq!(
         Ok(Bytes::from("nested %F 04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -354,7 +354,7 @@ fn render_log_dynamic_with_reverse_nested_strftime() {
     assert_eq!(
         Ok(Bytes::from("nested foo 04:05:06")),
         template.render(&event)
-    )
+    );
 }
 
 #[test]
@@ -446,7 +446,7 @@ fn render_log_unsigned_int_with_timezone() {
     let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
 
     assert_eq!(
-        Ok(2001020312),
+        Ok(2_001_020_312),
         template.with_tz_offset(offset).render(&event)
     );
 }

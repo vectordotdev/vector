@@ -543,10 +543,6 @@ generate-example-configs: generate-component-docs ## Generate committed componen
 .PHONY: generate-docs
 generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs generate-example-configs
 
-.PHONY: signoff
-signoff: ## Signsoff all previous commits since branch creation
-	scripts/signoff.sh
-
 .PHONY: version
 version: ## Get the current Vector version
 	@$(VDEV) version

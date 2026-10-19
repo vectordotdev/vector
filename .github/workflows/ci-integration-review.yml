@@ -188,7 +188,7 @@ jobs:
 
   e2e-tests:
     # The dedicated command also starts with the ordinary opentelemetry-traces command.
-    if: ${{ !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice') }}
+    if: github.repository == 'vectordotdev/vector' && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
     needs:
       - prep-pr
       - build-test-runner
@@ -255,7 +255,7 @@ jobs:
 
   otel-traces-multiservice:
     name: Multiservice OpenTelemetry trace validation
-    if: startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    if: github.repository == 'vectordotdev/vector' && startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
     needs:
       - prep-pr
       - build-test-runner
