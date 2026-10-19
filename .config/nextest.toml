@@ -24,5 +24,6 @@ store-failure-output = true
 [[profile.default.overrides]]
 filter = 'test(opentelemetry::multiservice_traces::trace_round_trip)'
 # This test stops its producers and collectors, so a retry needs a fresh Compose run.
+# CLI retries override this setting. Run vdev with --retries 0 (its default is 2).
 retries = 0
 slow-timeout = { period = "30s", terminate-after = 10 }

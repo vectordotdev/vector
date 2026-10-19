@@ -694,7 +694,6 @@ services:
       - LOCUST_HEADLESS=true
       - LOCUST_HOST=http://frontend:8080
       - LOCUST_HTTP_USER_WEIGHT=9
-      - LOCUST_USERS=5
       - LOCUST_WEB_HOST=0.0.0.0
       - LOCUST_WEB_PORT=8089
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -791,6 +790,8 @@ services:
         condition: service_healthy
     volumes:
       - "../data/vector.yaml:/etc/vector/vector.yaml:ro"
+  # This completion dependency makes `compose up --detach` wait for the workload
+  # before the Rust tests start, then checks that the completion marker exists.
   demo-ready:
     image: alpine:3.20
     command:

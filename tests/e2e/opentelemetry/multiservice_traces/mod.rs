@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     path::Path,
-    thread,
     time::{Duration, Instant},
 };
 
@@ -260,7 +259,7 @@ async fn validate_multiservice_traces() -> Result<(), String> {
     }
     let docker = Docker::connect_with_socket_defaults().map_err(|error| error.to_string())?;
     // Give asynchronous Kafka consumers time to process the final checkout.
-    thread::sleep(Duration::from_secs(5));
+    tokio::time::sleep(Duration::from_secs(5)).await;
     stop_containers(&docker, "vector.otel-traces-multiservice.producer=true").await?;
     stop_containers(&docker, "com.docker.compose.service=otel-collector").await?;
     let input = read_capture(&directory, "input.jsonl")?;
@@ -271,7 +270,7 @@ async fn validate_multiservice_traces() -> Result<(), String> {
     )
     .map_err(|error| error.to_string())?;
 
-    let deadline = Instant::now() + Duration::from_secs(120);
+    let deadline = Instant::now() + Duration::from_mins(2);
     let mut failures = Vec::new();
     loop {
         if let Ok(output) = read_capture(&directory, "output.jsonl")
@@ -283,7 +282,7 @@ async fn validate_multiservice_traces() -> Result<(), String> {
             failures.push("Timed out draining Vector; inspect input.jsonl and output.jsonl".into());
             break;
         }
-        thread::sleep(Duration::from_millis(500));
+        tokio::time::sleep(Duration::from_millis(500)).await;
     }
     stop_containers(&docker, "com.docker.compose.service=otel-collector-sink").await?;
     let output = read_capture(&directory, "output.jsonl")?;
@@ -339,7 +338,11 @@ async fn trace_round_trip() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
+    use vector_lib::opentelemetry::proto::{
+        common::v1::InstrumentationScope,
+        resource::v1::Resource,
+        trace::v1::{ResourceSpans, ScopeSpans, Span},
+    };
 
     fn request() -> ExportTraceServiceRequest {
         ExportTraceServiceRequest {
@@ -379,8 +382,8 @@ mod tests {
             match field {
                 "parent" => rs.scope_spans[0].spans[0].parent_span_id = vec![4; 8],
                 "span" => rs.scope_spans[0].spans[0].name = "changed".into(),
-                "resource" => rs.resource = Some(Default::default()),
-                "scope" => rs.scope_spans[0].scope = Some(Default::default()),
+                "resource" => rs.resource = Some(Resource::default()),
+                "scope" => rs.scope_spans[0].scope = Some(InstrumentationScope::default()),
                 "schema" => rs.schema_url = "changed".into(),
                 _ => unreachable!(),
             }

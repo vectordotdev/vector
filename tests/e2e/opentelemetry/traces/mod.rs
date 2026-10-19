@@ -1,4 +1,6 @@
-use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
+use vector_lib::opentelemetry::proto::{
+    collector::trace::v1::ExportTraceServiceRequest, common::v1::any_value::Value as AnyValueEnum,
+};
 
 use crate::opentelemetry::{
     assert_service_name_with, parse_export_traces_request, read_file_helper,
@@ -275,4 +277,26 @@ fn vector_component_received_events_total_counts_individual_spans() {
     use crate::opentelemetry::assert_component_received_events_total;
 
     assert_component_received_events_total("traces", FORWARDED_SPAN_COUNT);
+}
+
+#[test]
+fn collector_trace_parser_rejects_unknown_fields() {
+    let capture = r#"{"resourceSpans":[{"resource":{"entityRefs":[]},"scopeSpans":[]}]}"#;
+    assert!(
+        parse_export_traces_request(capture)
+            .unwrap_err()
+            .contains("entityRefs")
+    );
+}
+
+#[test]
+fn collector_trace_parser_decodes_byte_attributes() {
+    let capture = r#"{"resourceSpans":[{"scopeSpans":[{"spans":[{"attributes":[{"key":"payload","value":{"bytesValue":"AAEC/w=="}}]}]}]}]}"#;
+    let request = parse_export_traces_request(capture).unwrap();
+    assert_eq!(
+        request.resource_spans[0].scope_spans[0].spans[0].attributes[0].value,
+        Some(vector_lib::opentelemetry::proto::common::v1::AnyValue {
+            value: Some(AnyValueEnum::BytesValue(vec![0, 1, 2, 255]))
+        })
+    );
 }

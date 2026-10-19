@@ -187,9 +187,7 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
     );
 }
 
-pub(super) fn parse_export_traces_request(
-    content: &str,
-) -> Result<ExportTraceServiceRequest, String> {
+fn parse_export_traces_request(content: &str) -> Result<ExportTraceServiceRequest, String> {
     // The file may contain multiple lines, each with a JSON object containing an array of resourceSpans
     let mut merged_request = ExportTraceServiceRequest {
         resource_spans: Vec::new(),
@@ -225,7 +223,7 @@ fn parse_collector_trace_line(line: &str) -> Result<ExportTraceServiceRequest, S
         .get_message_by_name(TRACES_REQUEST_MESSAGE_TYPE)
         .ok_or("Trace request descriptor missing")?;
     reject_unknown_fields(&value, &descriptor)?;
-    decode_collector_ids(&mut value)?;
+    decode_collector_bytes(&mut value)?;
     parse_value_to_export_type_request(TRACES_REQUEST_MESSAGE_TYPE, value)
 }
 
@@ -257,52 +255,32 @@ fn reject_unknown_fields(value: &VrlValue, descriptor: &MessageDescriptor) -> Re
     Ok(())
 }
 
-fn decode_collector_ids(value: &mut VrlValue) -> Result<(), String> {
+fn decode_collector_bytes(value: &mut VrlValue) -> Result<(), String> {
     match value {
         VrlValue::Object(fields) => {
             for (name, value) in fields {
-                if name.as_str() == "bytesValue" {
-                    let encoded = value
-                        .as_bytes()
-                        .ok_or("bytesValue should be a base64 string")?;
-                    *value = VrlValue::Bytes(
-                        BASE64_STANDARD
-                            .decode(encoded)
-                            .map_err(|error| format!("Failed to decode bytesValue: {error}"))?
-                            .into(),
-                    );
-                    continue;
-                }
-                let valid_hex_lengths: &[usize] = match name.as_str() {
-                    "traceId" => &[32],
-                    "spanId" => &[16],
-                    "parentSpanId" => &[0, 16],
-                    _ => {
-                        decode_collector_ids(value)?;
-                        continue;
+                match name.as_str() {
+                    "bytesValue" => {
+                        let encoded = value
+                            .as_bytes()
+                            .ok_or("bytesValue should be a base64 string")?;
+                        *value = VrlValue::Bytes(
+                            BASE64_STANDARD
+                                .decode(encoded)
+                                .map_err(|error| format!("Failed to decode bytesValue: {error}"))?
+                                .into(),
+                        );
                     }
-                };
-
-                let encoded = value
-                    .as_bytes()
-                    .ok_or_else(|| format!("{name} should be a hexadecimal string"))?;
-                if !valid_hex_lengths.contains(&encoded.len()) {
-                    return Err(format!(
-                        "{name} has invalid hexadecimal length {}",
-                        encoded.len()
-                    ));
+                    "traceId" => decode_collector_hex(value, name, &[32])?,
+                    "spanId" => decode_collector_hex(value, name, &[16])?,
+                    "parentSpanId" => decode_collector_hex(value, name, &[0, 16])?,
+                    _ => decode_collector_bytes(value)?,
                 }
-
-                *value = VrlValue::Bytes(
-                    hex::decode(encoded.as_ref())
-                        .map_err(|e| format!("Failed to decode {name}: {e}"))?
-                        .into(),
-                );
             }
         }
         VrlValue::Array(values) => {
             for value in values {
-                decode_collector_ids(value)?;
+                decode_collector_bytes(value)?;
             }
         }
         _ => {}
@@ -311,24 +289,25 @@ fn decode_collector_ids(value: &mut VrlValue) -> Result<(), String> {
     Ok(())
 }
 
-#[test]
-fn collector_trace_parser_rejects_unknown_fields() {
-    let capture = r#"{"resourceSpans":[{"resource":{"entityRefs":[]},"scopeSpans":[]}]}"#;
-    assert!(
-        parse_export_traces_request(capture)
-            .unwrap_err()
-            .contains("entityRefs")
-    );
-}
+fn decode_collector_hex(
+    value: &mut VrlValue,
+    name: &str,
+    valid_hex_lengths: &[usize],
+) -> Result<(), String> {
+    let encoded = value
+        .as_bytes()
+        .ok_or_else(|| format!("{name} should be a hexadecimal string"))?;
+    if !valid_hex_lengths.contains(&encoded.len()) {
+        return Err(format!(
+            "{name} has invalid hexadecimal length {}",
+            encoded.len()
+        ));
+    }
 
-#[test]
-fn collector_trace_parser_decodes_byte_attributes() {
-    let capture = r#"{"resourceSpans":[{"scopeSpans":[{"spans":[{"attributes":[{"key":"payload","value":{"bytesValue":"AAEC/w=="}}]}]}]}]}"#;
-    let request = parse_export_traces_request(capture).unwrap();
-    assert_eq!(
-        request.resource_spans[0].scope_spans[0].spans[0].attributes[0].value,
-        Some(vector_lib::opentelemetry::proto::common::v1::AnyValue {
-            value: Some(AnyValueEnum::BytesValue(vec![0, 1, 2, 255]))
-        })
+    *value = VrlValue::Bytes(
+        hex::decode(encoded.as_ref())
+            .map_err(|e| format!("Failed to decode {name}: {e}"))?
+            .into(),
     );
+    Ok(())
 }
