@@ -107,6 +107,37 @@ pub struct BigqueryResponse {
     request_uncompressed_size: usize,
 }
 
+impl BigqueryResponse {
+    /// Short description of why BigQuery didn't accept the rows, for logging.
+    fn error_summary(&self) -> String {
+        if !self.body.row_errors.is_empty() {
+            let shown: Vec<String> = self
+                .body
+                .row_errors
+                .iter()
+                .take(5)
+                .map(|error| format!("row {}: {}", error.index, error.message))
+                .collect();
+            return format!(
+                "{} row error(s): {}",
+                self.body.row_errors.len(),
+                shown.join("; ")
+            );
+        }
+        match &self.body.response {
+            Some(proto::append_rows_response::Response::Error(status)) => {
+                match super::proto::google::rpc::Code::try_from(status.code) {
+                    Ok(code) => format!("{}: {}", code.as_str_name(), status.message),
+                    Err(_) => format!("code {}: {}", status.code, status.message),
+                }
+            }
+            Some(proto::append_rows_response::Response::AppendResult(_)) | None => {
+                "no error details in response".to_owned()
+            }
+        }
+    }
+}
+
 impl DriverResponse for BigqueryResponse {
     fn event_status(&self) -> EventStatus {
         if !self.body.row_errors.is_empty() {
@@ -195,6 +226,7 @@ impl RetryLogic for BigqueryRetryLogic {
                 true
             }
             // Allow transient gRPC status codes to be retried.
+            // Internal is documented as a retriable server-side error in `AppendRowsResponse`.
             // Unauthenticated is included because a bearer token may expire between the token
             // refresher updating it and the request being sent; a retry will pick up the new token.
             BigqueryServiceError::Request { status } => matches!(
@@ -202,6 +234,7 @@ impl RetryLogic for BigqueryRetryLogic {
                 tonic::Code::Unavailable
                     | tonic::Code::ResourceExhausted
                     | tonic::Code::DeadlineExceeded
+                    | tonic::Code::Internal
                     | tonic::Code::Unauthenticated
             ),
         }
@@ -215,12 +248,20 @@ impl RetryLogic for BigqueryRetryLogic {
             EventStatus::Delivered | EventStatus::Recorded | EventStatus::Dropped => {
                 RetryAction::Successful
             }
-            EventStatus::Errored => {
-                RetryAction::Retry("transient error in BigQuery response".into())
-            }
-            EventStatus::Rejected => {
-                RetryAction::DontRetry("permanent error in BigQuery response".into())
-            }
+            EventStatus::Errored => RetryAction::Retry(
+                format!(
+                    "transient error in BigQuery response: {}",
+                    response.error_summary()
+                )
+                .into(),
+            ),
+            EventStatus::Rejected => RetryAction::DontRetry(
+                format!(
+                    "permanent error in BigQuery response: {}",
+                    response.error_summary()
+                )
+                .into(),
+            ),
         }
     }
 }

@@ -60,8 +60,21 @@ pub struct BigqueryConfig {
     #[configurable(metadata(docs::examples = "https://bigquerystorage.googleapis.com:443"))]
     pub endpoint: String,
 
-    #[serde(default, flatten)]
-    pub auth: GcpAuthConfig,
+    /// Path to a [service account][gcp_service_account_credentials] credentials JSON file.
+    ///
+    /// If unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
+    /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
+    /// running on.
+    ///
+    /// API key authentication is not supported by the BigQuery Storage Write API.
+    ///
+    /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
+    pub credentials_path: Option<String>,
+
+    /// Skip all authentication handling. For use with integration tests only.
+    #[serde(default, skip_serializing)]
+    #[configurable(metadata(docs::hidden))]
+    pub skip_authentication: bool,
 
     #[serde(default)]
     pub batch: BatchConfig<BigqueryDefaultBatchSettings>,
@@ -119,7 +132,7 @@ async fn healthcheck_future(
     client
         .get_write_stream(proto::GetWriteStreamRequest {
             name: write_stream,
-            view: proto::WriteStreamView::Full as i32,
+            view: proto::WriteStreamView::Basic as i32,
         })
         .await?;
     Ok(())
@@ -172,12 +185,13 @@ impl ValidatedSink for BigqueryConfig {
         // so we don't use it when building the sink.
 
         // Configure auth and make sure it's constantly up-to-date
-        let auth = self.auth.build(Scope::BigQueryInsertdata).await?;
-        if matches!(auth, GcpAuthenticator::ApiKey(_)) {
-            return Err(
-                "GCP BigQuery sink does not support API key authentication. Use service account credentials or workload identity instead".into(),
-            );
+        let auth = GcpAuthConfig {
+            api_key: None,
+            credentials_path: self.credentials_path.clone(),
+            skip_authentication: self.skip_authentication,
         }
+        .build(Scope::BigQueryInsertdata)
+        .await?;
         auth.spawn_regenerate_token();
 
         // Create the gRPC channel; tonic channels are cheap to clone and share the underlying connection.

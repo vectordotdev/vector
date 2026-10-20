@@ -92,7 +92,7 @@ components: sinks: gcp_bigquery: {
 	input: {
 		logs:    true
 		metrics: null
-		traces:  false
+		traces:  true
 	}
 
 	permissions: iam: [
