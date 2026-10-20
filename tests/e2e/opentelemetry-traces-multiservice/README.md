@@ -116,8 +116,8 @@ from a pinned Demo 3.1.0 commit into the ignored `config/upstream/` directory.
 [config/compose.yaml](config/compose.yaml) includes them with
 [demo-overrides.yaml](config/demo-overrides.yaml), which holds the test-specific
 application settings. Only the `ad` and Valkey memory limits are increased after
-observed CI OOM failures. Other service limits, published ports, and restart policies
-keep their upstream defaults. Vector and the capture helpers stay in
+observed CI OOM failures. Container names, other service limits, published ports, and restart policies keep
+their upstream defaults. Vector and the capture helpers stay in
 `config/compose.yaml`.
 [demo.env](config/demo.env) overrides upstream defaults for the Demo image version,
 resource attributes, and headless shopper settings. CI runs the same setup script.

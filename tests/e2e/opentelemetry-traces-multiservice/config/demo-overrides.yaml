@@ -13,8 +13,8 @@ x-test-service: &test-service
 x-test-environment: &test-environment
   OTEL_BSP_SCHEDULE_DELAY: "1000"
   OTEL_TRACES_SAMPLER: always_on
-# Remove source builds and fixed names so the harness uses published images
-# and Compose-generated project names. Leave other deployment defaults upstream.
+# Remove source builds because setup downloads deployment files, not application
+# sources. Inherit upstream container names and other deployment defaults.
 # They must repeat: older Compose versions lose reset tags through YAML aliases.
 # Producers wait for a healthy Collector so startup does not lose their first spans.
 services:
@@ -26,7 +26,6 @@ services:
   ad:
     <<: *test-service
     build: !reset null # Use the published image, not a local source build.
-    container_name: !reset null # Let Compose name containers to avoid collisions.
     environment:
       <<: *test-environment
     # The upstream 300 MiB limit caused OOM kills in CI.
@@ -40,7 +39,6 @@ services:
   cart:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -49,7 +47,6 @@ services:
   checkout:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -58,7 +55,6 @@ services:
   currency:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -67,7 +63,6 @@ services:
   email:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -76,7 +71,6 @@ services:
   frontend:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -86,7 +80,6 @@ services:
   payment:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -95,7 +88,6 @@ services:
   product-catalog:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     volumes: !override # Use our local SDK configuration rather than a file from the Demo source tree.
@@ -106,7 +98,6 @@ services:
   quote:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -126,7 +117,6 @@ services:
   recommendation:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -135,7 +125,6 @@ services:
   shipping:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -144,7 +133,6 @@ services:
   accounting:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -153,7 +141,6 @@ services:
   fraud-detection:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
     depends_on:
@@ -162,29 +149,21 @@ services:
   kafka:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
   flagd:
     <<: *test-service
-    container_name: !reset null
     environment:
       <<: *test-environment
     volumes: !override # Fix feature flags for repeatable coverage, including cart error spans.
       - "../data/demo.flagd.json:/etc/flagd/demo.flagd.json:ro"
   astronomy-db:
     <<: *test-service
-    container_name: !reset null
-    environment:
-      <<: *test-environment
     volumes: !override # Create the application database and accounting tables before consumers start.
       - "../data/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"
   valkey-cart:
     # The upstream 20 MiB limit caused OOM kills in CI.
     <<: *test-service
-    container_name: !reset null
-    environment:
-      <<: *test-environment
     deploy:
       resources:
         limits:
@@ -193,7 +172,6 @@ services:
   load-generator:
     <<: *test-service
     build: !reset null
-    container_name: !reset null
     environment:
       <<: *test-environment
       CONFIG_INGRESS_EXPORTER: "${CONFIG_INGRESS_EXPORTER}"
