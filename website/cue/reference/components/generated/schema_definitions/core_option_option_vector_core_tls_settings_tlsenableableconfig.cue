@@ -38,6 +38,11 @@ _schemaDefinitions: "core::option::Option<vector_core::tls::settings::TlsEnablea
 
 			When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 			more information.
+
+			For outgoing connections to an endpoint URL, such as in the `vector` sink and other HTTP-based sinks, the URL
+			scheme determines whether TLS is used: `https` endpoints use TLS even when this is not enabled, and `http`
+			endpoints do not use TLS even when it is. Set this to `true` to apply the other `tls` settings to those
+			connections.
 			"""
 		required: false
 		type: bool: {}
