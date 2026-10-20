@@ -162,6 +162,8 @@ impl WebSocketSource {
                 {
                     break;
                 }
+
+                ping_manager = PingManager::new(&self.config);
             }
         }
         Ok(())
@@ -175,12 +177,12 @@ impl WebSocketSource {
     ) -> Result<(), WebSocketSourceError> {
         match msg {
             Message::Pong(_) => {
-                ping_manager.record_pong();
+                ping_manager.record_pong().await;
                 Ok(())
             }
             Message::Text(msg_txt) => {
                 if self.is_custom_pong(&msg_txt) {
-                    ping_manager.record_pong();
+                    ping_manager.record_pong().await;
                     debug!("Received custom pong response.");
                 } else {
                     self.process_message(&msg_txt, WebSocketKind::Text, out)
@@ -391,6 +393,7 @@ impl WebSocketSource {
 
 struct PingManager {
     interval: PingInterval,
+    ping_timeout_interval: PingInterval,
     waiting_for_pong: bool,
     message: Message,
 }
@@ -405,20 +408,24 @@ impl PingManager {
 
         Self {
             interval: PingInterval::new(config.common.ping_interval.map(u64::from)),
+            ping_timeout_interval: PingInterval::new(config.common.ping_timeout.map(u64::from)),
             waiting_for_pong: false,
             message: ping_message,
         }
     }
 
-    const fn record_pong(&mut self) {
+    async fn record_pong(&mut self) {
         self.waiting_for_pong = false;
+        self.ping_timeout_interval.reset().await;
     }
 
     async fn tick(&mut self, ws_sink: &mut WebSocketSink) -> Result<(), WebSocketSourceError> {
-        self.interval.tick().await;
+        tokio::select! {
+            _ = self.interval.tick() => {}
 
-        if self.waiting_for_pong {
-            return Err(WebSocketSourceError::PongTimeout);
+            _ = self.ping_timeout_interval.tick(), if self.waiting_for_pong => {
+                return Err(WebSocketSourceError::PongTimeout);
+            }
         }
 
         ws_sink.send(self.message.clone()).await.map_err(|error| {
@@ -426,6 +433,7 @@ impl PingManager {
             WebSocketSourceError::Tungstenite { source: error }
         })?;
 
+        self.ping_timeout_interval.reset().await;
         self.waiting_for_pong = true;
         Ok(())
     }
@@ -691,13 +699,83 @@ mod tests {
         let server_addr = start_unresponsive_server().await;
 
         let mut config = make_config(&server_addr);
-        config.common.ping_interval = NonZeroU64::new(3);
+        config.common.ping_interval = NonZeroU64::new(5);
         config.common.ping_timeout = NonZeroU64::new(1);
         config.ping_message = Some("ping".to_string());
         config.pong_message = Some(PongMessage::Simple("pong".to_string()));
 
         // The source should fail because the server never sends a pong.
-        run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
+        run_and_assert_source_error(config, Duration::from_secs(3), &SOURCE_TAGS).await;
+    }
+
+    async fn start_responsive_on_reconnect_server() -> String {
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+            websocket
+                .send(Message::Text("first message".to_string()))
+                .await
+                .unwrap();
+            // Wait for first message
+            let _ = websocket.next().await.unwrap();
+            // Wait a bit and then close the connection to force a reconnect
+            tokio::time::sleep(Duration::from_millis(600)).await;
+            let close_frame = CloseFrame {
+                code: CloseCode::Error,
+                reason: Cow::from("Reconnect please"),
+            };
+            websocket.close(Some(close_frame)).await.ok(); // connection may already be gone
+
+            // Wait for reconnect
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+            // Wait for first message
+            let _ = websocket.next().await.unwrap();
+            // Wait a bit before sending back pong
+            tokio::time::sleep(Duration::from_millis(600)).await;
+            websocket
+                .send(Message::Text("pong".to_string()))
+                .await
+                .unwrap();
+            // And only then send the second message
+            websocket
+                .send(Message::Text("second message".to_string()))
+                .await
+                .unwrap();
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_restarts_ping_timeout_on_reconnect() {
+        let server_addr = start_responsive_on_reconnect_server().await;
+
+        let mut config = make_config(&server_addr);
+        config.common.ping_interval = NonZeroU64::new(6);
+        config.common.ping_timeout = NonZeroU64::new(1);
+        config.ping_message = Some("ping".to_string());
+        config.pong_message = Some(PongMessage::Simple("pong".to_string()));
+
+        // The source should work because the server sends back pong after reconnect
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(3), &SOURCE_TAGS).await;
+
+        assert_eq!(
+            events.len(),
+            2,
+            "Should have received messages from both connections"
+        );
+
+        let event = events[0].as_log();
+        assert_eq!(event["message"], "first message".into());
+
+        let event = events[1].as_log();
+        assert_eq!(event["message"], "second message".into());
     }
 
     async fn start_blackhole_server() -> String {
