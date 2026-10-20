@@ -749,9 +749,7 @@ impl VectorConfig {
         let Some(auth) = self.auth.as_ref() else {
             return Ok(None);
         };
-        let header = auth.authorization_header().ok_or(
-            "The configured `auth` credentials could not be encoded into a valid authorization header.",
-        )?;
+        let header = auth.authorization_header()?;
         if uris.iter().any(|uri| uri.scheme_str() != Some("https")) {
             warn!(
                 "Authentication is enabled but an endpoint does not use TLS, so credentials will be sent to it in plaintext."

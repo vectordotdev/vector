@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use headers::{Authorization, HeaderMapExt};
+use headers::{Authorization, HeaderMapExt, authorization::Credentials};
 #[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
 use http::{
@@ -585,34 +585,34 @@ pub enum VectorAuthConfig {
         /// Custom string value of the Authorization header
         #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
         #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
-        value: String,
+        value: SensitiveString,
     },
 }
 
 impl VectorAuthConfig {
-    fn as_auth(&self) -> Auth {
-        match self {
-            Self::Basic { user, password } => Auth::Basic {
-                user: user.clone(),
-                password: password.clone(),
-            },
-            Self::Bearer { token } => Auth::Bearer {
-                token: token.clone(),
-            },
-            Self::Custom { value } => Auth::Custom {
-                value: value.clone(),
-            },
-        }
-    }
-
     /// Returns the `Authorization` header value for this strategy.
     ///
-    /// Returns `None` only if the configured credentials cannot be encoded into a valid header
-    /// value, in which case the underlying error is logged by [`Auth::apply_headers_map`].
-    pub fn authorization_header(&self) -> Option<HeaderValue> {
-        let mut map = HeaderMap::new();
-        self.as_auth().apply_headers_map(&mut map);
-        map.get(http::header::AUTHORIZATION).cloned()
+    /// The value is marked sensitive, which redacts it from debug output and keeps HTTP/2 header
+    /// compression from indexing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error naming the invalid option if the credentials cannot be encoded into a
+    /// header value. The error never contains the credentials.
+    pub fn authorization_header(&self) -> crate::Result<HeaderValue> {
+        let mut header = match self {
+            Self::Basic { user, password } => {
+                Authorization::basic(user, password.inner()).0.encode()
+            }
+            Self::Bearer { token } => Authorization::bearer(token.inner())
+                .map_err(|_| "The configured `auth.token` is not a valid header value.")?
+                .0
+                .encode(),
+            Self::Custom { value } => HeaderValue::from_str(value.inner())
+                .map_err(|_| "The configured `auth.value` is not a valid header value.")?,
+        };
+        header.set_sensitive(true);
+        Ok(header)
     }
 }
 
@@ -1027,30 +1027,43 @@ mod tests {
 
     #[test]
     fn authorization_header_for_each_strategy() {
-        let bearer = VectorAuthConfig::Bearer {
-            token: "token123".to_owned().into(),
-        };
-        assert_eq!(
-            bearer.authorization_header(),
-            Some(HeaderValue::from_static("Bearer token123"))
-        );
+        let cases = [
+            (
+                VectorAuthConfig::Bearer {
+                    token: "token123".to_owned().into(),
+                },
+                "Bearer token123",
+            ),
+            (
+                VectorAuthConfig::Basic {
+                    user: "user".to_owned(),
+                    password: "pass".to_owned().into(),
+                },
+                "Basic dXNlcjpwYXNz",
+            ),
+            (
+                VectorAuthConfig::Custom {
+                    value: "SSWS token123".to_owned().into(),
+                },
+                "SSWS token123",
+            ),
+        ];
 
-        let basic = VectorAuthConfig::Basic {
-            user: "user".to_owned(),
-            password: "pass".to_owned().into(),
-        };
-        assert_eq!(
-            basic.authorization_header(),
-            Some(HeaderValue::from_static("Basic dXNlcjpwYXNz"))
-        );
+        for (auth, expected) in cases {
+            let header = auth.authorization_header().unwrap();
+            assert_eq!(header, HeaderValue::from_static(expected));
+            assert!(header.is_sensitive(), "{expected} should be sensitive");
+        }
+    }
 
+    #[test]
+    fn authorization_header_error_omits_credentials() {
         let custom = VectorAuthConfig::Custom {
-            value: "SSWS token123".to_owned(),
+            value: "SSWS dummy-custom-secret\n".to_owned().into(),
         };
-        assert_eq!(
-            custom.authorization_header(),
-            Some(HeaderValue::from_static("SSWS token123"))
-        );
+        let error = custom.authorization_header().unwrap_err().to_string();
+        assert!(!error.contains("dummy-custom-secret"), "{error}");
+        assert!(error.contains("auth.value"), "{error}");
     }
 
     #[test]

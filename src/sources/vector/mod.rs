@@ -242,9 +242,7 @@ impl SourceConfig for VectorConfig {
 
         let auth_header = match self.auth.as_ref() {
             Some(auth) => {
-                let header = auth.authorization_header().ok_or(
-                    "The configured `auth` credentials could not be encoded into a valid authorization header.",
-                )?;
+                let header = auth.authorization_header()?;
                 if !tls_settings.is_tls() {
                     warn!(
                         "Authentication is enabled but TLS is not, so credentials will be received in plaintext."
