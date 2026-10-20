@@ -9,14 +9,7 @@ use futures::future::BoxFuture;
 use http_1::{Request, Response, Uri};
 use http_body_util::BodyExt;
 use tower::Service;
-#[cfg(any(
-    feature = "sinks-gcp",
-    feature = "sinks-greptimedb_logs",
-    feature = "sinks-honeycomb",
-    feature = "sinks-keep",
-))]
 use tracing::debug;
-
 use vector_lib::{
     event::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
@@ -30,13 +23,19 @@ use crate::{
 };
 
 /// Builds a native `http 1` request from a buffered HTTP sink request.
-pub(crate) trait HttpServiceRequestBuilder<T: Send> {
+pub trait HttpServiceRequestBuilder<T: Send> {
+    /// Builds the request to send for `request`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be built, for example because a header value
+    /// is invalid.
     fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
 }
 
 /// The response returned by the native `http 1` sink service.
 #[derive(Debug)]
-pub(crate) struct HttpResponse {
+pub struct HttpResponse {
     pub response: Response<Bytes>,
     pub events_byte_size: GroupedCountByteSize,
     pub raw_byte_size: usize,
@@ -74,7 +73,7 @@ impl DriverResponse for HttpResponse {
 
 /// Native `http 1` equivalent of the legacy `HttpService`.
 #[derive(Clone)]
-pub(crate) struct HttpService<B, T: Send> {
+pub struct HttpService<B, T: Send> {
     client: HttpClient,
     request_builder: Arc<B>,
     _phantom: PhantomData<fn() -> T>,
@@ -85,7 +84,7 @@ where
     B: HttpServiceRequestBuilder<T> + Send + Sync + 'static,
     T: Send + 'static,
 {
-    pub(crate) fn new(client: HttpClient, request_builder: B) -> Self {
+    pub fn new(client: HttpClient, request_builder: B) -> Self {
         Self {
             client,
             request_builder: Arc::new(request_builder),
@@ -144,14 +143,16 @@ where
     }
 }
 
-// Clickhouse implements its own retry logic, so this is only used by the sinks below.
-#[cfg(any(
-    feature = "sinks-gcp",
-    feature = "sinks-greptimedb_logs",
-    feature = "sinks-honeycomb",
-    feature = "sinks-keep",
-))]
-pub(crate) fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
+/// Retry logic for sinks that use [`HttpService`], based on the response status code.
+///
+/// ClickHouse implements its own retry logic; other native http 1 sinks use this.
+///
+/// # Panics
+///
+/// Does not panic in practice: every `http 1` status code is also a valid `http 0.2` status
+/// code.
+#[must_use]
+pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: super::http::RetryStrategy,
 ) -> super::http::HttpStatusRetryLogic<
     impl Fn(&HttpResponse) -> http::StatusCode + Clone + Send + Sync + 'static,
