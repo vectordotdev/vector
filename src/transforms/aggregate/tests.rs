@@ -1860,7 +1860,7 @@ fn set_interval_ms_sets_interval_on_flushed_incremental_metrics() {
 }
 
 #[tokio::test]
-async fn set_interval_ms_window_starts_follow_the_timer_after_a_slow_start() {
+async fn set_interval_ms_slow_start_does_not_backdate_windows() {
     use crate::transforms::TaskTransform;
 
     let agg = Aggregate::new(&with_set_interval_ms(system_time_config(
@@ -1868,11 +1868,11 @@ async fn set_interval_ms_window_starts_follow_the_timer_after_a_slow_start() {
     )))
     .unwrap();
     let (tx, rx) = mpsc::channel(10);
-    let timer_created = Utc::now();
     let mut out = Box::new(agg).transform(Box::pin(ReceiverStream::new(rx)));
 
-    // Startup takes longer than one interval, so the timer delivers missed ticks in a burst.
+    // The stream is first polled more than one interval after it is built, with input ready.
     tokio::time::sleep(Duration::from_millis(1_500)).await;
+    let sent = Utc::now();
     tx.send(make_metric(
         "counter_a",
         MetricKind::Incremental,
@@ -1888,14 +1888,10 @@ async fn set_interval_ms_window_starts_follow_the_timer_after_a_slow_start() {
 
     let window_start = event.as_metric().timestamp().expect("the window start");
     assert!(window_start <= received, "window start is in the future");
-    // Window starts are on the timer's schedule: one interval before creation, plus whole intervals.
-    let offset_ms = (window_start - timer_created).num_milliseconds() + 1_000;
-    let from_schedule_ms = offset_ms
-        .rem_euclid(1_000)
-        .min(1_000 - offset_ms.rem_euclid(1_000));
     assert!(
-        from_schedule_ms < 100,
-        "window start is {offset_ms} ms after the first window start, not on the 1 s schedule"
+        window_start >= sent - chrono::Duration::milliseconds(1_000),
+        "window start is {} ms before the metric was sent",
+        (sent - window_start).num_milliseconds()
     );
 }
 

@@ -500,10 +500,10 @@ impl TaskTransform<Event> for Aggregate {
     where
         Self: 'static,
     {
-        let mut flush_stream = tokio::time::interval(self.interval);
-        self.start_window_timeline(Utc::now());
-
         Box::pin(stream! {
+            // Created on the first poll, so that no ticks are missed before the task runs.
+            let mut flush_stream = tokio::time::interval(self.interval);
+            self.start_window_timeline(Utc::now());
             let mut output = Vec::new();
             let mut done = false;
             while !done {
