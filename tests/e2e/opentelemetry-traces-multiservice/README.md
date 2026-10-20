@@ -14,26 +14,38 @@ fixture-based trace tests.
 ## Input and destination
 
 ```mermaid
-flowchart LR
-    demo["OpenTelemetry Demo"] --> ingress["OTel Collector (input)"]
-    ingress --> input["input.jsonl"]
-    ingress -->|"OTLP/HTTP or gRPC (separate sequential runs)"| source
+flowchart TB
+    demo["OTel Demo App<br/><br/>14 services, 11 languages<br/>~80 traces, ~750 spans / run<br/>deep traces, async, errors"] --> ingress["OTel Collector<br/>input"]
+    ingress -->|"OTLP/HTTP or gRPC"| vector
     subgraph vector["Vector"]
-        source["OpenTelemetry source"] -->|"otel.traces (no transforms)"| sink["OpenTelemetry sink"]
+        source["OpenTelemetry source"] -->|"No transforms"| sink["OpenTelemetry sink"]
     end
-    sink -->|"OTLP/HTTP"| egress["OTel Collector (output)"]
-    egress --> output["output.jsonl"]
-    subgraph validation["Rust validation"]
-        coverage["Required services and trace shapes"]
-        preservation["Compare spans, resources, scopes, schema URLs and duplicate counts"]
+    vector -->|"OTLP/HTTP"| egress["OTel Collector<br/>output"]
+    ingress -.-> input
+    egress -.-> output
+    subgraph validation["Rust validation · after the run"]
+        input["input.jsonl"]
+        output["output.jsonl"]
+        coverage["Input must be rich enough<br/><br/>Every service and trace shape<br/>the test requires must appear"]
+        preservation["Every span must come out<br/>identical<br/><br/>The whole span is compared,<br/>with its resource and scope,<br/>only re-batching and<br/>attribute order may differ"]
     end
-    input -.-> coverage
-    input -.-> preservation
-    output -.-> preservation
+    input --> coverage
+    input --> preservation
+    output --> preservation
+
+    classDef app fill:#ffdfb8,stroke:#c76b15,color:#482909
+    classDef collector fill:#d5eaff,stroke:#3377b5,color:#173956
+    classDef vectorNode fill:#e9dcff,stroke:#8050c2,color:#402466
+    classDef capture fill:#d6f3f2,stroke:#248c91,color:#164e52
+    classDef check fill:#dff2db,stroke:#4d9251,color:#234b27
+    class demo app
+    class ingress,egress collector
+    class source,sink vectorNode
+    class input,output capture
+    class coverage,preservation check
 ```
 
-Rust validates the captures after each run. The comparison allows batching, span order,
-and attribute-map order to differ.
+The test runs twice: once with HTTP ingress and once with gRPC ingress.
 
 [scenario.py](data/scenario.py) runs one simulated shopper through three rounds of ad,
 recommendation, cart, and multi-item checkout requests. Checkout also exercises
