@@ -8,7 +8,6 @@ components: transforms: dedupe: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
@@ -21,7 +20,6 @@ components: transforms: dedupe: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.dedupe.configuration

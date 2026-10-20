@@ -202,7 +202,7 @@ where
                     Poll::Ready(Some(Err(D::Error::from(e))))
                 }
             }
-            other => other.map_err(|e| e.into_inner()),
+            other => other.map_err(DecoderError::into_inner),
         }
     }
 }

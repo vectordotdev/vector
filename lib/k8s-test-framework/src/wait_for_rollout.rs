@@ -10,6 +10,10 @@ use crate::util::run_command;
 /// Wait for a rollout of a `resource` within a `namespace` to complete via
 /// the specified `kubectl_command`.
 /// Use `extra` to pass additional arguments to `kubectl`.
+///
+/// # Errors
+///
+/// Returns an error if the command cannot be spawned or waited on, or exits unsuccessfully.
 pub async fn run<Cmd, NS, R, Ex>(
     kubectl_command: Cmd,
     namespace: NS,

@@ -15,7 +15,6 @@ components: sinks: datadog_traces: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    2_300_000
 				max_events:   1_000
 				timeout_secs: 5.0
@@ -76,7 +75,6 @@ components: sinks: datadog_traces: {
 				function correctly.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.datadog_traces.configuration

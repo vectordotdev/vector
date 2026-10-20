@@ -22,6 +22,7 @@ pub struct Parser {
 }
 
 impl Parser {
+    #[must_use]
     pub const fn new(sanitize_keys: bool, convert_to: ConversionUnit) -> Self {
         Self {
             sanitize: sanitize_keys,
@@ -29,6 +30,15 @@ impl Parser {
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the packet contains an invalid StatsD metric.
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn parse(&self, packet: &str) -> Result<Metric, ParseError> {
         // https://docs.datadoghq.com/developers/dogstatsd/datagram_shell/#datagram-format
         let key_and_body = packet.splitn(2, ':').collect::<Vec<_>>();
@@ -78,7 +88,7 @@ impl Parser {
                 )
                 .with_tags(tags)
             }
-            unit @ "h" | unit @ "ms" | unit @ "d" => {
+            unit @ ("h" | "ms" | "d") => {
                 let val: f64 = parts[0].parse()?;
                 let converted_val = match unit {
                     "ms" => match self.convert_to {
@@ -106,7 +116,9 @@ impl Parser {
                 {
                     parts[0].parse()?
                 } else {
-                    parts[0][1..].parse()?
+                    let mut chars = parts[0].chars();
+                    chars.next();
+                    chars.as_str().parse()?
                 };
 
                 match parse_direction(parts[0])? {
@@ -137,13 +149,14 @@ impl Parser {
 }
 
 fn parse_sampling(input: &str) -> Result<f64, ParseError> {
-    if !input.starts_with('@') || input.len() < 2 {
-        return Err(ParseError::Malformed(
+    let rest = input
+        .strip_prefix('@')
+        .filter(|s| !s.is_empty())
+        .ok_or(ParseError::Malformed(
             "expected non empty '@'-prefixed sampling component",
-        ));
-    }
+        ))?;
 
-    let num: f64 = input[1..].parse()?;
+    let num: f64 = rest.parse()?;
     if num.is_sign_positive() {
         Ok(num)
     } else {
@@ -153,16 +166,14 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
 
 /// Statsd (and dogstatsd) support bare, single and multi-value tags.
 fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
-    if !input.starts_with('#') || input.len() < 2 {
-        return Err(ParseError::Malformed(
+    let rest = input
+        .strip_prefix('#')
+        .filter(|s| !s.is_empty())
+        .ok_or(ParseError::Malformed(
             "expected non empty '#'-prefixed tags component",
-        ));
-    }
+        ))?;
 
-    Ok(input[1..]
-        .split(',')
-        .map(extract_tag_key_and_value)
-        .collect())
+    Ok(rest.split(',').map(extract_tag_key_and_value).collect())
 }
 
 fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
@@ -179,13 +190,13 @@ fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
 }
 
 fn sanitize_key(key: &str, sanitize: bool) -> String {
-    if !sanitize {
-        key.to_owned()
-    } else {
+    if sanitize {
         let s = key.replace('/', "'-");
         let s = WHITESPACE.replace_all(&s, "_");
         let s = NONALPHANUM.replace_all(&s, "");
         s.into()
+    } else {
+        key.to_owned()
     }
 }
 
@@ -242,6 +253,10 @@ mod test {
     };
 
     const SANITIZING_PARSER: Parser = Parser::new(true, ConversionUnit::Seconds);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the packet contains an invalid StatsD metric.
     fn parse(packet: &str) -> Result<Metric, ParseError> {
         SANITIZING_PARSER.parse(packet)
     }
@@ -447,6 +462,15 @@ mod test {
     }
 
     #[test]
+    fn gauge_multibyte_utf8_prefix_is_error_not_panic() {
+        // A multi-byte UTF-8 character as the value prefix must return a parse
+        // error, not panic with "byte index 1 is not a char boundary".
+        let input = std::str::from_utf8(b"m:\xc3\xa9|g").unwrap();
+        assert!(parse(input).is_err());
+        assert!(parse("m:é|g").is_err());
+    }
+
+    #[test]
     fn sets() {
         assert_event_data_eq!(
             parse("uniques:765|s"),
@@ -472,6 +496,10 @@ mod test {
         );
     }
 
+    #[expect(
+        clippy::float_cmp,
+        reason = "These deterministic fixture values are compared exactly."
+    )]
     #[test]
     fn sanitizing_sampling() {
         assert_eq!(1.0, sanitize_sampling(0.0));

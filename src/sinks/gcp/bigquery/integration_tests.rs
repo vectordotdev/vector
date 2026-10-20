@@ -3,7 +3,7 @@ use indoc::formatdoc;
 use regex::Regex;
 use std::collections::BTreeMap;
 use vector_common::finalization::BatchStatus;
-use vector_lib::event::{BatchNotifier, Event, LogEvent, Value};
+use vector_lib::event::{BatchNotifier, Event, EventMetadata, LogEvent, Value};
 use vector_lib::sink::VectorSink;
 
 use crate::config::SinkConfig;
@@ -55,14 +55,17 @@ fn event_generator(index: usize) -> Event {
     let now = Utc::now();
     let value = Value::Object(BTreeMap::from([
         ("time".into(), Value::Timestamp(now)),
-        ("count".into(), Value::Integer(index as i64)),
+        (
+            "count".into(),
+            Value::Integer(i64::try_from(index).unwrap()),
+        ),
         ("message".into(), Value::from(random_string(64))),
         ("user".into(), Value::from("Bob".to_string())),
     ]));
-    Event::Log(LogEvent::from_parts(value, Default::default()))
+    Event::Log(LogEvent::from_parts(value, EventMetadata::default()))
 }
 
-/// Create a BigquerySink from the local environment
+/// Create a `BigquerySink` from the local environment
 async fn create_sink() -> VectorSink {
     let desc_file = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
         .join("lib/codecs/tests/data/protobuf/integration.desc")

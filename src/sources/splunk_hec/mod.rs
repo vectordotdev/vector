@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     convert::Infallible,
-    io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
     time::Duration,
@@ -9,7 +8,6 @@ use std::{
 
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
-use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{Server, service::make_service_fn};
@@ -67,14 +65,15 @@ use self::{
 use crate::{
     SourceSender,
     codecs::DecodingConfig,
+    common::http::ErrorMessage,
     config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
-    serde::bool_or_struct,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    sources::util::{decompression::CappedDecoder, http::capped_body},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
 
 mod acknowledgements;
@@ -122,11 +121,9 @@ pub struct SplunkConfig {
     /// event metadata and preferentially used if the event is sent to a Splunk HEC sink.
     store_hec_token: bool,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
-    #[serde(deserialize_with = "bool_or_struct")]
+    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global settings.
@@ -134,7 +131,6 @@ pub struct SplunkConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -148,8 +144,6 @@ pub struct SplunkConfig {
     /// The VRL codec can access HEC envelope metadata, such as host, sourcetype, and,
     /// channel, and the authentication token via `%splunk_hec.*` paths and
     /// `get_secret!("splunk_hec_token")` before the program executes.
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub event: CodecConfig,
 
@@ -159,8 +153,6 @@ pub struct SplunkConfig {
     /// codec instead of being emitted as a single event. Decode failures are
     /// swallowed and do not return an error to the Splunk client. When unset, the
     /// endpoint preserves its existing behavior of one event per request body.
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub raw: CodecConfig,
 }
@@ -174,8 +166,6 @@ pub struct CodecConfig {
     ///
     /// Only used when `decoding` is also set. Defaults to a per-codec choice
     /// (typically `bytes`) that produces one event per payload.
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
 
@@ -185,8 +175,6 @@ pub struct CodecConfig {
     /// behavior. When set, the endpoint-selected payload is processed through
     /// `framing` and `decoding`, and a single payload can fan out to multiple
     /// events.
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub decoding: Option<DeserializerConfig>,
 }
@@ -217,10 +205,10 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecAcknowledgementsConfig::default(),
             store_hec_token: false,
             log_namespace: None,
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             event: CodecConfig::default(),
             raw: CodecConfig::default(),
         }
@@ -231,10 +219,24 @@ fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8088)
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec")]
-impl SourceConfig for SplunkConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+impl SplunkConfig {
+    /// The source's TLS configuration, if any. Exposed so a wrapping source can build a
+    /// [`TlsAcceptorReloader`] and watch the certificate files for rotation.
+    #[must_use]
+    pub const fn tls_config(&self) -> Option<&TlsEnableableConfig> {
+        self.tls.as_ref()
+    }
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or the configured event decoders cannot be built.
+    /// Build the source serving a runtime-swappable TLS acceptor when `tls_reloader` is set.
+    pub async fn build_with_tls_reloader(
+        &self,
+        cx: SourceContext,
+        tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
@@ -251,7 +253,7 @@ impl SourceConfig for SplunkConfig {
 
         let event_service = source.event_service(out.clone());
         let raw_service = source.raw_service(out);
-        let health_service = source.health_service();
+        let health_service = SplunkSource::health_service();
         let ack_service = source.ack_service();
         let options = SplunkSource::options();
 
@@ -269,7 +271,10 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls
+            .bind_reloadable(&self.address, tls_reloader)
+            .await?
+            .with_keepalive(self.keepalive.tcp_keepalive);
 
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
@@ -292,14 +297,24 @@ impl SourceConfig for SplunkConfig {
                 .serve(make_svc)
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
     }
+}
 
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec")]
+impl SourceConfig for SplunkConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.build_with_tls_reloader(cx, None).await
+    }
+
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
@@ -496,9 +511,13 @@ impl SplunkSource {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
-            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(ToOwned::to_owned));
         let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         let splunk_channel = splunk_channel_header
@@ -522,8 +541,8 @@ impl SplunkSource {
             .and(splunk_channel)
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
-            .and(self.gzip())
-            .and(warp::body::bytes())
+            .and(Self::gzip())
+            .and(capped_body())
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -544,10 +563,11 @@ impl SplunkSource {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
 
-                        let mut data = Vec::new();
+                        let data;
                         let (byte_size, body) = if gzip {
-                            MultiGzDecoder::new(body.reader())
-                                .read_to_end(&mut data)
+                            // Cap the decompressed output to mitigate gzip-bomb DoS.
+                            data = CappedDecoder::gzip(body.reader())
+                                .decompress()
                                 .map_err(|_| Rejection::from(ApiError::BadRequest))?;
                             (data.len(), String::from_utf8_lossy(data.as_slice()))
                         } else {
@@ -658,8 +678,8 @@ impl SplunkSource {
             .and(SplunkSource::required_channel())
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
-            .and(self.gzip())
-            .and(warp::body::bytes())
+            .and(Self::gzip())
+            .and(capped_body())
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -713,7 +733,7 @@ impl SplunkSource {
                             }
                             let res = out.send_event(event).await;
                             return res
-                                .map(|_| maybe_ack_id)
+                                .map(|()| maybe_ack_id)
                                 .map_err(|_| Rejection::from(ApiError::ServerShutdown));
                         };
 
@@ -748,7 +768,7 @@ impl SplunkSource {
                             // existing partial-delivery semantics still apply.
                             let res = out.send_batch(events).await;
                             return res
-                                .map(|_| None)
+                                .map(|()| None)
                                 .map_err(|_| Rejection::from(ApiError::ServerShutdown));
                         }
 
@@ -756,7 +776,7 @@ impl SplunkSource {
                             register_ack(idx_ack, receiver, Some(channel_id)).await?;
 
                         let res = out.send_batch(events).await;
-                        res.map(|_| maybe_ack_id)
+                        res.map(|()| maybe_ack_id)
                             .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
                 },
@@ -765,7 +785,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn health_service(&self) -> BoxedFilter<(Response,)> {
+    fn health_service() -> BoxedFilter<(Response,)> {
         // The Splunk docs document this endpoint as returning a 400 if given an invalid Splunk
         // token, but, in practice, it seems to ignore the token altogether
         //
@@ -788,14 +808,13 @@ impl SplunkSource {
         T: Send + DeserializeOwned + 'static,
     {
         warp::header::optional::<HeaderValue>(CONTENT_TYPE.as_str())
-            .and(warp::body::bytes())
+            .and(capped_body())
             .and_then(
                 |ctype: Option<HeaderValue>, body: bytes::Bytes| async move {
                     let ok = ctype
                         .as_ref()
                         .and_then(|v| v.to_str().ok())
-                        .map(|h| h.to_ascii_lowercase().contains("application/json"))
-                        .unwrap_or(true);
+                        .is_none_or(|h| h.to_ascii_lowercase().contains("application/json"));
 
                     if !ok {
                         return Err(warp::reject::custom(ApiError::UnsupportedContentType));
@@ -879,7 +898,7 @@ impl SplunkSource {
     }
 
     /// Is body encoded with gzip
-    fn gzip(&self) -> BoxedFilter<(bool,)> {
+    fn gzip() -> BoxedFilter<(bool,)> {
         warp::header::optional::<String>("Content-Encoding")
             .and_then(|encoding: Option<String>| async move {
                 match encoding {
@@ -893,7 +912,7 @@ impl SplunkSource {
 
     fn required_channel() -> BoxedFilter<(String,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
-            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(ToOwned::to_owned));
         let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         splunk_channel_header
@@ -928,7 +947,7 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     token: Option<Arc<str>>,
     /// Lognamespace to put the events in
     log_namespace: LogNamespace,
-    /// handle to EventsReceived registry
+    /// handle to `EventsReceived` registry
     events_received: Registered<EventsReceived>,
     /// Optional second-stage decoder applied to the envelope payload after HEC
     /// envelope parsing.
@@ -1000,6 +1019,12 @@ impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterat
 }
 
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     /// Process the envelope's `time` field, updating `self.time` (sticky across envelopes
     /// when not explicitly provided).
     fn process_time(&mut self, json: &mut JsonValue) -> Result<(), Rejection> {
@@ -1095,8 +1120,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
         // Add time field
         let timestamp = match self.time.clone() {
-            Time::Provided(time) => time,
-            Time::Now(time) => time,
+            Time::Provided(time) | Time::Now(time) => time,
         };
 
         self.log_namespace.insert_source_metadata(
@@ -1108,7 +1132,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         );
 
         // Extract default extracted fields
-        for de in self.extractors.iter_mut() {
+        for de in &mut self.extractors {
             de.extract(&mut log, &mut json);
         }
 
@@ -1159,7 +1183,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                         .and_then(|e| e.value.clone())
                 });
             if let Some(v) = val {
-                metadata.value_mut().insert(*meta_path, v);
+                metadata.value_mut().insert(
+                    &vrl::path::parse_value_path(meta_path)
+                        .expect("hardcoded splunk_hec metadata path is a valid VRL path"),
+                    v,
+                );
             }
         }
 
@@ -1170,12 +1198,20 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             .map(|s| Value::from(s.to_string()))
             .or_else(|| self.channel.clone());
         if let Some(ch) = channel {
-            metadata.value_mut().insert("splunk_hec.channel", ch);
+            metadata.value_mut().insert(
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
+                ch,
+            );
         }
 
         metadata
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     /// Decoded path: extract the envelope's `event` field as bytes (preserving shape),
     /// run it through the second-stage decoder, and overlay envelope metadata so that
     /// decoder-produced fields win on conflict. Returns the events along with a flag
@@ -1228,7 +1264,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         // For non-VRL decoders `with_metadata_template` is a no-op.
         let decoder = decoder.with_metadata_template(self.build_vrl_metadata(&json));
 
-        let (decoded, had_decode_errors) = decode_payload(
+        let (decoded_events, had_decode_errors) = decode_payload(
             decoder,
             &payload,
             Some(fallback_time),
@@ -1253,8 +1289,8 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             };
         let channel_path = owned_value_path!(CHANNEL);
 
-        let mut out = Vec::with_capacity(decoded.len());
-        for mut event in decoded {
+        let mut out = Vec::with_capacity(decoded_events.len());
+        for mut event in decoded_events {
             if let Event::Log(log) = &mut event {
                 // channel: envelope value beats header default. Use `InsertIfEmpty`
                 // for legacy event fields, and `try_insert` for the Vector metadata
@@ -1285,7 +1321,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 // are present — matching the non-decoder runtime precedence. Both
                 // still use InsertIfEmpty so the decoder's output wins over all
                 // envelope metadata. Order: decoder > top-level > fields.
-                for de in self.extractors.iter_mut() {
+                for de in &mut self.extractors {
                     de.extract(log, &mut json);
                 }
 
@@ -1456,6 +1492,7 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct DecodePayloadContext<'a> {
     batch: &'a Option<BatchNotifier>,
     log_namespace: LogNamespace,
@@ -1497,14 +1534,14 @@ fn decode_payload(
 
     loop {
         match decoder.decode_eof(&mut buffer) {
-            Ok(Some((decoded, _))) => {
-                for mut event in decoded {
+            Ok(Some((decoded_events, _))) => {
+                for mut event in decoded_events {
                     if let Event::Log(log) = &mut event {
                         log_namespace.insert_vector_metadata(
                             log,
                             log_schema().source_type_key(),
                             lookup::path!("source_type"),
-                            Bytes::from_static(SplunkConfig::NAME.as_bytes()),
+                            Value::from_static_str(SplunkConfig::NAME),
                         );
                         match log_namespace {
                             LogNamespace::Vector => {
@@ -1564,9 +1601,9 @@ fn decode_payload(
 /// Returns `None` if `t` is negative.
 fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
     // Utc.ymd(2400, 1, 1).and_hms(0,0,0).timestamp();
-    const SEC_CUTOFF: i64 = 13569465600;
+    const SEC_CUTOFF: i64 = 13_569_465_600;
     // Utc.ymd(10_000, 1, 1).and_hms(0,0,0).timestamp_millis();
-    const MILLISEC_CUTOFF: i64 = 253402300800000;
+    const MILLISEC_CUTOFF: i64 = 253_402_300_800_000;
 
     // Timestamps can't be negative!
     if t < 0 {
@@ -1690,6 +1727,14 @@ enum Time {
     Provided(DateTime<Utc>),
 }
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Borrowing request-handler inputs where possible is deferred to keep this cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// Creates events from a raw HEC request body.
 ///
 /// Without a decoder, returns a single event whose message is the (decompressed)
@@ -1712,10 +1757,10 @@ fn raw_event(
 ) -> Result<(Vec<Event>, bool), Rejection> {
     // Process gzip
     let body_bytes: Bytes = if gzip {
-        let mut data = Vec::new();
-        match MultiGzDecoder::new(bytes.reader()).read_to_end(&mut data) {
-            Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => Bytes::from(data),
+        // Cap the decompressed output to mitigate gzip-bomb DoS.
+        match CappedDecoder::gzip(bytes.reader()).decompress() {
+            Ok(data) if data.is_empty() => return Err(ApiError::NoData.into()),
+            Ok(data) => Bytes::from(data),
             Err(error) => {
                 emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
@@ -1745,10 +1790,17 @@ fn raw_event(
                 meta.set_splunk_hec_token(Arc::clone(token));
             }
             if let Some(ref h) = host {
-                meta.value_mut().insert("splunk_hec.host", h.clone());
+                meta.value_mut().insert(
+                    &vrl::path::parse_value_path("splunk_hec.host")
+                        .expect("splunk_hec.host is a valid VRL path"),
+                    h.clone(),
+                );
             }
-            meta.value_mut()
-                .insert("splunk_hec.channel", channel.clone());
+            meta.value_mut().insert(
+                &vrl::path::parse_value_path("splunk_hec.channel")
+                    .expect("splunk_hec.channel is a valid VRL path"),
+                channel.clone(),
+            );
             decoder.with_metadata_template(meta)
         };
 
@@ -1787,7 +1839,7 @@ fn raw_event(
             Utc::now(),
         );
 
-        if let Some(batch) = batch.clone() {
+        if let Some(batch) = batch {
             log = log.with_batch_notifier(&batch);
         }
         (vec![Event::from(log)], false)
@@ -1999,6 +2051,8 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::ACK_IS_DISABLED)
             }
         },))
+    } else if let Some(error) = rejection.find::<ErrorMessage>() {
+        Ok((response_json(error.status_code(), error),))
     } else {
         Err(rejection)
     }
@@ -2019,7 +2073,12 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
+    use crate::sinks::splunk_hec::common::EndpointTarget;
+    use crate::sinks::splunk_hec::common::acknowledgements::HecClientAcknowledgementsConfig;
+    use crate::template::ConfinementConfig;
     use std::{net::SocketAddr, num::NonZeroU64};
+    use vector_lib::codecs::decoding::JsonDeserializerConfig;
+    use vector_lib::codecs::decoding::NewlineDelimitedDecoderConfig;
 
     use chrono::{TimeZone, Utc};
     use futures_util::Stream;
@@ -2050,7 +2109,7 @@ mod tests {
         sinks::{
             Healthcheck, VectorSink,
             splunk_hec::logs::config::HecLogsSinkConfig,
-            util::{BatchConfig, Compression, TowerRequestConfig},
+            util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
@@ -2067,6 +2126,22 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SplunkConfig>();
+    }
+
+    #[tokio::test]
+    async fn finish_err_maps_capped_body_to_client_error() {
+        // `capped_body()` rejects oversized payloads with an `ErrorMessage` (e.g. 413). The
+        // recovery must surface that status instead of letting it fall through to a 500.
+        let rejection = warp::reject::custom(ErrorMessage::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Request body exceeds limit of 1024 bytes.".to_owned(),
+        ));
+
+        let (response,) = finish_err(rejection)
+            .await
+            .expect("capped-body rejection should be recovered");
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     /// Splunk token
@@ -2090,7 +2165,7 @@ mod tests {
         PortGuard,
     ) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let (_guard, address) = next_addr();
+        let (port_guard, address) = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|v| v.to_string().into()).collect());
         let cx = SourceContext::new_test(sender, None);
@@ -2103,7 +2178,7 @@ mod tests {
                 acknowledgements: acknowledgements.unwrap_or_default(),
                 store_hec_token,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event: CodecConfig::default(),
                 raw: CodecConfig::default(),
             }
@@ -2111,10 +2186,10 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
-        (recv, address, _guard)
+        (recv, address, port_guard)
     }
 
     async fn sink(
@@ -2124,7 +2199,7 @@ mod tests {
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
-            endpoint: format!("http://{address}"),
+            endpoint: HttpEndpoint::parse(&format!("http://{address}")).unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: None,
@@ -2135,11 +2210,12 @@ mod tests {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             timestamp_nanos_key: None,
             timestamp_key: None,
             auto_extract_timestamp: None,
-            endpoint_target: Default::default(),
+            endpoint_target: EndpointTarget::default(),
+            confinement: ConfinementConfig::default(),
         }
         .build(SinkContext::default())
         .await
@@ -2390,8 +2466,8 @@ mod tests {
         .await;
 
         let mut log = LogEvent::default();
-        log.insert("greeting", "hello");
-        log.insert("name", "bob");
+        log.insert(event_path!("greeting"), "hello");
+        log.insert(event_path!("name"), "bob");
         sink.run_events(vec![log.into()]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0).into_log();
@@ -2437,7 +2513,7 @@ mod tests {
         .await;
 
         let mut event = LogEvent::default();
-        event.insert("line", "hello");
+        event.insert(event_path!("line"), "hello");
         sink.run_events(vec![event.into()]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
@@ -2714,7 +2790,7 @@ mod tests {
                 message.into()
             );
             assert_eq!(
-                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                event.metadata().splunk_hec_token().as_deref().unwrap(),
                 TOKEN
             );
         })
@@ -2741,7 +2817,7 @@ mod tests {
                 "splunk_hec".into()
             );
             assert_eq!(
-                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                event.metadata().splunk_hec_token().as_deref().unwrap(),
                 TOKEN
             );
         })
@@ -2792,7 +2868,7 @@ mod tests {
                 message.into()
             );
             assert_eq!(
-                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                event.metadata().splunk_hec_token().as_deref().unwrap(),
                 TOKEN
             );
         })
@@ -2884,8 +2960,7 @@ mod tests {
 
         let b = reqwest::Client::new()
             .post(format!(
-                "http://{}/{}",
-                address, "services/collector/event"
+                "http://{address}/{}", "services/collector/event"
             ))
             .header("Authorization", format!("Splunk {TOKEN}"))
             .body::<&[u8]>(message);
@@ -2977,9 +3052,9 @@ mod tests {
     /// This test will fail once `warp` crate fixes support for
     /// custom connection listener, at that point this test can be
     /// modified to pass.
-    /// https://github.com/vectordotdev/vector/issues/7097
-    /// https://github.com/seanmonstar/warp/issues/830
-    /// https://github.com/seanmonstar/warp/pull/713
+    /// <https://github.com/vectordotdev/vector/issues/7097>
+    /// <https://github.com/seanmonstar/warp/issues/830>
+    /// <https://github.com/seanmonstar/warp/pull/713>
     #[tokio::test]
     async fn host_test() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -3361,7 +3436,7 @@ mod tests {
         PortGuard,
     ) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let (_guard, address) = next_addr();
+        let (port_guard, address) = next_addr();
         let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
@@ -3369,10 +3444,10 @@ mod tests {
                 token: Some(TOKEN.to_owned().into()),
                 valid_tokens: None,
                 tls: None,
-                acknowledgements: Default::default(),
+                acknowledgements: HecAcknowledgementsConfig::default(),
                 store_hec_token: false,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event,
                 raw,
             }
@@ -3380,10 +3455,10 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
-        (recv, address, _guard)
+        (recv, address, port_guard)
     }
 
     /// Codec config that just sets `decoding` (default framing).
@@ -3447,7 +3522,7 @@ mod tests {
             let event = collect_n(source, 1).await.remove(0);
             let log = event.as_log();
             assert_eq!(log["foo"], "bar".into());
-            assert_eq!(*log.get("nested.k").unwrap(), 1.into());
+            assert_eq!(*log.get(event_path!("nested", "k")).unwrap(), 1.into());
             assert_eq!(
                 log[log_schema().host_key().unwrap().to_string().as_str()],
                 "h".into()
@@ -3541,7 +3616,9 @@ mod tests {
             let (source, address, _guard) = source_with_codec(
                 CodecConfig::default(),
                 codec_full(
-                    Some(FramingConfig::NewlineDelimited(Default::default())),
+                    Some(FramingConfig::NewlineDelimited(
+                        NewlineDelimitedDecoderConfig::default(),
+                    )),
                     Some(DeserializerConfig::Bytes),
                 ),
             )
@@ -3606,7 +3683,9 @@ mod tests {
             let (source, address, _guard) = source_with_codec(
                 codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
                 codec_full(
-                    Some(FramingConfig::NewlineDelimited(Default::default())),
+                    Some(FramingConfig::NewlineDelimited(
+                        NewlineDelimitedDecoderConfig::default(),
+                    )),
                     Some(DeserializerConfig::Bytes),
                 ),
             )
@@ -3634,14 +3713,14 @@ mod tests {
             // The /event request produces one log with `foo=bar`.
             let event_log = events
                 .iter()
-                .find(|e| e.as_log().contains("foo"))
+                .find(|e| e.as_log().contains(event_path!("foo")))
                 .expect("expected /event request to produce a log with `foo` set");
             assert_eq!(event_log.as_log()["foo"], "bar".into());
 
             // The /raw request produces three logs whose messages are the lines.
             let raw_messages: Vec<String> = events
                 .iter()
-                .filter(|e| !e.as_log().contains("foo"))
+                .filter(|e| !e.as_log().contains(event_path!("foo")))
                 .map(|e| {
                     e.as_log()[log_schema().message_key().unwrap().to_string()]
                         .to_string_lossy()
@@ -3664,14 +3743,14 @@ mod tests {
     #[tokio::test]
     async fn decoder_vrl_reads_envelope_metadata() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let vrl_source = r#"
+            let vrl_source = r"
                 # Read envelope metadata injected before this VRL program runs.
                 .envelope_host = string!(%splunk_hec.host)
                 .envelope_sourcetype = string!(%splunk_hec.sourcetype)
 
                 # Decode the inner JSON payload (the bytes of the `event` string).
                 . = merge!(parse_json!(string!(.message)), .)
-            "#;
+            ";
 
             let event_codec = codec_decoding(
                 DeserializerConfig::Vrl(VrlDeserializerConfig {
@@ -3758,7 +3837,7 @@ mod tests {
                 acknowledgements: ack_config,
                 store_hec_token: false,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event: CodecConfig::default(),
                 raw: codec_decoding(vector_lib::codecs::JsonDeserializerConfig::default().into()),
             }
@@ -3766,7 +3845,7 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
 
@@ -3811,10 +3890,12 @@ mod tests {
                 acknowledgements: ack_config,
                 store_hec_token: false,
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 event: CodecConfig::default(),
                 raw: codec_full(
-                    Some(FramingConfig::NewlineDelimited(Default::default())),
+                    Some(FramingConfig::NewlineDelimited(
+                        NewlineDelimitedDecoderConfig::default(),
+                    )),
                     Some(vector_lib::codecs::JsonDeserializerConfig::default().into()),
                 ),
             }
@@ -3822,7 +3903,7 @@ mod tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
 
@@ -3852,7 +3933,9 @@ mod tests {
         // envelope's zero-indexed position, not the cumulative event count.
         let (source, address, _guard) = source_with_codec(
             codec_full(
-                Some(FramingConfig::NewlineDelimited(Default::default())),
+                Some(FramingConfig::NewlineDelimited(
+                    NewlineDelimitedDecoderConfig::default(),
+                )),
                 Some(DeserializerConfig::Bytes),
             ),
             CodecConfig::default(),
@@ -4047,7 +4130,7 @@ mod tests {
 
             let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
             let framing = BytesDecoderConfig::new().into();
-            let decoding = DeserializerConfig::Json(Default::default());
+            let decoding = DeserializerConfig::Json(JsonDeserializerConfig::default());
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,

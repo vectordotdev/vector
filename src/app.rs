@@ -25,7 +25,7 @@ use crate::api;
 use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
-    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    config::{self, Component, ComponentConfig, ComponentKind, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
     internal_events::{
@@ -62,6 +62,10 @@ pub struct Application {
 }
 
 impl ApplicationConfig {
+    /// # Errors
+    /// Returns an exit code if configuration loading, watching, or topology startup fails.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
     pub async fn from_opts(
         opts: &RootOpts,
         signal_handler: &mut SignalHandler,
@@ -86,7 +90,6 @@ impl ApplicationConfig {
             watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
-            !opts.disable_env_var_interpolation,
             graceful_shutdown_duration,
             signal_handler,
         )
@@ -95,6 +98,8 @@ impl ApplicationConfig {
         Self::from_config(config_paths, config, extra_context).await
     }
 
+    /// # Errors
+    /// Returns a configuration exit code if the topology cannot start.
     pub async fn from_config(
         config_paths: Vec<ConfigPath>,
         config: Config,
@@ -119,6 +124,8 @@ impl ApplicationConfig {
         })
     }
 
+    /// # Errors
+    /// Returns a configuration exit code if the internal topology cannot start.
     pub async fn add_internal_config(
         &mut self,
         config: Config,
@@ -175,6 +182,7 @@ impl ApplicationConfig {
 }
 
 impl Application {
+    #[must_use]
     pub fn run(extra_context: ExtraContext) -> ExitStatus {
         let (runtime, app) =
             Self::prepare_start(extra_context).unwrap_or_else(|code| std::process::exit(code));
@@ -182,6 +190,9 @@ impl Application {
         runtime.block_on(app.run())
     }
 
+    /// # Errors
+    /// Returns the exit code from argument parsing, initialization, configuration loading,
+    /// or a completed subcommand.
     pub fn prepare_start(
         extra_context: ExtraContext,
     ) -> Result<(Runtime, StartedApplication), ExitCode> {
@@ -189,6 +200,9 @@ impl Application {
             .and_then(|(runtime, app)| app.start(runtime.handle()).map(|app| (runtime, app)))
     }
 
+    /// # Errors
+    /// Returns the exit code from argument parsing, initialization, configuration loading,
+    /// or a completed subcommand.
     pub fn prepare(extra_context: ExtraContext) -> Result<(Runtime, Self), ExitCode> {
         let opts = Opts::get_matches().map_err(|error| {
             // Printing to stdout/err can itself fail; ignore it.
@@ -199,11 +213,18 @@ impl Application {
         Self::prepare_from_opts(opts, extra_context)
     }
 
+    /// # Errors
+    /// Returns an exit code if initialization or configuration loading fails, or when a
+    /// subcommand finishes.
     pub fn prepare_from_opts(
         opts: Opts,
         extra_context: ExtraContext,
     ) -> Result<(Runtime, Self), ExitCode> {
         opts.root.init_global();
+
+        crate::sources::util::set_max_decompressed_size_bytes(
+            opts.root.max_decompressed_size_bytes,
+        );
 
         let color = opts.root.color.use_color();
 
@@ -212,7 +233,13 @@ impl Application {
             opts.root.log_format,
             opts.log_level(),
             opts.root.internal_log_rate_limit,
+            opts.root.internal_logs_source_rate_limit,
         );
+
+        #[cfg(unix)]
+        if opts.root.raise_fd_limit {
+            crate::cli::raise_file_descriptor_limit();
+        }
 
         // Set global color preference for downstream modules
         crate::set_global_color(color);
@@ -224,14 +251,25 @@ impl Application {
             );
         }
 
-        let runtime = build_runtime(opts.root.threads, "vector-worker")?;
+        let runtime = build_runtime(
+            opts.root.threads,
+            opts.root.chunk_size_events,
+            "vector-worker",
+        )?;
 
         // Signal handler for OS and provider messages.
         let mut signals = SignalPair::new(&runtime);
 
         if let Some(sub_command) = &opts.sub_command {
+            // Combine root and subcommand flags before setting the global once.
+            config::set_env_var_interpolation(
+                opts.root.dangerously_allow_env_var_interpolation
+                    || sub_command.dangerously_allow_env_var_interpolation(),
+            );
             return Err(runtime.block_on(sub_command.execute(signals, color)));
         }
+
+        config::set_env_var_interpolation(opts.root.dangerously_allow_env_var_interpolation);
 
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
@@ -249,6 +287,8 @@ impl Application {
         ))
     }
 
+    /// # Errors
+    /// Currently always returns `Ok`.
     pub fn start(self, handle: &Handle) -> Result<StartedApplication, ExitCode> {
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
@@ -282,7 +322,6 @@ impl Application {
             signals,
             topology_controller,
             allow_empty_config: root_opts.allow_empty_config,
-            interpolate_env: !root_opts.disable_env_var_interpolation,
         })
     }
 }
@@ -294,14 +333,17 @@ pub struct StartedApplication {
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub allow_empty_config: bool,
-    pub interpolate_env: bool,
 }
 
 impl StartedApplication {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
     pub async fn run(self) -> ExitStatus {
         self.main().await.shutdown().await
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
     pub async fn main(self) -> FinishedApplication {
         let Self {
             config_paths,
@@ -310,7 +352,6 @@ impl StartedApplication {
             topology_controller,
             internal_topologies,
             allow_empty_config,
-            interpolate_env,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -327,13 +368,12 @@ impl StartedApplication {
                     &config_paths,
                     &mut signal_handler,
                     allow_empty_config,
-                    interpolate_env,
                 ).await {
                     break signal;
                 },
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 error = graceful_crash.next() => break SignalTo::Shutdown(error),
-                _ = TopologyController::sources_finished(topology_controller.clone()), if has_sources => {
+                () = TopologyController::sources_finished(topology_controller.clone()), if has_sources => {
                     info!("All sources have finished.");
                     break SignalTo::Shutdown(None)
                 } ,
@@ -350,13 +390,14 @@ impl StartedApplication {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::large_futures, reason = "Boxing needs profiling")]
 async fn handle_signal(
     signal: Result<SignalTo, RecvError>,
     topology_controller: &SharedTopologyController,
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
     allow_empty_config: bool,
-    interpolate_env: bool,
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadComponents(components_to_reload)) => {
@@ -375,7 +416,6 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
-                interpolate_env,
             )
             .await;
 
@@ -398,7 +438,6 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
-                interpolate_env,
             )
             .await;
 
@@ -430,7 +469,7 @@ async fn handle_signal(
             None
         }
         Err(RecvError::Lagged(amt)) => {
-            warn!("Overflow, dropped {} signals.", amt);
+            warn!("Overflow, dropped {amt} signals.");
             None
         }
         Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),
@@ -463,6 +502,8 @@ pub struct FinishedApplication {
 }
 
 impl FinishedApplication {
+    /// # Panics
+    /// Panics if the topology controller is still shared or the signal is not shutdown or quit.
     pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
             signal,
@@ -479,7 +520,9 @@ impl FinishedApplication {
             .into_inner();
 
         let status = match signal {
-            SignalTo::Shutdown(_) => Self::stop(topology_controller, signal_rx).await,
+            SignalTo::Shutdown(triggering_error) => {
+                Self::stop(topology_controller, signal_rx, triggering_error.is_none()).await
+            }
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         };
@@ -491,11 +534,18 @@ impl FinishedApplication {
         status
     }
 
-    async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+    async fn stop(
+        topology_controller: TopologyController,
+        mut signal_rx: SignalRx,
+        clean_shutdown: bool,
+    ) -> ExitStatus {
         emit!(VectorStopping);
         tokio::select! {
-            _ = topology_controller.stop() => {
+            drained = topology_controller.stop() => {
                 emit!(VectorStopped);
+                if clean_shutdown && drained {
+                    info!("All components shut down gracefully.");
+                }
                 ExitStatus::from_raw({
                     #[cfg(windows)]
                     {
@@ -536,7 +586,16 @@ fn get_log_levels(default: &str) -> String {
         .unwrap_or_else(|_| default.into())
 }
 
-pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
+/// # Errors
+/// Returns a configuration exit code for zero threads or buffer-size overflow.
+///
+/// # Panics
+/// Panics if global runtime settings are already initialized or the runtime cannot be created.
+pub fn build_runtime(
+    threads: Option<usize>,
+    chunk_size_events: Option<NonZeroUsize>,
+    thread_name: &str,
+) -> Result<Runtime, ExitCode> {
     let mut rt_builder = runtime::Builder::new_multi_thread();
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
@@ -551,16 +610,45 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    debug!(message = "Building runtime.", worker_threads = threads);
+    let chunk_size_events = chunk_size_events.map_or(
+        vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS,
+        NonZeroUsize::get,
+    );
+
+    let Some(source_sender_buffer_size) = threads.checked_mul(chunk_size_events) else {
+        error!(
+            "The `chunk_size_events` argument is too large for the configured number of threads."
+        );
+        return Err(exitcode::CONFIG);
+    };
+    let Some(ready_array_capacity) =
+        chunk_size_events.checked_mul(crate::topology::builder::READY_ARRAY_CAPACITY_CHUNKS)
+    else {
+        error!("The `chunk_size_events` argument is too large.");
+        return Err(exitcode::CONFIG);
+    };
+
+    vector_lib::source_sender::set_chunk_size_events(chunk_size_events);
+    crate::topology::builder::set_source_sender_buffer_size(source_sender_buffer_size);
+    crate::topology::builder::set_ready_array_capacity(ready_array_capacity);
+
+    debug!(
+        message = "Building runtime.",
+        worker_threads = threads,
+        chunk_size_events
+    );
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
+/// # Errors
+/// Returns a configuration exit code if paths, configuration loading, or watcher setup fail.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::large_futures, reason = "Boxing needs profiling")]
 pub async fn load_configs(
     config_paths: &[ConfigPath],
     watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
     allow_empty_config: bool,
-    interpolate_env: bool,
     graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
@@ -580,7 +668,6 @@ pub async fn load_configs(
         &config_paths,
         signal_handler,
         allow_empty_config,
-        interpolate_env,
     )
     .await
     .map_err(handle_config_errors)?;
@@ -588,34 +675,30 @@ pub async fn load_configs(
     let mut watched_component_paths = Vec::new();
 
     if let Some(watcher_conf) = watcher_conf {
-        for (name, transform) in config.transforms() {
-            let files = transform.inner.files_to_watch();
+        for (name, component) in config.components() {
+            let files = match &component {
+                Component::Source(_) => continue,
+                Component::Transform(transform) => transform.inner.files_to_watch(),
+                Component::Sink(sink) => sink.inner.files_to_watch(),
+                Component::EnrichmentTable(table) => table.inner.files_to_watch(),
+            };
             let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
+                files.iter().map(|path| (*path).clone()).collect(),
                 name.clone(),
-                ComponentType::Transform,
+                component.kind(),
             );
             watched_component_paths.push(component_config);
-        }
 
-        for (name, sink) in config.sinks() {
-            let files = sink.inner.files_to_watch();
-            let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
-                name.clone(),
-                ComponentType::Sink,
-            );
-            watched_component_paths.push(component_config);
-        }
-
-        for (name, table) in config.enrichment_tables() {
-            let files = table.inner.files_to_watch();
-            let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
-                name.clone(),
-                ComponentType::EnrichmentTable,
-            );
-            watched_component_paths.push(component_config);
+            if let Component::EnrichmentTable(table) = &component
+                && table.as_sink(name).is_some()
+            {
+                let sink_component_config = ComponentConfig::new(
+                    files.into_iter().cloned().collect(),
+                    name.clone(),
+                    ComponentKind::Sink,
+                );
+                watched_component_paths.push(sink_component_config);
+            }
         }
 
         info!(
@@ -653,21 +736,36 @@ pub async fn load_configs(
     Ok(config)
 }
 
-pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {
+pub fn init_logging(
+    color: bool,
+    format: LogFormat,
+    log_level: &str,
+    internal_log_rate_limit_secs: u64,
+    internal_logs_source_rate_limit_secs: Option<NonZeroU64>,
+) {
     let level = get_log_levels(log_level);
     let json = match format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
 
-    trace::init(color, json, &level, rate);
+    trace::init(
+        color,
+        json,
+        &level,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs,
+    );
     debug!(
         message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs =
+            internal_logs_source_rate_limit_secs.map(NonZeroU64::get),
     );
-    info!(message = "Log level is enabled.", level = ?level);
+    info!(message = "Log level is enabled.", ?level);
 }
 
+#[must_use]
 pub fn watcher_config(
     method: WatchConfigMethod,
     interval: NonZeroU64,

@@ -2,10 +2,10 @@
 
 use indoc::formatdoc;
 
-/// Creates a single demo_logs source with blackhole sink
+/// Creates a single `demo_logs` source with blackhole sink
 pub fn single_source_config(source_name: &str, interval_secs: f64, count: Option<u32>) -> String {
     let count_line = count
-        .map(|c| format!("    count: {}\n", c))
+        .map(|c| format!("    count: {c}\n"))
         .unwrap_or_default();
 
     formatdoc! {"
@@ -22,7 +22,7 @@ pub fn single_source_config(source_name: &str, interval_secs: f64, count: Option
     "}
 }
 
-/// Creates two demo_logs sources with shared blackhole sink
+/// Creates two `demo_logs` sources with shared blackhole sink
 pub fn dual_source_config(
     source1: &str,
     source2: &str,
@@ -30,7 +30,7 @@ pub fn dual_source_config(
     count: Option<u32>,
 ) -> String {
     let count_line = count
-        .map(|c| format!("    count: {}\n", c))
+        .map(|c| format!("    count: {c}\n"))
         .unwrap_or_default();
 
     formatdoc! {"

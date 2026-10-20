@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     fmt,
     future::Future,
     pin::Pin,
@@ -9,7 +10,9 @@ use futures::{FutureExt, future::BoxFuture};
 use pin_project::pin_project;
 use snafu::Snafu;
 use tokio::task::JoinError;
-use vector_lib::{buffers::topology::channel::BufferReceiverStream, event::EventArray};
+use vector_lib::{
+    buffers::topology::channel::BufferReceiverStream, event::EventArray, sink::SinkError,
+};
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
@@ -27,9 +30,7 @@ pub(crate) enum TaskError {
     #[snafu(display("the task was cancelled before it completed"))]
     Cancelled,
     #[snafu(display("the task panicked and was aborted"))]
-    Panicked,
-    #[snafu(display("the task completed with an error"))]
-    Opaque,
+    Panicked { panic: String },
     #[snafu(display("{}", source))]
     Wrapped { source: crate::Error },
 }
@@ -38,6 +39,28 @@ impl TaskError {
     pub fn wrapped(e: crate::Error) -> Self {
         Self::Wrapped { source: e }
     }
+
+    pub fn panicked(payload: &(dyn Any + Send)) -> Self {
+        let panic = payload
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| payload.downcast_ref::<&str>().copied())
+            .unwrap_or("non-string panic payload")
+            .to_owned();
+        Self::Panicked { panic }
+    }
+}
+
+impl From<crate::Error> for TaskError {
+    fn from(error: crate::Error) -> Self {
+        Self::wrapped(error)
+    }
+}
+
+impl From<SinkError> for TaskError {
+    fn from(error: SinkError) -> Self {
+        Self::wrapped(error.into_inner())
+    }
 }
 
 impl From<JoinError> for TaskError {
@@ -45,7 +68,7 @@ impl From<JoinError> for TaskError {
         if e.is_cancelled() {
             Self::Cancelled
         } else {
-            Self::Panicked
+            Self::panicked(e.into_panic().as_ref())
         }
     }
 }
@@ -78,9 +101,8 @@ impl Task {
         self.key.id()
     }
 
-    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
-    pub fn typetag(&self) -> &str {
-        &self.typetag
+    pub const fn typetag(&self) -> &str {
+        self.typetag.as_str()
     }
 }
 
@@ -98,6 +120,6 @@ impl fmt::Debug for Task {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
             .field("typetag", &self.typetag)
-            .finish()
+            .finish_non_exhaustive()
     }
 }

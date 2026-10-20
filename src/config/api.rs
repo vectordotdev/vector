@@ -13,7 +13,7 @@ use vector_lib::configurable::configurable_component;
 pub struct Options {
     /// Whether the API is enabled for this Vector instance.
     #[serde(default = "default_enabled")]
-    #[configurable(metadata(docs::common = true, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub enabled: bool,
 
     /// The network address to which the API should bind. If you're running
@@ -22,7 +22,7 @@ pub struct Options {
     #[serde(default = "default_address")]
     #[configurable(metadata(docs::examples = "0.0.0.0:8686"))]
     #[configurable(metadata(docs::examples = "127.0.0.1:1234"))]
-    #[configurable(metadata(docs::common = true, docs::required = false))]
+    #[configurable(metadata(docs::required = false))]
     pub address: Option<SocketAddr>,
 }
 
@@ -44,11 +44,15 @@ const fn default_enabled() -> bool {
 /// By default, the API binds to 127.0.0.1:8686. This function should remain public;
 /// `vector top`  will use it to determine which to connect to by default, if no URL
 /// override is provided.
+#[must_use]
 pub fn default_address() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8686))
 }
 
 /// Default gRPC API address for `vector top` and other API clients
+#[must_use]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn default_grpc_url() -> Url {
     let addr = default_address().unwrap();
     Url::parse(&format!("http://{addr}"))
@@ -56,6 +60,8 @@ pub fn default_grpc_url() -> Url {
 }
 
 impl Options {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn merge(&mut self, other: Self) -> Result<(), String> {
         // Merge options
 

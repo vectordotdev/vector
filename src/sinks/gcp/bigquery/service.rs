@@ -83,17 +83,18 @@ impl DriverResponse for BigqueryResponse {
                     // We really shouldn't be able to get here, but just in case
                     Ok(super::proto::google::rpc::Code::Ok) => EventStatus::Delivered,
                     // Permanent errors - retrying won't help
-                    Ok(super::proto::google::rpc::Code::InvalidArgument)
-                    | Ok(super::proto::google::rpc::Code::NotFound)
-                    | Ok(super::proto::google::rpc::Code::AlreadyExists)
-                    // PermissionDenied requires human action (IAM changes) to resolve, so fail fast.
-                    | Ok(super::proto::google::rpc::Code::PermissionDenied)
-                    | Ok(super::proto::google::rpc::Code::FailedPrecondition)
-                    | Ok(super::proto::google::rpc::Code::OutOfRange)
-                    | Ok(super::proto::google::rpc::Code::Unimplemented) => EventStatus::Rejected,
-                    // Unauthenticated is intentionally excluded since a bearer token may have just expired
-                    // and a retry will pick up the refreshed token.
-                    Ok(super::proto::google::rpc::Code::Unauthenticated) => EventStatus::Errored,
+                    Ok(
+                        super::proto::google::rpc::Code::InvalidArgument
+                        | super::proto::google::rpc::Code::NotFound
+                        | super::proto::google::rpc::Code::AlreadyExists
+                        // PermissionDenied requires human action (IAM changes) to resolve, so fail fast.
+                        | super::proto::google::rpc::Code::PermissionDenied
+                        | super::proto::google::rpc::Code::FailedPrecondition
+                        | super::proto::google::rpc::Code::OutOfRange
+                        | super::proto::google::rpc::Code::Unimplemented,
+                    ) => EventStatus::Rejected,
+                    // Everything else (including Unauthenticated, since a bearer token may have
+                    // just expired and a retry will pick up the refreshed token) is transient.
                     _ => EventStatus::Errored,
                 }
             }
@@ -150,8 +151,9 @@ impl RetryLogic for BigqueryRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            BigqueryServiceError::Transport { .. } => true,
-            BigqueryServiceError::ResponseStreamClosed => true,
+            BigqueryServiceError::Transport { .. } | BigqueryServiceError::ResponseStreamClosed => {
+                true
+            }
             // Allow transient gRPC status codes to be retried.
             // Unauthenticated is included because a bearer token may expire between the token
             // refresher updating it and the request being sent; a retry will pick up the new token.
@@ -167,11 +169,12 @@ impl RetryLogic for BigqueryRetryLogic {
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         match response.event_status() {
-            EventStatus::Delivered | EventStatus::Recorded => RetryAction::Successful,
             // Dropped means the event was abandoned without finalization.
             // It is never returned by `BigqueryResponse::event_status()` but treat it as a
             // no-op rather than a retriable error.
-            EventStatus::Dropped => RetryAction::Successful,
+            EventStatus::Delivered | EventStatus::Recorded | EventStatus::Dropped => {
+                RetryAction::Successful
+            }
             EventStatus::Errored => {
                 RetryAction::Retry("transient error in BigQuery response".into())
             }
@@ -234,15 +237,18 @@ impl Service<BigqueryRequest> for BigqueryService {
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeMap;
+
     use futures::FutureExt;
     use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
     use tokio_stream::wrappers::UnboundedReceiverStream;
     use tonic::{Request, Response, Status};
     use tower::Service;
+    use vector_lib::request_metadata::RequestMetadata;
 
-    use super::{BigqueryRequest, BigqueryService, proto};
+    use super::{BigqueryRequest, BigqueryService, EventFinalizers, proto};
 
-    /// A dumb BigQueryWrite server that can be used to test the BigqueryService.
+    /// A dumb `BigQueryWrite` server that can be used to test the `BigqueryService`.
     struct BigqueryServer {
         error: Option<Status>,
         append_rows_request_sender: UnboundedSender<(
@@ -322,7 +328,7 @@ mod test {
         }
     }
 
-    /// Create a TcpListener on some arbitrary local address and an HTTP Channel that's connected to it
+    /// Create a `TcpListener` on some arbitrary local address and an HTTP Channel that's connected to it
     async fn create_tcp_listener() -> (tokio::net::TcpListener, tonic::transport::Channel) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -339,7 +345,7 @@ mod test {
         (listener, channel)
     }
 
-    /// Run a fake BigqueryServer, providing a client, a request handler, and a handle to shut it down.
+    /// Run a fake `BigqueryServer`, providing a client, a request handler, and a handle to shut it down.
     async fn run_server() -> (
         BigqueryService,
         UnboundedReceiver<(
@@ -389,13 +395,13 @@ mod test {
                     request: proto::AppendRowsRequest {
                         write_stream: "test".to_string(),
                         offset: None,
-                        trace_id: "".to_string(),
-                        missing_value_interpretations: Default::default(),
+                        trace_id: String::new(),
+                        missing_value_interpretations: BTreeMap::new(),
                         default_missing_value_interpretation: 0,
                         rows: None,
                     },
-                    metadata: Default::default(),
-                    finalizers: Default::default(),
+                    metadata: RequestMetadata::default(),
+                    finalizers: EventFinalizers::default(),
                     uncompressed_size: 1,
                 })
                 .await
@@ -413,7 +419,7 @@ mod test {
                 )),
                 write_stream: "ack".into(),
                 updated_schema: None,
-                row_errors: Default::default(),
+                row_errors: Vec::new(),
             }))
             .unwrap();
         // clean everything up

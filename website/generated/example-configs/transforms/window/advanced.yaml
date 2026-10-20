@@ -1,0 +1,10 @@
+transforms:
+  my_transform_id:
+    type: window
+    inputs:
+      - my-source-or-transform-id
+    flush_when:
+      type: vrl
+      source: .status_code != 200 && !includes(["info", "debug"], .severity)
+    measure_cpu_usage: false
+    num_events_before: 100

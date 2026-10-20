@@ -1,6 +1,7 @@
 use crate::codecs::encoding::ProtobufSerializer;
 use bytes::BytesMut;
 use prost::{Message, encoding::encoded_len_varint};
+use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use tokio_util::codec::Encoder;
 use vector_lib::event::Finalizable;
@@ -68,8 +69,8 @@ impl BigqueryRequestBuilder {
         let request_overhead = proto::AppendRowsRequest {
             write_stream: write_stream.clone(),
             offset: None,
-            trace_id: Default::default(),
-            missing_value_interpretations: Default::default(),
+            trace_id: String::new(),
+            missing_value_interpretations: BTreeMap::new(),
             default_missing_value_interpretation: 0,
             rows: Some(proto::append_rows_request::Rows::ProtoRows(
                 proto::append_rows_request::ProtoData {
@@ -164,7 +165,7 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
                         serialized_rows = vec![];
                     }
                     let current_event_finalizers = event.take_finalizers();
-                    chunk_metadata.track_event(event);
+                    chunk_metadata.track_event(&event);
                     event_finalizers.merge(current_event_finalizers);
                     serialized_rows_len += row_framed_size;
                     serialized_rows.push(bytes.into());
@@ -189,8 +190,8 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
         let request = proto::AppendRowsRequest {
             write_stream: self.write_stream.clone(),
             offset: None, // not supported by _default stream
-            trace_id: Default::default(),
-            missing_value_interpretations: Default::default(),
+            trace_id: String::new(),
+            missing_value_interpretations: BTreeMap::new(),
             default_missing_value_interpretation: 0,
             rows: Some(proto::append_rows_request::Rows::ProtoRows(payload)),
         };
@@ -272,7 +273,7 @@ mod test {
             })
             .collect();
         let results = request_builder.encode_events_incremental(events);
-        assert!(results.iter().all(|r| r.is_ok()));
+        assert!(results.iter().all(std::result::Result::is_ok));
         assert!(results.len() > 1);
     }
 

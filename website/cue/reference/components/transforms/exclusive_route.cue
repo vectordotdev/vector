@@ -12,7 +12,6 @@ components: transforms: exclusive_route: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      false
@@ -25,7 +24,6 @@ components: transforms: exclusive_route: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.exclusive_route.configuration

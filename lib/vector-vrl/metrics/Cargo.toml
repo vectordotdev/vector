@@ -6,11 +6,14 @@ edition = "2021"
 publish = false
 license = "MPL-2.0"
 
+[lints]
+workspace = true
+
 [dependencies]
 arc-swap.workspace = true
 const-str.workspace = true
 vrl.workspace = true
-vector-core = { path = "../../vector-core", default-features = false, features = ["vrl"] }
+vector-core = { path = "../../vector-core", default-features = false }
 vector-common = { path = "../../vector-common", default-features = false }
 tokio.workspace = true
 tokio-stream.workspace = true

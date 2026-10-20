@@ -127,7 +127,7 @@ CI=true make check-docs
 ```
 
 > When the CI flag is on, then the checker will also run a CUE format validation step.
-> Also, note that when this flag on, CUE files might be modified. See `scripts/check-docs.sh` for details.
+> Also, note that when this flag on, CUE files might be modified. See `vdev/src/commands/check/docs.rs` for details.
 
 #### Tips & tricks
 
@@ -150,9 +150,7 @@ watchexec "make check-docs"
 Contributors document user-facing changes by adding a fragment under
 [`changelog.d/`](../changelog.d/README.md); the release CUE file's user-facing
 changelog section is assembled from those fragments by `cargo vdev release
-prepare` during release prep. The CUE file's `commits:` array is populated
-from the git log via [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/)
-titles, so PR titles must follow that spec.
+prepare` during release prep.
 
 ### Release highlights
 

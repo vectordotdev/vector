@@ -72,6 +72,11 @@ where
                     Poll::Pending | Poll::Ready(None) => break,
                     Poll::Ready(Some(item)) => {
                         let fut = (this.f)(item);
+                        // `ConcurrentMap` does not instrument the spawned future itself: the
+                        // mapping closure runs on a detached task, so the current span at poll
+                        // time is not necessarily meaningful for the work being performed. It is
+                        // the caller's responsibility to propagate any span (e.g. the owning
+                        // component's span for internal metric/log tagging) into `fut`.
                         let handle = tokio::spawn(fut);
                         this.in_flight.push_back(handle);
                     }

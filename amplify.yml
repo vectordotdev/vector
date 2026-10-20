@@ -1,0 +1,61 @@
+version: 1
+applications:
+  - appRoot: website
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - source "${NVM_DIR}/nvm.sh"
+            - nvm use 24.11.0
+            - node --version
+        build:
+          commands:
+            - |
+              if [[ "${AWS_BRANCH}" == "website" ]]; then
+                make ci-production-build
+              else
+                make ci-preview-build
+              fi
+      artifacts:
+        baseDirectory: public
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
+  - appRoot: lib/vector-vrl/web-playground
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - mv ../../../scripts/ensure-wasm-target-installed.sh ./
+            - chmod +x ./ensure-wasm-target-installed.sh
+        build:
+          commands:
+            - ./ensure-wasm-target-installed.sh && wasm-pack build --target web --out-dir public/pkg
+      artifacts:
+        baseDirectory: public
+        files:
+          - "**/*"
+      cache:
+        paths: []
+  - appRoot: rust-doc
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - mkdir -p ./public
+            - bash ../scripts/environment/prepare.sh --modules=rustup,protoc
+        build:
+          commands:
+            - export PATH="$HOME/.local/bin:$PATH"
+            - make ci-docs-build
+            - echo "<meta charset=\"UTF-8\" >" > ../target/doc/index.html
+            - mv ../target/doc ./public
+            - rm -rf ../target
+      artifacts:
+        baseDirectory: public/doc
+        files:
+          - "**/*"
+      cache:
+        paths: []

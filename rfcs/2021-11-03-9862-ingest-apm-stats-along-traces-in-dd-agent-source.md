@@ -101,9 +101,9 @@ found in the trace support [RFC][trace-support-pr] and may provide relevant cont
 
 * Ongoing work on transforms to add `named_outputs` that is laying the ground for the same feature but on `sources`,
   [one PR][named-outputs-pr] has already be merged while scheduled work is tracked in the [named outputs improvements issue][named-outputs-improvements].
-* [Ongoing work on schemas][schema-rfc] will ultimately offer a programatic way of validating required fields and
+* [Ongoing work on schemas][schema-rfc] will ultimately offer a programmatic way of validating required fields and
   express constrains on incoming event for a given sink. Traces & APM stats are a good fit for that because they will be
-  represented as standard Vector events, but sinks handling thos will expect some mandatory information.
+  represented as standard Vector events, but sinks handling those will expect some mandatory information.
 * An [official crate for dd-sketches][sketches-rs] is being worked on.
 
 [named-outputs-pr]: https://github.com/vectordotdev/vector/pull/9169
@@ -209,7 +209,7 @@ APM stats support would be done according to the following plan:
 
 At a certain point in time, when [sketches-rs][sketches-rs] will be production ready:
 
-* Swich Vector sketches to use the crate [sketches-rs][sketches-rs] instead of the Agent based implementation
+* Switch Vector sketches to use the crate [sketches-rs][sketches-rs] instead of the Agent based implementation
 * Then relocate conversion logic: sketch conversion will then be effectively useless in traces handling, but the
   `datadog_agent` source and the `datadog_metrics` sink will then have to handle conversion between vector sketches
   (plain ddsketches) and the agent variation (note: it's on the crate roadmap to offer that kind of conversion)
@@ -244,7 +244,7 @@ Regarding the internal representation, APM stats could alternatively be represen
 numerical fields. As stated above a hybrid approach like allowing a log event to have metric fields or introducing
 metric event that could hold multiple value could also be a solution.
 
-Regarding sketches, thos from APM stats are not exactly the same as the internal representation we have in Vector, thus
+Regarding sketches, those from APM stats are not exactly the same as the internal representation we have in Vector, thus
 converting them to the internal representation will required some plumbing this could be avoided by not decoding those
 sketches as all and keeping those as opaque data/raw bytes slices inside Vector.
 

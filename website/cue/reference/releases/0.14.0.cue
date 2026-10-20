@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.14.0": {
-	date:     "2021-06-03"
-	codename: ""
+	date: "2021-06-03"
 
 	description: """
 		The Vector team is pleased to announce version 0.14.0!

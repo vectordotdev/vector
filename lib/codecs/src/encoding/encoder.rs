@@ -8,74 +8,73 @@ use crate::encoding::ArrowStreamSerializer;
 #[cfg(feature = "parquet")]
 use crate::encoding::ParquetSerializer;
 use crate::{
-    encoding::{Error, Framer, ProtoBatchSerializer, Serializer},
+    encoding::{Error, Framer, Serializer},
     internal_events::{EncoderFramingError, EncoderSerializeError},
 };
 
 /// The output of a batch encoding operation.
 ///
-/// Different batch serializers produce different output types:
-/// - Arrow serializer produces a `RecordBatch`
-/// - Proto serializer produces individual byte buffers per event
+/// Only available when the `arrow` feature is enabled.
+#[cfg(feature = "arrow")]
 #[derive(Debug)]
 pub enum BatchOutput {
-    /// An Arrow RecordBatch containing all events encoded as columnar data.
-    #[cfg(feature = "arrow")]
+    /// An Arrow `RecordBatch` containing all events encoded as columnar data.
     Arrow(arrow::record_batch::RecordBatch),
-    /// A list of individually-serialized records (one per event).
-    Records(Vec<Vec<u8>>),
 }
 
 /// Serializers that support batch encoding (encoding all events at once).
+///
+/// Only available when the `arrow` feature is enabled (the `parquet` feature
+/// implies `arrow`).
+#[cfg(feature = "arrow")]
 #[derive(Debug, Clone)]
 pub enum BatchSerializer {
     /// Arrow IPC stream format serializer.
-    #[cfg(feature = "arrow")]
     Arrow(ArrowStreamSerializer),
     /// Parquet format serializer.
     #[cfg(feature = "parquet")]
     Parquet(Box<ParquetSerializer>),
-    /// Protobuf batch serializer that encodes each event individually.
-    ProtoBatch(ProtoBatchSerializer),
 }
 
 /// An encoder that encodes batches of events.
+#[cfg(feature = "arrow")]
 #[derive(Debug, Clone)]
 pub struct BatchEncoder {
     serializer: BatchSerializer,
 }
 
+#[cfg(feature = "arrow")]
 impl BatchEncoder {
     /// Creates a new `BatchEncoder` with the specified batch serializer.
+    #[must_use]
     pub const fn new(serializer: BatchSerializer) -> Self {
         Self { serializer }
     }
 
     /// Get the batch serializer.
+    #[must_use]
     pub const fn serializer(&self) -> &BatchSerializer {
         &self.serializer
     }
 
     /// Get the HTTP content type.
-    ///
-    /// Returns `None` for serializers that do not produce a single HTTP body
-    /// (e.g. `ProtoBatch`, which emits one record per event for an out-of-band
-    /// transport rather than an HTTP payload).
-    #[cfg(any(feature = "arrow", feature = "parquet"))]
+    #[must_use]
     pub const fn content_type(&self) -> Option<&'static str> {
         match &self.serializer {
-            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(_) => Some("application/vnd.apache.arrow.stream"),
             #[cfg(feature = "parquet")]
             BatchSerializer::Parquet(_) => Some("application/vnd.apache.parquet"),
-            BatchSerializer::ProtoBatch(_) => None,
         }
     }
 
     /// Encode a batch of events into a `BatchOutput`.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
         match &self.serializer {
-            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
                 let record_batch = serializer.encode_to_record_batch(events).map_err(|err| {
                     use crate::encoding::ArrowEncodingError;
@@ -88,12 +87,6 @@ impl BatchEncoder {
                 })?;
                 Ok(BatchOutput::Arrow(record_batch))
             }
-            BatchSerializer::ProtoBatch(serializer) => {
-                let records = serializer
-                    .encode_batch(events)
-                    .map_err(|err| Error::SerializingError(Box::new(err)))?;
-                Ok(BatchOutput::Records(records))
-            }
             #[cfg(feature = "parquet")]
             BatchSerializer::Parquet(_) => Err(Error::SerializingError(Box::from(
                 "Parquet serializer does not support encode_batch; use the tokio Encoder interface instead",
@@ -102,13 +95,12 @@ impl BatchEncoder {
     }
 }
 
+#[cfg(feature = "arrow")]
 impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
     type Error = Error;
 
-    #[allow(unused_variables)]
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match &mut self.serializer {
-            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
                 serializer.encode(events, buffer).map_err(|err| {
                     use crate::encoding::ArrowEncodingError;
@@ -124,9 +116,6 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
             BatchSerializer::Parquet(serializer) => serializer
                 .encode(events, buffer)
                 .map_err(Error::SerializingError),
-            BatchSerializer::ProtoBatch(_) => Err(Error::SerializingError(Box::from(
-                "ProtoBatch serializer does not support the tokio Encoder interface; use BatchEncoder::encode_batch() instead",
-            ))),
         }
     }
 }
@@ -137,6 +126,7 @@ pub enum EncoderKind {
     /// Uses framing to encode individual events
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
+    #[cfg(feature = "arrow")]
     Batch(BatchEncoder),
 }
 
@@ -177,6 +167,11 @@ where
     Framer: Clone,
 {
     /// Serialize the event without applying framing.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn serialize(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
         let len = buffer.len();
         let mut payload = buffer.split_off(len);
@@ -201,21 +196,25 @@ impl Encoder<Framer> {
     /// Creates a new `Encoder` with the specified `Serializer` to produce bytes
     /// from a structured event, and the `Framer` to wrap these into a byte
     /// frame.
+    #[must_use]
     pub const fn new(framer: Framer, serializer: Serializer) -> Self {
         Self { framer, serializer }
     }
 
     /// Get the framer.
+    #[must_use]
     pub const fn framer(&self) -> &Framer {
         &self.framer
     }
 
     /// Get the serializer.
+    #[must_use]
     pub const fn serializer(&self) -> &Serializer {
         &self.serializer
     }
 
     /// Get the prefix that encloses a batch of events.
+    #[must_use]
     pub const fn batch_prefix(&self) -> &[u8] {
         match (&self.framer, &self.serializer) {
             (
@@ -229,6 +228,7 @@ impl Encoder<Framer> {
     }
 
     /// Get the suffix that encloses a batch of events.
+    #[must_use]
     pub const fn batch_suffix(&self, empty: bool) -> &[u8] {
         match (&self.framer, &self.serializer, empty) {
             (
@@ -244,6 +244,7 @@ impl Encoder<Framer> {
     }
 
     /// Get the HTTP content type.
+    #[must_use]
     pub const fn content_type(&self) -> &'static str {
         match (&self.serializer, &self.framer) {
             (Serializer::Json(_) | Serializer::NativeJson(_), Framer::NewlineDelimited(_)) => {
@@ -255,7 +256,7 @@ impl Encoder<Framer> {
                     delimiter: b',',
                 }),
             ) => "application/json",
-            (Serializer::Native(_), _) | (Serializer::Protobuf(_), _) => "application/octet-stream",
+            (Serializer::Native(_) | Serializer::Protobuf(_), _) => "application/octet-stream",
             (
                 Serializer::Avro(_)
                 | Serializer::Cef(_)
@@ -279,6 +280,7 @@ impl Encoder<Framer> {
 impl Encoder<()> {
     /// Creates a new `Encoder` with the specified `Serializer` to produce bytes
     /// from a structured event.
+    #[must_use]
     pub const fn new(serializer: Serializer) -> Self {
         Self {
             framer: (),
@@ -287,6 +289,7 @@ impl Encoder<()> {
     }
 
     /// Get the serializer.
+    #[must_use]
     pub const fn serializer(&self) -> &Serializer {
         &self.serializer
     }
@@ -350,7 +353,7 @@ mod tests {
     impl tokio_util::codec::Encoder<()> for ParenEncoder {
         type Error = BoxedFramingError;
 
-        fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+        fn encode(&mut self, (): (), dst: &mut BytesMut) -> Result<(), Self::Error> {
             dst.reserve(2);
             let inner = dst.split();
             dst.put_u8(b'(');
@@ -380,7 +383,7 @@ mod tests {
     {
         type Error = BoxedFramingError;
 
-        fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
+        fn encode(&mut self, (): (), dst: &mut BytesMut) -> Result<(), Self::Error> {
             self.0.encode((), dst)?;
             let result = if self.1 == self.2 {
                 Err(Box::new(std::io::Error::other("error")) as _)

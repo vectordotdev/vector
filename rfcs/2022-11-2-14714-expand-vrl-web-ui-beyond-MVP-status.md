@@ -90,7 +90,7 @@ making it an easier sell for users, or at the very least an easier demo to poten
 
 - Why should we not do this?
 We should not do this if the MVP playground is already enough and no longer needs more iteration,
-if we do not forsee making the playground more complex than it already is in the MVP, then the
+if we do not foresee making the playground more complex than it already is in the MVP, then the
 effort will not be useful.
 
 - What kind on ongoing burden does this place on the team?

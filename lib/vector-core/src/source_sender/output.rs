@@ -24,7 +24,7 @@ use vector_common::{
 };
 use vrl::value::Value;
 
-use super::{CHUNK_SIZE, SendError, SourceSenderItem};
+use super::{PostProcessor, SendError, SourceSenderItem, chunk_size_events};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
@@ -76,7 +76,7 @@ impl Drop for UnsentEventCount {
             let _enter = self.span.enter();
             internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,
-                reason: "Source send cancelled.",
+                reason: "Source send interrupted mid-flight; pipeline may be overloaded or shutting down.",
             });
         }
     }
@@ -93,6 +93,8 @@ pub(super) struct Output {
     /// `EventMetadata` for all event sent through here.
     id: Arc<OutputId>,
     timeout: Option<Duration>,
+    /// Optional post-processing step applied to every event before it is placed on the channel.
+    post_processor: Option<Arc<dyn PostProcessor>>,
 }
 
 #[derive(Clone, Default)]
@@ -152,9 +154,16 @@ impl Output {
                 log_definition,
                 id: Arc::new(output_id),
                 timeout,
+                post_processor: None,
             },
             rx,
         )
+    }
+
+    /// Attach a post-processing step to this output, replacing any previously set one.
+    pub(super) fn with_post_processor(mut self, pp: Arc<dyn PostProcessor>) -> Self {
+        self.post_processor = Some(pp);
+        self
     }
 
     pub(super) async fn send(
@@ -172,7 +181,34 @@ impl Output {
         unsent_event_count: &mut UnsentEventCount,
         reference: i64,
     ) -> Result<(), SendError> {
+        // Apply post-processor with typed dispatch. Each method receives a reference to the
+        // concrete event type, making it impossible at the type level to change the variant.
+        // Original finalizers are stripped before calling the processor so they cannot be
+        // accidentally dropped if the processor replaces the entire inner value
+        // (e.g. `*log = LogEvent::default()`). Any finalizers added by the processor are
+        // collected after and merged back alongside the originals.
+        //
+        // Note: post-processing runs before the send_with_timeout call. Because PostProcessor
+        // methods are synchronous, they cannot be cancelled by tokio::time::timeout (which
+        // only fires at .await points). Implementations are expected to be fast; heavy
+        // processing should be done in a transform, not here.
+        if let Some(ref pp) = self.post_processor {
+            events.iter_events_mut().for_each(|mut event| {
+                let original_finalizers = event.metadata_mut().take_finalizers();
+                pp.process(&mut event);
+                let new_finalizers = event.metadata_mut().take_finalizers();
+                event.metadata_mut().merge_finalizers(original_finalizers);
+                event.metadata_mut().merge_finalizers(new_finalizers);
+            });
+        }
+
+        // Capture send_reference after post-processing so that buffer_send_duration_seconds
+        // excludes processor CPU time and reflects only lag-time emission, schema attachment,
+        // and buffer enqueue latency.
         let send_reference = Instant::now();
+
+        // Emit lag time after the post-processor so that any timestamp mutations made by the
+        // processor are reflected in the metric.
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));
@@ -189,7 +225,6 @@ impl Output {
         let count = events.len();
 
         let send_start = Instant::now();
-
         let send_result = self.send_with_timeout(events, send_reference).await;
 
         if let Some(send_latency) = &self.metrics.send_latency {
@@ -246,9 +281,9 @@ impl Output {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        let mut stream = events.ready_chunks(CHUNK_SIZE);
+        let mut stream = events.ready_chunks(chunk_size_events());
         while let Some(events) = stream.next().await {
-            self.send_batch(events.into_iter()).await?;
+            self.send_batch(events).await?;
         }
         Ok(())
     }
@@ -270,7 +305,7 @@ impl Output {
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         let send_batch_start = Instant::now();
 
-        for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
+        for events in array::events_into_arrays(events, Some(chunk_size_events())) {
             self.send_inner(events, &mut unsent_event_count, reference)
                 .await
                 .inspect_err(|error| {
@@ -293,6 +328,11 @@ impl Output {
             send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
         }
         Ok(())
+    }
+
+    /// Attach a post-processing step to this output, replacing any previously set one.
+    pub(super) fn set_post_processor(&mut self, pp: Arc<dyn PostProcessor>) {
+        self.post_processor = Some(pp);
     }
 
     /// Calculate the difference between the reference time and the

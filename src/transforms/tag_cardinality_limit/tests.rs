@@ -12,7 +12,7 @@ use vrl::compiler::prelude::Kind;
 
 use super::*;
 use crate::{
-    config::{LogNamespace, schema::Definition},
+    config::{LogNamespace, TransformConfig, TransformContext, schema::Definition},
     event::{Event, Metric, MetricTags, metric, metric::TagValue},
     test_util::components::assert_transform_compliance,
     transforms::{
@@ -121,6 +121,24 @@ fn make_transform_bloom_with_per_metric_limits(
     }
 }
 
+fn make_transform_fingerprint(
+    value_limit: usize,
+    limit_exceeded_action: LimitExceededAction,
+) -> Config {
+    Config {
+        global: Inner {
+            value_limit,
+            limit_exceeded_action,
+            mode: Mode::ExactFingerprint,
+            internal_metrics: InternalMetricsConfig::default(),
+        },
+        tracking_scope: TrackingScope::default(),
+        max_tracked_keys: None,
+        per_metric_limits: HashMap::new(),
+        per_tag_limits: HashMap::new(),
+    }
+}
+
 fn make_transform_with_global_per_tag_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
@@ -143,16 +161,33 @@ fn make_transform_with_global_per_tag_limits(
 
 #[tokio::test]
 async fn tag_cardinality_limit_drop_event_hashset() {
-    drop_event(make_transform_hashset(2, LimitExceededAction::DropEvent)).await;
+    Box::pin(drop_event(make_transform_hashset(
+        2,
+        LimitExceededAction::DropEvent,
+    )))
+    .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_drop_event_bloom() {
-    drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
+    Box::pin(drop_event(make_transform_bloom(
+        2,
+        LimitExceededAction::DropEvent,
+    )))
+    .await;
+}
+
+#[tokio::test]
+async fn tag_cardinality_limit_drop_event_fingerprint() {
+    Box::pin(drop_event(make_transform_fingerprint(
+        2,
+        LimitExceededAction::DropEvent,
+    )))
+    .await;
 }
 
 async fn drop_event(config: Config) {
-    assert_transform_compliance(async move {
+    Box::pin(assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1"));
         let mut event2 = make_metric(metric_tags!("tag1" => "val2"));
         let event3 = make_metric(metric_tags!("tag1" => "val3"));
@@ -189,22 +224,39 @@ async fn drop_event(config: Config) {
         assert_eq!(new_event2, Some(event2));
         // Third value rejected since value_limit is 2.
         assert_eq!(None, new_event3);
-    })
+    }))
     .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_drop_tag_hashset() {
-    drop_tag(make_transform_hashset(2, LimitExceededAction::DropTag)).await;
+    Box::pin(drop_tag(make_transform_hashset(
+        2,
+        LimitExceededAction::DropTag,
+    )))
+    .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_drop_tag_bloom() {
-    drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
+    Box::pin(drop_tag(make_transform_bloom(
+        2,
+        LimitExceededAction::DropTag,
+    )))
+    .await;
+}
+
+#[tokio::test]
+async fn tag_cardinality_limit_drop_tag_fingerprint() {
+    Box::pin(drop_tag(make_transform_fingerprint(
+        2,
+        LimitExceededAction::DropTag,
+    )))
+    .await;
 }
 
 async fn drop_tag(config: Config) {
-    assert_transform_compliance(async move {
+    Box::pin(assert_transform_compliance(async move {
         let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
         let mut event1 = make_metric(tags1);
 
@@ -257,22 +309,30 @@ async fn drop_tag(config: Config) {
             "val1",
             new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
         );
-    })
+    }))
     .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_drop_tag_hashset_multi_value() {
-    drop_tag_multi_value(make_transform_hashset(2, LimitExceededAction::DropTag)).await;
+    Box::pin(drop_tag_multi_value(make_transform_hashset(
+        2,
+        LimitExceededAction::DropTag,
+    )))
+    .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_drop_tag_bloom_multi_value() {
-    drop_tag_multi_value(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
+    Box::pin(drop_tag_multi_value(make_transform_bloom(
+        2,
+        LimitExceededAction::DropTag,
+    )))
+    .await;
 }
 
 async fn drop_tag_multi_value(config: Config) {
-    assert_transform_compliance(async move {
+    Box::pin(assert_transform_compliance(async move {
         let mut tags1 = MetricTags::default();
         tags1.set_multi_value(
             "tag1".to_string(),
@@ -340,24 +400,32 @@ async fn drop_tag_multi_value(config: Config) {
         assert_eq!(new_event2, Some(event2));
         // The third event should have been modified to remove "tag1"
         assert_ne!(new_event3, Some(event3));
-    })
+    }))
     .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_separate_value_limit_per_tag_hashset() {
-    separate_value_limit_per_tag(make_transform_hashset(2, LimitExceededAction::DropEvent)).await;
+    Box::pin(separate_value_limit_per_tag(make_transform_hashset(
+        2,
+        LimitExceededAction::DropEvent,
+    )))
+    .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_separate_value_limit_per_tag_bloom() {
-    separate_value_limit_per_tag(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
+    Box::pin(separate_value_limit_per_tag(make_transform_bloom(
+        2,
+        LimitExceededAction::DropEvent,
+    )))
+    .await;
 }
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
 async fn separate_value_limit_per_tag(config: Config) {
-    assert_transform_compliance(async move {
+    Box::pin(assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val1"));
 
         let mut event2 = make_metric(metric_tags!("tag1" => "val2", "tag2" => "val1"));
@@ -401,7 +469,7 @@ async fn separate_value_limit_per_tag(config: Config) {
         assert_eq!(new_event1, Some(event1));
         assert_eq!(new_event2, Some(event2));
         assert_eq!(new_event3, Some(event3));
-    })
+    }))
     .await;
 }
 
@@ -461,118 +529,126 @@ fn override_inner_bloom(value_limit: usize, action: LimitExceededAction) -> Over
 
 #[tokio::test]
 async fn tag_cardinality_limit_separate_value_limit_per_metric_name_hashset() {
-    separate_value_limit_per_metric_name(make_transform_hashset_with_per_metric_limits(
-        2,
-        LimitExceededAction::DropTag,
-        HashMap::from([
-            (
-                "metricA".to_string(),
-                PerMetricConfig {
-                    namespace: None,
-                    per_tag_limits: HashMap::new(),
-                    config: override_inner_hashset(1, LimitExceededAction::DropTag),
-                },
-            ),
-            (
-                "metricB".to_string(),
-                PerMetricConfig {
-                    namespace: None,
-                    per_tag_limits: HashMap::new(),
-                    config: override_inner_hashset(5, LimitExceededAction::DropTag),
-                },
-            ),
-        ]),
+    Box::pin(separate_value_limit_per_metric_name(
+        make_transform_hashset_with_per_metric_limits(
+            2,
+            LimitExceededAction::DropTag,
+            HashMap::from([
+                (
+                    "metricA".to_string(),
+                    PerMetricConfig {
+                        namespace: None,
+                        per_tag_limits: HashMap::new(),
+                        config: override_inner_hashset(1, LimitExceededAction::DropTag),
+                    },
+                ),
+                (
+                    "metricB".to_string(),
+                    PerMetricConfig {
+                        namespace: None,
+                        per_tag_limits: HashMap::new(),
+                        config: override_inner_hashset(5, LimitExceededAction::DropTag),
+                    },
+                ),
+            ]),
+        ),
     ))
     .await;
 }
 
 #[tokio::test]
 async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
-    separate_value_limit_per_metric_name(make_transform_bloom_with_per_metric_limits(
-        2,
-        LimitExceededAction::DropTag,
-        HashMap::from([
-            (
-                "metricA".to_string(),
-                PerMetricConfig {
-                    namespace: None,
-                    per_tag_limits: HashMap::new(),
-                    config: override_inner_bloom(1, LimitExceededAction::DropTag),
-                },
-            ),
-            (
-                "metricB".to_string(),
-                PerMetricConfig {
-                    namespace: None,
-                    per_tag_limits: HashMap::new(),
-                    config: override_inner_bloom(5, LimitExceededAction::DropTag),
-                },
-            ),
-        ]),
+    Box::pin(separate_value_limit_per_metric_name(
+        make_transform_bloom_with_per_metric_limits(
+            2,
+            LimitExceededAction::DropTag,
+            HashMap::from([
+                (
+                    "metricA".to_string(),
+                    PerMetricConfig {
+                        namespace: None,
+                        per_tag_limits: HashMap::new(),
+                        config: override_inner_bloom(1, LimitExceededAction::DropTag),
+                    },
+                ),
+                (
+                    "metricB".to_string(),
+                    PerMetricConfig {
+                        namespace: None,
+                        per_tag_limits: HashMap::new(),
+                        config: override_inner_bloom(5, LimitExceededAction::DropTag),
+                    },
+                ),
+            ]),
+        ),
     ))
     .await;
 }
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn separate_value_limit_per_metric_name(config: Config) {
-    assert_transform_compliance(async move {
-        let mut event_a1 =
+    Box::pin(assert_transform_compliance(async move {
+        let mut limited_baseline =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricA");
 
         // The limit for tag1 should already be reached here
-        let mut event_a2 =
+        let mut rejected_first_tag =
             make_metric_with_name(metric_tags!("tag1" => "val2", "tag2" => "val1"), "metricA");
 
         // The limit for tag2 should be reached here
-        let mut event_a3 =
+        let mut rejected_second_tag =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val2"), "metricA");
 
         // MetricB should have all of its tags kept due to higher limit
-        let mut event_b1 =
+        let mut higher_limit_baseline =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricB");
-        let mut event_b2 =
+        let mut accepted_first_tag_change =
             make_metric_with_name(metric_tags!("tag1" => "val2", "tag2" => "val1"), "metricB");
-        let mut event_b3 =
+        let mut accepted_second_tag_change =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val2"), "metricB");
 
         // MetricC has no specific config, so it uses the global config, which allows 2 values
-        let mut event_c1 =
+        let mut default_baseline =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricC");
-        let mut event_c2 =
+        let mut accepted_default_pair =
             make_metric_with_name(metric_tags!("tag1" => "val2", "tag2" => "val2"), "metricC");
         // The limit for tag2 should be reached here
-        let mut event_c3 =
+        let mut rejected_default_second_tag =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val3"), "metricC");
 
         let (tx, rx) = mpsc::channel(1);
         let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
         let events = vec![
-            &mut event_a1,
-            &mut event_a2,
-            &mut event_a3,
-            &mut event_b1,
-            &mut event_b2,
-            &mut event_b3,
-            &mut event_c1,
-            &mut event_c2,
-            &mut event_c3,
+            &mut limited_baseline,
+            &mut rejected_first_tag,
+            &mut rejected_second_tag,
+            &mut higher_limit_baseline,
+            &mut accepted_first_tag_change,
+            &mut accepted_second_tag_change,
+            &mut default_baseline,
+            &mut accepted_default_pair,
+            &mut rejected_default_second_tag,
         ];
 
         for event in &events {
             tx.send((*event).clone()).await.unwrap();
         }
 
-        let new_event_a1 = out.recv().await;
-        let new_event_a2 = out.recv().await;
-        let new_event_a3 = out.recv().await;
-        let new_event_b1 = out.recv().await;
-        let new_event_b2 = out.recv().await;
-        let new_event_b3 = out.recv().await;
-        let new_event_c1 = out.recv().await;
-        let new_event_c2 = out.recv().await;
-        let new_event_c3 = out.recv().await;
+        let baseline_output = out.recv().await;
+        let first_tag_filtered_output = out.recv().await;
+        let second_tag_filtered_output = out.recv().await;
+        let high_limit_initial_output = out.recv().await;
+        let high_limit_first_change_output = out.recv().await;
+        let high_limit_second_change_output = out.recv().await;
+        let default_initial_output = out.recv().await;
+        let default_pair_output = out.recv().await;
+        let default_filtered_output = out.recv().await;
 
         drop(tx);
         topology.stop().await;
@@ -585,11 +661,11 @@ async fn separate_value_limit_per_metric_name(config: Config) {
             ));
         }
 
-        assert_eq!(new_event_a1, Some(event_a1));
+        assert_eq!(baseline_output, Some(limited_baseline));
         // The second event should have been modified to remove "tag1"
-        let new_event_a2 = new_event_a2.unwrap();
+        let first_tag_filtered_output = first_tag_filtered_output.unwrap();
         assert!(
-            !new_event_a2
+            !first_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -597,7 +673,7 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
         assert_eq!(
             "val1",
-            new_event_a2
+            first_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -606,9 +682,9 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
 
         // The third event should have been modified to remove "tag2"
-        let new_event_a3 = new_event_a3.unwrap();
+        let second_tag_filtered_output = second_tag_filtered_output.unwrap();
         assert!(
-            !new_event_a3
+            !second_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -616,7 +692,7 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
         assert_eq!(
             "val1",
-            new_event_a3
+            second_tag_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -624,16 +700,22 @@ async fn separate_value_limit_per_metric_name(config: Config) {
                 .unwrap()
         );
 
-        assert_eq!(new_event_b1, Some(event_b1));
-        assert_eq!(new_event_b2, Some(event_b2));
-        assert_eq!(new_event_b3, Some(event_b3));
+        assert_eq!(high_limit_initial_output, Some(higher_limit_baseline));
+        assert_eq!(
+            high_limit_first_change_output,
+            Some(accepted_first_tag_change)
+        );
+        assert_eq!(
+            high_limit_second_change_output,
+            Some(accepted_second_tag_change)
+        );
 
-        assert_eq!(new_event_c1, Some(event_c1));
-        assert_eq!(new_event_c2, Some(event_c2));
+        assert_eq!(default_initial_output, Some(default_baseline));
+        assert_eq!(default_pair_output, Some(accepted_default_pair));
         // The third event should have been modified to remove "tag2"
-        let new_event_c3 = new_event_c3.unwrap();
+        let default_filtered_output = default_filtered_output.unwrap();
         assert!(
-            !new_event_c3
+            !default_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
@@ -641,14 +723,14 @@ async fn separate_value_limit_per_metric_name(config: Config) {
         );
         assert_eq!(
             "val1",
-            new_event_c3
+            default_filtered_output
                 .as_metric()
                 .tags()
                 .unwrap()
                 .get("tag1")
                 .unwrap()
         );
-    })
+    }))
     .await;
 }
 
@@ -849,7 +931,10 @@ fn max_tracked_keys_caps_across_per_metric_buckets() {
 
 fn make_per_tag(value_limit: usize) -> PerTagConfig {
     PerTagConfig {
-        mode: PerTagMode::LimitOverride { value_limit },
+        mode: PerTagMode::LimitOverride {
+            value_limit,
+            cache_size_per_key: None,
+        },
     }
 }
 
@@ -1127,7 +1212,10 @@ fn tag_excluded_unbounded_sibling_limited() {
 #[test]
 fn per_tag_limit_override_caps_at_explicit_value() {
     let per_tag = PerTagConfig {
-        mode: PerTagMode::LimitOverride { value_limit: 2 },
+        mode: PerTagMode::LimitOverride {
+            value_limit: 2,
+            cache_size_per_key: None,
+        },
     };
     let config = make_transform_hashset_with_per_metric_limits(
         500,
@@ -1193,7 +1281,7 @@ fn per_tag_zero_limit_drop_event_drops_first_event() {
 /// Per-tag YAML syntax: `mode: limit_override` with `value_limit`, and `mode: excluded`.
 #[test]
 fn per_tag_modes_deserialize() {
-    let yaml = r#"
+    let yaml = r"
 value_limit: 5
 mode: exact
 per_metric_limits:
@@ -1205,12 +1293,18 @@ per_metric_limits:
         value_limit: 10
       excluded_tag:
         mode: excluded
-"#;
+";
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
     let per_metric = parsed.per_metric_limits.get("metric_a").unwrap();
 
     let capped = per_metric.per_tag_limits.get("capped_tag").unwrap();
-    assert_eq!(capped.mode, PerTagMode::LimitOverride { value_limit: 10 });
+    assert_eq!(
+        capped.mode,
+        PerTagMode::LimitOverride {
+            value_limit: 10,
+            cache_size_per_key: None,
+        }
+    );
 
     let excluded = per_metric.per_tag_limits.get("excluded_tag").unwrap();
     assert_eq!(excluded.mode, PerTagMode::Excluded);
@@ -1233,6 +1327,11 @@ fn global_per_tag_excluded_drop_tag_passthrough_bloom() {
     global_per_tag_excluded_drop_tag_passthrough(Mode::Probabilistic(BloomFilterConfig {
         cache_size_per_key: default_cache_size(),
     }));
+}
+
+#[test]
+fn global_per_tag_excluded_drop_tag_passthrough_fingerprint() {
+    global_per_tag_excluded_drop_tag_passthrough(Mode::ExactFingerprint);
 }
 
 /// A globally-excluded tag passes through unchanged on every metric, even when its values
@@ -1285,6 +1384,11 @@ fn global_per_tag_excluded_drop_event_passthrough_bloom() {
     global_per_tag_excluded_drop_event_passthrough(Mode::Probabilistic(BloomFilterConfig {
         cache_size_per_key: default_cache_size(),
     }));
+}
+
+#[test]
+fn global_per_tag_excluded_drop_event_passthrough_fingerprint() {
+    global_per_tag_excluded_drop_event_passthrough(Mode::ExactFingerprint);
 }
 
 /// Under `DropEvent`, a globally-excluded tag never triggers a drop, but a non-excluded
@@ -1443,7 +1547,7 @@ fn global_per_tag_overridden_by_per_metric_entry() {
 /// with `value_limit`, and `mode: excluded`.
 #[test]
 fn global_per_tag_modes_deserialize() {
-    let yaml = r#"
+    let yaml = r"
 value_limit: 5
 mode: exact
 per_tag_limits:
@@ -1452,12 +1556,316 @@ per_tag_limits:
     value_limit: 10
   excluded_tag:
     mode: excluded
-"#;
+";
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
 
     let capped = parsed.per_tag_limits.get("capped_tag").unwrap();
-    assert_eq!(capped.mode, PerTagMode::LimitOverride { value_limit: 10 });
+    assert_eq!(
+        capped.mode,
+        PerTagMode::LimitOverride {
+            value_limit: 10,
+            cache_size_per_key: None,
+        }
+    );
 
     let excluded = parsed.per_tag_limits.get("excluded_tag").unwrap();
     assert_eq!(excluded.mode, PerTagMode::Excluded);
+}
+
+/// A re-sent already-accepted tag value must pass through even after the limit is hit,
+/// for both `DropTag` and `DropEvent` actions.
+#[test]
+fn fingerprint_accepted_value_passes_through_after_limit() {
+    for action in [LimitExceededAction::DropTag, LimitExceededAction::DropEvent] {
+        let mut transform = TagCardinalityLimit::new(make_transform_fingerprint(2, action));
+        transform
+            .transform_one(make_metric(metric_tags!("env" => "prod")))
+            .unwrap();
+        transform
+            .transform_one(make_metric(metric_tags!("env" => "staging")))
+            .unwrap();
+        // Limit now hit; re-send of an already-accepted value must still pass through.
+        let e = transform
+            .transform_one(make_metric(metric_tags!("env" => "prod")))
+            .unwrap();
+        assert_eq!("prod", e.as_metric().tags().unwrap().get("env").unwrap());
+    }
+}
+
+/// Fingerprint mode must never allocate a tracking entry for a tag that is globally
+/// excluded, matching the `Mode::Exact` "never allocate" contract.
+#[test]
+fn fingerprint_excluded_tag_never_populates_cache() {
+    let config = make_transform_with_global_per_tag_limits(
+        2,
+        LimitExceededAction::DropTag,
+        Mode::ExactFingerprint,
+        HashMap::from([("kube_pod_name".to_string(), make_per_tag_excluded())]),
+    );
+    let mut transform = TagCardinalityLimit::new(config);
+
+    for i in 0..10 {
+        let event = make_metric(metric_tags!(
+            "kube_pod_name" => format!("pod-{i}").as_str(),
+            "tag1" => "val1"
+        ));
+        transform.transform_one(event).unwrap();
+    }
+
+    let bucket = transform
+        .accepted_tags
+        .get(&None)
+        .expect("non-excluded tag1 should still allocate a global bucket");
+    assert!(
+        bucket.contains_key("tag1"),
+        "non-excluded tag must still be tracked"
+    );
+    assert!(
+        !bucket.contains_key("kube_pod_name"),
+        "excluded tag key must never enter the fingerprint cache"
+    );
+}
+
+/// Fingerprint mode YAML round-trips: `mode: exact_fingerprint` deserializes cleanly.
+#[test]
+fn fingerprint_mode_deserializes() {
+    let yaml = "mode: exact_fingerprint";
+    let mode: Mode = serde_yaml::from_str(yaml).expect("exact_fingerprint should deserialize");
+    assert_eq!(mode, Mode::ExactFingerprint);
+
+    let serialized = serde_yaml::to_string(&mode).expect("should serialize");
+    assert!(
+        serialized.contains("exact_fingerprint"),
+        "serialized form should contain 'exact_fingerprint'"
+    );
+}
+
+/// `apply_cache_size_override` replaces the bloom size when mode is probabilistic and an
+/// override is given; leaves the mode unchanged in all other cases.
+#[test]
+fn apply_cache_size_override_probabilistic_with_some() {
+    let base = Mode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    });
+    let result = apply_cache_size_override(base, Some(1024));
+    assert_eq!(
+        result,
+        Mode::Probabilistic(BloomFilterConfig {
+            cache_size_per_key: 1024,
+        })
+    );
+}
+
+#[test]
+fn apply_cache_size_override_exact_with_some_is_noop() {
+    let result = apply_cache_size_override(Mode::Exact, Some(1024));
+    assert_eq!(result, Mode::Exact);
+}
+
+#[test]
+fn apply_cache_size_override_probabilistic_with_none_inherits() {
+    let base = Mode::Probabilistic(BloomFilterConfig {
+        cache_size_per_key: default_cache_size(),
+    });
+    let result = apply_cache_size_override(base, None);
+    assert_eq!(
+        result,
+        Mode::Probabilistic(BloomFilterConfig {
+            cache_size_per_key: default_cache_size(),
+        })
+    );
+}
+
+/// A per-metric `limit_override` with `cache_size_per_key` set deserializes correctly.
+#[test]
+fn per_tag_cache_size_per_key_deserializes() {
+    let yaml = r"
+value_limit: 5
+mode: probabilistic
+cache_size_per_key: 5120
+per_metric_limits:
+  metric_a:
+    mode: probabilistic
+    cache_size_per_key: 5120
+    per_tag_limits:
+      big_tag:
+        mode: limit_override
+        value_limit: 100
+        cache_size_per_key: 32768
+      default_tag:
+        mode: limit_override
+        value_limit: 10
+";
+    let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
+    let per_metric = parsed.per_metric_limits.get("metric_a").unwrap();
+
+    let big_tag = per_metric.per_tag_limits.get("big_tag").unwrap();
+    assert_eq!(
+        big_tag.mode,
+        PerTagMode::LimitOverride {
+            value_limit: 100,
+            cache_size_per_key: Some(32768),
+        }
+    );
+
+    // Omitting the field defaults to None (inherits from enclosing config).
+    let default_tag = per_metric.per_tag_limits.get("default_tag").unwrap();
+    assert_eq!(
+        default_tag.mode,
+        PerTagMode::LimitOverride {
+            value_limit: 10,
+            cache_size_per_key: None,
+        }
+    );
+}
+
+/// A global `per_tag_limits` `limit_override` with `cache_size_per_key` set deserializes correctly.
+#[test]
+fn global_per_tag_cache_size_per_key_deserializes() {
+    let yaml = r"
+value_limit: 5
+mode: probabilistic
+cache_size_per_key: 5120
+per_tag_limits:
+  big_tag:
+    mode: limit_override
+    value_limit: 100
+    cache_size_per_key: 32768
+  default_tag:
+    mode: limit_override
+    value_limit: 10
+";
+    let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
+
+    let big_tag = parsed.per_tag_limits.get("big_tag").unwrap();
+    assert_eq!(
+        big_tag.mode,
+        PerTagMode::LimitOverride {
+            value_limit: 100,
+            cache_size_per_key: Some(32768),
+        }
+    );
+
+    let default_tag = parsed.per_tag_limits.get("default_tag").unwrap();
+    assert_eq!(
+        default_tag.mode,
+        PerTagMode::LimitOverride {
+            value_limit: 10,
+            cache_size_per_key: None,
+        }
+    );
+}
+
+// ============================================================================
+// Config validation tests
+// ============================================================================
+
+/// `cache_size_per_key` on a global per-tag entry in exact mode is a build error.
+#[test]
+fn validation_rejects_cache_size_in_global_exact_mode() {
+    let config = make_transform_with_global_per_tag_limits(
+        500,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        HashMap::from([(
+            "tag1".to_string(),
+            PerTagConfig {
+                mode: PerTagMode::LimitOverride {
+                    value_limit: 10,
+                    cache_size_per_key: Some(1024),
+                },
+            },
+        )]),
+    );
+    assert!(config.validate_structure().is_err());
+}
+
+/// `cache_size_per_key` on a per-metric per-tag entry in exact mode is a build error.
+#[test]
+fn validation_rejects_cache_size_in_per_metric_exact_mode() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric(
+                10,
+                LimitExceededAction::DropTag,
+                HashMap::from([(
+                    "tag1".to_string(),
+                    PerTagConfig {
+                        mode: PerTagMode::LimitOverride {
+                            value_limit: 5,
+                            cache_size_per_key: Some(1024),
+                        },
+                    },
+                )]),
+            ),
+        )]),
+    );
+    assert!(config.validate_structure().is_err());
+}
+
+/// `cache_size_per_key` on a per-metric per-tag entry in excluded mode is a build error.
+#[test]
+fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
+    let config = make_transform_hashset_with_per_metric_limits(
+        500,
+        LimitExceededAction::DropTag,
+        HashMap::from([(
+            "metricA".to_string(),
+            make_per_metric_excluded(HashMap::from([(
+                "tag1".to_string(),
+                PerTagConfig {
+                    mode: PerTagMode::LimitOverride {
+                        value_limit: 5,
+                        cache_size_per_key: Some(1024),
+                    },
+                },
+            )])),
+        )]),
+    );
+    assert!(config.validate_structure().is_err());
+}
+
+/// `cache_size_per_key` in probabilistic mode is valid.
+#[tokio::test]
+async fn validation_allows_cache_size_in_probabilistic_mode() {
+    let config = make_transform_with_global_per_tag_limits(
+        500,
+        LimitExceededAction::DropTag,
+        Mode::Probabilistic(BloomFilterConfig {
+            cache_size_per_key: default_cache_size(),
+        }),
+        HashMap::from([(
+            "tag1".to_string(),
+            PerTagConfig {
+                mode: PerTagMode::LimitOverride {
+                    value_limit: 10,
+                    cache_size_per_key: Some(1024),
+                },
+            },
+        )]),
+    );
+    assert!(config.build(&TransformContext::default()).await.is_ok());
+}
+
+/// `cache_size_per_key`: None in exact mode is fine (no regression).
+#[tokio::test]
+async fn validation_allows_no_cache_size_override_in_exact_mode() {
+    let config = make_transform_with_global_per_tag_limits(
+        500,
+        LimitExceededAction::DropTag,
+        Mode::Exact,
+        HashMap::from([(
+            "tag1".to_string(),
+            PerTagConfig {
+                mode: PerTagMode::LimitOverride {
+                    value_limit: 10,
+                    cache_size_per_key: None,
+                },
+            },
+        )]),
+    );
+    assert!(config.build(&TransformContext::default()).await.is_ok());
 }

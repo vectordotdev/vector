@@ -4,13 +4,17 @@ mod size_of;
 use std::collections::HashSet;
 
 use super::*;
+use vrl::event_path;
 
 #[test]
 fn event_iteration() {
     let mut log = LogEvent::default();
 
-    log.insert("\"Ke$ha\"", "It's going down, I'm yelling timber");
-    log.insert("Pitbull", "The bigger they are, the harder they fall");
+    log.insert(event_path!("Ke$ha"), "It's going down, I'm yelling timber");
+    log.insert(
+        event_path!("Pitbull"),
+        "The bigger they are, the harder they fall",
+    );
 
     let all = log
         .all_event_fields()
@@ -37,9 +41,9 @@ fn event_iteration() {
 #[test]
 fn event_iteration_order() {
     let mut log = LogEvent::default();
-    log.insert("lZDfzKIL", Value::from("tOVrjveM"));
-    log.insert("o9amkaRY", Value::from("pGsfG7Nr"));
-    log.insert("YRjhxXcg", Value::from("nw8iM5Jr"));
+    log.insert(event_path!("lZDfzKIL"), Value::from("tOVrjveM"));
+    log.insert(event_path!("o9amkaRY"), Value::from("pGsfG7Nr"));
+    log.insert(event_path!("YRjhxXcg"), Value::from("nw8iM5Jr"));
 
     let collected: Vec<_> = log.all_event_fields().unwrap().collect();
     assert_eq!(

@@ -31,6 +31,7 @@ macro_rules! labels {
     }
 
 #[tokio::test]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_request() {
     let outputs = send_request("", vec![create_event("gauge-2".into(), 32.0)]).await;
     assert_eq!(outputs.len(), 1);
@@ -51,14 +52,15 @@ async fn sends_request() {
 }
 
 #[tokio::test]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_authenticated_request() {
     let outputs = send_request(
         indoc! {r#"
-                tenant_id = "tenant-%Y"
-                [auth]
-                strategy = "basic"
-                user = "user"
-                password = "password"
+                tenant_id: "tenant-%Y"
+                auth:
+                  strategy: "basic"
+                  user: "user"
+                  password: "password"
             "#},
         vec![create_event("gauge-2".into(), 32.0)],
     )
@@ -84,13 +86,13 @@ async fn sends_authenticated_request() {
 async fn sends_authenticated_aws_request() {
     let outputs = send_request(
         indoc! {r#"
-                tenant_id = "tenant-%Y"
-                [aws]
-                region = "foo"
-                [auth]
-                strategy = "aws"
-                access_key_id = "foo"
-                secret_access_key = "bar"
+                tenant_id: "tenant-%Y"
+                aws:
+                  region: "foo"
+                auth:
+                  strategy: "aws"
+                  access_key_id: "foo"
+                  secret_access_key: "bar"
             "#},
         vec![create_event("gauge-2".into(), 32.0)],
     )
@@ -108,7 +110,7 @@ async fn sends_authenticated_aws_request() {
 #[tokio::test]
 async fn sends_x_scope_orgid_header() {
     let outputs = send_request(
-        r#"tenant_id = "tenant""#,
+        r#"tenant_id: "tenant""#,
         vec![create_event("gauge-3".into(), 12.0)],
     )
     .await;
@@ -121,7 +123,7 @@ async fn sends_x_scope_orgid_header() {
 #[tokio::test]
 async fn sends_templated_x_scope_orgid_header() {
     let outputs = send_request(
-        r#"tenant_id = "tenant-%Y""#,
+        r#"tenant_id: "tenant-%Y""#,
         vec![create_event("gauge-3".into(), 12.0)],
     )
     .await;
@@ -136,12 +138,14 @@ async fn sends_templated_x_scope_orgid_header() {
 }
 
 #[tokio::test]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn sends_custom_headers() {
     let outputs = send_request(
         indoc! {r#"
-                [request.headers]
-                X-Custom-Header = "custom-value"
-                X-Another-Header = "another-value"
+                request:
+                  headers:
+                    X-Custom-Header: "custom-value"
+                    X-Another-Header: "another-value"
             "#},
         vec![create_event("gauge-4".into(), 42.0)],
     )
@@ -168,11 +172,12 @@ async fn sends_custom_headers() {
 }
 
 #[tokio::test]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn retains_state_between_requests() {
     // This sink converts all incremental events to absolute, and
     // should accumulate their totals between batches.
     let outputs = send_request(
-        r"batch.max_events = 1",
+        "batch:\n  max_events: 1",
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-2".into(), 13.0),
@@ -196,9 +201,10 @@ async fn retains_state_between_requests() {
 }
 
 #[tokio::test]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn aggregates_batches() {
     let outputs = send_request(
-        r"batch.max_events = 3",
+        "batch:\n  max_events: 3",
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-1".into(), 14.0),
@@ -222,14 +228,14 @@ async fn aggregates_batches() {
 }
 
 #[tokio::test]
+#[expect(clippy::float_cmp, reason = "Exact integer fixtures.")]
 async fn doesnt_aggregate_batches() {
     let outputs = send_request(
-        indoc! {
-            r"
-            batch.max_events = 3
-            batch.aggregate = false
-            "
-        },
+        indoc! {"
+            batch:
+              max_events: 3
+              aggregate: false
+        "},
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-1".into(), 14.0),
@@ -266,8 +272,10 @@ async fn send_request(config: &str, events: Vec<Event>) -> Vec<(HeaderMap, proto
         let (rx, trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let config = format!("endpoint = \"http://{addr}/write\"\n{config}");
-        let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
+        let config = indoc::formatdoc! {r#"
+            endpoint: "http://{addr}/write"
+            {config}"#};
+        let config: RemoteWriteConfig = serde_yaml::from_str(&config).unwrap();
         let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
@@ -323,15 +331,16 @@ fn create_inc_event(name: String, value: f64) -> Event {
 #[tokio::test]
 async fn conflicting_auth_headers_rejected() {
     let config = indoc! {r#"
-        endpoint = "http://localhost:9090/api/v1/write"
-        [request.headers]
-        Authorization = "Bearer my-token"
-        [auth]
-        strategy = "bearer"
-        token = "another-token"
+        endpoint: "http://localhost:9090/api/v1/write"
+        request:
+          headers:
+            Authorization: "Bearer my-token"
+        auth:
+          strategy: "bearer"
+          token: "another-token"
     "#};
 
-    let config: RemoteWriteConfig = toml::from_str(config).unwrap();
+    let config: RemoteWriteConfig = serde_yaml::from_str(config).unwrap();
     let cx = SinkContext::default();
 
     let result = config.build(cx).await;

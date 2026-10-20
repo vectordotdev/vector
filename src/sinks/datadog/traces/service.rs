@@ -47,7 +47,7 @@ impl RetryLogic for TraceApiRetry {
             StatusCode::FORBIDDEN => RetryAction::Retry("forbidden".into()),
             StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
             _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(&response.body)).into(),
+                format!("{status}: {}", String::from_utf8_lossy(&response.body)).into(),
             ),
             _ if status.is_success() => RetryAction::Successful,
             _ => RetryAction::DontRetry(format!("response status: {status}").into()),
@@ -68,7 +68,7 @@ pub struct TraceApiRequest {
 impl TraceApiRequest {
     pub fn into_http_request(self) -> http::Result<Request<Body>> {
         let mut request = Request::post(self.uri);
-        for (k, v) in self.headers.iter() {
+        for (k, v) in &self.headers {
             request = request.header(k, v);
         }
         request.body(Body::from(self.body))

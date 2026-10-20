@@ -9,11 +9,14 @@ use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use super::request_builder::{BigqueryRequestBuilder, MAX_BATCH_PAYLOAD_SIZE};
 use super::service::{AuthInterceptor, BigqueryRetryLogic, BigqueryService};
 use super::sink::BigquerySink;
-use crate::config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext};
+use crate::config::{
+    AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+};
 use crate::gcp::{BIGQUERY_STORAGE_URL, GcpAuthConfig, GcpAuthenticator, Scope};
 use crate::sinks::util::service::ServiceBuilderExt;
 use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
+use vector_lib::stream::BatcherSettings;
 
 fn default_endpoint() -> String {
     BIGQUERY_STORAGE_URL.to_string()
@@ -60,19 +63,15 @@ pub struct BigqueryConfig {
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BigqueryDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
     // we only support protobuf encoding because that's what the API uses (gRPC)
-    #[configurable(derived)]
     encoding: ProtobufSerializerConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -93,19 +92,21 @@ impl BigqueryConfig {
 }
 
 impl GenerateConfig for BigqueryConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            project = "my-project"
-            dataset = "my-dataset"
-            table = "my-table"
-            encoding.protobuf.desc_file = "/etc/vector/proto.desc"
-            encoding.protobuf.message_type = "BigqueryMessage"
-        "#})
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r"
+            project: my-project
+            dataset: my-dataset
+            table: my-table
+            encoding:
+              protobuf:
+                desc_file: /etc/vector/proto.desc
+                message_type: BigqueryMessage
+        "})
         .unwrap()
     }
 }
 
-/// Create a future that calls GetWriteStream to verify connectivity and auth.
+/// Create a future that calls `GetWriteStream` to verify connectivity and auth.
 async fn healthcheck_future(
     channel: Channel,
     auth: GcpAuthenticator,
@@ -127,7 +128,46 @@ async fn healthcheck_future(
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_bigquery")]
 impl SinkConfig for BigqueryConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::new(self.encoding.input_type())
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedBigquery {
+    endpoint: http::Uri,
+    write_stream: String,
+    batcher_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for BigqueryConfig {
+    type Validated = ValidatedBigquery;
+
+    fn validate(&self) -> crate::Result<ValidatedBigquery> {
+        let endpoint = self.endpoint.parse()?;
+        let batcher_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batcher_settings()?;
+
+        Ok(ValidatedBigquery {
+            endpoint,
+            write_stream: self.get_write_stream(),
+            batcher_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedBigquery,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         // `cx.proxy` doesn't apply well to tonic gRPC connections,
         // so we don't use it when building the sink.
 
@@ -141,14 +181,19 @@ impl SinkConfig for BigqueryConfig {
         auth.spawn_regenerate_token();
 
         // Create the gRPC channel; tonic channels are cheap to clone and share the underlying connection.
-        let channel = Channel::builder(self.endpoint.parse()?)
+        let channel = Channel::builder(validated.endpoint.clone())
             .connect_timeout(std::time::Duration::from_secs(10))
             .connect()
             .await?;
 
         // Kick off the healthcheck
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {
-            healthcheck_future(channel.clone(), auth.clone(), self.get_write_stream()).boxed()
+            healthcheck_future(
+                channel.clone(),
+                auth.clone(),
+                validated.write_stream.clone(),
+            )
+            .boxed()
         } else {
             Box::pin(async move { Ok(()) })
         };
@@ -158,30 +203,16 @@ impl SinkConfig for BigqueryConfig {
             .settings(request_settings, BigqueryRetryLogic)
             .service(BigqueryService::with_auth(channel, auth));
 
-        let batcher_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
-            .into_batcher_settings()?;
-
         let protobuf_serializer = self.encoding.build()?;
-        let write_stream = self.get_write_stream();
-        let request_builder = BigqueryRequestBuilder::new(protobuf_serializer, write_stream)?;
+        let request_builder =
+            BigqueryRequestBuilder::new(protobuf_serializer, validated.write_stream.clone())?;
 
         let sink = BigquerySink {
             service,
-            batcher_settings,
+            batcher_settings: validated.batcher_settings,
             request_builder,
         };
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.input_type())
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 

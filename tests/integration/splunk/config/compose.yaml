@@ -8,11 +8,17 @@ services:
       - SPLUNK_PASSWORD=password
       - SPLUNK_HEC_TOKEN=abcd1234
     volumes:
-      - ../data/splunk/default.yml:/tmp/defaults/default.yml
+      - ../data/default.yml:/tmp/defaults/default.yml
     ports:
       - 8000:8000
       - 8088:8088
       - 8089:8089
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/services/collector/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
 
 networks:
   default:

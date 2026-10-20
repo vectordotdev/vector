@@ -86,7 +86,7 @@ info!("Server has started.");
 debug!("User connected: {}", username);
 
 // Adding structured fields to the even, mixing and matching the message format:
-trace!(bytes_sent = 22, "Sent heartbeat packet to client.")`
+trace!(bytes_sent = 22, "Sent heartbeat packet to client.");
 error!(client_addr = %conn.get_ref().peer_addr, "Client actor received malformed packet: {}", parse_err.to_string())
 ```
 

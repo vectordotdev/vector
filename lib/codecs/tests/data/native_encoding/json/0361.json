@@ -1,1 +1,0 @@
-{"metric":{"name":"a","interval_ms":2516192506,"kind":"absolute","distribution":{"samples":[{"value":604480.0,"rate":3972213681}],"statistic":"histogram"}}}

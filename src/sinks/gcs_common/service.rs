@@ -3,7 +3,7 @@ use std::task::Poll;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
-    Request, Uri,
+    Request,
     header::{HeaderName, HeaderValue},
 };
 use hyper::Body;
@@ -17,17 +17,22 @@ use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
     http::{HttpClient, HttpError},
+    sinks::util::HttpEndpoint,
 };
 
 #[derive(Debug, Clone)]
 pub struct GcsService {
     client: HttpClient,
-    base_url: String,
+    base_url: HttpEndpoint,
     auth: GcpAuthenticator,
 }
 
 impl GcsService {
-    pub const fn new(client: HttpClient, base_url: String, auth: GcpAuthenticator) -> GcsService {
+    pub const fn new(
+        client: HttpClient,
+        base_url: HttpEndpoint,
+        auth: GcpAuthenticator,
+    ) -> GcsService {
         GcsService {
             client,
             base_url,
@@ -115,9 +120,11 @@ impl Service<GcsRequest> for GcsService {
         let settings = request.settings;
         let metadata = request.metadata;
 
-        let uri = merge_url_and_key(&self.base_url, &request.key);
-
-        let uri = uri.parse::<Uri>().unwrap();
+        let uri = self
+            .base_url
+            .append_path(&request.key)
+            .expect("partition key must be a valid URI path segment")
+            .into_uri();
 
         let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
@@ -146,37 +153,5 @@ impl Service<GcsRequest> for GcsService {
             let result = client.call(http_request).await;
             result.map(|inner| GcsResponse { inner, metadata })
         })
-    }
-}
-
-/// converts // to / between the base url and the key if necessary
-fn merge_url_and_key(base_url: &str, key: &str) -> String {
-    let base_url = base_url.strip_suffix('/').unwrap_or(base_url);
-    let key = key.strip_prefix('/').unwrap_or(key);
-    format!("{base_url}/{key}")
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::sinks::gcs_common::service::merge_url_and_key;
-
-    #[test]
-    fn merge_base_url_and_key() {
-        assert_eq!(
-            "https://baseurl/key",
-            merge_url_and_key("https://baseurl/", "/key")
-        );
-        assert_eq!(
-            "https://baseurl/key",
-            merge_url_and_key("https://baseurl/", "key")
-        );
-        assert_eq!(
-            "https://baseurl/key",
-            merge_url_and_key("https://baseurl", "/key")
-        );
-        assert_eq!(
-            "https://baseurl/key",
-            merge_url_and_key("https://baseurl", "key")
-        );
     }
 }

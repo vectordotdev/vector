@@ -28,6 +28,7 @@ use crate::{
     net,
     serde::default_decoding,
     shutdown::ShutdownSignal,
+    sources::SourceError,
     sources::{
         Source,
         socket::SocketConfig,
@@ -40,7 +41,6 @@ use crate::{
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// List of IPv4 multicast groups to join on socket's binding process.
@@ -57,6 +57,22 @@ pub struct UdpConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = "['224.0.0.2', '224.0.0.4']"))]
     pub(super) multicast_groups: Vec<Ipv4Addr>,
+
+    /// The IPv4 interface address used when joining multicast groups.
+    ///
+    /// Specifies which local network interface to use for receiving multicast traffic.
+    /// When not set, defaults to the socket's binding address.
+    ///
+    /// Set this explicitly when the host has multiple interfaces and you need to control
+    /// which one receives multicast traffic. For example, `127.0.0.1` restricts multicast
+    /// reception to the loopback interface.
+    ///
+    /// On macOS, specifying `0.0.0.0` only joins on the default network interface (typically
+    /// the primary Ethernet or Wi-Fi interface), unlike Linux, which joins on all interfaces.
+    /// If multicast traffic is expected on a specific interface (including loopback), set this
+    /// field explicitly.
+    #[serde(default)]
+    pub(super) multicast_interface: Option<Ipv4Addr>,
 
     /// The maximum buffer size of incoming messages.
     ///
@@ -90,10 +106,8 @@ pub struct UdpConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
-    #[configurable(derived)]
     pub(super) framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub(super) decoding: DeserializerConfig,
 
@@ -107,7 +121,7 @@ fn default_port_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("port"))
 }
 
-fn default_max_length() -> usize {
+const fn default_max_length() -> usize {
     crate::serde::default_max_length()
 }
 
@@ -116,12 +130,13 @@ impl UdpConfig {
         self.host_key.clone().unwrap_or(default_host_key())
     }
 
+    #[must_use]
     pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
-    pub(super) const fn framing(&self) -> &Option<FramingConfig> {
-        &self.framing
+    pub(super) const fn framing(&self) -> Option<&FramingConfig> {
+        self.framing.as_ref()
     }
 
     pub(super) const fn decoding(&self) -> &DeserializerConfig {
@@ -132,10 +147,12 @@ impl UdpConfig {
         self.address
     }
 
+    #[must_use]
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
             multicast_groups: Vec::new(),
+            multicast_interface: None,
             max_length: default_max_length(),
             host_key: None,
             port_key: default_port_key(),
@@ -152,6 +169,10 @@ impl UdpConfig {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(super) fn udp(
     config: UdpConfig,
     decoder: Decoder,
@@ -166,8 +187,9 @@ pub(super) fn udp(
             .map_err(|error| {
                 emit!(SocketBindError {
                     mode: SocketMode::Udp,
-                    error,
-                })
+                    error: &error,
+                });
+                SourceError::from(error)
             })?;
 
         if !config.multicast_groups.is_empty() {
@@ -185,15 +207,16 @@ pub(super) fn udp(
                 }
             };
             for group_addr in config.multicast_groups {
-                let interface = *listen_addr.ip();
+                let interface = config.multicast_interface.unwrap_or(*listen_addr.ip());
                 socket
                     .join_multicast_v4(group_addr, interface)
                     .map_err(|error| {
                         emit!(SocketMulticastGroupJoinError {
-                            error,
+                            error: &error,
                             group_addr,
                             interface,
-                        })
+                        });
+                        SourceError::from(error)
                     })?;
                 info!(message = "Joined multicast group.", group = %group_addr);
             }
@@ -235,10 +258,11 @@ pub(super) fn udp(
                                 }
                             }
 
-                            return Err(emit!(SocketReceiveError {
+                            emit!(SocketReceiveError {
                                 mode: SocketMode::Udp,
-                                error
-                            }));
+                                error: &error
+                            });
+                            return Err(SourceError::from(error));
                        }
                     };
 

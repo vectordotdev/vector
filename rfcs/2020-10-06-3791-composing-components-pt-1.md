@@ -21,7 +21,7 @@ arbitrary components is deferred to a later RFC.
 We need a way to quickly assemble Vector components that address specific use
 cases. This will allow us to improve ease of use without spending significant
 development time on each individual use case. It will allow us to focus
-development time on reuseable components without forcing users to do the work of
+development time on reusable components without forcing users to do the work of
 assembling them from scratch.
 
 ## Internal Proposal

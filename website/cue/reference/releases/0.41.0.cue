@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.41.0": {
-	date:     "2024-09-09"
-	codename: ""
+	date: "2024-09-09"
 
 	whats_next: []
 
@@ -35,7 +34,7 @@ releases: "0.41.0": {
 			description: """
 				VRL was updated to v0.18.0. This includes the following changes:
 
-				### New Features
+				### New Features {#vrl-new-features}
 
 				- Added `unflatten` function to inverse the result of the `flatten` function. This function is useful when you want to convert a flattened object back to its original form.
 				- The `parse_json` function now accepts an optional `lossy` parameter (which defaults to `true`).
@@ -46,12 +45,12 @@ releases: "0.41.0": {
 				- Added casing functions `camelcase`, `kebabcase`, `screamingsnakecase`, `snakecase`, `pascalcase` (https://github.com/vectordotdev/vrl/pull/973)
 				- Added `parse_influxdb` function to parse events encoded using the [InfluxDB line protocol](https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/).
 
-				### Enhancements
+				### Enhancements {#vrl-enhancements}
 
 				- The `match_datadog_query` function now accepts `||` in place of `OR` and `&&` in
 				place of `AND` in the query string, which is common Datadog syntax. (https://github.com/vectordotdev/vrl/pull/1001)
 
-				### Fixes
+				### Fixes {#vrl-fixes}
 
 				- `decode_base64` no longer requires canonical padding. (https://github.com/vectordotdev/vrl/pull/960)
 				- The assumption of a Datadog Logs-based intake event structure has been removed
@@ -331,7 +330,7 @@ releases: "0.41.0": {
 		{sha: "012a18df708a299369002f56f1b7510c9c5c4c9f", date: "2024-08-28 22:30:22 UTC", description: "removes conflicting overflow settings creating multiple scrollbars", pr_number: 21168, scopes: ["playground"], type: "fix", breaking_change: false, author: "britton", files_count: 2, insertions_count: 3, deletions_count: 15},
 		{sha: "5060aa5c223643d5198825896f62109353eb3e2f", date: "2024-08-29 02:24:11 UTC", description: "Bump VRL to the latest ref", pr_number: 21171, scopes: ["deps"], type: "chore", breaking_change: false, author: "Bruce Guenter", files_count: 6, insertions_count: 189, deletions_count: 173},
 		{sha: "1cc17611c0a71f4d6afbfe72b4da835ae91874cd", date: "2024-08-29 08:28:09 UTC", description: "Configure `datadog_search` condition directly", pr_number: 21174, scopes: ["config"], type: "chore", breaking_change: false, author: "Bruce Guenter", files_count: 2, insertions_count: 25, deletions_count: 12},
-		{sha: "c2dc1aa81f55588c44b6b6f0bcb0bbcb34d0fe06", date: "2024-08-29 22:42:13 UTC", description: "Hande numeric equality in `datadog_search` condition ", pr_number: 21179, scopes: ["transforms"], type: "fix", breaking_change: false, author: "Bruce Guenter", files_count: 2, insertions_count: 155, deletions_count: 8},
+		{sha: "c2dc1aa81f55588c44b6b6f0bcb0bbcb34d0fe06", date: "2024-08-29 22:42:13 UTC", description: "Handle numeric equality in `datadog_search` condition ", pr_number: 21179, scopes: ["transforms"], type: "fix", breaking_change: false, author: "Bruce Guenter", files_count: 2, insertions_count: 155, deletions_count: 8},
 		{sha: "360780dcaa1d79e115048864917bf30512012b9b", date: "2024-08-30 00:32:54 UTC", description: "Add conversion helpers for `DatadogSearchConfig`", pr_number: 21181, scopes: ["transforms"], type: "chore", breaking_change: false, author: "Bruce Guenter", files_count: 1, insertions_count: 16, deletions_count: 9},
 		{sha: "c132f35336aab3922e8595bfc910d103a074ac61", date: "2024-08-29 23:55:56 UTC", description: "Fix review workflow trigger", pr_number: 21182, scopes: ["ci"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 11, deletions_count: 13},
 		{sha: "3bf93ef1f19a5a5afcc1679a002e8b0f46cdf67e", date: "2024-08-30 02:44:04 UTC", description: "Fix fetching PR number for regression workflow", pr_number: 21183, scopes: ["ci"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 2, deletions_count: 2},

@@ -14,6 +14,7 @@ Table of Contents:
 - [Running Tests](#running-tests)
   - [Running Integration tests](#running-integration-tests)
 - [Developing vdev](#developing-vdev)
+- [Releasing vdev](#releasing-vdev)
 
 ## Pre-requisites
 
@@ -33,13 +34,14 @@ dependencies can be installed by running
 
 ## Installation
 
-CI installs vdev from a published binary release via [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) and never builds it from source. To match that locally:
+To install the same vdev version as CI:
 
 ```sh
 ./scripts/environment/prepare.sh --modules=vdev
 ```
 
-This pins the vdev version defined in `prepare.sh` and fetches the matching pre-compiled binary.
+The version is pinned in `vdev/Cargo.toml`. If its binaries have not been published yet,
+`prepare.sh` builds vdev from your working tree.
 
 For a quick install of the latest published vdev (not pinned):
 
@@ -53,7 +55,7 @@ If binstall is unavailable, fall back to compiling from crates.io:
 cargo install vdev
 ```
 
-Installation is otherwise optional: from within the Vector repository, `cargo vdev` works via a cargo alias that compiles vdev from source on each invocation. That path is fine for occasional use but is slower than a binstalled binary.
+You can also use `cargo vdev` from the Vector repository without installing vdev.
 
 
 ## Running Tests
@@ -66,7 +68,7 @@ Integration tests require docker or podman to run.
 
 Integration tests are not run by default when running `make test`. Instead, they are accessible via the integration subcommand `cargo vdev int` (example: `cargo vdev int test aws` runs aws-related integration tests).
 
-You should use `./scripts/run-integration-test.sh`, which is the wrapper used by CI and which suits most development needs. Integration tests require a `cargo vdev int start`, `cargo vdev int test`, and `cargo vdev int stop`, which the script handles automatically. You can find the list of available integration tests using `cargo vdev int show`.
+For most development needs, use `cargo vdev integration run <test-name>`, which handles the full lifecycle (start, test, stop) automatically. You can find the list of available integration tests using `cargo vdev int show`.
 
 
 ## Developing vdev
@@ -77,6 +79,7 @@ If you are actively developing vdev itself, install from your working tree so th
 cargo install -f --path vdev
 ```
 
-The CLI uses [Clap](https://github.com/clap-rs/clap) with the `derive` construction mechanism and is stored in the [commands](src/commands) directory.
+## Releasing vdev
 
-Every command group/namespace has its own directory with a `cli` module, including the root `vdev` command group. All commands have an `exec` method that provides the actual implementation, which in the case of command groups will be calling sub-commands.
+To release vdev, open a PR that bumps the `version` field in `vdev/Cargo.toml`.
+After it merges to `master`, CI automatically tags the version and publishes the binaries and crate.

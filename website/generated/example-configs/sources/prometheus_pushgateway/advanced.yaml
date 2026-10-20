@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: prometheus_pushgateway
+    address: 0.0.0.0:9091
+    aggregate_metrics: false

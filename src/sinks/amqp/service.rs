@@ -96,7 +96,7 @@ pub enum AmqpError {
     #[snafu(display("Failed to open AMQP channel: {}", error))]
     ConnectFailed { error: vector_common::Error },
 
-    #[snafu(display("Channel is not writeable: {:?}", status))]
+    #[snafu(display("Channel is not writable: {:?}", status))]
     ChannelClosed { status: lapin::ChannelStatus },
 
     #[snafu(display("Channel pool error: {}", error))]

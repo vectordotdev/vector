@@ -109,10 +109,8 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 /// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequestConfigDefaults> {
-    #[configurable(derived)]
     #[serde(default = "default_concurrency::<D>")]
     #[serde(skip_serializing_if = "concurrency_is_default::<D>")]
     pub concurrency: Concurrency,
@@ -157,11 +155,9 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
     #[serde(default = "default_retry_initial_backoff_secs::<D>")]
     pub retry_initial_backoff_secs: NonZeroU64,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_jitter_mode: JitterMode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 
@@ -220,6 +216,7 @@ impl<D: TowerRequestConfigDefaults> Default for TowerRequestConfig<D> {
 }
 
 impl<D: TowerRequestConfigDefaults> TowerRequestConfig<D> {
+    #[must_use]
     pub const fn into_settings(&self) -> TowerRequestSettings {
         // the unwrap() calls below are safe because the final defaults are always Some<>
         TowerRequestSettings {
@@ -310,14 +307,14 @@ impl TowerRequestSettings {
 
     /// Distributes requests to services [(Endpoint, service, healthcheck)]
     ///
-    /// [BufferLayer] suggests that the `buffer_bound` should be at least equal to
+    /// [`BufferLayer`] suggests that the `buffer_bound` should be at least equal to
     /// the number of the callers of the service. For sinks, this should typically be 1.
     pub fn distributed_service<Req, RL, HL, S>(
         self,
-        retry_logic: RL,
+        retry_logic: &RL,
         services: Vec<(String, S)>,
-        health_config: HealthConfig,
-        health_logic: HL,
+        health_config: &HealthConfig,
+        health_logic: &HL,
         buffer_bound: usize,
     ) -> DistributedService<S, RL, HL, usize, Req>
     where
@@ -429,28 +426,28 @@ mod tests {
         let toml = toml::to_string(&cfg).unwrap();
         toml::from_str::<TowerRequestConfig>(&toml).expect("Default config failed");
 
-        let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
+        let cfg = serde_yaml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
         assert_eq!(cfg.concurrency, Concurrency::Adaptive);
 
-        let cfg = toml::from_str::<TowerRequestConfig>("concurrency = 10")
+        let cfg = serde_yaml::from_str::<TowerRequestConfig>("concurrency: 10")
             .expect("Fixed concurrency failed");
         assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
 
-        let cfg = toml::from_str::<TowerRequestConfig>(r#"concurrency = "adaptive""#)
+        let cfg = serde_yaml::from_str::<TowerRequestConfig>(r#"concurrency: "adaptive""#)
             .expect("Adaptive concurrency setting failed");
         assert_eq!(cfg.concurrency, Concurrency::Adaptive);
 
-        let cfg = toml::from_str::<TowerRequestConfig>(r#"concurrency = "none""#)
+        let cfg = serde_yaml::from_str::<TowerRequestConfig>(r#"concurrency: "none""#)
             .expect("None concurrency setting failed");
         assert_eq!(cfg.concurrency, Concurrency::None);
 
-        toml::from_str::<TowerRequestConfig>(r#"concurrency = "broken""#)
+        serde_yaml::from_str::<TowerRequestConfig>(r#"concurrency: "broken""#)
             .expect_err("Invalid concurrency setting didn't fail");
 
-        toml::from_str::<TowerRequestConfig>(r"concurrency = 0")
+        serde_yaml::from_str::<TowerRequestConfig>("concurrency: 0")
             .expect_err("Invalid concurrency setting didn't fail on zero");
 
-        toml::from_str::<TowerRequestConfig>(r"concurrency = -9")
+        serde_yaml::from_str::<TowerRequestConfig>("concurrency: -9")
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
 
@@ -460,7 +457,7 @@ mod tests {
         let settings = cfg.into_settings();
 
         assert_eq!(settings.concurrency, None);
-        assert_eq!(settings.timeout, Duration::from_secs(60));
+        assert_eq!(settings.timeout, Duration::from_mins(1));
         assert_eq!(settings.rate_limit_duration, Duration::from_secs(1));
         assert_eq!(settings.rate_limit_num, i64::MAX as u64);
         assert_eq!(settings.retry_attempts, isize::MAX as usize);
@@ -498,16 +495,15 @@ mod tests {
     #[test]
     fn into_settings_with_populated_config() {
         // Populate with values not equal to the global defaults.
-        let cfg = toml::from_str::<TowerRequestConfig>(
-            r" concurrency = 16
-            timeout_secs = 1
-            rate_limit_duration_secs = 2
-            rate_limit_num = 3
-            retry_attempts = 4
-            retry_max_duration_secs = 5
-            retry_initial_backoff_secs = 6
-        ",
-        )
+        let cfg = serde_yaml::from_str::<TowerRequestConfig>(indoc::indoc! {"
+            concurrency: 16
+            timeout_secs: 1
+            rate_limit_duration_secs: 2
+            rate_limit_num: 3
+            retry_attempts: 4
+            retry_max_duration_secs: 5
+            retry_initial_backoff_secs: 6
+        "})
         .expect("Config failed to parse");
 
         // Merge with defaults
