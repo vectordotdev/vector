@@ -50,14 +50,11 @@ impl<T: SourceConfig + 'static> From<T> for BoxedSource {
 
 /// Fully resolved source component.
 #[configurable_component]
-#[configurable(metadata(docs::component_base_type = "source"))]
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
@@ -72,8 +69,8 @@ pub struct SourceOuter {
 impl SourceOuter {
     pub(crate) fn new<I: Into<BoxedSource>>(inner: I) -> Self {
         Self {
-            proxy: Default::default(),
-            graph: Default::default(),
+            proxy: ProxyConfig::default(),
+            graph: GraphConfig::default(),
             sink_acknowledgements: false,
             inner: inner.into(),
         }
@@ -155,6 +152,12 @@ pub struct SourceContext {
 
 impl SourceContext {
     #[cfg(any(test, feature = "test-utils"))]
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn new_shutdown(
         key: &ComponentKey,
         out: SourceSender,
@@ -166,20 +169,26 @@ impl SourceContext {
                 key: key.clone(),
                 globals: GlobalOptions::default(),
                 enrichment_tables: Default::default(),
-                metrics_storage: Default::default(),
+                metrics_storage: MetricsStorage::default(),
                 shutdown: shutdown_signal,
                 out,
-                proxy: Default::default(),
+                proxy: ProxyConfig::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
-                extra_context: Default::default(),
+                extra_context: ExtraContext::default(),
             },
             shutdown,
         )
     }
 
     #[cfg(any(test, feature = "test-utils"))]
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn new_test(
         out: SourceSender,
         schema_definitions: Option<HashMap<Option<String>, schema::Definition>>,
@@ -188,14 +197,14 @@ impl SourceContext {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             enrichment_tables: Default::default(),
-            metrics_storage: Default::default(),
+            metrics_storage: MetricsStorage::default(),
             shutdown: ShutdownSignal::noop(),
             out,
-            proxy: Default::default(),
+            proxy: ProxyConfig::default(),
             acknowledgements: false,
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
-            extra_context: Default::default(),
+            extra_context: ExtraContext::default(),
         }
     }
 
@@ -216,6 +225,7 @@ impl SourceContext {
 
     /// Gets the log namespacing to use. The passed in value is from the source itself
     /// and will override any global default if it's set.
+    #[must_use]
     pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
         namespace
             .or(self.schema.log_namespace)

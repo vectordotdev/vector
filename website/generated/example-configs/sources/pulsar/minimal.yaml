@@ -1,0 +1,6 @@
+sources:
+  my_source_id:
+    type: pulsar
+    endpoint: pulsar://127.0.0.1:6650
+    topics:
+      - topic-1234

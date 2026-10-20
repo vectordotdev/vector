@@ -17,14 +17,11 @@ mod request_builder;
 mod service;
 mod sink;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
+#[allow(warnings, clippy::trivially_copy_pass_by_ref, clippy::nursery)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
 
-#[allow(warnings)]
-pub(crate) mod dd_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
+pub(crate) use datadog_proto::trace as dd_proto;
 
 pub use self::config::DatadogTracesConfig;

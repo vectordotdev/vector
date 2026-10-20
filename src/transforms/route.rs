@@ -23,9 +23,13 @@ pub struct Route {
 }
 
 impl Route {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a route condition cannot be built.
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
-        for (output_name, condition) in config.route.iter() {
+        for (output_name, condition) in &config.route {
             let condition =
                 condition.build(&context.enrichment_tables, &context.metrics_storage)?;
             conditions.push((output_name.clone(), condition));
@@ -87,6 +91,7 @@ pub struct RouteConfig {
     /// Otherwise, the unmatched event is instead silently discarded.
     #[configurable(metadata(docs::additional_props_description = "An individual route."))]
     #[configurable(metadata(docs::examples = "route_examples()"))]
+    #[configurable(metadata(docs::required = true))]
     route: IndexMap<String, AnyCondition>,
 }
 
@@ -110,8 +115,8 @@ fn route_examples() -> IndexMap<String, AnyCondition> {
 }
 
 impl GenerateConfig for RouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             reroute_unmatched: true,
             route: route_examples(),
         })
@@ -131,7 +136,7 @@ impl TransformConfig for RouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         if self.route.contains_key(UNMATCHED_ROUTE) {
             Err(vec![format!(
                 "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
@@ -141,7 +146,7 @@ impl TransformConfig for RouteConfig {
         }
     }
 
-    fn validate_env(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
         let errors: Vec<String> = self
             .route
             .iter()
@@ -251,7 +256,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -297,7 +302,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -340,7 +345,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -384,7 +389,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -396,7 +401,7 @@ mod test {
             1,
         );
 
-        transform.transform(event.clone(), &mut outputs);
+        transform.transform(event, &mut outputs);
         for output_name in output_names {
             let events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 0);

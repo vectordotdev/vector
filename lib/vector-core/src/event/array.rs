@@ -10,7 +10,10 @@ use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizerGroups, EventFinalizers, Finalizable,
+        GroupedFinalizable, MergeFinalizable,
+    },
     json_size::JsonSize,
 };
 
@@ -313,6 +316,88 @@ impl Finalizable for EventArray {
             Self::Metrics(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
             Self::Traces(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
         }
+    }
+
+    fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
+        match self {
+            Self::Logs(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Metrics(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Traces(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+        }
+    }
+}
+
+impl GroupedFinalizable for EventArray {
+    fn merge_finalizer_groups(&mut self, finalizers: EventFinalizerGroups) {
+        fn merge_into<T: MergeFinalizable>(items: &mut [T], finalizers: EventFinalizerGroups) {
+            assert_eq!(
+                items.len(),
+                finalizers.len(),
+                "finalizer group count must match EventArray length"
+            );
+
+            for (item, finalizers) in items.iter_mut().zip(finalizers.into_groups()) {
+                item.merge_finalizers(finalizers);
+            }
+        }
+
+        match self {
+            Self::Logs(a) => merge_into(a, finalizers),
+            Self::Metrics(a) => merge_into(a, finalizers),
+            Self::Traces(a) => merge_into(a, finalizers),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::sync::oneshot::error::TryRecvError;
+    use vector_common::finalization::{BatchStatus, EventStatus};
+
+    use super::*;
+
+    #[test]
+    fn grouped_finalizer_round_trip_preserves_event_ownership() {
+        let (first_batch, mut first_rx) = BatchNotifier::new_with_receiver();
+        let (second_batch, mut second_rx) = BatchNotifier::new_with_receiver();
+
+        let mut first = LogEvent::default();
+        first.add_finalizer(EventFinalizer::new(first_batch));
+
+        let mut second = LogEvent::default();
+        second.add_finalizer(EventFinalizer::new(second_batch));
+
+        let mut array = EventArray::Logs(vec![first, second]);
+        let finalizers = array.take_finalizer_groups();
+        array.merge_finalizer_groups(finalizers);
+
+        let mut events = array.into_events();
+        let mut first = events.next().expect("first event must exist");
+        let mut second = events.next().expect("second event must exist");
+        assert!(events.next().is_none());
+
+        let first_finalizers = first.take_finalizers();
+        first_finalizers.update_status(EventStatus::Delivered);
+        drop(first_finalizers);
+
+        assert_eq!(first_rx.try_recv(), Ok(BatchStatus::Delivered));
+        assert!(matches!(second_rx.try_recv(), Err(TryRecvError::Empty)));
+
+        let second_finalizers = second.take_finalizers();
+        second_finalizers.update_status(EventStatus::Errored);
+        drop(second_finalizers);
+
+        assert_eq!(second_rx.try_recv(), Ok(BatchStatus::Errored));
+    }
+
+    #[test]
+    fn empty_event_array_grouped_round_trip() {
+        let mut array = EventArray::Logs(Vec::new());
+        let finalizers = array.take_finalizer_groups();
+
+        assert!(finalizers.is_empty());
+        array.merge_finalizer_groups(finalizers);
+        assert!(array.is_empty());
     }
 }
 

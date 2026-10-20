@@ -18,7 +18,6 @@ components: sinks: aws_s3: components._aws & {
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    10000000
 				timeout_secs: 300.0
 			}
@@ -68,7 +67,6 @@ components: sinks: aws_s3: components._aws & {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

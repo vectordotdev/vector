@@ -1,4 +1,4 @@
-//! The `vector` source. See [VectorConfig].
+//! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
 
 use chrono::Utc;
@@ -9,6 +9,7 @@ use tonic::{
     transport::server::RoutesBuilder,
 };
 use tonic_health::server::health_reporter;
+use tower::layer::util::Identity;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::NativeDeserializerConfig,
@@ -25,12 +26,14 @@ use crate::{
         SourceContext, SourceOutput,
     },
     http::VectorAuthConfig,
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
-    serde::bool_or_struct,
     sources::{
         Source,
-        util::grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        util::{
+            decompression::max_decompressed_size_bytes,
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -57,12 +60,20 @@ impl proto::Service for Service {
         &self,
         request: Request<proto::PushEventsRequest>,
     ) -> Result<Response<proto::PushEventsResponse>, Status> {
-        let mut events: Vec<Event> = request
-            .into_inner()
-            .events
-            .into_iter()
-            .map(Event::from)
-            .collect();
+        let request = request.into_inner();
+        let mut events = Vec::with_capacity(request.events.len());
+        for wrapper in request.events {
+            match Event::try_from(wrapper) {
+                Ok(event) => events.push(event),
+                Err(error) => {
+                    emit!(GrpcEventDecodeError { error: &error });
+                    return Err(Status::invalid_argument(error.to_string()));
+                }
+            }
+        }
+        if events.is_empty() {
+            return Ok(Response::new(proto::PushEventsResponse {}));
+        }
 
         let now = Utc::now();
         for event in &mut events {
@@ -90,7 +101,7 @@ impl proto::Service for Service {
                 emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
-            .and_then(|_| handle_batch_status(receiver))
+            .and_then(|()| handle_batch_status(receiver))
             .await?;
 
         Ok(Response::new(proto::PushEventsResponse {}))
@@ -169,22 +180,18 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
     /// Authentication required on incoming requests.
     ///
     /// Use TLS to keep credentials from being received in plaintext.
-    #[configurable(derived)]
     #[serde(default)]
     auth: Option<VectorAuthConfig>,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: GrpcKeepaliveConfig,
 
@@ -196,6 +203,7 @@ pub struct VectorConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
+    #[must_use]
     pub fn from_address(addr: SocketAddr) -> Self {
         Self {
             address: addr,
@@ -211,16 +219,16 @@ impl Default for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
             auth: None,
-            acknowledgements: Default::default(),
-            keepalive: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
             log_namespace: None,
         }
     }
 }
 
 impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(VectorConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(VectorConfig::default()).unwrap()
     }
 }
 
@@ -257,8 +265,10 @@ impl SourceConfig for VectorConfig {
             acknowledgements,
             log_namespace,
         })
-        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
-        .max_decoding_message_size(usize::MAX);
+        // Tonic added a default of 4MB in 0.9. Bound this by the global decompressed-size
+        // cap rather than `usize::MAX` so a single oversized message cannot drive unbounded
+        // allocation on this unauthenticated listener.
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         // Require auth on the Vector service when it is configured. The standard gRPC
         // health service is left open so liveness probes don't need credentials.
@@ -286,12 +296,15 @@ impl SourceConfig for VectorConfig {
         let source = run_grpc_server_with_routes(
             self.address,
             tls_settings,
+            None,
             builder.routes(),
             self.keepalive.clone(),
             cx.shutdown,
+            Identity::new(),
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);
+            crate::sources::SourceError::from(error)
         });
 
         Ok(Box::pin(source))
@@ -429,7 +442,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -448,7 +461,7 @@ mod test {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -484,10 +497,10 @@ mod tests {
         // to ensure interoperability.
         let sink_config = match compression {
             Some(c) => indoc::formatdoc! {r#"
-                address: "{addr}"
+                address: "http://{addr}"
                 compression: "{c}"
             "#},
-            None => format!("address: \"{addr}\"\n"),
+            None => format!("address: \"http://{addr}\"\n"),
         };
         let sink: SinkConfig = serde_yaml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
@@ -503,7 +516,7 @@ mod tests {
             );
         }
 
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_event_data_eq!(events, output);
     }
 
@@ -580,7 +593,7 @@ mod tests {
         tokio::spawn(server);
         test_util::wait_for_tcp(addr).await;
 
-        let sink_config = format!(r#"address = "{addr}"{auth}"#);
+        let sink_config = format!(r#"address = "http://{addr}"{auth}"#);
         let sink: SinkConfig = toml::from_str(&sink_config).unwrap();
         let (sink, _) = sink.build(SinkContext::default()).await.unwrap();
 
@@ -594,7 +607,7 @@ mod tests {
             );
         }
 
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_event_data_eq!(events, output);
     }
 
@@ -755,6 +768,8 @@ mod tests {
 
     #[tokio::test]
     async fn standard_grpc_health_check_works() {
+        use tonic_health::pb::health_check_response::ServingStatus;
+
         use tonic::transport::Channel;
         use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
 
@@ -789,7 +804,6 @@ mod tests {
             .await
             .unwrap();
 
-        use tonic_health::pb::health_check_response::ServingStatus;
         assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
 
         // Check the named Vector service health

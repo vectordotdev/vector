@@ -213,7 +213,12 @@ fn default_profile() -> String {
 
 impl AwsAuthentication {
     /// Creates the identity cache to store credentials based on the authentication mechanism chosen.
-    pub(super) async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Preserve the existing return type and caller contracts during the lint rollout."
+    )]
+    pub(super) fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
         match self {
             AwsAuthentication::Role {
                 load_timeout_secs, ..
@@ -223,9 +228,7 @@ impl AwsAuthentication {
             } => {
                 let credentials_cache = IdentityCache::lazy()
                     .load_timeout(
-                        load_timeout_secs
-                            .map(Duration::from_secs)
-                            .unwrap_or(DEFAULT_LOAD_TIMEOUT),
+                        load_timeout_secs.map_or(DEFAULT_LOAD_TIMEOUT, Duration::from_secs),
                     )
                     .build();
 
@@ -235,9 +238,9 @@ impl AwsAuthentication {
         }
     }
 
-    /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
+    /// Create the `AssumeRoleProviderBuilder`, ensuring we create the HTTP client with
     /// the correct proxy and TLS options.
-    fn assume_role_provider_builder(
+    async fn assume_role_provider_builder(
         proxy: &ProxyConfig,
         tls_options: Option<&TlsConfig>,
         region: &Region,
@@ -245,11 +248,16 @@ impl AwsAuthentication {
         external_id: Option<&str>,
         session_name: Option<&str>,
     ) -> crate::Result<AssumeRoleProviderBuilder> {
-        let connector = super::connector(proxy, tls_options)?;
+        let connector = super::AwsHttpClient {
+            http: super::connector(proxy, tls_options)?,
+            region: region.clone(),
+            emit_bytes_sent: false,
+        };
         let config = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
             .time_source(SystemTimeSource::new())
+            .use_fips(resolve_use_fips().await.unwrap_or(false))
             .build();
 
         let mut builder = AssumeRoleProviderBuilder::new(assume_role)
@@ -257,17 +265,22 @@ impl AwsAuthentication {
             .configure(&config);
 
         if let Some(external_id) = external_id {
-            builder = builder.external_id(external_id)
+            builder = builder.external_id(external_id);
         }
 
         if let Some(session_name) = session_name {
-            builder = builder.session_name(session_name)
+            builder = builder.session_name(session_name);
         }
 
         Ok(builder)
     }
 
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub async fn credentials_provider(
         &self,
         service_region: Region,
@@ -290,7 +303,7 @@ impl AwsAuthentication {
                     session_token.clone().map(|v| v.inner().into()),
                 ));
                 if let Some(assume_role) = assume_role {
-                    let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                    let auth_region = region.clone().map_or(service_region, Region::new);
                     let builder = Self::assume_role_provider_builder(
                         proxy,
                         tls_options,
@@ -298,7 +311,8 @@ impl AwsAuthentication {
                         assume_role,
                         external_id.as_deref(),
                         session_name.as_deref(),
-                    )?;
+                    )
+                    .await?;
 
                     let provider = builder.build_from_provider(provider).await;
 
@@ -311,8 +325,6 @@ impl AwsAuthentication {
                 profile,
                 region,
             } => {
-                let connector = super::connector(proxy, tls_options)?;
-
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = EnvConfigFiles::builder()
@@ -320,6 +332,11 @@ impl AwsAuthentication {
                     .build();
 
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                let connector = super::AwsHttpClient {
+                    http: super::connector(proxy, tls_options)?,
+                    region: auth_region.clone(),
+                    emit_bytes_sent: false,
+                };
                 let provider_config = ProviderConfig::empty()
                     .with_region(Option::from(auth_region))
                     .with_http_client(connector);
@@ -347,7 +364,8 @@ impl AwsAuthentication {
                     assume_role,
                     external_id.as_deref(),
                     session_name.as_deref(),
-                )?;
+                )
+                .await?;
 
                 let provider = builder
                     .build_from_provider(
@@ -372,6 +390,7 @@ impl AwsAuthentication {
 
     #[cfg(test)]
     /// Creates dummy authentication for tests.
+    #[must_use]
     pub fn test_auth() -> AwsAuthentication {
         AwsAuthentication::AccessKey {
             access_key_id: "dummy".to_string().into(),
@@ -385,17 +404,31 @@ impl AwsAuthentication {
     }
 }
 
+/// Resolves the FIPS endpoint setting from the environment variable
+/// `AWS_USE_FIPS_ENDPOINT`.
+///
+/// Returns `Some(true)` if FIPS is enabled, `Some(false)` if explicitly
+/// disabled, or `None` if the environment variable is not set.
+async fn resolve_use_fips() -> Option<bool> {
+    aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty()).await
+}
+
 async fn default_credentials_provider(
     region: Region,
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let connector = super::connector(proxy, tls_options)?;
+    let connector = super::AwsHttpClient {
+        http: super::connector(proxy, tls_options)?,
+        region: region.clone(),
+        emit_bytes_sent: false,
+    };
 
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))
-        .with_http_client(connector);
+        .with_http_client(connector)
+        .with_use_fips(resolve_use_fips().await);
 
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)

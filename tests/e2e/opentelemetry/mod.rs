@@ -1,10 +1,13 @@
 pub mod logs;
 pub mod metrics;
+pub mod metrics_native;
+pub mod traces;
 
 use std::{io, path::Path, process::Command};
 
 use prost::Message as ProstMessage;
 use prost_reflect::{DescriptorPool, prost::Message as ProstReflectMessage};
+use serde_json::Value;
 use vector_lib::opentelemetry::proto::{
     DESCRIPTOR_BYTES, common::v1::any_value::Value as AnyValueEnum, resource::v1::Resource,
 };
@@ -48,22 +51,29 @@ fn parse_line_to_export_type_request<Message>(
 where
     Message: ProstMessage + Default,
 {
-    // Parse JSON and convert to VRL Value
-    let vrl_value: VrlValue = serde_json::from_str::<serde_json::Value>(line)
+    let vrl_value: VrlValue = serde_json::from_str::<Value>(line)
         .map_err(|e| format!("Failed to parse JSON: {e}"))?
         .into();
 
-    // Get the message descriptor from the descriptor pool
+    parse_value_to_export_type_request(request_message_type, vrl_value)
+}
+
+fn parse_value_to_export_type_request<Message>(
+    request_message_type: &str,
+    vrl_value: VrlValue,
+) -> Result<Message, String>
+where
+    Message: ProstMessage + Default,
+{
     let descriptor_pool = DescriptorPool::decode(DESCRIPTOR_BYTES)
         .map_err(|e| format!("Failed to decode descriptor pool: {e}"))?;
 
     let message_descriptor = descriptor_pool
         .get_message_by_name(request_message_type)
         .ok_or_else(|| {
-            format!("Message type '{request_message_type}' not found in descriptor pool",)
+            format!("Message type '{request_message_type}' not found in descriptor pool")
         })?;
 
-    // Encode VRL Value to DynamicMessage using VRL's encode_message with JSON names enabled
     let dynamic_message = vrl::protobuf::encode::encode_message(
         &message_descriptor,
         vrl_value,
@@ -74,14 +84,11 @@ where
     )
     .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
 
-    // Encode DynamicMessage to bytes (using prost 0.13.5)
     let mut buf = Vec::new();
     ProstReflectMessage::encode(&dynamic_message, &mut buf)
         .map_err(|e| format!("Failed to encode dynamic message to bytes: {e}"))?;
 
-    // Decode bytes into T (using prost 0.12.6)
-    ProstMessage::decode(&buf[..])
-        .map_err(|e| format!("Failed to decode ExportLogsServiceRequest: {e}"))
+    ProstMessage::decode(&buf[..]).map_err(|e| format!("Failed to decode protobuf message: {e}"))
 }
 
 pub fn assert_service_name_with<ResourceT, F>(
@@ -116,9 +123,14 @@ pub fn assert_service_name_with<ResourceT, F>(
     }
 }
 
-/// Verifies that the component_received_events_total internal metric counts
+/// Verifies that the `component_received_events_total` internal metric counts
 /// individual log records/metrics/spans, not batch requests.
-/// This ensures consistency when use_otlp_decoding is enabled.
+/// This ensures consistency when OTLP preservation is enabled.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing metric-counter conversion used by this fixture assertion. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub fn assert_component_received_events_total(data_type: &str, expected_count: usize) {
     let metrics_content = read_file_helper(data_type, "vector-internal-metrics-sink.log")
         .expect("Failed to read internal metrics file");
@@ -134,7 +146,7 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
         }
 
         // Parse the JSON metric
-        let metric: serde_json::Value = serde_json::from_str(line)
+        let metric: Value = serde_json::from_str(line)
             .unwrap_or_else(|e| panic!("Failed to parse metrics JSON: {e}"));
 
         // Look for component_received_events_total metric
@@ -149,7 +161,7 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
                 found_metric = true;
                 // Get the counter value
                 if let Some(counter) = metric.get("counter")
-                    && let Some(value) = counter.get("value").and_then(|v| v.as_f64())
+                    && let Some(value) = counter.get("value").and_then(Value::as_f64)
                 {
                     total_events = value as u64;
                 }

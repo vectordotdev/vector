@@ -2,8 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use tracing::debug;
 use vector_config_common::schema::{
+    InstanceType, Map, RootSchema, Schema, SchemaObject, SchemaSettings, SingleOrVec,
+    SubschemaValidation, get_cleaned_schema_reference, visit,
     visit::{Visitor, with_resolved_schema_reference},
-    *,
 };
 
 use super::scoped_visit::{
@@ -29,6 +30,7 @@ pub struct DisallowUnevaluatedPropertiesVisitor {
 }
 
 impl DisallowUnevaluatedPropertiesVisitor {
+    #[must_use]
     pub fn from_settings(_: &SchemaSettings) -> Self {
         Self {
             scope_stack: SchemaScopeStack::default(),
@@ -42,9 +44,8 @@ impl Visitor for DisallowUnevaluatedPropertiesVisitor {
         let eligible_to_flatten = build_closed_schema_flatten_eligibility_mappings(root);
 
         debug!(
-            "Found {} referents eligible for flattening: {:?}",
+            "Found {} referents eligible for flattening: {eligible_to_flatten:?}",
             eligible_to_flatten.len(),
-            eligible_to_flatten,
         );
 
         self.eligible_to_flatten = eligible_to_flatten;
@@ -233,22 +234,16 @@ fn build_closed_schema_flatten_eligibility_mappings(
             Schema::Object(schema) => schema,
         };
 
-        debug!(
-            "Evaluating schema definition '{}' for markability.",
-            definition_name
-        );
+        debug!("Evaluating schema definition '{definition_name}' for markability.");
 
         // If a schema itself would not be considered markable, then we don't need to consider the
         // eligibility between parent/child since there's nothing to drive the "now unmark the child
         // schemas" logic.
-        if !is_markable_schema(&root_schema.definitions, parent_schema) {
-            debug!("Schema definition '{}' not markable.", definition_name);
-            continue;
+        if is_markable_schema(&root_schema.definitions, parent_schema) {
+            debug!("Schema definition '{definition_name}' markable. Collecting referents.");
         } else {
-            debug!(
-                "Schema definition '{}' markable. Collecting referents.",
-                definition_name
-            );
+            debug!("Schema definition '{definition_name}' not markable.");
+            continue;
         }
 
         // Collect all referents for this definition, which includes both property-based referents
@@ -258,10 +253,8 @@ fn build_closed_schema_flatten_eligibility_mappings(
         get_referents(parent_schema, &mut referents);
 
         debug!(
-            "Collected {} referents for '{}': {:?}",
-            referents.len(),
-            definition_name,
-            referents
+            "Collected {} referents for '{definition_name}': {referents:?}",
+            referents.len()
         );
 
         // Store the parent/child mapping.
@@ -309,9 +302,9 @@ fn build_closed_schema_flatten_eligibility_mappings(
             .collect::<HashSet<_>>();
 
         if would_not_unmark.len() >= would_unmark.len() {
-            eligible_to_flatten.insert(child_schema_ref.to_string(), would_unmark);
+            eligible_to_flatten.insert(child_schema_ref.clone(), would_unmark);
         } else {
-            eligible_to_flatten.insert(child_schema_ref.to_string(), would_not_unmark);
+            eligible_to_flatten.insert(child_schema_ref.clone(), would_not_unmark);
         }
     }
 
@@ -327,8 +320,7 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
         .object
         .as_ref()
         .and_then(|object| object.additional_properties.as_ref())
-        .map(|schema| matches!(schema.as_ref(), Schema::Object(_)))
-        .unwrap_or(false);
+        .is_some_and(|schema| matches!(schema.as_ref(), Schema::Object(_)));
 
     if is_object_schema(schema) && !has_additional_properties {
         return true;
@@ -359,10 +351,7 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
                 })
                 .and_then(|(name, schema)| schema.as_object().map(|schema| (name, schema)))
                 .is_some_and(|(name, schema)| {
-                    debug!(
-                        "Following schema reference '{}' for subschema markability.",
-                        name
-                    );
+                    debug!("Following schema reference '{name}' for subschema markability.");
                     is_markable_schema(definitions, schema)
                 })
         });
@@ -491,7 +480,7 @@ fn mark_schema_closed(schema: &mut SchemaObject) {
         .object()
         .additional_properties
         .as_ref()
-        .map(|v| v.as_ref())
+        .map(std::convert::AsRef::as_ref)
     {
         return;
     }

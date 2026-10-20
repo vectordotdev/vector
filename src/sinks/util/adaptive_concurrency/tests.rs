@@ -20,7 +20,7 @@ use futures::{
     future::{self, BoxFuture},
     stream,
 };
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Exp1;
 use rstest::*;
 use serde::Deserialize;
@@ -31,7 +31,7 @@ use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
 use super::{AdaptiveConcurrencySettings, controller::ControllerStatistics};
 use crate::{
-    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{Event, metric::MetricValue},
     metrics,
     sinks::{
@@ -78,7 +78,6 @@ struct LimitParams {
     /// The level above which more requests will be denied.
     limit: Option<usize>,
 
-    #[configurable(derived)]
     #[serde(default)]
     action: Action,
 }
@@ -89,17 +88,19 @@ impl LimitParams {
             .and_then(|limit| (level > limit).then_some(self.action))
     }
 
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Simulation request counts are approximate. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn scale(&self, level: usize) -> f64 {
         ((level - 1) as f64).mul_add(
             self.scale,
-            self.knee_start
-                .map(|knee| {
-                    self.knee_exp
-                        .unwrap_or(self.scale + 1.0)
-                        .powf(level.saturating_sub(knee) as f64)
-                        - 1.0
-                })
-                .unwrap_or(0.0),
+            self.knee_start.map_or(0.0, |knee| {
+                self.knee_exp
+                    .unwrap_or(self.scale + 1.0)
+                    .powf(level.saturating_sub(knee) as f64)
+                    - 1.0
+            }),
         )
     }
 }
@@ -125,19 +126,15 @@ struct TestParams {
     #[serde(default)]
     jitter: f64,
 
-    #[configurable(derived)]
     #[serde(default)]
     concurrency_limit_params: LimitParams,
 
-    #[configurable(derived)]
     #[serde(default)]
     rate: LimitParams,
 
-    #[configurable(derived)]
     #[serde(default = "default_concurrency")]
     concurrency: Concurrency,
 
-    #[configurable(derived)]
     #[serde(default)]
     adaptive_concurrency: AdaptiveConcurrencySettings,
 }
@@ -154,10 +151,8 @@ const fn default_concurrency() -> Concurrency {
 #[configurable_component(sink("test_arc", "Test (adaptive concurrency)."))]
 #[derive(Clone, Debug, Default)]
 pub struct TestConfig {
-    #[configurable(derived)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     params: TestParams,
 
     // The statistics collected by running a test must be local to that
@@ -176,7 +171,28 @@ impl_generate_config_from_default!(TestConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "test_arc")]
 impl SinkConfig for TestConfig {
-    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for TestConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 1;
@@ -207,14 +223,6 @@ impl SinkConfig for TestConfig {
 
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
     }
 }
 
@@ -359,7 +367,7 @@ impl TestController {
         Self {
             todo,
             send_done: Some(send_done),
-            stats: Default::default(),
+            stats: Statistics::default(),
         }
     }
 
@@ -385,7 +393,7 @@ impl Statistics {
         self.prune_old_requests(now);
         self.rate.add(self.requests.len(), now.into());
         self.in_flight.adjust(-1, now.into());
-        self.completed += completed as usize;
+        self.completed += usize::from(completed);
     }
 
     /// Prune any requests that are more than one second old. The
@@ -428,7 +436,7 @@ async fn run_test(params: TestParams) -> TestResults {
         },
         params,
         control: Arc::new(Mutex::new(TestController::new(params.requests, send_done))),
-        controller_stats: Default::default(),
+        controller_stats: Arc::default(),
     };
 
     let control = Arc::clone(&test_config.control);
@@ -521,6 +529,12 @@ struct Failure {
 struct Range(f64, f64);
 
 impl Range {
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Preserve simulation range rounding and reporting. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn assert_usize(&self, value: usize, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 as usize {
             Some(Failure {
@@ -664,8 +678,8 @@ async fn run_compare(input: TestInput) {
             FailureMode::ExceededMaximum => "maximum",
         };
         eprintln!(
-            "Comparison failed: {} = {}; {} = {}",
-            failure.stat_name, failure.value, mode, failure.reference
+            "Comparison failed: {} = {}; {mode} = {}",
+            failure.stat_name, failure.value, failure.reference
         );
     }
     assert!(failures.is_empty(), "{results:#?}");

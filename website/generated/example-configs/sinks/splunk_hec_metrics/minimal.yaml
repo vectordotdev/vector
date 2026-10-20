@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: splunk_hec_metrics
+    inputs:
+      - my-source-or-transform-id
+    default_token: ${SPLUNK_HEC_TOKEN}
+    endpoint: https://http-inputs-hec.splunkcloud.com

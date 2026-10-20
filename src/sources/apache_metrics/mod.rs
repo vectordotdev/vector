@@ -48,17 +48,19 @@ pub struct ApacheMetricsConfig {
     namespace: String,
 }
 
+#[must_use]
 pub const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> String {
     "apache".to_string()
 }
 
 impl GenerateConfig for ApacheMetricsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoints: vec!["http://localhost:8080/server-status/?auto".to_owned()],
             scrape_interval_secs: default_scrape_interval_secs(),
             namespace: default_namespace(),
@@ -141,6 +143,10 @@ impl UriExt for http::Uri {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn apache_metrics(
     urls: Vec<http::Uri>,
     interval: Duration,
@@ -149,7 +155,7 @@ fn apache_metrics(
     mut out: SourceSender,
     proxy: ProxyConfig,
 ) -> super::Source {
-    Box::pin(async move {
+    crate::sources::source_with_error(async move {
         let mut stream = IntervalStream::new(tokio::time::interval(interval))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
@@ -163,7 +169,7 @@ fn apache_metrics(
                     .expect("error creating request");
 
                 let tags = metric_tags! {
-                    "endpoint" => sanitized_url.to_string(),
+                    "endpoint" => sanitized_url.clone(),
                     "host" => url.sanitized_authority(),
                 };
 
@@ -226,7 +232,7 @@ fn apache_metrics(
                             Ok((header, _)) => {
                                 emit!(HttpClientHttpResponseError {
                                     code: header.status,
-                                    url: sanitized_url.to_owned(),
+                                    url: sanitized_url.clone(),
                                 });
                                 Some(stream::iter(vec![
                                     Metric::new(
@@ -242,7 +248,7 @@ fn apache_metrics(
                             Err(error) => {
                                 emit!(HttpClientHttpError {
                                     error,
-                                    url: sanitized_url.to_owned(),
+                                    url: sanitized_url.clone(),
                                 });
                                 Some(stream::iter(vec![
                                     Metric::new(
@@ -267,10 +273,10 @@ fn apache_metrics(
                 debug!("Finished sending.");
                 Ok(())
             }
-            Err(_) => {
+            Err(error) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Err(())
+                Err(error)
             }
         }
     })
@@ -278,6 +284,7 @@ fn apache_metrics(
 
 #[cfg(test)]
 mod test {
+    use crate::event::Event;
     use hyper::{
         Body, Response, Server,
         service::{make_service_fn, service_fn},
@@ -360,7 +367,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         wait_for_tcp(in_addr).await;
 
         let config = ApacheMetricsConfig {
-            endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
+            endpoints: vec![format!("http://foo:bar@{in_addr}/metrics")],
             scrape_interval_secs: Duration::from_secs(1),
             namespace: "custom".to_string(),
         };
@@ -373,24 +380,22 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         .await;
         let metrics = events
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(Event::into_metric)
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => {
-                assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
+        if let Some(m) = metrics.iter().find(|m| m.name() == "up") {
+            assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
 
-                match m.tags() {
-                    Some(tags) => {
-                        let endpoint = format!("http://{in_addr}/metrics");
-                        let host = in_addr.to_string();
-                        assert_eq!(tags.get("endpoint"), Some(endpoint.as_str()));
-                        assert_eq!(tags.get("host"), Some(host.as_str()));
-                    }
-                    None => error!(message = "No tags for metric.", metric = ?m),
-                }
+            if let Some(tags) = m.tags() {
+                let endpoint = format!("http://{in_addr}/metrics");
+                let host = in_addr.to_string();
+                assert_eq!(tags.get("endpoint"), Some(endpoint.as_str()));
+                assert_eq!(tags.get("host"), Some(host.as_str()));
+            } else {
+                error!(message = "No tags for metric.", metric = ?m);
             }
-            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
+        } else {
+            error!(message = "Could not find up metric in.", metrics = ?metrics);
         }
     }
 
@@ -419,7 +424,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
-            endpoints: vec![format!("http://{}", in_addr)],
+            endpoints: vec![format!("http://{in_addr}")],
             scrape_interval_secs: Duration::from_secs(1),
             namespace: "apache".to_string(),
         }
@@ -431,17 +436,17 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
-            .await
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(Event::into_metric)
             .collect::<Vec<_>>();
 
         // we still publish `up=1` for bad status codes following the pattern of the Prometheus exporter:
         //
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
-        match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 }),
-            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
+        if let Some(m) = metrics.iter().find(|m| m.name() == "up") {
+            assert_eq!(m.value(), &MetricValue::Gauge { value: 1.0 });
+        } else {
+            error!(message = "Could not find up metric in.", metrics = ?metrics);
         }
     }
 
@@ -453,7 +458,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
-            endpoints: vec![format!("http://{}", in_addr)],
+            endpoints: vec![format!("http://{in_addr}")],
             scrape_interval_secs: Duration::from_secs(1),
             namespace: "custom".to_string(),
         }
@@ -465,14 +470,14 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
-            .await
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(Event::into_metric)
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name() == "up") {
-            Some(m) => assert_eq!(m.value(), &MetricValue::Gauge { value: 0.0 }),
-            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
+        if let Some(m) = metrics.iter().find(|m| m.name() == "up") {
+            assert_eq!(m.value(), &MetricValue::Gauge { value: 0.0 });
+        } else {
+            error!(message = "Could not find up metric in.", metrics = ?metrics);
         }
     }
 }

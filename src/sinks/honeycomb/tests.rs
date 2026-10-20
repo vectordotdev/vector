@@ -1,11 +1,10 @@
 //! Unit tests for the `honeycomb` sink.
 
 use futures::{future::ready, stream};
-use serde::Deserialize;
 
 use super::config::HoneycombConfig;
 use crate::{
-    sinks::prelude::*,
+    sinks::{prelude::*, util::HttpEndpoint},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -21,12 +20,9 @@ fn generate_config() {
 async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-    let config = HoneycombConfig::generate_config().to_string();
-    let mut config = HoneycombConfig::deserialize(
-        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-    )
-    .expect("config should be valid");
-    config.endpoint = mock_endpoint.to_string();
+    let mut config: HoneycombConfig =
+        serde_json::from_value(HoneycombConfig::generate_config()).expect("config should be valid");
+    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();

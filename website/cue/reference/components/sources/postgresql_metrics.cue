@@ -44,7 +44,6 @@ components: sources: postgresql_metrics: {
 		requirements: []
 
 		warnings: []
-		notices: []
 	}
 
 	installation: {

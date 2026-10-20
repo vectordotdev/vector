@@ -65,10 +65,14 @@ async fn handle_errors(
     AssertUnwindSafe(task)
         .catch_unwind()
         .await
-        .map_err(|_| TaskError::Panicked)
+        .map_err(|payload| TaskError::panicked(payload.as_ref()))
         .and_then(|res| res)
         .map_err(|e| {
-            error!("An error occurred that Vector couldn't handle: {}.", e);
+            let panic = match &e {
+                TaskError::Panicked { panic } => Some(panic.as_str()),
+                _ => None,
+            };
+            error!(panic, "An error occurred that Vector couldn't handle: {e}.");
             _ = abort_tx.send(error(e.to_string()));
             e
         })

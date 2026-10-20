@@ -85,7 +85,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 

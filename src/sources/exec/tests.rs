@@ -302,7 +302,7 @@ async fn test_spawn_reader_thread() {
 async fn test_drop_receiver() {
     let config = standard_scheduled_test_config();
     let hostname = Some("Some.Machine".to_string());
-    let decoder = Default::default();
+    let decoder = Decoder::default();
     let shutdown = ShutdownSignal::noop();
     let (tx, rx) = SourceSender::new_test();
 
@@ -330,7 +330,7 @@ async fn test_drop_receiver() {
 
 #[tokio::test]
 #[cfg(unix)]
-#[cfg_attr(target_os = "macos", ignore)] // Flaky when running `cargo test`
+#[cfg_attr(target_os = "macos", ignore = "Flaky when running cargo test on macOS")]
 async fn test_run_command_linux() {
     let config = standard_scheduled_test_config();
 
@@ -338,7 +338,7 @@ async fn test_run_command_linux() {
         &crate::test_util::components::SOURCE_TAGS,
         async {
             let hostname = Some("Some.Machine".to_string());
-            let decoder = Default::default();
+            let decoder = Decoder::default();
             let shutdown = ShutdownSignal::noop();
             let (tx, rx) = SourceSender::new_test();
 
@@ -372,7 +372,7 @@ async fn test_run_command_linux() {
         assert_eq!(*log.get_source_type().unwrap(), "exec".into());
         assert_eq!(*log.get_message().unwrap(), "Hello World!".into());
         assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
-        assert!(log.get(PID_KEY).is_some());
+        assert!(log.get(vrl::event_path!(PID_KEY)).is_some());
         assert!(log.get_timestamp().is_some());
 
         assert_eq!(8, log.all_event_fields().unwrap().count());
@@ -394,7 +394,7 @@ async fn test_graceful_shutdown() {
         ),
     ];
     let hostname = Some("Some.Machine".to_string());
-    let decoder = Default::default();
+    let decoder = Decoder::default();
     let (trigger, shutdown, _) = ShutdownSignal::new_wired();
     let (tx, mut rx) = SourceSender::new_test();
 
@@ -438,7 +438,7 @@ async fn test_graceful_shutdown() {
 }
 
 fn standard_scheduled_test_config() -> ExecConfig {
-    Default::default()
+    ExecConfig::default()
 }
 
 fn standard_streaming_test_config() -> ExecConfig {

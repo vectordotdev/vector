@@ -1,7 +1,7 @@
 use std::{cell::RefCell, marker::PhantomData};
 
+use serde_json::Value;
 use snafu::Snafu;
-use toml::Value;
 use vector_config_common::{attributes::CustomAttribute, constants};
 
 use super::{ComponentMarker, GenerateConfig};
@@ -41,6 +41,7 @@ where
     ///
     /// The type parameter `C` must be the component's configuration type that implements
     /// `Configurable` and `GenerateConfig`.
+    #[must_use]
     pub const fn new<C: GenerateConfig + Configurable + 'static>(
         component_name: &'static str,
         label: &'static str,
@@ -75,6 +76,7 @@ where
     }
 
     /// Gets a sorted list of all registered components of the given component type.
+    #[must_use]
     pub fn types() -> Vec<&'static str> {
         let mut types = Vec::new();
         for definition in inventory::iter::<ComponentDescription<T>> {
@@ -85,6 +87,10 @@ where
     }
 
     /// Generate a schema object covering all the descriptions of this type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if generating a registered component schema fails.
     pub fn generate_schemas(
         generator: &RefCell<SchemaGenerator>,
     ) -> Result<SchemaObject, GenerateError> {
@@ -105,7 +111,7 @@ where
         let mut tag_subschema =
             schema::generate_const_string_schema(self.component_name.to_string());
         let variant_tag_metadata = Metadata::with_description(self.description);
-        schema::apply_base_metadata(&mut tag_subschema, variant_tag_metadata);
+        schema::apply_metadata(&mut tag_subschema, variant_tag_metadata);
 
         let tag_schema =
             schema::generate_internal_tagged_variant_schema("type".to_string(), tag_subschema);
@@ -126,7 +132,7 @@ where
         ));
         variant_metadata
             .add_custom_attribute(CustomAttribute::kv("logical_name", self.logical_name));
-        schema::apply_base_metadata(&mut subschema, variant_metadata);
+        schema::apply_metadata(&mut subschema, variant_metadata);
 
         Ok(subschema)
     }

@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: prometheus_remote_write
+    inputs:
+      - my-source-or-transform-id
+    compression: snappy
+    dangerously_allow_unconfined_template_resolution: false
+    default_namespace: service
+    endpoint: https://localhost:8087/api/v1/write
+    tenant_id: my-domain

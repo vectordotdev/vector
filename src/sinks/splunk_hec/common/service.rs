@@ -61,7 +61,7 @@ where
             crate::spawn_in_current_span(run_acknowledgements(
                 rx,
                 ack_client,
-                Arc::clone(&http_request_builder),
+                http_request_builder,
                 indexer_acknowledgements,
             ));
             Some(tx)
@@ -69,6 +69,11 @@ where
             None
         };
 
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Preserve the existing limit conversion."
+        )]
         let ack_slots = PollSemaphore::new(Arc::new(Semaphore::new(max_pending_acks as usize)));
         Self {
             inner,
@@ -128,7 +133,7 @@ where
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
                                 match ack_finalizer_tx.send((ack_id, tx)).await {
-                                    Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
+                                    Ok(()) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(error) => {
                                         emit!(SplunkIndexerAcknowledgementUnavailableError {
@@ -197,6 +202,7 @@ pub(super) struct MetadataFields {
 }
 
 impl HttpRequestBuilder {
+    #[must_use]
     pub fn new(
         endpoint: String,
         endpoint_target: EndpointTarget,
@@ -205,8 +211,8 @@ impl HttpRequestBuilder {
     ) -> Self {
         let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
-            endpoint,
             endpoint_target,
+            endpoint,
             default_token,
             compression,
             channel,
@@ -430,7 +436,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
@@ -448,7 +454,7 @@ mod tests {
         responses.push(service.ready().await.unwrap().call(get_hec_request()));
         responses.push(service.ready().await.unwrap().call(get_hec_request()));
         while let Some(response) = responses.next().await {
-            assert_eq!(EventStatus::Delivered, response.unwrap().event_status)
+            assert_eq!(EventStatus::Delivered, response.unwrap().event_status);
         }
     }
 
@@ -465,7 +471,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
@@ -481,7 +487,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Rejected, response.event_status)
+        assert_eq!(EventStatus::Rejected, response.event_status);
     }
 
     #[tokio::test]
@@ -501,7 +507,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
@@ -518,7 +524,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Errored, response.event_status)
+        assert_eq!(EventStatus::Errored, response.event_status);
     }
 
     #[tokio::test]
@@ -544,13 +550,16 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.ready().await.unwrap().call(request).await.unwrap();
-        assert_eq!(EventStatus::Delivered, response.event_status)
+        assert_eq!(EventStatus::Delivered, response.event_status);
     }
 
     #[tokio::test]
     async fn service_poll_ready_multiple_times() {
         let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
-        let mut service = get_hec_service(mock_server.uri(), Default::default());
+        let mut service = get_hec_service(
+            mock_server.uri(),
+            HecClientAcknowledgementsConfig::default(),
+        );
 
         assert!(service.ready().await.is_ok());
         // Consecutive poll_ready returns OK since an ack slot has been granted
@@ -559,10 +568,13 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "poll_ready not called before invoking call")]
     async fn service_call_without_poll_ready() {
         let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
-        let mut service = get_hec_service(mock_server.uri(), Default::default());
+        let mut service = get_hec_service(
+            mock_server.uri(),
+            HecClientAcknowledgementsConfig::default(),
+        );
 
         _ = service.call(get_hec_request()).await;
     }
@@ -593,7 +605,7 @@ mod tests {
         // The service should now be ready for additional requests
         assert!(matches!(
             poll!(poll_fn(|cx| service.poll_ready(cx))),
-            Poll::Ready(Ok(_))
+            Poll::Ready(Ok(()))
         ));
     }
 }

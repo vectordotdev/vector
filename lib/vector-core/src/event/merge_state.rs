@@ -54,7 +54,7 @@ mod test {
 
         assert_eq!(
             merged_event
-                .get("message")
+                .get(vrl::event_path!("message"))
                 .unwrap()
                 .coerce_to_bytes()
                 .as_ref(),

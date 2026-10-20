@@ -1,10 +1,12 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
+    path::PathBuf,
     time::Duration,
 };
 
 use bytes::Bytes;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{SmallVec, smallvec};
@@ -25,7 +27,7 @@ use super::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_s
 use crate::{
     SourceSender,
     codecs::Decoder,
-    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, UnixOnly},
     event::Event,
     internal_events::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
@@ -43,7 +45,7 @@ mod unix;
 
 use parser::Parser;
 #[cfg(unix)]
-use unix::{UnixConfig, statsd_unix};
+use unix::statsd_unix;
 use vector_lib::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
@@ -60,8 +62,24 @@ pub enum StatsdConfig {
     Udp(UdpConfig),
 
     /// Listen on a Unix domain Socket (UDS).
-    #[cfg(unix)]
-    Unix(UnixConfig),
+    Unix(UnixOnly<UnixConfig>),
+}
+
+/// Unix domain socket configuration for the `statsd` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    pub path: PathBuf,
+
+    #[serde(default = "default_sanitize")]
+    pub sanitize: bool,
+
+    #[serde(default = "default_convert_to")]
+    pub convert_to: ConversionUnit,
 }
 
 /// Specifies the target unit for converting incoming StatsD timing values. When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to "milliseconds", the original timing values are preserved.
@@ -81,22 +99,20 @@ pub enum ConversionUnit {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The size of the receive buffer used for each connection.
     receive_buffer_bytes: Option<usize>,
 
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 
 impl UdpConfig {
+    #[must_use]
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -112,16 +128,12 @@ impl UdpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsSourceConfig>,
 
@@ -139,21 +151,28 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
+
     ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"
     /// - All whitespace is replaced with "_"
     /// - All non alphanumeric characters (A-Z, a-z, 0-9, _, or -) are removed.
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 
 impl TcpConfig {
     #[cfg(test)]
+    #[must_use]
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -163,6 +182,7 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
             connection_limit: None,
+            tls_handshake_timeout_secs: None,
             sanitize: default_sanitize(),
             convert_to: default_convert_to(),
         }
@@ -182,8 +202,8 @@ const fn default_convert_to() -> ConversionUnit {
 }
 
 impl GenerateConfig for StatsdConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::Udp(UdpConfig::from_address(
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::Udp(UdpConfig::from_address(
             SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
                 Ipv4Addr::LOCALHOST,
                 8125,
@@ -219,9 +239,11 @@ impl SourceConfig for StatsdConfig {
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     None,
+                    config.tls_handshake_timeout_secs,
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -230,8 +252,11 @@ impl SourceConfig for StatsdConfig {
                     LogNamespace::Legacy,
                 )
             }
-            #[cfg(unix)]
-            StatsdConfig::Unix(config) => statsd_unix(config.clone(), cx.shutdown, cx.out),
+            StatsdConfig::Unix(config) => config.as_ref().on_unix(
+                cx,
+                #[cfg(unix)]
+                |config, cx| statsd_unix(config.clone(), cx.shutdown, cx.out),
+            ),
         }
     }
 
@@ -243,7 +268,6 @@ impl SourceConfig for StatsdConfig {
         match self.clone() {
             Self::Tcp(tcp) => vec![tcp.address.as_tcp_resource()],
             Self::Udp(udp) => vec![udp.address.as_udp_resource()],
-            #[cfg(unix)]
             Self::Unix(_) => vec![],
         }
     }
@@ -325,16 +349,17 @@ async fn statsd_udp(
     config: UdpConfig,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), super::SourceError> {
     let listenfd = ListenFd::from_env();
     let socket = try_bind_udp_socket(config.address, listenfd)
+        .await
         .map_err(|error| {
             emit!(SocketBindError {
                 mode: SocketMode::Udp,
-                error
-            })
-        })
-        .await?;
+                error: &error,
+            });
+            super::SourceError::from(error)
+        })?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
         && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)
@@ -438,6 +463,17 @@ mod test {
         crate::test_util::test_generate_config::<StatsdConfig>();
     }
 
+    #[test]
+    fn unix_mode_deserializes_on_all_platforms() {
+        let config: StatsdConfig = serde_yaml::from_str(indoc::indoc! {r"
+            mode: unix
+            path: /tmp/vector-statsd.sock
+        "})
+        .unwrap();
+
+        assert!(matches!(config, StatsdConfig::Unix(_)));
+    }
+
     #[tokio::test]
     async fn test_statsd_udp() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
@@ -504,11 +540,14 @@ mod test {
     async fn test_statsd_unix() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
-            let config = StatsdConfig::Unix(UnixConfig {
-                path: in_path.clone(),
-                sanitize: true,
-                convert_to: ConversionUnit::Seconds,
-            });
+            let config = StatsdConfig::Unix(
+                UnixConfig {
+                    path: in_path.clone(),
+                    sanitize: true,
+                    convert_to: ConversionUnit::Seconds,
+                }
+                .into(),
+            );
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
                 while let Some(bytes) = receiver.next().await {
@@ -568,7 +607,7 @@ mod test {
         let metrics = state.finish();
         assert_distribution(
             &metrics,
-            series!("timer"),
+            &series!("timer"),
             3200.0,
             10,
             &[(1.0, 0), (2.0, 0), (4.0, 0), (f64::INFINITY, 10)],
@@ -630,7 +669,7 @@ mod test {
 
         assert_counter(
             &metrics,
-            series!(
+            &series!(
                 "foo",
                 "a" => TagValue::Bare,
                 "b" => "b"
@@ -640,7 +679,7 @@ mod test {
 
         assert_counter(
             &metrics,
-            series!(
+            &series!(
                 "foo",
                 "a" => TagValue::Bare,
                 "b" => "c"
@@ -648,22 +687,22 @@ mod test {
             100.0,
         );
 
-        assert_gauge(&metrics, series!("bar"), 42.0);
+        assert_gauge(&metrics, &series!("bar"), 42.0);
         assert_distribution(
             &metrics,
-            series!("glork"),
+            &series!("glork"),
             3000.0,
             1000,
             &[(1.0, 0), (2.0, 0), (4.0, 1000), (f64::INFINITY, 1000)],
         );
         assert_distribution(
             &metrics,
-            series!("milliglork"),
+            &series!("milliglork"),
             1500.0,
             500,
             &[(1.0, 0), (2.0, 0), (4.0, 500), (f64::INFINITY, 500)],
         );
-        assert_set(&metrics, series!("set"), &["0", "1"]);
+        assert_set(&metrics, &series!("set"), &["0", "1"]);
     }
 
     async fn test_invalid_statsd(

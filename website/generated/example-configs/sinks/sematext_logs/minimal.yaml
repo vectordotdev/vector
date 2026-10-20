@@ -1,0 +1,6 @@
+sinks:
+  my_sink_id:
+    type: sematext_logs
+    inputs:
+      - my-source-or-transform-id
+    token: ${SEMATEXT_TOKEN}

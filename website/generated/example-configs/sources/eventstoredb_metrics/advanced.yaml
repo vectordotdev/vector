@@ -1,0 +1,6 @@
+sources:
+  my_source_id:
+    type: eventstoredb_metrics
+    default_namespace: eventstoredb
+    endpoint: https://localhost:2113/stats
+    scrape_interval_secs: 15

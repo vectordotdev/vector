@@ -17,6 +17,7 @@ pub struct Interface {
 impl Interface {
     /// Create a new [`Interface`] instance with the parameters obtained from
     /// the process environment.
+    #[must_use]
     pub fn from_env() -> Option<Self> {
         Some(Self {
             deploy_chart_command: env::var("KUBE_TEST_DEPLOY_COMMAND").ok()?,

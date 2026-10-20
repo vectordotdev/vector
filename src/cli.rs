@@ -30,20 +30,25 @@ pub struct Opts {
 }
 
 impl Opts {
+    /// # Errors
+    /// Returns an error if the parsed arguments cannot be converted to options.
     pub fn get_matches() -> Result<Self, clap::Error> {
         let version = get_version();
         let app = Opts::command().version(version);
         Opts::from_arg_matches(&app.get_matches())
     }
 
+    #[must_use]
     pub const fn log_level(&self) -> &'static str {
         let (quiet_level, verbose_level) = match self.sub_command {
-            Some(SubCommand::Validate(_))
-            | Some(SubCommand::Graph(_))
-            | Some(SubCommand::Generate(_))
-            | Some(SubCommand::ConvertConfig(_))
-            | Some(SubCommand::List(_))
-            | Some(SubCommand::Test(_)) => {
+            Some(
+                SubCommand::Validate(_)
+                | SubCommand::Graph(_)
+                | SubCommand::Generate(_)
+                | SubCommand::ConvertConfig(_)
+                | SubCommand::List(_)
+                | SubCommand::Test(_),
+            ) => {
                 if self.root.verbose == 0 {
                     (self.root.quiet + 1, self.root.verbose)
                 } else {
@@ -67,6 +72,8 @@ impl Opts {
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::struct_excessive_bools, reason = "Independent CLI flags")]
 pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
@@ -145,13 +152,14 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
@@ -295,7 +303,7 @@ pub struct RootOpts {
     )]
     pub max_decompressed_size_bytes: usize,
 
-    /// Raise the file descriptor soft limit (RLIMIT_NOFILE) to the hard limit at startup.
+    /// Raise the file descriptor soft limit (`RLIMIT_NOFILE`) to the hard limit at startup.
     ///
     /// Many systems default the soft limit to 1024 (Linux) or 256 (macOS), which is too low
     /// when Vector monitors large numbers of log files. This flag raises the soft limit to
@@ -307,6 +315,7 @@ pub struct RootOpts {
 
 impl RootOpts {
     /// Return a list of config paths with the associated formats.
+    #[must_use]
     pub fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
@@ -318,13 +327,16 @@ impl RootOpts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
 
+    /// # Panics
+    /// Panics if global metrics initialization fails.
     pub fn init_global(&self) {
         if !self.openssl_no_probe {
+            // SAFETY: Initialization runs before worker threads start.
             unsafe {
                 openssl_probe::init_openssl_env_vars();
             }
@@ -334,14 +346,14 @@ impl RootOpts {
     }
 }
 
-/// Raise the soft file descriptor limit (RLIMIT_NOFILE) as high as the OS allows.
+/// Raise the soft file descriptor limit (`RLIMIT_NOFILE`) as high as the OS allows.
 ///
 /// Many systems default the soft limit to 1024 (Linux) or 256 (macOS), which is too low
 /// for Vector when it monitors large numbers of log files. Raising it prevents
 /// "Too many open files (os error 24)" errors without requiring manual sysadmin intervention.
 ///
 /// On Linux, the soft limit is raised to the hard limit (typically 65536+).
-/// On macOS, the hard limit can be RLIM_INFINITY, so we first try the hard limit,
+/// On macOS, the hard limit can be `RLIM_INFINITY`, so we first try the hard limit,
 /// then fall back to the kernel-enforced `kern.maxfilesperproc` (typically 10240).
 #[cfg(unix)]
 pub(crate) fn raise_file_descriptor_limit() {
@@ -404,14 +416,14 @@ fn macos_maxfilesperproc() -> Option<libc::rlim_t> {
     let ret = unsafe {
         libc::sysctlbyname(
             c"kern.maxfilesperproc".as_ptr(),
-            &mut maxfiles as *mut libc::c_int as *mut libc::c_void,
-            &mut len,
+            (&raw mut maxfiles).cast::<libc::c_void>(),
+            &raw mut len,
             std::ptr::null_mut(),
             0,
         )
     };
     if ret == 0 && maxfiles > 0 {
-        Some(maxfiles as libc::rlim_t)
+        libc::rlim_t::try_from(maxfiles).ok()
     } else {
         None
     }
@@ -448,10 +460,6 @@ pub enum SubCommand {
     #[command(hide = true)]
     Completion(completion::Opts),
 
-    /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
-    #[command(hide = true)]
-    Config(config::Opts),
-
     /// List available components, then exit.
     List(list::Opts),
 
@@ -459,7 +467,7 @@ pub enum SubCommand {
     /// For guidance on how to write unit tests check out <https://vector.dev/guides/level-up/unit-testing/>.
     Test(unit_test::Opts),
 
-    /// Output the topology as visual representation using the DOT language which can be rendered by GraphViz
+    /// Output the topology as visual representation using the DOT language which can be rendered by Graphviz
     Graph(graph::Opts),
 
     /// Display topology and metrics in the console, for a local or remote Vector instance
@@ -479,6 +487,24 @@ pub enum SubCommand {
 }
 
 impl SubCommand {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "the #[cfg(windows)] arm calls a non-const method"
+    )]
+    #[must_use]
+    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+        match self {
+            Self::Graph(g) => g.dangerously_allow_env_var_interpolation,
+            Self::Test(t) => t.dangerously_allow_env_var_interpolation,
+            Self::Validate(v) => v.dangerously_allow_env_var_interpolation,
+            #[cfg(windows)]
+            Self::Service(s) => s.dangerously_allow_env_var_interpolation(),
+            _ => false,
+        }
+    }
+
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::large_futures, reason = "Boxing needs profiling")]
     pub async fn execute(
         &self,
         mut signals: signal::SignalPair,
@@ -486,7 +512,6 @@ impl SubCommand {
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
-            Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema(opts) => generate_schema::cmd(opts),
@@ -499,7 +524,7 @@ impl SubCommand {
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, color).await,
+            Self::Validate(v) => validate::validate(v, &mut signals.handler, color).await,
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }
@@ -513,6 +538,11 @@ pub enum Color {
 }
 
 impl Color {
+    #[cfg_attr(
+        windows,
+        expect(clippy::missing_const_for_fn, reason = "Unix checks the terminal")
+    )]
+    #[must_use]
     pub fn use_color(&self) -> bool {
         match self {
             #[cfg(unix)]
@@ -554,6 +584,9 @@ pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
 #[cfg(test)]
 mod tests {
     #[cfg(unix)]
+    use nix::sys::resource::{Resource, getrlimit, setrlimit};
+
+    #[cfg(unix)]
     fn run_in_subprocess(test_name: &str) {
         let exe = std::env::current_exe().unwrap();
         let output = std::process::Command::new(exe)
@@ -576,8 +609,6 @@ mod tests {
             run_in_subprocess("cli::tests::test_raise_file_descriptor_limit");
             return;
         }
-
-        use nix::sys::resource::{Resource, getrlimit, setrlimit};
 
         let (original_soft, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
         let lowered = std::cmp::min(original_soft, 256);
@@ -604,8 +635,6 @@ mod tests {
             run_in_subprocess("cli::tests::test_raise_file_descriptor_limit_already_at_max");
             return;
         }
-
-        use nix::sys::resource::{Resource, getrlimit, setrlimit};
 
         let (_, hard) = getrlimit(Resource::RLIMIT_NOFILE).unwrap();
 

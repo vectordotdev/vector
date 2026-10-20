@@ -7,6 +7,7 @@ pub mod config;
 mod grpc;
 mod http;
 mod reply;
+mod request_control;
 mod status;
 
 use vector_lib::{
@@ -25,26 +26,24 @@ fn count_items_inner(resource: &Value, array_id: &str, inner_id: &str) -> usize 
     resource_array
         .iter()
         .map(|r| {
-            r.get(array_id)
+            r.get(vrl::path!(array_id))
                 .and_then(|s| s.as_array())
-                .map(|scope_array| {
+                .map_or(0, |scope_array| {
                     scope_array
                         .iter()
                         .map(|sl| {
-                            sl.get(inner_id)
+                            sl.get(vrl::path!(inner_id))
                                 .and_then(|lr| lr.as_array())
-                                .map(|arr| arr.len())
-                                .unwrap_or(0)
+                                .map_or(0, <[Value]>::len)
                         })
                         .sum::<usize>()
                 })
-                .unwrap_or(0)
         })
         .sum()
 }
 
 /// Counts individual log records, metrics, or spans within OTLP batch events.
-/// When use_otlp_decoding is enabled, events contain entire OTLP batches, but
+/// When OTLP preservation is enabled, events contain entire OTLP batches, but
 /// we want to count the individual items for metric consistency with other sources.
 /// This iterates through the Value structure, which is less efficient than
 /// counting from the typed protobuf request, but avoids decoding twice.
@@ -53,9 +52,11 @@ pub(crate) fn count_otlp_items(events: &[Event]) -> usize {
         .iter()
         .map(|event| match event {
             Event::Log(log) => {
-                if let Some(resource_logs) = log.get(RESOURCE_LOGS_JSON_FIELD) {
+                if let Some(resource_logs) = log.get(vrl::event_path!(RESOURCE_LOGS_JSON_FIELD)) {
                     count_items_inner(resource_logs, "scopeLogs", "logRecords")
-                } else if let Some(resource_metrics) = log.get(RESOURCE_METRICS_JSON_FIELD) {
+                } else if let Some(resource_metrics) =
+                    log.get(vrl::event_path!(RESOURCE_METRICS_JSON_FIELD))
+                {
                     count_items_inner(resource_metrics, "scopeMetrics", "metrics")
                 } else {
                     0
@@ -63,13 +64,14 @@ pub(crate) fn count_otlp_items(events: &[Event]) -> usize {
             }
             Event::Trace(trace) => {
                 // Count spans in resourceSpans
-                if let Some(resource_spans) = trace.get(RESOURCE_SPANS_JSON_FIELD) {
+                if let Some(resource_spans) = trace.get(vrl::event_path!(RESOURCE_SPANS_JSON_FIELD))
+                {
                     count_items_inner(resource_spans, "scopeSpans", "spans")
                 } else {
                     0
                 }
             }
-            _ => 0, // unreachable
+            Event::Metric(_) => 0, // unreachable
         })
         .sum()
 }

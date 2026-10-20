@@ -20,7 +20,6 @@ use vector_lib::{configurable::configurable_component, sensitive_string::Sensiti
 
 /// TLS configuration.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobTlsConfig {
@@ -223,9 +222,12 @@ impl ClientAssertion for ManagedIdentityClientAssertion {
 
 impl AzureAuthentication {
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
-    pub async fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
+    ///
+    /// # Errors
+    /// Returns an error if credential settings or certificate files are invalid.
+    pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
         match self {
-            Self::Specific(specific) => specific.credential().await,
+            Self::Specific(specific) => specific.credential(),
 
             #[cfg(test)]
             Self::MockCredential => Ok(Arc::new(MockTokenCredential) as Arc<dyn TokenCredential>),
@@ -235,8 +237,11 @@ impl AzureAuthentication {
 
 impl SpecificAzureCredential {
     /// Returns the provider for the credentials based on the specific credential type.
-    pub async fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
-        let credential: Arc<dyn TokenCredential> = match self {
+    ///
+    /// # Errors
+    /// Returns an error if credential settings or certificate files are invalid.
+    pub fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
+        Ok(match self {
             #[cfg(not(target_arch = "wasm32"))]
             Self::AzureCli {} => AzureCliCredential::new(None)?,
 
@@ -304,26 +309,10 @@ impl SpecificAzureCredential {
             Self::ManagedIdentity {
                 user_assigned_managed_identity_id,
                 user_assigned_managed_identity_id_type,
-            } => {
-                let mut options = ManagedIdentityCredentialOptions::default();
-                if let Some(id) = user_assigned_managed_identity_id {
-                    options.user_assigned_id = match user_assigned_managed_identity_id_type
-                        .as_ref()
-                        .unwrap_or(&Default::default())
-                    {
-                        UserAssignedManagedIdentityIdType::ClientId => {
-                            Some(UserAssignedId::ClientId(id.clone()))
-                        }
-                        UserAssignedManagedIdentityIdType::ObjectId => {
-                            Some(UserAssignedId::ObjectId(id.clone()))
-                        }
-                        UserAssignedManagedIdentityIdType::ResourceId => {
-                            Some(UserAssignedId::ResourceId(id.clone()))
-                        }
-                    };
-                }
-                ManagedIdentityCredential::new(Some(options))?
-            }
+            } => managed_identity_credential(
+                user_assigned_managed_identity_id.as_deref(),
+                user_assigned_managed_identity_id_type.as_ref(),
+            )?,
 
             Self::ManagedIdentityClientAssertion {
                 user_assigned_managed_identity_id,
@@ -331,24 +320,10 @@ impl SpecificAzureCredential {
                 client_assertion_tenant_id,
                 client_assertion_client_id,
             } => {
-                let mut options = ManagedIdentityCredentialOptions::default();
-                if let Some(id) = user_assigned_managed_identity_id {
-                    options.user_assigned_id = match user_assigned_managed_identity_id_type
-                        .as_ref()
-                        .unwrap_or(&Default::default())
-                    {
-                        UserAssignedManagedIdentityIdType::ClientId => {
-                            Some(UserAssignedId::ClientId(id.clone()))
-                        }
-                        UserAssignedManagedIdentityIdType::ObjectId => {
-                            Some(UserAssignedId::ObjectId(id.clone()))
-                        }
-                        UserAssignedManagedIdentityIdType::ResourceId => {
-                            Some(UserAssignedId::ResourceId(id.clone()))
-                        }
-                    };
-                }
-                let msi: Arc<dyn TokenCredential> = ManagedIdentityCredential::new(Some(options))?;
+                let msi: Arc<dyn TokenCredential> = managed_identity_credential(
+                    user_assigned_managed_identity_id.as_deref(),
+                    user_assigned_managed_identity_id_type.as_ref(),
+                )?;
                 let assertion = ManagedIdentityClientAssertion {
                     credential: msi,
                     // Future: make this configurable for sovereign clouds? (no way to test...)
@@ -377,9 +352,32 @@ impl SpecificAzureCredential {
 
                 WorkloadIdentityCredential::new(Some(options))?
             }
-        };
-        Ok(credential)
+        })
     }
+}
+
+fn managed_identity_credential(
+    id: Option<&str>,
+    id_type: Option<&UserAssignedManagedIdentityIdType>,
+) -> azure_core::Result<Arc<ManagedIdentityCredential>> {
+    let user_assigned_id =
+        id.map(
+            |id| match id_type.unwrap_or(&UserAssignedManagedIdentityIdType::default()) {
+                UserAssignedManagedIdentityIdType::ClientId => {
+                    UserAssignedId::ClientId(id.to_owned())
+                }
+                UserAssignedManagedIdentityIdType::ObjectId => {
+                    UserAssignedId::ObjectId(id.to_owned())
+                }
+                UserAssignedManagedIdentityIdType::ResourceId => {
+                    UserAssignedId::ResourceId(id.to_owned())
+                }
+            },
+        );
+    ManagedIdentityCredential::new(Some(ManagedIdentityCredentialOptions {
+        user_assigned_id,
+        ..Default::default()
+    }))
 }
 
 #[cfg(test)]
@@ -405,7 +403,7 @@ impl TokenCredential for MockTokenCredential {
         // the claims in alphabetical order to ensure a consistent base64 encoding for testing
         let jwt = serde_json::json!({
             "aud": scope.strip_suffix("/.default").unwrap_or(*scope),
-            "exp": 2147483647,
+            "exp": 2_147_483_647,
             "iat": 0,
             "iss": "https://sts.windows.net/",
             "nbf": 0,
@@ -417,19 +415,17 @@ impl TokenCredential for MockTokenCredential {
             "e30.{}.",
             BASE64_STANDARD
                 .encode(serde_json::to_string(&jwt).unwrap())
-                .trim_end_matches("=")
-        )
-        .to_string();
+                .trim_end_matches('=')
+        );
 
         warn!(
-            "Using mock token credential, JWT: {}, base64: {}",
-            serde_json::to_string(&jwt).unwrap(),
-            jwt_base64
+            "Using mock token credential, JWT: {}, base64: {jwt_base64}",
+            serde_json::to_string(&jwt).unwrap()
         );
 
         Ok(azure_core::credentials::AccessToken::new(
             jwt_base64,
-            azure_core::time::OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600),
+            azure_core::time::OffsetDateTime::now_utc() + std::time::Duration::from_hours(1),
         ))
     }
 }

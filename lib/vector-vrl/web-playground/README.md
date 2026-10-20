@@ -72,7 +72,17 @@ with this [issue filter][vrl-wasm-unsupported-filter].
 
 ### macOS Troubleshooting
 
-If you are getting compilation errors on macOS here are some things to check:
+If compilation fails because the selected C compiler does not support the
+`wasm32-unknown-unknown` target, try a compiler with WebAssembly support, such
+as Homebrew LLVM. The following command explicitly selects that toolchain.
+
+```shell
+CC_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/clang" \
+AR_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/llvm-ar" \
+wasm-pack build --target web --out-dir public/pkg
+```
+
+If you are getting other compilation errors on macOS here are some things to check:
 
 ```shell
 xcode-select -p

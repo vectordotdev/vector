@@ -1,0 +1,24 @@
+{{- $contributors := .contributors -}}
+{{- $prNumbers := .pr_numbers -}}
+{{- if or (gt (len $contributors) 0) (gt (len $prNumbers) 0) }}
+<div class="mt-3 overflow-x-auto border-t border-gray-200 pt-3 text-sm italic text-gray-600 dark:border-gray-700 dark:text-gray-300">
+  {{- if gt (len $contributors) 0 }}
+    {{- printf "Thanks to " -}}
+    {{- range $i, $contributor := $contributors }}
+      {{- $username := replace $contributor "@" "" }}
+      {{- $profile := printf "https://github.com/%s" $username }}
+      {{- if gt $i 0 }}{{ printf ", " }}{{ end -}}
+      <a href="{{ $profile }}" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary" rel="noopener" target="_blank">{{ $username }}</a>
+    {{- end }}
+    {{- if gt (len $prNumbers) 0 }}{{ printf " for contributing %s " (cond (eq (len $prNumbers) 1) "PR" "PRs") }}{{ else }}{{ printf " for contributing this change!" }}{{ end -}}
+  {{- else }}
+    {{- printf "%s " (cond (eq (len $prNumbers) 1) "PR" "PRs") -}}
+  {{- end }}
+  {{- range $i, $prNumber := $prNumbers }}
+    {{- if gt $i 0 }}{{ printf ", " }}{{ end -}}
+    {{- $prLink := printf "https://github.com/vectordotdev/vector/pull/%v" $prNumber -}}
+    <a href="{{ $prLink }}" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary" rel="noopener" target="_blank">#{{ $prNumber }}</a>
+  {{- end -}}
+  {{- if gt (len $prNumbers) 0 }}!{{ end -}}
+</div>
+{{- end }}

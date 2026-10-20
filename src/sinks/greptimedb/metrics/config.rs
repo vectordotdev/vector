@@ -1,50 +1,20 @@
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use crate::sinks::{
-    greptimedb::{
-        GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
-        metrics::{
-            request::GreptimeDBGrpcRetryLogic,
-            request_builder::RequestBuilderOptions,
-            service::{GreptimeDBGrpcService, healthcheck},
-            sink,
+use crate::{
+    config::ValidatedSink,
+    sinks::{
+        greptimedb::{
+            GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
+            metrics::{
+                request::GreptimeDBGrpcRetryLogic,
+                request_builder::RequestBuilderOptions,
+                service::{GreptimeDBGrpcService, healthcheck},
+                sink,
+            },
         },
+        prelude::*,
     },
-    prelude::*,
 };
-
-/// Configuration for the `greptimedb` sink.
-#[configurable_component(sink("greptimedb", "Ingest metrics data into GreptimeDB."))]
-#[configurable(metadata(
-    deprecated = "The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
-))]
-#[derive(Clone, Debug, Default)]
-pub struct GreptimeDBConfig(GreptimeDBMetricsConfig);
-
-impl GenerateConfig for GreptimeDBConfig {
-    fn generate_config() -> toml::Value {
-        <GreptimeDBMetricsConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "greptimedb")]
-impl SinkConfig for GreptimeDBConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        warn!(
-            "DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
-        );
-        self.0.build(cx).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.0.acknowledgements()
-    }
-}
 
 /// Configuration items for GreptimeDB
 #[configurable_component(sink("greptimedb_metrics", "Ingest metrics data into GreptimeDB."))]
@@ -89,15 +59,12 @@ pub struct GreptimeDBMetricsConfig {
     #[serde(default)]
     pub grpc_compression: GrpcCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -105,7 +72,6 @@ pub struct GreptimeDBMetricsConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// Use Greptime's prefixed naming for time index and value columns.
@@ -133,23 +99,6 @@ impl_generate_config_from_default!(GreptimeDBMetricsConfig);
 #[typetag::serde(name = "greptimedb_metrics")]
 #[async_trait::async_trait]
 impl SinkConfig for GreptimeDBMetricsConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let request_settings = self.request.into_settings();
-        let service = ServiceBuilder::new()
-            .settings(request_settings, GreptimeDBGrpcRetryLogic)
-            .service(GreptimeDBGrpcService::try_new(self)?);
-        let sink = sink::GreptimeDBGrpcSink {
-            service,
-            batch_settings: self.batch.into_batcher_settings()?,
-            request_builder_options: RequestBuilderOptions {
-                use_new_naming: self.new_naming.unwrap_or(false),
-            },
-        };
-
-        let healthcheck = healthcheck(self)?;
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -159,11 +108,74 @@ impl SinkConfig for GreptimeDBMetricsConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedGreptimeDBMetrics {
+    batch_settings: BatcherSettings,
+    use_new_naming: bool,
+}
+
+/// Validate the all-or-none GreptimeDB TLS path requirement without touching the
+/// filesystem.
+///
+/// The greptimedb ingester requires all three TLS paths (`ca_file`, `crt_file`,
+/// `key_file`) to be set. Mirrors the check in `new_client_from_config`.
+pub(super) fn validate_tls_all_or_none(tls: &TlsConfig) -> crate::Result<()> {
+    if tls.ca_file.is_none() || tls.crt_file.is_none() || tls.key_file.is_none() {
+        return Err(
+            "GreptimeDB TLS requires ca_file, crt_file, and key_file to all be set.".into(),
+        );
+    }
+    Ok(())
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for GreptimeDBMetricsConfig {
+    type Validated = ValidatedGreptimeDBMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedGreptimeDBMetrics> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        if let Some(tls) = &self.tls {
+            validate_tls_all_or_none(tls)?;
+        }
+
+        Ok(ValidatedGreptimeDBMetrics {
+            batch_settings,
+            use_new_naming: self.new_naming.unwrap_or(false),
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedGreptimeDBMetrics,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedGreptimeDBMetrics {
+            batch_settings,
+            use_new_naming,
+        } = validated.clone();
+
+        let request_settings = self.request.into_settings();
+        let service = ServiceBuilder::new()
+            .settings(request_settings, GreptimeDBGrpcRetryLogic)
+            .service(GreptimeDBGrpcService::try_new(self)?);
+        let sink = sink::GreptimeDBGrpcSink {
+            service,
+            batch_settings,
+            request_builder_options: RequestBuilderOptions { use_new_naming },
+        };
+
+        let healthcheck = healthcheck(self)?;
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
 
     use super::*;
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
@@ -178,5 +190,49 @@ mod tests {
         "#};
 
         serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+    }
+
+    #[test]
+    fn prepares_valid_config() {
+        let config = GreptimeDBMetricsConfig {
+            endpoint: "example.com:4001".to_string(),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert!(!validated.use_new_naming);
+    }
+
+    #[test]
+    fn validate_rejects_partial_tls() {
+        let config = indoc! {r#"
+            endpoint: "example.com:4001"
+            tls:
+                ca_file: "/path/to/ca.pem"
+                crt_file: "/path/to/crt.pem"
+        "#};
+
+        let config = serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+        assert!(
+            config.validate().is_err(),
+            "partial TLS should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_full_tls() {
+        let config = indoc! {r#"
+            endpoint: "example.com:4001"
+            tls:
+                ca_file: "/path/to/ca.pem"
+                crt_file: "/path/to/crt.pem"
+                key_file: "/path/to/key.pem"
+        "#};
+
+        let config = serde_yaml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
+        assert!(
+            config.validate().is_ok(),
+            "complete TLS should pass validation"
+        );
     }
 }

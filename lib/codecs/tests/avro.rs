@@ -22,7 +22,7 @@ use vector_core::{config::LogNamespace, event::Event};
 #[case(false)]
 fn roundtrip_avro_fixtures(
     #[files("tests/data/avro/generated/*.avro")]
-    #[exclude(".*(date|fixed|time_millis).avro")]
+    #[exclude(".*fixed.avro")]
     path: PathBuf,
     #[case] reserialize: bool,
 ) {
@@ -32,13 +32,18 @@ fn roundtrip_avro_fixtures(
     roundtrip_avro(path, schema_path, reserialize);
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the existing owned-argument API during the lint rollout."
+)]
 fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
     let schema = load_file(&schema_path);
     let schema = from_utf8(&schema).unwrap().to_string();
     let deserializer = AvroDeserializerConfig::new(schema.clone(), false)
         .build()
         .unwrap();
-    let mut serializer = AvroSerializerConfig::new(schema.clone()).build().unwrap();
+    let mut serializer = AvroSerializerConfig::new(schema).build().unwrap();
 
     let (buf, event) = load_deserialize(&data_path, &deserializer);
 
@@ -57,7 +62,7 @@ fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
     } else {
         // Ensure that the parsed event is serialized to the same bytes
         let mut new_buf = BytesMut::new();
-        serializer.encode(event.clone(), &mut new_buf).unwrap();
+        serializer.encode(event, &mut new_buf).unwrap();
         assert_eq!(buf, new_buf);
     }
 }

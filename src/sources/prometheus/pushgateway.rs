@@ -27,7 +27,6 @@ use crate::{
     },
     event::Event,
     http::KeepaliveConfig,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, http::HttpMethod},
@@ -48,18 +47,13 @@ pub struct PrometheusPushgatewayConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:9091"))]
     address: SocketAddr,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -72,8 +66,8 @@ pub struct PrometheusPushgatewayConfig {
 }
 
 impl GenerateConfig for PrometheusPushgatewayConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "127.0.0.1:9091".parse().unwrap(),
             tls: None,
             auth: None,
@@ -91,6 +85,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = PushgatewaySource {
             aggregate_metrics: self.aggregate_metrics,
+            log_namespace: cx.log_namespace(None),
         };
         source.run(
             self.address,
@@ -118,6 +113,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 #[derive(Clone)]
 struct PushgatewaySource {
     aggregate_metrics: bool,
+    log_namespace: LogNamespace,
 }
 
 impl PushgatewaySource {
@@ -127,6 +123,14 @@ impl PushgatewaySource {
 }
 
 impl HttpSource for PushgatewaySource {
+    fn name() -> &'static str {
+        PrometheusPushgatewayConfig::NAME
+    }
+
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
     fn build_events(
         &self,
         body: Bytes,
@@ -210,7 +214,7 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
             ));
         }
 
-        return Ok((stripped_key.to_owned(), "".to_owned()));
+        return Ok((stripped_key.to_owned(), String::new()));
     }
 
     // The Prometheus Pushgateway has a fairly permissive base64 implementation
@@ -362,6 +366,10 @@ mod test {
     async fn test_whole_request_happy_path_https() {
         whole_request_happy_path(Some(TlsEnableableConfig::test_config())).await;
     }
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn whole_request_happy_path(tls: Option<TlsEnableableConfig>) {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (_guard, address) = test_util::addr::next_addr();
@@ -386,13 +394,7 @@ mod test {
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";
-            let push_url = format!(
-                "{}://{}:{}/{}",
-                proto,
-                address.ip(),
-                address.port(),
-                push_path
-            );
+            let push_url = format!("{proto}://{}:{}/{push_path}", address.ip(), address.port());
             let push_body = r#"
                 # TYPE jobs_total counter
                 # HELP jobs_total Total number of jobs

@@ -6,7 +6,6 @@ use vector_lib::configurable::configurable_component;
 ///
 /// Configure output for component when generated with graph command
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct GraphConfig {
@@ -23,16 +22,12 @@ pub struct GraphConfig {
     /// Edge attributes to add to the edges linked to this component's node in resulting graph
     ///
     /// They are added to the edge as provided
-    #[configurable(metadata(
-        docs::additional_props_description = "A collection of graph edge attributes in graphviz DOT language, related to a single input component.",
-        docs::examples = "example_edges_options()"
-    ))]
+    #[configurable(metadata(docs::examples = "example_edges_options()"))]
     #[serde(default)]
     pub edge_attributes: HashMap<String, EdgeAttributes>,
 }
 
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 /// A collection of graph edge attributes in graphviz DOT language, related to a single input

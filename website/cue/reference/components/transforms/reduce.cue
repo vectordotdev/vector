@@ -21,7 +21,6 @@ components: transforms: reduce: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.reduce.configuration

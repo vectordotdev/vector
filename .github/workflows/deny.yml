@@ -48,11 +48,14 @@ jobs:
   test-deny:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
+    if: &deny_gate >-
+      always() &&
+      (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') &&
+      (github.event_name != 'schedule' || github.repository == 'vectordotdev/vector')
     needs: [changes]
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
@@ -67,11 +70,11 @@ jobs:
   test-deny-licenses:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
+    if: *deny_gate
     needs: [changes]
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
