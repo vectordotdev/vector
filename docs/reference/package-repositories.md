@@ -186,19 +186,18 @@ that is the intended operation.
 ## Recovery
 
 Use the manually dispatched `Package Repository Maintenance` workflow on `master`
-for `status`, `rollback` or `recover-lock`. It uses the protected publishing
-environment, its OIDC role and the same concurrency group as release publication.
-It receives no signing secrets. Maintenance remains available when
-`PACKAGE_REPOSITORIES_ENABLED` is disabled so an incident can be recovered while
-new publication is stopped. The publishing environment and role must be
-configured before maintenance can run.
+for `status`, `rollback` or `recover-lock`. It shares the release workflow's
+concurrency group. Status and lock recovery use only the protected publishing
+environment and its OIDC role. Rollback downloads archives there, signs in the
+protected signing environment, then publishes and verifies public HTTPS in
+separate jobs. Signing never receives AWS credentials; publishing never receives
+the private key.
 
-The workflow requires the exact archived snapshot digest for rollback. Lock
-recovery additionally requires the exact control-object version and confirmation
-that the old owner has stopped. The publisher enforces the same 65-minute safety
-window for the workflow and CLI. A successful run records the resulting control
-state in its summary; public endpoint and client verification still follow a
-rollback.
+Maintenance remains available when `PACKAGE_REPOSITORIES_ENABLED` is disabled.
+The protected environments and role must be configured before it can run.
+Rollback requires an exact archived snapshot digest. Lock recovery also requires
+the exact control-object version and confirmation that the old owner stopped.
+A successful operation records the resulting control state in its summary.
 
 Inspect the state before acting:
 
@@ -217,22 +216,35 @@ cargo vdev release repositories recover-lock \
   --expected-version VERSION_ID --confirm-owner-stopped
 ```
 
-Resume the pending signed snapshot, or restore the last completed snapshot:
+Resume the pending signed publication, or select an archived package set. When
+abandoning an incomplete publication, the selection must be the last completed
+snapshot. The maintenance workflow performs these phases with separate
+credentials; the equivalent CLI sequence uses a fresh workspace:
 
 ```sh
-cargo vdev release repositories rollback SNAPSHOT_SHA256
+cargo vdev release repositories --work target/repository-rollback rollback base SNAPSHOT_SHA256
+cargo vdev release repositories --work target/repository-rollback rollback prepare
+cargo vdev release repositories --work target/repository-rollback rollback publish
+cargo vdev release repositories --work target/repository-rollback rollback verify
 ```
 
-Rollback restores retained signed metadata and checks that its immutable objects
-still exist. It does not downgrade installed packages or restore Datadog-only
-client trust. Verify the public endpoints and native clients after rollback.
-Never delete a control object to bypass the recovery checks.
+Skip `prepare` when `base` restores a saved signed result. Rollback signs a new apt
+Release date, newer than the selected, active and any pending roots. It preserves
+the selected indexes and repository identity, reuses the selected yum signatures,
+and retains all completed immutable history. Publication rejects a changed base
+or pending state. Interrupted and completed retries restore the same signed
+bundle without signing again or creating extra live-object versions.
 
-Apt can retain newer cached indexes when a restored Release has an older Date.
-The original rollback client tests cleared those caches, so they do not prove
-that existing clients adopt the restored snapshot. Before activation, validate a
-recovery design that accounts for cached Release dates, such as publishing a
-freshly dated and signed generation for the intended package set. Do not disable
-apt's date or signature checks globally. This remains an open cutover requirement.
-The behavior is visible in
+Replaying old apt signatures alone is insufficient: clients can keep their newer
+cached indexes when the restored Release date is older, as shown in
 [apt's metadata verification](https://sources.debian.org/src/apt/2.2.4/apt-pkg/acquire-item.cc/).
+Neither cache deletion nor disabling date/signature checks is part of recovery.
+A clock more than five seconds behind a required new date stops preparation;
+correct the clock or retry later. Repositories with `Valid-Until` or a changed
+metadata layout require a separate recovery policy.
+
+Rollback changes which versions the indexes advertise. It does not downgrade
+installed packages or restore Datadog-only trust. To restore a newer package
+selection afterward, dispatch rollback with that newer archived snapshot; do not
+replay its old publication. Run native client checks after public verification.
+Never delete a control object to bypass recovery checks.

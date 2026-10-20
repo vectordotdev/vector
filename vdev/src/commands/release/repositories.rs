@@ -47,8 +47,11 @@ enum Commands {
     Verify,
     /// Print the publication state and its S3 version for operator inspection.
     Status,
-    /// Restore archived metadata; this does not downgrade installed packages.
-    Rollback { snapshot: String },
+    /// Restore an archived package selection with fresh signed metadata.
+    Rollback {
+        #[command(subcommand)]
+        phase: Rollback,
+    },
     /// Release an abandoned lock after the fixed credential safety window.
     RecoverLock {
         #[arg(long)]
@@ -66,6 +69,18 @@ enum Commands {
         #[arg(long)]
         s3: bool,
     },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum Rollback {
+    /// Download the selected archive and the current/pending roots, or a saved retry.
+    Base { snapshot: String },
+    /// Sign fresh apt roots for the selected indexes; package bytes stay unchanged.
+    Prepare,
+    /// Publish the prepared rollback only if its expected state still matches.
+    Publish,
+    /// Verify public HTTPS objects against the prepared rollback.
+    Verify,
 }
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug)]
@@ -148,11 +163,16 @@ impl Commands {
     fn credentials(&self) -> &'static [&'static str] {
         match self {
             Self::Fetch { .. } => &["GH_TOKEN"],
-            Self::Prepare => &["PACKAGE_SIGNING_SUBKEY", "PACKAGE_SIGNING_PASSPHRASE"],
+            Self::Prepare
+            | Self::Rollback {
+                phase: Rollback::Prepare,
+            } => &["PACKAGE_SIGNING_SUBKEY", "PACKAGE_SIGNING_PASSPHRASE"],
             Self::Base
             | Self::Publish
             | Self::Status
-            | Self::Rollback { .. }
+            | Self::Rollback {
+                phase: Rollback::Base { .. } | Rollback::Publish,
+            }
             | Self::RecoverLock { .. }
             | Self::Test { s3: true, .. } => &[
                 "AWS_ACCESS_KEY_ID",
@@ -195,8 +215,22 @@ impl Commands {
             Commands::Status => {
                 command.arg("status");
             }
-            Commands::Rollback { snapshot } => {
-                command.args(["rollback", &snapshot]);
+            Commands::Rollback { phase } => {
+                command.arg("rollback");
+                match phase {
+                    Rollback::Base { snapshot } => {
+                        command.args(["base", &snapshot]);
+                    }
+                    Rollback::Prepare => {
+                        command.arg("prepare");
+                    }
+                    Rollback::Publish => {
+                        command.arg("publish");
+                    }
+                    Rollback::Verify => {
+                        command.arg("verify");
+                    }
+                }
             }
             Commands::RecoverLock {
                 expected_version,
@@ -223,7 +257,7 @@ impl Commands {
 
 #[cfg(test)]
 mod tests {
-    use super::Commands;
+    use super::{Commands, Rollback};
 
     #[test]
     fn signing_and_publishing_receive_disjoint_credentials() {
@@ -235,6 +269,28 @@ mod tests {
         );
         assert!(publishing.contains(&"AWS_SESSION_TOKEN"));
         assert!(signing.iter().all(|name| !publishing.contains(name)));
+        for phase in [
+            Rollback::Base {
+                snapshot: "test".into(),
+            },
+            Rollback::Publish,
+        ] {
+            assert_eq!(Commands::Rollback { phase }.credentials(), publishing);
+        }
+        assert_eq!(
+            Commands::Rollback {
+                phase: Rollback::Prepare
+            }
+            .credentials(),
+            signing
+        );
+        assert!(
+            Commands::Rollback {
+                phase: Rollback::Verify
+            }
+            .credentials()
+            .is_empty()
+        );
         assert!(Commands::Verify.credentials().is_empty());
         assert!(
             Commands::Test {

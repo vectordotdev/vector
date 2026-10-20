@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Inspect state, restore signed metadata, or recover an abandoned lock
+        description: Inspect state, restore a package selection, or recover an abandoned lock
         type: choice
         options: [status, rollback, recover-lock]
         default: status
@@ -56,6 +56,7 @@ jobs:
         run: |
           cargo build --locked --package vdev
           target/debug/vdev release repositories build-image
+          target/debug/vdev release repositories test
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
@@ -64,7 +65,7 @@ jobs:
           role-session-name: package-maintenance-${{ github.run_id }}
           allowed-account-ids: "486234852809"
           unset-current-credentials: true
-      - name: Run maintenance and record the resulting state
+      - name: Prepare rollback or run maintenance, and record the current state
         env:
           PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
           OPERATION: ${{ inputs.operation }}
@@ -74,7 +75,7 @@ jobs:
           case "$OPERATION" in
             status) ;;
             rollback)
-              target/debug/vdev release repositories rollback "$SNAPSHOT"
+              target/debug/vdev release repositories rollback base "$SNAPSHOT"
               ;;
             recover-lock)
               target/debug/vdev release repositories recover-lock \
@@ -88,3 +89,117 @@ jobs:
             cat target/package-repository-status.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save the reviewed tools for the rollback jobs
+        if: inputs.operation == 'rollback'
+        run: |
+          mkdir -p target/package-repository-tools
+          cp target/debug/vdev target/package-repository-tools/vdev
+          docker save vector-package-publisher:local | gzip > target/package-repository-tools/image.tar.gz
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.operation == 'rollback'
+        with:
+          name: package-repository-tools
+          path: target/package-repository-tools/
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.operation == 'rollback'
+        with:
+          name: package-repository-rollback-base
+          path: target/package-repositories/
+          retention-days: 1
+          if-no-files-found: error
+
+  sign:
+    needs: maintain
+    if: inputs.operation == 'rollback'
+    runs-on: ubuntu-24.04
+    environment: package-repositories-signing
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/package-repository-tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-rollback-base
+          path: target/package-repositories
+      - id: cached
+        run: |
+          if test -f target/package-repositories/result/manifest.json; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Sign fresh apt roots for the selected archived indexes
+        if: steps.cached.outputs.ready != 'true'
+        env:
+          PACKAGE_SIGNING_SUBKEY: ${{ secrets.PACKAGE_SIGNING_SUBKEY }}
+          PACKAGE_SIGNING_PASSPHRASE: ${{ secrets.PACKAGE_SIGNING_PASSPHRASE }}
+        run: '"$VDEV" release repositories rollback prepare'
+      # Private material stays in the container's tmpfs, outside this artifact.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-repository-rollback-signed
+          path: target/package-repositories/
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    needs: sign
+    runs-on: ubuntu-24.04
+    environment: package-repositories-publishing
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/package-repository-tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-rollback-signed
+          path: target/package-repositories
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 900
+          allowed-account-ids: "486234852809"
+          unset-current-credentials: true
+      - name: Publish the fresh rollback against its expected repository state
+        env:
+          PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+        run: |
+          "$VDEV" release repositories rollback publish
+          "$VDEV" release repositories status > target/package-repository-status.json
+          cat target/package-repository-status.json
+          {
+            echo '```json'
+            cat target/package-repository-status.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  endpoints:
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/package-repository-tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-rollback-signed
+          path: target/package-repositories
+      - name: Verify the selected indexes and fresh roots through public HTTPS
+        run: '"$VDEV" release repositories rollback verify'

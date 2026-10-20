@@ -9,7 +9,8 @@ import subprocess
 import tarfile
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime, parsedate_to_datetime
 import xml.etree.ElementTree as ET
 
 from inputs import DEB_ARCHES, RPM_ARCHES, require, verify_input
@@ -252,6 +253,30 @@ def verify_metadata(snapshot, root, public):
                                 "RPM package differs from its signed index")
 
 
+def release_date(data):
+    metadata = fields(data.decode())
+    require("Date" in metadata and "Valid-Until" not in metadata,
+            "Expected a dated repository without Valid-Until; expiry needs a separate policy")
+    value = parsedate_to_datetime(metadata["Date"])
+    require(value.tzinfo is not None, "Repository date must have a timezone")
+    return value.astimezone(timezone.utc)
+
+
+def next_release_date(previous, now=None):
+    now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    value = max([now, *(release_date(data) + timedelta(seconds=1) for data in previous)])
+    # Apt normally tolerates ten seconds into the future. Keep a margin and
+    # fail on clock skew rather than publishing a root clients cannot accept.
+    require(value <= now + timedelta(seconds=5), "Repository date is too far ahead; check the clock and retry later")
+    return format_datetime(value)
+
+
+def dated_release(data, date):
+    release_date(data)  # Reject ambiguous/unsupported roots before changing one field.
+    return b"".join(("Date: " + date + "\n").encode() if line.startswith(b"Date:") else line
+                    for line in data.splitlines(keepends=True))
+
+
 def apt_indexes(root, channel, incoming, previous, signer):
     suite = root / "apt/dists" / channel
     architectures = (*DEB_ARCHES, "x86_64", "all", "i386")
@@ -273,8 +298,9 @@ def apt_indexes(root, channel, incoming, previous, signer):
     # Preserve the existing public repository identity during the key/hosting
     # migration. Adding Origin/Label or changing the empty Suite would require
     # a separate apt release-information approval on clients with cached indexes.
-    lines = ["Suite:", f"Codename: {channel}",
-             "Date: " + datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000"),
+    prior_release = previous / f"apt/dists/{channel}/Release"
+    date = next_release_date([prior_release.read_bytes()] if prior_release.exists() else [])
+    lines = ["Suite:", f"Codename: {channel}", "Date: " + date,
              "Architectures: " + " ".join(architectures), "Components: vector-0", "Acquire-By-Hash: yes"]
     for algorithm in ("sha256", "sha512"):
         lines.append(algorithm.upper() + ":")

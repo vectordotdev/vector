@@ -309,9 +309,9 @@ class Publisher:
         data, _ = self.store.read(self.archives + snapshot_id + "/manifest.json")
         return Snapshot.decode(data, snapshot_id)
 
-    def preflight(self, snapshot, rollback):
+    def preflight(self, snapshot):
         active = self.state["active"]
-        if not rollback and active != snapshot.id:
+        if active != snapshot.id:
             if active != snapshot.base:
                 raise Conflict("Repository advanced after preparation; regenerate against the current base")
             if active:
@@ -327,23 +327,26 @@ class Publisher:
             if not mutable(name):
                 if old is not None and not matches(old, entry):
                     raise Conflict("Immutable object conflict: " + name)
-                if rollback and old is None:
-                    raise Conflict("Rollback payload/index no longer exists: " + name)
                 if old is None and (snapshot.source is None or not (snapshot.source / name).is_file()):
                     raise Conflict("Inherited payload/index no longer exists: " + name)
 
-    def publish(self, snapshot, *, rollback=False):
+    def publish(self, snapshot, *, recovery=None):
         self.acquire()
         try:
-            pending = self.state["pending"]
-            if pending and snapshot.id != pending and not (
-                rollback and snapshot.id == self.state["active"]
-            ):
+            active, pending = self.state["active"], self.state["pending"]
+            if recovery is not None:
+                # Recovery may abandon a pending generation only from the exact
+                # state whose signed metadata was checked during preparation.
+                expected_active, expected_pending = recovery
+                allowed = {(expected_active, expected_pending),
+                           (expected_active, snapshot.id), (snapshot.id, None)}
+                if snapshot.base != expected_active or (active, pending) not in allowed:
+                    raise Conflict("Repository changed after rollback preparation; inspect and prepare again")
+            elif pending and snapshot.id != pending:
                 raise Conflict("Recover the pending snapshot or roll back to the last completed one")
-            self.preflight(snapshot, rollback)
+            self.preflight(snapshot)
             # Nothing above changes client-visible metadata.
-            if not rollback:
-                self.archive(snapshot)
+            self.archive(snapshot)
             metadata = {}
             for name, entry in snapshot.entries.items():
                 if mutable(name):
@@ -353,8 +356,9 @@ class Publisher:
                     metadata[name] = data
             self.state["pending"] = snapshot.id
             self.write_state()
+            self.hook("pending")
             for name, entry in sorted(snapshot.entries.items()):
-                if not mutable(name) and not rollback:
+                if not mutable(name):
                     # Preflight verified inherited immutable objects under the lock.
                     if not (snapshot.source / name).exists():
                         continue

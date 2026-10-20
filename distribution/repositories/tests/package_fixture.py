@@ -100,6 +100,8 @@ def prepare_fixture(configuration, work):
                 require(promoted.entries["yum/beta/" + relative] == snapshot.entries["yum/stable/" + relative],
                         "Selecting another channel changed RPM signatures")
         shutil.rmtree(beta)
+        from tests.rollback_fixture import prepare_fixture as prepare_rollback_fixture
+        prepare_rollback_fixture(config, work, key, password)
         from tests.installer_fixture import installer_fixture
         installer_fixture(config, work, gpg, password)
         config.pop("public_key_path")
@@ -109,7 +111,8 @@ def prepare_fixture(configuration, work):
             "primary_fingerprint": primary, "signing_fingerprint": subkey,
             "checks": ["primary secret rejected", "encrypted subkey signing", "SHA-256 RPM signatures",
                        "apt/dnf metadata signatures", "all six architecture packages", "incremental retained history",
-                       "historical payloads not copied", "channel selection reuses shared Debian bytes and RPM signatures"]}))
+                       "historical payloads not copied", "channel selection reuses shared Debian bytes and RPM signatures",
+                       "fresh rollback and recovery roots", "pending root date covered", "corrupt source rejected before key import"]}))
         print("PASS: incremental metadata retains both versions without copying old packages", flush=True)
         print("PASS: explicit beta selection reuses the existing package bytes and RPM signatures", flush=True)
     finally:

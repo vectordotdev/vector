@@ -172,9 +172,40 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(state["pending"], self.two.id)
         with self.assertRaises(Conflict):
             self.publisher.publish(self.snapshot("three", "three"))
-        self.publisher.publish(self.publisher.archived(self.one.id), rollback=True)
+        recovery = self.snapshot("recovery", "fresh signed old selection")
+        self.publisher.publish(recovery, recovery=(self.one.id, self.two.id))
+        self.assertEqual(self.publisher.load_state()[0]["active"], recovery.id)
         self.assertIsNone(self.publisher.load_state()[0]["pending"])
+        before = self.live()
+        self.publisher.publish(recovery, recovery=(self.one.id, self.two.id))
+        self.assertEqual(self.live(), before)
+        with self.assertRaises(Conflict):
+            self.publisher.publish(self.two)
+
+    def test_recovery_rejects_changed_active_or_pending_state_before_live_writes(self):
+        self.publisher.publish(self.one)
+        recovery = self.snapshot("recovery", "fresh signed old selection")
+        before = self.live()
+        with self.assertRaises(Conflict):
+            self.publisher.publish(recovery, recovery=(self.one.id, self.two.id))
+        self.assertEqual(self.live(), before)
         self.publisher.publish(self.two)
+        before = self.live()
+        with self.assertRaises(Conflict):
+            self.publisher.publish(recovery, recovery=(self.one.id, None))
+        self.assertEqual(self.live(), before)
+
+    def test_recovery_can_resume_its_own_interrupted_generation(self):
+        self.publisher.publish(self.one)
+        recovery = self.snapshot("recovery", "fresh signed old selection")
+        def stop(phase):
+            if phase.endswith("repomd.xml"):
+                raise Interrupted("torn recovery pair")
+        with self.assertRaises(Interrupted):
+            Publisher(self.store, CONFIG, stop).publish(recovery, recovery=(self.one.id, None))
+        self.assertEqual(self.publisher.load_state()[0]["pending"], recovery.id)
+        self.publisher.publish(recovery, recovery=(self.one.id, None))
+        self.assertEqual(self.publisher.load_state()[0]["active"], recovery.id)
 
     def test_lost_write_response_retains_lock_and_blocks_early_recovery(self):
         self.publisher.publish(self.one)
@@ -198,10 +229,10 @@ class PublisherTests(unittest.TestCase):
         self.publisher.publish(self.one)
         self.publisher.publish(self.two)
         before = self.live()
-        key = self.publisher.archives + self.one.id + "/files/apt/dists/stable/InRelease"
+        key = self.publisher.archives + self.two.id + "/files/apt/dists/stable/InRelease"
         self.store.put(key, b"bad", byte_entry(b"bad"), previous=self.store.head(key))
         with self.assertRaises(Conflict):
-            self.publisher.publish(self.publisher.archived(self.one.id), rollback=True)
+            self.publisher.publish(self.two)
         self.assertEqual(before, self.live())
 
     def test_manifest_rejects_extra_file_changed_bytes_symlink_and_traversal(self):

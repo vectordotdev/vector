@@ -1,21 +1,20 @@
 """Container implementation for the typed `vdev release repositories` commands."""
 
 import argparse
-import gzip
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import shutil
 import sys
-import tarfile
 from urllib.request import urlopen
 
+from bundles import checked_download, pack_bundle, unpack_bundle
+import rollback
 from inputs import fetch, require, verify_input
 from repository import PublicKey, lint_package, prepare, repomd_locations, run, verify_metadata
 from storage import (Busy, Conflict, Publisher, S3Store, Snapshot, byte_entry,
-                     canonical, matches, mutable, safe_relative, sha256_file)
+                     mutable, sha256_file)
 
 
 def configuration(path):
@@ -56,50 +55,6 @@ def bundle_key(config, snapshot):
 
 def rpm_cache_key(config, asset):
     return config["bundle_prefix"] + "rpms/" + asset["sha256"] + ".rpm"
-
-
-def checked_download(store, key, path, entry=None):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    head = store.head(key)
-    require(head is not None and head["ContentLength"] < 5 * 1024**3, "Missing or oversized S3 input")
-    actual = store.download(key, path)
-    require(matches(head, actual) and (entry is None or actual == entry), "Downloaded S3 object failed checksum verification")
-    return actual
-
-
-def unpack_bundle(path, destination):
-    destination.mkdir()
-    total = 0
-    names = set()
-    with tarfile.open(path, "r:gz") as archive:
-        for member in archive:
-            require(member.isfile() and member.name not in names, "Bundle has a duplicate or nonregular member")
-            names.add(member.name)
-            require(member.name in {"input.json", "manifest.json"} or member.name.startswith("files/"), "Unexpected bundle member")
-            if member.name.startswith("files/"):
-                safe_relative(member.name[6:])
-            total += member.size
-            require(total < 5 * 1024**3, "Bundle exceeds the extraction budget")
-            target = destination / member.name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with archive.extractfile(member) as source, target.open("xb") as output:
-                shutil.copyfileobj(source, output)
-    require({"input.json", "manifest.json"}.issubset(names), "Incomplete signed bundle")
-    return Snapshot.local(destination / "files")
-
-
-def pack_bundle(source, target):
-    with target.open("xb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as compressed:
-        with tarfile.open(fileobj=compressed, mode="w|") as archive:
-            for path in sorted(source.rglob("*")):
-                require(not path.is_symlink(), "Bundle contains a symlink")
-                if path.is_file():
-                    info = archive.gettarinfo(str(path), arcname=path.relative_to(source).as_posix())
-                    info.uid = info.gid = info.mtime = 0
-                    info.uname = info.gname = ""
-                    info.mode = 0o644
-                    with path.open("rb") as data:
-                        archive.addfile(info, data)
 
 
 def base(config, work):
@@ -200,8 +155,7 @@ def publish(config, work):
     print("Published snapshot " + publisher.publish(snapshot))
 
 
-def verify(config, work):
-    manifest, snapshot = check_result(config, work)
+def verify_snapshot(config, snapshot):
     names = {name for name in snapshot.entries if mutable(name)}
     names.update(path.relative_to(snapshot.source).as_posix() for path in snapshot.source.rglob("*") if path.is_file())
     for name in sorted(names):
@@ -218,7 +172,12 @@ def verify(config, work):
                 require(size <= expected["size"], "Endpoint returned an oversized object")
                 digest.update(data)
         require({"sha256": digest.hexdigest(), "size": size} == expected, "Endpoint differs from published snapshot: " + name)
-    print(f"Verified {len(names)} endpoint objects for {manifest['tag']}")
+    print(f"Verified {len(names)} endpoint objects for snapshot {snapshot.id}")
+
+
+def verify(config, work):
+    _, snapshot = check_result(config, work)
+    verify_snapshot(config, snapshot)
 
 
 def main():
@@ -234,7 +193,10 @@ def main():
     test_options = commands.add_parser("test").add_mutually_exclusive_group()
     test_options.add_argument("--packages", action="store_true")
     test_options.add_argument("--s3", action="store_true")
-    commands.add_parser("rollback").add_argument("snapshot")
+    rollback_commands = commands.add_parser("rollback").add_subparsers(dest="phase", required=True)
+    rollback_commands.add_parser("base").add_argument("snapshot")
+    for name in ("prepare", "publish", "verify"):
+        rollback_commands.add_parser(name)
     recovery = commands.add_parser("recover-lock")
     recovery.add_argument("--expected-version", required=True)
     recovery.add_argument("--confirm-owner-stopped", action="store_true")
@@ -252,6 +214,16 @@ def main():
         publish(config, work)
     elif args.command == "verify":
         verify(config, work)
+    elif args.command == "rollback":
+        if args.phase == "base":
+            rollback.base(config, work, args.snapshot, store_for(config))
+        elif args.phase == "prepare":
+            print("Prepared rollback snapshot " + rollback.prepare(config, work))
+        elif args.phase == "publish":
+            rollback.publish(config, work, store_for(config))
+        else:
+            _, snapshot = rollback.check_result(config, work)
+            verify_snapshot(config, snapshot)
     elif args.command == "test":
         import unittest
         suite = unittest.defaultTestLoader.discover("tests")
@@ -267,8 +239,6 @@ def main():
         if args.command == "status":
             state, head = publisher.load_state()
             print(json.dumps({"state": state, "version": head["VersionId"] if head else None}, indent=2))
-        elif args.command == "rollback":
-            print(publisher.publish(publisher.archived(args.snapshot), rollback=True))
         else:
             publisher.recover_lock(args.expected_version, args.confirm_owner_stopped)
             print("Lock released; resume the pending snapshot or roll back to the last completed snapshot")
