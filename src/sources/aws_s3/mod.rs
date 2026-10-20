@@ -35,6 +35,12 @@ use crate::{
 
 pub mod sqs;
 
+pub(super) const BUCKET: &str = "bucket";
+pub(super) const OBJECT: &str = "object";
+pub(super) const REGION: &str = "region";
+pub(super) const TIMESTAMP: &str = "timestamp";
+pub(super) const METADATA: &str = "metadata";
+
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -205,38 +211,38 @@ impl SourceConfig for AwsS3Config {
             .schema_definition(log_namespace)
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("bucket"))),
-                &owned_value_path!("bucket"),
+                Some(LegacyKey::Overwrite(owned_value_path!(BUCKET))),
+                &owned_value_path!(BUCKET),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("object"))),
-                &owned_value_path!("object"),
+                Some(LegacyKey::Overwrite(owned_value_path!(OBJECT))),
+                &owned_value_path!(OBJECT),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("region"))),
-                &owned_value_path!("region"),
+                Some(LegacyKey::Overwrite(owned_value_path!(REGION))),
+                &owned_value_path!(REGION),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(TIMESTAMP),
             )
             .with_standard_vector_source_metadata()
             // for metadata that is added to the events dynamically from the metadata
             .with_source_metadata(
                 Self::NAME,
                 None,
-                &owned_value_path!("metadata"),
+                &owned_value_path!(METADATA),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             );
@@ -994,9 +1000,9 @@ mod integration_tests {
                 } else {
                     assert_eq!(log["message"], message.into());
                 }
-                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("bucket"), path!("bucket")).unwrap(), &bucket.clone().into());
-                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("object"), path!("object")).unwrap(), &key.clone().into());
-                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")).unwrap(), &"us-east-1".into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!(BUCKET), path!(BUCKET)).unwrap(), &bucket.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!(OBJECT), path!(OBJECT)).unwrap(), &key.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!(REGION), path!(REGION)).unwrap(), &"us-east-1".into());
             }
 
             // Unfortunately we need a fairly large sleep here to ensure that the source has actually managed to delete the SQS message.
