@@ -322,7 +322,7 @@ pub async fn sign_request(
         credentials_provider,
         region,
         payload_checksum_sha256,
-        SystemTime::now(),
+        SystemTime::now,
     )
     .await?;
 
@@ -363,7 +363,7 @@ pub async fn sign_request_v1(
         credentials_provider,
         region,
         payload_checksum_sha256,
-        SystemTime::now(),
+        SystemTime::now,
     )
     .await?;
 
@@ -391,6 +391,9 @@ fn signable_headers<'a>(
 ///
 /// Builds the `SignableRequest` from the given request parts and produces the
 /// `SigningInstructions` to apply to a request of either `http` crate version.
+///
+/// `signing_time` is called after the credentials are provided, so a slow credential lookup
+/// does not make the signature's `x-amz-date` stale.
 // https://github.com/vectordotdev/vector/issues/19179
 #[allow(
     clippy::too_many_arguments,
@@ -405,7 +408,7 @@ async fn sign_request_helper(
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
-    signing_time: SystemTime,
+    signing_time: impl FnOnce() -> SystemTime,
 ) -> crate::Result<SigningInstructions> {
     let signable_request =
         SignableRequest::new(method, uri, headers.into_iter(), SignableBody::Bytes(body))?;
@@ -425,7 +428,7 @@ async fn sign_request_helper(
         .identity(&identity)
         .region(region.as_ref().map_or("", std::convert::AsRef::as_ref))
         .name(service_name)
-        .time(signing_time)
+        .time(signing_time())
         .settings(signing_settings);
 
     let signing_params = signing_params_builder
@@ -727,7 +730,7 @@ mod tests {
             &credentials_provider,
             Some(&region),
             true,
-            signing_time,
+            || signing_time,
         )
         .await
         .expect("signing should succeed");
@@ -740,7 +743,7 @@ mod tests {
             &credentials_provider,
             Some(&region),
             true,
-            signing_time,
+            || signing_time,
         )
         .await
         .expect("signing should succeed");
