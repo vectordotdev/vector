@@ -47,8 +47,10 @@ flowchart TB
 
 The test runs twice: once with HTTP ingress and once with gRPC ingress.
 Before Rust validation, [finalize.py](data/finalize.py) allows Kafka consumers to finish,
-stops the producers and input Collector, waits up to 120 seconds for Vector to drain,
-and stops the output Collector. Compose waits for capture finalization to finish.
+stops the producers and input Collector, then gracefully stops Vector while the
+output Collector still accepts traces. It waits up to 120 seconds for the expected
+span count before stopping the output Collector. An unclean Vector exit fails the
+run. Compose waits for capture finalization to finish.
 Rust reads the finalized files, so retries do not need a fresh environment.
 
 [scenario.py](data/scenario.py) runs one simulated shopper through three rounds of ad,
@@ -80,8 +82,8 @@ writes `output.jsonl`.
 
 The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 
-- Completion: requires finalized captures and fails if Vector did not drain within
-  the helper's 120-second limit.
+- Completion: requires a clean Vector shutdown and finalized captures. Fails if
+  the output capture does not reach the expected span count within 120 seconds.
 - Service coverage: requires spans from 14 services exercised by the workload.
 - Trace shapes: requires roots, multi-span traces, children with captured
   parents, cross-service parent relationships, and error spans.

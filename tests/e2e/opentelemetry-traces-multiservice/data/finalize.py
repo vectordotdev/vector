@@ -10,7 +10,10 @@ import socket
 import time
 from urllib.parse import urlencode
 
-DRAIN_TIMEOUT_SECONDS = 120
+# Allow more than Vector's default 60-second graceful shutdown limit.
+VECTOR_SHUTDOWN_TIMEOUT_SECONDS = 120
+# Bound the wait for the output Collector to write all expected spans.
+CAPTURE_DRAIN_TIMEOUT_SECONDS = 120
 
 
 class DockerConnection(http.client.HTTPConnection):
@@ -20,8 +23,8 @@ class DockerConnection(http.client.HTTPConnection):
         self.sock.connect("/var/run/docker.sock")
 
 
-def docker_request(method, path):
-    with closing(DockerConnection("localhost", timeout=40)) as connection:
+def docker_request(method, path, timeout=40):
+    with closing(DockerConnection("localhost", timeout=timeout)) as connection:
         connection.request(method, path)
         response = connection.getresponse()
         body = response.read()
@@ -30,18 +33,21 @@ def docker_request(method, path):
         return json.loads(body) if body else None
 
 
-def stop_containers(network, label):
+def stop_containers(network, label, timeout=30):
     filters = json.dumps({"network": [network], "label": [label]})
     containers = docker_request("GET", "/containers/json?" + urlencode({"filters": filters}))
     if not containers:
         raise RuntimeError(f"No running demo containers matching {label}")
 
-    # Stop producers together, preserving the existing SDK shutdown grace period.
+    # Stop containers together; allow the API request to outlast Docker's grace period.
     with ThreadPoolExecutor(max_workers=len(containers)) as executor:
         list(executor.map(
-            lambda container: docker_request("POST", f"/containers/{container['Id']}/stop?t=30"),
+            lambda container: docker_request(
+                "POST", f"/containers/{container['Id']}/stop?t={timeout}", timeout=timeout + 10,
+            ),
             containers,
         ))
+    return containers
 
 
 def span_count(path):
@@ -63,7 +69,14 @@ def finalize(directory, network):
     stop_containers(network, "vector.otel-traces-multiservice.producer=true")
     stop_containers(network, "com.docker.compose.service=otel-collector")
     expected = span_count(directory / "input.jsonl")
-    deadline = time.monotonic() + DRAIN_TIMEOUT_SECONDS
+    # Keep the destination alive until Vector has flushed and exited, including any
+    # late duplicate batches that the Rust comparison must be able to detect.
+    for container in stop_containers(network, "com.docker.compose.service=vector", timeout=VECTOR_SHUTDOWN_TIMEOUT_SECONDS):
+        state = docker_request("GET", f"/containers/{container['Id']}/json")["State"]
+        if state["ExitCode"] != 0 or state["OOMKilled"]:
+            raise RuntimeError(f"Vector did not shut down cleanly: {state}")
+
+    deadline = time.monotonic() + CAPTURE_DRAIN_TIMEOUT_SECONDS
     received = 0
     while received < expected:
         try:
