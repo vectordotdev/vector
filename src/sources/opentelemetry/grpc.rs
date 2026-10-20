@@ -23,13 +23,14 @@ use vector_lib::{
             trace_service_server::TraceService,
         },
     },
+    tls::TlsPeerMetadata,
 };
 
 use crate::{
     SourceSender,
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::{
-        config::{LOGS, METRICS, TRACES},
+        config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
         request_control::{
             AcknowledgementFailure, MiddlewareError, PendingAcknowledgement,
             SharedPendingAcknowledgement,
@@ -56,6 +57,7 @@ impl TraceService for Service {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
+        let tls_peer_metadata = request.extensions().get::<TlsPeerMetadata>().cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -71,7 +73,9 @@ impl TraceService for Service {
                 .flat_map(ResourceSpans::into_event_iter)
                 .collect()
         };
-        let receiver = self.handle_events(events, TRACES).await?;
+        let receiver = self
+            .handle_events(events, TRACES, tls_peer_metadata)
+            .await?;
 
         Ok(response_with_acknowledgement(
             ExportTraceServiceResponse {
@@ -88,6 +92,7 @@ impl LogsService for Service {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
+        let tls_peer_metadata = request.extensions().get::<TlsPeerMetadata>().cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -103,7 +108,7 @@ impl LogsService for Service {
                 .flat_map(|v| v.into_event_iter(self.log_namespace))
                 .collect()
         };
-        let receiver = self.handle_events(events, LOGS).await?;
+        let receiver = self.handle_events(events, LOGS, tls_peer_metadata).await?;
 
         Ok(response_with_acknowledgement(
             ExportLogsServiceResponse {
@@ -120,6 +125,7 @@ impl MetricsService for Service {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
+        let tls_peer_metadata = request.extensions().get::<TlsPeerMetadata>().cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             // Major caveat here, the output event will be logs.
@@ -137,7 +143,9 @@ impl MetricsService for Service {
                 .collect()
         };
 
-        let receiver = self.handle_events(events, METRICS).await?;
+        let receiver = self
+            .handle_events(events, METRICS, tls_peer_metadata)
+            .await?;
 
         Ok(response_with_acknowledgement(
             ExportMetricsServiceResponse {
@@ -153,7 +161,11 @@ impl Service {
         &self,
         mut events: Vec<Event>,
         log_name: &'static str,
+        tls_peer_metadata: Option<TlsPeerMetadata>,
     ) -> Result<Option<BatchStatusReceiver>, Status> {
+        if let Some(tls_peer_metadata) = &tls_peer_metadata {
+            tls_peer_metadata.insert_into(&mut events, OpentelemetryConfig::NAME);
+        }
         // When using OTLP decoding, count individual items within the batch
         // to maintain consistency with other Vector sources
         let count = if self.deserializer.is_some() {

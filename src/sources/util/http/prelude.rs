@@ -31,7 +31,9 @@ use crate::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
-    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig, TlsError},
+    tls::{
+        MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig, TlsError, TlsPeerMetadata,
+    },
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
@@ -195,13 +197,15 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(body_filter)
                 .and(warp::query::<HashMap<String, String>>())
                 .and(warp::filters::ext::optional())
+                .and(warp::filters::ext::optional())
                 .and_then(
                     move |path: FullPath,
                           encoding_header: Option<String>,
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>,
-                          addr: Option<PeerAddr>| {
+                          addr: Option<PeerAddr>,
+                          tls_peer_metadata: Option<TlsPeerMetadata>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
                         let events = auth_matcher
@@ -247,6 +251,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 if let Some(enrichment) = auth_enrichment {
                                     self.inject_auth_enrichment(&mut events, enrichment);
                                 }
+                                if let Some(tls_peer_metadata) = &tls_peer_metadata {
+                                    tls_peer_metadata.insert_into(&mut events, Self::name());
+                                }
 
                                 events
                             });
@@ -284,6 +291,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 cx.shutdown.map(|_| ()),
                 move |conn| {
                     let remote_addr = conn.peer_addr();
+                    let tls_peer_metadata = conn.tls_peer_metadata();
                     ServiceBuilder::new()
                         .layer(build_http_trace_layer(span.clone()))
                         .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -295,6 +303,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         }))
                         .map_request(move |mut request: http::Request<_>| {
                             request.extensions_mut().insert(PeerAddr::new(remote_addr));
+                            request.extensions_mut().insert(tls_peer_metadata.clone());
 
                             request
                         })
