@@ -183,18 +183,10 @@ impl DriverResponse for BigqueryResponse {
 
 #[derive(Debug, Snafu)]
 pub enum BigqueryServiceError {
-    #[snafu(display("Error communicating with BigQuery: {}", error))]
-    Transport { error: tonic::transport::Error },
     #[snafu(display("BigQuery request failure: {}", status))]
     Request { status: tonic::Status },
     #[snafu(display("BigQuery response stream closed"))]
     ResponseStreamClosed,
-}
-
-impl From<tonic::transport::Error> for BigqueryServiceError {
-    fn from(error: tonic::transport::Error) -> Self {
-        Self::Transport { error }
-    }
 }
 
 impl From<tonic::Status> for BigqueryServiceError {
@@ -212,6 +204,21 @@ pub struct BigqueryService {
     service: BigQueryWriteClient,
 }
 
+/// Whether the status was caused by a connection-level failure rather than an error returned by BigQuery.
+fn is_transport_failure(status: &tonic::Status) -> bool {
+    let mut source = std::error::Error::source(status);
+    while let Some(error) = source {
+        if error.is::<std::io::Error>()
+            || error.is::<hyper::Error>()
+            || error.is::<tonic::transport::Error>()
+        {
+            return true;
+        }
+        source = error.source();
+    }
+    false
+}
+
 #[derive(Clone, Debug)]
 pub struct BigqueryRetryLogic;
 
@@ -222,21 +229,24 @@ impl RetryLogic for BigqueryRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            BigqueryServiceError::Transport { .. } | BigqueryServiceError::ResponseStreamClosed => {
-                true
-            }
+            BigqueryServiceError::ResponseStreamClosed => true,
             // Allow transient gRPC status codes to be retried.
-            // Internal is documented as a retriable server-side error in `AppendRowsResponse`.
-            // Unauthenticated is included because a bearer token may expire between the token
-            // refresher updating it and the request being sent; a retry will pick up the new token.
-            BigqueryServiceError::Request { status } => matches!(
-                status.code(),
+            BigqueryServiceError::Request { status } => match status.code() {
                 tonic::Code::Unavailable
-                    | tonic::Code::ResourceExhausted
-                    | tonic::Code::DeadlineExceeded
-                    | tonic::Code::Internal
-                    | tonic::Code::Unauthenticated
-            ),
+                | tonic::Code::ResourceExhausted
+                | tonic::Code::DeadlineExceeded
+                // Internal is documented as a retriable server-side error in `AppendRowsResponse`.
+                | tonic::Code::Internal
+                // Unauthenticated is included because a bearer token may expire between the token
+                // refresher updating it and the request being sent. A retry will pick up a new token.
+                | tonic::Code::Unauthenticated
+                // Aborted is returned when the server closes the stream (e.g. on restart) and advises
+                // clients to reconnect.
+                | tonic::Code::Aborted => true,
+                // tonic reports connection failures mid-request (e.g. a connection reset) as Unknown.
+                tonic::Code::Unknown => is_transport_failure(status),
+                _ => false,
+            },
         }
     }
 
