@@ -56,7 +56,6 @@ jobs:
         run: |
           cargo build --locked --package vdev
           target/debug/vdev release repositories build-image
-          target/debug/vdev release repositories test
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}

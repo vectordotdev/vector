@@ -6,6 +6,5 @@ COPY requirements.txt /app/requirements.txt
 RUN python3 -m venv /opt/publisher && /opt/publisher/bin/pip install \
     --no-cache-dir --require-hashes --only-binary=:all: -r /app/requirements.txt
 COPY *.py /app/
-COPY tests /app/tests
 WORKDIR /app
 ENTRYPOINT ["/opt/publisher/bin/python", "/app/engine.py"]

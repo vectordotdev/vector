@@ -79,12 +79,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Offline regressions need neither signing material nor AWS access.
+      # CLI and image checks require neither signing material nor AWS access.
       - run: |
           cargo test --locked --package vdev commands::release::repositories::
           cargo build --locked --package vdev
           target/debug/vdev release repositories build-image
-          target/debug/vdev release repositories test
+          docker run --rm vector-package-publisher:local --help
 
   test:
     needs: changes

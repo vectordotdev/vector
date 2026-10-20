@@ -57,7 +57,6 @@ jobs:
         run: |
           cargo build --locked --package vdev
           target/debug/vdev release repositories build-image
-          target/debug/vdev release repositories test
       - name: Freeze and verify release inputs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -231,7 +230,23 @@ jobs:
           export CHANNEL TAG
           export APT_URL=https://apt.vector.dev/
           export YUM_URL=https://yum.vector.dev/
-          docker run --rm --env CHANNEL --env TAG --env APT_URL --env YUM_URL \
+          docker run --rm --interactive --env CHANNEL --env TAG --env APT_URL --env YUM_URL \
             --mount "type=bind,source=$PWD/distribution/repositories/setup.sh,target=/setup.sh,readonly" \
-            --mount "type=bind,source=$PWD/distribution/repositories/tests/client.sh,target=/test.sh,readonly" \
-            "$IMAGE" bash /test.sh
+            "$IMAGE" bash -seuo pipefail <<'VERIFY'
+          version=${TAG#v}
+          version=${version/-/\~}
+          VECTOR_DIST_CHANNEL="$CHANNEL" TESTING_APT_URL="$APT_URL" TESTING_YUM_URL="$YUM_URL" bash /setup.sh
+          if command -v apt-get >/dev/null; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get install -y "vector=$version-1"
+            test "$(dpkg-query -W -f='${Version}' vector)" = "$version-1"
+          else
+            version=${version//-/.}
+            dnf install -y "vector-$version-1"
+            test "$(rpm -q --qf '%{VERSION}-%{RELEASE}' vector)" = "$version-1"
+          fi
+          getent passwd vector
+          getent group vector
+          vector --version
+          test -f /usr/share/vector/examples/vector.yaml
+          VERIFY

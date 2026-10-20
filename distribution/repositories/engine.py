@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import Path
 import re
-import sys
 from urllib.request import urlopen
 
 from bundles import checked_download, pack_bundle, unpack_bundle
@@ -190,9 +189,6 @@ def main():
     download.add_argument("--channel", choices=("stable", "beta"), required=True)
     for name in ("base", "prepare", "publish", "verify", "status"):
         commands.add_parser(name)
-    test_options = commands.add_parser("test").add_mutually_exclusive_group()
-    test_options.add_argument("--packages", action="store_true")
-    test_options.add_argument("--s3", action="store_true")
     rollback_commands = commands.add_parser("rollback").add_subparsers(dest="phase", required=True)
     rollback_commands.add_parser("base").add_argument("snapshot")
     for name in ("prepare", "publish", "verify"):
@@ -224,16 +220,6 @@ def main():
         else:
             _, snapshot = rollback.check_result(config, work)
             verify_snapshot(config, snapshot)
-    elif args.command == "test":
-        import unittest
-        suite = unittest.defaultTestLoader.discover("tests")
-        require(unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful(), "Publisher regressions failed")
-        if args.packages:
-            from tests.package_fixture import prepare_fixture
-            prepare_fixture(config, work)
-        elif args.s3:
-            from tests.publication_fixture import publish_fixture
-            publish_fixture(config, work)
     else:
         publisher = Publisher(store_for(config), config)
         if args.command == "status":

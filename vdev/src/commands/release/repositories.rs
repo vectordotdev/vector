@@ -60,15 +60,6 @@ enum Commands {
         #[arg(long)]
         confirm_owner_stopped: bool,
     },
-    /// Run the publisher's offline protocol and metadata regressions.
-    Test {
-        /// Prepare two releases in the workspace with an ephemeral test key.
-        #[arg(long, conflicts_with = "s3")]
-        packages: bool,
-        /// Exercise prepared fixtures against the isolated private S3 sandbox.
-        #[arg(long)]
-        s3: bool,
-    },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -173,8 +164,7 @@ impl Commands {
             | Self::Rollback {
                 phase: Rollback::Base { .. } | Rollback::Publish,
             }
-            | Self::RecoverLock { .. }
-            | Self::Test { s3: true, .. } => &[
+            | Self::RecoverLock { .. } => &[
                 "AWS_ACCESS_KEY_ID",
                 "AWS_SECRET_ACCESS_KEY",
                 "AWS_SESSION_TOKEN",
@@ -241,15 +231,6 @@ impl Commands {
                     command.arg("--confirm-owner-stopped");
                 }
             }
-            Commands::Test { packages, s3 } => {
-                command.arg("test");
-                if packages {
-                    command.arg("--packages");
-                }
-                if s3 {
-                    command.arg("--s3");
-                }
-            }
             Commands::BuildImage => unreachable!(),
         }
     }
@@ -292,13 +273,5 @@ mod tests {
             .is_empty()
         );
         assert!(Commands::Verify.credentials().is_empty());
-        assert!(
-            Commands::Test {
-                packages: true,
-                s3: false
-            }
-            .credentials()
-            .is_empty()
-        );
     }
 }

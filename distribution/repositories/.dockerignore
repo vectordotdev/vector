@@ -2,7 +2,5 @@
 !Dockerfile
 !requirements.txt
 !*.py
-!tests/
-!tests/**
 
 **/__pycache__

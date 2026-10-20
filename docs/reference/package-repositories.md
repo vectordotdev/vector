@@ -9,9 +9,9 @@ This workflow is disabled unless the repository variable
 `PACKAGE_REPOSITORIES_ENABLED` is `true`. It requires a completed historical
 backfill. Enabling it is part of the repository migration cutover, after the new
 public key, installation instructions and client migration have been published.
-The normal Test Suite runs the offline publisher regressions when this tooling
-changes. Those checks require no signing secrets or AWS credentials and remain
-available while publication is disabled.
+The normal Test Suite checks the vdev CLI and builds the publisher image when
+this tooling changes. Those checks require no signing secrets or AWS credentials.
+Publisher regressions and migration rehearsals live in the private CI sandbox.
 
 ## Inputs and job boundaries
 
@@ -133,8 +133,8 @@ channel on a repeated invocation. `CSM_MIGRATE=true` disables the known
 The publisher keeps the existing apt identity: no `Origin` or `Label`, an empty
 `Suite`, and the channel as `Codename`. This permits the signing-key and hosting
 transition without a separate release-information approval. The observed
-legacy fields are recorded in `tests/legacy-apt-identity.json`; a regression
-check compares the publisher's output with that observation.
+legacy fields and the regression check comparing them with publisher output
+are kept in the private migration test suite.
 
 Before announcement, deploy the reviewed script at
 `vector/setup.sh` and the public key at `vector/keys/vector-packages.asc`
@@ -146,9 +146,9 @@ new script and update those installation pages together.
 
 The protected production client job runs this setup script before installing a
 release. Activation therefore requires the public key endpoint to be available.
-The real-package fixture also creates separate ephemeral legacy and COSE signing
-identities and installer bundles for disposable HTTPS client tests. Private keys
-stay in tmpfs; client bundles contain only public keys and signed packages.
+Private sandbox tests use separate ephemeral legacy and COSE signing identities
+for disposable HTTPS clients. Private keys stay in tmpfs; client bundles contain
+only public keys and signed packages.
 
 ## Maintainer commands
 
@@ -156,7 +156,6 @@ Build the tools once from reviewed source:
 
 ```sh
 cargo vdev release repositories build-image
-cargo vdev release repositories test
 ```
 
 The default workspace is `target/package-repositories`. Use a different `--work`
