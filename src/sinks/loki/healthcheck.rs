@@ -34,11 +34,8 @@ pub async fn healthcheck(
 ) -> crate::Result<()> {
     // Healthcheck URI has been explicitly configured
     if let Some(uri) = healthcheck_uri {
-        let auth = uri.auth.or(auth);
-        // `UriSerde` wraps an `http 0.2` URI; round-trip through `Display`,
-        // which `HttpEndpoint::into_v1` relies on for the same conversion.
-        let uri = uri.uri.to_string().parse::<http_1::Uri>()?;
-        let status = fetch_status(uri, auth.as_ref(), &client).await?;
+        let status =
+            fetch_status(uri.uri_v1()?, uri.auth.as_ref().or(auth.as_ref()), &client).await?;
         return match status {
             StatusCode::OK => Ok(()),
             _ => Err(format!("A non-successful status returned: {status}").into()),
