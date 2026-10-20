@@ -46,6 +46,10 @@ flowchart TB
 ```
 
 The test runs twice: once with HTTP ingress and once with gRPC ingress.
+Before Rust validation, [finalize.py](data/finalize.py) allows Kafka consumers to finish,
+stops the producers and input Collector, waits up to 120 seconds for Vector to drain,
+and stops the output Collector. Compose waits for capture finalization to finish.
+Rust reads the finalized files, so retries do not need a fresh environment.
 
 [scenario.py](data/scenario.py) runs one simulated shopper through three rounds of ad,
 recommendation, cart, and multi-item checkout requests. Checkout also exercises
@@ -76,8 +80,8 @@ writes `output.jsonl`.
 
 The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 
-- Completion: requires the workload marker, allows Kafka consumers to finish,
-  stops the input, and waits up to 120 seconds for Vector to drain.
+- Completion: requires finalized captures and fails if Vector did not drain within
+  the helper's 120-second limit.
 - Service coverage: requires spans from 14 services exercised by the workload.
 - Trace shapes: requires roots, multi-span traces, children with captured
   parents, cross-service parent relationships, and error spans.
@@ -100,7 +104,7 @@ The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 With Docker available, run both transports:
 
 ```shell
-cargo vdev e2e run opentelemetry-traces-multiservice --retries 0 --always-show-logs
+cargo vdev e2e run opentelemetry-traces-multiservice --always-show-logs
 ```
 
 To run one transport, add `-e 0.159.0-otlphttp` (HTTP) or `-e 0.159.0-otlp` (gRPC).

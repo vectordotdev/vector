@@ -1,7 +1,7 @@
 """Run a fixed workload using the demo's instrumented Locust user.
 
 Unlike the default random, continuous workload, this stops after three shopping
-rounds and writes a completion marker so trace validation can start.
+rounds and writes a completion marker so captures can be finalized.
 """
 
 import os

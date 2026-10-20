@@ -288,7 +288,7 @@ jobs:
         run: |
           mkdir -p target/otel-traces-multiservice-evidence
           set -o pipefail
-          vdev e2e run opentelemetry-traces-multiservice --retries 0 --always-show-logs 2>&1 | tee target/otel-traces-multiservice-evidence/runner.log
+          vdev e2e run opentelemetry-traces-multiservice --always-show-logs 2>&1 | tee target/otel-traces-multiservice-evidence/runner.log
 
       - name: Collect multiservice trace evidence
         if: always()

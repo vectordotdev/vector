@@ -1,14 +1,9 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
-    time::{Duration, Instant},
 };
 
-use bollard::{
-    Docker,
-    query_parameters::{ListContainersOptionsBuilder, StopContainerOptionsBuilder},
-};
 use prost::Message;
 use serde::Serialize;
 use vector_lib::opentelemetry::proto::{
@@ -20,7 +15,6 @@ use vector_lib::opentelemetry::proto::{
 use crate::opentelemetry::parse_export_traces_request;
 
 const OUTPUT: &str = "/output/opentelemetry-traces-multiservice";
-const NETWORK: &str = "vector-integration-tests-opentelemetry-traces-multiservice";
 const REQUIRED_SERVICES: &[&str] = &[
     "ad",
     "cart",
@@ -161,15 +155,6 @@ struct Coverage<'a> {
     scope_groups_with_multiple_trace_ids: usize,
 }
 
-fn span_count(request: &ExportTraceServiceRequest) -> usize {
-    request
-        .resource_spans
-        .iter()
-        .flat_map(|resource| &resource.scope_spans)
-        .map(|scope| scope.spans.len())
-        .sum()
-}
-
 impl<'a> Coverage<'a> {
     fn new(request: &'a ExportTraceServiceRequest) -> Self {
         let mut services = BTreeMap::<&str, usize>::new();
@@ -241,36 +226,6 @@ impl<'a> Coverage<'a> {
     }
 }
 
-async fn stop_containers(docker: &Docker, filter: &str) -> Result<(), String> {
-    let filters = HashMap::from([
-        ("network".to_owned(), vec![NETWORK.to_owned()]),
-        ("label".to_owned(), vec![filter.to_owned()]),
-    ]);
-    let containers = docker
-        .list_containers(Some(
-            ListContainersOptionsBuilder::new()
-                .filters(&filters)
-                .build(),
-        ))
-        .await
-        .map_err(|error| error.to_string())?;
-    if containers.is_empty() {
-        return Err(format!("No running demo containers matching {filter}"));
-    }
-    // Stop producers together so consumers remain alive during SDK shutdown.
-    futures::future::try_join_all(containers.iter().map(|container| async {
-        docker
-            .stop_container(
-                container.id.as_deref().ok_or("Container ID missing")?,
-                Some(StopContainerOptionsBuilder::new().t(30).build()),
-            )
-            .await
-            .map_err(|error| error.to_string())
-    }))
-    .await?;
-    Ok(())
-}
-
 fn read_capture(directory: &Path, name: &str) -> Result<ExportTraceServiceRequest, String> {
     let path = directory.join(name);
     parse_export_traces_request(
@@ -278,25 +233,14 @@ fn read_capture(directory: &Path, name: &str) -> Result<ExportTraceServiceReques
     )
 }
 
-async fn validate_multiservice_traces() -> Result<(), String> {
-    let exporter = std::env::var("CONFIG_INGRESS_EXPORTER").map_err(|error| error.to_string())?;
-    let transport = match exporter.as_str() {
-        "otlphttp" => "HTTP",
-        "otlp" => "gRPC",
-        _ => return Err(format!("Unsupported ingress exporter: {exporter}")),
-    };
-    let directory = Path::new(OUTPUT).join(&exporter);
-    if !directory.join("workload-complete").exists() {
+fn validate_captures(directory: &Path, transport: &str) -> Result<(), String> {
+    if !directory.join("capture-complete").exists() {
         return Err(
-            "Demo workload did not complete; run cargo vdev e2e run opentelemetry-traces-multiservice".into(),
+            "Captures were not finalized; run cargo vdev e2e run opentelemetry-traces-multiservice"
+                .into(),
         );
     }
-    let docker = Docker::connect_with_socket_defaults().map_err(|error| error.to_string())?;
-    // Give asynchronous Kafka consumers time to process the final checkout.
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    stop_containers(&docker, "vector.otel-traces-multiservice.producer=true").await?;
-    stop_containers(&docker, "com.docker.compose.service=otel-collector").await?;
-    let input = read_capture(&directory, "input.jsonl")?;
+    let input = read_capture(directory, "input.jsonl")?;
     let input_coverage = Coverage::new(&input);
     fs::write(
         directory.join("coverage.json"),
@@ -304,22 +248,11 @@ async fn validate_multiservice_traces() -> Result<(), String> {
     )
     .map_err(|error| error.to_string())?;
 
-    let deadline = Instant::now() + Duration::from_mins(2);
     let mut failures = Vec::new();
-    loop {
-        if let Ok(output) = read_capture(&directory, "output.jsonl")
-            && span_count(&output) >= input_coverage.spans
-        {
-            break;
-        }
-        if Instant::now() >= deadline {
-            failures.push("Timed out draining Vector; inspect input.jsonl and output.jsonl".into());
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(500)).await;
+    if directory.join("drain-timeout").exists() {
+        failures.push("Timed out draining Vector; inspect input.jsonl and output.jsonl".into());
     }
-    stop_containers(&docker, "com.docker.compose.service=otel-collector-sink").await?;
-    let output = read_capture(&directory, "output.jsonl")?;
+    let output = read_capture(directory, "output.jsonl")?;
     let differences = compare(&input, &output);
     fs::write(directory.join("differences.txt"), differences.join("\n\n"))
         .map_err(|error| error.to_string())?;
@@ -368,11 +301,16 @@ async fn validate_multiservice_traces() -> Result<(), String> {
     }
 }
 
-#[tokio::test]
-async fn trace_round_trip() {
-    validate_multiservice_traces()
-        .await
-        .unwrap_or_else(|error| panic!("{error}"));
+#[test]
+fn trace_round_trip() {
+    let exporter = std::env::var("CONFIG_INGRESS_EXPORTER").unwrap();
+    let transport = match exporter.as_str() {
+        "otlphttp" => "HTTP",
+        "otlp" => "gRPC",
+        _ => panic!("Unsupported ingress exporter: {exporter}"),
+    };
+    let directory = Path::new(OUTPUT).join(&exporter);
+    validate_captures(&directory, transport).unwrap_or_else(|error| panic!("{error}"));
 }
 
 #[cfg(test)]
@@ -403,6 +341,36 @@ mod tests {
     }
 
     #[test]
+    fn finalized_captures_can_be_validated_repeatedly() {
+        let directory = tempfile::tempdir().unwrap();
+        let resources: Vec<_> = REQUIRED_SERVICES.iter().enumerate().map(|(index, name)| {
+            serde_json::json!({
+                "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": name}}]},
+                "scopeSpans": [{"spans": [{
+                    "traceId": "01".repeat(16),
+                    "spanId": format!("{:016x}", index + 1),
+                    "parentSpanId": if index == 0 { "" } else { "0000000000000001" },
+                    "status": {"code": 2}
+                }]}]
+            })
+        }).collect();
+        let capture = serde_json::json!({"resourceSpans": resources}).to_string();
+        for name in ["input.jsonl", "output.jsonl"] {
+            fs::write(directory.path().join(name), &capture).unwrap();
+        }
+        assert!(validate_captures(directory.path(), "HTTP").is_err());
+        fs::write(directory.path().join("capture-complete"), "").unwrap();
+        assert!(validate_captures(directory.path(), "HTTP").is_ok());
+        assert!(validate_captures(directory.path(), "HTTP").is_ok());
+        fs::write(directory.path().join("drain-timeout"), "").unwrap();
+        assert!(
+            validate_captures(directory.path(), "HTTP")
+                .unwrap_err()
+                .contains("Timed out draining Vector")
+        );
+    }
+
+    #[test]
     fn coverage_preserves_json_fields_and_counts() {
         let mut input = request();
         let spans = &mut input.resource_spans[0].scope_spans[0].spans;
@@ -416,8 +384,6 @@ mod tests {
             span_id: vec![5; 8],
             ..Default::default()
         });
-        assert_eq!(span_count(&input), 3);
-        assert_eq!(span_count(&ExportTraceServiceRequest::default()), 0);
         assert_eq!(
             serde_json::to_value(Coverage::new(&input)).unwrap(),
             serde_json::json!({

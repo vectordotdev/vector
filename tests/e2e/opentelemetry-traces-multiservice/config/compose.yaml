@@ -790,16 +790,29 @@ services:
         condition: service_healthy
     volumes:
       - "../data/vector.yaml:/etc/vector/vector.yaml:ro"
-  # Nothing uses this directly: depending on load-generator's completion makes
-  # `docker compose up --detach` wait for the workload before the test starts.
+  finalize-captures:
+    # Reuse the demo's pinned Python runtime without starting Locust.
+    image: ghcr.io/open-telemetry/demo:3.1.0-load-generator
+    entrypoint: ["python", "/usr/src/app/finalize.py"]
+    environment:
+      - CONFIG_INGRESS_EXPORTER=${CONFIG_INGRESS_EXPORTER}
+      - VECTOR_NETWORK=${VECTOR_NETWORK}
+    depends_on:
+      load-generator:
+        condition: service_completed_successfully
+    volumes:
+      - "../data/finalize.py:/usr/src/app/finalize.py:ro"
+      - "${DOCKER_SOCKET}:/var/run/docker.sock"
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+  # Its dependency makes `docker compose up --detach` wait for finalized captures.
   demo-ready:
     image: alpine:3.20
     command:
       - sh
       - "-c"
-      - test -f /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}/workload-complete
+      - test -f /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}/capture-complete
     depends_on:
-      load-generator:
+      finalize-captures:
         condition: service_completed_successfully
     volumes:
       - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
