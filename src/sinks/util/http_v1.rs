@@ -146,24 +146,18 @@ where
 /// Retry logic for sinks that use [`HttpService`], based on the response status code.
 ///
 /// ClickHouse implements its own retry logic; other native http 1 sinks use this.
-///
-/// # Panics
-///
-/// Does not panic in practice: every `http 1` status code is also a valid `http 0.2` status
-/// code.
 #[must_use]
 pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: super::http::RetryStrategy,
 ) -> super::http::HttpStatusRetryLogic<
-    impl Fn(&HttpResponse) -> http::StatusCode + Clone + Send + Sync + 'static,
+    impl Fn(&HttpResponse) -> http_1::StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
     HttpError,
 > {
     super::http::HttpStatusRetryLogic::new_with_error(
         |response: &HttpResponse| {
-            let status = http::StatusCode::from_u16(response.response.status().as_u16())
-                .expect("HTTP status codes are valid u16 values");
+            let status = response.response.status();
             if !status.is_success() {
                 debug!(
                     message = "HTTP response.",

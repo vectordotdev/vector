@@ -14,6 +14,7 @@ use crate::{
         gcs_common::service::GcsResponse,
         util::{
             HttpEndpoint,
+            http::IntoStatusCode,
             retries::{RetryAction, RetryLogic},
         },
     },
@@ -155,14 +156,14 @@ pub fn healthcheck_response(
 /// # Errors
 /// Returns an error for forbidden, missing, or unexpected response statuses.
 pub fn healthcheck_status(
-    status: http::StatusCode,
+    status: impl IntoStatusCode,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
-    match status {
+    match status.into_status_code() {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 
