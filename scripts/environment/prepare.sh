@@ -185,6 +185,12 @@ maybe_install_cargo_tool() {
   # code of an unmerged checkout. If no prebuilt binary exists, build the
   # current checkout instead.
   if [[ "$tool" == "vdev" ]]; then
+    if [[ "${VDEV_BUILD_FROM_SOURCE:-false}" == "true" ]]
+    then
+      echo "Building vdev from the working tree to test harness changes..."
+      cargo install -f --path vdev --locked
+      return 0
+    fi
     local vdev_installer=("${cargo_tool_installer[@]}")
     if [[ "${vdev_installer[0]}" == "binstall" ]]; then
       vdev_installer+=(--force --disable-strategies compile)
