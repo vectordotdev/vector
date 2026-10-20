@@ -170,71 +170,74 @@ fn span_count(request: &ExportTraceServiceRequest) -> usize {
         .sum()
 }
 
-fn coverage(request: &ExportTraceServiceRequest) -> Coverage<'_> {
-    let mut services = BTreeMap::<&str, usize>::new();
-    let mut scopes = BTreeMap::<&str, usize>::new();
-    let mut traces = BTreeMap::<&[u8], usize>::new();
-    let mut parents = BTreeMap::new();
-    let mut roots = 0;
-    let mut errors = 0;
-    let mut events = 0;
-    let mut links = 0;
-    let mut mixed_scopes = 0;
-    for rs in &request.resource_spans {
-        for ss in &rs.scope_spans {
-            let ids: BTreeSet<_> = ss.spans.iter().map(|span| &span.trace_id).collect();
-            mixed_scopes += usize::from(ids.len() > 1);
-            for span in &ss.spans {
-                *services.entry(service(rs)).or_default() += 1;
-                *scopes
-                    .entry(
-                        ss.scope
-                            .as_ref()
-                            .map_or("<missing>", |scope| scope.name.as_str()),
-                    )
-                    .or_default() += 1;
-                *traces.entry(&span.trace_id).or_default() += 1;
-                parents.insert(
-                    (span.trace_id.as_slice(), span.span_id.as_slice()),
-                    service(rs),
-                );
-                roots += usize::from(
-                    span.parent_span_id.is_empty()
-                        || span.parent_span_id.iter().all(|byte| *byte == 0),
-                );
-                errors += usize::from(span.status.as_ref().is_some_and(|status| status.code == 2));
-                events += span.events.len();
-                links += span.links.len();
-            }
-        }
-    }
-    let mut children = 0;
-    let mut cross_service = 0;
-    for rs in &request.resource_spans {
-        for ss in &rs.scope_spans {
-            for span in &ss.spans {
-                if let Some(parent_service) =
-                    parents.get(&(span.trace_id.as_slice(), span.parent_span_id.as_slice()))
-                {
-                    children += 1;
-                    cross_service += usize::from(*parent_service != service(rs));
+impl<'a> Coverage<'a> {
+    fn new(request: &'a ExportTraceServiceRequest) -> Self {
+        let mut services = BTreeMap::<&str, usize>::new();
+        let mut scopes = BTreeMap::<&str, usize>::new();
+        let mut traces = BTreeMap::<&[u8], usize>::new();
+        let mut parents = BTreeMap::new();
+        let mut roots = 0;
+        let mut errors = 0;
+        let mut events = 0;
+        let mut links = 0;
+        let mut mixed_scopes = 0;
+        for rs in &request.resource_spans {
+            for ss in &rs.scope_spans {
+                let ids: BTreeSet<_> = ss.spans.iter().map(|span| &span.trace_id).collect();
+                mixed_scopes += usize::from(ids.len() > 1);
+                for span in &ss.spans {
+                    *services.entry(service(rs)).or_default() += 1;
+                    *scopes
+                        .entry(
+                            ss.scope
+                                .as_ref()
+                                .map_or("<missing>", |scope| scope.name.as_str()),
+                        )
+                        .or_default() += 1;
+                    *traces.entry(&span.trace_id).or_default() += 1;
+                    parents.insert(
+                        (span.trace_id.as_slice(), span.span_id.as_slice()),
+                        service(rs),
+                    );
+                    roots += usize::from(
+                        span.parent_span_id.is_empty()
+                            || span.parent_span_id.iter().all(|byte| *byte == 0),
+                    );
+                    errors +=
+                        usize::from(span.status.as_ref().is_some_and(|status| status.code == 2));
+                    events += span.events.len();
+                    links += span.links.len();
                 }
             }
         }
-    }
-    Coverage {
-        spans: services.values().sum(),
-        services,
-        scopes,
-        traces: traces.len(),
-        multi_span_traces: traces.values().filter(|count| **count > 1).count(),
-        root_spans: roots,
-        children_with_captured_parent: children,
-        cross_service_parent_relationships: cross_service,
-        error_spans: errors,
-        events,
-        links,
-        scope_groups_with_multiple_trace_ids: mixed_scopes,
+        let mut children = 0;
+        let mut cross_service = 0;
+        for rs in &request.resource_spans {
+            for ss in &rs.scope_spans {
+                for span in &ss.spans {
+                    if let Some(parent_service) =
+                        parents.get(&(span.trace_id.as_slice(), span.parent_span_id.as_slice()))
+                    {
+                        children += 1;
+                        cross_service += usize::from(*parent_service != service(rs));
+                    }
+                }
+            }
+        }
+        Self {
+            spans: services.values().sum(),
+            services,
+            scopes,
+            traces: traces.len(),
+            multi_span_traces: traces.values().filter(|count| **count > 1).count(),
+            root_spans: roots,
+            children_with_captured_parent: children,
+            cross_service_parent_relationships: cross_service,
+            error_spans: errors,
+            events,
+            links,
+            scope_groups_with_multiple_trace_ids: mixed_scopes,
+        }
     }
 }
 
@@ -294,7 +297,7 @@ async fn validate_multiservice_traces() -> Result<(), String> {
     stop_containers(&docker, "vector.otel-traces-multiservice.producer=true").await?;
     stop_containers(&docker, "com.docker.compose.service=otel-collector").await?;
     let input = read_capture(&directory, "input.jsonl")?;
-    let input_coverage = coverage(&input);
+    let input_coverage = Coverage::new(&input);
     fs::write(
         directory.join("coverage.json"),
         serde_json::to_string_pretty(&input_coverage).unwrap(),
@@ -416,7 +419,7 @@ mod tests {
         assert_eq!(span_count(&input), 3);
         assert_eq!(span_count(&ExportTraceServiceRequest::default()), 0);
         assert_eq!(
-            serde_json::to_value(coverage(&input)).unwrap(),
+            serde_json::to_value(Coverage::new(&input)).unwrap(),
             serde_json::json!({
                 "services": {"<missing>": 3}, "scopes": {"<missing>": 3},
                 "spans": 3, "traces": 2, "multi_span_traces": 1,
