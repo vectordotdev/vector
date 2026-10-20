@@ -1,3 +1,6 @@
+#[cfg(feature = "package-repositories")]
+mod publisher;
+
 use std::{path::PathBuf, process::Command};
 
 use anyhow::{Context as _, Result, ensure};
@@ -10,6 +13,9 @@ pub(super) struct Cli {
     /// Container built with `build-image` from the reviewed publisher source.
     #[arg(long, default_value = "vector-package-publisher:local", global = true)]
     image: String,
+    /// Run the publisher inside the prepared tools image.
+    #[arg(long, hide = true, global = true)]
+    in_container: bool,
     /// Configuration and public key directory; never contains a private key.
     #[arg(
         long,
@@ -82,10 +88,23 @@ enum Channel {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        if self.in_container {
+            #[cfg(feature = "package-repositories")]
+            return publisher::exec(&self.config, &self.work, self.command);
+            #[cfg(not(feature = "package-repositories"))]
+            anyhow::bail!("The publisher requires the package-repositories Cargo feature");
+        }
         app::set_repo_dir()?;
         if matches!(self.command, Commands::BuildImage) {
             return Command::new("docker")
-                .args(["build", "--tag", &self.image, "distribution/repositories"])
+                .args([
+                    "build",
+                    "--tag",
+                    &self.image,
+                    "--file",
+                    "distribution/repositories/Dockerfile",
+                    ".",
+                ])
                 .check_run();
         }
         std::fs::create_dir_all(&self.work)?;
@@ -136,6 +155,9 @@ impl Cli {
             command.args(["--env", name]);
         }
         command.arg(&self.image).args([
+            "--in-container",
+            "--work",
+            "/work",
             "--config",
             &format!(
                 "/config/{}",

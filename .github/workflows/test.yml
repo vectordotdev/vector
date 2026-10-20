@@ -72,7 +72,7 @@ jobs:
   check-package-repositories:
     name: Check package repository tooling
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     if: ${{ needs.changes.outputs.package_repositories == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:

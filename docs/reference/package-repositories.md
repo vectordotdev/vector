@@ -2,8 +2,13 @@
 
 The `Package Repositories` workflow consumes existing GitHub release assets and
 publishes apt and yum repositories. `cargo vdev release repositories` provides the
-maintainer commands. The container implementation is under
-`distribution/repositories`; its image is built within each workflow run.
+maintainer commands and the Rust publisher implementation in
+`vdev/src/commands/release/repositories/publisher`. The tools image is built within
+each workflow run from a pinned Rust builder and Ubuntu runtime. It contains
+`vdev`, GPG and native Debian/RPM metadata tools; Python and pip are not required.
+The `package-repositories` Cargo feature keeps AWS SDK dependencies out of ordinary
+vdev builds. `distribution/repositories` holds the image definition, production
+configuration, public key and standalone shell installer.
 
 This workflow is disabled unless the repository variable
 `PACKAGE_REPOSITORIES_ENABLED` is `true`. It requires a completed historical
