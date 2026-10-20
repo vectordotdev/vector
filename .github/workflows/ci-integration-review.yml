@@ -141,6 +141,7 @@ jobs:
             "pulsar",
             "redis",
             "splunk",
+            "syslog",
             "webhdfs"
           ]
     steps:
