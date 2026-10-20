@@ -1,0 +1,253 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+# Start with the upstream application, then apply only the test-specific settings below.
+# !reset removes an inherited setting. !override replaces a whole section instead
+# of merging it. <<: *name reuses the settings from the named YAML anchor.
+# Settings not listed here keep their upstream values.
+
+# Label producers so capture finalization can stop them.
+x-test-service: &test-service
+  labels:
+    vector.otel-traces-multiservice.producer: "true"
+# Export every trace and flush batches every second so short runs capture all spans.
+x-test-environment: &test-environment
+  OTEL_BSP_SCHEDULE_DELAY: "1000"
+  OTEL_TRACES_SAMPLER: always_on
+# Remove source builds and fixed names so the harness uses published images
+# and Compose-generated project names. Leave other deployment defaults upstream.
+# They must repeat: older Compose versions lose reset tags through YAML aliases.
+# Producers wait for a healthy Collector so startup does not lose their first spans.
+services:
+  # Omit the browser proxy, static images, and documentation/flag UIs.
+  flagd-ui: !reset null
+  frontend-proxy: !reset null
+  image-provider: !reset null
+  telemetry-docs: !reset null
+  ad:
+    <<: *test-service
+    build: !reset null # Use the published image, not a local source build.
+    container_name: !reset null # Let Compose name containers to avoid collisions.
+    environment:
+      <<: *test-environment
+    # The upstream 300 MiB limit caused OOM kills in CI.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  cart:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  checkout:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  currency:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  email:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  frontend:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+      image-provider: !reset null # The API-only workload does not fetch images.
+  payment:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  product-catalog:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    volumes: !override # Use our local SDK configuration rather than a file from the Demo source tree.
+      - "../data/otel-config.yml:/otel-config.yml:ro"
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  quote:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+    # A failed connection must exit nonzero; upstream uses a string exit message.
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - "-r"
+        - fsockopen('localhost', 8090) or exit(1);
+      timeout: 5s
+      interval: 5s
+      retries: 20
+      start_period: 10s
+  recommendation:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  shipping:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  accounting:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  fraud-detection:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+  kafka:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+  flagd:
+    <<: *test-service
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    volumes: !override # Fix feature flags for repeatable coverage, including cart error spans.
+      - "../data/demo.flagd.json:/etc/flagd/demo.flagd.json:ro"
+  astronomy-db:
+    <<: *test-service
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    volumes: !override # Create the application database and accounting tables before consumers start.
+      - "../data/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"
+  valkey-cart:
+    # The upstream 20 MiB limit caused OOM kills in CI.
+    <<: *test-service
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+  # Replace continuous random/browser traffic with three rounds from one shopper.
+  load-generator:
+    <<: *test-service
+    build: !reset null
+    container_name: !reset null
+    environment:
+      <<: *test-environment
+      CONFIG_INGRESS_EXPORTER: "${CONFIG_INGRESS_EXPORTER}"
+      # Upstream hard-codes this value, so an env-file setting cannot replace it.
+      LOCUST_BROWSER_TRAFFIC_ENABLED: "false"
+    command:
+      - "-f"
+      - "/usr/src/app/scenario.py"
+      - "--headless"
+      - "--users=1"
+      - "--spawn-rate=1"
+      # Safety limit. The scenario exits after three shopping rounds.
+      - "--run-time=15m"
+      - "--stop-timeout=15"
+      - DemoUser
+    volumes: !override
+      - "../data/scenario.py:/usr/src/app/scenario.py:ro"
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+    depends_on:
+      accounting:
+        condition: service_started
+      fraud-detection:
+        condition: service_started
+    # Headless Locust has no web UI for the upstream port-based healthcheck.
+    healthcheck: !reset null
+  # Replace the upstream observability pipeline: write input.jsonl and forward
+  # the same traces to Vector. Remove unrelated upstream mounts and receivers.
+  otel-collector: !override
+    build:
+      context: "../../../.."
+      dockerfile: tests/e2e/opentelemetry-common/collector.Dockerfile
+      args:
+        CONFIG_COLLECTOR_VERSION: "${CONFIG_COLLECTOR_VERSION}"
+    environment:
+      - CONFIG_INGRESS_EXPORTER=${CONFIG_INGRESS_EXPORTER}
+    command:
+      - "--config=/etc/otelcol-contrib/config.yaml"
+    depends_on:
+      prepare-output:
+        condition: service_completed_successfully
+      vector:
+        condition: service_started
+    volumes:
+      - "../data/collector-source.yaml:/etc/otelcol-contrib/config.yaml:ro"
+      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://localhost:13133/
+      interval: 1s
+      timeout: 1s
+      retries: 120
+# Join the network created by vdev, including the Rust validation runner.
+networks:
+  default: !override
+    name: "${VECTOR_NETWORK}"
+    external: true

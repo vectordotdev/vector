@@ -104,11 +104,26 @@ The [Rust test](../opentelemetry/multiservice_traces/mod.rs) verifies:
 
 ## Running and results
 
-With Docker available, run both transports:
+With Docker Compose 2.38.2 or later and `curl` available, download the pinned Demo
+configuration, then run both transports:
 
 ```shell
-cargo vdev e2e run opentelemetry-traces-multiservice --always-show-logs
+bash tests/e2e/opentelemetry-traces-multiservice/data/prepare-demo.sh && cargo vdev e2e run opentelemetry-traces-multiservice --always-show-logs
 ```
+
+The setup script downloads upstream `compose.yaml`, `compose.full.yaml`, and `.env`
+from a pinned Demo 3.1.0 commit into the ignored `config/upstream/` directory.
+[config/compose.yaml](config/compose.yaml) includes them with
+[demo-overrides.yaml](config/demo-overrides.yaml), which holds the test-specific
+application settings. Only the `ad` and Valkey memory limits are increased after
+observed CI OOM failures. Other service limits, published ports, and restart policies
+keep their upstream defaults. Vector and the capture helpers stay in
+`config/compose.yaml`.
+[demo.env](config/demo.env) overrides upstream defaults for the Demo image version,
+resource attributes, and headless shopper settings. CI runs the same setup script.
+
+To upgrade the Demo, update the revision in `prepare-demo.sh`, the versions in
+`demo.env` and the finalizer image, then rerun both transports and verify coverage.
 
 To run one transport, add `-e 0.159.0-otlphttp` (HTTP) or `-e 0.159.0-otlp` (gRPC).
 
