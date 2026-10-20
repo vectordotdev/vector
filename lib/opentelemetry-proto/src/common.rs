@@ -62,7 +62,7 @@ pub fn tag_set_to_any_value(tag_set: TagValueSet) -> Option<AnyValue> {
         TagValueSet::Single(tag) => Some(tag.into()),
         TagValueSet::Set(set) => Some(AnyValue {
             value: Some(PBValue::ArrayValue(ArrayValue {
-                values: set.into_iter().map(Into::into).collect(),
+                values: (*set).into_iter().map(Into::into).collect(),
             })),
         }),
     }

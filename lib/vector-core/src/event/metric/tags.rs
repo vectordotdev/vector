@@ -112,7 +112,7 @@ pub enum TagValueSet {
     /// index set is used for this set, as it preserves the insertion order of the contained
     /// elements. This allows us to retrieve the last element inserted which in turn allows us to
     /// emulate the set having a single value.
-    Set(IndexSet<TagValue>),
+    Set(Box<IndexSet<TagValue>>),
 }
 
 impl Display for TagValueSet {
@@ -170,7 +170,7 @@ impl TagValueSet {
             Self::Set(set) => {
                 // Extract the last element of the set that has a value and convert it back into
                 // self as a single value.
-                *self = std::mem::take(set)
+                *self = (*std::mem::take(set))
                     .into_iter()
                     .rfind(TagValue::is_value)
                     .map_or(Self::Empty, Self::Single);
@@ -220,7 +220,7 @@ impl TagValueSet {
                     *self = Self::Single(value);
                     true
                 } else {
-                    *self = Self::Set(IndexSet::from([tag, value]));
+                    *self = Self::Set(Box::new(IndexSet::from([tag, value])));
                     false
                 }
             }
@@ -248,7 +248,7 @@ impl IntoIterator for TagValueSet {
         match self {
             Self::Empty => TagValueIntoIter::Empty,
             Self::Single(tag) => TagValueIntoIter::Single(tag),
-            Self::Set(set) => TagValueIntoIter::Set(set.into_iter()),
+            Self::Set(set) => TagValueIntoIter::Set((*set).into_iter()),
         }
     }
 }
@@ -261,7 +261,7 @@ impl<'a> IntoIterator for &'a TagValueSet {
         match self {
             TagValueSet::Empty => TagValueRefIter::Empty,
             TagValueSet::Single(tag) => TagValueRefIter::Single(tag),
-            TagValueSet::Set(set) => TagValueRefIter::Set(set.into_iter()),
+            TagValueSet::Set(set) => TagValueRefIter::Set(set.iter()),
         }
     }
 }
@@ -411,7 +411,7 @@ impl ByteSizeOf for TagValueSet {
         match self {
             Self::Empty => 0,
             Self::Single(tag) => tag.allocated_bytes(),
-            Self::Set(set) => set.allocated_bytes(),
+            Self::Set(set) => std::mem::size_of::<IndexSet<TagValue>>() + set.allocated_bytes(),
         }
     }
 }
@@ -687,6 +687,14 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    #[test]
+    fn tag_value_set_keeps_multi_value_storage_out_of_line() {
+        assert!(
+            std::mem::size_of::<TagValueSet>() <= 2 * std::mem::size_of::<TagValue>(),
+            "TagValueSet should be sized for the common single-value case"
+        );
     }
 
     #[test]
