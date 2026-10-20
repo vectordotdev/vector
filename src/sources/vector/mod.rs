@@ -265,7 +265,7 @@ impl SourceConfig for VectorConfig {
         })
         // Tonic added a default of 4MB in 0.9. Bound this by the global decompressed-size
         // cap rather than `usize::MAX` so a single oversized message cannot drive unbounded
-        // allocation on this unauthenticated listener.
+        // allocation, since the listener may not require authentication.
         .max_decoding_message_size(max_decompressed_size_bytes());
 
         // Require auth on the Vector service when it is configured. The standard gRPC

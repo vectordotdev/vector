@@ -116,7 +116,7 @@ pub struct VectorConfig {
     /// Authentication sent with every request to the downstream Vector instance.
     ///
     /// Use TLS to keep the credentials from being sent in plaintext.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     auth: Option<VectorAuthConfig>,
 
     #[serde(
