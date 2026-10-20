@@ -193,6 +193,29 @@ pub(super) fn save_bundle(publisher: &Publisher<'_>, work: &Path, key: &str) -> 
         entry.size < LIMIT,
         "Prepared bundle exceeds single-PUT limit"
     );
+    if let Some(saved) = publisher.store.head(key)? {
+        if saved.entry == entry {
+            return Ok(());
+        }
+        // Compression or tar encodings can change between tool versions. Keep
+        // the saved archive when every signed file and manifest is identical.
+        let temporary = tempfile::tempdir_in(work)?;
+        let saved_archive = temporary.path().join("saved.tar.gz");
+        checked_download(publisher.store, key, &saved_archive, Some(&saved.entry))?;
+        let saved_result = temporary.path().join("result");
+        unpack_bundle(&saved_archive, &saved_result)?;
+        let contents = |root: &Path| -> Result<Vec<(String, Entry)>> {
+            files(root)?
+                .into_iter()
+                .map(|(name, path)| Ok((name, Entry::file(&path)?)))
+                .collect()
+        };
+        ensure!(
+            contents(&saved_result)? == contents(&work.join("result"))?,
+            "Saved signed bundle contains different files"
+        );
+        return Ok(());
+    }
     publisher.ensure_file(key, &archive, &entry)
 }
 pub(super) fn publish(config: &Config, work: &Path) -> Result<()> {
