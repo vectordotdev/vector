@@ -11,7 +11,7 @@ use crate::common::resolve_tags;
 use crate::common::validate_tags;
 use crate::common::{Error, MetricsStorage};
 
-static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
+static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new().into()));
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
         Parameter::required("function", kind::BYTES, "The aggregation function to apply to the matched metrics.")

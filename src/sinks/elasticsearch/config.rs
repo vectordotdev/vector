@@ -534,13 +534,13 @@ impl DataStreamMode {
         let namespace = self.namespace(&*log);
 
         if log.as_map().is_none() {
-            *log.value_mut() = Value::Object(BTreeMap::new());
+            *log.value_mut() = Value::Object(BTreeMap::new().into());
         }
         let existing = log
             .as_map_mut()
             .expect("must be a map")
             .entry("data_stream".into())
-            .or_insert_with(|| Value::Object(BTreeMap::new()))
+            .or_insert_with(|| Value::Object(BTreeMap::new().into()))
             .as_object_mut_unwrap();
 
         if let Some(dtype) = dtype {
@@ -606,7 +606,7 @@ impl DataStreamMode {
 /// back to `fallback` (normal template rendering) when the event field is
 /// missing.
 fn auto_routed_value<F>(
-    data_stream: Option<&std::collections::BTreeMap<vector_lib::event::KeyString, Value>>,
+    data_stream: Option<&vector_lib::event::ObjectMap>,
     key: &str,
     template: &ConfinedTemplate,
     field: &'static str,
