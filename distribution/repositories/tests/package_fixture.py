@@ -100,6 +100,8 @@ def prepare_fixture(configuration, work):
                 require(promoted.entries["yum/beta/" + relative] == snapshot.entries["yum/stable/" + relative],
                         "Selecting another channel changed RPM signatures")
         shutil.rmtree(beta)
+        from tests.installer_fixture import installer_fixture
+        installer_fixture(config, work, gpg, password)
         config.pop("public_key_path")
         config.pop("role", None)
         (directory / "staging.json").write_bytes(canonical(config))

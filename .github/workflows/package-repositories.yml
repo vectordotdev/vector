@@ -222,7 +222,7 @@ jobs:
         with:
           name: package-repository-inputs
           path: target/package-repositories
-      - name: Install through the public repository with the pinned public key
+      - name: Configure and install through the public repository with pinned trust
         env:
           IMAGE: ${{ matrix.image }}
         run: |
@@ -232,6 +232,6 @@ jobs:
           export APT_URL=https://apt.vector.dev/
           export YUM_URL=https://yum.vector.dev/
           docker run --rm --env CHANNEL --env TAG --env APT_URL --env YUM_URL \
-            --mount "type=bind,source=$PWD/distribution/repositories/vector-packages.asc,target=/key.asc,readonly" \
+            --mount "type=bind,source=$PWD/distribution/repositories/setup.sh,target=/setup.sh,readonly" \
             --mount "type=bind,source=$PWD/distribution/repositories/tests/client.sh,target=/test.sh,readonly" \
             "$IMAGE" bash /test.sh

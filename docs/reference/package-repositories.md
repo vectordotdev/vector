@@ -88,6 +88,68 @@ headers; the actual CDN caching and retry behavior must be validated before
 cutover. Workflow success also requires public HTTPS checksum verification and
 native apt/DNF installation on amd64 and arm64.
 
+## Client setup and migration
+
+`distribution/repositories/setup.sh` is the standalone apt/yum setup script.
+It configures a repository without installing or upgrading Vector. A new source
+defaults to stable and COSE-only trust. An existing `vector.list` or `vector.repo`
+keeps its URL, channel, architecture restrictions and other options while adding
+COSE trust. `--migrate` requires an existing managed source.
+
+A pre-cutover migration retains the old public keys in Vector's own key file.
+It leaves shared Datadog keyrings and RPM database entries unchanged. On RPM
+clients, old remote public keys are copied into the local Vector key file so
+subsequent refreshes no longer need Datadog's key endpoint. Both `gpgcheck` and
+`repo_gpgcheck` are required, including on custom mirrors. The old RHEL/CentOS
+8.1 exception is not retained.
+
+Only after hosting has switched to COSE, `--migrate --cose-only` can remove legacy
+trust from Vector's own configuration. This mode also supports late migration
+when the old key files or endpoints are unavailable. It never deletes shared
+Datadog key files, RPM keys or keys cached by DNF.
+
+The default public key URL is
+`https://dd-cose-releases.s3.us-east-1.amazonaws.com/vector/keys/vector-packages.asc`.
+The script verifies its full primary fingerprint before changing managed files.
+It uses HTTPS with certificate verification for key downloads, backs up original
+managed files with `.pre-cose`, installs replacements atomically, and refreshes
+only the Vector repository. A failed final refresh leaves the saved configuration
+available for inspection and retry. The script rejects ambiguous source layouts,
+symlinked managed files, unavailable legacy trust and unsupported overrides
+before replacing source files. Custom filenames and deb822 sources require
+manual migration.
+
+Fresh setup retains `VECTOR_DIST_CHANNEL`, `VECTOR_MAJOR_VERSION`,
+`VEC_REPO_URL`, `TESTING_APT_URL`, `TESTING_YUM_URL`,
+`TESTING_APT_REPO_VERSION` and `TESTING_YUM_VERSION_PATH`.
+`TESTING_KEYS_URL` is a compatibility alias for the HTTPS directory containing
+`vector-packages.asc`. An owned staging mirror can supply
+`VECTOR_PUBLIC_KEY_URL` and an explicit full
+`VECTOR_PUBLIC_KEY_FINGERPRINT`. These are public trust settings, not secrets.
+Existing sources reject fresh-setup overrides rather than switching their
+channel on a repeated invocation. `CSM_MIGRATE=true` disables the known
+`timber-vector` file with a backup.
+
+The publisher keeps the existing apt identity: no `Origin` or `Label`, an empty
+`Suite`, and the channel as `Codename`. This permits the signing-key and hosting
+transition without a separate release-information approval. The observed
+legacy fields are recorded in `tests/legacy-apt-identity.json`; a regression
+check compares the publisher's output with that observation.
+
+Before announcement, deploy the reviewed script at
+`vector/setup.sh` and the public key at `vector/keys/vector-packages.asc`
+in the COSE bucket, then publish the migration guide. These paths are separate
+from the package publisher's scope and need an appropriately scoped deployment.
+Keep the live `setup.vector.dev` redirect and normal installation pages unchanged
+until the repository hosting cutover. At cutover, point `setup.vector.dev` at the
+new script and update those installation pages together.
+
+The protected production client job runs this setup script before installing a
+release. Activation therefore requires the public key endpoint to be available.
+The real-package fixture also creates separate ephemeral legacy and COSE signing
+identities and installer bundles for disposable HTTPS client tests. Private keys
+stay in tmpfs; client bundles contain only public keys and signed packages.
+
 ## Maintainer commands
 
 Build the tools once from reviewed source:
@@ -165,3 +227,12 @@ Rollback restores retained signed metadata and checks that its immutable objects
 still exist. It does not downgrade installed packages or restore Datadog-only
 client trust. Verify the public endpoints and native clients after rollback.
 Never delete a control object to bypass the recovery checks.
+
+Apt can retain newer cached indexes when a restored Release has an older Date.
+The original rollback client tests cleared those caches, so they do not prove
+that existing clients adopt the restored snapshot. Before activation, validate a
+recovery design that accounts for cached Release dates, such as publishing a
+freshly dated and signed generation for the intended package set. Do not disable
+apt's date or signature checks globally. This remains an open cutover requirement.
+The behavior is visible in
+[apt's metadata verification](https://sources.debian.org/src/apt/2.2.4/apt-pkg/acquire-item.cc/).

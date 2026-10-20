@@ -1,5 +1,6 @@
 import copy
 import io
+import json
 import sys
 import tarfile
 import tempfile
@@ -9,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from engine import unpack_bundle
 from inputs import expected_packages, parse_checksums, select_assets, validate_run, versions
-from repository import merge_packages
+from repository import apt_indexes, merge_packages
 from storage import PublicationError
 
 
@@ -63,6 +64,25 @@ class InputTests(unittest.TestCase):
         self.assertEqual(merge_packages(old, old), old)
         with self.assertRaises(PublicationError):
             merge_packages(old, old.replace(b"pool/v/ve", b"pool/replaced"))
+
+    def test_apt_identity_matches_observed_legacy_repository(self):
+        # Identity fields are cached by apt and changes require explicit user
+        # approval. Compare with observed input rather than the desired output.
+        observed = json.loads((Path(__file__).parent / "legacy-apt-identity.json").read_bytes())
+        class UnsignedFixture:
+            def sign(self, source, **kwargs):
+                pass
+            def verify(self, *args):
+                pass
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            apt_indexes(root, "stable", {}, root / "previous", UnsignedFixture())
+            release = {key: value.strip() for line in
+                       (root / "apt/dists/stable/Release").read_text().splitlines()
+                       if ":" in line and not line.startswith(" ")
+                       for key, value in [line.split(":", 1)]}
+            for field in ("Origin", "Label", "Suite", "Codename"):
+                self.assertEqual(release.get(field), observed[field], field)
 
     def test_signed_bundle_rejects_links_traversal_and_duplicates(self):
         for names, linked in ((["files/apt/../escape"], False), (["files/apt/pool/x"], True),

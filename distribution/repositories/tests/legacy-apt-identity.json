@@ -1,0 +1,9 @@
+{
+  "source": "https://apt.vector.dev/dists/stable/Release",
+  "observed": "2026-10-20",
+  "Origin": null,
+  "Label": null,
+  "Suite": "",
+  "Codename": "stable",
+  "Components": "main 6 7 observability-pipelines-worker-1 vector-0 observability-pipelines-worker-2 agentless-scanner datadog-security-cli datadog-bits-cli"
+}

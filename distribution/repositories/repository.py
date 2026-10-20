@@ -270,7 +270,10 @@ def apt_indexes(root, channel, incoming, previous, signer):
                 hashed = path.parent / "by-hash" / algorithm.upper() / hashlib.new(algorithm, content).hexdigest()
                 hashed.parent.mkdir(parents=True, exist_ok=True)
                 hashed.write_bytes(content)
-    lines = ["Origin: Vector", "Label: Vector", f"Suite: {channel}", f"Codename: {channel}",
+    # Preserve the existing public repository identity during the key/hosting
+    # migration. Adding Origin/Label or changing the empty Suite would require
+    # a separate apt release-information approval on clients with cached indexes.
+    lines = ["Suite:", f"Codename: {channel}",
              "Date: " + datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000"),
              "Architectures: " + " ".join(architectures), "Components: vector-0", "Acquire-By-Hash: yes"]
     for algorithm in ("sha256", "sha512"):

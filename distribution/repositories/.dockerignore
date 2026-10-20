@@ -4,3 +4,5 @@
 !*.py
 !tests/
 !tests/**
+
+**/__pycache__
