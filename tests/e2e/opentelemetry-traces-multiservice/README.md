@@ -52,6 +52,7 @@ output Collector still accepts traces. It waits up to 120 seconds for the expect
 span count before stopping the output Collector. An unclean Vector exit fails the
 run. Compose waits for capture finalization to finish.
 Rust reads the finalized files, so retries do not need a fresh environment.
+The idle `demo-ready` container keeps the environment active until harness cleanup.
 
 [scenario.py](data/scenario.py) runs one simulated shopper through three rounds of ad,
 recommendation, cart, and multi-item checkout requests. Checkout also exercises

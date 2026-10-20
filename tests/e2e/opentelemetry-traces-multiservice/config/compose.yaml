@@ -804,13 +804,13 @@ services:
       - "../data/finalize.py:/usr/src/app/finalize.py:ro"
       - "${DOCKER_SOCKET}:/var/run/docker.sock"
       - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
-  # Its dependency makes `docker compose up --detach` wait for finalized captures.
+  # Wait for finalized captures and stay running so vdev does not restart the workload.
   demo-ready:
     image: alpine:3.20
     command:
       - sh
       - "-c"
-      - test -f /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}/capture-complete
+      - test -f /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}/capture-complete && exec sleep infinity
     depends_on:
       finalize-captures:
         condition: service_completed_successfully
