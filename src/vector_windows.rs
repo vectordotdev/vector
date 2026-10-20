@@ -11,7 +11,7 @@ use windows_service::{
     service_dispatcher,
 };
 
-use crate::{app::Application, signal::SignalTo};
+use crate::{app::Application, extra_context::ExtraContext, signal::SignalTo};
 
 const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
@@ -121,11 +121,14 @@ pub mod service_control {
                 "stop" => Ok(ControlAction::Stop {
                     stop_timeout: Duration::from_secs(10),
                 }),
-                _ => Err(format!("invalid option {} for ControlAction", s)),
+                _ => Err(format!("invalid option {s} for ControlAction")),
             }
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the requested Windows service operation fails.
     pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> crate::Result<()> {
         match action {
             ControlAction::Start => start_service(service_def),
@@ -316,8 +319,8 @@ pub mod service_control {
             ServiceExitCode::ServiceSpecific(ec) => {
                 warn!(message = "Service stopped with error.", exit_code = ec);
             }
-            _ => {}
-        };
+            ServiceExitCode::Win32(_) => {}
+        }
     }
 
     fn poll_state(
@@ -376,13 +379,16 @@ fn win_main(arguments: Vec<OsString>) {
     if let Err(_e) = run_service(arguments) {}
 }
 
+/// # Errors
+///
+/// Returns an error if the Windows service dispatcher cannot start.
 pub fn run() -> Result<i32> {
     service_dispatcher::start(SERVICE_NAME, ffi_service_main).map(|()| 0_i32)
     // Always returns 0 exit code as errors are handled by the service dispatcher.
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    match Application::prepare_start(Default::default()) {
+    match Application::prepare_start(ExtraContext::default()) {
         Ok((runtime, app)) => {
             let signal_tx = app.signals.handler.clone_tx();
             let event_handler = move |control_event| -> ServiceControlHandlerResult {

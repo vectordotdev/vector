@@ -5,13 +5,13 @@
 
 #![deny(warnings)]
 #![deny(clippy::all)]
-#![deny(clippy::pedantic)]
 #![deny(unreachable_pub)]
 #![deny(unused_allocation)]
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
+pub use pastey; // Exported so that registered_event! doesn't need pastey in other crates
 pub use vector_common_macros::NamedInternalEvent;
 
 #[cfg(feature = "btreemap")]

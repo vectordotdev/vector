@@ -18,6 +18,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
+            HttpEndpoint,
             auth::Auth,
             http::{HttpResponse, OrderedHeaderName},
         },
@@ -37,7 +38,7 @@ mod headers {
 
 #[derive(Clone)]
 pub(super) struct RemoteWriteService {
-    pub(super) endpoint: Uri,
+    pub(super) endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) client: HttpClient,
     pub(super) compression: super::Compression,
@@ -56,7 +57,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut request: RemoteWriteRequest) -> Self::Future {
         let client = self.client.clone();
-        let endpoint = self.endpoint.clone();
+        let endpoint = self.endpoint.as_uri().clone();
         let auth = self.auth.clone();
         let compression = self.compression;
         let headers = Arc::clone(&self.headers);

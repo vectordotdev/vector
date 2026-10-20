@@ -1,4 +1,12 @@
-use super::*;
+use derivative::Derivative;
+
+use super::{
+    Bytes, ConfinedTemplate, Display, EventRef, FixedOffset, Hash, TemplateRenderingError,
+    confined_preview, fmt,
+};
+
+#[cfg(doc)]
+use super::{Template, UnconfinedTemplate, UriTemplate};
 
 impl fmt::Debug for ConfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -9,14 +17,9 @@ impl fmt::Debug for ConfinedTemplate {
     }
 }
 
-impl fmt::Display for ConfinedTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
 impl ConfinedTemplate {
     /// Set tz offset on the wrapped template.
+    #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.inner.tz_offset = tz_offset;
         self
@@ -26,6 +29,10 @@ impl ConfinedTemplate {
     ///
     /// Callers that bypass template rendering entirely (e.g. the elasticsearch sink's
     /// `auto_routing` path) must call this to keep the confinement contract intact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the rendered value violates the configured confinement rules.
     pub fn check_confinement(&self, rendered: &str) -> Result<(), TemplateRenderingError> {
         if let Some(checker) = &self.checker {
             checker
@@ -43,6 +50,10 @@ impl ConfinedTemplate {
     ///
     /// If a confinement checker was attached via [`Template::confine`], it runs after
     /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a referenced field is missing or the rendered value fails confinement.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -54,6 +65,10 @@ impl ConfinedTemplate {
     ///
     /// If a confinement checker was attached via [`Template::confine`], it runs after
     /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a referenced field is missing or the rendered value fails confinement.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -66,7 +81,80 @@ impl ConfinedTemplate {
     /// Returns the fields used by this template for dynamic rendering.
     ///
     /// Delegates to [`UnconfinedTemplate::get_fields`].
+    #[must_use]
     pub fn get_fields(&self) -> Option<Vec<String>> {
         self.inner.get_fields()
+    }
+}
+
+/// A template confined via [`UriTemplate::confine`], for HTTP/HTTPS URI fields.
+///
+/// The field is private to this module, so a `ConfinedUriTemplate` can only be
+/// obtained through [`UriTemplate::confine`].
+#[derive(Derivative, Clone, Display, PartialEq, Eq, Hash)]
+#[derivative(Debug = "transparent")]
+pub struct ConfinedUriTemplate(ConfinedTemplate);
+
+impl ConfinedUriTemplate {
+    pub(super) const fn new(inner: ConfinedTemplate) -> Self {
+        Self(inner)
+    }
+}
+
+impl ConfinedUriTemplate {
+    /// Set tz offset on the wrapped template.
+    #[must_use]
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.0.inner.tz_offset = tz_offset;
+        self
+    }
+
+    /// Run the confinement check against a raw string without going through a normal render.
+    ///
+    /// See [`ConfinedTemplate::check_confinement`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the rendered value violates the configured confinement rules.
+    pub fn check_confinement(&self, rendered: &str) -> Result<(), TemplateRenderingError> {
+        self.0.check_confinement(rendered)
+    }
+
+    /// Renders the given template with data from the event, returning raw bytes.
+    ///
+    /// If a confinement checker was attached via [`UriTemplate::confine`], it runs after
+    /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a referenced field is missing or the rendered value fails confinement.
+    pub fn render<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<Bytes, TemplateRenderingError> {
+        self.0.render(event)
+    }
+
+    /// Renders the given template with data from the event.
+    ///
+    /// If a confinement checker was attached via [`UriTemplate::confine`], it runs after
+    /// rendering and returns [`TemplateRenderingError::Confined`] on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a referenced field is missing or the rendered value fails confinement.
+    pub fn render_string<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<String, TemplateRenderingError> {
+        self.0.render_string(event)
+    }
+
+    /// Returns the fields used by this template for dynamic rendering.
+    ///
+    /// Delegates to [`UnconfinedTemplate::get_fields`].
+    #[must_use]
+    pub fn get_fields(&self) -> Option<Vec<String>> {
+        self.0.get_fields()
     }
 }

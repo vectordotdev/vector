@@ -81,7 +81,7 @@ async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    info!("HTTP server for `{}` listening on {}", name, addr);
+    info!("HTTP server for `{name}` listening on {addr}");
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -110,10 +110,7 @@ async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Re
 /// Process a POST request from the stats endpoint.
 /// De-compresses and De-serializes the payload, then forwards it on the Sender channel.
 async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: Request<Body>) {
-    debug!(
-        "`{}` server process_stats request: {:?}",
-        state.name, request
-    );
+    debug!("`{}` server process_stats request: {request:?}", state.name);
 
     let content_type_header = request.headers().get(CONTENT_TYPE);
     let content_type = content_type_header.and_then(|value| value.to_str().ok());
@@ -140,13 +137,15 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
             "`{}` server received and deserialized stats payload.",
             state.name
         );
-        debug!("{:?}", payload);
+        debug!("{payload:?}");
 
         state.tx.send(payload).await.unwrap();
     }
 }
 
 #[derive(Serialize)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::struct_field_names, reason = "Match the Datadog span schema.")]
 struct Span {
     duration: i64,
     error: i32,
@@ -204,25 +203,27 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
                 .unwrap();
 
             if res.status() != hyper::StatusCode::OK {
-                error!("Error sending traces to {}, res: {:?}.", url, res);
+                error!("Error sending traces to {url}, res: {res:?}.");
                 return false;
             }
-            info!("Sent a trace to the Agent at {}.", url);
+            info!("Sent a trace to the Agent at {url}.");
         }
         true
     }
 
     // send first set of trace data
-    if !send_trace(urls, start, duration, span_id).await {
-        panic!("can't perform checks if traces aren't accepted by agent.");
-    }
+    assert!(
+        send_trace(urls, start, duration, span_id).await,
+        "can't perform checks if traces aren't accepted by agent."
+    );
 
     sleep(Duration::from_millis(100)).await;
 
     // send second set of trace data
-    if !send_trace(urls, start, duration, span_id + 1).await {
-        panic!("can't perform checks if traces aren't accepted by agent.");
-    }
+    assert!(
+        send_trace(urls, start, duration, span_id + 1).await,
+        "can't perform checks if traces aren't accepted by agent."
+    );
 }
 
 /// Receives the stats payloads from the Receiver channels from both of the server instances.
@@ -259,7 +260,7 @@ async fn receive_the_stats(
                     break;
                 }
             },
-            _ = &mut timeout => break,
+            () = &mut timeout => break,
         }
     }
 
@@ -294,8 +295,8 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
     let agent_s = agent_bucket.stats.first().unwrap();
     let vector_s = vector_bucket.stats.first().unwrap();
 
-    info!("\nagent_stats : {:?}", agent_s);
-    info!("\nvector_stats : {:?}", vector_s);
+    info!("\nagent_stats : {agent_s:?}");
+    info!("\nvector_stats : {vector_s:?}");
 
     assert!(agent_s.service == vector_s.service);
     assert!(agent_s.name == vector_s.name);

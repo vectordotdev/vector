@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
@@ -15,7 +14,7 @@ use vector_lib::{
     },
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
@@ -53,7 +52,6 @@ pub enum DataTypeConfig {
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
-    #[configurable(derived)]
     method: Method,
 }
 
@@ -96,7 +94,6 @@ pub struct RedisSourceConfig {
     #[serde(default)]
     data_type: DataTypeConfig,
 
-    #[configurable(derived)]
     list: Option<ListOption>,
 
     /// The Redis URL to connect to.
@@ -117,12 +114,10 @@ pub struct RedisSourceConfig {
     #[configurable(metadata(docs::examples = "redis_key"))]
     redis_key: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
@@ -254,7 +249,7 @@ impl InputHandler {
                                 log,
                                 log_schema().source_type_key(),
                                 path!("source_type"),
-                                Bytes::from(RedisSourceConfig::NAME),
+                                Value::from_static_str(RedisSourceConfig::NAME),
                             );
                             self.log_namespace.insert_vector_metadata(
                                 log,
@@ -270,7 +265,7 @@ impl InputHandler {
                                 path!("key"),
                                 self.key.as_str(),
                             );
-                        };
+                        }
 
                         event
                     });
@@ -328,7 +323,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();
@@ -371,7 +366,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
 
@@ -410,7 +405,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();

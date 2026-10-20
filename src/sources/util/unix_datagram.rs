@@ -1,6 +1,6 @@
 use std::{fs::remove_file, path::PathBuf};
 
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tracing::field;
@@ -25,6 +25,14 @@ use crate::{
     },
 };
 
+///
+/// # Errors
+///
+/// The returned source reports an error if processing the datagram stream fails.
+///
+/// # Panics
+///
+/// The returned source panics if binding the socket or setting its permissions fails.
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
@@ -34,7 +42,7 @@ pub fn build_unix_datagram_source(
     socket_file_mode: Option<u32>,
     max_length: usize,
     decoder: Decoder,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<String>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
@@ -64,9 +72,9 @@ async fn listen(
     max_length: usize,
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
-    handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
+    handle_events: impl Fn(&mut [Event], Option<String>) + Clone + Send + Sync + 'static,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> Result<(), crate::sources::SourceError> {
     let mut buf = BytesMut::with_capacity(max_length);
     let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
     loop {
@@ -78,23 +86,24 @@ async fn listen(
                     emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
-                    })
+                    });
+                    crate::sources::SourceError::from(error)
                 })?;
 
                 let span = info_span!("datagram");
-                let received_from = if !address.is_unnamed() {
-                    let path = address.as_pathname().map(|e| e.to_owned()).inspect(|path| {
-                        span.record("peer_path", field::debug(path));
-                    });
-
-                    path.map(|p| p.to_string_lossy().into_owned().into())
-                } else {
+                let received_from = if address.is_unnamed() {
                     // In most cases, we'll be connecting to this
                     // socket from an unnamed socket (a socket not
                     // bound to a file). Instead of a filename, we'll
                     // surface a specific host value.
                     span.record("peer_path", field::debug(UNNAMED_SOCKET_HOST));
-                    Some(UNNAMED_SOCKET_HOST.into())
+                    Some(UNNAMED_SOCKET_HOST.to_owned())
+                } else {
+                    let path = address.as_pathname().map(ToOwned::to_owned).inspect(|path| {
+                        span.record("peer_path", field::debug(path));
+                    });
+
+                    path.map(|p| p.to_string_lossy().into_owned())
                 };
 
                 bytes_received.emit(ByteSize(byte_size));

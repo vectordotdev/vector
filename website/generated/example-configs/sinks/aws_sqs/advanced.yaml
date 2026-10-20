@@ -6,7 +6,5 @@ sinks:
     encoding:
       codec: json
     endpoint: http://127.0.0.0:5000/path/to/service
-    message_deduplication_id: "{{ transaction_id }}"
-    message_group_id: vector
     queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
     region: us-east-1

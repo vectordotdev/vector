@@ -51,6 +51,11 @@ pub struct MetricsStorage {
 }
 
 impl MetricsStorage {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the owned-argument convention used by VRL runtime helpers."
+    )]
     pub(crate) fn get_metric(
         &self,
         metric: &str,
@@ -63,6 +68,11 @@ impl MetricsStorage {
             .cloned()
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the owned-argument convention used by VRL runtime helpers."
+    )]
     pub(crate) fn find_metrics(&self, metric: &str, tags: BTreeMap<String, String>) -> Vec<Metric> {
         self.cache
             .load()
@@ -72,6 +82,10 @@ impl MetricsStorage {
             .collect()
     }
 
+    /// Refreshes the cached snapshot from the metrics controller.
+    ///
+    /// # Panics
+    /// Panics if the metrics controller has not been initialized.
     pub fn refresh_metrics(&self) {
         let new_metrics = Controller::get()
             .expect("metrics not initialized")
@@ -136,7 +150,7 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
                                 Value::Array(
                                     v.iter()
                                     .filter_map(|v| {
-                                        v.map(ToString::to_string).map(Into::into).map(Value::Bytes)
+                                        v.map(ToString::to_string).map(Value::from)
                                     })
                                     .collect(),
                                 ),
@@ -189,7 +203,7 @@ pub(crate) fn resolve_tags(
             v.resolve(ctx).and_then(|v| {
                 Ok((
                     k.clone().into(),
-                    v.as_str().ok_or("Tag must be a string")?.into_owned(),
+                    v.to_str_lossy().ok_or("Tag must be a string")?.into_owned(),
                 ))
             })
         })
@@ -226,7 +240,7 @@ mod tests {
         let state = TypeState::default();
 
         let mut config = CompileConfig::default();
-        config.set_custom(storage.clone());
+        config.set_custom(storage);
         config.set_read_only();
 
         compile_vrl(vrl_source, &functions, &state, config)
@@ -253,7 +267,7 @@ mod tests {
         value: f64,
         tags: Option<Vec<(&str, &str)>>,
     ) {
-        assert_eq!(metric.get("name").unwrap().as_str().unwrap(), name);
+        assert_eq!(metric.get("name").unwrap().to_str_lossy().unwrap(), name);
         assert_eq!(
             metric.get("value").unwrap().as_float().unwrap(),
             NotNan::new(value).unwrap()
@@ -269,7 +283,7 @@ mod tests {
                         .as_array_unwrap()
                         .first()
                         .unwrap()
-                        .as_str()
+                        .to_str_lossy()
                         .unwrap(),
                     value
                 );
@@ -628,6 +642,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "These fixtures use exactly representable values and assert exact aggregation results."
+    )]
     fn test_aggregate_vector_metrics_sum() {
         let storage = MetricsStorage::default();
         storage.cache.store(
@@ -676,6 +695,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "These fixtures use exactly representable values and assert exact aggregation results."
+    )]
     fn test_aggregate_vector_metrics_avg() {
         let storage = MetricsStorage::default();
         storage.cache.store(
@@ -724,6 +748,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "These fixtures use exactly representable values and assert exact aggregation results."
+    )]
     fn test_aggregate_vector_metrics_max() {
         let storage = MetricsStorage::default();
         storage.cache.store(
@@ -772,6 +801,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "These fixtures use exactly representable values and assert exact aggregation results."
+    )]
     fn test_aggregate_vector_metrics_min() {
         let storage = MetricsStorage::default();
         storage.cache.store(

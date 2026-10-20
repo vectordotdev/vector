@@ -41,9 +41,21 @@ mod test {
     fn config_keepalive_rejects_zero() {
         for field in &["interval_secs", "timeout_secs"] {
             let result = toml::from_str::<super::VectorConfig>(&format!(
-                "address = \"127.0.0.1:6000\"\n[keepalive]\n{field} = 0"
+                "address = \"http://127.0.0.1:6000\"\n[keepalive]\n{field} = 0"
             ));
             assert!(result.is_err(), "{field} = 0 should be rejected");
+        }
+    }
+
+    #[test]
+    fn config_rejects_boolean_compression() {
+        for compression in [true, false] {
+            let result: Result<super::VectorConfig, _> =
+                toml::from_str(&format!("compression = {compression}"));
+            assert!(
+                result.is_err(),
+                "compression = {compression} should be rejected"
+            );
         }
     }
 }
@@ -68,7 +80,7 @@ mod tests {
         event::{BatchNotifier, BatchStatus},
     };
 
-    use super::{config::with_default_scheme, *};
+    use super::*;
     use crate::{
         config::{SinkConfig as _, SinkContext},
         event::Event,
@@ -96,9 +108,8 @@ mod tests {
     async fn build_rejects_missing_address() {
         let config: VectorConfig = toml::from_str("").unwrap();
 
-        let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("missing address should fail"),
-            Err(err) => err,
+        let Err(err) = config.build(SinkContext::default()).await else {
+            panic!("missing address should fail");
         };
 
         assert!(
@@ -121,9 +132,8 @@ mod tests {
         )
         .unwrap();
 
-        let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("address and routing should be mutually exclusive"),
-            Err(err) => err,
+        let Err(err) = config.build(SinkContext::default()).await else {
+            panic!("address and routing should be mutually exclusive");
         };
 
         assert!(
@@ -143,9 +153,8 @@ mod tests {
         )
         .unwrap();
 
-        let err = match config.build(SinkContext::default()).await {
-            Ok(_) => panic!("routing without endpoints should fail"),
-            Err(err) => err,
+        let Err(err) = config.build(SinkContext::default()).await else {
+            panic!("routing without endpoints should fail");
         };
 
         assert!(
@@ -223,7 +232,9 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -237,7 +248,7 @@ mod tests {
 
             TestType::DataVolume => {
                 run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS)
-                    .await
+                    .await;
             }
         }
 
@@ -302,14 +313,18 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -359,14 +374,18 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -412,7 +431,9 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -462,7 +483,9 @@ mod tests {
                 hyper::Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(hyper::Body::from(encode_body(
+                        &proto::PushEventsResponse {},
+                    )))
                     .unwrap()
             }
         });
@@ -470,7 +493,9 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -547,7 +572,9 @@ mod tests {
                 hyper::Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(hyper::Body::from(encode_body(
+                        &proto::PushEventsResponse {},
+                    )))
                     .unwrap()
             } else {
                 hyper::Response::builder()
@@ -565,7 +592,9 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -622,7 +651,9 @@ mod tests {
                 hyper::Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(hyper::Body::from(encode_body(
+                        &proto::PushEventsResponse {},
+                    )))
                     .unwrap()
             }
         });
@@ -634,7 +665,9 @@ mod tests {
                 hyper::Response::builder()
                     .header("grpc-status", "0") // OK
                     .header("content-type", "application/grpc")
-                    .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                    .body(hyper::Body::from(encode_body(
+                        &proto::PushEventsResponse {},
+                    )))
                     .unwrap()
             } else {
                 hyper::Response::builder()
@@ -652,7 +685,9 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -704,7 +739,9 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -752,7 +789,9 @@ mod tests {
                     Response::builder()
                         .header("grpc-status", "0") // OK
                         .header("content-type", "application/grpc")
-                        .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                        .body(hyper::Body::from(encode_body(
+                            &proto::PushEventsResponse {},
+                        )))
                         .unwrap(),
                 )
             }))
@@ -764,7 +803,9 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::Body::from(encode_body(
+                    &proto::PushEventsResponse {},
+                )))
                 .unwrap()
         });
 
@@ -822,7 +863,9 @@ mod tests {
                             Response::builder()
                                 .header("grpc-status", "0") // OK
                                 .header("content-type", "application/grpc")
-                                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                                .body(hyper::Body::from(encode_body(
+                                    &proto::PushEventsResponse {},
+                                )))
                                 .unwrap(),
                         )
                     }
@@ -908,18 +951,6 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
-    #[test]
-    fn test_with_default_scheme() {
-        assert_eq!(
-            with_default_scheme("0.0.0.0", false).unwrap().to_string(),
-            "http://0.0.0.0/"
-        );
-        assert_eq!(
-            with_default_scheme("0.0.0.0", true).unwrap().to_string(),
-            "https://0.0.0.0/"
-        );
-    }
-
     async fn get_received(
         rx: mpsc::Receiver<(Parts, Bytes)>,
         assert_parts: impl Fn(Parts),
@@ -951,14 +982,14 @@ mod tests {
 
             let mut events = Vec::with_capacity(req.events.len());
             for event in req.events {
-                let event: Event = event.into();
+                let event = Event::try_from(event).expect("encoded test event should decode");
                 let string = event
                     .as_log()
                     .get_message()
                     .unwrap()
                     .to_string_lossy()
                     .into_owned();
-                events.push(string)
+                events.push(string);
             }
 
             events
@@ -971,7 +1002,7 @@ mod tests {
     }
 
     // taken from <https://github.com/hyperium/tonic/blob/5aa8ae1fec27377cd4c2a41d309945d7e38087d0/examples/src/grpc-web/client.rs#L45-L75>
-    fn encode_body<T>(msg: T) -> Bytes
+    fn encode_body<T>(msg: &T) -> Bytes
     where
         T: prost::Message,
     {
@@ -981,6 +1012,8 @@ mod tests {
         // cannot write it yet since we don't know the size of the
         // encoded message
         buf.reserve(GRPC_HEADER_SIZE);
+        // SAFETY: The capacity for the complete header was reserved immediately above, and the
+        // header bytes are initialized before the buffer is read.
         unsafe {
             buf.advance_mut(GRPC_HEADER_SIZE);
         }
@@ -997,7 +1030,7 @@ mod tests {
             // compression flag, 0 means "no compression"
             buf.put_u8(0);
 
-            buf.put_u32(len as u32);
+            buf.put_u32(u32::try_from(len).expect("test message fits in the gRPC length field"));
         }
 
         buf.split_to(len + GRPC_HEADER_SIZE).freeze()

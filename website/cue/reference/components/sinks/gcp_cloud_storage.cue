@@ -69,7 +69,6 @@ components: sinks: gcp_cloud_storage: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_cloud_storage.configuration

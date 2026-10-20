@@ -5,6 +5,7 @@ use vector_lib::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
 use super::{Compression, Compressor, encoding::Encoder, metadata::RequestMetadataBuilder};
 
+#[must_use]
 pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
     if let Some(limit) = std::env::var("VECTOR_EXPERIMENTAL_REQUEST_BUILDER_CONCURRENCY")
         .map(|value| value.parse::<NonZeroUsize>().ok())
@@ -14,7 +15,7 @@ pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
         return limit;
     }
 
-    crate::app::worker_threads().unwrap_or_else(|| NonZeroUsize::new(8).expect("static"))
+    crate::app::worker_threads().unwrap_or(const { NonZeroUsize::new(8).expect("nonzero limit") })
 }
 
 pub struct EncodeResult<P> {
@@ -54,9 +55,6 @@ where
 }
 
 impl<P> EncodeResult<P> {
-    // Can't be `const` because you can't (yet?) run deconstructors in a const context, which is what this function does
-    // by dropping the (un)compressed sizes.
-    #[allow(clippy::missing_const_for_fn)]
     pub fn into_payload(self) -> P {
         self.payload
     }
@@ -83,6 +81,11 @@ pub trait RequestBuilder<Input> {
     /// as-is, such as event finalizers, while the events are the actual events to process.
     fn split_input(&self, input: Input) -> (Self::Metadata, RequestMetadataBuilder, Self::Events);
 
+    /// Encodes and compresses the events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if encoding or writing fails.
     fn encode_events(
         &self,
         events: Self::Events,

@@ -1,6 +1,11 @@
+use crate::event::Value;
 use std::collections::HashMap;
+use vector_lib::codecs::decoding::JsonDeserializerConfig;
+use vector_lib::codecs::decoding::NewlineDelimitedDecoderConfig;
+use vector_lib::codecs::decoding::framing::OversizedAction;
+use vector_lib::config::proxy::NoProxy;
 
-use http::Uri;
+use http::{Method, Uri, header};
 use tokio::time::Duration;
 use vector_lib::{
     codecs::{
@@ -9,6 +14,7 @@ use vector_lib::{
     },
     config::LogNamespace,
     event::Event,
+    serde::AsciiChar,
 };
 use vrl::event_path;
 use warp::{Filter, http::HeaderMap};
@@ -16,12 +22,17 @@ use warp::{Filter, http::HeaderMap};
 use super::HttpClientConfig;
 use crate::{
     components::validation::prelude::*,
+    config::{ProxyConfig, SourceContext},
     http::{ParamType, ParameterValue, QueryParameterValue},
     serde::{default_decoding, default_framing_message_based},
     sources::util::http::{HttpMethod, capped_body},
     test_util::{
         addr::next_addr,
-        components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+        components::{
+            HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+            run_and_assert_source_compliance_advanced,
+        },
+        http::spawn_authenticated_http_proxy,
         test_generate_config, wait_for_tcp,
     },
 };
@@ -54,7 +65,7 @@ impl ValidatableComponent for HttpClientConfig {
             endpoint: uri.to_string(),
             interval: Duration::from_secs(1),
             timeout: Duration::from_secs(1),
-            decoding: DeserializerConfig::Json(Default::default()),
+            decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
             ..Default::default()
         };
         let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
@@ -126,8 +137,8 @@ async fn json_decoding_newline_delimited() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
-        framing: FramingConfig::NewlineDelimited(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
+        framing: FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig::default()),
         headers: HashMap::new(),
         method: HttpMethod::Get,
         body: None,
@@ -156,12 +167,12 @@ async fn json_decoding_character_delimited() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
             character_delimited: CharacterDelimitedDecoderOptions {
-                delimiter: b',',
+                delimiter: AsciiChar::new(','),
                 max_length: Some(usize::MAX),
-                oversized_action: Default::default(),
+                oversized_action: OversizedAction::default(),
             },
         }),
         headers: HashMap::new(),
@@ -203,7 +214,7 @@ async fn request_query_applied() {
                 ]),
             ),
         ]),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -214,7 +225,7 @@ async fn request_query_applied() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events.into_iter().map(Event::into_log).collect();
 
     let expected = HashMap::from([
         (
@@ -244,6 +255,10 @@ async fn request_query_applied() {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// VRL query parameters should be parsed correctly
 #[tokio::test]
 async fn request_query_vrl_applied() {
@@ -317,7 +332,7 @@ async fn request_query_vrl_applied() {
                 ]),
             ),
         ]),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -328,7 +343,7 @@ async fn request_query_vrl_applied() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events.into_iter().map(Event::into_log).collect();
 
     let mut expected = HashMap::from([
         (
@@ -401,7 +416,7 @@ async fn request_query_vrl_dynamic_updates() {
                 r#type: ParamType::Vrl,
             }),
         )]),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -412,7 +427,7 @@ async fn request_query_vrl_dynamic_updates() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events.into_iter().map(Event::into_log).collect();
 
     // Make sure we have at least 2 events to check for unique timestamps
     assert!(
@@ -458,7 +473,7 @@ async fn headers_applied() {
             assert_eq!(&"bazz", iter.next().unwrap());
             assert_eq!(&"bizz", iter.next().unwrap());
         }))
-        .map(|_| r#"{"data" : "foo"}"#);
+        .map(|()| r#"{"data" : "foo"}"#);
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
@@ -538,7 +553,7 @@ async fn post_with_body() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Post,
@@ -549,17 +564,17 @@ async fn post_with_body() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events.into_iter().map(Event::into_log).collect();
 
     // Verify the body was echoed back correctly
     for log in logs {
         assert_eq!(
-            log.get(event_path!("key")).unwrap().as_str().unwrap(),
+            log.get(event_path!("key")).unwrap().to_str_lossy().unwrap(),
             "value"
         );
         let number = log.get(event_path!("number")).unwrap();
         match number {
-            vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
+            Value::Integer(n) => assert_eq!(*n, 42),
             _ => panic!("Expected integer value"),
         }
     }
@@ -582,7 +597,7 @@ async fn post_without_body() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Post,
@@ -612,7 +627,7 @@ async fn post_with_custom_content_type() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::from([("Content-Type".to_string(), vec!["text/plain".to_string()])]),
         method: HttpMethod::Post,
@@ -646,7 +661,7 @@ async fn post_with_vrl_body() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Post,
@@ -660,17 +675,20 @@ async fn post_with_vrl_body() {
     })
     .await;
 
-    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+    let logs: Vec<_> = events.into_iter().map(Event::into_log).collect();
 
     // Verify VRL was evaluated correctly
     for log in logs {
         assert_eq!(
-            log.get(event_path!("message")).unwrap().as_str().unwrap(),
+            log.get(event_path!("message"))
+                .unwrap()
+                .to_str_lossy()
+                .unwrap(),
             "HELLO"
         );
         let value = log.get(event_path!("value")).unwrap();
         match value {
-            vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
+            Value::Integer(n) => assert_eq!(*n, 42),
             _ => panic!("Expected integer value"),
         }
     }
@@ -693,7 +711,7 @@ async fn query_vrl_compilation_error() {
                 r#type: ParamType::Vrl,
             }),
         )]),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
@@ -714,8 +732,7 @@ async fn query_vrl_compilation_error() {
             let err_msg = err.to_string();
             assert!(
                 err_msg.contains("VRL compilation failed"),
-                "Expected VRL compilation error, got: {}",
-                err_msg
+                "Expected VRL compilation error, got: {err_msg}"
             );
         }
         Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),
@@ -733,7 +750,7 @@ async fn body_vrl_compilation_error() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Post,
@@ -757,10 +774,83 @@ async fn body_vrl_compilation_error() {
             let err_msg = err.to_string();
             assert!(
                 err_msg.contains("VRL compilation failed"),
-                "Expected VRL compilation error, got: {}",
-                err_msg
+                "Expected VRL compilation error, got: {err_msg}"
             );
         }
         Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),
     }
+}
+
+/// Requests should be routed through the configured authenticated HTTP proxy,
+/// which forwards them to the origin without leaking the proxy credentials.
+#[tokio::test]
+async fn requests_through_authenticated_proxy() {
+    let (_guard, in_addr) = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::header::headers_cloned().map(|headers: HeaderMap| {
+            // The proxy credentials must not reach the origin.
+            assert!(!headers.contains_key("Proxy-Authorization"));
+        }))
+        .map(move |()| r#"{"data" : "foo"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    let mut proxy = spawn_authenticated_http_proxy();
+    let proxy_config = ProxyConfig {
+        enabled: true,
+        http: Some(proxy.url().to_owned()),
+        https: None,
+        no_proxy: NoProxy::default(),
+    };
+
+    let events = run_and_assert_source_compliance_advanced(
+        HttpClientConfig {
+            endpoint: format!("http://{in_addr}/endpoint"),
+            interval: INTERVAL,
+            timeout: TIMEOUT,
+            query: HashMap::new(),
+            decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
+            framing: default_framing_message_based(),
+            headers: HashMap::new(),
+            method: HttpMethod::Get,
+            body: None,
+            tls: None,
+            auth: None,
+            log_namespace: None,
+        },
+        move |context: &mut SourceContext| {
+            context.proxy = proxy_config;
+        },
+        Some(Duration::from_secs(3)),
+        None,
+        &HTTP_PULL_SOURCE_TAGS,
+    )
+    .await;
+
+    assert!(!events.is_empty());
+    for event in events {
+        assert_eq!(
+            event
+                .into_log()
+                .get(event_path!("data"))
+                .unwrap()
+                .to_str_lossy()
+                .unwrap(),
+            "foo"
+        );
+    }
+
+    let observation = proxy.next_request().await;
+    assert_eq!(observation.method, Method::GET);
+    assert_eq!(
+        observation.uri.to_string(),
+        format!("http://{in_addr}/endpoint")
+    );
+    assert!(
+        observation
+            .headers
+            .contains_key(header::PROXY_AUTHORIZATION)
+    );
 }

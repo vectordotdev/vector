@@ -55,7 +55,7 @@ impl ByteSizeOf for PulsarEvent {
     fn allocated_bytes(&self) -> usize {
         self.event.size_of()
             + self.topic.size_of()
-            + self.key.as_ref().map_or(0, |bytes| bytes.size_of())
+            + self.key.as_ref().map_or(0, vector_lib::ByteSizeOf::size_of)
             + self.properties.as_ref().map_or(0, |props| {
                 props
                     .iter()
@@ -77,13 +77,13 @@ pub(crate) async fn healthcheck(
 ) -> crate::Result<()> {
     let client = config.create_pulsar_client().await?;
     let topic = topic_template.render_string(&LogEvent::from_str_legacy(""))?;
-    client.lookup_topic(topic).await?;
+    Box::pin(client.lookup_topic(topic)).await?;
     Ok(())
 }
 
 impl PulsarSink {
     pub(crate) fn new(
-        client: Pulsar<TokioExecutor>,
+        client: &Pulsar<TokioExecutor>,
         config: PulsarSinkConfig,
         topic_template: ConfinedTemplate,
     ) -> crate::Result<Self> {
@@ -94,10 +94,10 @@ impl PulsarSink {
         let service = PulsarService::new(client, producer_opts, config.producer_name.clone());
 
         Ok(PulsarSink {
-            config,
             transformer,
             encoder,
             service,
+            config,
             topic_template,
         })
     }
@@ -121,7 +121,7 @@ impl PulsarSink {
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 request
-                    .map_err(|e| error!("Failed to build Pulsar request: {:?}.", e))
+                    .map_err(|e| error!("Failed to build Pulsar request: {e:?}."))
                     .ok()
             })
             .into_driver(service)

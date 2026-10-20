@@ -384,8 +384,7 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn container_name(&self) -> String {
         if let Some(integration) = self.integration.as_ref() {
             format!(
-                "vector-test-runner-{}-{}",
-                integration,
+                "vector-test-runner-{integration}-{}",
                 RustToolchainConfig::rust_version()
             )
         } else {

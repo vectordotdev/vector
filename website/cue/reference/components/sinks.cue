@@ -9,8 +9,13 @@ components: sinks: [Name=string]: {
 		inputs: generated.components.sinks.configuration.inputs
 		buffer: generated.components.sinks.configuration.buffer
 		healthcheck: {
-			description: generated.components.sinks.configuration.healthcheck.description
+			description: """
+				\(generated.components.sinks.configuration.healthcheck.description)
+
+				A boolean value sets `enabled`; other healthcheck options retain their defaults.
+				"""
 			required:    generated.components.sinks.configuration.healthcheck.required
+			type: bool: generated.components.sinks.configuration.healthcheck.type.bool
 			type: object: options: {
 				enabled: generated.components.sinks.configuration.healthcheck.type.object.options.enabled
 
@@ -632,11 +637,9 @@ components: sinks: [Name=string]: {
 	}
 
 	telemetry: metrics: {
-		buffer_byte_size:                     components.sources.internal_metrics.output.metrics.buffer_byte_size
 		buffer_discarded_events_total:        components.sources.internal_metrics.output.metrics.buffer_discarded_events_total
 		buffer_size_bytes:                    components.sources.internal_metrics.output.metrics.buffer_size_bytes
 		buffer_size_events:                   components.sources.internal_metrics.output.metrics.buffer_size_events
-		buffer_events:                        components.sources.internal_metrics.output.metrics.buffer_events
 		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
 		buffer_received_bytes_total:          components.sources.internal_metrics.output.metrics.buffer_received_bytes_total
 		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total

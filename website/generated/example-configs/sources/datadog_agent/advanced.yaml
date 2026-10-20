@@ -2,6 +2,7 @@ sources:
   my_source_id:
     type: datadog_agent
     address: 0.0.0.0:80
+    disable_llmobs: false
     disable_logs: false
     disable_metrics: false
     disable_traces: false

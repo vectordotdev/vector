@@ -26,9 +26,9 @@ use crate::{
             },
             logs::config::HecLogsSinkConfig,
         },
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS, run_and_assert_data_volume_sink_compliance,
@@ -120,7 +120,7 @@ async fn config(
 
     HecLogsSinkConfig {
         default_token: get_token().await.into(),
-        endpoint: splunk_hec_address(),
+        endpoint: HttpEndpoint::parse(&splunk_hec_address()).unwrap(),
         host_key: Some(OptionalTargetPath::event("host")),
         indexed_fields,
         index: None,
@@ -131,12 +131,12 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Default::default(),
+        acknowledgements: HecClientAcknowledgementsConfig::default(),
         timestamp_nanos_key: None,
         timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     }
 }
 
@@ -489,10 +489,7 @@ async fn splunk_auto_extracted_timestamp() {
     // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
     // This environment variable is set by the integration test docker-compose file.
-    if std::env::var("CONFIG_VERSION")
-        .map(|version| !version.starts_with("7."))
-        .unwrap_or(true)
-    {
+    if std::env::var("CONFIG_VERSION").map_or(true, |version| !version.starts_with("7.")) {
         let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {
@@ -549,10 +546,7 @@ async fn splunk_non_auto_extracted_timestamp() {
     // The auto_extract_timestamp setting only works on version 8 and above of splunk.
     // If the splunk version is set to 7, we ignore this test.
     // This environment variable is set by the integration test docker-compose file.
-    if std::env::var("CONFIG_VERSION")
-        .map(|version| !version.starts_with("7."))
-        .unwrap_or(true)
-    {
+    if std::env::var("CONFIG_VERSION").map_or(true, |version| !version.starts_with("7.")) {
         let cx = SinkContext::default();
 
         let config = HecLogsSinkConfig {

@@ -1,11 +1,76 @@
 package metadata
 
 generated: components: transforms: aggregate: configuration: {
+	event_time: {
+		description: """
+			Event-time aggregation settings.
+
+			When present, metrics are grouped into buckets based on their timestamps rather than when
+			they are processed. Omit this block to keep the default system-time behavior.
+			"""
+		required: false
+		type: object: options: {
+			allowed_lateness_ms: {
+				description: """
+					Grace period for late-arriving events, in milliseconds.
+
+					Each bucket accepts events until the system clock reaches
+					`bucket_end + allowed_lateness_ms`, where `bucket_end` is the exclusive end of the
+					event-time window. That cutoff is enforced when events are recorded, not only when a
+					periodic flush runs. Once a bucket is emitted it is closed permanently; any later
+					events whose timestamp falls inside it are dropped and counted via
+					`component_discarded_events_total`.
+
+					Set to 0 for strict ordering (no late events allowed).
+					"""
+				required: false
+				type: uint: {
+					default: 0
+					examples: [0, 5000, 30000]
+				}
+			}
+			max_future_ms: {
+				description: """
+					Maximum allowed time drift for future events, in milliseconds.
+
+					Acts as a clock-skew guard: events whose timestamp is further in the future than this
+					many milliseconds (relative to the current system time) are dropped and counted via
+					`component_discarded_events_total`. Defaults to 10 seconds.
+
+					Set to 0 to allow events at any future time.
+					"""
+				required: false
+				type: uint: {
+					default: 10000
+					examples: [0, 60000, 300000]
+				}
+			}
+			missing_timestamp: {
+				description: """
+					How to handle events with missing timestamps.
+
+					Metrics that pass through unchanged for the configured mode do not require a timestamp.
+					For metrics that would be bucketed:
+					- `drop` (default) discards the event and increments `component_discarded_events_total`
+					- `use_system_time` synthesizes a timestamp from the current system clock
+					"""
+				required: false
+				type: string: {
+					default: "drop"
+					enum: {
+						drop:            "Drop the event and count it via `component_discarded_events_total`."
+						use_system_time: "Use the current system time as the event timestamp."
+					}
+				}
+			}
+		}
+	}
 	interval_ms: {
 		description: """
 			The interval between flushes, in milliseconds.
 
-			During this time frame, metrics (beta) with the same series data (name, namespace, tags, and so on) are aggregated.
+			Must be greater than zero. During this time frame, metrics (beta) with the same series data
+			(name, namespace, tags, and so on) are aggregated.
 			"""
 		required: false
 		type: uint: default: 10000

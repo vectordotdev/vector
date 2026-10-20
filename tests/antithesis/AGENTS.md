@@ -28,7 +28,7 @@ Agent behavior will be governed by the following dictums:
 
 # Submitting a Shot
 
-One shared `scenarios/launch.sh` launches every scenario. The per-scenario bits
+One shared `scripts/launch.sh` launches every scenario. The per-scenario bits
 live in that scenario's `launch.env` (test name, description, and the SUT node
 list to fault). Launch through it, never by hand-typing `snouty launch`, so every
 shot is identical and comparable and no fault flag is ever fumbled or forgotten.
@@ -36,11 +36,11 @@ The fault profile is the single source of truth: change a shot's faults by editi
 `launch.env`'s node list, not by passing one-off flags.
 
 ```sh
-cd tests/antithesis/scenarios
-./launch.sh vector_to_vector_e2e_disk          # 30-minute run with the pinned profile
-./launch.sh vector_e2e                          # the no-disk, single-node counterpart
-DURATION=60 ./launch.sh vector_e2e              # override duration (minutes)
-DRY_RUN=1 ./launch.sh vector_e2e                # print the exact command, submit nothing
+cd tests/antithesis
+./scripts/launch.sh vector_to_vector_e2e_disk  # 30-minute run with the pinned profile
+./scripts/launch.sh vector_e2e                 # the no-disk, single-node counterpart
+DURATION=60 ./scripts/launch.sh vector_e2e     # override duration (minutes)
+DRY_RUN=1 ./scripts/launch.sh vector_e2e       # print the exact command, submit nothing
 ```
 
 The launcher reads tenant and registry from the environment (snouty's variables):
@@ -52,7 +52,7 @@ The launcher reads tenant and registry from the environment (snouty's variables)
 `DESCRIPTION`, `TEST_NAME`, `FAULT_NODES`, and `WEBHOOK` are overridable. The
 running git commit is stamped into the description automatically so a shot records
 the code it tested. Extra snouty flags pass straight through, e.g.
-`./launch.sh vector_e2e --recipients you@example.com`.
+`./scripts/launch.sh vector_e2e --recipients you@example.com`.
 
 The pinned profile submits to the `persistent_storage` webhook and faults the
 scenario's SUT nodes (`head` and `tail` for the disk scenario, `vector` for

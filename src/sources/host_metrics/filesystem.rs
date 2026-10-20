@@ -4,7 +4,7 @@ use heim::units::information::byte;
 use heim::units::ratio::ratio;
 #[cfg(unix)]
 use nix::sys::statvfs::statvfs;
-use vector_lib::{configurable::configurable_component, metric_tags};
+use vector_lib::{configurable::configurable_component, internal_event::GaugeName, metric_tags};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
@@ -47,6 +47,15 @@ fn example_mountpoints() -> FilterList {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_lossless,
+        clippy::cast_precision_loss,
+        reason = "Native inode counter widths differ across platforms; preserve conversion of filesystem counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn filesystem_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "filesystem";
         match heim::disk::partitions().await {
@@ -69,7 +78,7 @@ impl HostMetrics {
                         self.config
                             .filesystem
                             .devices
-                            .contains_path(partition.device().map(|d| d.as_ref()))
+                            .contains_path(partition.device().map(AsRef::as_ref))
                             .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -95,7 +104,7 @@ impl HostMetrics {
                                         .unwrap_or("unknown")
                                         .to_string(),
                                     error,
-                                })
+                                });
                             })
                             .map(|usage| (partition, usage))
                             .ok()
@@ -112,24 +121,24 @@ impl HostMetrics {
                         tags.replace("device".into(), device.to_string_lossy().to_string());
                     }
                     output.gauge(
-                        "filesystem_free_bytes",
+                        GaugeName::FilesystemFreeBytes,
                         usage.free().get::<byte>() as f64,
                         tags.clone(),
                     );
                     output.gauge(
-                        "filesystem_total_bytes",
+                        GaugeName::FilesystemTotalBytes,
                         usage.total().get::<byte>() as f64,
                         tags.clone(),
                     );
                     output.gauge(
-                        "filesystem_used_bytes",
+                        GaugeName::FilesystemUsedBytes,
                         usage.used().get::<byte>() as f64,
                         tags.clone(),
                     );
                     #[cfg(not(windows))]
                     output.gauge(
-                        "filesystem_used_ratio",
-                        usage.ratio().get::<ratio>() as f64,
+                        GaugeName::FilesystemUsedRatio,
+                        f64::from(usage.ratio().get::<ratio>()),
                         tags.clone(),
                     );
 
@@ -149,10 +158,14 @@ impl HostMetrics {
                             0.0
                         };
 
-                        output.gauge("filesystem_inodes_total", inodes_total, tags.clone());
-                        output.gauge("filesystem_inodes_free", inodes_free, tags.clone());
-                        output.gauge("filesystem_inodes_used", inodes_used, tags.clone());
-                        output.gauge("filesystem_inodes_used_ratio", inodes_used_ratio, tags);
+                        output.gauge(GaugeName::FilesystemInodesTotal, inodes_total, tags.clone());
+                        output.gauge(GaugeName::FilesystemInodesFree, inodes_free, tags.clone());
+                        output.gauge(GaugeName::FilesystemInodesUsed, inodes_used, tags.clone());
+                        output.gauge(
+                            GaugeName::FilesystemInodesUsedRatio,
+                            inodes_used_ratio,
+                            tags,
+                        );
                     }
                     #[cfg(windows)]
                     drop(tags);
@@ -185,7 +198,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .filesystem_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         assert!(!metrics.is_empty());
         assert!(all_gauges(&metrics));
 
@@ -235,7 +248,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .filesystem_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 3 == 0);
         assert!(all_gauges(&metrics));
@@ -246,12 +259,7 @@ mod tests {
             "filesystem_total_bytes",
             "filesystem_used_bytes",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 3,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 3, "name={name}");
         }
 
         // They should all have "filesystem" and "mountpoint" tags
@@ -272,7 +280,7 @@ mod tests {
             })
             .filesystem_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }
@@ -290,7 +298,7 @@ mod tests {
             })
             .filesystem_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }
@@ -308,7 +316,7 @@ mod tests {
             })
             .filesystem_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }

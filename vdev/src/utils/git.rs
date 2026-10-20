@@ -2,10 +2,12 @@
 
 use std::{collections::HashSet, fs, path::Path, process::Command};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use git2::{BranchType, ErrorCode, Repository};
 
 use crate::app::CommandExt as _;
+
+pub const MASTER_BRANCH: &str = "master";
 
 /// Get the git HEAD tag if it exists
 pub fn git_head() -> Result<std::process::Output> {
@@ -37,15 +39,12 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
-    // Committed e.g.:
-    // A   relative/path/to/file.added
-    // M   relative/path/to/file.modified
-    let output = run_and_check_output(&["diff", "--name-status", "origin/master..."])?;
+    // Use name-only output so renames and copies yield their destination path.
+    let base = format!("origin/{MASTER_BRANCH}...");
+    let output = run_and_check_output(&["diff", "--name-only", &base])?;
     for line in output.lines() {
-        if !is_warning_line(line)
-            && let Some((_, path)) = line.split_once('\t')
-        {
-            files.insert(path.to_string());
+        if !is_warning_line(line) {
+            files.insert(line.to_string());
         }
     }
 
@@ -81,6 +80,25 @@ pub fn get_git_sha() -> Result<String> {
         .map(|output| output.trim_end().to_string())
 }
 
+pub fn ensure_sha(value: &str, label: &str) -> Result<()> {
+    ensure!(
+        value.len() == 40
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+        "{label} must be a 40-character lowercase hexadecimal SHA"
+    );
+    Ok(())
+}
+
+pub fn ensure_worktree_clean() -> Result<()> {
+    ensure!(
+        run_and_check_output(&["status", "--porcelain"])?.is_empty(),
+        "working tree must be clean"
+    );
+    Ok(())
+}
+
 /// Get a list of files that have been modified, as a vector of strings
 pub fn get_modified_files() -> Result<Vec<String>> {
     let args = vec![
@@ -109,22 +127,6 @@ pub fn get_files_changed_from_head() -> Result<Vec<String>> {
     let mut files = Vec::from_iter(files);
     files.sort();
     Ok(files)
-}
-
-pub fn set_config_value(key: &str, value: &str) -> Result<String> {
-    Command::new("git")
-        .args(["config", key, value])
-        .stdout(std::process::Stdio::null())
-        .check_output()
-}
-
-/// Checks if the current directory's repo is clean
-pub fn check_git_repository_clean() -> Result<bool> {
-    Ok(Command::new("git")
-        .args(["diff-index", "--quiet", "HEAD"])
-        .stdout(std::process::Stdio::null())
-        .status()
-        .map(|status| status.success())?)
 }
 
 pub fn add_files_in_current_dir() -> Result<String> {
@@ -156,11 +158,6 @@ pub fn latest_release_version() -> Result<semver::Version> {
     anyhow::bail!("No valid semantic version tag found")
 }
 
-/// Removes a file from the index (and working tree) using `git rm`.
-pub fn rm(path: &str) -> Result<String> {
-    Command::new("git").args(["rm", path]).check_output()
-}
-
 /// Pushes changes from the current repo
 pub fn push() -> Result<String> {
     Command::new("git").args(["push"]).check_output()
@@ -170,11 +167,6 @@ pub fn push_and_set_upstream(branch_name: &str) -> Result<String> {
     Command::new("git")
         .args(["push", "-u", "origin", branch_name])
         .check_output()
-}
-
-pub fn clone(repo_url: &str) -> Result<String> {
-    // We cannot use capture_output since this will need to run in the CWD
-    Command::new("git").args(["clone", repo_url]).check_output()
 }
 
 /// Walks up from the current working directory until it finds a `.git`
@@ -205,7 +197,7 @@ pub fn checkout_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn checkout_main_branch() -> Result<()> {
-    let _output = run_and_check_output(&["switch", "master"])?;
+    let _output = run_and_check_output(&["switch", MASTER_BRANCH])?;
     Ok(())
 }
 

@@ -1,13 +1,15 @@
+mod bytes_unread;
 mod experiment;
 mod experiment_no_truncations;
 
-use std::{path::PathBuf, str, thread};
+use std::{fs, path::PathBuf, str, thread};
 
+use async_compression::tokio::bufread::GzipEncoder;
 use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
-use tokio::time::Instant;
+use tokio::{io::AsyncReadExt as _, time::Instant};
 
-use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, null_reader};
+use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher};
 
 // Welcome.
 //
@@ -136,10 +138,10 @@ impl FileWatcherFile {
         // newline character. Well, that'll happen when truncations
         // cause trimmed reads and the only remaining character in the
         // line is the newline. Womp womp
-        if !ret.is_empty() {
-            Some(ret.to_string())
-        } else {
+        if ret.is_empty() {
             None
+        } else {
+            Some(ret.to_string())
         }
     }
 }
@@ -177,18 +179,14 @@ impl Arbitrary for FileWatcherAction {
 
 #[tokio::test]
 async fn gzip_multi_stream_reads_all_members() {
-    use async_compression::tokio::bufread::GzipEncoder;
-    use std::fs;
-    use tokio::io::AsyncReadExt as _;
-
-    let dir = tempfile::TempDir::new().expect("could not create tempdir");
-    let path = dir.path().join("multi.gz");
-
     async fn encode(data: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
         GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
         out
     }
+
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("multi.gz");
 
     // Write two separate gzip members into one file — the bug dropped the second.
     let mut bytes = encode(b"first\n").await;
@@ -226,7 +224,7 @@ fn watcher_for_timing() -> FileWatcher {
     FileWatcher {
         path: PathBuf::new(),
         findable: true,
-        reader: Box::new(null_reader()),
+        reader: FileReader::Null(std::io::Cursor::new(Vec::new())),
         file_position: 0,
         devno: 0,
         inode: 0,
@@ -282,9 +280,49 @@ fn caps_and_resets_eof_backoff() {
     assert!(!watcher.reached_eof());
 }
 
+#[tokio::test]
+async fn updating_path_resets_eof_backoff() {
+    for replace_file in [false, true] {
+        let dir = tempfile::TempDir::new().unwrap();
+        let old_path = dir.path().join("old.log");
+        let new_path = dir.path().join("new.log");
+        std::fs::write(&old_path, b"first\n").unwrap();
+        let mut watcher = FileWatcher::new(
+            old_path.clone(),
+            file_source_common::ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        for _ in 0..16 {
+            watcher.track_read_attempt();
+            watcher.track_read_eof();
+        }
+        assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
+
+        if replace_file {
+            std::fs::write(&new_path, b"second\n").unwrap();
+        } else {
+            std::fs::rename(&old_path, &new_path).unwrap();
+        }
+        let old_info = watcher.update_path(new_path).await.unwrap();
+        assert_eq!(old_info.is_some(), replace_file);
+        if let Some(old_info) = old_info {
+            assert!(old_info.reached_eof);
+        }
+        assert!(!watcher.reached_eof());
+        assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+        let line = watcher.read_line().await.unwrap().raw_line.unwrap();
+        let expected: &[u8] = if replace_file { b"second" } else { b"first" };
+        assert_eq!(line.bytes.as_ref(), expected);
+    }
+}
+
 #[inline]
 pub fn delay(attempts: u32) {
-    let delay = match attempts {
+    let delay: u64 = match attempts {
         0 => return,
         1 => 1,
         2 => 4,
@@ -296,6 +334,6 @@ pub fn delay(attempts: u32) {
         8 => 256,
         _ => 512,
     };
-    let sleep_time = std::time::Duration::from_millis(delay as u64);
+    let sleep_time = std::time::Duration::from_millis(delay);
     std::thread::sleep(sleep_time);
 }

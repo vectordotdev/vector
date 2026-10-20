@@ -49,7 +49,7 @@ use crate::{
         GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
     },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util,
     tls::{TlsConfig, TlsSettings},
@@ -68,10 +68,6 @@ const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
-// prost emits some generated code that includes clones on `Arc`
-// objects, which causes a clippy ding on this block. We don't
-// directly control the generated code, so allow this lint here.
-#[allow(clippy::clone_on_ref_ptr)]
 // https://github.com/hyperium/tonic/issues/1350
 #[allow(clippy::missing_const_for_fn)]
 #[allow(warnings)]
@@ -146,7 +142,6 @@ pub struct PubsubConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The maximum number of concurrent stream connections to open at once.
@@ -210,18 +205,15 @@ pub struct PubsubConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
@@ -230,7 +222,7 @@ fn default_endpoint() -> String {
 }
 
 const fn default_ack_deadline() -> Duration {
-    Duration::from_secs(600)
+    Duration::from_mins(10)
 }
 
 const fn default_retry_delay() -> Duration {
@@ -238,7 +230,7 @@ const fn default_retry_delay() -> Duration {
 }
 
 const fn default_keepalive() -> Duration {
-    Duration::from_secs(60)
+    Duration::from_mins(1)
 }
 
 const fn default_max_concurrency() -> usize {
@@ -264,7 +256,7 @@ impl SourceConfig for PubsubConfig {
                 warn!(
                     "The `ack_deadline_seconds` setting is deprecated, use `ack_deadline_secs` instead."
                 );
-                Duration::from_secs(ads as u64)
+                Duration::from_secs(u64::from(ads))
             }
         };
         if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs.as_secs()) {
@@ -305,8 +297,7 @@ impl SourceConfig for PubsubConfig {
 
         let protocol = uri
             .scheme()
-            .map(|scheme| Protocol(scheme.to_string().into()))
-            .unwrap_or(Protocol::HTTP);
+            .map_or(Protocol::HTTP, |scheme| Protocol(scheme.to_string().into()));
 
         let source = PubsubSource {
             endpoint,
@@ -328,14 +319,17 @@ impl SourceConfig for PubsubConfig {
             ack_deadline_secs,
             retry_delay: retry_delay_secs,
             keepalive: self.keepalive_secs,
-            concurrency: Default::default(),
+            concurrency: Arc::default(),
             full_response_size: self.full_response_size,
             log_namespace,
             bytes_received: register!(BytesReceived::from(protocol)),
             events_received: register!(EventsReceived),
         }
         .run_all(self.max_concurrency, self.poll_time_seconds)
-        .map_err(|error| error!(message = "Source failed.", %error));
+        .map_err(|error| {
+            error!(message = "Source failed.", %error);
+            crate::sources::SourceError::from(error)
+        });
         Ok(Box::pin(source))
     }
 
@@ -426,7 +420,7 @@ impl PubsubSource {
                     }
 
                 },
-                _ = tokio::time::sleep(poll_time) => {
+                () = tokio::time::sleep(poll_time) => {
                     // If all of the tasks are marked as busy, start
                     // up a new one.
                     if tasks.len() < max_concurrency
@@ -552,7 +546,7 @@ impl PubsubSource {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
-                _ = tokio::time::sleep(self.keepalive) => {
+                () = tokio::time::sleep(self.keepalive) => {
                     if pending_acks == 0 {
                         // No pending acks, and no new data, so drop
                         // this stream if we aren't the only active
@@ -580,6 +574,10 @@ impl PubsubSource {
         }
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn request_stream(
         &self,
         ack_ids: mpsc::Receiver<Vec<String>>,
@@ -612,6 +610,10 @@ impl PubsubSource {
         }))
     }
 
+    #[allow(
+        clippy::ref_option,
+        reason = "Keep optional batch notifiers consistent with the event finalization API. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
@@ -626,7 +628,7 @@ impl PubsubSource {
         self.bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-        let (events, ids) = self.parse_messages(response.received_messages, batch).await;
+        let (events, ids) = self.parse_messages(response.received_messages, batch);
 
         let count = events.len();
         match self.out.send_batch(events).await {
@@ -647,7 +649,11 @@ impl PubsubSource {
         }
     }
 
-    async fn parse_messages(
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "Keep the batch notifier alive until all decoded events have been collected."
+    )]
+    fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
         batch: Option<BatchNotifier>,
@@ -655,7 +661,7 @@ impl PubsubSource {
         let mut ack_ids = Vec::with_capacity(response.len());
         let events = response
             .into_iter()
-            .flat_map(|received| {
+            .filter_map(|received| {
                 ack_ids.push(received.ack_id);
                 received
                     .message
@@ -666,6 +672,14 @@ impl PubsubSource {
         (events, ack_ids)
     }
 
+    #[allow(
+        clippy::ref_option,
+        reason = "Keep optional batch notifiers consistent with the event finalization API. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn parse_message<'a>(
         &'a self,
         message: proto::PubsubMessage,
@@ -675,7 +689,7 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::from(value)))
                 .collect(),
         );
         let log_namespace = self.log_namespace;
@@ -705,7 +719,7 @@ impl PubsubSource {
                     Some(LegacyKey::Overwrite(path!("attributes"))),
                     path!("attributes"),
                     attributes.clone(),
-                )
+                );
             }
             event
         })
@@ -874,7 +888,7 @@ mod integration_tests {
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: LazyLock<String> =
-        LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
+        LazyLock::new(|| format!("{}/v1/projects/{PROJECT}", *gcp::PUBSUB_ADDRESS));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
@@ -984,7 +998,7 @@ mod integration_tests {
     // I have verified manually that the streaming code above omits the
     // acknowledgements when events are rejected, but have been unable
     // to verify the events are not acknowledged through the emulator.
-    #[ignore]
+    #[ignore = "The emulator does not reliably expose missing acknowledgements for rejected events"]
     async fn does_not_ack_rejected() {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
@@ -1055,7 +1069,7 @@ mod integration_tests {
             this.request(Method::PUT, "topics/{topic}", json!({})).await;
 
             let body = json!({
-                "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
+                "topic": format!("projects/{PROJECT}/topics/{}", this.topic),
                 "ackDeadlineSeconds": *ACK_DEADLINE,
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
@@ -1123,8 +1137,7 @@ mod integration_tests {
                 .await;
             response
                 .get("receivedMessages")
-                .map(|rm| rm.as_array().unwrap().len())
-                .unwrap_or(0)
+                .map_or(0, |rm| rm.as_array().unwrap().len())
         }
 
         async fn request(&self, method: Method, base: &str, body: Value) -> Value {

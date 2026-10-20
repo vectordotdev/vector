@@ -66,7 +66,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
         .as_deref()
         .map(Regex::new)
         .and_then(Result::ok);
-    let state_rx = state::updater(rx, ui_rx, starting_state).await;
+    let state_rx = state::updater(rx, ui_rx, starting_state);
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
@@ -84,7 +84,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
     )
     .await
     {
-        Ok(_) => {
+        Ok(()) => {
             connection.abort();
             exitcode::OK
         }
@@ -111,12 +111,9 @@ async fn subscription(
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(uri.clone(), &opts.components).await {
-            Ok(state) => state,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
+        let Ok(state) = metrics::init_components(uri.clone(), &opts.components).await else {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
         };
         let initial_components = state
             .components
@@ -126,20 +123,17 @@ async fn subscription(
         _ = tx.send(EventType::InitializeState(state)).await;
 
         // Subscribe to updated metrics via gRPC streaming
-        let handles = match metrics::subscribe(
+        let Ok(handles) = metrics::subscribe(
             uri.clone(),
             tx.clone(),
-            opts.interval as i64,
+            i64::from(opts.interval),
             opts.components.clone(),
             initial_components,
         )
         .await
-        {
-            Ok(handles) => handles,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
+        else {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
         };
 
         _ = tx

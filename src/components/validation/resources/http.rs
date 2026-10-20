@@ -53,11 +53,17 @@ impl HttpResourceConfig {
         }
     }
 
+    #[must_use]
     pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
         self.headers = Some(headers);
         self
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     pub fn spawn_as_input(
         self,
         direction: ResourceDirection,
@@ -69,15 +75,21 @@ impl HttpResourceConfig {
         match direction {
             // The source will pull data from us.
             ResourceDirection::Pull => {
-                spawn_input_http_server(self, codec, input_rx, task_coordinator, runner_metrics)
+                spawn_input_http_server(self, codec, input_rx, task_coordinator, runner_metrics);
             }
             // We'll push data to the source.
             ResourceDirection::Push => {
-                spawn_input_http_client(self, codec, input_rx, task_coordinator, runner_metrics)
+                spawn_input_http_client(self, codec, input_rx, task_coordinator, runner_metrics);
             }
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     pub fn spawn_as_output(self, ctx: HttpResourceOutputContext) -> vector_lib::Result<()> {
         match ctx.direction {
             // We'll pull data from the sink.
@@ -89,7 +101,11 @@ impl HttpResourceConfig {
 }
 
 /// Spawns an HTTP server that a source will make requests to in order to get events.
-#[allow(clippy::missing_const_for_fn)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn spawn_input_http_server(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -154,18 +170,15 @@ fn spawn_input_http_server(
                 // When the channel closes, we'll mark the input as being finished so that we know
                 // to close the external resource itself once the HTTP server has consumed/sent all
                 // outstanding events.
-                maybe_event = input_rx.recv(), if !input_finished => match maybe_event {
-                    Some(event) => {
-                        let mut outstanding_events = outstanding_events.lock().await;
-                        outstanding_events.push_back(event);
-                    },
-                    None => {
-                        info!("HTTP server external input resource input is finished.");
-                        input_finished = true;
-                    },
+                maybe_event = input_rx.recv(), if !input_finished => if let Some(event) = maybe_event {
+                    let mut outstanding_events = outstanding_events.lock().await;
+                    outstanding_events.push_back(event);
+                } else {
+                    info!("HTTP server external input resource input is finished.");
+                    input_finished = true;
                 },
 
-                _ = resource_notifier.notified() => {
+                () = resource_notifier.notified() => {
                     // The HTTP server notified us that it made progress with a send, which is
                     // specifically that it serviced a request which returned a non-zero number of
                     // events.
@@ -199,6 +212,11 @@ fn spawn_input_http_server(
 }
 
 /// Spawns an HTTP client that pushes events to a source which is accepting events over HTTP.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn spawn_input_http_client(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -273,7 +291,7 @@ fn spawn_input_http_client(
                 }
                 Err(e) => {
                     // TODO: Emit metric that tracks a failed response from the HTTP server.
-                    error!("Failed to send request: {}", e);
+                    error!("Failed to send request: {e}");
                 }
             }
         }
@@ -298,7 +316,11 @@ pub struct HttpResourceOutputContext<'a> {
 
 impl HttpResourceOutputContext<'_> {
     /// Spawns an HTTP server that accepts events sent by a sink.
-    #[allow(clippy::missing_const_for_fn)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     fn spawn_output_http_server(&self, config: HttpResourceConfig) -> vector_lib::Result<()> {
         // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
         // via an output sender. We accept/collect events until we're told to shutdown.
@@ -334,7 +356,7 @@ impl HttpResourceOutputContext<'_> {
                         .headers()
                         .get("content-encoding")
                         .and_then(|v| v.to_str().ok())
-                        .map(|s| s.to_string());
+                        .map(std::string::ToString::to_string);
 
                     match request.into_body().collect().await.map(Collected::to_bytes) {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -394,9 +416,8 @@ impl HttpResourceOutputContext<'_> {
                                             // This status code is not retried and should result in the component under test
                                             // emitting error events
                                             return StatusCode::BAD_REQUEST.into_response();
-                                        } else {
-                                            return StatusCode::OK.into_response();
                                         }
+                                        return StatusCode::OK.into_response();
                                     }
                                     Err(_) => {
                                         error!(
@@ -439,12 +460,11 @@ impl HttpResourceOutputContext<'_> {
     }
 
     /// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
-    #[allow(clippy::missing_const_for_fn)]
     fn spawn_output_http_client(&self, _config: HttpResourceConfig) {
         // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
         // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
         // use this generically for that purpose.
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -466,8 +486,7 @@ where
     let request_path = config
         .uri
         .path_and_query()
-        .map(|pq| pq.as_str().to_string())
-        .unwrap_or_else(|| "/".to_string());
+        .map_or_else(|| "/".to_string(), |pq| pq.as_str().to_string());
     let request_method = config.method.clone().unwrap_or(Method::POST);
 
     // Create our synchronization primitives that are shared between the HTTP server and the

@@ -65,12 +65,7 @@ In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files a
 
 ### Search
 
-Search for vector.dev is provided by [Typesense]. Our search solution is largely custom:
-
-* The [`typesense-index.ts`](./scripts/typesense-index.ts) script generates an index of all of the relevant pages on the site and stores the result in a single JSON file (output to `public/search.json`).
-* The [`typesense-sync.ts`](./scripts/typesense-sync.ts) script syncs the generated JSON index with the Typesense backend, performing all the necessary create, update, and delete operations, using a custom package, `typesense-sync`. Reach out in #websites for more details.
-
-The Typesense configuration for the site is captured via the [`typesense.config.json`](./typesense.config.json) file.
+Search for vector.dev uses [Pagefind], which generates a static search index from the built site. Every production and preview build creates the index locally; no search service or search credentials are required.
 
 
 #### De-indexing pages
@@ -136,6 +131,52 @@ make serve
 This builds all the necessary [prereqs](#prerequisites) for the site and starts up a local web server. Navigate to http://localhost:1313 to view the site.
 
 When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
+
+### Run browser tests locally
+
+The browser suite uses [Playwright](https://playwright.dev) to test the built website in Chromium,
+Firefox, and WebKit.
+
+Install dependencies and browser binaries once from this directory:
+
+```shell
+yarn install --frozen-lockfile
+yarn playwright install chromium firefox webkit
+```
+
+Python 3 is required for the local static server. On Linux, install browser system dependencies with
+`yarn playwright install --with-deps chromium firefox webkit`.
+
+Build the production site and its Pagefind index, then run all browser tests:
+
+```shell
+make test
+```
+
+This uses the existing component-example generator to prepare the documentation data. Playwright
+starts and stops a static server on `127.0.0.1:4173`; that port must be free. Tests use isolated browser
+contexts and do not use an existing Hugo development server.
+
+In GitHub Actions, `make generate-vector-vrl-docs` runs from the repository root before the website build.
+The browser suite uses one worker when `CI=true` and three workers otherwise.
+
+To run tests again against the current `public/` build, or inspect a failure:
+
+```shell
+yarn test --project=chromium
+yarn test:ui
+yarn test:report
+```
+
+Rebuild with `make test` after website changes; `yarn test` alone does not rebuild the site. To test
+the preview build instead, run `make preview-build` after `make test`, then `yarn test`.
+
+The HTML report is in `playwright-report/`. Failed tests save screenshots and traces in
+`test-results/`; both directories are ignored by Git.
+
+Tests load real local JavaScript, CSS, and search indexes. The search theme comes from the installed
+Yarn package instead of the CDN. External requests are blocked and stubbed out. External services,
+CDN availability, and external fonts and icons are not covered by this suite.
 
 ### Run the site with Docker
 
@@ -216,7 +257,7 @@ description: """
         """
 ```
 
-[typesense]: https://typesense.org
+[pagefind]: https://pagefind.app
 [aliases]: https://gohugo.io/content-management/urls
 [alpine]: https://alpinejs.dev
 [components]: https://vector.dev/components

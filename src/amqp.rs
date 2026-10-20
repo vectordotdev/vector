@@ -21,7 +21,6 @@ pub(crate) struct AmqpConfig {
     ))]
     pub(crate) connection_string: String,
 
-    #[configurable(derived)]
     pub(crate) tls: Option<crate::tls::TlsConfig>,
 }
 
@@ -74,11 +73,7 @@ impl AmqpConfig {
                     let der = tokio::fs::read(identity.to_owned()).await?;
                     Some(OwnedIdentity::PKCS12 {
                         der,
-                        password: tls
-                            .key_pass
-                            .as_ref()
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(String::default),
+                        password: tls.key_pass.clone().unwrap_or_else(String::default),
                     })
                 } else {
                     None

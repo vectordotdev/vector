@@ -1,4 +1,7 @@
+use smallvec::SmallVec;
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use vector_lib::opentelemetry::proto::metrics::v1::ResourceMetrics;
+use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
@@ -7,13 +10,13 @@ use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
-use tower::ServiceBuilder;
+use tower::{Layer, ServiceBuilder};
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
-    event::{BatchNotifier, BatchStatus},
+    event::BatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
@@ -38,7 +41,13 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         http_server::HttpConfigParamKind,
-        opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+        opentelemetry::{
+            config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+            request_control::{
+                AcknowledgementFailure, MiddlewareError, PendingAcknowledgement,
+                RequestControlLayer,
+            },
+        },
         util::{add_headers, decompress_body, http::capped_body},
     },
     tls::{MaybeTlsSettings, TlsAcceptorReloader},
@@ -51,6 +60,20 @@ pub(crate) enum ApiError {
 
 impl warp::reject::Reject for ApiError {}
 
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> Response {
+    let status = match error {
+        MiddlewareError::LoadShed => StatusCode::TOO_MANY_REQUESTS,
+        MiddlewareError::TimedOut | MiddlewareError::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+    };
+
+    let response = protobuf(Status {
+        code: tonic::Code::Unavailable as i32,
+        message: error.message().to_owned(),
+        ..Default::default()
+    });
+    warp::reply::with_status(response, status).into_response()
+}
+
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -58,13 +81,21 @@ pub(crate) async fn run_http_server(
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
+    request_control: RequestControlLayer<
+        impl Fn(MiddlewareError) -> Response + Clone + Send + 'static,
+    >,
 ) -> crate::Result<()> {
-    let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
+    let listener = tls_settings
+        .bind_reloadable(&address, tls_reloader)
+        .await?
+        .with_keepalive(keepalive_settings.tcp_keepalive);
     let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
 
     let span = Span::current();
+    // Admission wraps the Warp service, so rejected requests cannot reach `capped_body`.
+    let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
@@ -75,7 +106,7 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
-            .service(warp::service(routes.clone()));
+            .service(admitted.clone());
         futures_util::future::ok::<_, Infallible>(svc)
     });
 
@@ -119,10 +150,10 @@ pub(crate) fn build_warp_filter(
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
-        out.clone(),
+        out,
         bytes_received,
         events_received,
-        headers.clone(),
+        headers,
         traces_deserializer,
     );
     log_filters
@@ -165,7 +196,7 @@ fn parse_with_deserializer(
 ) -> Result<Vec<Event>, ErrorMessage> {
     let events = deserializer
         .parse(body, log_namespace)
-        .map(|r| r.into_vec())
+        .map(SmallVec::into_vec)
         .map_err(emit_decode_error)?;
 
     // Count individual items within OTLP batches for consistency with other sources
@@ -358,7 +389,7 @@ fn decode_trace_body(
     let events: Vec<Event> = request
         .resource_spans
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(ResourceSpans::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(
@@ -399,7 +430,7 @@ fn decode_metrics_body(
     let events: Vec<Event> = request
         .resource_metrics
         .into_iter()
-        .flat_map(|v| v.into_event_iter())
+        .flat_map(ResourceMetrics::into_event_iter)
         .collect();
 
     events_received.emit(CountByteSize(
@@ -426,26 +457,32 @@ async fn handle_request(
                 emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
-
-            match receiver {
-                None => Ok(protobuf(resp).into_response()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Error delivering contents to sink".into(),
-                        ..Default::default()
-                    })),
-                    BatchStatus::Rejected => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Contents failed to deliver to sink".into(),
-                        ..Default::default()
-                    })),
-                },
+            let mut response = protobuf(resp).into_response();
+            if let Some(receiver) = receiver {
+                response
+                    .extensions_mut()
+                    .insert(PendingAcknowledgement::new(
+                        receiver,
+                        acknowledgement_failure_response,
+                    ));
             }
+            Ok(response)
         }
         Err(err) => Err(warp::reject::custom(err)),
     }
+}
+
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> Response {
+    let message = match status {
+        AcknowledgementFailure::Errored => "Error delivering contents to sink",
+        AcknowledgementFailure::Rejected => "Contents failed to deliver to sink",
+    };
+    let response = protobuf(Status {
+        code: tonic::Code::Unknown as i32,
+        message: message.to_owned(),
+        ..Default::default()
+    });
+    warp::reply::with_status(response, StatusCode::INTERNAL_SERVER_ERROR).into_response()
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {

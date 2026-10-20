@@ -1,6 +1,12 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    fmt,
+    sync::{Arc, LazyLock},
+    time::Instant,
+};
 
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
@@ -20,6 +26,38 @@ use crate::{
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
+
+/// Which legacy trace key layout an event was produced with.
+///
+/// This is an internal, unstable discriminator so Vector's own transforms and
+/// sinks can dispatch on layout after `source_type` is rewritten (for example
+/// across a vector sink/source hop). It names the original source layout so a
+/// converter can select a decoder; it is not a guarantee that the event object
+/// still has that shape. `remap` can rewrite or replace the payload while this
+/// field is retained, because it is not exposed to VRL. The converter that
+/// consumes the hint is still responsible for validating the payload.
+///
+/// It is not documented for users, is not a compatibility contract, and may
+/// change or be removed without a deprecation cycle. It is meaningful only on
+/// trace events; it is `None` on logs and metrics.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TraceLayout {
+    /// Layout written by the `datadog_agent` source.
+    Datadog,
+    /// Flattened per-span traces from the `opentelemetry` source.
+    ///
+    /// This is Vector's historical projection of an OTLP span (one event per
+    /// span), not an OTLP `resourceSpans` message.
+    OtelFlattened,
+    /// Raw OTLP `resourceSpans` batches from the `opentelemetry` source.
+    OtlpResourceSpans,
+    /// A protobuf value that is present but not a known layout.
+    ///
+    /// Conversion must treat this as an error rather than falling back to shape
+    /// detection. The original wire number is preserved so a later Vector that
+    /// understands it can still decode the record.
+    Unrecognized(i32),
+}
 
 /// The event metadata structure is a `Arc` wrapper around the actual metadata to avoid cloning the
 /// underlying data until it becomes necessary to provide a `mut` copy.
@@ -66,10 +104,13 @@ pub(super) struct Inner {
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
     /// This definition is only currently valid for logs, and shouldn't be used for other event types.
+    /// `None` stands for the shared default definition, so creating an event allocates nothing
+    /// for it.
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
-    #[serde(default = "default_schema_definition", skip)]
-    pub(crate) schema_definition: Arc<schema::Definition>,
+    #[derivative(PartialEq(compare_with = "schema_definition_eq"))]
+    #[serde(default, skip)]
+    pub(crate) schema_definition: Option<Arc<schema::Definition>>,
 
     /// A store of values that may be dropped during the encoding process but may be needed
     /// later on. The map is indexed by meaning.
@@ -83,6 +124,11 @@ pub(super) struct Inner {
     /// Only a small set of Vector sources and transforms explicitly set this field.
     #[serde(default)]
     pub(crate) datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
+
+    /// Which legacy trace key layout produced this event. `None` means unmarked.
+    /// Meaningful only on traces; always `None` for logs and metrics.
+    #[serde(default)]
+    pub(crate) trace_layout: Option<TraceLayout>,
 
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
@@ -204,6 +250,26 @@ impl EventMetadata {
         self.get_mut().source_type = Some(source_type.into());
     }
 
+    /// Sets the internal, unstable trace-layout hint.
+    pub fn set_trace_layout(&mut self, layout: TraceLayout) {
+        self.get_mut().trace_layout = Some(layout);
+    }
+
+    /// Returns the internal, unstable trace-layout marker, if present.
+    #[must_use]
+    pub fn trace_layout(&self) -> Option<TraceLayout> {
+        self.inner.trace_layout
+    }
+
+    /// Removes the internal trace-layout marker.
+    ///
+    /// Call this when converting a trace to a log. The marker is only meaningful
+    /// to components that consume traces as traces; leaving it would let a later
+    /// `TraceEvent` reconstructed from that log inherit a stale layout.
+    pub fn clear_trace_layout(&mut self) {
+        self.get_mut().trace_layout = None;
+    }
+
     /// Sets the `upstream_id` in the metadata to the provided value.
     pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
         self.get_mut().upstream_id = Some(upstream_id);
@@ -270,12 +336,13 @@ impl Default for Inner {
             value: Value::Object(ObjectMap::new()),
             secrets: Secrets::new(),
             finalizers: Default::default(),
-            schema_definition: default_schema_definition(),
+            schema_definition: None,
             source_id: None,
             source_type: None,
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
+            trace_layout: None,
             source_event_id: Some(Uuid::new_v4()),
         }
     }
@@ -290,11 +357,29 @@ impl Default for EventMetadata {
     }
 }
 
-pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
+static DEFAULT_SCHEMA_DEFINITION: LazyLock<Arc<schema::Definition>> = LazyLock::new(|| {
     Arc::new(schema::Definition::new_with_default_metadata(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
     ))
+});
+
+fn default_schema_definition() -> &'static Arc<schema::Definition> {
+    &DEFAULT_SCHEMA_DEFINITION
+}
+
+fn resolve_schema_definition(
+    definition: Option<&Arc<schema::Definition>>,
+) -> &Arc<schema::Definition> {
+    definition.unwrap_or_else(|| default_schema_definition())
+}
+
+#[expect(clippy::ref_option, reason = "signature required by `derivative`")]
+fn schema_definition_eq(
+    left: &Option<Arc<schema::Definition>>,
+    right: &Option<Arc<schema::Definition>>,
+) -> bool {
+    resolve_schema_definition(left.as_ref()) == resolve_schema_definition(right.as_ref())
 }
 
 impl ByteSizeOf for EventMetadata {
@@ -339,7 +424,7 @@ impl EventMetadata {
     /// Replace the schema definition with the given one.
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
-        self.get_mut().schema_definition = Arc::clone(schema_definition);
+        self.get_mut().schema_definition = Some(Arc::clone(schema_definition));
         self
     }
 
@@ -423,12 +508,12 @@ impl EventMetadata {
 
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
-        &self.inner.schema_definition
+        resolve_schema_definition(self.inner.schema_definition.as_ref())
     }
 
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
-        self.get_mut().schema_definition = Arc::clone(definition);
+        self.get_mut().schema_definition = Some(Arc::clone(definition));
     }
 
     /// Helper function to add a semantic meaning to the schema definition.
@@ -447,7 +532,11 @@ impl EventMetadata {
     ///     .set_schema_definition(new_schema);
     /// ````
     pub fn add_schema_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
-        let schema = Arc::make_mut(&mut self.get_mut().schema_definition);
+        let schema = Arc::make_mut(
+            self.get_mut()
+                .schema_definition
+                .get_or_insert_with(|| Arc::clone(default_schema_definition())),
+        );
         schema.add_meaning(target_path, meaning);
     }
 }
@@ -563,6 +652,38 @@ mod test {
     const SECRET2: &str = "secret2";
 
     #[test]
+    fn trace_layout_round_trip() {
+        let mut metadata = EventMetadata::default();
+        assert_eq!(metadata.trace_layout(), None);
+        metadata.set_trace_layout(TraceLayout::Datadog);
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Datadog));
+        metadata.set_trace_layout(TraceLayout::OtelFlattened);
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::OtelFlattened));
+        metadata.set_trace_layout(TraceLayout::OtlpResourceSpans);
+        assert_eq!(
+            metadata.trace_layout(),
+            Some(TraceLayout::OtlpResourceSpans)
+        );
+    }
+
+    #[test]
+    fn clear_trace_layout() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_trace_layout(TraceLayout::Datadog);
+        metadata.clear_trace_layout();
+        assert_eq!(metadata.trace_layout(), None);
+    }
+
+    #[test]
+    fn unrecognized_trace_layout_is_preserved() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_trace_layout(TraceLayout::Unrecognized(99));
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Unrecognized(99)));
+        metadata.set_trace_layout(TraceLayout::Unrecognized(0));
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Unrecognized(0)));
+    }
+
+    #[test]
     fn metadata_hardcoded_secrets_get_set() {
         let mut metadata = EventMetadata::default();
         metadata.set_datadog_api_key(Arc::from(SECRET));
@@ -602,7 +723,7 @@ mod test {
 
         {
             let mut merged = m2.clone();
-            merged.merge(m1.clone());
+            merged.merge(m1);
             assert_eq!(merged.source_event_id(), m2.source_event_id());
         }
     }

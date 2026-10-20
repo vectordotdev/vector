@@ -26,7 +26,6 @@ components: transforms: delay: {
 				items are emitted in the same millisecond.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.transforms.delay.configuration & {
