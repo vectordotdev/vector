@@ -85,8 +85,8 @@ impl From<Compression> for Writer {
                 ZLIB_INPUT_BUFFER_CAPACITY,
                 ZlibEncoder::new(writer, level.as_flate2()),
             )),
-            Compression::Zstd(level) => {
-                let encoder = ZstdEncoder::new(writer, level.into())
+            Compression::Zstd { level, window_log } => {
+                let encoder = ZstdEncoder::new(writer, level.into(), window_log)
                     .expect("Zstd encoder should not fail on init.");
                 Writer::Zstd(encoder)
             }

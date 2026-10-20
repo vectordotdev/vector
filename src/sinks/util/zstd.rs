@@ -34,8 +34,15 @@ impl<W: io::Write> ZstdEncoder<W> {
     /// # Errors
     ///
     /// Returns an error if the encoder cannot be initialized.
-    pub fn new(writer: W, level: ZstdCompressionLevel) -> io::Result<Self> {
-        let encoder = zstd::Encoder::new(writer, level.0)?;
+    pub fn new(
+        writer: W,
+        level: ZstdCompressionLevel,
+        window_log: Option<u32>,
+    ) -> io::Result<Self> {
+        let mut encoder = zstd::Encoder::new(writer, level.0)?;
+        if let Some(window_log) = window_log {
+            encoder.window_log(window_log)?;
+        }
         Ok(Self { inner: encoder })
     }
 

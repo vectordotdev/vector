@@ -550,7 +550,7 @@ const APPEND_BLOB_MAX_BLOCK_BYTES: usize = 4 * 1024 * 1024;
 /// concatenation: `gzip` (multi-member) and `zstd` (multi-frame) do, raw Snappy and zlib do not.
 const fn supports_append(compression: Compression) -> bool {
     match compression {
-        Compression::None | Compression::Gzip(_) | Compression::Zstd(_) => true,
+        Compression::None | Compression::Gzip(_) | Compression::Zstd { .. } => true,
         Compression::Snappy | Compression::Zlib(_) => false,
     }
 }
