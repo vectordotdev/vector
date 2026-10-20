@@ -23,6 +23,8 @@ use crate::{
     },
 };
 
+mod http2;
+
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const INVALID_CA_PATH: &str = "tests/integration/http-client/data/certs/invalid-ca-cert.pem";
 const PROXY_USERNAME: &str = "proxy-user";

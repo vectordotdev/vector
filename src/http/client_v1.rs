@@ -19,10 +19,10 @@ use hyper_1::{body::Incoming, rt};
 use hyper_openssl_1::{SslStream, client::legacy::HttpsConnector};
 use hyper_util::{
     client::legacy::{
-        Client,
+        Builder, Client,
         connect::{Connected, Connection, HttpConnector},
     },
-    rt::TokioExecutor,
+    rt::{TokioExecutor, TokioTimer},
 };
 use openssl::ssl::SslConnector;
 use percent_encoding::percent_decode_str;
@@ -126,7 +126,8 @@ impl HttpClient {
     /// build a connector.
     pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
         let routes = Arc::new(RoutePlanner::new(proxy)?);
-        let connector = HttpProxyConnectorV1::new(tls, Arc::clone(&routes))?;
+        let connector =
+            HttpProxyConnectorV1::new(tls, Arc::clone(&routes), ForwardProxyAlpn::Http1)?;
         let client = Client::builder(TokioExecutor::new()).build(connector);
 
         Ok(Self {
@@ -150,16 +151,7 @@ impl HttpClient {
         async move {
             default_request_headers(&mut request, &self.user_agent);
 
-            if let Route::ForwardProxy {
-                authorization: Some(authorization),
-                ..
-            } = self.routes.route(request.uri()).map_err(HttpError::from)?
-                && !request.headers().contains_key(PROXY_AUTHORIZATION)
-            {
-                request
-                    .headers_mut()
-                    .insert(PROXY_AUTHORIZATION, authorization);
-            }
+            add_forward_proxy_authorization(&self.routes, &mut request).map_err(HttpError::from)?;
 
             {
                 let telemetry = HttpRequestV1Telemetry::new(&request);
@@ -194,6 +186,145 @@ impl HttpClient {
         .instrument(span)
         .await
     }
+}
+
+/// A native HTTP/2-only client that shares [`HttpClient`]'s TLS and proxy routing.
+///
+/// The wire protocol is always HTTP/2 with prior knowledge, independent of TLS ALPN. The
+/// configured `tls.alpn_protocols` list is offered unchanged on destination TLS connections and
+/// is neither required nor forced to contain `h2`; whatever ALPN result is negotiated, or none,
+/// the client speaks HTTP/2. This matches the HTTP/2-only `hyper` 0.14 client used by gRPC sinks.
+/// Unlike that client, forward proxy credentials are sent and `tls.server_name` also applies to
+/// destinations tunneled through a proxy.
+///
+/// Routes:
+///
+/// - Direct `http://` destinations use cleartext HTTP/2 (h2c) prior knowledge.
+/// - Direct `https://` destinations use the configured TLS settings, including
+///   `tls.server_name`, identity, and the configured ALPN list.
+/// - `https://` destinations reached through a proxy are tunneled with an HTTP/1.1 `CONNECT`.
+///   The TLS connection to the proxy itself only offers `http/1.1` via ALPN, so the proxy never
+///   negotiates HTTP/2 for the `CONNECT` exchange. HTTP/2 then runs inside the tunnel over the
+///   destination TLS connection, which uses the configured TLS settings and ALPN list.
+/// - `http://` destinations reached through a forward proxy have no tunnel, so the proxy itself
+///   is the HTTP/2 peer: the client sends h2c prior knowledge to the proxy, with the destination
+///   in the `:scheme` and `:authority` pseudo-headers, as the legacy `hyper-proxy` connector did.
+///   Such proxies must accept HTTP/2 prior knowledge. A TLS (`https://`) forward proxy is
+///   connected with the configured TLS settings and ALPN list, except `tls.server_name`, and
+///   receives HTTP/2 over that TLS connection instead of h2c.
+/// - `no_proxy` matches are always connected directly.
+///
+/// Request and response bodies are passed through natively: `B` is neither boxed nor
+/// re-encoded, and the returned [`Incoming`] body yields the peer's data and trailer frames.
+///
+/// Unlike [`HttpClient`], this client adds no `User-Agent` or `Accept-Encoding` header and emits
+/// no HTTP client telemetry; callers own request headers and internal events. The only header it
+/// may add is `Proxy-Authorization`, see [`Http2Client::request`].
+pub struct Http2Client<B> {
+    client: Client<HttpProxyConnectorV1, B>,
+    routes: Arc<RoutePlanner>,
+}
+
+impl<B> Clone for Http2Client<B> {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            routes: Arc::clone(&self.routes),
+        }
+    }
+}
+
+impl<B> fmt::Debug for Http2Client<B> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Http2Client")
+            .finish_non_exhaustive()
+    }
+}
+
+impl<B> Http2Client<B>
+where
+    B: http_body_1::Body + Send + Unpin + 'static,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
+{
+    /// Builds an HTTP/2-only client that routes requests through `proxy` and uses `tls` for
+    /// HTTPS destinations and TLS proxies.
+    ///
+    /// `builder` supplies the executor, connection pool, and HTTP/2 settings such as
+    /// `http2_keep_alive_interval`, `http2_keep_alive_timeout`, and
+    /// `http2_keep_alive_while_idle`. This constructor always enables `http2_only` and installs
+    /// [`TokioTimer`] as both the HTTP/2 timer, which keepalive pings require, and the pool timer,
+    /// which evicts idle connections once the pool idle timeout elapses. Any timers previously set
+    /// on `builder` are replaced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot build a
+    /// connector.
+    pub fn new(
+        tls: MaybeTlsSettings,
+        proxy: &ProxyConfig,
+        mut builder: Builder,
+    ) -> Result<Self, BoxError> {
+        let routes = Arc::new(RoutePlanner::new(proxy)?);
+        let connector =
+            HttpProxyConnectorV1::new(tls, Arc::clone(&routes), ForwardProxyAlpn::Configured)?;
+        let client = builder
+            .http2_only(true)
+            .timer(TokioTimer::new())
+            .pool_timer(TokioTimer::new())
+            .build(connector);
+
+        Ok(Self { client, routes })
+    }
+
+    /// Sends `request` over HTTP/2 and resolves to the response head with its streaming body.
+    ///
+    /// The request URI must be absolute with an `http` or `https` scheme. If the destination is
+    /// an `http://` URI routed through a forward proxy whose URL contains credentials, a
+    /// `Proxy-Authorization` header is inserted unless the request already has one. No other
+    /// header is added, and no HTTP client internal events are emitted.
+    ///
+    /// The returned future does not borrow `self`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a non-retriable [`HttpError`] if the request URI cannot be routed, for example
+    /// because it has no scheme or an unsupported one. Returns a retriable [`HttpError`] if the
+    /// connection, proxy tunnel, TLS handshake, or HTTP/2 exchange fails.
+    pub fn request(
+        &self,
+        mut request: Request<B>,
+    ) -> impl Future<Output = Result<Response<Incoming>, HttpError>> + Send + 'static + use<B> {
+        let response = add_forward_proxy_authorization(&self.routes, &mut request)
+            .map(|()| self.client.request(request));
+
+        async move {
+            match response {
+                Ok(response) => response.await.map_err(HttpError::new),
+                Err(error) => Err(HttpError::from(error)),
+            }
+        }
+    }
+}
+
+/// Inserts the forward proxy credentials for `request` unless it already carries them.
+fn add_forward_proxy_authorization<B>(
+    routes: &RoutePlanner,
+    request: &mut Request<B>,
+) -> Result<(), BoxError> {
+    if let Route::ForwardProxy {
+        authorization: Some(authorization),
+        ..
+    } = routes.route(request.uri())?
+        && !request.headers().contains_key(PROXY_AUTHORIZATION)
+    {
+        request
+            .headers_mut()
+            .insert(PROXY_AUTHORIZATION, authorization);
+    }
+    Ok(())
 }
 
 fn default_user_agent() -> HeaderValue {
@@ -363,10 +494,21 @@ enum Route {
 
 type BaseConnector = HttpsConnector<HttpConnector>;
 
+/// ALPN protocols offered on the TLS connection to a forward (non-`CONNECT`) proxy.
+#[derive(Clone, Copy)]
+enum ForwardProxyAlpn {
+    /// Offer only `http/1.1`, for clients that speak HTTP/1.1 to forward proxies.
+    Http1,
+    /// Offer the configured `tls.alpn_protocols`, for the HTTP/2-only client whose forward proxy
+    /// is its HTTP/2 peer.
+    Configured,
+}
+
 #[derive(Clone)]
 struct HttpProxyConnectorV1 {
     direct: BaseConnector,
-    proxy: BaseConnector,
+    forward_proxy: BaseConnector,
+    connect_proxy: BaseConnector,
     destination_tls: SslConnector,
     tls_settings: Option<TlsSettings>,
     routes: Arc<RoutePlanner>,
@@ -378,15 +520,26 @@ impl HttpProxyConnectorV1 {
         clippy::needless_pass_by_value,
         reason = "Preserve ownership and drop timing"
     )]
-    fn new(tls: MaybeTlsSettings, routes: Arc<RoutePlanner>) -> Result<Self, BoxError> {
+    fn new(
+        tls: MaybeTlsSettings,
+        routes: Arc<RoutePlanner>,
+        forward_proxy_alpn: ForwardProxyAlpn,
+    ) -> Result<Self, BoxError> {
         let tls_settings = tls.tls().cloned();
-        let direct = https_connector(&tls, false)?;
-        let proxy = https_connector(&tls, true)?;
+        let direct = https_connector(&tls, false, false)?;
+        // `CONNECT` is always driven through HTTP/1.1. Do not allow a TLS proxy to negotiate h2
+        // from the destination's configured ALPN list.
+        let connect_proxy = https_connector(&tls, true, true)?;
+        let forward_proxy = match forward_proxy_alpn {
+            ForwardProxyAlpn::Http1 => connect_proxy.clone(),
+            ForwardProxyAlpn::Configured => https_connector(&tls, true, false)?,
+        };
         let destination_tls = tls_connector_builder(&tls)?.build();
 
         Ok(Self {
             direct,
-            proxy,
+            forward_proxy,
+            connect_proxy,
             destination_tls,
             tls_settings,
             routes,
@@ -460,7 +613,8 @@ impl Service<Uri> for HttpProxyConnectorV1 {
     fn call(&mut self, destination: Uri) -> Self::Future {
         let route = self.routes.route(&destination);
         let mut direct = self.direct.clone();
-        let mut proxy = self.proxy.clone();
+        let mut forward_proxy = self.forward_proxy.clone();
+        let connect_proxy = self.connect_proxy.clone();
         let destination_tls = self.destination_tls.clone();
         let tls_settings = self.tls_settings.clone();
 
@@ -469,7 +623,7 @@ impl Service<Uri> for HttpProxyConnectorV1 {
                 Route::Direct { destination } => direct.call(destination).await.map(BoxedIo::new),
                 Route::ForwardProxy {
                     proxy: proxy_uri, ..
-                } => proxy
+                } => forward_proxy
                     .call(proxy_uri)
                     .await
                     .map(|stream| BoxedIo::new(ForwardProxyIo(stream))),
@@ -479,7 +633,7 @@ impl Service<Uri> for HttpProxyConnectorV1 {
                     authorization,
                 } => {
                     Self::connect_tunnel(
-                        proxy,
+                        connect_proxy,
                         destination_tls,
                         tls_settings,
                         proxy_uri,
@@ -496,13 +650,12 @@ impl Service<Uri> for HttpProxyConnectorV1 {
 fn https_connector(
     tls: &MaybeTlsSettings,
     skip_server_name: bool,
+    http1_alpn: bool,
 ) -> Result<BaseConnector, BoxError> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
     let mut tls_builder = tls_connector_builder(tls)?;
-    if skip_server_name {
-        // Proxy connections are driven through HTTP/1.1, including CONNECT. Do not allow a TLS
-        // proxy to negotiate h2 from the destination's configured ALPN list.
+    if http1_alpn {
         tls_builder.set_alpn_protos(HTTP1_ALPN)?;
     }
     let mut https = HttpsConnector::with_connector(http, tls_builder)?;
