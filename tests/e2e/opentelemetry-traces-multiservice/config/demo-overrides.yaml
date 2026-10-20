@@ -9,14 +9,9 @@
 x-test-service: &test-service
   labels:
     vector.otel-traces-multiservice.producer: "true"
-# Export every trace and flush batches every second so short runs capture all spans.
-x-test-environment: &test-environment
-  OTEL_BSP_SCHEDULE_DELAY: "1000"
-  OTEL_TRACES_SAMPLER: always_on
 # Remove source builds because setup downloads deployment files, not application
 # sources. Inherit upstream container names and other deployment defaults.
 # They must repeat: older Compose versions lose reset tags through YAML aliases.
-# Producers wait for a healthy Collector so startup does not lose their first spans.
 services:
   # Omit the browser proxy, static images, and documentation/flag UIs.
   flagd-ui: !reset null
@@ -26,83 +21,39 @@ services:
   ad:
     <<: *test-service
     build: !reset null # Use the published image, not a local source build.
-    environment:
-      <<: *test-environment
     # The upstream 300 MiB limit caused OOM kills in CI.
     deploy:
       resources:
         limits:
           memory: 512M
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   cart:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   checkout:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   currency:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   email:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   frontend:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
     depends_on:
-      otel-collector:
-        condition: service_healthy
       image-provider: !reset null # The API-only workload does not fetch images.
   payment:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   product-catalog:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
     volumes: !override # Use our local SDK configuration rather than a file from the Demo source tree.
       - "../data/otel-config.yml:/otel-config.yml:ro"
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   quote:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
     # A failed connection must exit nonzero; upstream uses a string exit message.
     healthcheck:
       test:
@@ -110,51 +61,23 @@ services:
         - php
         - "-r"
         - fsockopen('localhost', 8090) or exit(1);
-      timeout: 5s
-      interval: 5s
-      retries: 20
-      start_period: 10s
   recommendation:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   shipping:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   accounting:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   fraud-detection:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
-    depends_on:
-      otel-collector:
-        condition: service_healthy
   kafka:
     <<: *test-service
     build: !reset null
-    environment:
-      <<: *test-environment
   flagd:
     <<: *test-service
-    environment:
-      <<: *test-environment
     volumes: !override # Fix feature flags for repeatable coverage, including cart error spans.
       - "../data/demo.flagd.json:/etc/flagd/demo.flagd.json:ro"
   astronomy-db:
@@ -173,7 +96,6 @@ services:
     <<: *test-service
     build: !reset null
     environment:
-      <<: *test-environment
       CONFIG_INGRESS_EXPORTER: "${CONFIG_INGRESS_EXPORTER}"
       # Upstream hard-codes this value, so an env-file setting cannot replace it.
       LOCUST_BROWSER_TRAFFIC_ENABLED: "false"
