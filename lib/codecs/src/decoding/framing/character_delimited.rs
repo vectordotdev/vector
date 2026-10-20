@@ -2,10 +2,13 @@ use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
+use vector_common::internal_event::{ComponentEventsDropped, INTENTIONAL, emit};
 use vector_config::configurable_component;
 use vector_core::serde::AsciiChar;
 
 use super::BoxedFramingError;
+
+const OVERSIZED_FRAME_DROPPED_REASON: &str = "Frame exceeded max_length.";
 
 /// The behavior to apply when a frame exceeds the maximum allowed byte size.
 #[configurable_component]
@@ -169,6 +172,10 @@ impl Decoder for CharacterDelimitedDecoder {
                                     buf_len = buf.len(),
                                     max_length = self.max_length,
                                 );
+                                emit(ComponentEventsDropped::<INTENTIONAL> {
+                                    count: 1,
+                                    reason: OVERSIZED_FRAME_DROPPED_REASON,
+                                });
                                 buf.advance(next_delimiter_idx + 1);
                             }
                             OversizedAction::Truncate => {
@@ -211,6 +218,10 @@ impl Decoder for CharacterDelimitedDecoder {
                                 buf_len = buf.len(),
                                 max_length = self.max_length,
                             );
+                            emit(ComponentEventsDropped::<INTENTIONAL> {
+                                count: 1,
+                                reason: OVERSIZED_FRAME_DROPPED_REASON,
+                            });
                             buf.clear();
                             Ok(None)
                         }
@@ -272,6 +283,39 @@ mod tests {
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123456")));
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123")));
         assert_eq!(codec.decode_eof(buf).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_drop_emits_intentional_discarded_events() {
+        use vector_core::{
+            event::MetricValue,
+            metrics::{Controller, init_test},
+        };
+
+        init_test();
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', 3);
+        let buf = &mut BytesMut::new();
+
+        // One oversized frame dropped by `decode`, one by `decode_eof`.
+        buf.put_slice(b"toolong\nok\nalsotoolong");
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("ok")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), None);
+
+        let discarded = Controller::get()
+            .expect("There must be a controller")
+            .capture_metrics()
+            .into_iter()
+            .filter(|metric| metric.name() == "component_discarded_events_total")
+            .collect::<Vec<_>>();
+        assert_eq!(discarded.len(), 1);
+        assert_eq!(
+            discarded[0].tags().and_then(|tags| tags.get("intentional")),
+            Some("true")
+        );
+        let MetricValue::Counter { value } = discarded[0].value() else {
+            panic!("component_discarded_events_total has invalid type")
+        };
+        assert!((*value - 2.0).abs() < f64::EPSILON);
     }
 
     // Regression test for [infinite loop bug](https://github.com/vectordotdev/vector/issues/2564)
