@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package test;
-
-message Bytes {
-    bytes text = 1;
-    bytes binary = 2;
-}

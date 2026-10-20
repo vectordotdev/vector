@@ -1,7 +1,10 @@
 use crate::codecs::encoding::ProtobufSerializerConfig;
 use futures::FutureExt;
 use indoc::indoc;
-use tonic::transport::Channel;
+use std::path::PathBuf;
+
+use http::uri::Scheme;
+use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
@@ -16,6 +19,7 @@ use crate::gcp::{BIGQUERY_STORAGE_URL, GcpAuthConfig, GcpAuthenticator, Scope};
 use crate::sinks::util::service::ServiceBuilderExt;
 use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
+use crate::tls::{TlsConfig, TlsSettings};
 use vector_lib::stream::BatcherSettings;
 
 fn default_endpoint() -> String {
@@ -51,11 +55,11 @@ pub struct BigqueryConfig {
     /// The endpoint to which to publish events.
     ///
     /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
-    /// by the [`GCP BigQuery`][bigquery_api] API are used.
+    /// by the [BigQuery Storage Write API][bigquery_write_api] are used.
     ///
     /// The trailing slash `/` must not be included.
     ///
-    /// [bigquery_api]: https://cloud.google.com/bigquery/docs/reference/rest
+    /// [bigquery_write_api]: https://cloud.google.com/bigquery/docs/write-api
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "https://bigquerystorage.googleapis.com:443"))]
     pub endpoint: String,
@@ -82,8 +86,13 @@ pub struct BigqueryConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    // we only support protobuf encoding because that's what the API uses (gRPC)
+    /// Encoding configuration.
+    ///
+    /// Only Protobuf is supported, because the Storage Write API ingests rows as serialized Protobuf messages.
     encoding: ProtobufSerializerConfig,
+
+    #[serde(default)]
+    pub tls: Option<BigqueryTlsConfig>,
 
     #[serde(
         default,
@@ -91,6 +100,81 @@ pub struct BigqueryConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+/// TLS configuration.
+///
+/// TLS is used whenever `endpoint` uses the `https` scheme, verifying the server against the system's
+/// trusted root certificates. These options customize it.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct BigqueryTlsConfig {
+    /// Absolute path to an additional CA certificate file, trusted in addition to the system's root certificates.
+    ///
+    /// The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+    #[configurable(metadata(docs::examples = "/path/to/certificate_authority.crt"))]
+    #[configurable(metadata(docs::human_name = "CA File Path"))]
+    pub ca_file: Option<PathBuf>,
+
+    /// Absolute path to a certificate file used to identify this client.
+    ///
+    /// The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+    /// an inline string in PEM format.
+    ///
+    /// If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+    #[configurable(metadata(docs::examples = "/path/to/host_certificate.crt"))]
+    #[configurable(metadata(docs::human_name = "Certificate File Path"))]
+    pub crt_file: Option<PathBuf>,
+
+    /// Absolute path to a private key file used to identify this client.
+    ///
+    /// The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+    #[configurable(metadata(docs::examples = "/path/to/host_certificate.key"))]
+    #[configurable(metadata(docs::human_name = "Key File Path"))]
+    pub key_file: Option<PathBuf>,
+
+    /// Passphrase used to unlock the encrypted key file.
+    ///
+    /// This has no effect unless `key_file` is set.
+    #[configurable(metadata(docs::examples = "${KEY_PASS_ENV_VAR}"))]
+    #[configurable(metadata(docs::examples = "PassWord1"))]
+    #[configurable(metadata(docs::human_name = "Key File Password"))]
+    pub key_pass: Option<String>,
+
+    /// Server name to use for Server Name Indication (SNI) and to verify the server's certificate.
+    ///
+    /// Defaults to the host of `endpoint`.
+    #[configurable(metadata(docs::examples = "bigquerystorage.googleapis.com"))]
+    #[configurable(metadata(docs::human_name = "Server Name"))]
+    pub server_name: Option<String>,
+}
+
+impl BigqueryTlsConfig {
+    /// Loads the certificate files and builds the tonic TLS configuration.
+    fn client_tls_config(&self) -> crate::Result<ClientTlsConfig> {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            ca_file: self.ca_file.clone(),
+            crt_file: self.crt_file.clone(),
+            key_file: self.key_file.clone(),
+            key_pass: self.key_pass.clone(),
+            ..TlsConfig::default()
+        }))?;
+
+        let mut config = ClientTlsConfig::new();
+        if let Some(server_name) = &self.server_name {
+            config = config.domain_name(server_name);
+        }
+        // tonic accepts a single PEM bundle of additional CA certificates.
+        let authorities: Vec<u8> = settings.authorities_pem().flatten().collect();
+        if !authorities.is_empty() {
+            config = config.ca_certificate(Certificate::from_pem(authorities));
+        }
+        if let Some((cert, key)) = settings.identity_pem() {
+            config = config.identity(Identity::from_pem(cert, key));
+        }
+        Ok(config)
+    }
 }
 
 impl BigqueryConfig {
@@ -162,7 +246,21 @@ impl ValidatedSink for BigqueryConfig {
     type Validated = ValidatedBigquery;
 
     fn validate(&self) -> crate::Result<ValidatedBigquery> {
-        let endpoint = self.endpoint.parse()?;
+        let endpoint: http::Uri = self.endpoint.parse()?;
+        let scheme = endpoint.scheme();
+        if scheme != Some(&Scheme::HTTP) && scheme != Some(&Scheme::HTTPS) {
+            return Err(format!(
+                "`endpoint` must use the `http` or `https` scheme, got `{}`",
+                self.endpoint
+            )
+            .into());
+        }
+        if endpoint.host().is_none() {
+            return Err(format!("`endpoint` must include a host, got `{}`", self.endpoint).into());
+        }
+        if self.tls.is_some() && scheme != Some(&Scheme::HTTPS) {
+            return Err("`tls` options require an `https` endpoint".into());
+        }
         let batcher_settings = self
             .batch
             .validate()?
@@ -195,9 +293,17 @@ impl ValidatedSink for BigqueryConfig {
         auth.spawn_regenerate_token();
 
         // Create the gRPC channel; tonic channels are cheap to clone and share the underlying connection.
-        let channel = Channel::builder(validated.endpoint.clone())
-            .connect_timeout(std::time::Duration::from_secs(10))
-            .connect_lazy();
+        let mut endpoint = Channel::builder(validated.endpoint.clone())
+            .connect_timeout(std::time::Duration::from_secs(10));
+        // Configure TLS explicitly rather than relying on tonic's implicit TLS for `https` URIs,
+        // which only exists in some tonic versions (removed in 0.12).
+        if validated.endpoint.scheme() == Some(&Scheme::HTTPS) {
+            let tls = self.tls.clone().unwrap_or_default().client_tls_config()?;
+            endpoint = endpoint.tls_config(tls)?;
+        }
+        // Connect lazily so an unreachable endpoint at startup surfaces as a retriable error on the
+        // first request instead of failing the sink build.
+        let channel = endpoint.connect_lazy();
 
         // Kick off the healthcheck
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {

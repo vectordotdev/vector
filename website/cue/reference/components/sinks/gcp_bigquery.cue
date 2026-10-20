@@ -37,8 +37,8 @@ components: sinks: gcp_bigquery: {
 			}
 			tls: {
 				enabled:                true
-				can_verify_certificate: true
-				can_verify_hostname:    true
+				can_verify_certificate: false
+				can_verify_hostname:    false
 				enabled_default:        true
 				enabled_by_scheme:      true
 			}
@@ -85,6 +85,12 @@ components: sinks: gcp_bigquery: {
 				used by one of its fields must be defined as a nested type inside it.
 				References to other top-level messages, including types such as
 				`google.protobuf.Timestamp`, are rejected when the sink starts.
+
+				The message must also be defined with proto2 syntax.
+				BigQuery expects rows encoded with proto2 semantics, and proto3 omits fields
+				set to their default value (such as `0` or an empty string), which BigQuery
+				would store as `NULL`. Messages from proto3 files are rejected when the sink
+				starts.
 				"""
 		}
 	}

@@ -1,10 +1,12 @@
 use crate::codecs::encoding::ProtobufSerializer;
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use prost::{Message, encoding::encoded_len_varint};
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use tokio_util::codec::Encoder;
-use vector_lib::event::Finalizable;
+use vector_lib::config;
+use vector_lib::event::{EventStatus, Finalizable};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
 use vector_lib::request_metadata::RequestMetadata;
 
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
@@ -32,6 +34,8 @@ pub enum BigqueryRequestBuilderError {
         type_name
     ))]
     ExternalTypeReference { root: String, type_name: String },
+    #[snafu(display("Protobuf message `{}` is not defined with proto2 syntax.", root))]
+    UnsupportedSyntax { root: String },
 }
 
 /// Returns the first referenced type that isn't self-contained.
@@ -92,6 +96,13 @@ impl BigqueryRequestBuilder {
             })?;
         let root_full_name = protobuf_serializer.message_full_name();
 
+        // The Storage Write API expects rows with proto2 semantics, especially for default values.
+        if protobuf_serializer.syntax() != prost_reflect::Syntax::Proto2 {
+            return Err(BigqueryRequestBuilderError::UnsupportedSyntax {
+                root: root_full_name.to_owned(),
+            });
+        }
+
         // BigQuery only receives the root message's `DescriptorProto`, so it must be self-contained.
         if let Some(type_name) = find_external_type_reference(&descriptor_proto, root_full_name) {
             return Err(BigqueryRequestBuilderError::ExternalTypeReference {
@@ -137,7 +148,7 @@ impl BigqueryRequestBuilder {
 
     fn build_proto_data(
         &self,
-        serialized_rows: Vec<Vec<u8>>,
+        serialized_rows: Vec<Bytes>,
     ) -> (NonZeroUsize, proto::append_rows_request::ProtoData) {
         let proto_data = proto::append_rows_request::ProtoData {
             writer_schema: Some(self.proto_schema.clone()),
@@ -147,6 +158,16 @@ impl BigqueryRequestBuilder {
             .expect("encoded payload can never be empty");
         (size, proto_data)
     }
+}
+
+fn empty_chunk_metadata() -> RequestMetadataBuilder {
+    RequestMetadataBuilder::new(0, 0, config::telemetry().create_request_count_byte_size())
+}
+
+/// Marks an event as rejected so acknowledging sources don't treat it as delivered.
+fn reject_event(finalizers: &EventFinalizers, reason: &'static str) {
+    finalizers.update_status(EventStatus::Rejected);
+    emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
 }
 
 impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
@@ -163,52 +184,58 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
             MAX_BATCH_PAYLOAD_SIZE - self.request_overhead - LENGTH_PREFIX_BUFFER;
         let mut results = vec![];
         let mut event_finalizers = EventFinalizers::DEFAULT;
-        let mut chunk_metadata = RequestMetadataBuilder::default();
+        let mut chunk_metadata = empty_chunk_metadata();
 
-        let mut serialized_rows: Vec<Vec<u8>> = vec![];
+        let mut serialized_rows: Vec<Bytes> = vec![];
         let mut serialized_rows_len = 0;
         for mut event in input {
+            let finalizers = event.take_finalizers();
+            let event_metadata = RequestMetadataBuilder::from_event(&event);
             let mut bytes = BytesMut::new();
-            if let Err(e) = self.protobuf_serializer.encode(event.clone(), &mut bytes) {
+            if let Err(e) = self.protobuf_serializer.encode(event, &mut bytes) {
+                reject_event(&finalizers, "Failed to encode event.");
                 results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
                     message: format!("{e}"),
                 }));
-            } else {
-                // Each row in ProtoRows.serialized_rows (field 1, wire type 2) is encoded as
-                // 1 byte tag + varint(len) bytes + payload bytes.
-                let row_framed_size = bytes.len() + 1 + encoded_len_varint(bytes.len() as u64);
-                if row_framed_size > max_serialized_rows_len {
-                    // A single event that exceeds the limit cannot be sent in any request, reject it immediately.
-                    results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
-                        message: format!(
-                            "Event ({row_framed_size} bytes including proto framing) exceeds the maximum allowed serialized rows size ({max_serialized_rows_len} bytes).",
-                        ),
-                    }));
-                } else {
-                    if row_framed_size + serialized_rows_len > max_serialized_rows_len {
-                        // Adding this event would overflow the current chunk so flush it first.
-                        let (size, proto_data) = self.build_proto_data(serialized_rows);
-                        results.push(Ok((
-                            BigqueryRequestMetadata {
-                                finalizers: event_finalizers,
-                                request_metadata: chunk_metadata.with_request_size(size),
-                            },
-                            proto_data,
-                        )));
-                        event_finalizers = EventFinalizers::DEFAULT;
-                        chunk_metadata = RequestMetadataBuilder::default();
-                        serialized_rows_len = 0;
-                        serialized_rows = vec![];
-                    }
-                    let current_event_finalizers = event.take_finalizers();
-                    chunk_metadata.track_event(&event);
-                    event_finalizers.merge(current_event_finalizers);
-                    serialized_rows_len += row_framed_size;
-                    serialized_rows.push(bytes.into());
-                }
+                continue;
             }
+
+            // Each row in ProtoRows.serialized_rows (field 1, wire type 2) is encoded as
+            // 1 byte tag + varint(len) bytes + payload bytes.
+            let row_framed_size = bytes.len() + 1 + encoded_len_varint(bytes.len() as u64);
+            if row_framed_size > max_serialized_rows_len {
+                // A single event that exceeds the limit cannot be sent in any request, reject it immediately.
+                reject_event(&finalizers, "Event is too large to send.");
+                results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
+                    message: format!(
+                        "Event ({row_framed_size} bytes including proto framing) exceeds the maximum allowed serialized rows size ({max_serialized_rows_len} bytes).",
+                    ),
+                }));
+                continue;
+            }
+
+            if row_framed_size + serialized_rows_len > max_serialized_rows_len {
+                // Adding this event would overflow the current chunk so flush it first.
+                let (size, proto_data) = self.build_proto_data(serialized_rows);
+                results.push(Ok((
+                    BigqueryRequestMetadata {
+                        finalizers: event_finalizers,
+                        request_metadata: chunk_metadata.with_request_size(size),
+                    },
+                    proto_data,
+                )));
+                event_finalizers = EventFinalizers::DEFAULT;
+                chunk_metadata = empty_chunk_metadata();
+                serialized_rows_len = 0;
+                serialized_rows = vec![];
+            }
+            chunk_metadata.merge(event_metadata);
+            event_finalizers.merge(finalizers);
+            serialized_rows_len += row_framed_size;
+            serialized_rows.push(bytes.freeze());
         }
-        // flush the final chunk (if there are any events left)
+
+        // flush the final chunk if there are any events left.
         if !serialized_rows.is_empty() {
             let (size, proto_data) = self.build_proto_data(serialized_rows);
             results.push(Ok((
@@ -257,7 +284,7 @@ mod test {
     fn make_oversized_event() -> Event {
         Event::Log(LogEvent::from_parts(
             Value::Object(BTreeMap::from([(
-                "binary".into(),
+                "email".into(),
                 Value::Bytes(Bytes::from_static(OVERSIZED_PAYLOAD)),
             )])),
             EventMetadata::default(),
@@ -266,11 +293,11 @@ mod test {
 
     fn make_request_builder() -> BigqueryRequestBuilder {
         let desc_file = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
-            .join("lib/codecs/tests/data/protobuf/test.desc");
+            .join("lib/codecs/tests/data/protobuf/protos/test_protobuf.desc");
         let protobuf_serializer = ProtobufSerializerConfig {
             protobuf: ProtobufSerializerOptions {
                 desc_file,
-                message_type: "test.Bytes".into(),
+                message_type: "test_protobuf.Person".into(),
                 use_json_names: false,
             },
         }
@@ -301,8 +328,8 @@ mod test {
             .map(|_| {
                 Event::Log(LogEvent::from_parts(
                     Value::Object(BTreeMap::from([
-                        ("text".into(), Value::Bytes(Bytes::from("hello world"))),
-                        ("binary".into(), Value::Bytes(data.clone().into())),
+                        ("name".into(), Value::Bytes(Bytes::from("hello world"))),
+                        ("email".into(), Value::Bytes(data.clone().into())),
                     ])),
                     EventMetadata::default(),
                 ))
@@ -326,7 +353,7 @@ mod test {
         let mut request_builder = make_request_builder();
         let normal_event = Event::Log(LogEvent::from_parts(
             Value::Object(BTreeMap::from([(
-                "text".into(),
+                "name".into(),
                 Value::Bytes(Bytes::from("hello")),
             )])),
             EventMetadata::default(),
