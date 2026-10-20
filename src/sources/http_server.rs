@@ -2016,3 +2016,56 @@ mod tests {
 
     register_validatable_component!(SimpleHttpConfig);
 }
+
+#[cfg(test)]
+mod tls_peer_metadata_tests {
+    use futures::StreamExt;
+    use vector_lib::{event::EventStatus, lookup::path, tls::TLS_CLIENT_IDENTITY_KEY};
+    use vrl::value::{ObjectMap, Value};
+
+    use super::SimpleHttpConfig;
+    use crate::{
+        SourceSender,
+        config::SourceContext,
+        test_util::{
+            addr::next_addr,
+            http::{
+                post_with_client_cert, reloader_attaching_peer_metadata, test_mtls_server_config,
+            },
+            wait_for_tcp,
+        },
+    };
+
+    #[tokio::test]
+    async fn verifier_metadata_reaches_events() {
+        let identity = ObjectMap::from([("rule".into(), Value::from("agents"))]);
+        let tls = test_mtls_server_config(false);
+        let (_guard, address) = next_addr();
+        let config: SimpleHttpConfig = serde_json::from_value(serde_json::json!({
+            "address": address,
+            "tls": tls,
+        }))
+        .unwrap();
+        let (sender, mut events) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let source = config
+            .build_with_tls_reloader(
+                SourceContext::new_test(sender, None),
+                Some(reloader_attaching_peer_metadata(&tls, identity.clone())),
+            )
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let status = post_with_client_cert(address, "/", "text/plain", b"hello").await;
+        assert!(status.contains("200"), "{status}");
+
+        let event = events.next().await.unwrap();
+        assert_eq!(
+            event
+                .metadata()
+                .value()
+                .get(path!("http_server", TLS_CLIENT_IDENTITY_KEY)),
+            Some(&Value::Object(identity))
+        );
+    }
+}

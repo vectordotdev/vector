@@ -2341,3 +2341,92 @@ mod otlp_decoding_config_tests {
         assert_eq!(traces_output.ty, DataType::Trace); // Should always be Trace regardless of OTLP decoding
     }
 }
+
+mod tls_peer_metadata {
+    use hyper::client::HttpConnector;
+    use hyper_openssl::HttpsConnector;
+    use openssl::ssl::{SslConnector, SslFiletype, SslMethod};
+    use tonic::body::BoxBody;
+    use vector_lib::tls::{
+        TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH,
+        TLS_CLIENT_IDENTITY_KEY,
+    };
+
+    use similar_asserts::assert_eq;
+
+    use super::*;
+    use crate::test_util::http::{
+        post_with_client_cert, reloader_attaching_peer_metadata, test_mtls_server_config,
+    };
+
+    fn identity() -> ObjectMap {
+        ObjectMap::from([("rule".into(), Value::from("collectors"))])
+    }
+
+    fn assert_carries_identity(event: &Event) {
+        assert_eq!(
+            event
+                .metadata()
+                .value()
+                .get(path!(OpentelemetryConfig::NAME, TLS_CLIENT_IDENTITY_KEY)),
+            Some(&Value::Object(identity()))
+        );
+    }
+
+    #[tokio::test]
+    async fn verifier_metadata_reaches_grpc_and_http_events() {
+        let (_grpc_guard, grpc_addr) = next_addr();
+        let (_http_guard, http_addr) = next_addr();
+        let (grpc_tls, http_tls) = (
+            test_mtls_server_config(true),
+            test_mtls_server_config(false),
+        );
+        let config: OpentelemetryConfig = serde_json::from_value(serde_json::json!({
+            "grpc": { "address": grpc_addr, "tls": grpc_tls },
+            "http": { "address": http_addr, "tls": http_tls },
+        }))
+        .unwrap();
+        let (sender, output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+        let mut output = Box::pin(output);
+        let server = config
+            .build_with_tls_reloaders(
+                SourceContext::new_test(sender, None),
+                Some(reloader_attaching_peer_metadata(&grpc_tls, identity())),
+                Some(reloader_attaching_peer_metadata(&http_tls, identity())),
+            )
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(grpc_addr).await;
+        test_util::wait_for_tcp(http_addr).await;
+
+        // The test server certificate has no SAN, which rustls (tonic's TLS client) rejects, so
+        // speak gRPC over an OpenSSL-backed HTTP/2 client instead.
+        let mut ssl = SslConnector::builder(SslMethod::tls()).unwrap();
+        ssl.set_ca_file(TEST_PEM_CA_PATH).unwrap();
+        ssl.set_certificate_chain_file(TEST_PEM_CLIENT_CRT_PATH)
+            .unwrap();
+        ssl.set_private_key_file(TEST_PEM_CLIENT_KEY_PATH, SslFiletype::PEM)
+            .unwrap();
+        ssl.set_alpn_protos(b"\x02h2").unwrap();
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+        let https = HttpsConnector::with_connector(http, ssl).unwrap();
+        let client = hyper::Client::builder()
+            .http2_only(true)
+            .build::<_, BoxBody>(https);
+        let origin = format!("https://localhost:{}", grpc_addr.port())
+            .parse()
+            .unwrap();
+        LogsServiceClient::with_origin(client, origin)
+            .export(create_test_logs_request())
+            .await
+            .unwrap();
+        assert_carries_identity(&output.next().await.unwrap());
+
+        let body = create_test_logs_request().into_inner().encode_to_vec();
+        let status =
+            post_with_client_cert(http_addr, "/v1/logs", "application/x-protobuf", &body).await;
+        assert!(status.contains("200"), "{status}");
+        assert_carries_identity(&output.next().await.unwrap());
+    }
+}

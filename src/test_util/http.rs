@@ -152,3 +152,107 @@ pub fn spawn_authenticated_http_proxy() -> AuthenticatedHttpProxy {
         task,
     }
 }
+
+/// Sends one HTTP/1.1 `POST` request over TLS, presenting the test client certificate, and returns
+/// the response's status line.
+///
+/// The client trusts the test CA and identifies with `TEST_PEM_CLIENT_CRT_PATH`, so it works
+/// against servers configured with the test server certificate and `verify_certificate`.
+///
+/// # Panics
+///
+/// Panics if the connection, the TLS handshake, or the request fails.
+pub async fn post_with_client_cert(
+    address: SocketAddr,
+    path: &str,
+    content_type: &str,
+    body: &[u8],
+) -> String {
+    use std::pin::Pin;
+
+    use openssl::ssl::{SslConnector, SslFiletype, SslMethod};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use vector_lib::tls::{TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH};
+
+    let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+    builder.set_ca_file(TEST_PEM_CA_PATH).unwrap();
+    builder
+        .set_certificate_chain_file(TEST_PEM_CLIENT_CRT_PATH)
+        .unwrap();
+    builder
+        .set_private_key_file(TEST_PEM_CLIENT_KEY_PATH, SslFiletype::PEM)
+        .unwrap();
+    let ssl = builder
+        .build()
+        .configure()
+        .unwrap()
+        .into_ssl("localhost")
+        .unwrap();
+    let tcp = tokio::net::TcpStream::connect(address).await.unwrap();
+    let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
+    Pin::new(&mut stream).connect().await.unwrap();
+
+    let head = format!(
+        "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Type: {content_type}\r\n\
+         Content-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    stream.write_all(head.as_bytes()).await.unwrap();
+    stream.write_all(body).await.unwrap();
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).await.ok();
+    String::from_utf8_lossy(&response)
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .to_owned()
+}
+
+/// Server TLS settings using the test server certificate and requiring client certificates
+/// issued under the test CA. Pass `alpn_h2` for gRPC listeners.
+#[must_use]
+pub fn test_mtls_server_config(alpn_h2: bool) -> vector_lib::tls::TlsEnableableConfig {
+    use vector_lib::tls::{
+        TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH, TlsConfig, TlsEnableableConfig,
+    };
+
+    TlsEnableableConfig {
+        enabled: Some(true),
+        options: TlsConfig {
+            ca_file: Some(TEST_PEM_CA_PATH.into()),
+            crt_file: Some(TEST_PEM_CRT_PATH.into()),
+            key_file: Some(TEST_PEM_KEY_PATH.into()),
+            verify_certificate: Some(true),
+            alpn_protocols: alpn_h2.then(|| vec!["h2".to_owned()]),
+            ..Default::default()
+        },
+    }
+}
+
+/// An acceptor for `tls` whose client certificate verifier accepts every client and attaches
+/// `metadata` to the connection.
+///
+/// # Panics
+///
+/// Panics if `tls` does not enable server TLS.
+#[must_use]
+pub fn reloader_attaching_peer_metadata(
+    tls: &vector_lib::tls::TlsEnableableConfig,
+    metadata: vrl::value::ObjectMap,
+) -> vector_lib::tls::TlsAcceptorReloader {
+    use std::sync::Arc;
+
+    use openssl::{stack::StackRef, x509::X509};
+    use vector_lib::tls::{ClientCertVerdict, MaybeTls, MaybeTlsSettings};
+
+    let MaybeTls::Tls(settings) = MaybeTlsSettings::from_config(Some(tls), true).unwrap() else {
+        panic!("TLS must be enabled");
+    };
+    let settings = settings.with_client_cert_verifier(Arc::new(move |_: &StackRef<X509>| {
+        ClientCertVerdict::Accept(Some(metadata.clone()))
+    }));
+    MaybeTlsSettings::Tls(settings)
+        .reloadable_acceptor()
+        .unwrap()
+        .unwrap()
+}

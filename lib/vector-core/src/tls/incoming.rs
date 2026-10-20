@@ -25,7 +25,7 @@ use tonic::transport::{Certificate, server::Connected};
 
 use super::{
     CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
-    SslBuildSnafu, TcpBindSnafu, TlsAcceptorReloader, TlsError, TlsSettings,
+    SslBuildSnafu, TcpBindSnafu, TlsAcceptorReloader, TlsError, TlsPeerMetadata, TlsSettings,
 };
 use crate::tcp::{self, TcpKeepaliveConfig};
 
@@ -223,6 +223,8 @@ pub struct MaybeTlsIncomingStream<S> {
     // of MaybeTlsIncomingStream want access to the peer address while
     // still handshaking, so we have to cache it here.
     peer_addr: SocketAddr,
+    // Filled by the client certificate verifier during the handshake; available before it.
+    tls_peer_metadata: TlsPeerMetadata,
 }
 
 enum StreamState<S> {
@@ -235,6 +237,12 @@ enum StreamState<S> {
 impl<S> MaybeTlsIncomingStream<S> {
     pub const fn peer_addr(&self) -> SocketAddr {
         self.peer_addr
+    }
+
+    /// The metadata the client certificate verifier attached to this connection. The handle is
+    /// available immediately and filled once the TLS handshake completes.
+    pub fn tls_peer_metadata(&self) -> TlsPeerMetadata {
+        self.tls_peer_metadata.clone()
     }
 
     /// None if connection still hasn't been established.
@@ -281,22 +289,31 @@ impl MaybeTlsIncomingStream<TcpStream> {
         peer_addr: SocketAddr,
         acceptor: Option<SslAcceptor>,
     ) -> Self {
+        let tls_peer_metadata = TlsPeerMetadata::default();
         let state = match acceptor {
-            Some(acceptor) => StreamState::Accepting(
-                async move {
-                    let ssl = Ssl::new(acceptor.context()).context(SslBuildSnafu)?;
-                    let mut stream = SslStream::new(ssl, stream).context(SslBuildSnafu)?;
-                    Pin::new(&mut stream)
-                        .accept()
-                        .await
-                        .context(HandshakeSnafu)?;
-                    Ok(stream)
-                }
-                .boxed(),
-            ),
+            Some(acceptor) => {
+                let tls_peer_metadata = tls_peer_metadata.clone();
+                StreamState::Accepting(
+                    async move {
+                        let mut ssl = Ssl::new(acceptor.context()).context(SslBuildSnafu)?;
+                        tls_peer_metadata.attach(&mut ssl);
+                        let mut stream = SslStream::new(ssl, stream).context(SslBuildSnafu)?;
+                        Pin::new(&mut stream)
+                            .accept()
+                            .await
+                            .context(HandshakeSnafu)?;
+                        Ok(stream)
+                    }
+                    .boxed(),
+                )
+            }
             None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
         };
-        Self { state, peer_addr }
+        Self {
+            state,
+            peer_addr,
+            tls_peer_metadata,
+        }
     }
 
     // Explicit handshake method

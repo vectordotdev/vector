@@ -324,6 +324,7 @@ async fn handle_stream<T>(
         .ssl_stream()
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
+    let tls_peer_metadata = socket.get_ref().tls_peer_metadata();
 
     let reader = LenientFramedRead::new(socket, source.decoder());
 
@@ -417,6 +418,7 @@ async fn handle_stream<T>(
                                 );
                             }
                         }
+                        tls_peer_metadata.insert_into(&mut events, source_name);
 
                         source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {

@@ -34,7 +34,7 @@ use tracing::Span;
 use crate::{
     internal_events::{GrpcServerRequestReceived, GrpcServerResponseSent},
     shutdown::{ShutdownSignal, ShutdownSignalToken},
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsAcceptorReloader},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsAcceptorReloader, TlsPeerMetadata},
 };
 use vector_lib::configurable::configurable_component;
 
@@ -222,6 +222,7 @@ impl Connected for MaxConnectionAgeIo {
     fn connect_info(&self) -> Self::ConnectInfo {
         MaxConnectionAgeConnectInfo {
             active_requests: self.state.active_requests(),
+            tls_peer_metadata: self.inner.tls_peer_metadata(),
         }
     }
 }
@@ -229,6 +230,9 @@ impl Connected for MaxConnectionAgeIo {
 #[derive(Clone, Debug)]
 struct MaxConnectionAgeConnectInfo {
     active_requests: Arc<AtomicUsize>,
+    // tonic captures connect info when the connection is accepted, before the TLS handshake, so
+    // this is a handle that the handshake fills in.
+    tls_peer_metadata: TlsPeerMetadata,
 }
 
 #[derive(Clone)]
@@ -337,11 +341,18 @@ where
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
-        let guard = req
+    fn call(&mut self, mut req: Request<Body>) -> Self::Future {
+        let connect_info = req
             .extensions()
             .get::<MaxConnectionAgeConnectInfo>()
+            .cloned();
+        let guard = connect_info
+            .as_ref()
             .map(|connect_info| ActiveRequestGuard::new(Arc::clone(&connect_info.active_requests)));
+        // Expose the connection's TLS peer metadata to gRPC handlers as a plain extension.
+        if let Some(connect_info) = connect_info {
+            req.extensions_mut().insert(connect_info.tls_peer_metadata);
+        }
         let future = self.service.call(req);
 
         async move {
@@ -519,6 +530,7 @@ mod tests {
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {
                 active_requests: Arc::clone(&active_requests),
+                tls_peer_metadata: TlsPeerMetadata::default(),
             });
 
         assert_eq!(active_requests.load(Ordering::Acquire), 0);
@@ -547,12 +559,14 @@ mod tests {
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {
                 active_requests: Arc::clone(&first_connection_active_requests),
+                tls_peer_metadata: TlsPeerMetadata::default(),
             });
         let mut second_request = Request::new(Body::empty());
         second_request
             .extensions_mut()
             .insert(MaxConnectionAgeConnectInfo {
                 active_requests: Arc::clone(&second_connection_active_requests),
+                tls_peer_metadata: TlsPeerMetadata::default(),
             });
 
         let first_response = service

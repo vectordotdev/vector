@@ -16,12 +16,14 @@ mod client_cert_verifier;
 mod incoming;
 mod maybe_tls;
 mod outgoing;
+mod peer_metadata;
 mod reload;
 mod settings;
 
-pub use client_cert_verifier::ClientCertVerifier;
+pub use client_cert_verifier::{ClientCertVerdict, ClientCertVerifier};
 pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub use maybe_tls::MaybeTls;
+pub use peer_metadata::{TLS_CLIENT_IDENTITY_KEY, TlsPeerMetadata};
 pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};
 pub use settings::{
     MaybeTlsSettings, PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,

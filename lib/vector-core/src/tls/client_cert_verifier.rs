@@ -4,9 +4,37 @@
 //! certificate issued by that CA. When a CA is shared by many workloads, a server may need to
 //! restrict which of those certificates it accepts. A [`ClientCertVerifier`] installed with
 //! [`TlsSettings::with_client_cert_verifier`](super::TlsSettings::with_client_cert_verifier)
-//! makes that decision during the handshake.
+//! makes that decision during the handshake, and can attach metadata to the connection (for
+//! example, the identity it matched), which the TLS server sources add to the events received on
+//! that connection.
 
-use openssl::{stack::StackRef, x509::X509, x509::X509StoreContextRef};
+use openssl::{
+    stack::StackRef,
+    x509::{X509, X509StoreContext, X509StoreContextRef},
+};
+use vrl::value::ObjectMap;
+
+use super::TlsPeerMetadata;
+
+/// The decision of a [`ClientCertVerifier`].
+#[derive(Clone, Debug, PartialEq)]
+pub enum ClientCertVerdict {
+    /// Fail the handshake.
+    Reject,
+    /// Accept the client. Metadata, if any, is attached to the connection (see
+    /// [`TlsPeerMetadata`]).
+    Accept(Option<ObjectMap>),
+}
+
+impl From<bool> for ClientCertVerdict {
+    fn from(accept: bool) -> Self {
+        if accept {
+            Self::Accept(None)
+        } else {
+            Self::Reject
+        }
+    }
+}
 
 /// Decides whether a TLS server accepts a client certificate.
 ///
@@ -17,15 +45,15 @@ use openssl::{stack::StackRef, x509::X509, x509::X509StoreContextRef};
 /// Implementations run on the connection's handshake path, so they must be fast and must not
 /// block. They must not panic: the call crosses an FFI boundary, where a panic aborts the process.
 pub trait ClientCertVerifier: Send + Sync {
-    /// Returns whether to accept the client. `chain` is the verified chain, leaf first.
-    fn verify(&self, chain: &StackRef<X509>) -> bool;
+    /// Decides whether to accept the client. `chain` is the verified chain, leaf first.
+    fn verify(&self, chain: &StackRef<X509>) -> ClientCertVerdict;
 }
 
 impl<F> ClientCertVerifier for F
 where
-    F: Fn(&StackRef<X509>) -> bool + Send + Sync,
+    F: Fn(&StackRef<X509>) -> ClientCertVerdict + Send + Sync,
 {
-    fn verify(&self, chain: &StackRef<X509>) -> bool {
+    fn verify(&self, chain: &StackRef<X509>) -> ClientCertVerdict {
         self(chain)
     }
 }
@@ -45,7 +73,21 @@ pub(super) fn verify_client_cert(
     if context.error_depth() != 0 {
         return true;
     }
-    context.chain().is_some_and(|chain| verifier.verify(chain))
+    let Some(chain) = context.chain() else {
+        return false;
+    };
+    match verifier.verify(chain) {
+        ClientCertVerdict::Reject => false,
+        ClientCertVerdict::Accept(metadata) => {
+            if let Some(metadata) = metadata
+                && let Ok(index) = X509StoreContext::ssl_idx()
+                && let Some(ssl) = context.ex_data(index)
+            {
+                TlsPeerMetadata::fill(ssl, metadata);
+            }
+            true
+        }
+    }
 }
 
 #[cfg(test)]
@@ -67,11 +109,14 @@ mod tests {
     };
     use tokio::net::TcpStream;
 
-    use super::ClientCertVerifier;
+    use vrl::value::{ObjectMap, Value};
+
+    use super::{ClientCertVerdict, ClientCertVerifier};
+    use crate::event::{Event, LogEvent};
     use crate::tls::{
         MaybeTls, MaybeTlsSettings, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
         TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH, TlsConfig,
-        TlsEnableableConfig, TlsSettings,
+        TlsEnableableConfig, TlsPeerMetadata, TlsSettings,
     };
 
     /// A verifier that records how often it ran and the chain it last saw.
@@ -97,11 +142,11 @@ mod tests {
     }
 
     impl ClientCertVerifier for RecordingVerifier {
-        fn verify(&self, chain: &StackRef<X509>) -> bool {
+        fn verify(&self, chain: &StackRef<X509>) -> ClientCertVerdict {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.chain_len.store(chain.len(), Ordering::SeqCst);
             *self.leaf_common_name.lock().unwrap() = chain.iter().next().map(common_name);
-            self.accept
+            self.accept.into()
         }
     }
 
@@ -270,10 +315,92 @@ mod tests {
 
     #[tokio::test]
     async fn closures_can_be_verifiers() {
-        let settings = server_settings()
-            .with_client_cert_verifier(Arc::new(|chain: &StackRef<X509>| !chain.is_empty()));
+        let settings =
+            server_settings().with_client_cert_verifier(Arc::new(|chain: &StackRef<X509>| {
+                ClientCertVerdict::from(!chain.is_empty())
+            }));
 
         assert!(server_accepts(&settings, Client::Trusted).await);
+    }
+
+    /// Serves one connection and returns the metadata its handle holds before and after the
+    /// server-side handshake.
+    async fn peer_metadata_around_handshake(
+        settings: &TlsSettings,
+    ) -> (Option<ObjectMap>, Option<ObjectMap>) {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = MaybeTlsSettings::Tls(settings.clone())
+            .bind(&addr)
+            .await
+            .unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let mut stream = listener.accept().await.unwrap();
+            // Captured before the handshake, as HTTP and gRPC servers do.
+            let handle = stream.tls_peer_metadata();
+            let before = handle.get().cloned();
+            stream.handshake().await.ok();
+            (before, handle.get().cloned())
+        });
+        connect(local_addr, Client::Trusted).await;
+        server.await.unwrap()
+    }
+
+    fn identity_metadata() -> ObjectMap {
+        ObjectMap::from([("rule".into(), Value::from("agents"))])
+    }
+
+    #[tokio::test]
+    async fn accepted_connection_carries_the_verifier_metadata() {
+        let settings =
+            server_settings().with_client_cert_verifier(Arc::new(|_: &StackRef<X509>| {
+                ClientCertVerdict::Accept(Some(identity_metadata()))
+            }));
+        assert_eq!(
+            peer_metadata_around_handshake(&settings).await,
+            (None, Some(identity_metadata()))
+        );
+    }
+
+    #[tokio::test]
+    async fn rejected_connection_carries_no_metadata() {
+        let settings = server_settings()
+            .with_client_cert_verifier(Arc::new(|_: &StackRef<X509>| ClientCertVerdict::Reject));
+        assert_eq!(
+            peer_metadata_around_handshake(&settings).await,
+            (None, None)
+        );
+    }
+
+    #[test]
+    fn peer_metadata_is_written_to_event_metadata_under_the_source_name() {
+        let handle = TlsPeerMetadata::default();
+        handle.0.set(identity_metadata()).unwrap();
+        let mut events = vec![Event::Log(LogEvent::from("hello"))];
+        handle.insert_into(&mut events, "splunk_tcp");
+
+        assert_eq!(
+            events[0]
+                .metadata()
+                .value()
+                .get(lookup::path!("splunk_tcp", "tls_client_identity")),
+            Some(&Value::Object(identity_metadata()))
+        );
+        // The event itself is untouched, so clients cannot spoof or overwrite the value.
+        assert!(
+            events[0]
+                .as_log()
+                .get(lookup::event_path!("splunk_tcp"))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn empty_peer_metadata_leaves_events_unchanged() {
+        let mut events = vec![Event::Log(LogEvent::from("hello"))];
+        let before = events.clone();
+        TlsPeerMetadata::default().insert_into(&mut events, "splunk_tcp");
+        assert_eq!(events, before);
     }
 
     #[tokio::test]

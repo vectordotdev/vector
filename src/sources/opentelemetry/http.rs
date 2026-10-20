@@ -22,7 +22,7 @@ use vector_lib::{
         metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
         trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
     },
-    tls::MaybeTlsIncomingStream,
+    tls::{MaybeTlsIncomingStream, TlsPeerMetadata},
 };
 use warp::{
     Filter, Reply, filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response,
@@ -94,6 +94,7 @@ pub(crate) async fn run_http_server(
     // Admission wraps the Warp service, so rejected requests cannot reach `capped_body`.
     let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+        let tls_peer_metadata = conn.tls_peer_metadata();
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
             .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -103,6 +104,10 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
+            .map_request(move |mut request: hyper::Request<_>| {
+                request.extensions_mut().insert(tls_peer_metadata.clone());
+                request
+            })
             .service(admitted.clone());
         futures_util::future::ok::<_, Infallible>(svc)
     });
@@ -233,9 +238,18 @@ where
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
         .and(body_filter)
+        .and(warp::filters::ext::optional())
         .and_then(
-            move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
-                let events = make_events(encoding_header, headers, body);
+            move |encoding_header: Option<String>,
+                  headers: HeaderMap,
+                  body: Bytes,
+                  tls_peer_metadata: Option<TlsPeerMetadata>| {
+                let events = make_events(encoding_header, headers, body).map(|mut events| {
+                    if let Some(tls_peer_metadata) = &tls_peer_metadata {
+                        tls_peer_metadata.insert_into(&mut events, OpentelemetryConfig::NAME);
+                    }
+                    events
+                });
                 handle_request(
                     events,
                     acknowledgements,

@@ -40,7 +40,7 @@ use vector_lib::{
     schema::meaning,
     sensitive_string::SensitiveString,
     source_sender::SendError,
-    tls::MaybeTlsIncomingStream,
+    tls::{MaybeTlsIncomingStream, TlsPeerMetadata},
 };
 use vrl::{
     path::{OwnedTargetPath, PathPrefix, ValuePath as _},
@@ -276,6 +276,7 @@ impl SplunkConfig {
         Ok(Box::pin(async move {
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let tls_peer_metadata = conn.tls_peer_metadata();
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -285,6 +286,10 @@ impl SplunkConfig {
                             conn.peer_addr(),
                         )
                     }))
+                    .map_request(move |mut request: hyper::Request<_>| {
+                        request.extensions_mut().insert(tls_peer_metadata.clone());
+                        request
+                    })
                     .service(warp::service(services.clone()));
                 futures_util::future::ok::<_, Infallible>(svc)
             });
@@ -534,6 +539,7 @@ impl SplunkSource {
             .and(self.gzip())
             .and(capped_body())
             .and(warp::path::full())
+            .and(warp::filters::ext::optional())
             .and_then(
                 move |_,
                       token: Option<String>,
@@ -542,7 +548,8 @@ impl SplunkSource {
                       remote_addr: Option<String>,
                       gzip: bool,
                       body: Bytes,
-                      path: warp::path::FullPath| {
+                      path: warp::path::FullPath,
+                      tls_peer_metadata: Option<TlsPeerMetadata>| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
@@ -631,6 +638,7 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
+                            attach_tls_peer_metadata(tls_peer_metadata.as_ref(), &mut events);
                             match out.send_batch(events).await {
                                 Ok(()) => (),
                                 Err(SendError::Closed) => {
@@ -654,6 +662,10 @@ impl SplunkSource {
             .boxed()
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn raw_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
@@ -671,6 +683,7 @@ impl SplunkSource {
             .and(self.gzip())
             .and(capped_body())
             .and(warp::path::full())
+            .and(warp::filters::ext::optional())
             .and_then(
                 move |_,
                       token: Option<String>,
@@ -679,7 +692,8 @@ impl SplunkSource {
                       xff: Option<String>,
                       gzip: bool,
                       body: Bytes,
-                      path: warp::path::FullPath| {
+                      path: warp::path::FullPath,
+                      tls_peer_metadata: Option<TlsPeerMetadata>| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
@@ -721,6 +735,10 @@ impl SplunkSource {
                             if let Some(token) = token.filter(|_| store_hec_token) {
                                 event.metadata_mut().set_splunk_hec_token(token.into());
                             }
+                            attach_tls_peer_metadata(
+                                tls_peer_metadata.as_ref(),
+                                std::slice::from_mut(&mut event),
+                            );
                             let res = out.send_event(event).await;
                             return res
                                 .map(|_| maybe_ack_id)
@@ -732,7 +750,7 @@ impl SplunkSource {
                         // (rather than after the whole payload is decoded).
                         let token: Option<Arc<str>> =
                             token.filter(|_| store_hec_token).map(Arc::from);
-                        let (events, had_decode_errors) = raw_event(
+                        let (mut events, had_decode_errors) = raw_event(
                             body,
                             gzip,
                             channel_id.clone(),
@@ -744,6 +762,7 @@ impl SplunkSource {
                             Some(decoder),
                             token,
                         )?;
+                        attach_tls_peer_metadata(tls_peer_metadata.as_ref(), &mut events);
 
                         if events.is_empty() || had_decode_errors {
                             // With newline framing, `valid \n invalid \n valid`
@@ -1959,6 +1978,13 @@ async fn register_ack(
     match (idx_ack, receiver, channel) {
         (Some(ack), Some(rx), Some(ch)) => Ok(Some(ack.get_ack_id_from_channel(ch, rx).await?)),
         _ => Ok(None),
+    }
+}
+
+/// Adds the TLS peer metadata of the request's connection, if any, to `events`.
+fn attach_tls_peer_metadata(tls_peer_metadata: Option<&TlsPeerMetadata>, events: &mut [Event]) {
+    if let Some(tls_peer_metadata) = tls_peer_metadata {
+        tls_peer_metadata.insert_into(events, SplunkConfig::NAME);
     }
 }
 
@@ -4114,4 +4140,87 @@ mod tests {
     }
 
     register_validatable_component!(SplunkConfig);
+}
+
+#[cfg(test)]
+mod tls_peer_metadata_tests {
+    use futures::StreamExt;
+    use vector_lib::{event::EventStatus, lookup::path, tls::TLS_CLIENT_IDENTITY_KEY};
+    use vrl::value::{ObjectMap, Value};
+
+    use super::SplunkConfig;
+    use crate::{
+        SourceSender,
+        config::SourceContext,
+        test_util::{
+            addr::next_addr,
+            http::{
+                post_with_client_cert, reloader_attaching_peer_metadata, test_mtls_server_config,
+            },
+            wait_for_tcp,
+        },
+    };
+
+    /// Runs a TLS `splunk_hec` source whose verifier attaches `identity`, posts `body` to `path`,
+    /// and returns the emitted event's TLS client identity metadata.
+    async fn received_identity(path: &str, body: &[u8], identity: &ObjectMap) -> Option<Value> {
+        let tls = test_mtls_server_config(false);
+        let (_guard, address) = next_addr();
+        let config: SplunkConfig = serde_json::from_value(serde_json::json!({
+            "address": address,
+            "tls": tls,
+        }))
+        .unwrap();
+        let (sender, mut events) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let source = config
+            .build_with_tls_reloader(
+                SourceContext::new_test(sender, None),
+                Some(reloader_attaching_peer_metadata(&tls, identity.clone())),
+            )
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let status = post_with_client_cert(address, path, "application/json", body).await;
+        assert!(status.contains("200"), "{status}");
+        events
+            .next()
+            .await
+            .unwrap()
+            .metadata()
+            .value()
+            .get(path!(SplunkConfig::NAME, TLS_CLIENT_IDENTITY_KEY))
+            .cloned()
+    }
+
+    fn identity() -> ObjectMap {
+        ObjectMap::from([("rule".into(), Value::from("forwarders"))])
+    }
+
+    #[tokio::test]
+    async fn verifier_metadata_reaches_event_endpoint_events() {
+        assert_eq!(
+            received_identity(
+                "/services/collector/event",
+                br#"{"event":"hello"}"#,
+                &identity()
+            )
+            .await,
+            Some(Value::Object(identity()))
+        );
+    }
+
+    #[tokio::test]
+    async fn verifier_metadata_reaches_raw_endpoint_events() {
+        assert_eq!(
+            received_identity(
+                "/services/collector/raw?channel=7f0e8c4e-6b6e-4a39-9d6c-1d1b0b1e2a3b",
+                b"hello",
+                &identity()
+            )
+            .await,
+            Some(Value::Object(identity()))
+        );
+    }
 }
