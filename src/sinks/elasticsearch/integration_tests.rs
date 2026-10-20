@@ -393,6 +393,89 @@ async fn insert_events_over_http() {
     .await;
 }
 
+#[cfg(feature = "opensearch-integration-tests")]
+mod opensearch {
+    use super::*;
+    use crate::config::BoxedSink;
+
+    #[tokio::test]
+    async fn insert_events_with_auto_api_version_over_http() {
+        insert_event(false).await;
+    }
+
+    #[tokio::test]
+    async fn insert_events_with_auto_api_version_over_https() {
+        insert_event(true).await;
+    }
+
+    async fn insert_event(secure: bool) {
+        trace_init();
+        let endpoint = if secure {
+            https_server()
+        } else {
+            http_server()
+        }
+        .to_string();
+        let endpoint = endpoint.trim_end_matches('/');
+        let index = gen_index().to_string();
+        let mut config = json!({
+            "type": "opensearch",
+            "endpoints": [endpoint],
+            "bulk": { "index": index },
+            "compression": "gzip",
+        });
+        if secure {
+            config["auth"] = json!({
+                "strategy": "basic",
+                "user": http_username(),
+                "password": http_password(),
+            });
+            config["tls"] = json!({ "ca_file": tls::TEST_PEM_CA_PATH });
+        }
+        // Omit api_version to exercise the constructor-selected OpenSearch API version.
+        let config: BoxedSink = serde_json::from_value(config).unwrap();
+        let (sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
+        healthcheck.await.unwrap();
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event = LogEvent::from("OpenSearch integration test").with_batch_notifier(&batch);
+        drop(batch);
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(Event::from(event))),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let client = create_http_client();
+        client
+            .post(format!("{endpoint}/{index}/_refresh"))
+            .basic_auth(http_username(), Some(http_password()))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+        let response: Value = client
+            .get(format!("{endpoint}/{index}/_search"))
+            .basic_auth(http_username(), Some(http_password()))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(response["hits"]["total"]["value"], 1);
+        assert_eq!(
+            response["hits"]["hits"][0]["_source"]["message"],
+            "OpenSearch integration test"
+        );
+    }
+}
+
 #[tokio::test]
 async fn insert_events_with_data_volume() {
     trace_init();
@@ -823,7 +906,7 @@ async fn run_insert_tests_with_config(
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
     let cx = SinkContext::default();
-    let commons = ElasticsearchCommon::parse_many(config, cx.proxy())
+    let commons = ElasticsearchCommon::parse_many(config, Distribution::Elasticsearch, cx.proxy())
         .await
         .expect("Config error");
     let index = match config.mode {
