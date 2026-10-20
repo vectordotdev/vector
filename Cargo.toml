@@ -1042,6 +1042,7 @@ all-integration-tests = [
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
   "fluent-integration-tests",
+  "gcp-bigquery-integration-tests",
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
