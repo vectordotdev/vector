@@ -165,11 +165,12 @@ impl BigqueryTlsConfig {
         if let Some(server_name) = &self.server_name {
             config = config.domain_name(server_name);
         }
-        // tonic accepts a single PEM bundle of additional CA certificates.
+
         let authorities: Vec<u8> = settings.authorities_pem().flatten().collect();
         if !authorities.is_empty() {
             config = config.ca_certificate(Certificate::from_pem(authorities));
         }
+
         if let Some((cert, key)) = settings.identity_pem() {
             config = config.identity(Identity::from_pem(cert, key));
         }
@@ -292,15 +293,13 @@ impl ValidatedSink for BigqueryConfig {
         .await?;
         auth.spawn_regenerate_token();
 
-        // Create the gRPC channel; tonic channels are cheap to clone and share the underlying connection.
         let mut endpoint = Channel::builder(validated.endpoint.clone())
             .connect_timeout(std::time::Duration::from_secs(10));
-        // Configure TLS explicitly rather than relying on tonic's implicit TLS for `https` URIs,
-        // which only exists in some tonic versions (removed in 0.12).
         if validated.endpoint.scheme() == Some(&Scheme::HTTPS) {
             let tls = self.tls.clone().unwrap_or_default().client_tls_config()?;
             endpoint = endpoint.tls_config(tls)?;
         }
+
         // Connect lazily so an unreachable endpoint at startup surfaces as a retriable error on the
         // first request instead of failing the sink build.
         let channel = endpoint.connect_lazy();
