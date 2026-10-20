@@ -4,7 +4,6 @@ components: sinks: gcp_bigquery: {
 	title: "GCP BigQuery"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: gcp_bigquery: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				max_events:   50_000
 				timeout_secs: 1.0
@@ -65,10 +63,31 @@ components: sinks: gcp_bigquery: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_bigquery.configuration
+
+	how_it_works: {
+		healthcheck_permissions: {
+			title: "Healthcheck permissions"
+			body: """
+				Health checking calls the `GetWriteStream` API, which requires the
+				`bigquery.tables.get` permission. Writing rows only requires
+				`bigquery.tables.updateData`. If your service account has write-only
+				permissions, disable the healthcheck with `healthcheck.enabled = false`.
+				"""
+		}
+		self_contained_schema: {
+			title: "Self-contained Protobuf schema"
+			body: """
+				Vector sends BigQuery the descriptor of the configured `message_type`, so
+				that message must be self-contained, meaning that every message or enum type
+				used by one of its fields must be defined as a nested type inside it.
+				References to other top-level messages, including types such as
+				`google.protobuf.Timestamp`, are rejected when the sink starts.
+				"""
+		}
+	}
 
 	input: {
 		logs:    true
@@ -82,6 +101,10 @@ components: sinks: gcp_bigquery: {
 			_service: "bigquery"
 
 			policies: [
+				{
+					_action: "tables.get"
+					required_for: ["healthcheck"]
+				},
 				{
 					_action: "tables.updateData"
 					required_for: ["operation"]

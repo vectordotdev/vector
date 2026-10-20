@@ -26,6 +26,33 @@ const LENGTH_PREFIX_BUFFER: usize = 6;
 pub enum BigqueryRequestBuilderError {
     #[snafu(display("Encoding protobuf failed: {}", message))]
     ProtobufEncoding { message: String },
+    #[snafu(display(
+        "Protobuf message `{}` references `{}` which is an external type.",
+        root,
+        type_name
+    ))]
+    ExternalTypeReference { root: String, type_name: String },
+}
+
+/// Returns the first referenced type that isn't self-contained.
+fn find_external_type_reference(
+    descriptor: &prost_types::DescriptorProto,
+    root_full_name: &str,
+) -> Option<String> {
+    let root = format!(".{root_full_name}");
+    let nested_prefix = format!("{root}.");
+    let mut pending = vec![descriptor];
+    while let Some(message) = pending.pop() {
+        for field in &message.field {
+            let type_name = field.type_name();
+            if !type_name.is_empty() && type_name != root && !type_name.starts_with(&nested_prefix)
+            {
+                return Some(type_name.trim_start_matches('.').to_owned());
+            }
+        }
+        pending.extend(&message.nested_type);
+    }
+    None
 }
 
 impl From<vector_common::Error> for BigqueryRequestBuilderError {
@@ -63,6 +90,15 @@ impl BigqueryRequestBuilder {
             .map_err(|e| BigqueryRequestBuilderError::ProtobufEncoding {
                 message: format!("{e}"),
             })?;
+        let root_full_name = protobuf_serializer.message_full_name();
+
+        // BigQuery only receives the root message's `DescriptorProto`, so it must be self-contained.
+        if let Some(type_name) = find_external_type_reference(&descriptor_proto, root_full_name) {
+            return Err(BigqueryRequestBuilderError::ExternalTypeReference {
+                root: root_full_name.to_owned(),
+                type_name,
+            });
+        }
         let proto_schema = proto::ProtoSchema {
             proto_descriptor: Some(descriptor_proto),
         };

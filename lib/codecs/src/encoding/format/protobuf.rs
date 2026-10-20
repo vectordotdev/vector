@@ -131,6 +131,12 @@ impl ProtobufSerializer {
         self.message_descriptor.descriptor_proto()
     }
 
+    /// Get the fully qualified name of the message type used in serialization.
+    #[must_use]
+    pub fn message_full_name(&self) -> &str {
+        self.message_descriptor.full_name()
+    }
+
     /// Encode the descriptor proto to bytes.
     #[must_use]
     pub fn encode_descriptor_proto(&self) -> Vec<u8> {

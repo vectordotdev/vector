@@ -1,7 +1,8 @@
 use futures::future::BoxFuture;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use snafu::Snafu;
 use std::task::{Context, Poll};
-use tonic::metadata::MetadataValue;
+use tonic::metadata::{Ascii, MetadataValue};
 use tonic::service::Interceptor;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
@@ -19,9 +20,45 @@ use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use crate::event::{EventFinalizers, Finalizable};
 use crate::gcp::GcpAuthenticator;
 
+/// Characters left unescaped in the `x-goog-request-params` header.
+const REQUEST_PARAMS_ESCAPE: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'/')
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
+
 #[derive(Clone)]
 pub struct AuthInterceptor {
-    pub auth: GcpAuthenticator,
+    auth: GcpAuthenticator,
+    request_params: MetadataValue<Ascii>,
+}
+
+impl AuthInterceptor {
+    /// Interceptor for `AppendRows`, which routes on the `write_stream` field.
+    pub fn for_append_rows(auth: GcpAuthenticator, write_stream: &str) -> crate::Result<Self> {
+        Self::new(auth, "write_stream", write_stream)
+    }
+
+    /// Interceptor for `GetWriteStream`, which routes on the `name` field.
+    pub fn for_get_write_stream(auth: GcpAuthenticator, write_stream: &str) -> crate::Result<Self> {
+        Self::new(auth, "name", write_stream)
+    }
+
+    /// `param` is the request field BigQuery routes on which varies depending on the API.
+    /// gRPC callers must send it so that requests to datasets outside the US multi-region
+    /// reach the correct region.
+    fn new(auth: GcpAuthenticator, param: &str, write_stream: &str) -> crate::Result<Self> {
+        let request_params = format!(
+            "{param}={}",
+            utf8_percent_encode(write_stream, REQUEST_PARAMS_ESCAPE)
+        )
+        .parse()?;
+        Ok(Self {
+            auth,
+            request_params,
+        })
+    }
 }
 
 impl Interceptor for AuthInterceptor {
@@ -32,6 +69,9 @@ impl Interceptor for AuthInterceptor {
                 .map_err(|e| tonic::Status::unauthenticated(format!("{e:?}")))?;
             request.metadata_mut().insert("authorization", value);
         }
+        request
+            .metadata_mut()
+            .insert("x-goog-request-params", self.request_params.clone());
         Ok(request)
     }
 }
@@ -186,16 +226,20 @@ impl RetryLogic for BigqueryRetryLogic {
 }
 
 impl BigqueryService {
-    pub fn with_auth(channel: Channel, auth: GcpAuthenticator) -> Self {
+    pub fn new(
+        channel: Channel,
+        auth: GcpAuthenticator,
+        write_stream: &str,
+    ) -> crate::Result<Self> {
         let service = proto::big_query_write_client::BigQueryWriteClient::with_interceptor(
             channel,
-            AuthInterceptor { auth },
+            AuthInterceptor::for_append_rows(auth, write_stream)?,
         )
         // AppendRowsResponse.row_errors is a repeated field
         // that can grow with batch size, so remove the cap to avoid decoding failures on large
         // error responses.
         .max_decoding_message_size(usize::MAX);
-        Self { service }
+        Ok(Self { service })
     }
 }
 
@@ -374,7 +418,8 @@ mod test {
                 .await
                 .unwrap();
         });
-        let service = BigqueryService::with_auth(channel, crate::gcp::GcpAuthenticator::None);
+        let service =
+            BigqueryService::new(channel, crate::gcp::GcpAuthenticator::None, "test").unwrap();
         (service, receiver, shutdown_tx, join_handle)
     }
 

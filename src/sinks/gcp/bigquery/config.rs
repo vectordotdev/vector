@@ -114,7 +114,7 @@ async fn healthcheck_future(
 ) -> crate::Result<()> {
     let mut client = proto::big_query_write_client::BigQueryWriteClient::with_interceptor(
         channel,
-        AuthInterceptor { auth },
+        AuthInterceptor::for_get_write_stream(auth, &write_stream)?,
     );
     client
         .get_write_stream(proto::GetWriteStreamRequest {
@@ -183,8 +183,7 @@ impl ValidatedSink for BigqueryConfig {
         // Create the gRPC channel; tonic channels are cheap to clone and share the underlying connection.
         let channel = Channel::builder(validated.endpoint.clone())
             .connect_timeout(std::time::Duration::from_secs(10))
-            .connect()
-            .await?;
+            .connect_lazy();
 
         // Kick off the healthcheck
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {
@@ -201,7 +200,11 @@ impl ValidatedSink for BigqueryConfig {
         let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_settings, BigqueryRetryLogic)
-            .service(BigqueryService::with_auth(channel, auth));
+            .service(BigqueryService::new(
+                channel,
+                auth,
+                &validated.write_stream,
+            )?);
 
         let protobuf_serializer = self.encoding.build()?;
         let request_builder =
