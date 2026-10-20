@@ -217,11 +217,17 @@ runs:
         key: ${{ runner.os }}-npm-tools-${{ hashFiles('scripts/environment/npm-tools/*') }}
 
     - name: Detect vdev source changes
-      if: ${{ inputs.vdev == 'true' && github.event.pull_request }}
+      if: ${{ inputs.vdev == 'true' && (github.event.pull_request || github.event.merge_group || github.event_name == 'workflow_dispatch') }}
       shell: bash
       env:
-        VDEV_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        VDEV_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
       run: |
+        # Manual runs have no comparison base, so exercise the checked-out harness.
+        if [[ -z "$VDEV_BASE_SHA" ]]
+        then
+          echo "VDEV_BUILD_FROM_SOURCE=true" >> "$GITHUB_ENV"
+          exit 0
+        fi
         if ! git cat-file -e "${VDEV_BASE_SHA}^{commit}" 2>/dev/null
         then
           git fetch --no-tags --depth=1 origin "$VDEV_BASE_SHA"
