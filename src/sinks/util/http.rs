@@ -2,8 +2,8 @@
 use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
-use bytes::{Buf, Bytes};
-use futures::{Sink, future::BoxFuture};
+use bytes::{Bytes, BytesMut};
+use futures::{Sink, future::BoxFuture, task::AtomicWaker};
 use headers::HeaderName;
 use http::{HeaderValue, Request, Response, StatusCode, header};
 use http_body::Body as _;
@@ -11,6 +11,10 @@ use tracing::debug;
 
 /// Maximum number of response body bytes to include in a non-retriable error's reason.
 pub(crate) const MAX_ERROR_BODY_BYTES: usize = 1024;
+
+/// Total response body bytes a single sink may buffer across its in-flight requests before
+/// reads pause and backpressure is applied. See [`ResponseBodyBudget`].
+pub(crate) const RESPONSE_BODY_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -49,7 +53,10 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     pin::Pin,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     task::{Context, Poll, ready},
     time::Duration,
 };
@@ -57,6 +64,7 @@ use std::{
 use hyper::Body;
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
+use tokio::sync::Notify;
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_lib::{
@@ -421,6 +429,141 @@ pub struct SigV4Config {
     pub(crate) service: String,
 }
 
+/// Shared budget bounding the total response body bytes a single sink buffers in memory across
+/// all of its in-flight requests.
+///
+/// Response bodies are buffered in full before a request is considered complete, so a
+/// misbehaving or compromised endpoint returning an arbitrarily large (or slow, never-ending)
+/// response could otherwise exhaust memory. When the budget is exhausted, in-flight body
+/// collection pauses (stalling the remote endpoint via TCP flow control) and the service's
+/// `poll_ready` pends, so the sink stops accepting new batches and backpressure propagates
+/// instead of memory growing. A connection stalled this way is still bounded by the request
+/// timeout, which cancels the collection and releases the budget.
+///
+/// The limit is [`RESPONSE_BODY_BUDGET_BYTES`], independent of the source-side decompressed
+/// payload cap.
+#[derive(Debug)]
+pub(crate) struct ResponseBodyBudget {
+    used: AtomicUsize,
+    limit: usize,
+    /// Wakes tasks paused in [`BudgetHold::record`].
+    notify: Notify,
+    /// Wakes a `poll_ready` caller pended on an exhausted budget.
+    waker: AtomicWaker,
+}
+
+impl ResponseBodyBudget {
+    pub(crate) fn new(limit: usize) -> Arc<Self> {
+        Arc::new(Self {
+            used: AtomicUsize::new(0),
+            limit,
+            notify: Notify::new(),
+            waker: AtomicWaker::new(),
+        })
+    }
+
+    pub(crate) fn used(&self) -> usize {
+        self.used.load(Ordering::Relaxed)
+    }
+
+    /// Returns true when the budget is exhausted and new requests should not be admitted.
+    pub(crate) fn is_exhausted(&self) -> bool {
+        self.used() >= self.limit
+    }
+
+    /// Registers `waker` to be woken the next time budget is released.
+    pub(crate) fn register_waker(&self, waker: &std::task::Waker) {
+        self.waker.register(waker);
+    }
+
+    fn release(&self, bytes: usize) {
+        self.used.fetch_sub(bytes, Ordering::AcqRel);
+        self.notify.notify_waiters();
+        self.waker.wake();
+    }
+
+    pub(crate) fn hold(self: &Arc<Self>) -> BudgetHold {
+        BudgetHold {
+            budget: Arc::clone(self),
+            held: 0,
+        }
+    }
+}
+
+/// RAII handle tracking the bytes a single in-flight response body has buffered from a
+/// [`ResponseBodyBudget`]. Releases its bytes on drop, including when the request future is
+/// cancelled (e.g. by the request timeout).
+///
+/// Bytes are released when the body finishes collecting, while the returned body may still be
+/// held briefly by the caller. That tail is small and bounded by the number of in-flight
+/// requests; the collection window the budget governs is where an endpoint can hold memory
+/// open-ended.
+#[derive(Debug)]
+pub(crate) struct BudgetHold {
+    budget: Arc<ResponseBodyBudget>,
+    held: usize,
+}
+
+impl BudgetHold {
+    /// Accounts for `bytes` more buffered payload, waiting for budget capacity first if the
+    /// budget is exhausted.
+    ///
+    /// A hold that is the sole budget holder may exceed the limit, so a single response larger
+    /// than the budget still makes progress instead of deadlocking.
+    pub(crate) async fn record(&mut self, bytes: usize) {
+        loop {
+            let used = self.budget.used();
+            if used < self.budget.limit || used == self.held {
+                break;
+            }
+            let notified = self.budget.notify.notified();
+            tokio::pin!(notified);
+            // Register in the wait list before re-checking, so a release between the check and
+            // the await is not missed.
+            notified.as_mut().enable();
+            let used = self.budget.used();
+            if used < self.budget.limit || used == self.held {
+                break;
+            }
+            notified.await;
+        }
+        self.budget.used.fetch_add(bytes, Ordering::AcqRel);
+        self.held += bytes;
+    }
+}
+
+impl Drop for BudgetHold {
+    fn drop(&mut self) {
+        if self.held > 0 {
+            self.budget.release(self.held);
+        }
+    }
+}
+
+/// Collects an HTTP response body into a single contiguous buffer, pacing reads against the
+/// sink's [`ResponseBodyBudget`].
+///
+/// The full body is always returned. The budget bounds the aggregate memory the sink buffers
+/// across in-flight requests by pausing reads — which stalls the remote endpoint via TCP flow
+/// control — rather than by truncating.
+async fn collect_response_body<B>(
+    body: B,
+    budget: &Arc<ResponseBodyBudget>,
+) -> Result<Bytes, B::Error>
+where
+    B: http_body::Body<Data = Bytes>,
+{
+    let mut body = std::pin::pin!(body);
+    let mut hold = budget.hold();
+    let mut buffer = BytesMut::new();
+    while let Some(chunk) = body.as_mut().data().await {
+        let chunk = chunk?;
+        hold.record(chunk.len()).await;
+        buffer.extend_from_slice(&chunk);
+    }
+    Ok(buffer.freeze())
+}
+
 /// @struct `HttpBatchService`
 ///
 /// NOTE: This has been deprecated, please do not use directly when creating new sinks.
@@ -430,6 +573,7 @@ pub struct SigV4Config {
 pub struct HttpBatchService<F, B = Bytes> {
     inner: HttpClient<Body>,
     request_builder: Arc<dyn Fn(B) -> F + Send + Sync>,
+    budget: Arc<ResponseBodyBudget>,
     #[cfg(feature = "aws-core")]
     sig_v4_config: Option<SigV4Config>,
 }
@@ -442,6 +586,7 @@ impl<F, B> HttpBatchService<F, B> {
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
+            budget: ResponseBodyBudget::new(RESPONSE_BODY_BUDGET_BYTES),
             #[cfg(feature = "aws-core")]
             sig_v4_config: None,
         }
@@ -456,6 +601,7 @@ impl<F, B> HttpBatchService<F, B> {
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
+            budget: ResponseBodyBudget::new(RESPONSE_BODY_BUDGET_BYTES),
             sig_v4_config: Some(sig_v4_config),
         }
     }
@@ -470,7 +616,16 @@ where
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Apply backpressure while in-flight responses hold the response body budget:
+        // new batches are not admitted until buffered responses complete. Register before
+        // re-checking so a release between the check and registration is not missed.
+        if self.budget.is_exhausted() {
+            self.budget.register_waker(cx.waker());
+            if self.budget.is_exhausted() {
+                return Poll::Pending;
+            }
+        }
         Poll::Ready(Ok(()))
     }
 
@@ -479,6 +634,7 @@ where
         #[cfg(feature = "aws-core")]
         let sig_v4_config = self.sig_v4_config.clone();
         let http_client = self.inner.clone();
+        let budget = Arc::clone(&self.budget);
 
         Box::pin(async move {
             let request = request_builder(body).await.inspect_err(|error| {
@@ -524,11 +680,8 @@ where
             }
 
             let (parts, body) = response.into_parts();
-            let mut body = body.collect().await?.aggregate();
-            Ok(hyper::Response::from_parts(
-                parts,
-                body.copy_to_bytes(body.remaining()),
-            ))
+            let body = collect_response_body(body, &budget).await?;
+            Ok(hyper::Response::from_parts(parts, body))
         })
     }
 }
@@ -538,6 +691,7 @@ impl<F, B> Clone for HttpBatchService<F, B> {
         Self {
             inner: self.inner.clone(),
             request_builder: Arc::clone(&self.request_builder),
+            budget: Arc::clone(&self.budget),
             #[cfg(feature = "aws-core")]
             sig_v4_config: self.sig_v4_config.clone(),
         }
@@ -1128,6 +1282,7 @@ where
 mod test {
     #![allow(clippy::print_stderr)] //tests
 
+    use bytes::Buf;
     use futures::{StreamExt, future::ready};
     use hyper::{
         Response, Server, Uri,
@@ -1300,5 +1455,136 @@ mod test {
 
         let (body, _rest) = StreamExt::into_future(rx).await;
         assert_eq!(body.unwrap(), "hello");
+    }
+
+    /// Waits until `budget` reports at least `expected` bytes in use.
+    async fn wait_for_used(budget: &Arc<ResponseBodyBudget>, expected: usize) {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while budget.used() < expected {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("budget was not recorded in time");
+    }
+
+    #[tokio::test]
+    async fn collect_response_body_collects_full_body_under_budget() {
+        let budget = ResponseBodyBudget::new(100);
+        let (mut sender, body) = Body::channel();
+        tokio::spawn(async move {
+            for chunk in [b"aaaa".as_slice(), b"bbbb", b"cccc"] {
+                sender.send_data(Bytes::from_static(chunk)).await.unwrap();
+            }
+        });
+
+        let collected = collect_response_body(body, &budget).await.unwrap();
+        assert_eq!(&collected[..], b"aaaabbbbcccc");
+        assert_eq!(budget.used(), 0, "budget must be released on completion");
+    }
+
+    #[tokio::test]
+    async fn collect_response_body_sole_holder_may_exceed_budget() {
+        // A single response larger than the whole budget still completes instead of deadlocking.
+        let budget = ResponseBodyBudget::new(4);
+        let collected = collect_response_body(Body::from("0123456789"), &budget)
+            .await
+            .unwrap();
+        assert_eq!(&collected[..], b"0123456789");
+        assert_eq!(budget.used(), 0);
+    }
+
+    #[tokio::test]
+    async fn budget_paces_second_collector_until_first_releases() {
+        let budget = ResponseBodyBudget::new(10);
+
+        // Collector A fills the whole budget and stays in flight.
+        let (mut a_sender, a_body) = Body::channel();
+        let a = {
+            let budget = Arc::clone(&budget);
+            tokio::spawn(async move { collect_response_body(a_body, &budget).await })
+        };
+        a_sender
+            .send_data(Bytes::from_static(b"aaaaaaaaaa"))
+            .await
+            .unwrap();
+        wait_for_used(&budget, 10).await;
+
+        // Collector B has a complete body available but must wait for budget.
+        let b = {
+            let budget = Arc::clone(&budget);
+            tokio::spawn(async move { collect_response_body(Body::from("xy"), &budget).await })
+        };
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(
+            !b.is_finished(),
+            "second collector must wait while the budget is exhausted"
+        );
+
+        // Finishing A releases the budget and unblocks B.
+        drop(a_sender);
+        let a_body = a.await.unwrap().unwrap();
+        assert_eq!(&a_body[..], b"aaaaaaaaaa");
+        let b_body = b.await.unwrap().unwrap();
+        assert_eq!(&b_body[..], b"xy");
+        assert_eq!(budget.used(), 0);
+    }
+
+    #[tokio::test]
+    async fn budget_released_when_collection_is_cancelled() {
+        let budget = ResponseBodyBudget::new(10);
+        let (mut sender, body) = Body::channel();
+        let collect = {
+            let budget = Arc::clone(&budget);
+            tokio::spawn(async move { collect_response_body(body, &budget).await })
+        };
+        sender
+            .send_data(Bytes::from_static(b"12345"))
+            .await
+            .unwrap();
+        wait_for_used(&budget, 5).await;
+
+        // The request timeout cancels the collection future this way.
+        collect.abort();
+        assert!(collect.await.is_err());
+        assert_eq!(budget.used(), 0, "cancellation must release the budget");
+    }
+
+    #[tokio::test]
+    async fn poll_ready_pends_while_budget_is_exhausted() {
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
+        let mut service = HttpBatchService::new(client, move |body: Bytes| {
+            Box::pin(ready(
+                http::Request::post("http://localhost/")
+                    .body(body)
+                    .map_err(Into::into),
+            ))
+        });
+
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        assert!(service.poll_ready(&mut cx).is_ready());
+
+        let mut hold = service.budget.hold();
+        hold.record(service.budget.limit).await;
+        assert!(service.budget.is_exhausted());
+        assert!(service.poll_ready(&mut cx).is_pending());
+
+        drop(hold);
+        assert!(!service.budget.is_exhausted());
+        assert!(service.poll_ready(&mut cx).is_ready());
+    }
+
+    #[tokio::test]
+    async fn collect_response_body_propagates_body_errors() {
+        let budget = ResponseBodyBudget::new(10);
+        let (sender, body) = Body::channel();
+        tokio::spawn(async move {
+            sender.abort();
+        });
+        let result = collect_response_body(body, &budget).await;
+        assert!(result.is_err());
+        assert_eq!(budget.used(), 0);
     }
 }
