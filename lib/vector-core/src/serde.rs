@@ -67,7 +67,7 @@ where
 /// One ASCII character, represented as a string in configuration and a byte in codecs.
 #[derive(Clone, Copy, Configurable, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
-#[configurable(metadata(docs::type_override = "ascii_char"))]
+#[configurable(metadata(docs::type_override = "ascii_char", serde::string_only))]
 pub struct AsciiChar(#[configurable(validation(pattern = r"^[\x00-\x7F]$"))] char);
 
 impl AsciiChar {
@@ -172,6 +172,7 @@ mod tests {
         assert_eq!(property["minLength"], 1);
         assert_eq!(property["maxLength"], 1);
         assert_eq!(property["pattern"], r"^[\x00-\x7F]$");
+        assert_eq!(property["_metadata"]["serde::string_only"], true);
     }
 
     /// Options accepting a boolean shorthand while retaining other defaults.
