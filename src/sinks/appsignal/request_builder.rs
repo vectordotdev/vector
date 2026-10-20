@@ -1,44 +1,15 @@
 use bytes::Bytes;
 use vector_lib::{
-    byte_size_of::ByteSizeOf,
     event::Event,
     finalization::{EventFinalizers, Finalizable},
-    request_metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::RequestMetadata,
 };
 
 use super::encoder::AppsignalEncoder;
 use crate::sinks::util::{
-    Compression, RequestBuilder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
+    Compression, RequestBuilder, http::HttpRequest, metadata::RequestMetadataBuilder,
+    request_builder::EncodeResult,
 };
-
-#[derive(Clone)]
-pub(super) struct AppsignalRequest {
-    pub(super) payload: Bytes,
-    pub(super) finalizers: EventFinalizers,
-    pub(super) metadata: RequestMetadata,
-}
-
-impl MetaDescriptive for AppsignalRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
-    }
-
-    fn metadata_mut(&mut self) -> &mut RequestMetadata {
-        &mut self.metadata
-    }
-}
-
-impl Finalizable for AppsignalRequest {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.finalizers.take_finalizers()
-    }
-}
-
-impl ByteSizeOf for AppsignalRequest {
-    fn allocated_bytes(&self) -> usize {
-        self.payload.allocated_bytes() + self.finalizers.allocated_bytes()
-    }
-}
 
 pub(super) struct AppsignalRequestBuilder {
     pub(super) encoder: AppsignalEncoder,
@@ -50,7 +21,7 @@ impl RequestBuilder<Vec<Event>> for AppsignalRequestBuilder {
     type Events = Vec<Event>;
     type Encoder = AppsignalEncoder;
     type Payload = Bytes;
-    type Request = AppsignalRequest;
+    type Request = HttpRequest<()>;
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
@@ -77,10 +48,6 @@ impl RequestBuilder<Vec<Event>> for AppsignalRequestBuilder {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        AppsignalRequest {
-            finalizers: metadata,
-            payload: payload.into_payload(),
-            metadata: request_metadata,
-        }
+        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
     }
 }
