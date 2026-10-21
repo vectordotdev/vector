@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Freeze verified release assets and build the tools reused by every job.
+  # Freeze verified release assets and build the publisher image reused by each job.
   # Enable only after historical backfill and the repository/key migration are ready.
   inputs:
     if: >-
@@ -55,21 +55,23 @@ jobs:
           persist-credentials: false
       - id: source
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Build the reviewed tools
-        run: |
-          cargo build --locked --package vdev
-          target/debug/vdev release repositories build-image
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+      - name: Build the reviewed publisher image
+        run: '"$VDEV" release repositories build-image'
       - name: Freeze and verify release inputs
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN: ${{ inputs.run_id || github.event.workflow_run.id }}
           SOURCE_TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
           CHANNEL: ${{ inputs.channel || 'stable' }}
-        run: target/debug/vdev release repositories fetch --run "$SOURCE_RUN" --tag "$SOURCE_TAG" --channel "$CHANNEL"
-      - name: Save the exact tools used by this run
+        run: >-
+          "$VDEV" release repositories fetch --run "$SOURCE_RUN" --tag "$SOURCE_TAG" --channel "$CHANNEL"
+      - name: Save the publisher image used by this run
         run: |
           mkdir -p target/package-repository-tools
-          cp target/debug/vdev target/package-repository-tools/vdev
           docker save vector-package-publisher:local | gzip > target/package-repository-tools/image.tar.gz
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -99,6 +101,10 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
       - uses: ./.github/actions/package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -135,6 +141,10 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
       - uses: ./.github/actions/package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -174,6 +184,10 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
       - uses: ./.github/actions/package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -202,6 +216,10 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
       - uses: ./.github/actions/package-repository-tools
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
