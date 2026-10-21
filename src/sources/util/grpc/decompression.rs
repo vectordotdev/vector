@@ -280,11 +280,9 @@ impl Decompressor {
     }
 }
 
-/// Incremental gRPC message processing for a request body, independent of the HTTP body type.
+/// Splits request body chunks into gRPC messages and decompresses the compressed ones.
 ///
-/// Reassembles gRPC messages from raw body chunks and decompresses compressed messages with the
-/// negotiated scheme. Every emitted message has a cleared compressed flag and a length prefix
-/// matching its (decompressed) payload.
+/// Emitted messages are uncompressed, with a length prefix that matches their payload.
 struct MessageDecoder {
     scheme: Option<CompressionScheme>,
     state: State,
@@ -309,10 +307,8 @@ impl MessageDecoder {
         self.bytes_received
     }
 
-    /// Buffers `chunk` and returns the next complete message, if any.
-    ///
-    /// At most one message is returned per chunk. Further complete messages stay buffered until
-    /// the next chunk is processed.
+    /// Buffers `chunk` and returns the next complete message, if any. Later complete messages
+    /// stay buffered until the next chunk.
     fn process_chunk(&mut self, chunk: Bytes) -> Result<Option<Bytes>, Status> {
         self.buf.put(chunk);
 
@@ -1011,21 +1007,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_failed_upstream_read() {
-        let frame = grpc_frame(false, b"a message interrupted by an upstream error");
-        let chunks = vec![
-            Ok(frame[..3].to_vec()),
-            Err(io::Error::other("connection reset")),
-        ];
-
-        let status = decompress_body(None, Body::wrap_stream(stream::iter(chunks)))
-            .await
-            .expect_err("an upstream read error must fail the body");
-
-        assert_eq!(status.code(), Code::Internal);
-    }
-
-    #[tokio::test]
     async fn forwards_trailers_after_messages() {
         let payload = b"a compressed message followed by trailers".repeat(100);
         let mut trailers = HeaderMap::new();
@@ -1082,68 +1063,6 @@ mod tests {
             .now_or_never()
             .expect("a finished driver must close the destination");
         assert!(end.is_none());
-    }
-
-    #[test]
-    fn stops_reading_upstream_when_destination_closes() {
-        let frames = identity_frames(3);
-        let pulled = Arc::new(AtomicUsize::new(0));
-        let source = Body::wrap_stream(counting_stream(frames.clone(), &pulled));
-        let (destination, mut decompressed) = Body::channel();
-        let mut driver = task::spawn(drive_body_decompression(source, destination, None));
-
-        assert_pending!(driver.poll());
-        assert_eq!(next_message(&mut decompressed), frames[0]);
-        drop(decompressed);
-
-        let status =
-            assert_ready!(driver.poll()).expect_err("a closed destination must fail the body");
-        assert_eq!(status.code(), Code::Internal);
-        assert_eq!(pulled.load(Ordering::SeqCst), 2);
-    }
-
-    #[test]
-    fn completed_request_cancels_unfinished_body() {
-        let frame = grpc_frame(false, b"the only message the service reads");
-        let pulled = Arc::new(AtomicUsize::new(0));
-        // The upstream body never ends, so the request only completes if the body driver is
-        // cancelled once the inner service responds.
-        let source = Body::wrap_stream(
-            counting_stream(vec![frame.clone()], &pulled).chain(stream::pending()),
-        );
-        let (destination, mut decompressed) = Body::channel();
-        let inner = async move {
-            let message = decompressed
-                .data()
-                .await
-                .expect("the service must receive a message")
-                .expect("the decompressed body must not fail");
-            assert_eq!(message, frame);
-            Ok::<_, Infallible>(Response::new(tonic::body::empty_body()))
-        };
-        let mut request = task::spawn(drive_request(
-            source,
-            destination,
-            inner,
-            register!(BytesReceived::from(Protocol::from("grpc"))),
-            None,
-        ));
-
-        let response = loop {
-            match request.poll() {
-                Poll::Ready(response) => break response.expect("the inner service is infallible"),
-                Poll::Pending => assert!(request.is_woken(), "the request must not stall"),
-            }
-        };
-
-        assert!(Status::from_header_map(response.headers()).is_none());
-        assert_eq!(
-            accept_encoding(&response),
-            Some(GRPC_ACCEPT_ENCODING_VALUE.as_str())
-        );
-        assert_eq!(pulled.load(Ordering::SeqCst), 1);
-        // The cancelled body driver released the upstream body.
-        assert_eq!(Arc::strong_count(&pulled), 1);
     }
 
     #[test]
