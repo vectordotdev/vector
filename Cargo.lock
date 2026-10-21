@@ -10610,20 +10610,23 @@ dependencies = [
 
 [[package]]
 name = "rumqttc"
-version = "0.24.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1568e15fab2d546f940ed3a21f48bbbd1c494c90c99c4481339364a497f94a9"
+checksum = "0feff8d882bff0b2fddaf99355a10336d43dd3ed44204f85ece28cf9626ab519"
 dependencies = [
  "bytes",
+ "fixedbitset 0.5.7",
  "flume 0.11.0",
  "futures-util",
  "log",
- "rustls-native-certs 0.7.0",
+ "rustls-native-certs 0.8.1",
  "rustls-pemfile 2.2.0",
  "rustls-webpki 0.102.8",
- "thiserror 1.0.68",
+ "thiserror 2.0.18",
  "tokio",
- "tokio-rustls 0.25.0",
+ "tokio-rustls 0.26.2",
+ "tokio-stream",
+ "tokio-util",
 ]
 
 [[package]]
@@ -13520,7 +13523,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.32"
+version = "0.3.33"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -13726,6 +13729,7 @@ dependencies = [
  "roaring",
  "rstest",
  "rumqttc",
+ "rustls 0.23.46",
  "seahash",
  "semver",
  "serde",

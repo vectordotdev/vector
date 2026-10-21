@@ -121,11 +121,11 @@ fn cleanup_test_output(test_name: &str) -> Result<()> {
             "run",
             "--rm",
             "-v",
-            &format!("vector_target:/output/{test_name}"),
+            "vector_target:/output",
             "alpine:3.20",
             "sh",
             "-c",
-            &format!("rm -rf /output/{test_name}/*"),
+            &format!("rm -rf /output/{test_name}"),
         ])
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to run cleanup command: {e}"))?;
