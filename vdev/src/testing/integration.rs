@@ -1,15 +1,17 @@
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     process::{Command, ExitStatus},
 };
 
 use anyhow::{Context, Result, bail};
+use serde::Deserialize;
 
 use super::{
     config::{
         ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
     },
-    runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _},
+    runner::{ContainerTestRunner as _, IntegrationTestRunner, TARGET_PATH, TestRunner as _},
 };
 use crate::{
     app::CommandExt as _,
@@ -22,12 +24,83 @@ use crate::{
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
+/// Records the sha256 of the Vector binary an E2E Vector image was committed with.
+const E2E_VECTOR_BINARY_LABEL: &str = "vector.e2e.binary-sha256";
 
 /// Check if a Docker image exists locally
 fn docker_image_exists(image_name: &str) -> Result<bool> {
     let output =
         docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"]).check_output()?;
     Ok(output.lines().any(|line| line == image_name))
+}
+
+/// Image that the compose `vector` services of E2E tests run.
+fn e2e_vector_image_name(rust_version: &str) -> String {
+    format!("vector-e2e-vector-{rust_version}:latest")
+}
+
+/// Extract the digest from `sha256sum` output (`<digest>  <path>`).
+fn parse_sha256sum(output: &str) -> Option<&str> {
+    output
+        .split_whitespace()
+        .next()
+        .filter(|digest| digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+
+/// The parts of `docker image inspect` output needed to decide whether an image can be reused.
+#[derive(Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ImageInspect {
+    id: String,
+    #[serde(default)]
+    config: ImageConfig,
+    #[serde(default, rename = "RootFS")]
+    root_fs: ImageRootFs,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ImageConfig {
+    #[serde(default)]
+    labels: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ImageRootFs {
+    #[serde(default)]
+    layers: Vec<String>,
+}
+
+impl ImageInspect {
+    /// Parse `docker image inspect` output for a single image.
+    fn parse(output: &str) -> Result<Self> {
+        let mut images: Vec<Self> =
+            serde_json::from_str(output).context("Invalid docker image inspect output")?;
+        match images.len() {
+            1 => Ok(images.remove(0)),
+            count => bail!("Expected one image from docker image inspect, got {count}"),
+        }
+    }
+
+    fn label(&self, name: &str) -> Option<&str> {
+        self.config.labels.as_ref()?.get(name).map(String::as_str)
+    }
+
+    /// Whether this image was committed from a container of `runner` holding a Vector binary
+    /// with sha256 `binary_digest`.
+    ///
+    /// This compares filesystem layers, not image IDs: rebuilding the runner image from cache
+    /// yields the same layers but can yield a new ID (e.g. with the containerd image store).
+    fn is_committed_from(&self, runner: &ImageInspect, binary_digest: &str) -> bool {
+        self.label(E2E_VECTOR_BINARY_LABEL) == Some(binary_digest)
+            && self.root_fs.layers.len() == runner.root_fs.layers.len() + 1
+            && self.root_fs.layers.starts_with(&runner.root_fs.layers)
+    }
+}
+
+fn inspect_image(image: &str) -> Result<ImageInspect> {
+    ImageInspect::parse(&docker_command(["image", "inspect", image]).check_output()?)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -125,7 +198,11 @@ impl ComposeTest {
             compose.is_some().then_some(network_name),
         )?;
 
-        env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
+        let vector_image = match local_config.kind {
+            ComposeTestKind::E2E => e2e_vector_image_name(&RustToolchainConfig::rust_version()),
+            ComposeTestKind::Integration => runner.image_name(),
+        };
+        env_config.insert("VECTOR_IMAGE".to_string(), Some(vector_image));
 
         let compose_test = ComposeTest {
             local_config,
@@ -202,24 +279,7 @@ impl ComposeTest {
         }
         let mut args = self.config.args.clone().unwrap_or_default();
 
-        args.push("--features".to_string());
-
-        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
-        // If using per-test runner: use test-specific features from test.yaml
-        args.push(if self.runner.is_shared_runner() {
-            format!("{},vendored", self.local_config.feature_flag)
-        } else {
-            format!("{},vendored", self.config.features.join(","))
-        });
-
-        // If the test field is not present then use the --lib flag
-        match self.config.test {
-            Some(ref test_arg) => {
-                args.push("--test".to_string());
-                args.push(test_arg.clone());
-            }
-            None => args.push("--lib".to_string()),
-        }
+        args.extend(self.cargo_target_args());
 
         // Ensure the test_filter args are passed as well
         if let Some(ref filter) = self.config.test_filter {
@@ -240,9 +300,7 @@ impl ComposeTest {
         self.runner.test(
             &env_vars,
             &self.config.runner.env,
-            Some(&self.config.features),
             &args,
-            self.local_config.kind == ComposeTestKind::E2E,
             self.coverage,
             if self.coverage {
                 Some(self.environment.as_str())
@@ -254,16 +312,89 @@ impl ComposeTest {
         Ok(())
     }
 
+    /// Cargo arguments selecting the features and test target to compile.
+    fn cargo_target_args(&self) -> Vec<String> {
+        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
+        // If using per-test runner: use test-specific features from test.yaml
+        let features = if self.runner.is_shared_runner() {
+            format!("{},vendored", self.local_config.feature_flag)
+        } else {
+            format!("{},vendored", self.config.features.join(","))
+        };
+        let mut args = vec!["--features".to_string(), features];
+
+        // If the test field is not present then use the --lib flag
+        match self.config.test {
+            Some(ref test_arg) => args.extend(["--test".to_string(), test_arg.clone()]),
+            None => args.push("--lib".to_string()),
+        }
+        args
+    }
+
+    /// Compile the tests in the runner and package the resulting Vector binary as the image that
+    /// the compose `vector` services run.
+    ///
+    /// Cargo builds the `vector` binary for integration test targets, using the same features
+    /// and target directory as the test binary. The test phase then reuses these artifacts
+    /// instead of compiling Vector a second time. The image is only re-committed when the
+    /// runner image or the binary changed, so later environments of a run reuse it.
+    fn build_e2e_vector_image(&self) -> Result<()> {
+        self.runner.ensure_network()?;
+        self.runner.ensure_external_volumes()?;
+        self.runner.ensure_running(&self.env_config)?;
+        self.runner.build_tests(&self.cargo_target_args())?;
+
+        let container = self.runner.container_name();
+        let binary = format!("{TARGET_PATH}/debug/vector");
+        let output = docker_command(["exec", &container, "sha256sum", &binary])
+            .check_output()
+            .with_context(|| format!("{binary} was not built by the test target"))?;
+        let Some(digest) = parse_sha256sum(&output) else {
+            bail!("Unexpected sha256sum output: {output:?}");
+        };
+        let runner_image =
+            docker_command(["inspect", "--format", "{{.Image}}", &container]).check_output()?;
+        let runner_image = inspect_image(runner_image.trim())?;
+
+        let image = e2e_vector_image_name(&RustToolchainConfig::rust_version());
+        // A missing or unreadable image is simply rebuilt.
+        let previous = inspect_image(&image).ok();
+        if previous
+            .as_ref()
+            .is_some_and(|previous| previous.is_committed_from(&runner_image, digest))
+        {
+            info!("Reusing {image}: Vector binary unchanged");
+            return Ok(());
+        }
+
+        docker_command(["exec", &container, "cp", &binary, "/usr/bin/vector"]).check_run()?;
+        docker_command([
+            "commit",
+            "--change",
+            &format!("LABEL {E2E_VECTOR_BINARY_LABEL}={digest}"),
+            &container,
+            &image,
+        ])
+        .wait(format!("Committing {image}"))?;
+
+        // Each commit leaves the previous image dangling, and it holds a full debug binary.
+        if let Some(previous) = previous
+            && let Err(error) = docker_command(["image", "rm", &previous.id]).check_output()
+        {
+            debug!(
+                "Could not remove previous {image} ({}): {error}",
+                previous.id
+            );
+        }
+        Ok(())
+    }
+
     pub(crate) fn start(&self) -> Result<()> {
-        // For end-to-end tests, we want to run vector as a service, leveraging the
-        // image for the runner. So we must build that image before starting the
-        // compose so that it is available.
+        // For end-to-end tests, we want to run vector as a service. Build it in the runner so
+        // the compile is shared with the test binary. Coverage only instruments the test binary,
+        // so the same uninstrumented service binary works for coverage runs.
         if self.local_config.kind == ComposeTestKind::E2E {
-            self.runner.build(
-                Some(&self.config.features),
-                &self.env_config,
-                true, // E2E tests build Vector in the image
-            )?;
+            self.build_e2e_vector_image()?;
         }
 
         self.config.check_required()?;
@@ -428,6 +559,105 @@ impl Compose {
         command.env("RUST_VERSION", RustToolchainConfig::rust_version());
         command.envs(extract_present(&self.env));
         command
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn e2e_vector_image_name_includes_rust_version() {
+        assert_eq!(
+            e2e_vector_image_name("1.96.1"),
+            "vector-e2e-vector-1.96.1:latest"
+        );
+    }
+
+    #[test]
+    fn parses_sha256sum_output() {
+        let digest = "b68fc0af0e9e62e5c2a2df3fc1bb5d0c3c8f2bd0e5d6c9a1f7a6e1b2c3d4e5f6";
+        assert_eq!(
+            parse_sha256sum(&format!("{digest}  /home/target/debug/vector\n")),
+            Some(digest)
+        );
+        assert_eq!(parse_sha256sum(""), None);
+        assert_eq!(
+            parse_sha256sum("sha256sum: /home/target/debug/vector: No such file or directory"),
+            None
+        );
+    }
+
+    fn image(id: &str, binary: Option<&str>, layers: &[&str]) -> ImageInspect {
+        ImageInspect {
+            id: id.to_string(),
+            config: ImageConfig {
+                labels: binary.map(|digest| {
+                    BTreeMap::from([(E2E_VECTOR_BINARY_LABEL.to_string(), digest.to_string())])
+                }),
+            },
+            root_fs: ImageRootFs {
+                layers: layers.iter().map(ToString::to_string).collect(),
+            },
+        }
+    }
+
+    #[test]
+    fn parses_image_inspect_output() {
+        let output = r#"[{
+            "Id": "sha256:committed",
+            "Config": {"Cmd": ["/bin/sleep", "infinity"], "Labels": {
+                "vector-test-runner": "true",
+                "vector.e2e.binary-sha256": "abc"
+            }},
+            "RootFS": {"Type": "layers", "Layers": ["sha256:a", "sha256:b"]}
+        }]"#;
+        assert_eq!(
+            ImageInspect::parse(output).unwrap(),
+            ImageInspect {
+                config: ImageConfig {
+                    labels: Some(BTreeMap::from([
+                        ("vector-test-runner".to_string(), "true".to_string()),
+                        (E2E_VECTOR_BINARY_LABEL.to_string(), "abc".to_string()),
+                    ])),
+                },
+                ..image("sha256:committed", None, &["sha256:a", "sha256:b"])
+            }
+        );
+
+        // Docker prints `null` for images without labels.
+        let unlabeled = ImageInspect::parse(
+            r#"[{"Id": "sha256:x", "Config": {"Labels": null}, "RootFS": {"Layers": []}}]"#,
+        )
+        .unwrap();
+        assert_eq!(unlabeled.label(E2E_VECTOR_BINARY_LABEL), None);
+
+        assert!(ImageInspect::parse("[]").is_err());
+        assert!(ImageInspect::parse("Error: No such image").is_err());
+    }
+
+    #[test]
+    fn reuses_image_only_for_same_runner_layers_and_binary() {
+        let runner = image("sha256:runner", None, &["sha256:a", "sha256:b"]);
+        let committed = image(
+            "sha256:e2e",
+            Some("abc"),
+            &["sha256:a", "sha256:b", "sha256:c"],
+        );
+        assert!(committed.is_committed_from(&runner, "abc"));
+
+        // A rebuilt runner with the same layers but a new ID is still a match.
+        let rebuilt = image("sha256:rebuilt", None, &["sha256:a", "sha256:b"]);
+        assert!(committed.is_committed_from(&rebuilt, "abc"));
+
+        assert!(!committed.is_committed_from(&runner, "def"));
+        let changed = image("sha256:changed", None, &["sha256:a", "sha256:x"]);
+        assert!(!committed.is_committed_from(&changed, "abc"));
+        let unlabeled = image("sha256:e2e", None, &["sha256:a", "sha256:b", "sha256:c"]);
+        assert!(!unlabeled.is_committed_from(&runner, "abc"));
+        // The runner image itself is never mistaken for a committed image.
+        let labeled_runner = image("sha256:runner", Some("abc"), &["sha256:a", "sha256:b"]);
+        assert!(!labeled_runner.is_committed_from(&runner, "abc"));
     }
 }
 
