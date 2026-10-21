@@ -274,9 +274,6 @@ jobs:
       - uses: ./.github/actions/dd-token
 
       - uses: ./.github/actions/setup
-        env:
-          # Include harness changes inherited from the PR's base branch.
-          VDEV_BUILD_FROM_SOURCE: true
         with:
           vdev: true
           datadog-ci: true
