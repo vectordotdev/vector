@@ -31,37 +31,24 @@ jobs:
     outputs:
       commit: ${{ steps.commit.outputs.sha }}
     steps:
-      # Build the workflow's tooling once, even when testing an older review SHA.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: ./.github/actions/setup
         with:
           rust: true
           mold: false
-          vdev: false
-          cargo-cache: true
-      - name: Build and test coverage tooling
-        run: |
-          cargo test --locked -p vdev coverage
-          cargo build --locked --release -p vdev
-          mkdir -p "$RUNNER_TEMP/coverage-tools"
-          cp target/release/vdev "$RUNNER_TEMP/coverage-tools/vdev"
-          echo "$RUNNER_TEMP/coverage-tools" >> "$GITHUB_PATH"
-          cp .github/workflows/integration.yml "$RUNNER_TEMP/integration.yml"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.ref || github.sha }}
-          path: coverage-source
+          vdev: true
       - name: Resolve tested commit and expected reports
         id: commit
-        working-directory: coverage-source
         env:
           COVERAGE_RUN_ID: ${{ github.run_id }}
         run: |
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/coverage-tools"
+          cp "$(command -v vdev)" "$RUNNER_TEMP/coverage-tools/vdev"
           vdev build coverage plan \
-            --workflow "$RUNNER_TEMP/integration.yml" \
+            --workflow ".github/workflows/integration.yml" \
             --run-id "$COVERAGE_RUN_ID" \
             --output "$RUNNER_TEMP/coverage-tools/plan.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
