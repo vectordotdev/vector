@@ -12,10 +12,16 @@ use vrl::event_path;
 use super::*;
 use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
-    config::{ProxyConfig, SinkConfig, SinkContext, log_schema},
+    config::{AcknowledgementsConfig, ProxyConfig, SinkConfig, SinkContext, log_schema},
     event::{Event, LogEvent, Value},
-    sinks::{aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder, util::BatchConfig},
-    template::{Template, UnconfinedTemplate},
+    sinks::{
+        aws_cloudwatch_logs::{
+            config::{CloudwatchLogsClientBuilder, Retention},
+            healthcheck::healthcheck,
+        },
+        util::{BatchConfig, Compression, http::RequestConfig},
+    },
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
     test_util::{
         components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines, random_lines_with_stream, random_string, trace_init,
@@ -56,17 +62,17 @@ async fn cloudwatch_insert_log_event() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -110,17 +116,17 @@ async fn cloudwatch_insert_log_events_sorted() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -189,17 +195,17 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -269,17 +275,17 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -323,14 +329,14 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: Some(
             create_kms_client_test()
                 .await
@@ -348,7 +354,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             "key".to_string(),
             "value".to_string(),
         )])),
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -413,17 +419,17 @@ async fn cloudwatch_insert_log_event_batched() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
         batch,
-        request: Default::default(),
-        tls: Default::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -467,17 +473,17 @@ async fn cloudwatch_insert_log_event_partitioned() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -552,7 +558,6 @@ async fn cloudwatch_insert_log_event_partitioned() {
 #[tokio::test]
 async fn cloudwatch_healthcheck() {
     trace_init();
-    use super::healthcheck::healthcheck;
 
     ensure_group().await;
 
@@ -563,17 +568,17 @@ async fn cloudwatch_healthcheck() {
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
-        retention: Default::default(),
-        compression: Default::default(),
-        batch: Default::default(),
-        request: Default::default(),
-        tls: Default::default(),
+        retention: Retention::default(),
+        compression: Compression::default(),
+        batch: BatchConfig::default(),
+        request: RequestConfig::default(),
+        tls: None,
         assume_role: None,
-        auth: Default::default(),
-        acknowledgements: Default::default(),
+        auth: AwsAuthentication::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
-        confinement: Default::default(),
+        confinement: ConfinementConfig::default(),
     };
 
     let client = config.create_client(&ProxyConfig::default()).await.unwrap();

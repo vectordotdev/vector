@@ -32,13 +32,13 @@ pub enum Protocol {
 
 impl GenerateConfig for OpenTelemetryConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             protocol:
               type: http
               uri: http://localhost:5318/v1/logs
               encoding:
                 codec: json
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -86,7 +86,7 @@ impl ValidatedSink for OpenTelemetryConfig {
                 // Confinement of the URI and templated headers happens here (not in
                 // `validate`) so per-template security warnings carry the outer
                 // `opentelemetry` component type rather than `http`.
-                config.build_from_validated(validated, cx, Self::NAME).await
+                Box::pin(config.build_from_validated(validated, cx, Self::NAME)).await
             }
         }
     }

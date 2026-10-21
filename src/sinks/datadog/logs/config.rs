@@ -7,13 +7,11 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
-use hyper::{Body, client::connect::Connect};
-
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
-use crate::config::ValidatedSink;
 use crate::{
     common::datadog,
-    http::HttpClient,
+    config::ValidatedSink,
+    http::client_v1::HttpClient,
     schema,
     sinks::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
@@ -109,6 +107,10 @@ pub struct DatadogLogsConfig {
     pub truncate_oversized_logs: Option<DatadogLogsTruncationConfig>,
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Serde and derived defaults require an optional payload limit."
+)]
 const fn default_max_payload_bytes() -> Option<usize> {
     Some(MAX_PAYLOAD_BYTES)
 }
@@ -117,15 +119,19 @@ const fn default_max_log_bytes() -> usize {
     DEFAULT_MAX_LOG_BYTES
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Serde and derived defaults require an optional compression value."
+)]
 const fn default_compression() -> Option<Compression> {
     Some(Compression::zstd_default())
 }
 
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             default_api_key: ${DATADOG_API_KEY_ENV_VAR}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -137,26 +143,29 @@ impl DatadogLogsConfig {
     fn logs_endpoint(endpoint: Option<&str>, site: &str) -> crate::Result<HttpEndpoint> {
         let base_url = endpoint.map_or_else(
             || format!("https://http-intake.logs.{site}"),
-            |endpoint| endpoint.to_string(),
+            std::string::ToString::to_string,
         );
 
         Ok(HttpEndpoint::parse(&base_url)?.append_path("/api/v2/logs")?)
     }
 
-    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> crate::Result<HttpEndpoint> {
+    fn get_uri(dd_common: &DatadogCommonConfig) -> crate::Result<HttpEndpoint> {
         Self::logs_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)
     }
 
-    pub fn build_processor<C>(
+    /// Builds the log-processing sink using the supplied client and batch settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the logs endpoint cannot be parsed or request headers
+    /// are invalid.
+    pub fn build_processor(
         &self,
         dd_common: &DatadogCommonConfig,
-        client: HttpClient<Body, C>,
+        client: HttpClient,
         dd_evp_origin: String,
         batch: BatcherSettings,
-    ) -> crate::Result<VectorSink>
-    where
-        C: Connect + Clone + Send + Sync + 'static,
-    {
+    ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.into_settings();
 
@@ -176,14 +185,14 @@ impl DatadogLogsConfig {
             false
         };
 
-        let endpoint = self.get_uri(dd_common)?;
+        let endpoint = Self::get_uri(dd_common)?;
         let protocol = endpoint.protocol().to_string();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(
                 client,
-                endpoint.into_uri(),
+                endpoint.into_v1(),
                 headers,
                 dd_evp_origin,
             )?);
@@ -199,27 +208,31 @@ impl DatadogLogsConfig {
             conforms_as_agent,
             self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES),
         )
-        .compression(self.compression.or_else(default_compression).unwrap())
+        .compression(self.compression.unwrap_or_else(Compression::zstd_default))
         .truncation(self.truncate_oversized_logs)
         .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
+    /// Creates an HTTP client using this sink's TLS settings and the supplied proxy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TLS settings or HTTP client cannot be constructed.
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let default_tls_config;
 
         let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
+            Some(if let Some(config) = self.local_dd_common.tls.as_ref() {
+                config
+            } else {
+                default_tls_config = TlsEnableableConfig::enabled();
+                &default_tls_config
             }),
             false,
         )?;
-        Ok(HttpClient::new(tls_settings, proxy)?)
+        HttpClient::new(tls_settings, proxy)
     }
 }
 
@@ -538,15 +551,14 @@ mod test {
 
     #[test]
     fn get_uri_defaults_missing_scheme_to_https() {
-        let config = DatadogLogsConfig::default();
         let custom = DatadogCommonConfig {
             endpoint: Some("localhost:8080".to_string()),
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
-            config.get_uri(&custom).unwrap().to_string(),
+            DatadogLogsConfig::get_uri(&custom).unwrap().to_string(),
             "https://localhost:8080/api/v2/logs"
         );
         // The default site-based endpoint keeps its scheme.
@@ -554,10 +566,10 @@ mod test {
             endpoint: None,
             site: "datadoghq.com".to_string(),
             default_api_key: SensitiveString::from("key".to_string()),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         assert_eq!(
-            config.get_uri(&default).unwrap().to_string(),
+            DatadogLogsConfig::get_uri(&default).unwrap().to_string(),
             "https://http-intake.logs.datadoghq.com/api/v2/logs"
         );
     }

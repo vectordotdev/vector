@@ -147,6 +147,7 @@ byteorder,https://github.com/BurntSushi/byteorder,Unlicense OR MIT,Andrew Gallan
 bytes,https://github.com/tokio-rs/bytes,MIT,"Carl Lerche <me@carllerche.com>, Sean McArthur <sean@seanmonstar.com>"
 bytes-utils,https://github.com/vorner/bytes-utils,Apache-2.0 OR MIT,Michal 'vorner' Vaner <vorner@vorner.cz>
 bytesize,https://github.com/bytesize-rs/bytesize,Apache-2.0,"Hyunsik Choi <hyunsik.choi@gmail.com>, MrCroxx <mrcroxx@outlook.com>, Rob Ede <robjtede@icloud.com>"
+bytestring,https://github.com/actix/actix-net,MIT OR Apache-2.0,"Nikolay Kim <fafhrd91@gmail.com>, Rob Ede <robjtede@icloud.com>"
 castaway,https://github.com/sagebind/castaway,MIT,Stephen M. Coakley <me@stephencoakley.com>
 cbc,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 cfb-mode,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
@@ -922,7 +923,6 @@ web-time,https://github.com/daxpedda/web-time,MIT OR Apache-2.0,The web-time Aut
 webbrowser,https://github.com/amodm/webbrowser-rs,MIT OR Apache-2.0,Amod Malviya @amodm
 webpki-root-certs,https://github.com/rustls/webpki-roots,CDLA-Permissive-2.0,The webpki-root-certs Authors
 webpki-roots,https://github.com/rustls/webpki-roots,CDLA-Permissive-2.0,The webpki-roots Authors
-webpki-roots,https://github.com/rustls/webpki-roots,MPL-2.0,The webpki-roots Authors
 whoami,https://github.com/ardaku/whoami,Apache-2.0 OR BSL-1.0 OR MIT,The whoami Authors
 widestring,https://github.com/starkat99/widestring-rs,MIT OR Apache-2.0,Kathryn Long <squeeself@gmail.com>
 widestring,https://github.com/starkat99/widestring-rs,MIT OR Apache-2.0,The widestring Authors

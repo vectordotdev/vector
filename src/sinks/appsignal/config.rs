@@ -1,9 +1,9 @@
 use futures::FutureExt;
-use http::{HeaderValue, Request, header::AUTHORIZATION};
-use hyper::Body;
+use http::StatusCode;
+use http_1::{HeaderValue, Request, header::AUTHORIZATION};
 use tower::ServiceBuilder;
 use vector_lib::{
-    config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
+    config::{AcknowledgementsConfig, DataType, Input},
     configurable::configurable_component,
     sensitive_string::SensitiveString,
     stream::BatcherSettings,
@@ -11,20 +11,21 @@ use vector_lib::{
 };
 
 use super::{
-    service::{AppsignalResponse, AppsignalService},
-    sink::AppsignalSink,
+    encoder::AppsignalEncoder, request_builder::AppsignalRequestBuilder,
+    service::AppsignalSvcRequestBuilder, sink::AppsignalSink,
 };
 use crate::{
     codecs::Transformer,
     config::ValidatedSink,
-    http::HttpClient,
+    http::client_v1::{HttpClient, empty_body},
     sinks::{
         Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},
         util::{
             BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
-            http::{HttpStatusRetryLogic, RetryStrategy},
+            http::RetryStrategy,
+            http_v1::{HttpService, http_response_retry_logic},
         },
     },
 };
@@ -35,6 +36,7 @@ use crate::{
 #[derivative(Default)]
 pub(super) struct AppsignalConfig {
     /// The URI for the AppSignal API to send data to.
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
     #[derivative(Default(value = "default_endpoint()"))]
@@ -42,6 +44,7 @@ pub(super) struct AppsignalConfig {
     pub(super) endpoint: HttpEndpoint,
 
     /// A valid app-level AppSignal Push API key.
+    #[expect(clippy::doc_markdown, reason = "Service name")]
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
     #[configurable(metadata(docs::examples = "${APPSIGNAL_PUSH_API_KEY}"))]
     push_api_key: SensitiveString,
@@ -85,45 +88,44 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 }
 
 impl AppsignalConfig {
-    pub(super) fn build_client(
-        &self,
-        proxy: &ProxyConfig,
-        tls: &MaybeTlsSettings,
-    ) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(tls.clone(), proxy)?;
-        Ok(client)
-    }
-
     pub(super) fn build_sink(
         &self,
         http_client: HttpClient,
         batch_settings: BatcherSettings,
         endpoint: HttpEndpoint,
-    ) -> crate::Result<VectorSink> {
-        let push_api_key = self.push_api_key.clone();
-        let compression = self.compression;
-        let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
+    ) -> VectorSink {
+        let service_request_builder = AppsignalSvcRequestBuilder {
+            endpoint,
+            push_api_key: self.push_api_key.clone(),
+            compression: self.compression,
+        };
+
+        let service =
+            HttpService::new(http_client, service_request_builder).with_response_decompression();
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
-        let retry_logic = HttpStatusRetryLogic::new(
-            |req: &AppsignalResponse| req.http_status,
-            self.retry_strategy.clone(),
-        );
 
         let service = ServiceBuilder::new()
-            .settings(request_settings, retry_logic)
+            .settings(
+                request_settings,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
-        let transformer = self.encoding.clone();
-        let sink = AppsignalSink {
-            service,
-            compression,
-            transformer,
-            batch_settings,
+        let request_builder = AppsignalRequestBuilder {
+            encoder: AppsignalEncoder {
+                transformer: self.encoding.clone(),
+            },
+            compression: self.compression,
         };
 
-        Ok(VectorSink::from_event_streamsink(sink))
+        let sink = AppsignalSink {
+            service,
+            batch_settings,
+            request_builder,
+        };
+        VectorSink::from_event_streamsink(sink)
     }
 }
 
@@ -185,9 +187,9 @@ impl ValidatedSink for AppsignalConfig {
         // TLS settings may read certificate files from disk, so they are
         // resolved at build time rather than during pure validation.
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let client = self.build_client(cx.proxy(), &tls)?;
+        let client = HttpClient::new(tls, cx.proxy())?;
         let healthcheck = healthcheck(healthcheck_endpoint, authorization, client.clone()).boxed();
-        let sink = self.build_sink(client, batch_settings, endpoint)?;
+        let sink = self.build_sink(client, batch_settings, endpoint);
 
         Ok((sink, healthcheck))
     }
@@ -198,10 +200,13 @@ async fn healthcheck(
     authorization: HeaderValue,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::get(uri.as_uri()).header(AUTHORIZATION, authorization);
-    let response = client.send(request.body(Body::empty()).unwrap()).await?;
+    let request = Request::get(uri.into_v1()).header(AUTHORIZATION, authorization);
+    let response = client.send(request.body(empty_body())?).await?;
 
-    match response.status() {
+    let status = StatusCode::from_u16(response.status().as_u16())
+        .expect("HTTP status codes are valid u16 values");
+
+    match status {
         status if status.is_success() => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }

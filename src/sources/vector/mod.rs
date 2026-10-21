@@ -1,4 +1,4 @@
-//! The `vector` source. See [VectorConfig].
+//! The `vector` source. See [`VectorConfig`].
 use std::net::SocketAddr;
 
 use chrono::Utc;
@@ -23,7 +23,6 @@ use crate::{
     },
     internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
-    serde::bool_or_struct,
     sources::{
         Source,
         util::{
@@ -97,7 +96,7 @@ impl proto::Service for Service {
                 emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
-            .and_then(|_| handle_batch_status(receiver))
+            .and_then(|()| handle_batch_status(receiver))
             .await?;
 
         Ok(Response::new(proto::PushEventsResponse {}))
@@ -145,7 +144,7 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -159,6 +158,7 @@ pub struct VectorConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
+    #[must_use]
     pub fn from_address(addr: SocketAddr) -> Self {
         Self {
             address: addr,
@@ -173,8 +173,8 @@ impl Default for VectorConfig {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
-            acknowledgements: Default::default(),
-            keepalive: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: GrpcKeepaliveConfig::default(),
             log_namespace: None,
         }
     }
@@ -234,6 +234,7 @@ impl SourceConfig for VectorConfig {
         )
         .map_err(|error| {
             error!(message = "Source future failed.", %error);
+            crate::sources::SourceError::from(error)
         });
 
         Ok(Box::pin(source))
@@ -361,7 +362,7 @@ mod test {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -380,7 +381,7 @@ mod test {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None);
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -416,10 +417,10 @@ mod tests {
         // to ensure interoperability.
         let sink_config = match compression {
             Some(c) => indoc::formatdoc! {r#"
-                address: "{addr}"
+                address: "http://{addr}"
                 compression: "{c}"
             "#},
-            None => format!("address: \"{addr}\"\n"),
+            None => format!("address: \"http://{addr}\"\n"),
         };
         let sink: SinkConfig = serde_yaml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
@@ -566,6 +567,8 @@ mod tests {
 
     #[tokio::test]
     async fn standard_grpc_health_check_works() {
+        use tonic_health::pb::health_check_response::ServingStatus;
+
         use tonic::transport::Channel;
         use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
 
@@ -600,7 +603,6 @@ mod tests {
             .await
             .unwrap();
 
-        use tonic_health::pb::health_check_response::ServingStatus;
         assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
 
         // Check the named Vector service health

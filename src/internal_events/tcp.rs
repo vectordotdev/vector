@@ -239,11 +239,10 @@ mod tests {
                         .iter()
                         .all(|(k, v)| m.tags().is_some_and(|t| t.get(k) == Some(*v)))
             })
-            .map(|m| match m.value() {
+            .map_or(0.0, |m| match m.value() {
                 MetricValue::Counter { value } => *value,
                 other => panic!("expected counter for {name}, got {other:?}"),
             })
-            .unwrap_or(0.0)
     }
 
     /// `TcpSourceConnectionClosed` MUST bump `connection_shutdown_total{mode="tcp"}`
@@ -251,6 +250,8 @@ mod tests {
     /// connection-close counter on the source side.
     #[test]
     #[serial]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::float_cmp, reason = "Counters are exact integers")]
     fn tcp_source_connection_closed_increments_shutdown_total() {
         crate::test_util::trace_init();
         let before = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
@@ -263,9 +264,11 @@ mod tests {
 
     /// `TcpSendAckError` is an `*Error` event and per the instrumentation spec MUST
     /// only emit on real errors — bumping `component_errors_total` with the
-    /// `ack_failed` error_code.
+    /// `ack_failed` `error_code`.
     #[test]
     #[serial]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::float_cmp, reason = "Counters are exact integers")]
     fn tcp_send_ack_error_emit_always_increments_component_errors_total() {
         crate::test_util::trace_init();
         let errors_before = counter_value(

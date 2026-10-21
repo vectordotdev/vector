@@ -23,6 +23,22 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
+/// The backend selected by the sink constructor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Distribution {
+    Elasticsearch,
+    OpenSearch,
+}
+
+impl Distribution {
+    pub(super) const fn component_name(self) -> &'static str {
+        match self {
+            Self::Elasticsearch => "elasticsearch",
+            Self::OpenSearch => "opensearch",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
@@ -38,8 +54,19 @@ pub struct ElasticsearchCommon {
 }
 
 impl ElasticsearchCommon {
+    /// Builds the shared sink settings for an endpoint.
+    ///
+    /// # Errors
+    /// Returns an error for invalid endpoints, authentication, TLS settings, template
+    /// confinement, or incompatible versioning and serverless configuration.
+    ///
+    /// # Panics
+    /// Panics if the constructed bulk endpoint cannot be parsed as an HTTP URI.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep endpoint setup together.")]
     pub async fn parse_config(
         config: &ElasticsearchConfig,
+        distribution: Distribution,
         endpoint: &HttpEndpoint,
         proxy_config: &ProxyConfig,
         version: &mut Option<usize>,
@@ -59,7 +86,7 @@ impl ElasticsearchCommon {
 
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
-        let mode = config.common_mode()?;
+        let mode = config.common_mode(distribution.component_name())?;
 
         let tower_request = config.request.tower.into_settings();
 
@@ -98,7 +125,7 @@ impl ElasticsearchCommon {
             );
         }
 
-        let bulk_url = {
+        let bulk_endpoint = {
             let mut query = url::form_urlencoded::Serializer::new(String::new());
             // Iterate through the HashMap
             for (param_name, param_value) in &query_params {
@@ -117,7 +144,7 @@ impl ElasticsearchCommon {
             }
             format!("{base_url}/_bulk?{}", query.finish())
         };
-        let bulk_uri = bulk_url.parse::<Uri>().unwrap();
+        let bulk_uri = bulk_endpoint.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
         let config = config.clone();
@@ -147,6 +174,9 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::V6 => 6,
                 ElasticsearchApiVersion::V7 => 7,
                 ElasticsearchApiVersion::V8 => 8,
+                // OpenSearch's bulk API is compatible with Elasticsearch 7. Its own
+                // major version is unrelated, so no cluster-version probe is needed.
+                ElasticsearchApiVersion::Auto if distribution == Distribution::OpenSearch => 7,
                 ElasticsearchApiVersion::Auto => {
                     match get_version(
                         &base_url,
@@ -209,15 +239,15 @@ impl ElasticsearchCommon {
         };
 
         Ok(Self {
-            auth,
-            service_type,
             base_url,
             bulk_uri,
+            auth,
+            service_type,
             mode,
             request_builder,
-            query_params,
-            request,
             tls_settings,
+            request,
+            query_params,
             metric_to_log,
         })
     }
@@ -243,7 +273,7 @@ impl ElasticsearchCommon {
                 let region = config
                     .aws
                     .as_ref()
-                    .map(|config| config.region())
+                    .map(crate::aws::region::RegionOrEndpoint::region)
                     .ok_or(ParseError::RegionRequired)?
                     .ok_or(ParseError::RegionRequired)?;
                 Some(Auth::Aws {
@@ -269,9 +299,14 @@ impl ElasticsearchCommon {
         Ok(auth)
     }
 
-    /// Parses endpoints into a vector of ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
+    /// Parses endpoints into a vector of `ElasticsearchCommons`. The resulting vector is guaranteed to not be empty.
+    ///
+    /// # Errors
+    /// Returns an error if no endpoint is configured, both endpoint options are used,
+    /// or any endpoint fails [`Self::parse_config`].
     pub async fn parse_many(
         config: &ElasticsearchConfig,
+        distribution: Distribution,
         proxy_config: &ProxyConfig,
     ) -> crate::Result<Vec<Self>> {
         let mut version = None;
@@ -281,7 +316,8 @@ impl ElasticsearchCommon {
             );
             if config.endpoints.is_empty() {
                 Ok(vec![
-                    Self::parse_config(config, endpoint, proxy_config, &mut version).await?,
+                    Self::parse_config(config, distribution, endpoint, proxy_config, &mut version)
+                        .await?,
                 ])
             } else {
                 Err(ParseError::EndpointsExclusive.into())
@@ -290,23 +326,40 @@ impl ElasticsearchCommon {
             Err(ParseError::EndpointRequired.into())
         } else {
             let mut commons = Vec::new();
-            for endpoint in config.endpoints.iter() {
-                commons
-                    .push(Self::parse_config(config, endpoint, proxy_config, &mut version).await?);
+            for endpoint in &config.endpoints {
+                commons.push(
+                    Self::parse_config(config, distribution, endpoint, proxy_config, &mut version)
+                        .await?,
+                );
             }
             Ok(commons)
         }
     }
 
-    /// Parses a single endpoint, else panics.
+    /// Parses a single endpoint.
+    ///
+    /// # Errors
+    /// Returns any error from [`Self::parse_many`].
+    ///
+    /// # Panics
+    /// Panics if the configuration contains more than one endpoint.
     #[cfg(test)]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
-        let mut commons =
-            Self::parse_many(config, crate::config::SinkContext::default().proxy()).await?;
+        let mut commons = Self::parse_many(
+            config,
+            Distribution::Elasticsearch,
+            crate::config::SinkContext::default().proxy(),
+        )
+        .await?;
         assert_eq!(commons.len(), 1);
         Ok(commons.remove(0))
     }
 
+    /// Checks cluster health, unless the endpoint is serverless.
+    ///
+    /// # Errors
+    /// Returns an error if the health request cannot be built, signed, or sent,
+    /// or the endpoint returns a status other than 200 OK.
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         if self.service_type == OpenSearchServiceType::Serverless {
             warn!(
@@ -333,6 +386,11 @@ impl ElasticsearchCommon {
     }
 }
 
+/// Signs an Elasticsearch or OpenSearch request with AWS credentials.
+///
+/// # Errors
+/// Returns an error if credentials cannot be loaded, headers are not UTF-8,
+/// or the AWS request signature cannot be constructed.
 #[cfg(feature = "aws-core")]
 pub async fn sign_request(
     service_type: &OpenSearchServiceType,

@@ -36,7 +36,7 @@ impl SecretBackend for DirectoryBackend {
         _: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
         let mut secrets = HashMap::new();
-        for k in secret_keys.into_iter() {
+        for k in secret_keys {
             let file_path = self.path.join(&k);
             let contents = tokio::fs::read_to_string(&file_path).await?;
             let secret = if self.remove_trailing_whitespace {

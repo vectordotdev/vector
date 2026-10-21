@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.60.0-dev"
+version = "0.61.0-dev"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -53,10 +53,11 @@ workspace = true
 [package.metadata.deb]
 name = "vector"
 section = "admin"
-maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/default/vector"]
+maintainer-scripts = "target/debian-maintainer-scripts/"
+conf-files = ["/etc/default/vector", "/etc/vector/vector.yaml"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
+  ["distribution/debian/vector.yaml", "/etc/vector/vector.yaml", "644"],
   ["config/vector.yaml", "/usr/share/vector/examples/vector.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
@@ -142,6 +143,7 @@ members = [
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(ddsketch_extended)'] }
 
 [workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
 string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"
@@ -329,7 +331,7 @@ aws-sdk-sts = { version = "1.114.0", default-features = false, features = ["beha
 
 # The `aws-sdk-sts` crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication is configured.
-aws-sigv4 = { version = "1.5.1", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "1.5.1", default-features = false, features = ["sign-http", "http0-compat", "http1"], optional = true }
 
 aws-smithy-async = { version = "1.3.0", default-features = false, features = ["rt-tokio"], optional = true }
 aws-smithy-http = { version = "0.64", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
@@ -355,6 +357,7 @@ opendal-http-transport-reqwest = { version = "0.58.2", default-features = false,
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
+tower-http-1 = { package = "tower-http", version = "0.6.8", default-features = false, features = ["decompression-full"] }
 # Serde
 serde.workspace = true
 serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
@@ -931,6 +934,7 @@ sinks-logs = [
   "sinks-nats",
   "sinks-new_relic",
   "sinks-new_relic_logs",
+  "sinks-opensearch",
   "sinks-opentelemetry",
   "sinks-papertrail",
   "sinks-postgres",
@@ -1002,6 +1006,7 @@ sinks-mqtt = ["dep:rumqttc", "dep:rustls"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
+sinks-opensearch = ["sinks-elasticsearch"]
 sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
@@ -1054,6 +1059,7 @@ all-integration-tests = [
   "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "opensearch-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
   "postgres_sink-integration-tests",
@@ -1107,6 +1113,7 @@ datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_trac
 docker-logs-integration-tests = ["sources-docker_logs"]
 doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
+opensearch-integration-tests = ["es-integration-tests", "sinks-opensearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]

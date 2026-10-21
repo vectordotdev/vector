@@ -1,5 +1,3 @@
-#![allow(dead_code)] // The remaining unused pieces will be exercised as more sinks migrate.
-
 use std::{
     convert::Infallible,
     error::Error,
@@ -42,24 +40,25 @@ use crate::{
 };
 
 type BoxError = Box<dyn Error + Send + Sync>;
-pub(crate) type RequestBody = UnsyncBoxBody<Bytes, BoxError>;
+pub type RequestBody = UnsyncBoxBody<Bytes, BoxError>;
 const HTTP1_ALPN: &[u8] = b"\x08http/1.1";
 
 #[derive(Debug)]
-pub(crate) struct HttpError {
+pub struct HttpError {
     source: BoxError,
     retriable: bool,
 }
 
 impl HttpError {
-    pub(crate) fn new(source: impl Error + Send + Sync + 'static) -> Self {
+    pub fn new(source: impl Error + Send + Sync + 'static) -> Self {
         Self {
             source: Box::new(source),
             retriable: true,
         }
     }
 
-    pub(crate) const fn is_retriable(&self) -> bool {
+    #[must_use]
+    pub const fn is_retriable(&self) -> bool {
         self.retriable
     }
 }
@@ -91,20 +90,21 @@ impl crate::sinks::util::http::HttpErrorClassify for HttpError {
     }
 }
 
-pub(crate) fn empty_body() -> RequestBody {
+#[must_use]
+pub fn empty_body() -> RequestBody {
     Empty::<Bytes>::new()
         .map_err(|never: Infallible| match never {})
         .boxed_unsync()
 }
 
-pub(crate) fn full_body(bytes: Bytes) -> RequestBody {
+pub fn full_body(bytes: Bytes) -> RequestBody {
     Full::new(bytes)
         .map_err(|never: Infallible| match never {})
         .boxed_unsync()
 }
 
 #[derive(Clone)]
-pub(crate) struct HttpClient {
+pub struct HttpClient {
     client: Client<HttpProxyConnectorV1, RequestBody>,
     routes: Arc<RoutePlanner>,
     user_agent: HeaderValue,
@@ -117,7 +117,14 @@ impl fmt::Debug for HttpClient {
 }
 
 impl HttpClient {
-    pub(crate) fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
+    /// Builds a client that routes requests through `proxy` and uses `tls` for HTTPS
+    /// destinations and TLS proxies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
+    /// build a connector.
+    pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
         let routes = Arc::new(RoutePlanner::new(proxy)?);
         let connector = HttpProxyConnectorV1::new(tls, Arc::clone(&routes))?;
         let client = Client::builder(TokioExecutor::new()).build(connector);
@@ -129,7 +136,13 @@ impl HttpClient {
         })
     }
 
-    pub(crate) async fn send(
+    /// Sends `request`, adding the default request headers and any forward proxy credentials.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be routed through the configured proxy or the
+    /// request fails in transport.
+    pub async fn send(
         &self,
         mut request: Request<RequestBody>,
     ) -> Result<Response<Incoming>, HttpError> {
@@ -360,6 +373,11 @@ struct HttpProxyConnectorV1 {
 }
 
 impl HttpProxyConnectorV1 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     fn new(tls: MaybeTlsSettings, routes: Arc<RoutePlanner>) -> Result<Self, BoxError> {
         let tls_settings = tls.tls().cloned();
         let direct = https_connector(&tls, false)?;

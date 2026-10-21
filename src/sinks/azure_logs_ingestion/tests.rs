@@ -250,7 +250,7 @@ async fn correct_request() {
     let validated = config.validate().unwrap();
     let (sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
@@ -296,6 +296,81 @@ async fn correct_request() {
         &parts.uri.path_and_query().unwrap().to_string(),
         "/dataCollectionRules/dcr-00000000000000000000000000000000/streams/Custom-UnitTest?api-version=2023-01-01"
     );
+}
+
+#[tokio::test]
+async fn retries_transport_error() {
+    use hyper::{
+        Body, Server,
+        service::{make_service_fn, service_fn},
+    };
+    use std::{
+        convert::Infallible,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+
+    let (_guard, addr) = crate::test_util::addr::next_addr();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let server_requests = Arc::clone(&requests);
+    let server = Server::bind(&addr).serve(make_service_fn(move |_| {
+        let requests = Arc::clone(&server_requests);
+        async move {
+            Ok::<_, Infallible>(service_fn(move |request: http::Request<Body>| {
+                let requests = Arc::clone(&requests);
+                async move {
+                    http_body::Body::collect(request.into_body()).await.unwrap();
+                    if requests.fetch_add(1, Ordering::Relaxed) == 0 {
+                        Err(std::io::Error::other(
+                            "close the first connection without a response",
+                        ))
+                    } else {
+                        Ok(Response::builder().status(204).body(Body::empty()).unwrap())
+                    }
+                }
+            }))
+        }
+    }));
+    let server = tokio::spawn(server);
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        endpoint: "http://localhost:9001"
+        dcr_immutable_id: dcr-00000000000000000000000000000000
+        stream_name: Custom-UnitTest
+        request:
+          retry_attempts: 1
+        auth:
+          azure_credential_kind: client_secret_credential
+          azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+          azure_client_id: mock-client-id
+          azure_client_secret: mock-client-secret
+    "#})
+    .unwrap();
+    let (sink, _) = config
+        .build_inner(
+            &SinkContext::default(),
+            &config.validate().unwrap(),
+            HttpEndpoint::parse(&format!("http://{addr}")).unwrap(),
+            Arc::new(create_mock_credential()),
+            config.token_scope.clone(),
+            config.timestamp_field.clone(),
+        )
+        .unwrap();
+    let (batch, receiver) = crate::event::BatchNotifier::new_with_receiver();
+    let mut log = LogEvent::from("retry after connection closes");
+    insert_timestamp_kv(&mut log);
+    let events =
+        crate::test_util::map_event_batch_stream(stream::iter([Event::Log(log)]), Some(batch));
+    let status = timeout(Duration::from_secs(10), async {
+        sink.run(events).await.unwrap();
+        receiver.await
+    })
+    .await;
+    server.abort();
+
+    assert_eq!(status.unwrap(), crate::event::BatchStatus::Delivered);
+    assert_eq!(requests.load(Ordering::Relaxed), 2);
 }
 
 fn create_mock_credential() -> impl TokenCredential {
@@ -361,7 +436,7 @@ async fn mock_healthcheck_with_400_response() {
     let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
@@ -425,7 +500,7 @@ async fn mock_healthcheck_with_403_response() {
     let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
-            context,
+            &context,
             &validated,
             HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,

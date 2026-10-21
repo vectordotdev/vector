@@ -1,5 +1,4 @@
 #![deny(warnings)]
-#![warn(clippy::pedantic)]
 #![deny(clippy::unwrap_used)]
 //! Rate limiting for tracing events.
 //!

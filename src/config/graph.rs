@@ -265,13 +265,13 @@ impl Graph {
             traversal.push_back(s.to_owned());
             while !traversal.is_empty() {
                 let n = traversal.back().expect("can't be empty").clone();
-                if !visited.contains(&n) {
-                    visited.insert(n.clone());
-                    stack.insert(n.clone());
-                } else {
+                if visited.contains(&n) {
                     // we came back to the node after exploring all its children - remove it from the stack and traversal
                     stack.shift_remove(&n);
                     traversal.pop_back();
+                } else {
+                    visited.insert(n.clone());
+                    stack.insert(n.clone());
                 }
                 let inputs = self
                     .edges
@@ -287,7 +287,7 @@ impl Graph {
                             .iter()
                             .skip(1) // skip the sink
                             .rev()
-                            .map(|item| item.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>();
                         return Err(format!(
                             "Cyclic dependency detected in the chain [ {} -> {} ]",
@@ -928,7 +928,7 @@ mod test {
             .collect();
 
         assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"])
+        assert_eq!(paths[0], vec!["in", "one", "two", "three", "out"]);
     }
 
     #[test]

@@ -57,10 +57,12 @@ impl DorisService {
         }
         if http_status_code.is_success() && stream_load_status == StreamLoadStatus::Successful {
             // Emit metrics for successfully loaded data
-            let load_bytes = response_json.get("LoadBytes").and_then(|b| b.as_i64());
+            let load_bytes = response_json
+                .get("LoadBytes")
+                .and_then(serde_json::Value::as_i64);
             let loaded_rows = response_json
                 .get("NumberLoadedRows")
-                .and_then(|r| r.as_i64());
+                .and_then(serde_json::Value::as_i64);
             if let Some(loaded_rows) = loaded_rows
                 && let Some(load_bytes) = load_bytes
             {
@@ -73,7 +75,7 @@ impl DorisService {
             // Emit metrics for filtered rows
             if let Some(filtered_rows) = response_json
                 .get("NumberFilteredRows")
-                .and_then(|r| r.as_i64())
+                .and_then(serde_json::Value::as_i64)
                 && filtered_rows > 0
             {
                 emit!(DorisRowsFiltered { filtered_rows });

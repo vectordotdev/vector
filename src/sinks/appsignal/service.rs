@@ -1,114 +1,43 @@
-use std::task::Poll;
-
+//! Service implementation for the `appsignal` sink.
 use bytes::Bytes;
-use futures::{
-    future,
-    future::{BoxFuture, Ready},
-};
-use http::{Request, StatusCode, header::AUTHORIZATION};
-use hyper::Body;
-use tower::{Service, ServiceExt};
-use vector_lib::{
-    finalization::EventStatus,
-    request_metadata::{GroupedCountByteSize, MetaDescriptive},
-    sensitive_string::SensitiveString,
-    stream::DriverResponse,
+use http_1::{Request, header::AUTHORIZATION};
+use snafu::ResultExt;
+use vector_lib::sensitive_string::SensitiveString;
+
+use crate::sinks::{
+    HTTPV1RequestBuilderSnafu,
+    util::{
+        HttpEndpoint, buffer::compression::Compression, http::HttpRequest,
+        http_v1::HttpServiceRequestBuilder,
+    },
 };
 
-use super::request_builder::AppsignalRequest;
-use crate::{
-    http::HttpClient,
-    sinks::util::{Compression, HttpEndpoint, http::HttpBatchService, sink::Response},
-};
-
-#[derive(Clone)]
-pub(super) struct AppsignalService {
-    // TODO: `HttpBatchService` has been deprecated for direct use in sinks.
-    //       This sink should undergo a refactor to utilize the `HttpService`
-    //       instead, which extracts much of the boilerplate code for `Service`.
-    pub(super) batch_service:
-        HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, AppsignalRequest>,
+#[derive(Clone, derive_more::Debug)]
+pub(super) struct AppsignalSvcRequestBuilder {
+    pub(super) endpoint: HttpEndpoint,
+    // Omitted: `push_api_key` is sent as the `Authorization` bearer header on
+    // every request.
+    #[debug(skip)]
+    pub(super) push_api_key: SensitiveString,
+    pub(super) compression: Compression,
 }
 
-impl AppsignalService {
-    pub fn new(
-        http_client: HttpClient<Body>,
-        endpoint: HttpEndpoint,
-        push_api_key: SensitiveString,
-        compression: Compression,
-    ) -> Self {
-        let batch_service = HttpBatchService::new(http_client, move |req| {
-            let req: AppsignalRequest = req;
+impl HttpServiceRequestBuilder<()> for AppsignalSvcRequestBuilder {
+    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+        let mut builder = Request::post(self.endpoint.clone().into_v1())
+            .header("Content-Type", "application/json")
+            .header(
+                AUTHORIZATION,
+                format!("Bearer {}", self.push_api_key.inner()),
+            );
 
-            let mut request = Request::post(endpoint.as_uri())
-                .header("Content-Type", "application/json")
-                .header(AUTHORIZATION, format!("Bearer {}", push_api_key.inner()))
-                .header("Content-Length", req.payload.len());
-            if let Some(ce) = compression.content_encoding() {
-                request = request.header("Content-Encoding", ce)
-            }
-            let result = request.body(req.payload).map_err(|x| x.into());
-            future::ready(result)
-        });
-        Self { batch_service }
-    }
-}
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
+        }
 
-impl Service<AppsignalRequest> for AppsignalService {
-    type Response = AppsignalResponse;
-    type Error = crate::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(
-        &mut self,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, mut request: AppsignalRequest) -> Self::Future {
-        let mut http_service = self.batch_service.clone();
-
-        Box::pin(async move {
-            let metadata = std::mem::take(request.metadata_mut());
-            http_service.ready().await?;
-            let bytes_sent = metadata.request_encoded_size();
-            let event_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
-            let http_response = http_service.call(request).await?;
-            let event_status = if http_response.is_successful() {
-                EventStatus::Delivered
-            } else if http_response.is_transient() {
-                EventStatus::Errored
-            } else {
-                EventStatus::Rejected
-            };
-            Ok(AppsignalResponse {
-                event_status,
-                http_status: http_response.status(),
-                event_byte_size,
-                bytes_sent,
-            })
-        })
-    }
-}
-
-pub struct AppsignalResponse {
-    pub(super) event_status: EventStatus,
-    pub(super) http_status: StatusCode,
-    pub(super) event_byte_size: GroupedCountByteSize,
-    pub(super) bytes_sent: usize,
-}
-
-impl DriverResponse for AppsignalResponse {
-    fn event_status(&self) -> EventStatus {
-        self.event_status
-    }
-
-    fn events_sent(&self) -> &GroupedCountByteSize {
-        &self.event_byte_size
-    }
-
-    fn bytes_sent(&self) -> Option<usize> {
-        Some(self.bytes_sent)
+        builder
+            .body(request.take_payload())
+            .context(HTTPV1RequestBuilderSnafu)
+            .map_err(crate::Error::from)
     }
 }

@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use http::StatusCode;
 use http_1::Request;
 use snafu::Snafu;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
@@ -177,7 +176,7 @@ pub(super) enum StackdriverLogName {
 #[derive(Clone, Debug, Default)]
 pub(super) struct StackdriverLabelConfig {
     /// The value of this field is used to retrieve the associated labels from the `jsonPayload`
-    /// and extract their values to set as LogEntry labels.
+    /// and extract their values to set as `LogEntry` labels.
     #[configurable(metadata(docs::examples = "logging.googleapis.com/labels"))]
     #[serde(default = "default_labels_key")]
     pub(super) labels_key: Option<String>,
@@ -201,6 +200,11 @@ fn labels_examples() -> HashMap<String, String> {
     example
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Serde requires the optional field type."
+)]
 pub(super) fn default_labels_key() -> Option<String> {
     Some("logging.googleapis.com/labels".to_string())
 }
@@ -375,9 +379,7 @@ async fn healthcheck(
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    healthcheck_status(status, HealthcheckError::NotFound.into())
+    healthcheck_status(response.status(), HealthcheckError::NotFound.into())
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ use vrl::event_path;
 
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         prelude::*,
         util::{
@@ -20,6 +20,50 @@ use crate::{
     },
     test_util,
 };
+
+#[rstest::rstest]
+#[case(400, 1)]
+#[case(429, 2)]
+#[case(500, 2)]
+#[case(501, 1)]
+#[tokio::test]
+async fn rejects_failed_requests(#[case] status: u16, #[case] expected_requests: usize) {
+    let (_guard, addr) = test_util::addr::next_addr();
+    let config = format!(
+        r#"
+            endpoint = "http://{addr}"
+            labels = {{test_name = "rejected"}}
+            encoding.codec = "json"
+            request.retry_attempts = 1
+        "#
+    );
+    let (config, cx) = load_sink::<LokiConfig>(&config).unwrap();
+    let requests = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let server_requests = Arc::clone(&requests);
+    let (_rx, _trigger, server) = build_test_server_generic(addr, move || {
+        server_requests.fetch_add(1, Ordering::Relaxed);
+        http::Response::builder()
+            .status(status)
+            .body(Body::empty())
+            .unwrap()
+    });
+    let server = tokio::spawn(server);
+    let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
+    let (batch, receiver) = crate::event::BatchNotifier::new_with_receiver();
+    let events = test_util::map_event_batch_stream(
+        stream::iter([Event::Log(LogEvent::from("rejected request"))]),
+        Some(batch),
+    );
+    let status = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        sink.run(events).await.unwrap();
+        receiver.await
+    })
+    .await;
+    server.abort();
+
+    assert_eq!(status.unwrap(), crate::event::BatchStatus::Rejected);
+    assert_eq!(requests.load(Ordering::Relaxed), expected_requests);
+}
 
 #[test]
 fn generate_config() {
@@ -37,8 +81,8 @@ async fn interpolate_labels() {
     "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
@@ -84,8 +128,8 @@ async fn use_label_from_dropped_fields() {
         "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
@@ -127,7 +171,7 @@ async fn healthcheck_includes_auth() {
     let tls =
         TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
-    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+    let client = HttpClient::new(tls.into(), &proxy).expect("could not create HTTP client");
 
     healthcheck(
         config.endpoint.clone(),
@@ -176,7 +220,7 @@ async fn healthcheck_uses_configured_uri_with_uri_auth_precedence() {
     let tls =
         TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
-    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+    let client = HttpClient::new(tls.into(), &proxy).expect("could not create HTTP client");
 
     healthcheck(
         config.endpoint.clone(),
@@ -218,8 +262,8 @@ async fn sink_uses_validated_endpoint_and_auth() {
         "#
     );
     let (config, cx) = load_sink::<LokiConfig>(&config).unwrap();
-    let client = config.build_client(cx).unwrap();
-    let sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let sink = LokiSink::new(&config, client).unwrap();
 
     let (mut rx, _trigger, server) = build_test_server(addr);
     tokio::spawn(server);
@@ -273,7 +317,7 @@ async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
     let tls =
         TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
-    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+    let client = HttpClient::new(tls.into(), &proxy).expect("could not create HTTP client");
 
     healthcheck(config.endpoint.clone(), config.auth.clone(), None, client)
         .await
@@ -300,7 +344,7 @@ async fn healthcheck_grafana_cloud() {
     let tls =
         TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
-    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+    let client = HttpClient::new(tls.into(), &proxy).expect("could not create HTTP client");
 
     healthcheck(
         config.endpoint.clone(),
@@ -322,8 +366,8 @@ async fn timestamp_out_of_range() {
     "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = LogEvent::from("hello world");
     if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
@@ -352,8 +396,8 @@ async fn structured_metadata_as_json() {
         "#,
     )
     .unwrap();
-    let client = config.build_client(cx).unwrap();
-    let mut sink = LokiSink::new(config, client).unwrap();
+    let client = config.build_client(&cx).unwrap();
+    let mut sink = LokiSink::new(&config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
     e1.as_mut_log().insert(event_path!("foo"), "bar");

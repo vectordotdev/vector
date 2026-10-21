@@ -1,3 +1,4 @@
+use http_1::Uri;
 use tower::ServiceBuilder;
 use vector_lib::{
     config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings,
@@ -11,7 +12,7 @@ use super::{
 use crate::{
     common::datadog,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
@@ -106,23 +107,23 @@ impl DatadogMetricsEndpoint {
     }
 }
 
-/// Maps Datadog metric endpoints to their actual URI.
+/// Maps Datadog metric endpoints to cached native HTTP 1 URIs.
 pub struct DatadogMetricsEndpointConfiguration {
-    series_endpoint: HttpEndpoint,
-    sketches_endpoint: HttpEndpoint,
+    series_endpoint: Uri,
+    sketches_endpoint: Uri,
 }
 
 impl DatadogMetricsEndpointConfiguration {
-    /// Creates a new `DatadogMEtricsEndpointConfiguration`.
-    pub const fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
+    /// Creates native HTTP 1 endpoints for the metrics APIs.
+    pub fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
         Self {
-            series_endpoint,
-            sketches_endpoint,
+            series_endpoint: series_endpoint.into_v1(),
+            sketches_endpoint: sketches_endpoint.into_v1(),
         }
     }
 
     /// Gets the URI for the given Datadog metrics endpoint.
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> HttpEndpoint {
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => self.series_endpoint.clone(),
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
@@ -237,7 +238,7 @@ impl DatadogMetricsConfig {
                 let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
                 format!("https://{version}-vector.agent.{site}")
             },
-            |endpoint| endpoint.to_string(),
+            std::string::ToString::to_string,
         )
     }
 
@@ -261,12 +262,11 @@ impl DatadogMetricsConfig {
         let default_tls_config;
 
         let tls_settings = MaybeTlsSettings::from_config(
-            Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => config,
-                None => {
-                    default_tls_config = TlsEnableableConfig::enabled();
-                    &default_tls_config
-                }
+            Some(if let Some(config) = self.local_dd_common.tls.as_ref() {
+                config
+            } else {
+                default_tls_config = TlsEnableableConfig::enabled();
+                &default_tls_config
             }),
             false,
         )?;

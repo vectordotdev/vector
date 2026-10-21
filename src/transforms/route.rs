@@ -23,9 +23,13 @@ pub struct Route {
 }
 
 impl Route {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a route condition cannot be built.
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
-        for (output_name, condition) in config.route.iter() {
+        for (output_name, condition) in &config.route {
             let condition =
                 condition.build(&context.enrichment_tables, &context.metrics_storage)?;
             conditions.push((output_name.clone(), condition));
@@ -252,7 +256,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -298,7 +302,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -341,7 +345,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -385,7 +389,7 @@ mod test {
         "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()

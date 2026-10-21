@@ -14,9 +14,12 @@ use super::{
     build_request,
 };
 use crate::{
-    http::{BuildRequestSnafu, HttpClient},
+    http::client_v1::{HttpClient, full_body},
     internal_events::DatadogTracesAPMStatsError,
-    sinks::util::{Compression, Compressor},
+    sinks::{
+        HTTPV1RequestBuilderSnafu,
+        util::{Compression, Compressor},
+    },
 };
 
 /// Flushes cached APM stats buckets to Datadog on a 10 second interval.
@@ -26,7 +29,7 @@ use crate::{
 /// # arguments
 ///
 /// * `tripwire`                 - Receiver that the sink signals when shutting down.
-/// * `client`                   - HttpClient to use in sending the stats payloads.
+/// * `client`                   - `HttpClient` to use in sending the stats payloads.
 /// * `compression`              - Compression to use when creating the HTTP requests.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
 /// * `aggregator`               - The Aggregator object containing cached stats buckets.
@@ -57,21 +60,18 @@ pub async fn flush_apm_stats_thread(
             // flush the oldest bucket from the cache to Datadog
             sender.flush_apm_stats(false).await;
         },
-        signal = &mut tripwire =>  match signal {
-            // sink has signaled us that the process is shutting down
-            Ok(sink_shutdown_ack_sender) => {
-
+        signal = &mut tripwire => {
+            if let Ok(sink_shutdown_ack_sender) = signal {
+                // The sink has signaled that the process is shutting down.
                 debug!("APM stats flushing thread received exit condition. Flushing remaining stats before exiting.");
                 sender.flush_apm_stats(true).await;
 
-                // signal the sink (who tripped the tripwire), that we are done flushing
+                // Signal the sink that we are done flushing.
                 _ = sink_shutdown_ack_sender.send(());
-                break;
-            }
-            Err(_) => {
+            } else {
                 error!(message = "Tokio Sender unexpectedly dropped.");
-                break;
-            },
+            }
+            break;
         }
         }
     }
@@ -116,7 +116,9 @@ impl ApmStatsSender {
         payload: StatsPayload,
         api_key: Arc<str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let (metadata, compressed_payload) = self.build_apm_stats_request_data(api_key, payload)?;
+        let (metadata, compressed_payload) =
+            self.build_apm_stats_request_data(api_key, &payload)?;
+        drop(payload);
 
         let request_metadata = RequestMetadata::default();
         let trace_api_request = build_request(
@@ -128,9 +130,9 @@ impl ApmStatsSender {
 
         let http_request = trace_api_request
             .into_http_request()
-            .context(BuildRequestSnafu)?;
+            .context(HTTPV1RequestBuilderSnafu)?;
 
-        self.client.send(http_request).await?;
+        self.client.send(http_request.map(full_body)).await?;
 
         Ok(())
     }
@@ -138,10 +140,10 @@ impl ApmStatsSender {
     fn build_apm_stats_request_data(
         &self,
         api_key: Arc<str>,
-        payload: StatsPayload,
+        payload: &StatsPayload,
     ) -> Result<(DDTracesMetadata, Bytes), RequestBuilderError> {
         let encoded_payload =
-            rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToBuild {
+            rmp_serde::to_vec_named(payload).map_err(|e| RequestBuilderError::FailedToBuild {
                 message: "Encoding failed.",
                 reason: e.to_string(),
                 dropped_events: 0,

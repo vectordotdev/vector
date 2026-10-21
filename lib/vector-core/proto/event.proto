@@ -197,6 +197,10 @@ message AggregatedHistogram3 {
   repeated HistogramBucket3 buckets = 1;
   uint64 count = 2;
   double sum = 3;
+  // Set when the source reported no sum; `sum` then carries no meaning.
+  // Negative on purpose: payloads without this field leave it false, so their
+  // `sum` keeps reading as reported, including a genuine zero.
+  bool sum_missing = 4;
 }
 
 message HistogramBucket {
