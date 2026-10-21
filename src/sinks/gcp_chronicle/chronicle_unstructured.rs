@@ -24,12 +24,13 @@ use vector_lib::{
     event::{Event, EventFinalizers, Finalizable},
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 use vrl::value::Kind;
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     schema,
@@ -45,14 +46,15 @@ use crate::{
             service::GcsResponse,
         },
         util::{
-            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Compression, HttpEndpoint, RequestBuilder, SinkBatchSettings,
+            TowerRequestConfig,
             encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
             service::TowerRequestConfigDefaults,
         },
     },
-    template::{Template, TemplateParseError},
+    template::{TemplateParseError, UnconfinedTemplate},
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -80,7 +82,7 @@ pub enum Region {
     /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)
     Asia,
 
-    /// SãoPaulo Region
+    /// São Paulo Region
     SãoPaulo,
 
     /// Canada Region
@@ -110,7 +112,7 @@ pub enum Region {
     /// Sydney Region
     Sydney,
 
-    /// TelAviv Region
+    /// Tel Aviv Region
     TelAviv,
 
     /// Tokyo Region
@@ -129,7 +131,9 @@ impl Region {
         match self {
             Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
             Region::Us => "https://malachiteingestion-pa.googleapis.com",
-            Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Asia | Region::Singapore => {
+                "https://asia-southeast1-malachiteingestion-pa.googleapis.com"
+            }
             Region::SãoPaulo => "https://southamerica-east1-malachiteingestion-pa.googleapis.com",
             Region::Canada => {
                 "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
@@ -140,7 +144,6 @@ impl Region {
             Region::London => "https://europe-west2-malachiteingestion-pa.googleapis.com",
             Region::Mumbai => "https://asia-south1-malachiteingestion-pa.googleapis.com",
             Region::Paris => "https://europe-west9-malachiteingestion-pa.googleapis.com",
-            Region::Singapore => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
             Region::Sydney => "https://australia-southeast1-malachiteingestion-pa.googleapis.com",
             Region::TelAviv => "https://me-west1-malachiteingestion-pa.googleapis.com",
             Region::Tokyo => "https://asia-northeast1-malachiteingestion-pa.googleapis.com",
@@ -180,13 +183,14 @@ impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefau
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
     #[configurable(metadata(
-        docs::examples = "127.0.0.1:8080",
-        docs::examples = "example.com:12345"
+        docs::examples = "http://127.0.0.1:8080",
+        docs::examples = "http://example.com:12345"
     ))]
-    pub endpoint: Option<String>,
+    #[configurable(required_one_of = "region_or_endpoint")]
+    pub endpoint: Option<HttpEndpoint>,
 
     /// The GCP region to use.
-    #[configurable(derived)]
+    #[configurable(required_one_of = "region_or_endpoint")]
     pub region: Option<Region>,
 
     /// The Unique identifier (UUID) corresponding to the Chronicle instance.
@@ -200,8 +204,7 @@ pub struct ChronicleUnstructuredConfig {
         docs::examples = "production",
         docs::examples = "production-{{ namespace }}",
     ))]
-    #[configurable(metadata(docs::advanced))]
-    pub namespace: Option<Template>,
+    pub namespace: Option<UnconfinedTemplate>,
 
     /// A set of labels that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "chronicle_labels_examples()"))]
@@ -211,22 +214,17 @@ pub struct ChronicleUnstructuredConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<ChronicleUnstructuredDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: ChronicleCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig<ChronicleUnstructuredTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The type of log entries in a request.
@@ -236,13 +234,12 @@ pub struct ChronicleUnstructuredConfig {
     ///
     /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
     #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
-    pub log_type: Template,
+    pub log_type: UnconfinedTemplate,
 
     /// The default `log_type` to attach to events if the template in `log_type` cannot be resolved.
     #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
     pub fallback_log_type: Option<String>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -259,20 +256,26 @@ fn chronicle_labels_examples() -> HashMap<String, String> {
 }
 
 impl GenerateConfig for ChronicleUnstructuredConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            credentials_path = "/path/to/credentials.json"
-            customer_id = "customer_id"
-            namespace = "namespace"
-            compression = "gzip"
-            log_type = "log_type"
-            fallback_log_type = "VECTOR_DEV"
-            encoding.codec = "text"
-        "#})
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r"
+            credentials_path: /path/to/credentials.json
+            customer_id: customer_id
+            namespace: namespace
+            region: asia
+            compression: gzip
+            log_type: log_type
+            fallback_log_type: VECTOR_DEV
+            encoding:
+              codec: text
+        "})
         .unwrap()
     }
 }
 
+/// Builds a Chronicle endpoint healthcheck.
+///
+/// # Errors
+/// Returns an error if the endpoint is not a valid HTTP URI.
 pub fn build_healthcheck(
     client: HttpClient,
     base_url: &str,
@@ -285,7 +288,7 @@ pub fn build_healthcheck(
         auth.apply(&mut request);
 
         let response = client.send(request).await?;
-        healthcheck_response(response, GcsHealthcheckError::NotFound.into())
+        healthcheck_response(&response, GcsHealthcheckError::NotFound.into())
     };
 
     Ok(Box::pin(healthcheck))
@@ -302,24 +305,6 @@ pub enum ChronicleError {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
-
-        let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
-
-        let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
-
-        // For the healthcheck we see if we can fetch the list of available log types.
-        let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
-
-        let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
-        creds.spawn_regenerate_token();
-        let sink = self.build_sink(client, endpoint, creds)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement =
             schema::Requirement::empty().required_meaning("timestamp", Kind::timestamp());
@@ -332,50 +317,106 @@ impl SinkConfig for ChronicleUnstructuredConfig {
     }
 }
 
+#[async_trait::async_trait]
+impl ValidatedSink for ChronicleUnstructuredConfig {
+    type Validated = ValidatedChronicleUnstructured;
+
+    fn validate(&self) -> crate::Result<ValidatedChronicleUnstructured> {
+        let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
+        endpoint.parse::<Uri>()?;
+
+        // For the healthcheck we see if we can fetch the list of available log types.
+        let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
+        healthcheck_endpoint.parse::<Uri>()?;
+
+        let batch_settings = self.batch.into_batcher_settings()?;
+        self.encoding.validate()?;
+
+        Ok(ValidatedChronicleUnstructured {
+            endpoint,
+            healthcheck_endpoint,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedChronicleUnstructured,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedChronicleUnstructured {
+            endpoint,
+            healthcheck_endpoint,
+            ..
+        } = validated;
+
+        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
+
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls, cx.proxy())?;
+
+        let healthcheck = build_healthcheck(client.clone(), healthcheck_endpoint, creds.clone())?;
+        creds.spawn_regenerate_token();
+        let sink = self.build_sink(client, endpoint.clone(), creds, validated)?;
+
+        Ok((sink, healthcheck))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedChronicleUnstructured {
+    endpoint: String,
+    healthcheck_endpoint: String,
+    batch_settings: BatcherSettings,
+}
+
 impl ChronicleUnstructuredConfig {
     fn build_sink(
         &self,
         client: HttpClient,
         base_url: String,
         creds: GcpAuthenticator,
+        validated: &ValidatedChronicleUnstructured,
     ) -> crate::Result<VectorSink> {
         use crate::sinks::util::service::ServiceBuilderExt;
 
         let request = self.request.into_settings();
 
-        let batch_settings = self.batch.into_batcher_settings()?;
-
-        let partitioner = self.partitioner()?;
+        let partitioner = self.partitioner();
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
             .service(ChronicleService::new(client, base_url, creds));
 
-        let request_settings = ChronicleRequestBuilder::new(self)?;
-
-        let sink = ChronicleSink::new(svc, request_settings, partitioner, batch_settings, "http");
+        let request_builder = ChronicleRequestBuilder::new(self)?;
+        let sink = ChronicleSink::new(
+            svc,
+            request_builder,
+            partitioner,
+            validated.batch_settings,
+            "http",
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
-        Ok(ChroniclePartitioner::new(
+    fn partitioner(&self) -> ChroniclePartitioner {
+        ChroniclePartitioner::new(
             self.log_type.clone(),
             self.fallback_log_type.clone(),
             self.namespace.clone(),
-        ))
+        )
     }
 
     fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
         Ok(format!(
-            "{}/{}",
+            "{}/{path}",
             match (&self.endpoint, self.region) {
-                (Some(endpoint), None) => endpoint.trim_end_matches('/'),
-                (None, Some(region)) => region.endpoint(),
+                (Some(endpoint), None) => endpoint.to_string().trim_end_matches('/').to_string(),
+                (None, Some(region)) => region.endpoint().to_string(),
                 (Some(_), Some(_)) => return Err(ChronicleError::BothRegionAndEndpoint),
                 (None, None) => return Err(ChronicleError::RegionOrEndpoint),
-            },
-            path
+            }
         ))
     }
 }
@@ -439,7 +480,7 @@ impl Encoder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleEncoder {
                     .as_log()
                     .get_timestamp()
                     .and_then(|ts| ts.as_timestamp())
-                    .cloned();
+                    .copied();
                 let mut bytes = BytesMut::new();
                 self.transformer.transform(&mut event);
 
@@ -589,8 +630,8 @@ impl ChronicleRequestBuilder {
             labels: config.labels.as_ref().map(|labs| {
                 labs.iter()
                     .map(|(k, v)| Label {
-                        key: k.to_string(),
-                        value: v.to_string(),
+                        key: k.clone(),
+                        value: v.clone(),
                     })
                     .collect::<Vec<_>>()
             }),
@@ -723,6 +764,89 @@ mod unit_tests {
             creds_path, log_type
         ))
         .unwrap();
-        assert!(config.build(cx).await.is_err());
+        assert!(SinkConfig::build(&config, cx).await.is_err());
+    }
+
+    #[test]
+    fn deserialization_rejects_malformed_endpoint() {
+        // The `HttpEndpoint` config field rejects a malformed endpoint at
+        // config load time, so deserialization fails.
+        let result: Result<ChronicleUnstructuredConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "not a uri"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a malformed endpoint"
+        );
+    }
+
+    #[test]
+    fn deserialization_rejects_non_http_endpoint() {
+        // The `HttpEndpoint` config field rejects a non-http(s) endpoint at
+        // config load time, so deserialization fails.
+        let result: Result<ChronicleUnstructuredConfig, _> = serde_yaml::from_str(indoc! {r#"
+            endpoint: "ftp://example.com"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#});
+        assert!(
+            result.is_err(),
+            "config load should reject a non-http endpoint"
+        );
+    }
+
+    #[test]
+    fn relative_endpoint_becomes_absolute_https() {
+        use crate::config::ValidatedSink;
+
+        // A missing scheme is defaulted to https by `HttpEndpoint`.
+        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(indoc! {r#"
+            endpoint: "chronicle.example.com:8080"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#})
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint,
+            "https://chronicle.example.com:8080/v2/unstructuredlogentries:batchCreate"
+        );
+        assert_eq!(
+            validated.healthcheck_endpoint,
+            "https://chronicle.example.com:8080/v2/logtypes"
+        );
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config: ChronicleUnstructuredConfig = serde_yaml::from_str(indoc! {r#"
+            endpoint: "http://127.0.0.1:8080"
+            customer_id: test-customer
+            log_type: "WINDOWS_DNS"
+            encoding:
+              codec: text
+        "#})
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint,
+            "http://127.0.0.1:8080/v2/unstructuredlogentries:batchCreate"
+        );
+        assert_eq!(
+            validated.healthcheck_endpoint,
+            "http://127.0.0.1:8080/v2/logtypes"
+        );
     }
 }

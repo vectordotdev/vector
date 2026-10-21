@@ -17,11 +17,12 @@ pub use decoder_framed_read::DecoderFramedRead;
 pub use decoding::{
     BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, DecodingConfig,
-    GelfDeserializer, GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
-    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NativeDeserializer,
-    NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,
-    NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, OctetCountingDecoder,
-    OctetCountingDecoderConfig, StreamDecodingError, VarintLengthDelimitedDecoder,
+    DecompressionAlgorithm, DecompressionConfig, Decompressor, GelfDeserializer,
+    GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, LengthDelimitedDecoder,
+    LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
+    NativeJsonDeserializer, NativeJsonDeserializerConfig, NewlineDelimitedDecoder,
+    NewlineDelimitedDecoderConfig, OctetCountingDecoder, OctetCountingDecoderConfig,
+    OversizedAction, StreamDecodingError, VarintLengthDelimitedDecoder,
     VarintLengthDelimitedDecoderConfig,
 };
 #[cfg(feature = "syslog")]
@@ -54,4 +55,18 @@ pub enum MetricTagValues {
     Single,
     /// All tags are exposed as arrays of either string or null values.
     Full,
+    /// Tag values are exposed using their underlying shape: single-value tags as strings,
+    /// multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+    /// force array shape.
+    Auto,
+}
+
+impl From<MetricTagValues> for vector_core::event::MetricTagMode {
+    fn from(value: MetricTagValues) -> Self {
+        match value {
+            MetricTagValues::Single => Self::Single,
+            MetricTagValues::Full => Self::Full,
+            MetricTagValues::Auto => Self::Auto,
+        }
+    }
 }

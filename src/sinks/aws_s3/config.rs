@@ -12,13 +12,17 @@ use vector_lib::{
     },
     configurable::configurable_component,
     sink::VectorSink,
+    stream::BatcherSettings,
 };
 
 use super::sink::S3RequestOptions;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     sinks::{
         Healthcheck,
         s3_common::{
@@ -33,7 +37,7 @@ use crate::{
             TowerRequestConfig, timezone_to_offset,
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     tls::TlsConfig,
 };
 
@@ -130,7 +134,6 @@ pub struct S3SinkConfig {
     /// instead of the standard per-event framing-based encoding. The columnar format handles
     /// its own internal compression, so the top-level `compression` setting is bypassed.
     #[cfg(feature = "codecs-parquet")]
-    #[configurable(derived)]
     #[serde(default)]
     pub batch_encoding: Option<S3BatchEncoding>,
 
@@ -140,26 +143,20 @@ pub struct S3SinkConfig {
     ///
     /// Some cloud storage API clients and browsers handle decompression transparently, so
     /// depending on how they are accessed, files may not always appear to be compressed.
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -167,7 +164,6 @@ pub struct S3SinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
 
@@ -181,7 +177,6 @@ pub struct S3SinkConfig {
     ///
     /// By default, the sink only retries attempts it deems possible to retry.
     /// These settings extend the default behavior.
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub retry_strategy: RetryStrategy,
 
@@ -198,9 +193,9 @@ pub(super) fn default_filename_time_format() -> String {
 }
 
 impl GenerateConfig for S3SinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            bucket: "".to_owned(),
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
+            bucket: String::new(),
             key_prefix: default_key_prefix(),
             filename_time_format: default_filename_time_format(),
             filename_append_uuid: true,
@@ -215,10 +210,10 @@ impl GenerateConfig for S3SinkConfig {
             request: TowerRequestConfig::default(),
             tls: Some(TlsConfig::default()),
             auth: AwsAuthentication::default(),
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            force_path_style: Default::default(),
-            retry_strategy: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: None,
+            force_path_style: false,
+            retry_strategy: RetryStrategy::default(),
             confinement: ConfinementConfig::default(),
         })
         .unwrap()
@@ -228,13 +223,6 @@ impl GenerateConfig for S3SinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = self.create_service(&cx.proxy).await?;
-        let healthcheck = self.build_healthcheck(service.client())?;
-        let sink = self.build_processor(service, cx)?;
-        Ok((sink, healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -254,11 +242,65 @@ impl SinkConfig for S3SinkConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedAwsS3 {
+    batch_settings: BatcherSettings,
+    key_prefix: ConfinedTemplate,
+    ssekms_key_id: Option<ConfinedTemplate>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for S3SinkConfig {
+    type Validated = ValidatedAwsS3;
+
+    fn validate(&self) -> crate::Result<ValidatedAwsS3> {
+        self.encoding.validate()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        let key_prefix = Template::try_from(self.key_prefix.clone())?.confine(
+            &self.confinement,
+            Self::NAME,
+            "key_prefix",
+        )?;
+
+        let ssekms_key_id = self
+            .options
+            .ssekms_key_id
+            .as_deref()
+            .map(Template::try_from)
+            .transpose()?
+            .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
+            .transpose()?;
+
+        Ok(ValidatedAwsS3 {
+            batch_settings,
+            key_prefix,
+            ssekms_key_id,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAwsS3,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let service = self.create_service(&cx.proxy).await?;
+        let healthcheck = self.build_healthcheck(service.client());
+        let sink = self.build_processor(service, &cx, validated)?;
+        Ok((sink, healthcheck))
+    }
+}
+
 impl S3SinkConfig {
+    /// Builds the S3 event processor.
+    ///
+    /// # Errors
+    /// Returns an error if the configured framing or serializer cannot be built.
     pub fn build_processor(
         &self,
         service: S3Service,
-        cx: SinkContext,
+        cx: &SinkContext,
+        validated: &ValidatedAwsS3,
     ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
@@ -276,20 +318,13 @@ impl S3SinkConfig {
             .and_then(timezone_to_offset);
 
         // Configure our partitioning/batching.
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let batch_settings = validated.batch_settings;
 
-        let key_prefix = Template::try_from(self.key_prefix.clone())?.with_tz_offset(offset);
-        let key_prefix = key_prefix.confine(&self.confinement, Self::NAME, "key_prefix")?;
-
-        let ssekms_key_id = self
-            .options
+        let key_prefix = validated.key_prefix.clone().with_tz_offset(offset);
+        let ssekms_key_id = validated
             .ssekms_key_id
-            .as_ref()
-            .cloned()
-            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
-            .transpose()?
-            .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
-            .transpose()?;
+            .clone()
+            .map(|t| t.with_tz_offset(offset));
 
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
 
@@ -309,7 +344,7 @@ impl S3SinkConfig {
             // override via `options.content_type`; we only set it when unset.
             let mut api_options = self.options.clone();
             if api_options.content_type.is_none() {
-                api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
+                api_options.content_type = batch_encoder.content_type().map(str::to_string);
             }
 
             let encoder = EncoderKind::Batch(batch_encoder);
@@ -324,7 +359,7 @@ impl S3SinkConfig {
             });
 
             if self.compression != Compression::None {
-                warn!("Top level compression setting ignored when batch_encoding set to parquet.")
+                warn!("Top level compression setting ignored when batch_encoding set to parquet.");
             }
 
             let request_options = S3RequestOptions {
@@ -362,10 +397,16 @@ impl S3SinkConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
+    /// Builds the future that checks access to the configured bucket.
+    #[must_use]
+    pub fn build_healthcheck(&self, client: S3Client) -> Healthcheck {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
+    /// Creates the S3 service.
+    ///
+    /// # Errors
+    /// Returns an error if region resolution, authentication, or HTTP client configuration fails.
     pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
         s3_common::config::create_service(
             &self.region,
@@ -380,8 +421,49 @@ impl S3SinkConfig {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "codecs-parquet")]
+    use vector_lib::codecs::{
+        TextSerializerConfig,
+        encoding::{
+            BatchSerializerConfig, FramingConfig,
+            format::{ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig},
+        },
+    };
+    use vector_lib::event::LogEvent;
+    use vrl::event_path;
+
     use super::S3SinkConfig;
-    use crate::template::{ConfinementConfig, Template};
+    #[cfg(feature = "codecs-parquet")]
+    use crate::{
+        aws::AwsAuthentication,
+        config::AcknowledgementsConfig,
+        sinks::{
+            s3_common::config::{RetryStrategy, S3Options},
+            util::{
+                BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, TowerRequestConfig,
+            },
+        },
+    };
+    use crate::{
+        config::ValidatedSink,
+        event::Event,
+        template::{ConfinementConfig, Template},
+    };
+
+    #[test]
+    fn prepares_valid_config() {
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+        "})
+        .unwrap();
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.key_prefix.to_string(), "date=%F");
+        assert!(validated.ssekms_key_id.is_none());
+    }
 
     #[test]
     fn generate_config() {
@@ -392,7 +474,7 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_batch_encoding_correct_toml_shape() {
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
@@ -402,14 +484,13 @@ mod tests {
               codec: parquet
               compression:
                 algorithm: snappy
-            "#})
+            "})
         .expect("correct batch_encoding shape should parse");
 
         let batch_enc = config
             .batch_encoding
             .expect("batch_encoding should be Some");
         let super::S3BatchEncoding::Parquet(ref p) = batch_enc;
-        use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSchemaMode};
         assert_eq!(p.schema_mode, ParquetSchemaMode::AutoInfer);
         assert_eq!(p.compression, ParquetCompression::Snappy);
     }
@@ -419,15 +500,6 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_content_type_auto_detected() {
-        use vector_lib::codecs::encoding::format::{
-            ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
-        };
-
-        use crate::sinks::s3_common::config::S3Options;
-        use crate::sinks::util::{BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression};
-        use vector_lib::codecs::TextSerializerConfig;
-        use vector_lib::codecs::encoding::{BatchSerializerConfig, FramingConfig};
-
         let parquet_config = ParquetSerializerConfig {
             schema_mode: ParquetSchemaMode::AutoInfer,
             compression: ParquetCompression::Snappy,
@@ -446,13 +518,13 @@ mod tests {
             batch_encoding: Some(super::S3BatchEncoding::Parquet(parquet_config)),
             compression: Compression::None,
             batch: BatchConfig::<BulkSizeBasedDefaultBatchSettings>::default(),
-            request: Default::default(),
-            tls: Default::default(),
-            auth: Default::default(),
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            request: TowerRequestConfig::default(),
+            tls: None,
+            auth: AwsAuthentication::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: None,
             force_path_style: true,
-            retry_strategy: Default::default(),
+            retry_strategy: RetryStrategy::default(),
             confinement: ConfinementConfig::default(),
         };
 
@@ -463,7 +535,7 @@ mod tests {
 
         let mut api_options = config.options.clone();
         if api_options.content_type.is_none() {
-            api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
+            api_options.content_type = batch_encoder.content_type().map(str::to_string);
         }
 
         assert_eq!(
@@ -499,7 +571,7 @@ mod tests {
 
         let mut api_options = config.options.clone();
         if api_options.content_type.is_none() {
-            api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
+            api_options.content_type = batch_encoder.content_type().map(str::to_string);
         }
 
         assert_eq!(
@@ -515,14 +587,14 @@ mod tests {
     #[test]
     fn parquet_batch_encoding_rejects_unsupported_codec() {
         let err = serde_yaml::from_str::<S3SinkConfig>(
-            r#"
+            r"
             bucket: test-bucket
             compression: none
             encoding:
               codec: text
             batch_encoding:
               codec: arrow_stream
-            "#,
+            ",
         )
         .unwrap_err();
 
@@ -532,11 +604,11 @@ mod tests {
         );
     }
 
-    /// Explicit filename_extension overrides the `.parquet` default.
+    /// Explicit `filename_extension` overrides the `.parquet` default.
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_filename_extension_user_override() {
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             filename_extension: pq
@@ -545,7 +617,7 @@ mod tests {
             batch_encoding:
               codec: parquet
               schema_mode: auto_infer
-            "#})
+            "})
         .unwrap();
 
         assert_eq!(config.filename_extension.as_deref(), Some("pq"));
@@ -555,16 +627,14 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_schema_mode_defaults_to_relaxed() {
-        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
-
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
               codec: text
             batch_encoding:
               codec: parquet
-            "#})
+            "})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
@@ -575,9 +645,7 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_schema_mode_strict_parsed() {
-        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
-
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
@@ -586,7 +654,7 @@ mod tests {
               codec: parquet
               schema_mode: strict
               schema_file: tmp/something.schema
-            "#})
+            "})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
@@ -616,10 +684,6 @@ mod tests {
 
     #[test]
     fn confinement_blocks_dotdot_escape_at_render() {
-        use crate::event::Event;
-        use vector_lib::event::LogEvent;
-        use vrl::event_path;
-
         let template: Template = "safe/{{ tenant }}/".try_into().unwrap();
         let template = template
             .confine(&ConfinementConfig::default(), "aws_s3", "key_prefix")

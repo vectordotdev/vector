@@ -1,16 +1,24 @@
 #![allow(missing_docs)]
 
-use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt,
+    fs::remove_dir_all,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 use exitcode::ExitCode;
 use vector_lib::enrichment::{Case, IndexHandle, TableRegistry};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::value::ObjectMap;
 
 use crate::{
-    config::{self, Config, ConfigDiff, TransformContext, loading::ConfigBuilderLoader},
+    config::{
+        self, Config, ConfigDiff, DynValidatedSink, SinkContext, TransformContext,
+        loading::ConfigBuilderLoader,
+    },
     schema::Definition,
     topology::{
         self,
@@ -18,10 +26,10 @@ use crate::{
     },
 };
 
-/// Stub enrichment table used during transform validation so VRL can resolve
+/// Stub enrichment table used during config validation so VRL can resolve
 /// table name references without loading actual table data.
 #[derive(Clone)]
-struct StubEnrichmentTable;
+pub(crate) struct StubEnrichmentTable;
 
 impl vector_lib::enrichment::Table for StubEnrichmentTable {
     fn find_table_row<'a>(
@@ -67,10 +75,22 @@ const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Independent validation flags"
+)]
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
+    /// Secret placeholders are not resolved unless `--resolve-secrets` is also given.
     #[arg(long)]
     pub no_environment: bool,
+
+    /// Resolves `SECRET[...]` placeholders from the configured secret backends
+    /// before validating. Only applies together with `--no-environment`;
+    /// without it, secrets are always resolved.
+    #[arg(long, requires = "no_environment")]
+    pub resolve_secrets: bool,
 
     /// Disables health checks during validation.
     #[arg(long)]
@@ -150,29 +170,33 @@ impl Opts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
 }
 
 /// Performs topology, component, and health checks.
-pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
+pub async fn validate(
+    opts: &Opts,
+    signal_handler: &mut crate::signal::SignalHandler,
+    color: bool,
+) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
 
-    let mut config = match validate_config(opts, &mut fmt) {
-        Some(config) => config,
-        None => return exitcode::CONFIG,
+    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt).await else {
+        return exitcode::CONFIG;
     };
 
-    validated &= validate_transforms(&config, &mut fmt).await;
+    validated &= validate_transforms(&config, &mut fmt);
+    validated &= validate_sinks_with_context(&config, &mut fmt);
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
             validated &= validate_environment(opts, &config, &mut fmt).await;
-            remove_tmp_directory(tmp_directory);
+            remove_tmp_directory(&tmp_directory);
         } else {
             validated = false;
         }
@@ -186,12 +210,14 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
+pub async fn validate_config(
+    opts: &Opts,
+    signal_handler: &mut crate::signal::SignalHandler,
+    fmt: &mut Formatter,
+) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
-    let paths = if let Some(paths) = config::process_paths(&paths) {
-        paths
-    } else {
+    let Some(paths) = config::process_paths(&paths) else {
         fmt.error("No config file paths");
         return None;
     };
@@ -203,10 +229,19 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    let builder = ConfigBuilderLoader::default()
-        .load_from_paths(&paths)
-        .map_err(&mut report_error)
-        .ok()?;
+
+    // `--no-environment` keeps the config textually unmodified unless
+    // `--resolve-secrets` is also given: no secret backends are contacted and
+    // `SECRET[...]` placeholders stay in place. Otherwise resolve them like
+    // the run path, so validation checks the config that would actually run.
+    let builder = if opts.no_environment && !opts.resolve_secrets {
+        ConfigBuilderLoader::default().load_from_paths(&paths)
+    } else {
+        config::loading::load_builder_from_paths_with_secrets(&paths, signal_handler, false).await
+    }
+    .map_err(&mut report_error)
+    .ok()?;
+
     config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
@@ -216,7 +251,9 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         .ok()?;
 
     // Warnings
-    if !warnings.is_empty() {
+    if warnings.is_empty() {
+        fmt.success(format!("Loaded {:?}", &paths_list));
+    } else {
         if opts.deny_warnings {
             report_error(warnings);
             return None;
@@ -224,18 +261,17 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
 
         fmt.title(format!("Loaded with warnings {:?}", &paths_list));
         fmt.sub_warning(warnings);
-    } else {
-        fmt.success(format!("Loaded {:?}", &paths_list));
     }
 
     Some(config)
 }
 
-async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
+/// Builds a `TableRegistry` with stub tables for the configured enrichment tables,
+/// so VRL can resolve table names without loading actual data. This lets config
+/// validation catch real VRL errors (syntax, type, wrong table name) while
+/// deferring data-loading to the environment phase.
+fn stub_enrichment_tables(config: &Config) -> TableRegistry {
     let enrichment_tables = TableRegistry::default();
-    // Register stub tables so VRL can resolve configured enrichment table names
-    // without loading actual data. This lets us catch real VRL errors (syntax,
-    // type, wrong table name) while deferring data-loading to the environment phase.
     let stubs: HashMap<String, Box<dyn vector_lib::enrichment::Table + Send + Sync>> = config
         .enrichment_tables
         .keys()
@@ -253,6 +289,11 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
         // VRL compilation) both operate on the loading stage. finish_load()
         // would move tables to the ArcSwap and make table_ids() return nothing.
     }
+    enrichment_tables
+}
+
+fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
+    let enrichment_tables = stub_enrichment_tables(config);
     let mut definition_cache = HashMap::new();
     let mut errors = Vec::new();
 
@@ -260,7 +301,7 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
         let input_definitions = topology::schema::input_definitions(
             &transform.inputs,
             config,
-            enrichment_tables.clone(),
+            &enrichment_tables,
             &mut definition_cache,
         )
         .unwrap_or_default();
@@ -283,10 +324,9 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
 
         for err in transform
             .inner
-            .validate(&context)
+            .validate_with_context(&context)
             .err()
             .into_iter()
-            .chain(transform.inner.validate_env(&context).err())
             .flatten()
         {
             errors.push(format!("Transform \"{key}\": {err}"));
@@ -303,14 +343,35 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
     }
 }
 
+fn validate_sinks_with_context(config: &Config, fmt: &mut Formatter) -> bool {
+    let cx = SinkContext {
+        enrichment_tables: stub_enrichment_tables(config),
+        ..Default::default()
+    };
+    let mut errors = Vec::new();
+
+    for (key, sink) in config.sinks() {
+        let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+        if let Err(error) = dyn_sink.validate_with_context_dyn(&cx) {
+            errors.push(format!("Sink \"{key}\": {error}"));
+        }
+    }
+
+    if errors.is_empty() {
+        fmt.success("Sinks configuration");
+        true
+    } else {
+        fmt.title("Sink errors");
+        fmt.sub_error(errors);
+        false
+    }
+}
+
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = match validate_components(config, &diff, fmt).await {
-        Some(pieces) => pieces,
-        _ => {
-            return false;
-        }
+    let Some(mut pieces) = validate_components(config, &diff, fmt).await else {
+        return false;
     };
     opts.skip_healthchecks || validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
@@ -372,7 +433,7 @@ async fn validate_healthchecks(
             }
             Ok(Err(e)) => failed(format!("Health check for \"{id}\" failed: {e}")),
             Err(error) if error.is_cancelled() => {
-                failed(format!("Health check for \"{id}\" was cancelled"))
+                failed(format!("Health check for \"{id}\" was cancelled"));
             }
             Err(_) => failed(format!("Health check for \"{id}\" panicked")),
         }
@@ -401,8 +462,8 @@ fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<Path
     }
 }
 
-fn remove_tmp_directory(path: PathBuf) {
-    if let Err(error) = remove_dir_all(&path) {
+fn remove_tmp_directory(path: &Path) {
+    if let Err(error) = remove_dir_all(path) {
         error!(message = "Failed to remove temporary directory.", path = ?path, %error);
     }
 }
@@ -420,6 +481,7 @@ pub struct Formatter {
 }
 
 impl Formatter {
+    #[must_use]
     pub fn new(color: bool) -> Self {
         Self {
             max_line_width: 0,
@@ -465,24 +527,24 @@ impl Formatter {
         } else {
             #[allow(clippy::print_stdout)]
             {
-                println!("{:>width$}", "Validated", width = self.max_line_width)
+                println!("{:>width$}", "Validated", width = self.max_line_width);
             }
         }
     }
 
     /// Standalone line
     fn success(&mut self, msg: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.success_intro, msg.as_ref()))
+        self.print(format!("{} {}\n", self.success_intro, msg.as_ref()));
     }
 
     /// Standalone line
     fn warning(&mut self, warning: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.warning_intro, warning.as_ref()))
+        self.print(format!("{} {}\n", self.warning_intro, warning.as_ref()));
     }
 
     /// Standalone line
     fn error(&mut self, error: impl AsRef<str>) {
-        self.print(format!("{} {}\n", self.error_intro, error.as_ref()))
+        self.print(format!("{} {}\n", self.error_intro, error.as_ref()));
     }
 
     /// Marks sub
@@ -493,7 +555,7 @@ impl Formatter {
             title.as_ref(),
             "",
             width = title.as_ref().len()
-        ))
+        ));
     }
 
     /// A list of warnings that go with a title.
@@ -501,7 +563,7 @@ impl Formatter {
     where
         I::Item: fmt::Display,
     {
-        self.sub(self.warning_intro.clone(), warnings)
+        self.sub(self.warning_intro.clone(), warnings);
     }
 
     /// A list of errors that go with a title.
@@ -509,7 +571,7 @@ impl Formatter {
     where
         I::Item: fmt::Display,
     {
-        self.sub(self.error_intro.clone(), errors)
+        self.sub(self.error_intro.clone(), errors);
     }
 
     fn sub<I: IntoIterator>(&mut self, intro: impl AsRef<str>, msgs: I)
@@ -517,7 +579,7 @@ impl Formatter {
         I::Item: fmt::Display,
     {
         for msg in msgs {
-            self.print(format!("{} {}\n", intro.as_ref(), msg));
+            self.print(format!("{} {msg}\n", intro.as_ref()));
         }
         self.space();
     }
@@ -548,7 +610,7 @@ impl Formatter {
         self.print_space = true;
         #[allow(clippy::print_stdout)]
         {
-            print!("{}", print.as_ref())
+            print!("{}", print.as_ref());
         }
     }
 }

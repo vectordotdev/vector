@@ -399,93 +399,91 @@ releases: "0.56.0": {
 	]
 
 	vrl_changelog: #"""
-		### [0.33.1 (2026-06-02)]
+		### [0.33.1 (2026-06-02)](https://github.com/vectordotdev/vrl/releases/tag/v0.33.1)
 
 		#### Fixes
 
 		- Reverted `parse_regex` changes from 0.33.0 which introduced a performance regression in multi-threaded scenarios.
 
-		(https://github.com/vectordotdev/vrl/pull/1789)
+		[PR #1789](https://github.com/vectordotdev/vrl/pull/1789) by [@thomasqueirozb](https://github.com/thomasqueirozb)
 
 
-		### [0.33.0 (2026-05-28)]
+		### [0.33.0 (2026-05-28)](https://github.com/vectordotdev/vrl/releases/tag/v0.33.0)
 
 		#### New Features
 
 		- VRL string literals now support `\u{HEX}` Unicode escape sequences. Any valid Unicode scalar value can be expressed, e.g. `"hello\u{1F30E}world"`. Invalid sequences (empty braces, non-hex digits, surrogate codepoints, or values above U+10FFFF) are reported as a compile-time error.
 
-		(https://github.com/vectordotdev/vrl/pull/1771)
-		- ~`parse_regex` now accepts dynamic regex patterns (variables and runtime expressions), consistent with `parse_regex_all`. When the pattern is a literal, return type information remains precise based on named capture groups.~
+		[PR #1771](https://github.com/vectordotdev/vrl/pull/1771) by [@thomasqueirozb](https://github.com/thomasqueirozb)
+		- ~~`parse_regex` now accepts dynamic regex patterns (variables and runtime expressions), consistent with `parse_regex_all`. When the pattern is a literal, return type information remains precise based on named capture groups.~~
 
-		~(https://github.com/vectordotdev/vrl/pull/1774)~
+		~~[PR #1774](https://github.com/vectordotdev/vrl/pull/1774) by [@thomasqueirozb](https://github.com/thomasqueirozb)~~
 
 		#### Enhancements
 
 		- Updated user agent data for `parse_user_agent` function
 
-		(https://github.com/vectordotdev/vrl/pull/1776)
+		[PR #1776](https://github.com/vectordotdev/vrl/pull/1776) by [@JakubOnderka](https://github.com/JakubOnderka)
 		- Protobuf encoding now coerces compatible scalar types into the target field type: integers and strings are accepted for `bool` fields (using the same parsing as `to_bool`), and integers are accepted for `float`/`double` fields. Previously these inputs failed encoding and required explicit conversion in VRL.
 
-		(https://github.com/vectordotdev/vrl/pull/1763)
+		[PR #1763](https://github.com/vectordotdev/vrl/pull/1763) by [@flaviofcruz](https://github.com/flaviofcruz)
 		- Added an optional `allow_lossy_string_coercion` argument to `encode_proto`. VRL's protobuf encoding stringifies `Boolean`, `Integer`, `Float`, and `Timestamp` values when assigned to a protobuf `string` field as a convenience for callers handling loosely typed input. The [protobuf JSON mapping](https://protobuf.dev/programming-guides/json/) only accepts a JSON string for a `string` field, so callers who want strict spec-compliant encoding can now pass `allow_lossy_string_coercion: false`. The default stays `true`, so today's behavior is unchanged.
 
-		(https://github.com/vectordotdev/vrl/pull/1764)
-		- ~Improved performance of `parse_regex`/`parse_regex_all` by pre-computing capture group names and indices at compile time. Users may see anywhere from 4% to 13% speedups in some cases.~
+		[PR #1764](https://github.com/vectordotdev/vrl/pull/1764) by [@pront](https://github.com/pront)
+		- ~~Improved performance of `parse_regex`/`parse_regex_all` by pre-computing capture group names and indices at compile time. Users may see anywhere from 4% to 13% speedups in some cases.~~
 
-		~(https://github.com/vectordotdev/vrl/pull/1773)~
+		~~[PR #1773](https://github.com/vectordotdev/vrl/pull/1773) by [@thomasqueirozb](https://github.com/thomasqueirozb)~~
 		- Improved performance of `parse_regex_all` by reusing the compiled regex across invocations.
 
-		(https://github.com/vectordotdev/vrl/pull/1775)
+		[PR #1775](https://github.com/vectordotdev/vrl/pull/1775) by [@thomasqueirozb](https://github.com/thomasqueirozb)
 
 		#### Fixes
 
 		- The compiler now reports every unhandled-error in a single compilation pass instead of stopping at the first one. For example:
 
-		```coffee
-		{
-		push(.x, 1)
-		.b = push(.y, 2)
-		}
-		```
+		    ```coffee
+		    {
+		    push(.x, 1)
+		    .b = push(.y, 2)
+		    }
+		    ```
 
-		now reports both `push(.x, 1)` (unhandled error) and `.b = push(.y, 2)` (unhandled fallible assignment) in one go. Previously you'd only see the second one, fix it, recompile, and only then discover the first.
+		    now reports both `push(.x, 1)` (unhandled error) and `.b = push(.y, 2)` (unhandled fallible assignment) in one go. Previously you'd only see the second one, fix it, recompile, and only then discover the first.
 
-		(https://github.com/vectordotdev/vrl/pull/1759)
+		[PR #1760](https://github.com/vectordotdev/vrl/pull/1760) by [@pront](https://github.com/pront)
 		- Fixed a confusing compile error where a fallible call earlier in a block could cause a later, unrelated assignment to be reported as the problem. For example:
 
-		```coffee
-		{
-		.a = 1
-		push(.x, 1)        # the unhandled error is actually here
-		.b = 2             # but the compiler used to flag this line
-		}
-		```
+		    ```coffee
+		    {
+		    .a = 1
+		    push(.x, 1)        # the unhandled error is actually here
+		    .b = 2             # but the compiler used to flag this line
+		    }
+		    ```
 
-		The error is now reported on the actual fallible expression, so adding `!` or the `, err =` form fixes it where you'd expect. This also fixes the same shape inside closure bodies, e.g. inside `for_each`/`map_values`.
+		    The error is now reported on the actual fallible expression, so adding `!` or the `, err =` form fixes it where you'd expect. This also fixes the same shape inside closure bodies, e.g. inside `for_each`/`map_values`.
 
-		(https://github.com/vectordotdev/vrl/pull/453)
+		[PR #1758](https://github.com/vectordotdev/vrl/pull/1758) by [@pront](https://github.com/pront)
 		- Fixed a false positive in the unused-variable diagnostic (`E900`) where a variable used before being reassigned (shadowed) was incorrectly flagged as unused at its original assignment.
 
-		(https://github.com/vectordotdev/vrl/pull/1743)
+		[PR #1743](https://github.com/vectordotdev/vrl/pull/1743) by [@pront](https://github.com/pront)
 		- `encode_proto` and `parse_proto` now support proto maps whose keys are integers or booleans, not just strings. Because VRL object keys are always strings, integer and boolean keys are written in their string form:
 
-		```coffee
-		encode_proto({ "by_id": { "42": "alice" } }, "schema.desc", "MyMessage")
-		```
+		    ```coffee
+		    encode_proto({ "by_id": { "42": "alice" } }, "schema.desc", "MyMessage")
+		    ```
 
-		Previously `parse_proto` errored on these maps and `encode_proto` silently dropped the field. Note that `encode_proto` will now return an error if a key string can't be parsed into the schema's key type (for example, `"abc"` against a `map<int32, ...>`).
+		    Previously `parse_proto` errored on these maps and `encode_proto` silently dropped the field. Note that `encode_proto` will now return an error if a key string can't be parsed into the schema's key type (for example, `"abc"` against a `map<int32, ...>`).
 
-		(https://github.com/vectordotdev/vrl/pull/1762)
+		[PR #1762](https://github.com/vectordotdev/vrl/pull/1762) by [@flaviofcruz](https://github.com/flaviofcruz)
 		- Fixed a typo in enum variant that made it impossible to use `SCREAMING_SNAKE` in casing functions such as `pascalcase`, `camelcase` and others.
 
-		`pascalcase("hello", original_case: "SCREAMING_SNAKE")` now compiles properly.
+		    `pascalcase("hello", original_case: "SCREAMING_SNAKE")` now compiles properly.
 
-		(https://github.com/vectordotdev/vrl/pull/1770)
+		[PR #1770](https://github.com/vectordotdev/vrl/pull/1770) by [@simplepad](https://github.com/simplepad)
 		- Allowed the `else` keyword (and `else if`) to appear on a new line after the closing `}` of an `if`-block. Previously the trailing newline terminated the if-expression at the parser level, forcing `else` to share a line with `}`.
 
-		authors: pront
-
-		(https://github.com/vectordotdev/vrl/pull/1756)
+		[PR #1756](https://github.com/vectordotdev/vrl/pull/1756) by [@pront](https://github.com/pront)
 
 		"""#
 

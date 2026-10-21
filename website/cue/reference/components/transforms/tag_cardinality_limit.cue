@@ -26,7 +26,6 @@ components: transforms: tag_cardinality_limit: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	// TODO: It'd be nice to have a way to define the description of the enum tag field on the Rust

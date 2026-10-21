@@ -57,7 +57,6 @@ components: sinks: mqtt: {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.mqtt.configuration & {

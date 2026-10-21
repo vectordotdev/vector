@@ -18,8 +18,7 @@ jobs:
     if: >-
       ${{
         contains(github.event.pull_request.labels.*.name, 'preview: website') ||
-        contains(github.event.pull_request.labels.*.name, 'preview: playground') ||
-        contains(github.event.pull_request.labels.*.name, 'preview: rust-doc')
+        contains(github.event.pull_request.labels.*.name, 'preview: playground')
       }}
     steps:
       # Save PR information. The raw branch name is only ever written as file data, hashed for
@@ -38,7 +37,6 @@ jobs:
             const apps = {
               website: labelNames.includes('preview: website'),
               playground: labelNames.includes('preview: playground'),
-              rustDoc: labelNames.includes('preview: rust-doc'),
             };
 
             await fs.mkdir('./pr', { recursive: true });
@@ -54,7 +52,7 @@ jobs:
 
       # Upload the artifact using latest version
       - name: Upload PR information artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr
           path: pr/

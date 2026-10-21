@@ -1,9 +1,11 @@
 use std::{collections::HashMap, io::Read};
 
 use indexmap::IndexMap;
-use toml::value::Table;
 
-use super::{ComponentHint, Process, deserialize_table, loader, prepare_input, secret};
+use super::{
+    ComponentHint, Process, deserialize_config_map, loader, prepare_input,
+    representation::ConfigMap, secret,
+};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
     TransformOuter,
@@ -18,24 +20,29 @@ pub struct ConfigBuilderLoader {
 
 impl ConfigBuilderLoader {
     /// Sets whether to interpolate environment variables in the config.
+    #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
     }
 
     /// Sets the secrets map for secret interpolation.
+    #[must_use]
     pub fn secrets(mut self, secrets: HashMap<String, String>) -> Self {
         self.secrets = secrets;
         self
     }
 
     /// Sets whether to allow empty configuration.
+    #[must_use]
     pub const fn allow_empty(mut self, allow_empty: bool) -> Self {
         self.builder.allow_empty = allow_empty;
         self
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -43,7 +50,9 @@ impl ConfigBuilderLoader {
         super::loader_from_paths(self, config_paths)
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn load_from_input<R: Read>(
         self,
         input: R,
@@ -74,42 +83,44 @@ impl Process for ConfigBuilderLoader {
         })
     }
 
-    /// Merge a TOML `Table` with a `ConfigBuilder`. Component types extend specific keys.
-    fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
+    /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
+    fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {
             Some(ComponentHint::Source) => {
-                self.builder.sources.extend(deserialize_table::<
-                    IndexMap<ComponentKey, SourceOuter>,
-                >(table)?);
+                self.builder
+                    .sources
+                    .extend(deserialize_config_map::<IndexMap<ComponentKey, SourceOuter>>(map)?);
             }
             Some(ComponentHint::Sink) => {
-                self.builder.sinks.extend(
-                    deserialize_table::<IndexMap<ComponentKey, SinkOuter<_>>>(table)?,
-                );
+                self.builder.sinks.extend(deserialize_config_map::<
+                    IndexMap<ComponentKey, SinkOuter<_>>,
+                >(map)?);
             }
             Some(ComponentHint::Transform) => {
-                self.builder.transforms.extend(deserialize_table::<
+                self.builder.transforms.extend(deserialize_config_map::<
                     IndexMap<ComponentKey, TransformOuter<_>>,
-                >(table)?);
+                >(map)?);
             }
             Some(ComponentHint::EnrichmentTable) => {
-                self.builder.enrichment_tables.extend(deserialize_table::<
-                    IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
-                >(table)?);
+                self.builder
+                    .enrichment_tables
+                    .extend(deserialize_config_map::<
+                        IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
+                    >(map)?);
             }
             Some(ComponentHint::Test) => {
                 // This serializes to a `Vec<TestDefinition<_>>`, so we need to first expand
                 // it to an ordered map, and then pull out the value, ignoring the keys.
                 self.builder.tests.extend(
-                    deserialize_table::<IndexMap<String, TestDefinition<String>>>(table)?
+                    deserialize_config_map::<IndexMap<String, TestDefinition<String>>>(map)?
                         .into_iter()
                         .map(|(_, test)| test),
                 );
             }
             None => {
-                self.builder.append(deserialize_table(table)?)?;
+                self.builder.append(deserialize_config_map(map)?)?;
             }
-        };
+        }
 
         Ok(())
     }

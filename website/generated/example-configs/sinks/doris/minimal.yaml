@@ -1,0 +1,11 @@
+sinks:
+  my_sink_id:
+    type: doris
+    inputs:
+      - my-source-or-transform-id
+    database: mydatabase
+    encoding:
+      codec: json
+    endpoints:
+      - http://127.0.0.1:8030
+    table: mytable

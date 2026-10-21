@@ -4,14 +4,13 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 pub use vector_lib::event::lua;
 use vector_lib::{
-    codecs::MetricTagValues,
     configurable::configurable_component,
     transform::runtime_transform::{RuntimeTransform, Timer},
 };
 
 use crate::{
     config::{self, CONFIG_PATHS, ComponentKey, DataType, Input, OutputId, TransformOutput},
-    event::{Event, lua::event::LuaEvent},
+    event::{Event, MetricTagMode, lua::event::LuaEvent},
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
     schema::Definition,
@@ -47,6 +46,29 @@ pub enum BuildError {
     RuntimeErrorGc { source: mlua::Error },
 }
 
+/// How metric tags are exposed to Lua scripts.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LuaMetricTagValues {
+    /// Tag values are exposed as single strings, the same as they were before this config
+    /// option. Tags with multiple values show the last assigned value, and null values
+    /// are ignored.
+    #[default]
+    Single,
+    /// All tags are exposed as arrays of either string or null values.
+    Full,
+}
+
+impl From<LuaMetricTagValues> for MetricTagMode {
+    fn from(value: LuaMetricTagValues) -> Self {
+        match value {
+            LuaMetricTagValues::Single => Self::Single,
+            LuaMetricTagValues::Full => Self::Full,
+        }
+    }
+}
+
 /// Configuration for the version two of the `lua` transform.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -60,6 +82,7 @@ pub struct LuaConfig {
     #[configurable(metadata(
         docs::examples = "function init()\n\tcount = 0\nend\n\nfunction process()\n\tcount = count + 1\nend\n\nfunction timer_handler(emit)\n\temit(make_counter(counter))\n\tcounter = 0\nend\n\nfunction shutdown(emit)\n\temit(make_counter(counter))\nend\n\nfunction make_counter(value)\n\treturn metric = {\n\t\tname = \"event_counter\",\n\t\tkind = \"incremental\",\n\t\ttimestamp = os.date(\"!*t\"),\n\t\tcounter = {\n\t\t\tvalue = value\n\t\t}\n \t}\nend",
         docs::examples = "-- external file with hooks and timers defined\nrequire('custom_module')",
+        docs::syntax_override = "lua",
     ))]
     source: Option<String>,
 
@@ -71,7 +94,6 @@ pub struct LuaConfig {
     #[configurable(metadata(docs::human_name = "Search Directories"))]
     search_dirs: Vec<PathBuf>,
 
-    #[configurable(derived)]
     hooks: HooksConfig,
 
     /// A list of timers which should be configured and executed periodically.
@@ -85,7 +107,7 @@ pub struct LuaConfig {
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    metric_tag_values: MetricTagValues,
+    metric_tag_values: LuaMetricTagValues,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -121,6 +143,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
         docs::examples = "init",
+        docs::syntax_override = "lua",
     ))]
     init: Option<String>,
 
@@ -134,6 +157,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (event, emit)\n\tevent.log.field = \"value\" -- set value of a field\n\tevent.log.another_field = nil -- remove field\n\tevent.log.first, event.log.second = nil, event.log.first -- rename field\n\t-- Very important! Emit the processed event.\n\temit(event)\nend",
         docs::examples = "process",
+        docs::syntax_override = "lua",
     ))]
     process: String,
 
@@ -146,6 +170,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
         docs::examples = "shutdown",
+        docs::syntax_override = "lua",
     ))]
     shutdown: Option<String>,
 }
@@ -172,14 +197,20 @@ struct TimerConfig {
 }
 
 impl LuaConfig {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua initialization or hook compilation fails.
     pub fn build(&self, key: ComponentKey) -> crate::Result<Transform> {
         Lua::new(self, key).map(Transform::event_task)
     }
 
+    #[must_use]
     pub fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
     }
 
+    #[must_use]
     pub fn outputs(
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
@@ -216,13 +247,13 @@ impl LuaConfig {
 const GC_INTERVAL: usize = 16;
 
 pub struct Lua {
-    lua: mlua::Lua,
+    runtime: mlua::Lua,
     invocations_after_gc: usize,
     hook_init: Option<mlua::RegistryKey>,
     hook_process: mlua::RegistryKey,
     hook_shutdown: Option<mlua::RegistryKey>,
     timers: Vec<(Timer, mlua::RegistryKey)>,
-    multi_value_tags: bool,
+    tag_mode: MetricTagMode,
     source_id: Arc<ComponentKey>,
 }
 
@@ -234,9 +265,17 @@ fn make_registry_value(lua: &mlua::Lua, source: &str) -> mlua::Result<mlua::Regi
 }
 
 impl Lua {
+    /// # Errors
+    ///
+    /// Returns an error if Lua initialization or hook compilation fails.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve timer index conversion. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn new(config: &LuaConfig, key: ComponentKey) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
+        // SAFETY: Native modules loaded by Lua must be trusted not to violate memory safety.
         let lua = unsafe {
             mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
         };
@@ -292,16 +331,14 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
-        let multi_value_tags = config.metric_tag_values == MetricTagValues::Full;
-
         Ok(Self {
-            lua,
+            runtime: lua,
             invocations_after_gc: 0,
             timers,
             hook_init,
             hook_process,
             hook_shutdown,
-            multi_value_tags,
+            tag_mode: config.metric_tag_values.into(),
             source_id: Arc::new(key),
         })
     }
@@ -309,7 +346,7 @@ impl Lua {
     #[cfg(test)]
     fn process(&mut self, event: Event, output: &mut Vec<Event>) -> Result<(), mlua::Error> {
         let source_id = event.source_id().cloned();
-        let lua = &self.lua;
+        let lua = &self.runtime;
         let result = lua.scope(|scope| {
             let emit = scope.create_function_mut(|_, mut event: Event| {
                 if let Some(source_id) = &source_id {
@@ -323,7 +360,7 @@ impl Lua {
                 .call((
                     LuaEvent {
                         event,
-                        metric_multi_value_tags: self.multi_value_tags,
+                        metric_tag_mode: self.tag_mode,
                     },
                     emit,
                 ))
@@ -345,10 +382,10 @@ impl Lua {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc.is_multiple_of(GC_INTERVAL) {
             emit!(LuaGcTriggered {
-                used_memory: self.lua.used_memory()
+                used_memory: self.runtime.used_memory()
             });
             _ = self
-                .lua
+                .runtime
                 .gc_collect()
                 .context(RuntimeErrorGcSnafu)
                 .map_err(|error| error!(%error, rate_limit = 30));
@@ -375,7 +412,7 @@ impl RuntimeTransform for Lua {
     where
         F: FnMut(Event),
     {
-        let lua = &self.lua;
+        let lua = &self.runtime;
         let source_id = Arc::clone(event.source_id().unwrap_or(&self.source_id));
         _ = lua
             .scope(|scope| -> mlua::Result<()> {
@@ -383,7 +420,7 @@ impl RuntimeTransform for Lua {
                     .call((
                         LuaEvent {
                             event,
-                            metric_multi_value_tags: self.multi_value_tags,
+                            metric_tag_mode: self.tag_mode,
                         },
                         wrap_emit_fn(scope, emit_fn, source_id)?,
                     ))
@@ -398,7 +435,7 @@ impl RuntimeTransform for Lua {
     where
         F: FnMut(Event),
     {
-        let lua = &self.lua;
+        let lua = &self.runtime;
         _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 match &self.hook_init {
@@ -418,7 +455,7 @@ impl RuntimeTransform for Lua {
     where
         F: FnMut(Event),
     {
-        let lua = &self.lua;
+        let lua = &self.runtime;
         _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 match &self.hook_shutdown {
@@ -438,7 +475,7 @@ impl RuntimeTransform for Lua {
     where
         F: FnMut(Event),
     {
-        let lua = &self.lua;
+        let lua = &self.runtime;
         _ = lua
             .scope(|scope| -> mlua::Result<()> {
                 let handler_key = &self.timers[timer.id as usize].1;
@@ -533,7 +570,7 @@ mod tests {
     #[tokio::test]
     async fn lua_runs_init_hook() {
         let line1 = random_string(9);
-        run_transform(
+        Box::pin(run_transform(
             &indoc::formatdoc! {r#"
                 version: "2"
                 hooks:
@@ -562,13 +599,13 @@ mod tests {
                     line2.into(),
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_add_field() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -587,13 +624,13 @@ mod tests {
                     "goodbye".into()
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_read_field() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -610,13 +647,13 @@ mod tests {
 
                 assert_eq!(next_event(&out, "in").await.as_log()["name"], "Bob".into());
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_remove_field() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -640,13 +677,13 @@ mod tests {
                     None
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_drop_event() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -661,13 +698,13 @@ mod tests {
 
                 // "run_transform" will assert that the output stream is empty
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_duplicate_event() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -685,13 +722,13 @@ mod tests {
                 assert!(out.lock().await.recv().await.is_some());
                 assert!(out.lock().await.recv().await.is_some());
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_read_empty_field() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -714,13 +751,13 @@ mod tests {
                     "empty".into()
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_integer_value() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -739,13 +776,13 @@ mod tests {
                     Value::Integer(3)
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_numeric_value() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -764,13 +801,13 @@ mod tests {
                     Value::from(3.14159)
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_boolean_value() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -789,13 +826,13 @@ mod tests {
                     Value::Boolean(true)
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_non_coercible_value() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -817,7 +854,7 @@ mod tests {
                     None
                 );
             },
-        )
+        ))
         .await;
     }
 
@@ -839,15 +876,14 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
         Ok(())
     }
 
     #[tokio::test]
     async fn lua_non_string_key_read() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -869,7 +905,7 @@ mod tests {
                     None
                 );
             },
-        )
+        ))
         .await;
     }
 
@@ -888,24 +924,24 @@ mod tests {
             .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("this is an error"), "{}", err);
+        assert!(err.contains("this is an error"), "{err}");
         Ok(())
     }
 
     #[tokio::test]
     async fn lua_syntax_error() -> crate::Result<()> {
-        let err = from_config(indoc! {r#"
+        let err = from_config(indoc! {r"
             hooks:
               process: |
                 function (event, emit)
                   1234 = sadf <>&*!#@
                 end
-            "#})
+            "})
         .map(|_| ())
         .unwrap_err()
         .to_string();
 
-        assert!(err.contains("syntax error:"), "{}", err);
+        assert!(err.contains("syntax error:"), "{err}");
         Ok(())
     }
 
@@ -930,7 +966,7 @@ mod tests {
         )
         .unwrap();
 
-        run_transform(
+        Box::pin(run_transform(
             &indoc::formatdoc! {r#"
                 version: "2"
                 hooks:
@@ -954,13 +990,13 @@ mod tests {
                     "new value".into()
                 );
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_pairs() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -983,13 +1019,13 @@ mod tests {
                 assert_eq!(output.as_log()["name"], "nameBob".into());
                 assert_eq!(output.as_log()["friend"], "friendAlice".into());
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_metric() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -1017,13 +1053,13 @@ mod tests {
 
                 assert_eq!(next_event(&out, "in").await.as_metric(), &expected);
             },
-        )
+        ))
         .await;
     }
 
     #[tokio::test]
     async fn lua_multiple_events() {
-        run_transform(
+        Box::pin(run_transform(
             indoc! {r#"
             version: "2"
             hooks:
@@ -1041,7 +1077,7 @@ mod tests {
                     assert!(out.lock().await.recv().await.is_some());
                 }
             },
-        )
+        ))
         .await;
     }
 }

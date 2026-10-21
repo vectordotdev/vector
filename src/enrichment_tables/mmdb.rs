@@ -24,8 +24,8 @@ pub struct MmdbConfig {
 }
 
 impl GenerateConfig for MmdbConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             path: "/path/to/GeoLite2-City.mmdb".into(),
         })
         .unwrap()
@@ -43,7 +43,7 @@ impl EnrichmentTableConfig for MmdbConfig {
 }
 
 #[derive(Clone)]
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a MaxMind database.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a `MaxMind` database.
 pub struct Mmdb {
     config: MmdbConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
@@ -52,6 +52,11 @@ pub struct Mmdb {
 
 impl Mmdb {
     /// Creates a new Mmdb struct from the provided config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn new(config: MmdbConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
 
@@ -60,7 +65,7 @@ impl Mmdb {
         let result = dbreader.lookup(ip)?.decode::<ObjectMap>().map(|_| ());
 
         match result {
-            Ok(_) => Ok(Mmdb {
+            Ok(()) => Ok(Mmdb {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 config,

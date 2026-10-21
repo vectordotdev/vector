@@ -98,12 +98,12 @@ impl InternalEvent for JournaldCheckpointSetError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct JournaldCheckpointFileOpenError {
-    pub error: std::io::Error,
+pub struct JournaldCheckpointFileOpenError<'a> {
+    pub error: &'a std::io::Error,
     pub path: String,
 }
 
-impl InternalEvent for JournaldCheckpointFileOpenError {
+impl InternalEvent for JournaldCheckpointFileOpenError<'_> {
     fn emit(self) {
         error!(
             message = "Unable to open checkpoint file.",

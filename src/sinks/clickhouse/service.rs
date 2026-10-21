@@ -1,30 +1,33 @@
 //! Service implementation for the `Clickhouse` sink.
 
+use std::fmt::Write as _;
+
 use bytes::Bytes;
-use http::{
-    Request, StatusCode, Uri,
+use http::Uri;
+use http_1::{
+    Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
+use tracing::debug;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, HttpError},
+    http::{Auth, client_v1::HttpError},
     sinks::{
-        HTTPRequestBuilderSnafu, UriParseSnafu,
+        UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpResponse, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
     },
 };
 
 #[derive(Debug, Default, Clone)]
-pub struct ClickhouseRetryLogic {
-    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
-}
+pub(crate) struct ClickhouseRetryLogic;
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = HttpError;
@@ -32,13 +35,23 @@ impl RetryLogic for ClickhouseRetryLogic {
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        self.inner.is_retriable_error(error)
+        error.is_retriable()
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        match response.http_response.status() {
+        let status = response.response.status();
+
+        if !status.is_success() {
+            debug!(
+                message = "HTTP response.",
+                %status,
+                body = %String::from_utf8_lossy(response.response.body()),
+            );
+        }
+
+        match status {
             StatusCode::INTERNAL_SERVER_ERROR => {
-                let body = response.http_response.body();
+                let body = response.response.body();
 
                 // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
@@ -56,7 +69,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                     RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
             }
-            _ => self.inner.should_retry_response(&response.http_response),
+            _ => RetryStrategy::Default.retry_action(status),
         }
     }
 }
@@ -90,8 +103,6 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             self.query_settings,
         )?;
 
-        let auth: Option<Auth> = self.auth.clone();
-
         // Extract format before taking payload to avoid borrow checker issues
         let format = metadata.format;
         let payload = request.take_payload();
@@ -102,31 +113,29 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             _ => "application/x-ndjson",
         };
 
-        let mut builder = Request::post(&uri)
+        let mut builder = Request::post(uri.to_string())
             .header(CONTENT_TYPE, content_type)
             .header(CONTENT_LENGTH, payload.len());
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
         }
-        if let Some(auth) = auth {
-            builder = auth.apply_builder(builder);
+        let mut request = builder.body(payload).map_err(crate::Error::from)?;
+        if let Some(auth) = &self.auth {
+            auth.apply_v1(&mut request);
         }
 
-        builder
-            .body(payload)
-            .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::into)
+        Ok(request)
     }
 }
 
 fn append_param<T: ToString>(uri: &mut String, key: &str, value: Option<T>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, val.to_string()));
+        write!(uri, "{key}={}&", val.to_string()).expect("writing to a String cannot fail");
     }
 }
 fn append_param_bool(uri: &mut String, key: &str, value: Option<bool>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, if val { 1 } else { 0 }));
+        write!(uri, "{key}={}&", u8::from(val)).expect("writing to a String cannot fail");
     }
 }
 
@@ -146,10 +155,7 @@ fn set_uri_query(
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
-            &format!(
-                "INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {}",
-                format
-            ),
+            &format!("INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {format}"),
         )
         .append_pair("param_database", database)
         .append_pair("param_table", table)
@@ -163,10 +169,10 @@ fn set_uri_query(
     uri.push_str("?input_format_import_nested_json=1&");
     append_param_bool(&mut uri, "input_format_skip_unknown_fields", skip_unknown);
     if date_time_best_effort {
-        uri.push_str("date_time_input_format=best_effort&")
+        uri.push_str("date_time_input_format=best_effort&");
     }
     if insert_random_shard {
-        uri.push_str("insert_distributed_one_random_shard=1&")
+        uri.push_str("insert_distributed_one_random_shard=1&");
     }
     append_param_bool(
         &mut uri,
@@ -305,7 +311,10 @@ mod tests {
                                      param_database=my_database&\
                                      param_table=my_%22table%22"
         );
+    }
 
+    #[test]
+    fn encode_async_insert_settings() {
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
             "my_database",

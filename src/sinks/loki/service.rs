@@ -1,13 +1,16 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use http::StatusCode;
+use http_1::{Request, StatusCode};
 use snafu::Snafu;
 use tracing::Instrument;
 
 use crate::{
-    http::{Auth, HttpClient},
-    sinks::{prelude::*, util::UriSerde},
+    http::{
+        Auth,
+        client_v1::{HttpClient, full_body},
+    },
+    sinks::{prelude::*, util::HttpEndpoint},
 };
 
 #[derive(Clone)]
@@ -36,7 +39,9 @@ pub enum LokiError {
     #[snafu(display("Server responded with an error: {}", code))]
     ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
+    HttpError {
+        error: crate::http::client_v1::HttpError,
+    },
 }
 
 #[derive(Debug, Snafu)]
@@ -85,20 +90,18 @@ impl MetaDescriptive for LokiRequest {
 
 #[derive(Debug, Clone)]
 pub struct LokiService {
-    endpoint: UriSerde,
+    endpoint: HttpEndpoint,
     client: HttpClient,
+    auth: Option<Auth>,
 }
 
 impl LokiService {
-    pub fn new(
-        client: HttpClient,
-        endpoint: UriSerde,
-        path: String,
-        auth: Option<Auth>,
-    ) -> crate::Result<Self> {
-        let endpoint = endpoint.append_path(&path)?.with_auth(auth);
-
-        Ok(Self { client, endpoint })
+    pub const fn new(client: HttpClient, endpoint: HttpEndpoint, auth: Option<Auth>) -> Self {
+        Self {
+            endpoint,
+            client,
+            auth,
+        }
     }
 }
 
@@ -116,7 +119,8 @@ impl Service<LokiRequest> for LokiService {
             Compression::Snappy => "application/x-protobuf",
             _ => "application/json",
         };
-        let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
+        let mut req =
+            Request::post(self.endpoint.clone().into_v1()).header("Content-Type", content_type);
 
         let metadata = request.get_metadata().clone();
 
@@ -128,17 +132,16 @@ impl Service<LokiRequest> for LokiService {
             req = req.header("Content-Encoding", ce);
         }
 
-        let body = hyper::Body::from(request.payload);
-        let mut req = req.body(body).unwrap();
+        let mut req = req.body(request.payload).unwrap();
 
-        if let Some(auth) = &self.endpoint.auth {
-            auth.apply(&mut req);
+        if let Some(auth) = &self.auth {
+            auth.apply_v1(&mut req);
         }
 
-        let mut client = self.client.clone();
+        let client = self.client.clone();
 
         Box::pin(async move {
-            match client.call(req).in_current_span().await {
+            match client.send(req.map(full_body)).in_current_span().await {
                 Ok(response) => {
                     let status = response.status();
 

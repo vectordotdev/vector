@@ -7,7 +7,7 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use snafu::{ResultExt, Snafu};
+use serde::{Deserialize, Deserializer, de::Error as _};
 use tower::Service;
 use vector_lib::{
     configurable::configurable_component,
@@ -16,6 +16,7 @@ use vector_lib::{
 };
 
 use crate::http::HttpClient;
+use crate::sinks::util::HttpEndpoint;
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -32,41 +33,23 @@ pub(in crate::sinks) enum Field {
     Bool(bool),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::sinks) enum ProtocolVersion {
     V1,
     V2,
 }
 
-#[derive(Debug, Snafu)]
-enum ConfigError {
-    #[snafu(display("InfluxDB v1 or v2 should be configured as endpoint."))]
-    MissingConfiguration,
-    #[snafu(display(
-        "Unclear settings. Both version configured v1: {:?}, v2: {:?}.",
-        v1_settings,
-        v2_settings
-    ))]
-    BothConfiguration {
-        v1_settings: InfluxDb1Settings,
-        v2_settings: InfluxDb2Settings,
-    },
-}
-
 /// Configuration settings for InfluxDB v0.x/v1.x.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct InfluxDb1Settings {
     /// The name of the database to write into.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "vector-database"))]
     #[configurable(metadata(docs::examples = "iot-store"))]
     database: String,
 
     /// The consistency level to use for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "any"))]
     #[configurable(metadata(docs::examples = "one"))]
     #[configurable(metadata(docs::examples = "quorum"))]
@@ -74,22 +57,16 @@ pub struct InfluxDb1Settings {
     consistency: Option<String>,
 
     /// The target retention policy for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "autogen"))]
     #[configurable(metadata(docs::examples = "one_day_only"))]
     retention_policy_name: Option<String>,
 
     /// The username to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "todd"))]
     #[configurable(metadata(docs::examples = "vector-source"))]
     username: Option<String>,
 
     /// The password to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
     #[configurable(metadata(docs::examples = "influxdb4ever"))]
     password: Option<SensitiveString>,
@@ -98,24 +75,19 @@ pub struct InfluxDb1Settings {
 /// Configuration settings for InfluxDB v2.x.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct InfluxDb2Settings {
     /// The name of the organization to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "my-org"))]
     #[configurable(metadata(docs::examples = "33f2cff0a28e5b63"))]
     org: String,
 
     /// The name of the bucket to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "vector-bucket"))]
     #[configurable(metadata(docs::examples = "4d2225e4d3d49f75"))]
     bucket: String,
 
     /// The [token][token_docs] to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
@@ -123,15 +95,65 @@ pub struct InfluxDb2Settings {
     token: SensitiveString,
 }
 
-trait InfluxDbSettings: std::fmt::Debug {
-    fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
-    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
+/// InfluxDB connection settings, selected by the `version` option.
+///
+/// Each version only accepts its own settings.
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug)]
+#[serde(tag = "version")]
+#[configurable(metadata(docs::enum_tag_description = "The InfluxDB API version to use."))]
+pub enum InfluxDbSettings {
+    /// InfluxDB v0.x/v1.x.
+    #[serde(rename = "1")]
+    V1(InfluxDb1Settings),
+    /// InfluxDB v2.x.
+    #[serde(rename = "2")]
+    V2(InfluxDb2Settings),
+}
+
+// The derived internally tagged deserializer would match integer tags by variant index, so an
+// unquoted `version: 1` would resolve to v2. Parse the tag with a plain enum instead, which only
+// accepts the strings "1" and "2", and hand the remaining fields to the per-version settings.
+impl<'de> Deserialize<'de> for InfluxDbSettings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        enum Version {
+            #[serde(rename = "1")]
+            V1,
+            #[serde(rename = "2")]
+            V2,
+        }
+
+        #[derive(Deserialize)]
+        struct Tagged {
+            version: Version,
+            #[serde(flatten)]
+            settings: serde_json::Map<String, serde_json::Value>,
+        }
+
+        let Tagged { version, settings } = Tagged::deserialize(deserializer)?;
+
+        let settings = serde_json::Value::Object(settings);
+        match version {
+            Version::V1 => InfluxDb1Settings::deserialize(settings).map(Self::V1),
+            Version::V2 => InfluxDb2Settings::deserialize(settings).map(Self::V2),
+        }
+        .map_err(D::Error::custom)
+    }
+}
+
+trait InfluxDbConnection: std::fmt::Debug {
+    fn write_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri>;
+    fn healthcheck_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri>;
     fn token(&self) -> SensitiveString;
     fn protocol_version(&self) -> ProtocolVersion;
 }
 
-impl InfluxDbSettings for InfluxDb1Settings {
-    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
+impl InfluxDbConnection for InfluxDb1Settings {
+    fn write_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "write",
@@ -146,7 +168,7 @@ impl InfluxDbSettings for InfluxDb1Settings {
         )
     }
 
-    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(&endpoint, "ping", &[])
     }
 
@@ -159,8 +181,8 @@ impl InfluxDbSettings for InfluxDb1Settings {
     }
 }
 
-impl InfluxDbSettings for InfluxDb2Settings {
-    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
+impl InfluxDbConnection for InfluxDb2Settings {
+    fn write_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "api/v2/write",
@@ -172,7 +194,7 @@ impl InfluxDbSettings for InfluxDb2Settings {
         )
     }
 
-    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(&endpoint, "ping", &[])
     }
 
@@ -185,31 +207,21 @@ impl InfluxDbSettings for InfluxDb2Settings {
     }
 }
 
-fn influxdb_settings(
-    influxdb1_settings: Option<InfluxDb1Settings>,
-    influxdb2_settings: Option<InfluxDb2Settings>,
-) -> Result<Box<dyn InfluxDbSettings>, crate::Error> {
-    match (influxdb1_settings, influxdb2_settings) {
-        (Some(v1_settings), Some(v2_settings)) => Err(ConfigError::BothConfiguration {
-            v1_settings,
-            v2_settings,
-        }
-        .into()),
-        (None, None) => Err(ConfigError::MissingConfiguration.into()),
-        (Some(settings), _) => Ok(Box::new(settings)),
-        (_, Some(settings)) => Ok(Box::new(settings)),
+fn influxdb_settings(settings: InfluxDbSettings) -> Box<dyn InfluxDbConnection> {
+    match settings {
+        InfluxDbSettings::V1(settings) => Box::new(settings),
+        InfluxDbSettings::V2(settings) => Box::new(settings),
     }
 }
 
 // V1: https://docs.influxdata.com/influxdb/v1.7/tools/api/#ping-http-endpoint
 // V2: https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
 fn healthcheck(
-    endpoint: String,
-    influxdb1_settings: Option<InfluxDb1Settings>,
-    influxdb2_settings: Option<InfluxDb2Settings>,
+    endpoint: HttpEndpoint,
+    settings: InfluxDbSettings,
     mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
-    let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
+    let settings = influxdb_settings(settings);
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
@@ -219,10 +231,9 @@ fn healthcheck(
         client
             .call(request)
             .await
-            .map_err(|error| error.into())
+            .map_err(Into::into)
             .and_then(|response| match response.status() {
-                StatusCode::OK => Ok(()),
-                StatusCode::NO_CONTENT => Ok(()),
+                StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
                 other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
             })
     }
@@ -251,7 +262,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     let unwrapped_tags = tags.unwrap_or_default();
     if !unwrapped_tags.is_empty() {
         line_protocol.put_u8(b',');
-        encode_tags(unwrapped_tags, line_protocol);
+        encode_tags(&unwrapped_tags, line_protocol);
     }
     line_protocol.put_u8(b' ');
 
@@ -265,7 +276,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     Ok(())
 }
 
-fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
+fn encode_tags(tags: &MetricTags, output: &mut BytesMut) {
     let original_len = output.len();
     // `tags` is already sorted
     for (key, value) in tags.iter_single() {
@@ -290,7 +301,7 @@ fn encode_fields(
     output: &mut BytesMut,
 ) {
     let original_len = output.len();
-    for (key, value) in fields.into_iter() {
+    for (key, value) in fields {
         encode_string(&key, output);
         output.put_u8(b'=');
         match value {
@@ -322,7 +333,7 @@ fn encode_fields(
             Field::Bool(b) => {
                 output.put_slice(&b.to_string().into_bytes());
             }
-        };
+        }
         output.put_u8(b',');
     }
 
@@ -351,7 +362,7 @@ pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i6
 }
 
 pub(in crate::sinks) fn encode_uri(
-    endpoint: &str,
+    endpoint: &HttpEndpoint,
     path: &str,
     pairs: &[(&str, Option<String>)],
 ) -> crate::Result<Uri> {
@@ -363,17 +374,13 @@ pub(in crate::sinks) fn encode_uri(
         }
     }
 
-    let mut url = if endpoint.ends_with('/') {
-        format!("{}{}?{}", endpoint, path, serializer.finish())
+    let query = serializer.finish();
+    let path_and_query = if query.is_empty() {
+        path.to_string()
     } else {
-        format!("{}/{}?{}", endpoint, path, serializer.finish())
+        format!("{path}?{query}")
     };
-
-    if url.ends_with('?') {
-        url.pop();
-    }
-
-    Ok(url.parse::<Uri>().context(super::UriParseSnafu)?)
+    Ok(endpoint.append_path(&path_and_query)?.into_uri())
 }
 
 #[cfg(test)]
@@ -410,16 +417,16 @@ pub mod test_util {
         )
     }
 
-    pub(crate) fn assert_fields(value: String, fields: Vec<&str>) {
+    pub(crate) fn assert_fields(value: &str, fields: Vec<&str>) {
         let encoded_fields: Vec<&str> = value.split(',').collect();
 
         assert_eq!(fields.len(), encoded_fields.len());
 
-        for field in fields.into_iter() {
+        for field in fields {
             assert!(
                 encoded_fields.contains(&field),
                 "Fields: {value} has to have: {field}"
-            )
+            );
         }
     }
 
@@ -489,7 +496,7 @@ pub mod test_util {
         // this with empty writes and loop if it reports the database
         // does not exist yet.
         crate::test_util::wait_for(|| {
-            let write_url = format!("{}/write?db={}", endpoint, &database);
+            let write_url = format!("{endpoint}/write?db={}", &database);
             async move {
                 match client()
                     .post(&write_url)
@@ -552,6 +559,10 @@ pub mod test_util {
     }
 
     // InfluxDB strips off trailing zeros in timestamps in metrics
+    #[expect(
+        clippy::case_sensitive_file_extension_comparisons,
+        reason = "Match timestamp suffixes exactly."
+    )]
     fn strip_timestamp(timestamp: String) -> String {
         #[expect(
             clippy::string_slice,
@@ -568,65 +579,31 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use serde::{Deserialize, Serialize};
-
     use super::*;
     use crate::sinks::influxdb::test_util::{assert_fields, tags, ts};
 
-    #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-    #[serde(deny_unknown_fields)]
-    pub struct InfluxDbTestConfig {
-        #[serde(flatten)]
-        pub influxdb1_settings: Option<InfluxDb1Settings>,
-        #[serde(flatten)]
-        pub influxdb2_settings: Option<InfluxDb2Settings>,
-    }
-
-    #[test]
-    fn test_influxdb_settings_both() {
-        let config = indoc::indoc! {r#"
-        bucket: "my-bucket"
-        org: "my-org"
-        token: "my-token"
-        database: "my-database"
-        "#};
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        assert_eq!(
-            settings.expect_err("expected error").to_string(),
-            "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"**REDACTED**\" }.".to_owned()
-        );
-    }
-
-    #[test]
-    fn test_influxdb_settings_missing() {
-        let config = "{}";
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        assert_eq!(
-            settings.expect_err("expected error").to_string(),
-            "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
-        );
-    }
-
     #[test]
     fn test_influxdb1_settings() {
-        let config = indoc::indoc! {r#"
-        database: "my-database"
-        "#};
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        let settings = InfluxDbSettings::V1(InfluxDb1Settings {
+            database: "my-database".to_owned(),
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+        });
+        let connection = influxdb_settings(settings);
+        assert_eq!(connection.protocol_version(), ProtocolVersion::V1);
     }
 
     #[test]
     fn test_influxdb2_settings() {
-        let config = indoc::indoc! {r#"
-        bucket: "my-bucket"
-        org: "my-org"
-        token: "my-token"
-        "#};
-        let config: InfluxDbTestConfig = serde_yaml::from_str(config).unwrap();
-        _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
+        let settings = InfluxDbSettings::V2(InfluxDb2Settings {
+            org: "my-org".to_owned(),
+            bucket: "my-bucket".to_owned(),
+            token: "my-token".to_owned().into(),
+        });
+        let connection = influxdb_settings(settings);
+        assert_eq!(connection.protocol_version(), ProtocolVersion::V2);
     }
 
     #[test]
@@ -640,12 +617,12 @@ mod tests {
         };
 
         let uri = settings
-            .write_uri("http://localhost:8086".to_owned())
+            .write_uri(HttpEndpoint::parse("http://localhost:8086").unwrap())
             .unwrap();
         assert_eq!(
             "http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns",
             uri.to_string()
-        )
+        );
     }
 
     #[test]
@@ -657,12 +634,12 @@ mod tests {
         };
 
         let uri = settings
-            .write_uri("http://localhost:9999".to_owned())
+            .write_uri(HttpEndpoint::parse("http://localhost:9999").unwrap())
             .unwrap();
         assert_eq!(
             "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns",
             uri.to_string()
-        )
+        );
     }
 
     #[test]
@@ -676,9 +653,9 @@ mod tests {
         };
 
         let uri = settings
-            .healthcheck_uri("http://localhost:8086".to_owned())
+            .healthcheck_uri(HttpEndpoint::parse("http://localhost:8086").unwrap())
             .unwrap();
-        assert_eq!("http://localhost:8086/ping", uri.to_string())
+        assert_eq!("http://localhost:8086/ping", uri.to_string());
     }
 
     #[test]
@@ -690,15 +667,15 @@ mod tests {
         };
 
         let uri = settings
-            .healthcheck_uri("http://localhost:9999".to_owned())
+            .healthcheck_uri(HttpEndpoint::parse("http://localhost:9999").unwrap())
             .unwrap();
-        assert_eq!("http://localhost:9999/ping", uri.to_string())
+        assert_eq!("http://localhost:9999/ping", uri.to_string());
     }
 
     #[test]
     fn test_encode_tags() {
         let mut value = BytesMut::new();
-        encode_tags(tags(), &mut value);
+        encode_tags(&tags(), &mut value);
 
         assert_eq!(value, "normal_tag=value,true_tag=true");
 
@@ -712,7 +689,7 @@ mod tests {
         .collect();
 
         let mut value = BytesMut::new();
-        encode_tags(tags_to_escape, &mut value);
+        encode_tags(&tags_to_escape, &mut value);
         assert_eq!(
             value,
             "a_first_place=10,name\\ escape=true,tag=val\\=ue,value_escape=value\\ escape"
@@ -723,7 +700,7 @@ mod tests {
     fn tags_order() {
         let mut value = BytesMut::new();
         encode_tags(
-            vec![
+            &vec![
                 ("a", "value"),
                 ("b", "value"),
                 ("c", "value"),
@@ -748,7 +725,7 @@ mod tests {
             ),
             ("field_float".into(), Field::Float(123.45)),
             ("field_unsigned_int".into(), Field::UnsignedInt(657)),
-            ("field_int".into(), Field::Int(657646)),
+            ("field_int".into(), Field::Int(657_646)),
             ("field_bool_true".into(), Field::Bool(true)),
             ("field_bool_false".into(), Field::Bool(false)),
             ("escape key".into(), Field::Float(10.0)),
@@ -760,7 +737,7 @@ mod tests {
         encode_fields(ProtocolVersion::V1, fields, &mut value);
         let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
         assert_fields(
-            value,
+            &value,
             [
                 "escape\\ key=10",
                 "field_float=123.45",
@@ -772,7 +749,7 @@ mod tests {
                 "field_bool_false=false",
             ]
             .to_vec(),
-        )
+        );
     }
 
     #[test]
@@ -785,7 +762,7 @@ mod tests {
             ),
             ("field_float".into(), Field::Float(123.45)),
             ("field_unsigned_int".into(), Field::UnsignedInt(657)),
-            ("field_int".into(), Field::Int(657646)),
+            ("field_int".into(), Field::Int(657_646)),
             ("field_bool_true".into(), Field::Bool(true)),
             ("field_bool_false".into(), Field::Bool(false)),
             ("escape key".into(), Field::Float(10.0)),
@@ -797,7 +774,7 @@ mod tests {
         encode_fields(ProtocolVersion::V2, fields, &mut value);
         let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
         assert_fields(
-            value,
+            &value,
             [
                 "escape\\ key=10",
                 "field_float=123.45",
@@ -809,7 +786,7 @@ mod tests {
                 "field_bool_false=false",
             ]
             .to_vec(),
-        )
+        );
     }
 
     #[test]
@@ -836,14 +813,14 @@ mod tests {
         let start = Utc::now()
             .timestamp_nanos_opt()
             .expect("Timestamp out of range");
-        assert_eq!(encode_timestamp(Some(ts())), 1542182950000000011);
-        assert!(encode_timestamp(None) >= start)
+        assert_eq!(encode_timestamp(Some(ts())), 1_542_182_950_000_000_011);
+        assert!(encode_timestamp(None) >= start);
     }
 
     #[test]
     fn test_encode_uri_valid() {
         let uri = encode_uri(
-            "http://localhost:9999",
+            &HttpEndpoint::parse("http://localhost:9999").unwrap(),
             "api/v2/write",
             &[
                 ("org", Some("my-org".to_owned())),
@@ -858,7 +835,7 @@ mod tests {
         );
 
         let uri = encode_uri(
-            "http://localhost:9999/",
+            &HttpEndpoint::parse("http://localhost:9999/").unwrap(),
             "api/v2/write",
             &[
                 ("org", Some("my-org".to_owned())),
@@ -872,7 +849,7 @@ mod tests {
         );
 
         let uri = encode_uri(
-            "http://localhost:9999",
+            &HttpEndpoint::parse("http://localhost:9999").unwrap(),
             "api/v2/write",
             &[
                 ("org", Some("Organization name".to_owned())),
@@ -886,19 +863,6 @@ mod tests {
             "http://localhost:9999/api/v2/write?org=Organization+name&bucket=Bucket%3Dname"
         );
     }
-
-    #[test]
-    fn test_encode_uri_invalid() {
-        encode_uri(
-            "localhost:9999",
-            "api/v2/write",
-            &[
-                ("org", Some("my-org".to_owned())),
-                ("bucket", Some("my-bucket".to_owned())),
-            ],
-        )
-        .unwrap_err();
-    }
 }
 
 #[cfg(feature = "influxdb-integration-tests")]
@@ -908,9 +872,10 @@ mod integration_tests {
         config::ProxyConfig,
         http::HttpClient,
         sinks::influxdb::{
-            InfluxDb1Settings, InfluxDb2Settings, healthcheck,
+            InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, healthcheck,
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
+        sinks::util::HttpEndpoint,
     };
 
     #[tokio::test]
@@ -919,8 +884,7 @@ mod integration_tests {
         onboarding_v2(&endpoint).await;
 
         let endpoint = address_v2();
-        let influxdb1_settings = None;
-        let influxdb2_settings = Some(InfluxDb2Settings {
+        let settings = InfluxDbSettings::V2(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string().into(),
@@ -928,20 +892,19 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value")]
     async fn influxdb2_healthchecks_fail() {
         let endpoint = "http://127.0.0.1:9999".to_string();
         onboarding_v2(&endpoint).await;
 
-        let influxdb1_settings = None;
-        let influxdb2_settings = Some(InfluxDb2Settings {
+        let settings = InfluxDbSettings::V2(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string().into(),
@@ -949,7 +912,7 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
             .unwrap();
@@ -959,39 +922,37 @@ mod integration_tests {
     async fn influxdb1_healthchecks_ok() {
         let endpoint = address_v1(false);
 
-        let influxdb1_settings = Some(InfluxDb1Settings {
+        let settings = InfluxDbSettings::V1(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
             retention_policy_name: None,
             username: None,
             password: None,
         });
-        let influxdb2_settings = None;
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
             .unwrap();
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value")]
     async fn influxdb1_healthchecks_fail() {
         let endpoint = "http://127.0.0.1:8086".to_string();
-        let influxdb1_settings = Some(InfluxDb1Settings {
+        let settings = InfluxDbSettings::V1(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
             retention_policy_name: None,
             username: None,
             password: None,
         });
-        let influxdb2_settings = None;
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
             .unwrap();

@@ -33,7 +33,7 @@ impl Record for KinesisStreamRecord {
             .record
             .explicit_hash_key
             .as_ref()
-            .map(|s| s.len())
+            .map(String::len)
             .unwrap_or_default();
 
         // data is base64 encoded
@@ -76,6 +76,8 @@ impl SendRecord for KinesisStreamClient {
             .await
             .map(|output: PutRecordsOutput| KinesisResponse {
                 failed_records: extract_failed_records(&output),
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(clippy::cast_sign_loss, reason = "AWS failure counts are nonnegative")]
                 failure_count: output.failed_record_count().unwrap_or(0) as usize,
                 events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
             })

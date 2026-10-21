@@ -13,6 +13,7 @@ mod cli;
 mod shutdown;
 
 /// Creates a file with given content
+#[must_use]
 pub fn create_file(config: &str) -> PathBuf {
     let path = temp_file();
     overwrite_file(path.clone(), config);
@@ -20,6 +21,7 @@ pub fn create_file(config: &str) -> PathBuf {
 }
 
 /// Creates a YAML config file (`.yaml` extension so Vector parses it as YAML)
+#[must_use]
 pub fn create_yaml_file(config: &str) -> PathBuf {
     let mut path = temp_file();
     path.set_extension("yaml");
@@ -27,7 +29,11 @@ pub fn create_yaml_file(config: &str) -> PathBuf {
     path
 }
 
-/// Overwrites file with given content
+/// Overwrites file with given content.
+///
+/// # Panics
+///
+/// Panics if the file cannot be opened, written, or synchronized.
 pub fn overwrite_file(path: PathBuf, config: &str) {
     let mut file = OpenOptions::new()
         .create(true)
@@ -40,6 +46,12 @@ pub fn overwrite_file(path: PathBuf, config: &str) {
     file.sync_all().unwrap();
 }
 
+/// Creates a temporary directory.
+///
+/// # Panics
+///
+/// Panics if the directory cannot be created.
+#[must_use]
 pub fn create_directory() -> PathBuf {
     let path = temp_dir();
     create_dir(path.clone()).unwrap();

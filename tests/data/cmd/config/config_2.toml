@@ -24,6 +24,7 @@ drop_on_error = false
 metric_tag_values = "single"
 reroute_dropped = false
 runtime = "ast"
+source = "."
 type = "remap"
 
 [sinks.sink0]

@@ -1,7 +1,13 @@
 mod config_builder;
+pub(crate) mod interpolation;
 mod loader;
+mod representation;
+pub mod schema_coercion;
 mod secret;
 mod source;
+
+#[cfg(test)]
+mod tests;
 
 use std::{
     collections::HashMap,
@@ -13,6 +19,7 @@ use std::{
 
 pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
+pub use interpolation::interpolate_config_map_with_env_vars;
 use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
@@ -20,8 +27,7 @@ pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
 use super::{
-    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, format,
-    validation, vars,
+    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, validation,
 };
 use crate::signal;
 
@@ -31,6 +37,8 @@ static ALLOW_ENV_VAR_INTERPOLATION: OnceLock<bool> = OnceLock::new();
 
 /// Sets whether environment variable interpolation is enabled for the process.
 /// Must be called exactly once at startup before any config loading.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn set_env_var_interpolation(allow: bool) {
     ALLOW_ENV_VAR_INTERPOLATION
         .set(allow)
@@ -46,15 +54,15 @@ pub fn env_var_interpolation_enabled() -> bool {
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
         .read_dir()
-        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])
+        .map_err(|err| vec![format!("Could not read config dir: {path:?}, {err}.")])
 }
 
 pub(super) fn component_name<P: AsRef<Path> + Debug>(path: P) -> Result<String, Vec<String>> {
     path.as_ref()
         .file_stem()
         .and_then(|name| name.to_str())
-        .map(|name| name.to_string())
-        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
+        .map(std::string::ToString::to_string)
+        .ok_or_else(|| vec![format!("Couldn't get component name for file: {path:?}")])
 }
 
 pub(super) fn open_file<P: AsRef<Path> + Debug>(path: P) -> Option<File> {
@@ -88,11 +96,13 @@ pub fn merge_path_lists(
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
-    let starting_paths = if !config_paths.is_empty() {
-        config_paths.to_owned()
-    } else {
+    let starting_paths = if config_paths.is_empty() {
         default_config_paths()
+    } else {
+        config_paths.to_owned()
     };
 
     let mut paths = Vec::new();
@@ -122,7 +132,7 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
             }
             ConfigPath::Dir(_) => {
                 for path in matches {
-                    paths.push(ConfigPath::Dir(path))
+                    paths.push(ConfigPath::Dir(path));
                 }
             }
         }
@@ -140,12 +150,14 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     Some(paths)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
     let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
-        warn!("{}", warning);
+        warn!("{warning}");
     }
 
     Ok(config)
@@ -154,21 +166,15 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
 /// Loads a configuration from paths. Handle secret replacement and if a provider is present
 /// in the builder, the config is used as bootstrapping for a remote source. Otherwise,
 /// provider instantiation is skipped.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
-    let secrets = secrets_backends_loader
-        .retrieve_secrets(signal_handler)
-        .await
-        .map_err(|e| vec![e])?;
-
-    let mut builder = ConfigBuilderLoader::default()
-        .allow_empty(allow_empty)
-        .secrets(secrets)
-        .load_from_paths(config_paths)?;
+    let mut builder =
+        load_builder_from_paths_with_secrets(config_paths, signal_handler, allow_empty).await?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -182,6 +188,27 @@ pub async fn load_from_paths_with_provider_and_secrets(
     finalize_config(builder).await
 }
 
+/// Loads a `ConfigBuilder` from paths, resolving `SECRET[...]` placeholders
+/// from the configured backends first, like the run path does.
+pub(crate) async fn load_builder_from_paths_with_secrets(
+    config_paths: &[ConfigPath],
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    ConfigBuilderLoader::default()
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_paths(config_paths)
+}
+
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub async fn load_from_str_with_secrets(
     input: &str,
     format: Format,
@@ -210,7 +237,7 @@ async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> 
     validation::check_buffer_preconditions(&new_config).await?;
 
     for warning in build_warnings {
-        warn!("{}", warning);
+        warn!("{warning}");
     }
 
     Ok(new_config)
@@ -226,7 +253,7 @@ where
     L: Loader<T> + Process,
     R: std::io::Read,
 {
-    loader.load_from_str(input, format).map(|_| loader.take())
+    loader.load_from_str(input, format).map(|()| loader.take())
 }
 
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
@@ -251,14 +278,12 @@ where
                 ) {
                     Ok(()) => {}
                     Err(errs) => errors.extend(errs),
-                };
+                }
             }
-            ConfigPath::Dir(path) => {
-                match loader.load_from_dir(path) {
-                    Ok(()) => {}
-                    Err(errs) => errors.extend(errs),
-                };
-            }
+            ConfigPath::Dir(path) => match loader.load_from_dir(path) {
+                Ok(()) => {}
+                Err(errs) => errors.extend(errs),
+            },
         }
     }
 
@@ -269,19 +294,23 @@ where
     }
 }
 
-/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
+/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a JSON object.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
-) -> Result<toml::value::Table, Vec<String>> {
+) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
     let builder = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
-        warn!("{}", warning);
+        warn!("{warning}");
     }
 
     Ok(config)
@@ -296,7 +325,7 @@ fn load_from_inputs(
     for (input, format) in inputs {
         if let Err(errs) = load(input, format).and_then(|n| config.append(n)) {
             // TODO: add back paths
-            errors.extend(errs.iter().map(|e| e.to_string()));
+            errors.extend(errs.iter().cloned());
         }
     }
 
@@ -307,6 +336,8 @@ fn load_from_inputs(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn prepare_input<R: std::io::Read>(
     mut input: R,
     interpolate_env: bool,
@@ -329,12 +360,14 @@ pub fn prepare_input<R: std::io::Read>(
         {
             vars.insert("HOSTNAME".into(), hostname);
         }
-        vars::interpolate(&source_string, &vars)
+        interpolation::interpolate(&source_string, &vars)
     } else {
         Ok(source_string)
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
@@ -342,7 +375,7 @@ where
     // Via configurations that load from raw string, skip interpolation of env
     let with_vars = prepare_input(input, false)?;
 
-    format::deserialize(&with_vars, format)
+    representation::deserialize_config(&with_vars, format)
 }
 
 #[cfg(not(windows))]
@@ -354,7 +387,7 @@ fn default_path() -> PathBuf {
 fn default_path() -> PathBuf {
     let program_files =
         std::env::var("ProgramFiles").expect("%ProgramFiles% environment variable must be defined");
-    format!("{}\\Vector\\config\\vector.yaml", program_files).into()
+    format!("{program_files}\\Vector\\config\\vector.yaml").into()
 }
 
 fn default_config_paths() -> Vec<ConfigPath> {

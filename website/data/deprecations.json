@@ -1,29 +1,34 @@
 {
   "deprecations_pending": [
     {
-      "what": "`azure_monitor_logs` sink",
-      "deprecated_since": "0.54.0",
-      "description": "The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink,\nwhich uses the Azure Monitor Logs Ingestion API.\n\nUsers should migrate before Microsoft ends support for the old Data Collector API (scheduled\nfor September 2026)."
+      "what": "`aggregate_failed_updates` counter without the `_total` suffix",
+      "deprecated_since": "0.59.0",
+      "description": "The `aggregate` transform now also emits the failed-updates counter with the `_total` suffix, matching Vector's counter naming convention:\n\n- `aggregate_failed_updates_total`\n\nThe previous name without the `_total` suffix is deprecated and will be removed in a future release. Migrate any dashboards or alerts that reference:\n\n- `aggregate_failed_updates`"
     },
     {
-      "what": "Boolean syntax for the `compression` field in the `vector` sink",
-      "deprecated_since": "0.56.0",
-      "description": "The boolean syntax (`compression: true` / `compression: false`) is deprecated.\nUse the string syntax instead: `compression: \"gzip\"`, `compression: \"zstd\"`, or `compression: \"none\"`.\n\nThe `bool_or_vector_compression` deserializer will be removed once the boolean syntax is no longer supported."
+      "what": "Boolean shorthand for object-valued configuration options",
+      "deprecated_since": "0.60.0",
+      "description": "Boolean shorthand for object-valued configuration options is deprecated. Use the object form instead\nso that each setting has one consistent representation and the options being configured are explicit.\n\nExisting boolean values continue to work. Removal is not yet scheduled. We will give users at least\none month to migrate before removing this shorthand.\n\nThis applies to `healthcheck` on sinks, global and sink `acknowledgements`, `jetstream` on the NATS sink,\nand `acknowledgements` on the Splunk HEC source.\nOrdinary boolean options, such as `healthcheck.enabled`, are unaffected.\n\nPlease also see the [dedicated note for `use_otlp_decoding`](/deprecations/#opentelemetry-use_otlp_decoding).\n\n### Settings with an `enabled` field\n\nFor `healthcheck`, global and sink `acknowledgements`, NATS sink `jetstream`, and Splunk HEC source\n`acknowledgements`, replace the boolean with an object containing the same value in `enabled`.\nFor example, within a sink configuration, replace:\n\n```yaml\nhealthcheck: false\nacknowledgements: true\n```\n\nwith:\n\n```yaml\nhealthcheck:\n  enabled: false\nacknowledgements:\n  enabled: true\n```\n\nOther options in these objects retain their defaults. Use the same transformation for either `true`\nor `false`."
     },
     {
-      "what": "`buffer_byte_size` and `buffer_events` gauge metrics",
-      "deprecated_since": "0.53.0",
-      "description": "The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the\n`buffer_size_bytes` and `buffer_size_events` metrics."
+      "what": "legacy memory enrichment table counters without the `_total` suffix",
+      "deprecated_since": "0.59.0",
+      "description": "The memory enrichment table failure and TTL-expiration counters are now also emitted with the\n`_total` suffix, matching Vector's counter naming convention:\n\n- `memory_enrichment_table_failed_insertions_total`\n- `memory_enrichment_table_failed_reads_total`\n- `memory_enrichment_table_ttl_expirations_total`\n\nThe previous names without the `_total` suffix are deprecated and will be removed in a future\nrelease. Migrate any dashboards or alerts that reference:\n\n- `memory_enrichment_table_failed_insertions`\n- `memory_enrichment_table_failed_reads`\n- `memory_enrichment_table_ttl_expirations`"
     },
     {
-      "what": "`series_api_version: v1` option on the `datadog_metrics` sink",
-      "deprecated_since": "0.56.0",
-      "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
+      "what": "OpenTelemetry `use_otlp_decoding` configuration option",
+      "deprecated_since": "0.60.0",
+      "description": "<a id=\"opentelemetry-use_otlp_decoding\"></a>\n\nThe `opentelemetry` source's `use_otlp_decoding` option is deprecated.\nSwitch to `decoding` with `codec: otlp` to preserve the same behavior as `use_otlp_decoding: true`.\n\nTo preserve the OTLP representation of all signals, replace:\n\n```yaml\nuse_otlp_decoding: true\n```\n\nwith:\n\n```yaml\ndecoding:\n  codec: otlp\n```\n\nTo preserve OTLP only for selected signals, replace:\n\n```yaml\nuse_otlp_decoding:\n  logs: false\n  metrics: false\n  traces: true\n```\n\nwith:\n\n```yaml\ndecoding:\n  codec: otlp\n  signal_types: [\"traces\"]\n```\n\nExisting boolean and object settings still work, but produce a deprecation warning.\n\nWhen migrating:\n\n- Leave out `signal_types` to keep all signals in OTLP format. Any\n  types not included will remain in Vector's native format.\n- If you currently use `use_otlp_decoding: false`, remove it and leave out `decoding`. Native conversion\n  remains the default.\n- Use `codec: otlp` and the signal names `logs`, `metrics`, and `traces`. Other values are not supported.\n- Remove `use_otlp_decoding` when adding `decoding`. Setting both prevents Vector from starting."
     },
     {
-      "what": "`encoding` field on HTTP server sources",
-      "deprecated_since": "0.50.0",
-      "description": "The `encoding` field will be removed. Use `decoding` and `framing` instead."
+      "what": "Stable Vector artifacts hosted at `packages.timber.io`",
+      "deprecated_since": "0.59.0",
+      "description": "Stable Vector release archives and packages are now hosted in the public COSE\nrelease bucket. The `packages.timber.io/vector` URLs are deprecated and users should\nswitch to `install.datadoghq.com/vector` instead.\n\nStarting with Vector `0.59.0`, the Vector installer and the download\ninstructions on [vector.dev](https://vector.dev/download/) point to artifacts\nin the COSE bucket. Existing `packages.timber.io` URLs continue to work during\nthe deprecation period.\n\n| Artifact | Migration outcome |\n| --- | --- |\n| Stable Vector releases, installers, and package-manager downloads | Migrated to exact-version paths under `install.datadoghq.com/vector/<version>/`; stable `latest` or `.X` aliases are not provided |\n| `packages.timber.io/vector` versioned, `latest`, and version-alias URLs | Remain readable through December 31, 2026, and may be deleted at any time after that date |\n| Nightly and custom builds | Treated as transient artifacts that are superseded by stable releases, so existing builds are not migrated; future builds are published to `install.datadoghq.com` under `vector/nightly/` and `vector/custom/` |\n| Helm charts | [GitHub Release assets](https://github.com/vectordotdev/helm-charts/releases); `https://helm.vector.dev` remains the Helm repository index |\n| All other legacy artifacts | Not migrated and will be deleted |"
+    },
+    {
+      "what": "host `process_runtime` counter without the `_total` suffix",
+      "deprecated_since": "0.59.0",
+      "description": "The `host_metrics` source now also emits the process runtime counter with the `_total` suffix, matching Vector's counter naming convention:\n\n- `process_runtime_total`\n\nThe previous name without the `_total` suffix is deprecated and will be removed in a future release. Migrate any dashboards or alerts that reference:\n\n- `process_runtime`"
     },
     {
       "what": "Environment-variable and secret placeholders in non-string positions",
@@ -37,6 +42,48 @@
       "deprecated_since": "0.55.0",
       "removed_in": "0.56.0",
       "description": "The `greptimedb_metrics` and `greptimedb_logs` sinks drop support for GreptimeDB v0.x.\nUsers must upgrade their GreptimeDB instance to v1.x before upgrading Vector."
+    },
+    {
+      "what": "`encoding` field on HTTP server sources",
+      "deprecated_since": "0.50.0",
+      "removed_in": "0.58.0",
+      "description": "The `encoding` field will be removed. Use `decoding` and `framing` instead."
+    },
+    {
+      "what": "`buffer_byte_size` and `buffer_events` gauge metrics",
+      "deprecated_since": "0.53.0",
+      "removed_in": "0.58.0",
+      "description": "The `buffer_byte_size` and `buffer_events` gauges are deprecated in favor of the\n`buffer_size_bytes` and `buffer_size_events` metrics."
+    },
+    {
+      "what": "`azure_monitor_logs` sink",
+      "deprecated_since": "0.54.0",
+      "removed_in": "0.58.0",
+      "description": "The `azure_monitor_logs` sink is deprecated in favor of the new `azure_logs_ingestion` sink,\nwhich uses the Azure Monitor Logs Ingestion API.\n\nUsers should migrate before Microsoft ends support for the old Data Collector API (scheduled\nfor September 2026)."
+    },
+    {
+      "what": "Boolean syntax for the `compression` field in the `vector` sink",
+      "deprecated_since": "0.56.0",
+      "removed_in": "0.59.0",
+      "description": "The boolean syntax (`compression: true` / `compression: false`) is deprecated.\nUse the string syntax instead: `compression: \"gzip\"`, `compression: \"zstd\"`, or `compression: \"none\"`.\n\nThe `bool_or_vector_compression` deserializer will be removed once the boolean syntax is no longer supported."
+    },
+    {
+      "what": "`series_api_version: v1` option on the `datadog_metrics` sink",
+      "deprecated_since": "0.56.0",
+      "removed_in": "0.60.0",
+      "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."
+    },
+    {
+      "what": "omitting the `version` field on `influxdb_logs` and `influxdb_metrics` sinks",
+      "deprecated_since": "0.58.0",
+      "removed_in": "0.60.0",
+      "description": "The `version` field selects the InfluxDB API version whose settings are used. It will be required\nin a future release. Until then, when `version` is unset the version is inferred from the\nconfigured settings.\n\n- `version: \"1\"` uses the v1 settings: `database`, `consistency`, `retention_policy_name`,\n  `username`, and `password`.\n- `version: \"2\"` uses the v2 settings: `org`, `bucket`, and `token`.\n\nMigrate by adding `version: \"1\"` or `version: \"2\"` to match the settings already present:\n\n```yaml\nsinks:\n  my_sink:\n    type: influxdb_logs\n    version: \"2\"\n    org: my-org\n    bucket: vector-bucket\n    token: ${INFLUXDB_TOKEN}\n```"
+    },
+    {
+      "what": "scheme-less `address` and `routing.endpoints` values in the `vector` sink defaulting to `http`",
+      "deprecated_since": "0.59.0",
+      "removed_in": "0.61.0",
+      "description": "A `vector` sink endpoint such as `127.0.0.1` without an explicit scheme currently defaults to `http`.\nThis behavior is deprecated and will change to `https` in a future release.\nNote that when TLS is enabled, a scheme-less address already defaults to `https`.\n\nMigrate by specifying the scheme explicitly:\n\n```yaml\nsinks:\n  my_sink:\n    type: vector\n    address: http://127.0.0.1:6000\n```"
     }
   ]
 }

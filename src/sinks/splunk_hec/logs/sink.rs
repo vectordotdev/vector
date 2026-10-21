@@ -20,7 +20,7 @@ use crate::{
         },
         util::processed_event::ProcessedEvent,
     },
-    template::Template,
+    template::ConfinedTemplate,
 };
 
 // NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
@@ -30,9 +30,9 @@ pub struct HecLogsSink<S> {
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub indexed_fields: Vec<OwnedValuePath>,
     pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<String>,
@@ -42,9 +42,9 @@ pub struct HecLogsSink<S> {
 }
 
 pub struct HecLogData<'a> {
-    pub sourcetype: Option<&'a Template>,
-    pub source: Option<&'a Template>,
-    pub index: Option<&'a Template>,
+    pub sourcetype: Option<&'a ConfinedTemplate>,
+    pub source: Option<&'a ConfinedTemplate>,
+    pub index: Option<&'a ConfinedTemplate>,
     pub indexed_fields: &'a [OwnedValuePath],
     pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<&'a String>,
@@ -135,7 +135,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build HEC Logs request: {:?}.", e);
+                        error!("Failed to build HEC Logs request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),
@@ -167,9 +167,9 @@ where
 /// metadata omission.
 fn has_confined_partition_error(
     event: &Event,
-    source: Option<&Template>,
-    sourcetype: Option<&Template>,
-    index: Option<&Template>,
+    source: Option<&ConfinedTemplate>,
+    sourcetype: Option<&ConfinedTemplate>,
+    index: Option<&ConfinedTemplate>,
 ) -> bool {
     let mut confined = false;
     for (tpl, field) in [
@@ -205,17 +205,17 @@ pub(super) struct Partitioned {
 
 #[derive(Default)]
 struct EventPartitioner {
-    pub sourcetype: Option<Template>,
-    pub source: Option<Template>,
-    pub index: Option<Template>,
+    pub sourcetype: Option<ConfinedTemplate>,
+    pub source: Option<ConfinedTemplate>,
+    pub index: Option<ConfinedTemplate>,
     pub host_key: Option<OptionalTargetPath>,
 }
 
 impl EventPartitioner {
     const fn new(
-        sourcetype: Option<Template>,
-        source: Option<Template>,
-        index: Option<Template>,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
         host_key: Option<OptionalTargetPath>,
     ) -> Self {
         Self {
@@ -237,7 +237,7 @@ impl Partitioner for EventPartitioner {
                 error,
                 field: Some(field),
                 drop_event: false,
-            })
+            });
         };
 
         let source = self.source.as_ref().and_then(|source| {
@@ -268,7 +268,7 @@ impl Partitioner for EventPartitioner {
             log_schema().host_key_target_path(),
         )
         .and_then(|path| item.event.get(&path))
-        .and_then(|value| value.as_str().map(|s| s.to_string()));
+        .and_then(|value| value.to_str_lossy().map(|s| s.to_string()));
 
         Some(Partitioned {
             token: item.event.metadata().splunk_hec_token(),
@@ -366,7 +366,12 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
                     if let Some(key) = data.timestamp_nanos_key {
                         log.try_insert(event_path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
                     }
-                    Some((ts.timestamp_millis() as f64) / 1000f64)
+                    #[expect(
+                        clippy::cast_precision_loss,
+                        reason = "HEC timestamps use floating-point seconds."
+                    )]
+                    let time = (ts.timestamp_millis() as f64) / 1000f64;
+                    Some(time)
                 }
                 Some(value) => {
                     emit!(SplunkEventTimestampInvalidType {
@@ -419,7 +424,7 @@ impl EventCount for HecProcessedEvent {
 #[cfg(test)]
 mod pre_check_tests {
     use super::*;
-    use crate::template::ConfinementConfig;
+    use crate::template::{ConfinementConfig, Template};
     use vector_lib::event::LogEvent;
     use vrl::event_path;
 

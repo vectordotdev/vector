@@ -67,7 +67,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
@@ -134,6 +134,7 @@ jobs:
             "mongodb",
             "nats",
             "nginx",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",
@@ -155,7 +156,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
@@ -183,14 +184,13 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh int ${{ matrix.service }}
+          command: vdev integration run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   e2e-tests:
     needs:
       - prep-pr
       - build-test-runner
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     permissions:
@@ -206,7 +206,8 @@ jobs:
             "datadog-metrics",
             "opentelemetry-logs",
             "opentelemetry-metrics",
-            "opentelemetry-metrics-native"
+            "opentelemetry-metrics-native",
+            "opentelemetry-traces"
           ]
     steps:
       - name: Evaluate run condition
@@ -221,7 +222,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
@@ -249,9 +250,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+          command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   update-pr-status:
     name: Signal result to PR
@@ -278,7 +277,7 @@ jobs:
         uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: (PR review) Submit PR result as success

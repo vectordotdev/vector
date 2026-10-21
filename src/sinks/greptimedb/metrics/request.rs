@@ -12,7 +12,7 @@ use crate::sinks::{
     prelude::*,
 };
 
-/// GreptimeDBGrpcRequest is a wrapper around the RowInsertRequests
+/// `GreptimeDBGrpcRequest` is a wrapper around the `RowInsertRequests`
 /// that is used to send metrics to GreptimeDB.
 /// It also contains the finalizers and metadata that are used to
 #[derive(Clone)]
@@ -29,15 +29,14 @@ impl GreptimeDBGrpcRequest {
         let mut finalizers = EventFinalizers::default();
         let mut request_metadata_builder = RequestMetadataBuilder::default();
 
-        let sizer = GreptimeDBBatchSizer;
         let mut estimated_request_size = 0;
-        for mut metric in metrics.into_iter() {
+        for mut metric in metrics {
             finalizers.merge(metric.take_finalizers());
-            estimated_request_size += sizer.estimated_size_of(&metric);
+            estimated_request_size += GreptimeDBBatchSizer::estimated_size_of(&metric);
 
-            request_metadata_builder.track_event(metric.clone());
+            request_metadata_builder.track_event(&metric);
 
-            items.push(metric_to_insert_request(metric, options));
+            items.push(metric_to_insert_request(&metric, options));
         }
 
         let request_size =
@@ -67,7 +66,7 @@ impl MetaDescriptive for GreptimeDBGrpcRequest {
     }
 }
 
-/// GreptimeDBGrpcBatchOutput is the output of the [`GreptimeDBGrpcService`]
+/// `GreptimeDBGrpcBatchOutput` is the output of the [`GreptimeDBGrpcService`]
 #[derive(Debug)]
 pub struct GreptimeDBGrpcBatchOutput {
     pub _item_count: u32,
@@ -88,7 +87,7 @@ impl DriverResponse for GreptimeDBGrpcBatchOutput {
     }
 }
 
-/// GreptimeDBGrpcRetryLogic is the retry logic for the [`GreptimeDBGrpcSink`]
+/// `GreptimeDBGrpcRetryLogic` is the retry logic for the [`GreptimeDBGrpcSink`]
 #[derive(Clone, Default)]
 pub struct GreptimeDBGrpcRetryLogic;
 

@@ -1,0 +1,18 @@
+sinks:
+  my_sink_id:
+    type: azure_blob
+    inputs:
+      - my-source-or-transform-id
+    blob_append_uuid: false
+    blob_prefix: blob/%F/
+    blob_type: block
+    compression: gzip
+    connection_string: DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net
+    container_name: my-logs
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    tags:
+      Classification: confidential
+      PHI: "True"
+      Project: Blue

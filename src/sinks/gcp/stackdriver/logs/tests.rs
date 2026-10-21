@@ -5,15 +5,16 @@ use std::collections::HashMap;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{future::ready, stream};
-use http::Uri;
 use indoc::indoc;
-use serde::Deserialize;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, value};
 
 use super::{
-    config::{StackdriverConfig, StackdriverResource, default_endpoint},
-    encoder::StackdriverLogsEncoder,
+    config::{StackdriverConfig, default_endpoint},
+    encoder::{
+        StackdriverLabelConfig as EncoderLabelConfig, StackdriverLogsEncoder,
+        StackdriverResource as EncoderResource,
+    },
 };
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -21,21 +22,37 @@ use crate::{
     gcp::GcpAuthenticator,
     sinks::{
         gcp::stackdriver::logs::{
-            config::{StackdriverLabelConfig, StackdriverLogName},
-            encoder::remap_severity,
+            config::StackdriverLogName, encoder::remap_severity,
             service::StackdriverLogsServiceRequestBuilder,
         },
         prelude::*,
         util::{
-            encoding::Encoder as _,
-            http::{HttpRequest, HttpServiceRequestBuilder},
+            HttpEndpoint, encoding::Encoder as _, http::HttpRequest,
+            http_v1::HttpServiceRequestBuilder,
         },
     },
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };
+
+// Tests exercise the encoder, not confinement; build a checkerless confined template.
+fn confined(s: &str) -> ConfinedTemplate {
+    Template::try_from(s)
+        .unwrap()
+        .confine(
+            &ConfinementConfig::unconfined(),
+            StackdriverConfig::NAME,
+            "template",
+        )
+        .unwrap()
+}
+
+fn unconfined(s: &str) -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from(s).unwrap()
+}
 
 #[test]
 fn generate_config() {
@@ -46,17 +63,15 @@ fn generate_config() {
 async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-    let config = StackdriverConfig::generate_config().to_string();
-    let mut config = StackdriverConfig::deserialize(
-        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-    )
-    .expect("config should be valid");
+    let mut config: StackdriverConfig =
+        serde_json::from_value(StackdriverConfig::generate_config())
+            .expect("config should be valid");
 
     // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
     // Metadata API, which we clearly don't have in unit tests. :)
     config.auth.credentials_path = None;
     config.auth.api_key = Some("fake".to_string().into());
-    config.endpoint = mock_endpoint.to_string();
+    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -78,26 +93,20 @@ fn encode_valid() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("{{ log_id }}").unwrap(),
+        confined("{{ log_id }}"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
             labels: HashMap::from([(
                 "config_user_label_1".to_owned(),
-                Template::try_from("config_user_value_1").unwrap(),
+                unconfined("config_user_value_1"),
             )]),
         },
-        StackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([
-                (
-                    "namespace".to_owned(),
-                    Template::try_from("office").unwrap(),
-                ),
-                (
-                    "node_id".to_owned(),
-                    Template::try_from("{{ node_id }}").unwrap(),
-                ),
+                ("namespace".to_owned(), unconfined("office")),
+                ("node_id".to_owned(), unconfined("{{ node_id }}")),
             ]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
@@ -142,21 +151,15 @@ fn encode_inserts_timestamp() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
-            labels: HashMap::from([(
-                "config_user_label_1".to_owned(),
-                Template::try_from("value_1").unwrap(),
-            )]),
+            labels: HashMap::from([("config_user_label_1".to_owned(), unconfined("value_1"))]),
         },
-        StackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
@@ -217,26 +220,18 @@ fn severity_remaps_strings() {
 
 #[tokio::test]
 async fn correct_request() {
-    let uri: Uri = default_endpoint().parse().unwrap();
-
     let transformer = Transformer::default();
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
-            labels: HashMap::from([(
-                "config_user_label_1".to_owned(),
-                Template::try_from("value_1").unwrap(),
-            )]),
+            labels: HashMap::from([("config_user_label_1".to_owned(), unconfined("value_1"))]),
         },
-        StackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         None,
     );
@@ -252,7 +247,7 @@ async fn correct_request() {
     let body = Bytes::copy_from_slice(&writer);
 
     let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
-        uri: uri.clone(),
+        endpoint: default_endpoint(),
         auth: GcpAuthenticator::None,
     };
 
@@ -317,36 +312,37 @@ async fn correct_request() {
 
 #[tokio::test]
 async fn fails_missing_creds() {
-    let config: StackdriverConfig = serde_yaml::from_str(indoc! {r#"
+    let config: StackdriverConfig = serde_yaml::from_str(indoc! {r"
             project_id: project
             log_id: testlogs
             resource:
               type: generic_node
               namespace: office
-        "#})
+        "})
     .unwrap();
-    if config.build(SinkContext::default()).await.is_ok() {
-        panic!("config.build failed to error");
-    }
+    assert!(
+        config.build(SinkContext::default()).await.is_err(),
+        "config.build failed to error"
+    );
 }
 
 #[test]
 fn fails_invalid_log_names() {
-    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r"
             log_id: testlogs
             resource:
               type: generic_node
               namespace: office
-        "#})
+        "})
     .expect_err("Config parsing failed to error with missing ids");
 
-    serde_yaml::from_str::<StackdriverConfig>(indoc! {r#"
+    serde_yaml::from_str::<StackdriverConfig>(indoc! {r"
             project_id: project
             folder_id: folder
             log_id: testlogs
             resource:
               type: generic_node
               namespace: office
-        "#})
+        "})
     .expect_err("Config parsing failed to error with extraneous ids");
 }

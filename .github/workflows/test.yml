@@ -33,20 +33,34 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' || needs.changes.outputs.prettier == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
           prettier: true
       - run: make check-fmt
 
+  check-actionlint:
+    name: Check GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.actionlint == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          vdev: false
+          actionlint: true
+      - run: make check-actionlint
+
   check-clippy:
     name: Check clippy
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -73,7 +87,7 @@ jobs:
     if: ${{ needs.changes.outputs.scripts == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           mold: false
@@ -82,11 +96,11 @@ jobs:
 
   check-events:
     name: Check events
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           mold: false
@@ -99,7 +113,7 @@ jobs:
     if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           mold: false
@@ -113,7 +127,7 @@ jobs:
     if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -128,7 +142,7 @@ jobs:
     if: ${{ needs.changes.outputs.markdown == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -137,40 +151,28 @@ jobs:
 
   check-generated-docs:
     name: Check Generated Docs
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
           protoc: true
           cue: true
+          prettier: true
           libsasl2: true
           cargo-cache: true
       - run: make check-generated-docs
 
-  check-rust-docs:
-    name: Check Rust Docs
-    runs-on: ubuntu-24.04-8core
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
-    needs: changes
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: ./.github/actions/setup
-        with:
-          rust: true
-          cargo-cache: true
-      - run: cd rust-doc && make ci-docs-build
-
   test-vrl:
     name: VRL - Linux
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -181,11 +183,11 @@ jobs:
 
   build-vrl-playground:
     name: Build VRL Playground
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -195,6 +197,14 @@ jobs:
           rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
+  test-website:
+    if: ${{ github.event_name == 'merge_group' && (needs.changes.outputs.website_tests == 'true' || needs.changes.outputs.test-yml == 'true') }}
+    needs: changes
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/website-tests.yml
+
   all-checks:
     name: Test Suite
     runs-on: ubuntu-24.04
@@ -202,6 +212,7 @@ jobs:
     needs:
       - changes
       - check-fmt
+      - check-actionlint
       - check-clippy
       - test
       - check-scripts
@@ -210,9 +221,9 @@ jobs:
       - check-docs
       - check-markdown
       - check-generated-docs
-      - check-rust-docs
       - test-vrl
       - build-vrl-playground
+      - test-website
     steps:
       - name: Check all jobs status
         run: |

@@ -2,10 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::{
-    Uri,
-    header::{HeaderName, HeaderValue},
-};
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -16,11 +13,15 @@ use vector_lib::{
     configurable::configurable_component,
     event::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
+    stream::BatcherSettings,
 };
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::{HttpClient, get_http_scheme_from_uri},
@@ -36,13 +37,13 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
-            partitioner::KeyPartitioner, request_builder::EncodeResult,
-            service::TowerRequestConfigDefaults, timezone_to_offset,
+            BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint, RequestBuilder,
+            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
-    template::{ConfinementConfig, Template, TemplateParseError},
+    template::{ConfinedTemplate, ConfinementConfig, Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -92,7 +93,6 @@ pub struct GcsSinkConfig {
     ///
     /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
     #[configurable(metadata(docs::additional_props_description = "A key/value pair."))]
-    #[configurable(metadata(docs::advanced))]
     metadata: Option<HashMap<String, String>>,
 
     /// A prefix to apply to all object keys.
@@ -107,7 +107,6 @@ pub struct GcsSinkConfig {
         docs::examples = "year=%Y/month=%m/day=%d/",
         docs::examples = "application_id={{ application_id }}/date=%F/"
     ))]
-    #[configurable(metadata(docs::advanced))]
     key_prefix: Option<String>,
 
     /// The timestamp format for the time component of the object key.
@@ -127,7 +126,6 @@ pub struct GcsSinkConfig {
     ///
     /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default = "default_time_format")]
-    #[configurable(metadata(docs::advanced))]
     filename_time_format: String,
 
     /// Whether or not to append a UUID v4 token to the end of the object key.
@@ -139,13 +137,11 @@ pub struct GcsSinkConfig {
     /// This ensures there are no name collisions, and can be useful in high-volume workloads where
     /// object keys must be unique.
     #[serde(default = "crate::serde::default_true")]
-    #[configurable(metadata(docs::advanced))]
     filename_append_uuid: bool,
 
     /// The filename extension to use in the object key.
     ///
     /// If not specified, the extension is determined by the compression scheme used.
-    #[configurable(metadata(docs::advanced))]
     filename_extension: Option<String>,
 
     #[serde(flatten)]
@@ -157,7 +153,6 @@ pub struct GcsSinkConfig {
     ///
     /// Some cloud storage API clients and browsers handle decompression transparently, so
     /// depending on how they are accessed, files may not always appear to be compressed.
-    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
 
@@ -186,7 +181,6 @@ pub struct GcsSinkConfig {
     #[configurable(metadata(docs::examples = "no-transform"))]
     cache_control: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
@@ -194,19 +188,16 @@ pub struct GcsSinkConfig {
     #[configurable(metadata(docs::examples = "http://localhost:9000"))]
     #[configurable(validation(format = "uri"))]
     #[serde(default = "default_endpoint")]
-    endpoint: String,
+    endpoint: HttpEndpoint,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig<GcsTowerRequestConfigDefaults>,
 
     #[serde(flatten)]
     auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -214,7 +205,6 @@ pub struct GcsSinkConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
 
@@ -229,38 +219,40 @@ fn default_time_format() -> String {
 #[cfg(test)]
 fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
     GcsSinkConfig {
-        bucket: Default::default(),
-        acl: Default::default(),
-        storage_class: Default::default(),
-        metadata: Default::default(),
-        key_prefix: Default::default(),
+        bucket: String::default(),
+        acl: Option::default(),
+        storage_class: Option::default(),
+        metadata: Option::default(),
+        key_prefix: Option::default(),
         filename_time_format: default_time_format(),
         filename_append_uuid: true,
-        filename_extension: Default::default(),
-        content_type: Default::default(),
-        content_encoding: Default::default(),
-        cache_control: Default::default(),
+        filename_extension: Option::default(),
+        content_type: Option::default(),
+        content_encoding: Option::default(),
+        cache_control: Option::default(),
         encoding,
         compression: Compression::gzip_default(),
-        batch: Default::default(),
-        endpoint: Default::default(),
-        request: Default::default(),
-        auth: Default::default(),
-        tls: Default::default(),
-        acknowledgements: Default::default(),
-        timezone: Default::default(),
+        batch: BatchConfig::default(),
+        endpoint: default_endpoint(),
+        request: TowerRequestConfig::default(),
+        auth: GcpAuthConfig::default(),
+        tls: Option::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        timezone: Option::default(),
         confinement: ConfinementConfig::default(),
     }
 }
 
 impl GenerateConfig for GcsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            bucket = "my-bucket"
-            credentials_path = "/path/to/credentials.json"
-            framing.method = "newline_delimited"
-            encoding.codec = "json"
-        "#})
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r"
+            bucket: my-bucket
+            credentials_path: /path/to/credentials.json
+            framing:
+              method: newline_delimited
+            encoding:
+              codec: json
+        "})
         .unwrap()
     }
 }
@@ -268,22 +260,6 @@ impl GenerateConfig for GcsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
-        let base_url = format!("{}/{}/", self.endpoint, self.bucket);
-        let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
-        let healthcheck = build_healthcheck(
-            self.bucket.clone(),
-            client.clone(),
-            base_url.clone(),
-            auth.clone(),
-        )?;
-        auth.spawn_regenerate_token();
-        let sink = self.build_sink(client, base_url, auth, cx)?;
-        Ok((sink, healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -297,21 +273,66 @@ impl SinkConfig for GcsSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
+impl ValidatedSink for GcsSinkConfig {
+    type Validated = ValidatedGcsSink;
+
+    fn validate(&self) -> crate::Result<ValidatedGcsSink> {
+        self.encoding.validate()?;
+        let base_url = self.endpoint.append_path(&format!("{}/", self.bucket))?;
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let key_prefix_template = self.key_prefix_template()?;
+
+        Ok(ValidatedGcsSink {
+            base_url,
+            batch_settings,
+            key_prefix_template,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedGcsSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedGcsSink { base_url, .. } = validated;
+
+        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls, cx.proxy())?;
+        let healthcheck = build_healthcheck(
+            self.bucket.clone(),
+            client.clone(),
+            base_url.clone(),
+            auth.clone(),
+        );
+        auth.spawn_regenerate_token();
+        let sink = self.build_sink(client, base_url.clone(), auth, &cx, validated)?;
+        Ok((sink, healthcheck))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedGcsSink {
+    base_url: HttpEndpoint,
+    batch_settings: BatcherSettings,
+    key_prefix_template: ConfinedTemplate,
+}
+
 impl GcsSinkConfig {
     fn build_sink(
         &self,
         client: HttpClient,
-        base_url: String,
+        base_url: HttpEndpoint,
         auth: GcpAuthenticator,
-        cx: SinkContext,
+        cx: &SinkContext,
+        validated: &ValidatedGcsSink,
     ) -> crate::Result<VectorSink> {
         let request = self.request.into_settings();
 
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let partitioner = KeyPartitioner::new(validated.key_prefix_template.clone(), None);
 
-        let partitioner = self.key_partitioner()?;
-
-        let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
+        let protocol = get_http_scheme_from_uri(base_url.as_uri());
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
@@ -319,16 +340,27 @@ impl GcsSinkConfig {
 
         let request_settings = RequestSettings::new(self, cx)?;
 
-        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, protocol);
+        let sink = GcsSink::new(
+            svc,
+            request_settings,
+            partitioner,
+            validated.batch_settings,
+            protocol,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
+    #[cfg(test)]
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
+        let tpl = self.key_prefix_template()?;
+        Ok(KeyPartitioner::new(tpl, None))
+    }
+
+    fn key_prefix_template(&self) -> crate::Result<ConfinedTemplate> {
         let tpl = Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
             .context(KeyPrefixTemplateSnafu)?;
-        let tpl = tpl.confine(&self.confinement, Self::NAME, "key_prefix")?;
-        Ok(KeyPartitioner::new(tpl, None))
+        tpl.confine(&self.confinement, Self::NAME, "key_prefix")
     }
 }
 
@@ -396,13 +428,13 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
             if self.append_uuid {
                 let uuid = Uuid::new_v4();
-                format!("{}-{}", seconds, uuid.hyphenated())
+                format!("{seconds}-{}", uuid.hyphenated())
             } else {
                 seconds.to_string()
             }
         };
 
-        let key = format!("{}{}.{}", key, filename, self.extension);
+        let key = format!("{key}{filename}.{}", self.extension);
         let body = payload.into_payload();
 
         GcsRequest {
@@ -423,7 +455,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 }
 
 impl RequestSettings {
-    fn new(config: &GcsSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+    fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -449,16 +481,15 @@ impl RequestSettings {
             .as_ref()
             .map(|cc| HeaderValue::from_str(cc))
             .transpose()?;
-        let metadata = config
-            .metadata
-            .as_ref()
-            .map(|metadata| {
+        let metadata = config.metadata.as_ref().map_or_else(
+            || Ok(vec![]),
+            |metadata| {
                 metadata
                     .iter()
                     .map(make_header)
                     .collect::<Result<Vec<_>, _>>()
-            })
-            .unwrap_or_else(|| Ok(vec![]))?;
+            },
+        )?;
         let extension = config
             .filename_extension
             .clone()
@@ -524,6 +555,25 @@ mod tests {
         crate::test_util::test_generate_config::<GcsSinkConfig>();
     }
 
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config = GcsSinkConfig {
+            bucket: "my-bucket".into(),
+            key_prefix: Some("date=%F/".into()),
+            endpoint: HttpEndpoint::parse("https://storage.googleapis.com")
+                .expect("valid endpoint"),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.base_url.to_string(),
+            "https://storage.googleapis.com/my-bucket/"
+        );
+        assert_eq!(validated.key_prefix_template.to_string(), "date=%F/");
+    }
+
     #[tokio::test]
     async fn component_spec_compliance() {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
@@ -534,14 +584,18 @@ mod tests {
         let client =
             HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
 
-        let config =
-            default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into());
+        let config = GcsSinkConfig {
+            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+            ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+        };
+        let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
-                mock_endpoint.to_string(),
+                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
-                context,
+                &context,
+                &validated,
             )
             .expect("failed to build sink");
 
@@ -570,7 +624,7 @@ mod tests {
         assert_eq!(key, "key: value");
     }
 
-    fn request_settings(sink_config: &GcsSinkConfig, context: SinkContext) -> RequestSettings {
+    fn request_settings(sink_config: &GcsSinkConfig, context: &SinkContext) -> RequestSettings {
         RequestSettings::new(sink_config, context).expect("Could not create request settings")
     }
 
@@ -600,7 +654,7 @@ mod tests {
         let mut byte_size = GroupedCountByteSize::new_untagged();
         byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         let (metadata, metadata_request_builder, _events) =
             request_settings.split_input((key, vec![log]));
         let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
@@ -632,7 +686,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should default to encoder's content type which is "text/plain" for text codec
         assert_eq!(
             request_settings.content_type.to_str().unwrap(),
@@ -648,7 +702,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should use custom content type
         assert_eq!(
             request_settings.content_type.to_str().unwrap(),
@@ -665,7 +719,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = RequestSettings::new(&sink_config, &context);
         // Should return an error, not panic
         assert!(result.is_err());
     }
@@ -679,7 +733,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should default to compression's content encoding which is "gzip"
         assert_eq!(
             request_settings.content_encoding.unwrap().to_str().unwrap(),
@@ -696,7 +750,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should be None when compression is None
         assert!(request_settings.content_encoding.is_none());
     }
@@ -710,7 +764,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should use custom content encoding
         assert_eq!(
             request_settings.content_encoding.unwrap().to_str().unwrap(),
@@ -727,7 +781,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = RequestSettings::new(&sink_config, &context);
         // Should return an error, not panic
         assert!(result.is_err());
     }
@@ -737,12 +791,12 @@ mod tests {
         let context = SinkContext::default();
         let sink_config = GcsSinkConfig {
             // Empty string to disable content encoding header even with compression
-            content_encoding: Some("".to_string()),
+            content_encoding: Some(String::new()),
             compression: Compression::gzip_default(),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should use empty content encoding (overriding the compression default)
         assert_eq!(
             request_settings.content_encoding.unwrap().to_str().unwrap(),
@@ -758,7 +812,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should be None by default
         assert!(request_settings.cache_control.is_none());
     }
@@ -771,7 +825,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         assert_eq!(
             request_settings.cache_control.unwrap().to_str().unwrap(),
             "no-transform"
@@ -787,7 +841,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = RequestSettings::new(&sink_config, &context);
         // Should return an error, not panic
         assert!(result.is_err());
     }

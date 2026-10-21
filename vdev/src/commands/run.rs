@@ -1,6 +1,6 @@
 use std::{path::PathBuf, process::Command};
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Args;
 
 use crate::{app::CommandExt as _, utils::features};
@@ -10,11 +10,11 @@ use crate::{app::CommandExt as _, utils::features};
 #[command()]
 pub struct Cli {
     /// Build and run `vector` in debug mode (default)
-    #[arg(long, default_value_t = true)]
+    #[arg(long)]
     debug: bool,
 
     /// Build and run `vector` in release mode
-    #[arg(long)]
+    #[arg(long, conflicts_with = "debug")]
     release: bool,
 
     /// Name an additional feature to add to the build
@@ -30,15 +30,18 @@ pub struct Cli {
 
 impl Cli {
     pub(super) fn exec(self) -> Result<()> {
-        if self.debug && self.release {
-            bail!("Can only set one of `--debug` and `--release`");
-        }
-
         let mut features = features::load_and_extract(&self.config)?;
         features.extend(self.feature);
         let features = features.join(",");
         let mut command = Command::new("cargo");
-        command.args(["run", "--no-default-features", "--features", &features]);
+        command.args([
+            "run",
+            "--package",
+            "vector",
+            "--no-default-features",
+            "--features",
+            &features,
+        ]);
         if self.release {
             command.arg("--release");
         }

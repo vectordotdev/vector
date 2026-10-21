@@ -17,7 +17,6 @@ use crate::{
     event::Event,
     http::KeepaliveConfig,
     internal_events::PrometheusRemoteWriteParseError,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, decompress_body, http::HttpMethod},
@@ -56,23 +55,17 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(metadata(docs::examples = "/remote-write"))]
     path: String,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
 
     /// Defines the behavior for handling conflicting metric metadata.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -80,13 +73,13 @@ pub struct PrometheusRemoteWriteConfig {
     ///
     /// When enabled, any metric sample with a NaN value will be filtered out
     /// during parsing, preventing downstream processing of invalid metrics.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     skip_nan_values: bool,
 }
 
 impl PrometheusRemoteWriteConfig {
     #[cfg(test)]
+    #[must_use]
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
@@ -106,8 +99,8 @@ fn default_path() -> String {
 }
 
 impl GenerateConfig for PrometheusRemoteWriteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "127.0.0.1:9090".parse().unwrap(),
             path: default_path(),
             tls: None,
@@ -223,7 +216,7 @@ mod test {
     use crate::{
         SourceSender,
         config::{SinkConfig, SinkContext},
-        sinks::prometheus::remote_write::RemoteWriteConfig,
+        sinks::{prometheus::remote_write::RemoteWriteConfig, util::HttpEndpoint},
         test_util::{self, wait_for_tcp},
         tls::MaybeTlsSettings,
     };
@@ -255,7 +248,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: tls.clone(),
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -268,7 +261,8 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("{}://localhost:{}/", proto, address.port()),
+            endpoint: HttpEndpoint::parse(&format!("{proto}://localhost:{}/", address.port()))
+                .unwrap(),
             tls: tls.map(|tls| tls.options),
             ..Default::default()
         };
@@ -341,7 +335,7 @@ mod test {
         // Send the request via HTTP POST
         let client = reqwest::Client::new();
         let response = client
-            .post(format!("http://localhost:{}{}", port, default_path()))
+            .post(format!("http://localhost:{port}{}", default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)
@@ -428,7 +422,7 @@ mod test {
     async fn send_request(port: u16, request_body: Vec<u8>) -> reqwest::Response {
         let client = reqwest::Client::new();
         client
-            .post(format!("http://localhost:{}{}", port, default_path()))
+            .post(format!("http://localhost:{port}{}", default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)
@@ -451,7 +445,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -464,7 +458,8 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("http://localhost:{}/", address.port()),
+            endpoint: HttpEndpoint::parse(&format!("http://localhost:{}/", address.port()))
+                .unwrap(),
             ..Default::default()
         };
         let (sink, _) = sink
@@ -523,7 +518,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: true,
@@ -576,7 +571,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we only received the valid metric (NaN metric should be filtered)
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -594,7 +589,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -647,7 +642,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received both metrics (including NaN metric)
-        let mut output = test_util::collect_ready(rx).await;
+        let mut output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 2);
 
         // Sort by name for predictable testing
@@ -679,7 +674,7 @@ mod test {
             path: "/api/v1/write".to_string(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -692,7 +687,11 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("http://localhost:{}/api/v1/write", address.port()),
+            endpoint: HttpEndpoint::parse(&format!(
+                "http://localhost:{}/api/v1/write",
+                address.port()
+            ))
+            .unwrap(),
             ..Default::default()
         };
         let (sink, _) = sink
@@ -728,7 +727,7 @@ mod test {
             path: "/api/v1/write".to_string(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -768,7 +767,7 @@ mod test {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -784,7 +783,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received the metric data
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -802,7 +801,7 @@ mod test {
             path: "/api/v1/write".to_string(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: true,
@@ -865,7 +864,7 @@ mod test {
         );
 
         // Verify we received the metric data
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -938,7 +937,7 @@ mod integration_tests {
             path: default_path(),
             auth: None,
             tls: None,
-            metadata_conflict_strategy: Default::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,

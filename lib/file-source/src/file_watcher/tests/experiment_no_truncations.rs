@@ -28,7 +28,7 @@ async fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
 
     let mut fwfiles: Vec<FileWatcherFile> = vec![FileWatcherFile::new()];
     let mut read_index = 0;
-    for action in actions.iter() {
+    for action in &actions {
         match *action {
             FileWatcherAction::DeleteFile => {
                 _ = fs::remove_file(&path);
@@ -68,12 +68,10 @@ async fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
                         }) if line.bytes.is_empty() => {
                             attempts -= 1;
                             assert!(fwfiles[read_index].read_line().is_none());
-                            continue;
                         }
                         Ok(RawLineResult { raw_line: None, .. }) => {
                             attempts -= 1;
                             assert!(fwfiles[read_index].read_line().is_none());
-                            continue;
                         }
                         Ok(RawLineResult {
                             raw_line: Some(line),

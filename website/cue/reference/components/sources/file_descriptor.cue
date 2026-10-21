@@ -32,7 +32,6 @@ components: sources: file_descriptor: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

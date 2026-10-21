@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: databend
+    inputs:
+      - my-source-or-transform-id
+    endpoint: databend://localhost:8000/default?sslmode=disable
+    table: mytable

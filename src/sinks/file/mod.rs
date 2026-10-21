@@ -30,7 +30,9 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{
@@ -42,7 +44,7 @@ use crate::{
         path_confinement::{ConfineError, PathConfinement},
         timezone_to_offset,
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 mod bytes_path;
@@ -58,7 +60,7 @@ pub struct FileSinkConfig {
     /// File path to write events to.
     ///
     /// Compression format extension must be explicit.
-    #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log"))]
+    #[configurable(metadata(docs::examples = "/var/log/vector/vector-%Y-%m-%d.log"))]
     #[configurable(metadata(
         docs::examples = "/tmp/application-{{ application_id }}-%Y-%m-%d.log"
     ))]
@@ -66,7 +68,7 @@ pub struct FileSinkConfig {
     #[configurable(metadata(
         docs::warnings = "Rendered paths are confined to `base_dir` (derived from the literal prefix of `path` when unset). See the `base_dir` option."
     ))]
-    pub path: Template,
+    pub path: UnconfinedTemplate,
 
     /// Directory under which all rendered `path` values must resolve.
     ///
@@ -96,11 +98,9 @@ pub struct FileSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -108,15 +108,12 @@ pub struct FileSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: FileInternalMetricsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub truncate: FileTruncateConfig,
 }
@@ -138,16 +135,16 @@ pub struct FileTruncateConfig {
 }
 
 impl GenerateConfig for FileSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
+            path: UnconfinedTemplate::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-            compression: Default::default(),
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            internal_metrics: Default::default(),
-            truncate: Default::default(),
+            compression: Compression::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         })
@@ -243,17 +240,6 @@ impl OutFile {
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx)?;
-        Ok((
-            super::VectorSink::from_event_streamsink(sink),
-            future::ok(()).boxed(),
-        ))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -267,8 +253,59 @@ impl SinkConfig for FileSinkConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedFileSink {
+    transformer: Transformer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for FileSinkConfig {
+    type Validated = ValidatedFileSink;
+
+    fn validate(&self) -> crate::Result<ValidatedFileSink> {
+        self.encoding.validate()?;
+        let transformer = self.encoding.transformer();
+
+        // Pure path-confinement checks. `PathConfinement` itself is not
+        // retained (it is not `Clone`), so `build` reconstructs it from the
+        // same inputs; running the checks here lets `vector validate
+        // --no-environment` catch invalid routing paths and relative
+        // `base_dir`s.
+        if let Some(base) = self.base_dir.as_ref()
+            && base.is_relative()
+        {
+            return Err(Box::new(
+                crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
+                    path: base.clone(),
+                },
+            ));
+        }
+        if !self
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            PathConfinement::for_template(&self.path, self.base_dir.as_deref())
+                .map_err(Box::new)?;
+        }
+
+        Ok(ValidatedFileSink { transformer })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedFileSink,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let sink = FileSink::from_validated(self, validated, &cx)?;
+        Ok((
+            super::VectorSink::from_event_streamsink(sink),
+            future::ok(()).boxed(),
+        ))
+    }
+}
+
 pub struct FileSink {
-    path: Template,
+    path: UnconfinedTemplate,
     transformer: Transformer,
     encoder: Encoder<Framer>,
     idle_timeout: Duration,
@@ -281,11 +318,23 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
-        let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+    /// Creates a file sink from its configuration.
+    ///
+    /// # Errors
+    /// Returns an error if the configuration, path confinement, or encoder is invalid.
+    pub fn new(config: &FileSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+        let validated = config.validate()?;
+        Self::from_validated(config, &validated, cx)
+    }
 
+    /// Constructs the sink from the validated state, performing only the
+    /// environment-dependent (non-`validate`) work: timezone offset resolution
+    /// and path confinement construction.
+    fn from_validated(
+        config: &FileSinkConfig,
+        validated: &ValidatedFileSink,
+        cx: &SinkContext,
+    ) -> crate::Result<Self> {
         let offset = config
             .timezone
             .or(cx.globals.timezone)
@@ -314,9 +363,12 @@ impl FileSink {
                 .map_err(Box::new)?
         };
 
+        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
-            transformer,
+            transformer: validated.transformer.clone(),
             encoder,
             idle_timeout: config.idle_timeout,
             files: ExpiringHashMap::default(),
@@ -371,34 +423,33 @@ impl FileSink {
         loop {
             tokio::select! {
                 event = input.next() => {
-                    match event {
-                        Some(event) => self.process_event(event).await,
-                        None => {
-                            // If we got `None` - terminate the processing.
-                            debug!(message = "Receiver exhausted, terminating the processing loop.");
+                    if let Some(event) = event {
+                        self.process_event(event).await;
+                    } else {
+                        // If we got `None` - terminate the processing.
+                        debug!(message = "Receiver exhausted, terminating the processing loop.");
 
-                            // Close all the open files.
-                            debug!(message = "Closing all the open files.");
-                            for (path, file) in self.files.iter_mut() {
-                                if let Err(error) = file.close().await {
-                                    emit!(FileIoError {
-                                        error,
-                                        code: "failed_closing_file",
-                                        message: "Failed to close file.",
-                                        path,
-                                        dropped_events: 0,
-                                    });
-                                } else{
-                                    trace!(message = "Successfully closed file.", path = ?path);
-                                }
+                        // Close all the open files.
+                        debug!(message = "Closing all the open files.");
+                        for (path, file) in self.files.iter_mut() {
+                            if let Err(error) = file.close().await {
+                                emit!(FileIoError {
+                                    error,
+                                    code: "failed_closing_file",
+                                    message: "Failed to close file.",
+                                    path,
+                                    dropped_events: 0,
+                                });
+                            } else{
+                                trace!(message = "Successfully closed file.", path = ?path);
                             }
-
-                            emit!(FileOpen {
-                                count: 0
-                            });
-
-                            break;
                         }
+
+                        emit!(FileOpen {
+                            count: 0
+                        });
+
+                        break;
                     }
                 }
                 result = self.files.next_expired(), if !self.files.is_empty() => {
@@ -420,16 +471,13 @@ impl FileSink {
     }
 
     async fn process_event(&mut self, mut event: Event) {
-        let path = match self.partition_event(&event) {
-            Some(path) => path,
-            None => {
-                // We weren't able to find the path to use for the
-                // file.
-                // The error is already handled at `partition_event`, so
-                // here we just skip the event.
-                event.metadata().update_status(EventStatus::Errored);
-                return;
-            }
+        let Some(path) = self.partition_event(&event) else {
+            // We weren't able to find the path to use for the
+            // file.
+            // The error is already handled at `partition_event`, so
+            // here we just skip the event.
+            event.metadata().update_status(EventStatus::Errored);
+            return;
         };
 
         let next_deadline = self.deadline_at();
@@ -622,6 +670,11 @@ impl std::error::Error for OpenError {}
 /// which is Phase 1b scope. `verify_parent` provides a second layer of
 /// defence after this call.
 #[cfg(unix)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::unnecessary_debug_formatting,
+    reason = "Preserve escaped paths in diagnostics."
+)]
 async fn create_dirs_nofollow(path: &Path, base: &Path) -> std::io::Result<()> {
     fs::create_dir_all(base).await?;
     let suffix = path.strip_prefix(base).unwrap_or(path);
@@ -631,8 +684,7 @@ async fn create_dirs_nofollow(path: &Path, base: &Path) -> std::io::Result<()> {
         match fs::symlink_metadata(&current).await {
             Ok(meta) if meta.file_type().is_symlink() => {
                 return Err(std::io::Error::other(format!(
-                    "intermediate path component {:?} is a symlink",
-                    current
+                    "intermediate path component {current:?} is a symlink"
                 )));
             }
             Ok(_) => {}
@@ -746,7 +798,7 @@ mod tests {
     use futures::{SinkExt, stream};
     use similar_asserts::assert_eq;
     use vector_lib::{
-        codecs::JsonSerializerConfig,
+        codecs::{JsonSerializerConfig, encoding::SerializerConfig},
         event::{LogEvent, TraceEvent},
         sink::VectorSink,
     };
@@ -768,6 +820,18 @@ mod tests {
         crate::test_util::test_generate_config::<FileSinkConfig>();
     }
 
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = base_config("/tmp/vector-test.log");
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the encoder.
+        assert!(matches!(
+            config.encoding.config().1,
+            SerializerConfig::Text(_)
+        ));
+    }
+
     #[tokio::test]
     async fn log_single_partition() {
         let template = temp_file();
@@ -777,12 +841,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -806,12 +870,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -835,12 +899,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -856,6 +920,11 @@ mod tests {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the partition fixture together until the test can be split."
+    )]
     async fn log_many_partitions() {
         let directory = temp_dir();
 
@@ -869,12 +938,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -980,12 +1049,12 @@ mod tests {
             idle_timeout: Duration::from_secs(1),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -996,13 +1065,13 @@ mod tests {
 
         let sink_handle = tokio::spawn(async move {
             assert_sink_compliance(&FILE_SINK_TAGS, async move {
-                let sink = FileSink::new(&config, SinkContext::default()).unwrap();
+                let sink = FileSink::new(&config, &SinkContext::default()).unwrap();
                 VectorSink::from_event_streamsink(sink)
                     .run(Box::pin(rx.map(Into::into)))
                     .await
                     .expect("Running sink failed");
             })
-            .await
+            .await;
         });
 
         // send initial payload
@@ -1039,12 +1108,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1065,20 +1134,19 @@ mod tests {
         let directory = temp_dir();
 
         let format = "%Y-%m-%d-%H-%M-%S";
-        let mut template = directory.to_string_lossy().to_string();
-        template.push_str(&format!("/{format}.log"));
+        let template = format!("{}/{format}.log", directory.to_string_lossy());
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1098,7 +1166,8 @@ mod tests {
         run_assert_sink(&config, input.clone().into_iter()).await;
 
         let output = (0..metric_count).map(|index| {
-            let expected_timestamp = timestamp + (timestamp_offset * index as u32);
+            let expected_timestamp = timestamp
+                + (timestamp_offset * u32::try_from(index).expect("test metric index fits in u32"));
             let expected_filename =
                 directory.join(format!("{}.log", expected_timestamp.format(format)));
 
@@ -1127,12 +1196,12 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         };
@@ -1153,10 +1222,10 @@ mod tests {
             idle_timeout: default_idle_timeout(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            internal_metrics: Default::default(),
-            truncate: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: Option::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
+            truncate: FileTruncateConfig::default(),
             base_dir: None,
             confinement: ConfinementConfig::default(),
         }
@@ -1205,14 +1274,13 @@ mod tests {
             cfg.base_dir = base_dir.clone();
             cfg.confinement
                 .dangerously_allow_unconfined_template_resolution = *hatch;
-            let result = FileSink::new(&cfg, SinkContext::default());
+            let result = FileSink::new(&cfg, &SinkContext::default());
             match expected {
                 NoConfinement => assert!(result.unwrap().confinement.is_none(), "path={path:?}"),
                 Confined => assert!(result.unwrap().confinement.is_some(), "path={path:?}"),
                 ErrContaining(msg) => {
-                    let err = match result {
-                        Err(e) => e,
-                        Ok(_) => panic!("expected build error for path={path:?}"),
+                    let Err(err) = result else {
+                        panic!("expected build error for path={path:?}");
                     };
                     assert!(err.to_string().contains(msg), "path={path:?} err={err}");
                 }
@@ -1232,7 +1300,7 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg, &SinkContext::default()).unwrap();
         assert!(sink.partition_event(&event).is_none());
     }
 
@@ -1249,7 +1317,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "/etc/passwd");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg, &SinkContext::default()).unwrap();
         let confined = sink.partition_event(&event).unwrap();
         let confined_str = String::from_utf8_lossy(&confined);
         assert!(
@@ -1271,7 +1339,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "tenant-a");
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg, &SinkContext::default()).unwrap();
         let rendered = sink.partition_event(&event).unwrap();
         let rendered_str = String::from_utf8_lossy(&rendered);
         assert!(rendered_str.ends_with("/tenant-a.log"), "{rendered_str}");
@@ -1284,7 +1352,7 @@ mod tests {
         let mut cfg = base_config("{{ key }}");
         cfg.confinement
             .dangerously_allow_unconfined_template_resolution = true;
-        let sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let sink = FileSink::new(&cfg, &SinkContext::default()).unwrap();
         assert!(sink.confinement.is_none());
     }
 
@@ -1298,7 +1366,7 @@ mod tests {
         cfg.confinement
             .dangerously_allow_unconfined_template_resolution = true;
 
-        let mut sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let mut sink = FileSink::new(&cfg, &SinkContext::default()).unwrap();
         assert!(sink.confinement.is_none());
 
         let mut event = Event::Log(LogEvent::from("payload"));
@@ -1317,7 +1385,7 @@ mod tests {
         let mut cfg = base_config(&path);
         cfg.base_dir = Some(dir.join("does-not-yet-exist"));
         // No filesystem precondition is established.
-        let _ = FileSink::new(&cfg, SinkContext::default()).unwrap();
+        let _ = FileSink::new(&cfg, &SinkContext::default()).unwrap();
     }
 
     async fn run_assert_log_sink(config: &FileSinkConfig, events: Vec<String>) {
@@ -1342,11 +1410,11 @@ mod tests {
 
     async fn run_assert_sink(config: &FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
         assert_sink_compliance(&FILE_SINK_TAGS, async move {
-            let sink = FileSink::new(config, SinkContext::default()).unwrap();
+            let sink = FileSink::new(config, &SinkContext::default()).unwrap();
             VectorSink::from_event_streamsink(sink)
                 .run(Box::pin(stream::iter(events.map(Into::into))))
                 .await
-                .expect("Running sink failed")
+                .expect("Running sink failed");
         })
         .await;
     }

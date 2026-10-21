@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, io, net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Buf, Bytes, BytesMut};
@@ -22,11 +22,10 @@ use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput, log_schema,
+        SourceContext, SourceOutput, UnixOnly, log_schema,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
-    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
 };
@@ -58,8 +57,7 @@ pub enum FluentMode {
     Tcp(FluentTcpConfig),
 
     /// Listen on unix stream socket
-    #[cfg(unix)]
-    Unix(FluentUnixConfig),
+    Unix(UnixOnly<FluentUnixConfig>),
 }
 
 /// Serde doesn't provide a way to specify a default tagged variant when deserializing
@@ -68,7 +66,7 @@ pub enum FluentMode {
 ///
 /// See [serde-rs/serde#2231](https://github.com/serde-rs/serde/issues/2231)
 mod deser {
-    use super::*;
+    use super::{Deserialize, FluentMode, FluentTcpConfig, FluentUnixConfig, UnixOnly};
 
     #[allow(clippy::large_enum_variant)]
     #[derive(Deserialize)]
@@ -77,9 +75,8 @@ mod deser {
         #[serde(rename = "tcp")]
         Tcp(FluentTcpConfig),
 
-        #[cfg(unix)]
         #[serde(rename = "unix")]
-        Unix(FluentUnixConfig),
+        Unix(UnixOnly<FluentUnixConfig>),
     }
 
     #[derive(Deserialize)]
@@ -97,10 +94,9 @@ mod deser {
             D: serde::Deserializer<'de>,
         {
             Ok(match FluentModeDe::deserialize(deserializer)? {
-                FluentModeDe::Tagged(FluentModeTagged::Tcp(config)) => FluentMode::Tcp(config),
-                #[cfg(unix)]
                 FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => FluentMode::Unix(config),
-                FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
+                FluentModeDe::Tagged(FluentModeTagged::Tcp(config))
+                | FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
             })
         }
     }
@@ -108,6 +104,7 @@ mod deser {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::sources::fluent::FluentConfig;
 
         #[test]
         fn test_tcp_default_mode() {
@@ -133,18 +130,6 @@ mod deser {
         }
 
         #[test]
-        fn test_invalid_unix_mode() {
-            let json_data = serde_json::json!({
-                "mode": "unix",
-                "address": "0.0.0.0:2020",
-                "connection_limit": 2
-            });
-
-            assert!(serde_json::from_value::<FluentConfig>(json_data).is_err());
-        }
-
-        #[cfg(unix)]
-        #[test]
         fn test_valid_unix_mode() {
             let json_data = serde_json::json!({
                 "mode": "unix",
@@ -153,7 +138,7 @@ mod deser {
 
             let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
             assert!(
-                matches!(parsed.mode, FluentMode::Unix(c) if c.path.to_string_lossy() == "/foo")
+                matches!(parsed.mode, FluentMode::Unix(c) if c.platform_independent().path.to_string_lossy() == "/foo")
             );
         }
     }
@@ -164,17 +149,14 @@ mod deser {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FluentTcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
     /// The size of the receive buffer used for each connection.
@@ -184,11 +166,17 @@ pub struct FluentTcpConfig {
     #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
-    #[configurable(derived)]
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
+
     tls: Option<TlsSourceConfig>,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 }
 
@@ -216,6 +204,7 @@ impl FluentTcpConfig {
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
+            self.tls_handshake_timeout_secs,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -230,7 +219,6 @@ impl FluentTcpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-#[cfg(unix)]
 pub struct FluentUnixConfig {
     /// The Unix socket path.
     ///
@@ -248,8 +236,8 @@ pub struct FluentUnixConfig {
     pub socket_file_mode: Option<u32>,
 }
 
-#[cfg(unix)]
 impl FluentUnixConfig {
+    #[cfg(unix)]
     fn build(
         &self,
         cx: SourceContext,
@@ -261,7 +249,7 @@ impl FluentUnixConfig {
             self.path.clone(),
             self.socket_file_mode,
             source.decoder(),
-            move |events, host| source.handle_events_impl(events, host.into()),
+            move |events, host| source.handle_events_impl(events, &host.into()),
             cx.shutdown,
             cx.out,
         )
@@ -269,15 +257,16 @@ impl FluentUnixConfig {
 }
 
 impl GenerateConfig for FluentConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             mode: FluentMode::Tcp(FluentTcpConfig {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
                 keepalive: None,
                 permit_origin: None,
                 tls: None,
                 receive_buffer_bytes: None,
-                acknowledgements: Default::default(),
+                tls_handshake_timeout_secs: None,
+                acknowledgements: SourceAcknowledgementsConfig::default(),
                 connection_limit: Some(2),
             }),
             log_namespace: None,
@@ -293,8 +282,11 @@ impl SourceConfig for FluentConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
         match &self.mode {
             FluentMode::Tcp(t) => t.build(cx, log_namespace),
-            #[cfg(unix)]
-            FluentMode::Unix(u) => u.build(cx, log_namespace),
+            FluentMode::Unix(u) => u.as_ref().on_unix(
+                (cx, log_namespace),
+                #[cfg(unix)]
+                |config, (cx, log_namespace)| config.build(cx, log_namespace),
+            ),
         }
     }
 
@@ -311,7 +303,6 @@ impl SourceConfig for FluentConfig {
     fn resources(&self) -> Vec<Resource> {
         match &self.mode {
             FluentMode::Tcp(tcp) => vec![tcp.address.as_tcp_resource()],
-            #[cfg(unix)]
             FluentMode::Unix(_) => vec![],
         }
     }
@@ -339,7 +330,6 @@ impl FluentConfig {
                 .and_then(|tls| tls.client_metadata_key.as_ref())
                 .and_then(|k| k.path.clone())
                 .map(LegacyKey::Overwrite),
-            #[cfg(unix)]
             FluentMode::Unix(_) => None,
         };
 
@@ -408,7 +398,7 @@ impl FluentSource {
         }
     }
 
-    fn handle_events_impl(&self, events: &mut [Event], host: Value) {
+    fn handle_events_impl(&self, events: &mut [Event], host: &Value) {
         for event in events {
             let log = event.as_mut_log();
 
@@ -439,7 +429,7 @@ impl TcpSource for FluentSource {
     }
 
     fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
-        self.handle_events_impl(events, host.ip().to_string().into())
+        self.handle_events_impl(events, &host.ip().to_string().into());
     }
 
     fn build_acker(&self, frame: &[Self::Item]) -> Self::Acker {
@@ -487,13 +477,12 @@ impl std::fmt::Display for DecodeError {
 impl StreamDecodingError for DecodeError {
     fn can_continue(&self) -> bool {
         match self {
-            DecodeError::IO(_) => false,
-            DecodeError::Decode(_) => true,
-            DecodeError::UnknownCompression(_) => true,
-            DecodeError::UnexpectedValue(_) => true,
+            DecodeError::Decode(_)
+            | DecodeError::UnknownCompression(_)
+            | DecodeError::UnexpectedValue(_) => true,
             // An oversized partial frame has no framing boundary to resync on, so
             // the connection must be dropped rather than re-decoded in a loop.
-            DecodeError::FrameTooLarge { .. } => false,
+            DecodeError::IO(_) | DecodeError::FrameTooLarge { .. } => false,
         }
     }
 }
@@ -527,6 +516,10 @@ impl FluentDecoder {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn handle_message(
         &mut self,
         message: Result<FluentMessage, DecodeError>,
@@ -657,6 +650,10 @@ impl Decoder for FluentDecoder {
     type Item = (FluentFrame, usize);
     type Error = DecodeError;
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         loop {
             if src.is_empty() {
@@ -708,7 +705,7 @@ impl Decoder for FluentDecoder {
     }
 }
 
-/// Decoder for decoding MessagePackEventStream which are just a stream of Entries
+/// Decoder for decoding `MessagePackEventStream` which are just a stream of Entries
 #[derive(Clone, Debug)]
 struct FluentEntryStreamDecoder;
 
@@ -716,6 +713,10 @@ impl Decoder for FluentEntryStreamDecoder {
     type Item = FluentEntry;
     type Error = DecodeError;
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if src.is_empty() {
             return Ok(None);
@@ -771,7 +772,7 @@ impl TcpSourceAcker for FluentAcker {
             ack_map.clear();
             if let TcpSourceAck::Ack = ack {
                 ack_map.insert("ack", chunk);
-            };
+            }
             ack_map.serialize(&mut ser).unwrap();
         }
         Some(buf.into())
@@ -819,7 +820,7 @@ impl From<FluentEvent<'_>> for LogEvent {
             &mut log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(FluentConfig::NAME.as_bytes()),
+            Value::from_static_str(FluentConfig::NAME),
         );
 
         match log_namespace {
@@ -840,7 +841,7 @@ impl From<FluentEvent<'_>> for LogEvent {
             tag,
         );
 
-        for (key, value) in record.into_iter() {
+        for (key, value) in record {
             let value: Value = value.into();
             log_namespace.insert_source_metadata(
                 FluentConfig::NAME,
@@ -915,7 +916,7 @@ mod tests {
         ];
 
         let expected = mock_event("bar", "2015-09-07T01:23:04Z");
-        let got = decode_all(message.clone()).unwrap();
+        let got = decode_all(&message).unwrap();
         assert_event_data_eq!(got.0[0], expected);
         assert_eq!(got.1, message.len());
     }
@@ -934,7 +935,7 @@ mod tests {
         ];
 
         let expected = mock_event("bar", "2015-09-07T01:23:04Z");
-        let got = decode_all(message.clone()).unwrap();
+        let got = decode_all(&message).unwrap();
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected);
     }
@@ -961,7 +962,7 @@ mod tests {
             mock_event("bar", "2015-09-07T01:23:05Z"),
             mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
-        let got = decode_all(message.clone()).unwrap();
+        let got = decode_all(&message).unwrap();
 
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected[0]);
@@ -994,7 +995,7 @@ mod tests {
             mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
-        let got = decode_all(message.clone()).unwrap();
+        let got = decode_all(&message).unwrap();
 
         assert_eq!(got.1, message.len());
 
@@ -1028,7 +1029,7 @@ mod tests {
             mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
-        let got = decode_all(message.clone()).unwrap();
+        let got = decode_all(&message).unwrap();
 
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected[0]);
@@ -1063,7 +1064,7 @@ mod tests {
             mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
-        let got = decode_all(message.clone()).unwrap();
+        let got = decode_all(&message).unwrap();
 
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected[0]);
@@ -1071,8 +1072,8 @@ mod tests {
         assert_event_data_eq!(got.0[2], expected[2]);
     }
 
-    fn decode_all(message: Vec<u8>) -> Result<(SmallVec<[Event; 1]>, usize), DecodeError> {
-        let mut buf = BytesMut::from(&message[..]);
+    fn decode_all(message: &[u8]) -> Result<(SmallVec<[Event; 1]>, usize), DecodeError> {
+        let mut buf = BytesMut::from(message);
 
         let mut decoder = FluentDecoder::new(LogNamespace::default());
 
@@ -1110,9 +1111,8 @@ mod tests {
             max_frame_size,
         };
 
-        let error = match decoder.decode(&mut buf) {
-            Err(error) => error,
-            Ok(_) => panic!("expected FrameTooLarge error, got Ok"),
+        let Err(error) = decoder.decode(&mut buf) else {
+            panic!("expected FrameTooLarge error, got Ok")
         };
         assert!(
             matches!(error, DecodeError::FrameTooLarge { size, max } if size == partial.len() && max == max_frame_size),
@@ -1167,6 +1167,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: true.into(),
                 connection_limit: None,
             }),
@@ -1198,10 +1199,10 @@ mod tests {
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
         assert_eq!(log.get(event_path!("field")).unwrap(), &msg.into());
-        assert!(matches!(
+        assert_eq!(
             log.get(event_path!("host")).unwrap(),
-            Value::Bytes(_)
-        ));
+            &address.ip().to_string().into()
+        );
         assert!(matches!(
             log.get(event_path!("timestamp")).unwrap(),
             Value::Timestamp(_)
@@ -1240,6 +1241,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
             }),
@@ -1286,7 +1288,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -1298,6 +1300,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
             }),
@@ -1324,7 +1327,7 @@ mod tests {
         .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -1380,7 +1383,7 @@ mod integration_tests {
             let dir = make_file(
                 "fluent-bit.conf",
                 &format!(
-                    r#"
+                    r"
 [SERVICE]
     Grace      0
     Flush      1
@@ -1397,7 +1400,7 @@ mod integration_tests {
     Host          host.docker.internal
     Port          {send_port}
     Require_ack_response true
-    "#,
+    ",
                     listen_host = test_address.ip(),
                     listen_port = test_address.port(),
                     send_port = source_address.port(),
@@ -1420,7 +1423,7 @@ mod integration_tests {
                         .unwrap();
                     sleep(Duration::from_secs(2)).await;
 
-                    collect_ready(out).await
+                    collect_ready(out)
                 })
                 .await;
 
@@ -1436,26 +1439,28 @@ mod integration_tests {
 
     #[tokio::test]
     async fn fluentd() {
-        test_fluentd(EventStatus::Delivered, "").await;
+        Box::pin(test_fluentd(EventStatus::Delivered, "")).await;
     }
 
     #[tokio::test]
     async fn fluentd_gzip() {
-        test_fluentd(EventStatus::Delivered, "compress gzip").await;
+        Box::pin(test_fluentd(EventStatus::Delivered, "compress gzip")).await;
     }
 
     #[tokio::test]
     async fn fluentd_rejection() {
-        test_fluentd(EventStatus::Rejected, "").await;
+        Box::pin(test_fluentd(EventStatus::Rejected, "")).await;
     }
 
     async fn test_fluentd(status: EventStatus, options: &str) {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let (_guard, test_address) = next_addr();
-            let (out, source_address, _guard) = source(status).await;
+        Box::pin(assert_source_compliance(
+            &SOCKET_PUSH_SOURCE_TAGS,
+            async move {
+                let (_guard, test_address) = next_addr();
+                let (out, source_address, _guard) = source(status).await;
 
-            let config = format!(
-                r#"
+                let config = format!(
+                    r"
 <source>
   @type http
   bind {http_host}
@@ -1476,40 +1481,41 @@ mod integration_tests {
   ack_response_timeout 1
   {options}
 </match>
-"#,
-                http_host = test_address.ip(),
-                http_port = test_address.port(),
-                port = source_address.port(),
-                options = options
-            );
+",
+                    http_host = test_address.ip(),
+                    http_port = test_address.port(),
+                    port = source_address.port(),
+                    options = options
+                );
 
-            let dir = make_file("fluent.conf", &config);
+                let dir = make_file("fluent.conf", &config);
 
-            let msg = random_string(64);
-            let body = serde_json::json!({ "message": msg });
+                let msg = random_string(64);
+                let body = serde_json::json!({ "message": msg });
 
-            let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
-                .bind(dir.path().display(), "/fluentd/etc")
-                .run(async move {
-                    wait_for_tcp(test_address).await;
-                    reqwest::Client::new()
-                        .post(format!("http://{test_address}/"))
-                        .header("content-type", "application/json")
-                        .body(body.to_string())
-                        .send()
-                        .await
-                        .unwrap();
-                    sleep(Duration::from_secs(2)).await;
-                    collect_ready(out).await
-                })
-                .await;
+                let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
+                    .bind(dir.path().display(), "/fluentd/etc")
+                    .run(async move {
+                        wait_for_tcp(test_address).await;
+                        reqwest::Client::new()
+                            .post(format!("http://{test_address}/"))
+                            .header("content-type", "application/json")
+                            .body(body.to_string())
+                            .send()
+                            .await
+                            .unwrap();
+                        sleep(Duration::from_secs(2)).await;
+                        collect_ready(out)
+                    })
+                    .await;
 
-            assert_eq!(events.len(), 1);
-            assert_eq!(events[0].as_log()["tag"], "".into());
-            assert_eq!(events[0].as_log()["message"], msg.into());
-            assert!(events[0].as_log().get(event_path!("timestamp")).is_some());
-            assert!(events[0].as_log().get(event_path!("host")).is_some());
-        })
+                assert_eq!(events.len(), 1);
+                assert_eq!(events[0].as_log()["tag"], "".into());
+                assert_eq!(events[0].as_log()["message"], msg.into());
+                assert!(events[0].as_log().get(event_path!("timestamp")).is_some());
+                assert!(events[0].as_log().get(event_path!("host")).is_some());
+            },
+        ))
         .await;
     }
 
@@ -1517,7 +1523,7 @@ mod integration_tests {
         status: EventStatus,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let (_guard, address) =
+        let (port_guard, address) =
             next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {
@@ -1527,6 +1533,7 @@ mod integration_tests {
                     keepalive: None,
                     permit_origin: None,
                     receive_buffer_bytes: None,
+                    tls_handshake_timeout_secs: None,
                     acknowledgements: false.into(),
                     connection_limit: None,
                 }),
@@ -1536,9 +1543,9 @@ mod integration_tests {
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
-        (recv, address, _guard)
+        (recv, address, port_guard)
     }
 }

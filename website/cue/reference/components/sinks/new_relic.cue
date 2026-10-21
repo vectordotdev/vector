@@ -18,7 +18,6 @@ components: sinks: new_relic: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   50
 				timeout_secs: 30.0
 			}
@@ -60,7 +59,6 @@ components: sinks: new_relic: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.new_relic.configuration

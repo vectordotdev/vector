@@ -53,6 +53,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
     fn name() -> &'static str;
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request body cannot be decoded into events.
     fn build_events(
         &self,
         body: Bytes,
@@ -107,10 +111,22 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the content encoding is unsupported or decompression fails.
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
         decompress_body(encoding_header, body)
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS or authentication cannot be configured.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -145,10 +161,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Options => warp::options().boxed(),
             };
 
-            // https://github.com/rust-lang/rust-clippy/issues/8148
-            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
-                filter = filter.and(warp::path(s.to_string())).boxed()
+                filter = filter.and(warp::path(s.to_string())).boxed();
             }
             let body_filter = capped_body();
 
@@ -271,17 +285,17 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.map_err(|err| {
-                error!("An error occurred: {:?}.", err);
-            })?;
+            let listener = tls
+                .bind(&address)
+                .await
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?
+                .with_keepalive(keepalive_settings.tcp_keepalive);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(make_svc)
                 .with_graceful_shutdown(cx.shutdown.map(|_| ()))
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
@@ -330,7 +344,7 @@ async fn handle_request(
                     emit!(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(response_code, receiver))
+                .and_then(|()| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {

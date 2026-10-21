@@ -115,12 +115,45 @@ impl InternalEvent for KafkaReadError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct KafkaPayloadDecompressionError<'a> {
+    pub error: &'a std::io::Error,
+    pub topic: &'a str,
+    pub partition: i32,
+    pub offset: i64,
+}
+
+impl InternalEvent for KafkaPayloadDecompressionError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed decompressing message payload.",
+            error = %self.error,
+            error_code = "failed_decompressing_payload",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::RECEIVING,
+            topic = self.topic,
+            partition = %self.partition,
+            offset = %self.offset,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "failed_decompressing_payload",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
     pub expose_lag_metrics: bool,
 }
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
+    #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn emit(self) {
         gauge!(GaugeName::KafkaQueueMessages).set(self.statistics.msg_cnt as f64);
         gauge!(GaugeName::KafkaQueueMessagesBytes).set(self.statistics.msg_size as f64);

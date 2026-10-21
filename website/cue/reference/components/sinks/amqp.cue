@@ -19,7 +19,6 @@ components: sinks: amqp: {
 		send: {
 			batch: {
 				enabled:      false
-				common:       false
 				timeout_secs: null
 			}
 			compression: {

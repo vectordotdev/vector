@@ -1,27 +1,27 @@
 use std::sync::Arc;
-use std::sync::LazyLock;
 use std::task::{Context, Poll};
 
 use azure_core::credentials::{AccessToken, TokenCredential};
 
 use bytes::Bytes;
-use http::{
+use http_1::{
     HeaderValue, Request, StatusCode, Uri,
     header::{self, HeaderMap},
 };
-use hyper::Body;
+use http_body_util::BodyExt;
+use snafu::ResultExt;
 use tracing::Instrument;
 
-use crate::{http::HttpClient, sinks::prelude::*};
+use crate::{
+    http::client_v1::{HttpClient, full_body},
+    sinks::{HTTPV1RequestBuilderSnafu, prelude::*},
+};
 
 /// Log Ingestion API version
 const API_VERSION: &str = "2023-01-01";
 
 /// JSON content type of logs
 const CONTENT_TYPE: &str = "application/json";
-
-static CONTENT_TYPE_VALUE: LazyLock<HeaderValue> =
-    LazyLock::new(|| HeaderValue::from_static(CONTENT_TYPE));
 
 #[derive(Debug, Clone)]
 pub struct AzureLogsIngestionRequest {
@@ -54,9 +54,10 @@ pub struct AzureLogsIngestionResponse {
 
 impl DriverResponse for AzureLogsIngestionResponse {
     fn event_status(&self) -> EventStatus {
-        match self.http_status.is_success() {
-            true => EventStatus::Delivered,
-            false => EventStatus::Rejected,
+        if self.http_status.is_success() {
+            EventStatus::Delivered
+        } else {
+            EventStatus::Rejected
         }
     }
 
@@ -79,28 +80,36 @@ pub struct AzureLogsIngestionService {
     default_headers: HeaderMap,
 }
 
+/// Builds the request path (including the query string) for the Log Ingestion
+/// API, from the Data collection rule immutable ID and stream name.
+pub(super) fn request_path(
+    dcr_immutable_id: &str,
+    stream_name: &str,
+) -> crate::Result<http_1::uri::PathAndQuery> {
+    format!(
+        "/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}"
+    )
+    .parse()
+    .map_err(Into::into)
+}
+
 impl AzureLogsIngestionService {
     /// Creates a new `AzureLogsIngestionService`.
     pub fn new(
         client: HttpClient,
         endpoint: Uri,
-        dcr_immutable_id: String,
-        stream_name: String,
+        path_and_query: http_1::uri::PathAndQuery,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
     ) -> crate::Result<Self> {
         let mut parts = endpoint.into_parts();
-        parts.path_and_query = Some(
-            format!("/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}")
-                .parse()
-                .expect("path and query should never fail to parse"),
-        );
+        parts.path_and_query = Some(path_and_query);
         let endpoint = Uri::from_parts(parts)?;
 
         let default_headers = {
             let mut headers = HeaderMap::new();
 
-            headers.insert(header::CONTENT_TYPE, CONTENT_TYPE_VALUE.clone());
+            headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(CONTENT_TYPE));
             headers
         };
 
@@ -113,8 +122,10 @@ impl AzureLogsIngestionService {
         })
     }
 
-    async fn build_request(&self, body: Bytes) -> crate::Result<Request<Body>> {
-        let mut request = Request::post(&self.endpoint).body(Body::from(body))?;
+    async fn build_request(&self, body: Bytes) -> crate::Result<Request<Bytes>> {
+        let mut request = Request::post(&self.endpoint)
+            .body(body)
+            .context(HTTPV1RequestBuilderSnafu)?;
 
         // TODO: make this an option, for sovereign clouds
         let access_token: AccessToken = self
@@ -135,19 +146,22 @@ impl AzureLogsIngestionService {
 
     pub fn healthcheck(&self) -> Healthcheck {
         let service = self.clone();
-        let mut client = service.client.clone();
         Box::pin(async move {
             let request = service.build_request(Bytes::from("[]")).await?;
-            let res = client.call(request).in_current_span().await?;
+            let res = service
+                .client
+                .send(request.map(full_body))
+                .in_current_span()
+                .await?;
 
-            match res.status() {
+            let status = res.status();
+            match status {
                  StatusCode::NO_CONTENT => Ok(()),
                  StatusCode::UNAUTHORIZED => Err("Azure returned 401 Unauthorised. Check that the token_scope matches the sovereign cloud endpoint.".into()),
                  StatusCode::FORBIDDEN => Err("Azure returned 403 Forbidden. Verify that the credential has the Monitoring Metrics Publisher role on the Data Collection Rule.".into()),
                  StatusCode::NOT_FOUND => Err("Azure returned 404 Not Found. Either the URL provided is incorrect, or the request is too large.".into()),
                  _ => {
-                    let status = res.status();
-                    let body_bytes: Bytes = http_body::Body::collect(res.into_body()).await?.to_bytes();
+                    let body_bytes: Bytes = res.into_body().collect().await?.to_bytes();
                     let body_string: String = String::from_utf8(body_bytes.to_vec()).unwrap();
                     let err_string: String = format!("Azure returned {status}: {body_string}");
                     Err(err_string.into())
@@ -170,10 +184,13 @@ impl Service<AzureLogsIngestionRequest> for AzureLogsIngestionService {
     // Emission of Error internal event is handled upstream by the caller.
     fn call(&mut self, request: AzureLogsIngestionRequest) -> Self::Future {
         let service = self.clone();
-        let mut client = service.client.clone();
         Box::pin(async move {
             let http_request = service.build_request(request.body).await?;
-            let response = client.call(http_request).in_current_span().await?;
+            let response = service
+                .client
+                .send(http_request.map(full_body))
+                .in_current_span()
+                .await?;
             Ok(AzureLogsIngestionResponse {
                 http_status: response.status(),
                 raw_byte_size: request.metadata.request_encoded_size(),

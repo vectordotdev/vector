@@ -1,0 +1,12 @@
+sources:
+  my_source_id:
+    type: gcp_pubsub
+    ack_deadline_secs: 600
+    endpoint: https://pubsub.googleapis.com
+    full_response_size: 100
+    keepalive_secs: 60.0
+    max_concurrency: 10
+    poll_time_seconds: 2.0
+    project: my-log-source-project
+    retry_delay_secs: 1.0
+    subscription: my-vector-source-subscription

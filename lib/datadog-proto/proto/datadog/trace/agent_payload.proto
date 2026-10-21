@@ -1,0 +1,32 @@
+// protoc -I. -I$GOPATH/src --gogofaster_out=. span.proto tracer_payload.proto agent_payload.proto
+
+syntax = "proto3";
+
+package datadog.trace;
+option go_package = "pkg/proto/pbgo/trace"; // golang
+
+import "datadog/trace/tracer_payload.proto";
+import "datadog/trace/idx/tracer_payload.proto";
+
+// AgentPayload represents payload the agent sends to the intake.
+message AgentPayload {
+        // hostName specifies hostname of where the agent is running.
+        string hostName = 1;
+        // env specifies `env` set in agent configuration.
+        string env = 2;
+        // tracerPayloads specifies list of the payloads received from tracers.
+        repeated TracerPayload tracerPayloads = 5;
+        // tags specifies tags common in all `tracerPayloads`.
+        map<string, string> tags = 6;
+        // agentVersion specifies version of the agent.
+        string agentVersion = 7;
+        // targetTPS holds `TargetTPS` value in AgentConfig.
+        double targetTPS = 8;
+        // errorTPS holds `ErrorTPS` value in AgentConfig.
+        double errorTPS = 9;
+        // rareSamplerEnabled holds `RareSamplerEnabled` value in AgentConfig
+        bool rareSamplerEnabled = 10;
+        // idxTracerPayloads specifies list of the payloads received from tracers.
+        // @gotags: msg:"-"
+        repeated idx.TracerPayload idxTracerPayloads = 11;
+}

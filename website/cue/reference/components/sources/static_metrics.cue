@@ -26,7 +26,6 @@ components: sources: static_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}
@@ -38,6 +37,7 @@ components: sources: static_metrics: {
 	configuration: generated.components.sources.static_metrics.configuration & {
 		metrics: type: array: items: type: object: options: {
 			name: type: string: examples: ["my-metric"]
+			tags: type: object: examples: [{"env": "production"}]
 			value: type: object: examples: [{gauge: {value: 1.0}}]
 		}
 	}

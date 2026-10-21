@@ -20,7 +20,7 @@ use std::{
 use chrono::{DateTime, SubsecRound, Utc};
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, stream, task::noop_waker_ref};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
@@ -45,6 +45,7 @@ use vector_lib::{
 
 use crate::{
     config::{Config, GenerateConfig},
+    extra_context::ExtraContext,
     topology::{RunningTopology, ShutdownErrorReceiver},
     trace,
 };
@@ -73,7 +74,7 @@ macro_rules! assert_downcast_matches {
     ($e:expr_2021, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
-            got => panic!("Assertion failed: got wrong error variant {:?}", got),
+            got => panic!("Assertion failed: got wrong error variant {got:?}"),
         }
     }};
 }
@@ -93,16 +94,37 @@ macro_rules! log_event {
     };
 }
 
+///
+/// # Panics
+///
+/// Panics if generated configuration cannot be serialized or deserialized.
 pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
-    let cfg = toml::to_string(&T::generate_config()).unwrap();
+    let generated = T::generate_config();
 
-    toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{e}\n'{cfg}'"));
+    // TOML cannot represent JSON null; strip None-valued fields before serializing.
+    let toml_cfg = toml::to_string(&crate::generate::strip_nulls(generated.clone())).unwrap();
+    toml::from_str::<T>(&toml_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from TOML string:\n\n{e}\n'{toml_cfg}'")
+    });
+
+    let yaml_cfg = serde_yaml::to_string(&generated).unwrap();
+    serde_yaml::from_str::<T>(&yaml_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from YAML string:\n\n{e}\n'{yaml_cfg}'")
+    });
+
+    let json_cfg = serde_json::to_string(&generated).unwrap();
+    serde_json::from_str::<T>(&json_cfg).unwrap_or_else(|e| {
+        panic!("Invalid config generated from JSON string:\n\n{e}\n'{json_cfg}'")
+    });
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the fixture cannot be opened or parsed as JSON.
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
     let test_file = File::open(path)?;
     let value: serde_json::Value = serde_json::from_reader(test_file)?;
@@ -132,6 +154,10 @@ pub fn trace_init() {
     vector_lib::metrics::init_test();
 }
 
+///
+/// # Errors
+///
+/// This helper never returns an error.
 pub async fn send_lines(
     addr: SocketAddr,
     lines: impl IntoIterator<Item = String>,
@@ -139,6 +165,14 @@ pub async fn send_lines(
     send_encodable(addr, LinesCodec::new(), lines).await
 }
 
+///
+/// # Errors
+///
+/// This helper never returns an error.
+///
+/// # Panics
+///
+/// Panics if connecting, querying the local address, encoding, sending, or shutting down fails.
 pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     addr: SocketAddr,
     encoder: impl Encoder<I, Error = E>,
@@ -159,6 +193,14 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     Ok(local_addr)
 }
 
+///
+/// # Errors
+///
+/// This helper never returns an error.
+///
+/// # Panics
+///
+/// Panics if connecting, configuring TLS, reading certificates, or writing lines fails.
 pub async fn send_lines_tls(
     addr: SocketAddr,
     host: String,
@@ -208,18 +250,21 @@ pub async fn send_lines_tls(
     Ok(local_addr)
 }
 
+#[must_use]
 pub fn temp_file() -> PathBuf {
     let path = std::env::temp_dir();
     let file_name = random_string(16);
     path.join(file_name + ".log")
 }
 
+#[must_use]
 pub fn temp_dir() -> PathBuf {
     let path = std::env::temp_dir();
     let dir_name = random_string(16);
     path.join(dir_name)
 }
 
+#[must_use]
 pub fn random_table_name() -> String {
     format!("test_{}", random_string(10).to_lowercase())
 }
@@ -267,10 +312,7 @@ pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
     batch: Option<BatchNotifier>,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count).map(generator).collect::<Vec<_>>();
-    let stream = map_batch_stream(
-        stream::iter(events.clone()).map(|event| event.into_log()),
-        batch,
-    );
+    let stream = map_batch_stream(stream::iter(events.clone()).map(Event::into_log), batch);
     (events, stream)
 }
 
@@ -299,6 +341,11 @@ pub fn random_metrics_with_stream(
 ///
 /// # Returns
 /// A tuple of the generated metric events and the stream of the generated events
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    reason = "Fixture indices intentionally retain their existing timestamp and floating-point conversions. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub fn random_metrics_with_stream_timestamp(
     count: usize,
     batch: Option<BatchNotifier>,
@@ -307,7 +354,7 @@ pub fn random_metrics_with_stream_timestamp(
     timestamp_offset: std::time::Duration,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events: Vec<_> = (0..count)
-        .map(|index| {
+        .map(move |index| {
             let ts = timestamp + (timestamp_offset * index as u32);
             Event::Metric(
                 Metric::new(
@@ -337,10 +384,7 @@ pub fn random_events_with_stream(
     let events = (0..count)
         .map(|_| Event::from(LogEvent::from_str_legacy(random_string(len))))
         .collect::<Vec<_>>();
-    let stream = map_batch_stream(
-        stream::iter(events.clone()).map(|event| event.into_log()),
-        batch,
-    );
+    let stream = map_batch_stream(stream::iter(events.clone()).map(Event::into_log), batch);
     (events, stream)
 }
 
@@ -359,10 +403,7 @@ where
         .map(update_fn)
         .map(Event::Log)
         .collect::<Vec<_>>();
-    let stream = map_batch_stream(
-        stream::iter(events.clone()).map(|event| event.into_log()),
-        batch,
-    );
+    let stream = map_batch_stream(stream::iter(events.clone()).map(Event::into_log), batch);
     (events, stream)
 }
 
@@ -389,6 +430,7 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
     iter::repeat_with(move || random_string(len))
 }
 
+#[must_use]
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
     let size = rng().random_range(0..max_size);
 
@@ -411,6 +453,10 @@ where
     rx.take(n).collect().await
 }
 
+///
+/// # Panics
+///
+/// Panics if the stream ends before the requested number of items is collected.
 pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
     let mut events = Vec::with_capacity(n);
 
@@ -421,7 +467,7 @@ pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n:
     events
 }
 
-pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
+pub fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
 where
     S: Stream + Unpin,
 {
@@ -456,14 +502,22 @@ pub async fn collect_n_limited<T: Send + 'static>(mut rx: LimitedReceiver<T>, n:
     items
 }
 
+///
+/// # Panics
+///
+/// Panics if the file cannot be opened or read.
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
     file.read_to_string(&mut output).unwrap();
-    output.lines().map(|s| s.to_owned()).collect()
+    output.lines().map(ToOwned::to_owned).collect()
 }
 
+///
+/// # Panics
+///
+/// Panics if the file cannot be opened, decompressed, or decoded as text.
 pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading gzip file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -473,11 +527,15 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     String::from_utf8(output)
         .unwrap()
         .lines()
-        .map(|s| s.to_owned())
+        .map(ToOwned::to_owned)
         .collect()
 }
 
 #[cfg(test)]
+///
+/// # Panics
+///
+/// Panics if the file cannot be opened, decompressed, or decoded as text.
 pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading zstd file.", path = %path.as_ref().display());
     let file = File::open(path).unwrap();
@@ -485,10 +543,15 @@ pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     String::from_utf8(output)
         .unwrap()
         .lines()
-        .map(|s| s.to_owned())
+        .map(ToOwned::to_owned)
         .collect()
 }
 
+#[must_use]
+///
+/// # Panics
+///
+/// Panics if the Tokio runtime cannot be created.
 pub fn runtime() -> runtime::Runtime {
     runtime::Builder::new_multi_thread()
         .enable_all()
@@ -497,6 +560,10 @@ pub fn runtime() -> runtime::Runtime {
 }
 
 // Wait for a Future to resolve, or the duration to elapse (will panic)
+///
+/// # Panics
+///
+/// Panics if the condition does not become true before the timeout.
 pub async fn wait_for_duration<F, Fut>(mut f: F, duration: Duration)
 where
     F: FnMut() -> Fut,
@@ -506,9 +573,7 @@ where
     let mut delay = WAIT_FOR_MIN_MILLIS;
     while !f().await {
         sleep(Duration::from_millis(delay)).await;
-        if started.elapsed() > duration {
-            panic!("Timed out while waiting");
-        }
+        assert!(started.elapsed() <= duration, "Timed out while waiting");
         // quadratic backoff up to a maximum delay
         delay = (delay * 2).min(WAIT_FOR_MAX_MILLIS);
     }
@@ -520,7 +585,7 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = bool> + Send + 'static,
 {
-    wait_for_duration(f, Duration::from_secs(WAIT_FOR_SECS)).await
+    wait_for_duration(f, Duration::from_secs(WAIT_FOR_SECS)).await;
 }
 
 // Wait (for 5 secs) for a TCP socket to be reachable
@@ -532,7 +597,7 @@ where
         let addr = addr.clone();
         async move { TcpStream::connect(addr).await.is_ok() }
     })
-    .await
+    .await;
 }
 
 // Allows specifying a custom duration to wait for a TCP socket to be reachable
@@ -541,7 +606,7 @@ pub async fn wait_for_tcp_duration(addr: SocketAddr, duration: Duration) {
         || async move { TcpStream::connect(addr).await.is_ok() },
         duration,
     )
-    .await
+    .await;
 }
 
 pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
@@ -550,7 +615,7 @@ where
     F: Fn(usize) -> bool,
 {
     let value = value.as_ref();
-    wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await
+    wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await;
 }
 
 pub async fn wait_for_atomic_usize_timeout_ms<T, F>(value: T, unblock: F, timeout_ms: u64)
@@ -563,10 +628,14 @@ where
         || ready(unblock(value.load(Ordering::SeqCst))),
         Duration::from_millis(timeout_ms),
     )
-    .await
+    .await;
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
+///
+/// # Panics
+///
+/// Panics if all attempts fail before the timeout.
 pub async fn retry_until<'a, F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
 where
     F: FnMut() -> Fut,
@@ -590,11 +659,16 @@ pub struct CountReceiver<T> {
 }
 
 impl<T: Send + 'static> CountReceiver<T> {
+    #[must_use]
     pub fn count(&self) -> usize {
         self.count.load(Ordering::Relaxed)
     }
 
     /// Succeeds once first connection has been made.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the receiver task closes its connection notification channel.
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
             tripwire.await.unwrap();
@@ -651,6 +725,11 @@ impl<T> Future for CountReceiver<T> {
 }
 
 impl CountReceiver<String> {
+    ///
+    /// # Panics
+    ///
+    /// The spawned task panics if binding, accepting, or reading the TCP stream fails.
+    #[must_use]
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire, connected| async move {
             let listener = TcpListener::bind(addr).await.unwrap();
@@ -665,6 +744,10 @@ impl CountReceiver<String> {
     }
 
     #[cfg(unix)]
+    ///
+    /// # Panics
+    ///
+    /// The spawned task panics if binding, accepting, or reading the Unix stream fails.
     pub fn receive_lines_unix<P>(path: P) -> CountReceiver<String>
     where
         P: AsRef<Path> + Send + 'static,
@@ -709,6 +792,10 @@ impl CountReceiver<String> {
 }
 
 impl CountReceiver<Event> {
+    ///
+    /// # Panics
+    ///
+    /// The spawned task panics if the connection notification receiver has been dropped.
     pub fn receive_events<S>(stream: S) -> CountReceiver<Event>
     where
         S: Stream<Item = Event> + Send + 'static,
@@ -726,12 +813,16 @@ impl CountReceiver<Event> {
     }
 }
 
+///
+/// # Panics
+///
+/// Panics if the topology cannot be started.
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
 ) -> (RunningTopology, ShutdownErrorReceiver) {
     config.healthchecks.set_require_healthy(require_healthy);
-    RunningTopology::start_init_validated(config, Default::default())
+    RunningTopology::start_init_validated(config, ExtraContext::default())
         .await
         .unwrap()
 }
@@ -741,6 +832,10 @@ pub async fn start_topology(
 /// happen concurrent with the sending process (ie the stream is
 /// handling finalization, which is required for the future to receive
 /// an acknowledgement).
+///
+/// # Panics
+///
+/// Panics if the spawned sender task fails.
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
@@ -761,6 +856,10 @@ where
 /// used for tests where the collect has to happen concurrent with the
 /// sending process (ie the stream is handling finalization, which is
 /// required for the future to receive an acknowledgement).
+///
+/// # Panics
+///
+/// Panics if the spawned sender task fails.
 pub async fn spawn_collect_ready<F, S>(future: F, stream: S, sleep: u64) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
@@ -768,7 +867,7 @@ where
 {
     let sender = tokio::spawn(future);
     tokio::time::sleep(Duration::from_secs(sleep)).await;
-    let events = collect_ready(stream).await;
+    let events = collect_ready(stream);
     sender.await.expect("Failed to send data");
     events
 }
@@ -783,7 +882,7 @@ mod tests {
     use super::retry_until;
 
     // helper which errors the first 3x, and succeeds on the 4th
-    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+    fn retry_until_helper(count: &RwLock<i32>) -> Result<(), ()> {
         if *count.read().unwrap() < 3 {
             let mut c = count.write().unwrap();
             *c += 1;
@@ -797,7 +896,7 @@ mod tests {
         let count = Arc::new(RwLock::new(0));
         let func = || {
             let count = Arc::clone(&count);
-            retry_until_helper(count)
+            async move { retry_until_helper(&count) }
         };
 
         retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;

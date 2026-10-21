@@ -1,6 +1,6 @@
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_lib::{configurable::configurable_component, metric_tags};
+use vector_lib::{configurable::configurable_component, internal_event::CounterName, metric_tags};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -17,6 +17,10 @@ pub struct DiskConfig {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn disk_metrics(&self, output: &mut super::MetricsBuffer) {
         match heim::disk::io_counters().await {
             Ok(counters) => {
@@ -40,22 +44,22 @@ impl HostMetrics {
                     };
                     output.name = "disk";
                     output.counter(
-                        "disk_read_bytes_total",
+                        CounterName::DiskReadBytesTotal,
                         counter.read_bytes().get::<byte>() as f64,
                         tags.clone(),
                     );
                     output.counter(
-                        "disk_reads_completed_total",
+                        CounterName::DiskReadsCompletedTotal,
                         counter.read_count() as f64,
                         tags.clone(),
                     );
                     output.counter(
-                        "disk_written_bytes_total",
+                        CounterName::DiskWrittenBytesTotal,
                         counter.write_bytes().get::<byte>() as f64,
                         tags.clone(),
                     );
                     output.counter(
-                        "disk_writes_completed_total",
+                        CounterName::DiskWritesCompletedTotal,
                         counter.write_count() as f64,
                         tags,
                     );
@@ -87,7 +91,7 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .disk_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
 
         // The Windows test runner doesn't generate any disk metrics on the VM.
         #[cfg(not(windows))]
@@ -119,7 +123,7 @@ mod tests {
             })
             .disk_metrics(&mut buffer)
             .await;
-            buffer.metrics
+            buffer.into_metrics()
         })
         .await;
     }

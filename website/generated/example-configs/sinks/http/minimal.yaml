@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: http
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    uri: https://10.22.212.22:9000/endpoint

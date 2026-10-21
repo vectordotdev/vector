@@ -24,7 +24,7 @@ vector-lookup = { path = "../vector-lookup", features = ["test"] }
 vector-stream = { path = "../vector-stream" }
 vector-tap = { path = "../vector-tap" }
 vector-top = { path = "../vector-top", optional = true }
-vrl = { workspace = true, optional = true }
+vrl.workspace = true
 
 [features]
 antithesis-disk-asserts = ["vector-buffers/antithesis-disk-asserts"]
@@ -34,9 +34,9 @@ parquet = ["codecs/parquet"]
 api = ["vector-tap/api"]
 file-source = ["dep:file-source", "dep:file-source-common"]
 lua = ["vector-core/lua"]
+typed-trace = ["vector-core/typed-trace"]
 opentelemetry = ["dep:opentelemetry-proto", "codecs/opentelemetry"]
 prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
 test = ["codecs/test", "vector-core/test"]
-vrl = ["vector-core/vrl", "dep:vrl"]

@@ -1,36 +1,73 @@
-use super::config::LokiConfig;
-use crate::http::HttpClient;
+use http_1::{Request, StatusCode};
+
+use super::append_loki_path;
+
+use crate::{
+    http::{
+        Auth,
+        client_v1::{HttpClient, empty_body},
+    },
+    sinks::util::{HttpEndpoint, UriSerde},
+};
 
 async fn fetch_status(
-    endpoint: &str,
-    config: &LokiConfig,
+    uri: http_1::Uri,
+    auth: Option<&Auth>,
     client: &HttpClient,
-) -> crate::Result<http::StatusCode> {
-    let endpoint = config.endpoint.append_path(endpoint)?;
+) -> crate::Result<StatusCode> {
+    let mut request = Request::get(uri).body(empty_body())?;
 
-    let mut req = http::Request::get(endpoint.uri)
-        .body(hyper::Body::empty())
-        .expect("Building request never fails.");
-
-    if let Some(auth) = &config.auth {
-        auth.apply(&mut req);
+    if let Some(auth) = auth {
+        auth.apply_v1(&mut request);
     }
 
-    Ok(client.send(req).await?.status())
+    let response = client.send(request).await?;
+
+    Ok(response.status())
 }
 
-pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let status = match fetch_status("ready", &config, &client).await? {
+pub async fn healthcheck(
+    base_endpoint: HttpEndpoint,
+    auth: Option<Auth>,
+    healthcheck_uri: Option<UriSerde>,
+    client: HttpClient,
+) -> crate::Result<()> {
+    // Healthcheck URI has been explicitly configured
+    if let Some(uri) = healthcheck_uri {
+        let status =
+            fetch_status(uri.uri_v1()?, uri.auth.as_ref().or(auth.as_ref()), &client).await?;
+        return match status {
+            StatusCode::OK => Ok(()),
+            _ => Err(format!("A non-successful status returned: {status}").into()),
+        };
+    }
+
+    let status = match fetch_status(
+        append_loki_path(&base_endpoint, "ready")?.into_v1(),
+        auth.as_ref(),
+        &client,
+    )
+    .await?
+    {
         // Issue https://github.com/vectordotdev/vector/issues/6463
-        http::StatusCode::NOT_FOUND => {
+        StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
-            fetch_status("", &config, &client).await?
+            // Probe the normalized base path with one trailing slash (`/loki/`,
+            // not `/loki`), matching the pre-`HttpEndpoint` behavior. Reverse
+            // proxies commonly redirect `/loki` to `/loki/`, and the healthcheck
+            // rejects non-200 responses rather than following them.
+            fetch_status(
+                append_loki_path(&base_endpoint, "/")?.into_v1(),
+                auth.as_ref(),
+                &client,
+            )
+            .await?
         }
         status => status,
     };
 
     match status {
-        http::StatusCode::OK => Ok(()),
+        StatusCode::OK => Ok(()),
         _ => Err(format!("A non-successful status returned: {status}").into()),
     }
 }

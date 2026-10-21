@@ -18,7 +18,6 @@ components: sinks: sematext_metrics: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   20
 				timeout_secs: 1.0
 			}
@@ -44,7 +43,6 @@ components: sinks: sematext_metrics: {
 				with the `sematext_logs` sink.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.sematext_metrics.configuration

@@ -14,9 +14,14 @@ use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use tokio::sync::Semaphore;
+use tonic::Code::{
+    AlreadyExists, DataLoss, InvalidArgument, NotFound, OutOfRange, PermissionDenied,
+    Unauthenticated, Unimplemented,
+};
 use tonic::body::BoxBody;
 use tower::{Service, ServiceBuilder};
 use vector_lib::configurable::configurable_component;
+use vector_lib::stream::BatcherSettings;
 
 use super::{
     VectorSinkError,
@@ -27,14 +32,14 @@ use super::{
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
-        SinkHealthcheckOptions,
+        SinkHealthcheckOptions, ValidatedSink,
     },
     http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
         util::{
-            BatchConfig, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
+            BatchConfig, HttpEndpoint, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
             retries::RetryLogic,
             service::{HealthConfig, HealthLogic, ServiceBuilderExt, TowerRequestSettings},
         },
@@ -59,6 +64,9 @@ pub struct VectorConfig {
     ///
     /// The address _must_ include a port.
     ///
+    /// If no scheme is specified, `https` is used. Specify `http://` explicitly to connect
+    /// without TLS.
+    ///
     /// This option is mutually exclusive with `routing`. Set exactly one of
     /// `address` or `routing`.
     ///
@@ -67,8 +75,9 @@ pub struct VectorConfig {
     #[configurable(
         deprecated = "This option has been deprecated, use `routing.endpoints` instead."
     )]
-    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
+    #[configurable(required_one_of = "address_or_routing")]
     #[serde(default)]
     address: Option<String>,
 
@@ -77,32 +86,21 @@ pub struct VectorConfig {
     /// This option is mutually exclusive with `address`. Set exactly one of
     /// `address` or `routing`.
     #[serde(default)]
-    #[configurable(derived)]
+    #[configurable(required_one_of = "address_or_routing")]
     routing: Option<RoutingConfig>,
 
     /// Compression algorithm for requests.
     ///
     /// Supports `"none"`, `"gzip"`, or `"zstd"`.
-    ///
-    /// For backward compatibility, boolean values are still accepted:
-    /// - `true` defaults to gzip compression
-    /// - `false` disables compression (deprecated syntax)
-    #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "super::compression::bool_or_vector_compression"
-    )]
+    #[serde(default)]
     compression: VectorCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
@@ -112,11 +110,9 @@ pub struct VectorConfig {
     /// frames on idle connections so that a pooled connection to a downstream Vector instance that
     /// has gone away (crashed, restarted, or cut off by a network partition) is detected and evicted
     /// before it is reused, ensuring retries always go to a live connection.
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     keepalive: Option<VectorKeepaliveConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -171,8 +167,11 @@ struct RoutingConfig {
     /// Both IP addresses and hostnames are accepted formats.
     ///
     /// Each endpoint _must_ include a port.
+    ///
+    /// If no scheme is specified, `https` is used. Specify `http://` explicitly to connect
+    /// without TLS.
     #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(docs::examples = "92.12.333.224:6000"))]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
     endpoints: Vec<String>,
@@ -190,21 +189,20 @@ struct RoutingConfig {
     ///
     /// This option is only used when `strategy` is set to `load_balance`.
     #[serde(default)]
-    #[configurable(derived)]
     health: Option<HealthConfig>,
 }
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
-    pub fn from_address(addr: Uri) -> Self {
+    pub fn from_address(addr: &Uri) -> Self {
         let addr = addr.to_string();
         default_config(addr.as_str())
     }
 }
 
 impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config("127.0.0.1:6000")).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(default_config("http://127.0.0.1:6000")).unwrap()
     }
 }
 
@@ -218,16 +216,65 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         keepalive: None,
-        acknowledgements: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
     }
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedVector {
+    request_settings: TowerRequestSettings,
+    batch_settings: BatcherSettings,
+    endpoints: Vec<HttpEndpoint>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for VectorConfig {
+    type Validated = ValidatedVector;
+
+    fn validate(&self) -> crate::Result<ValidatedVector> {
+        // Endpoint options and endpoint syntax are validated here, and the
+        // parsed endpoints are retained so `build` does not re-parse the
+        // original strings. Re-parsing is unsafe: `http::Uri` reads the host
+        // of a scheme-less `host:port[/path]` endpoint as a scheme, producing
+        // a URI that validation accepted but the sink cannot use.
+        let endpoints = self.validate_endpoint_options()?;
+        let request_settings = self.request.into_settings();
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        Ok(ValidatedVector {
+            request_settings,
+            batch_settings,
+            endpoints,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedVector,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let uris = self.uris(tls.is_tls())?;
+        let ValidatedVector {
+            request_settings,
+            batch_settings,
+            endpoints,
+        } = validated.clone();
+        let uris = endpoints
+            .into_iter()
+            .map(HttpEndpoint::into_uri)
+            .collect::<Vec<_>>();
         let endpoint_strategy = self
             .routing
             .as_ref()
@@ -235,9 +282,7 @@ impl SinkConfig for VectorConfig {
 
         let client = new_client(&tls, cx.proxy(), self.keepalive)?;
 
-        let healthcheck = healthchecks(client.clone(), &uris, cx.healthcheck, endpoint_strategy);
-        let request_settings = self.request.into_settings();
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let healthcheck = healthchecks(client.clone(), &uris, &cx.healthcheck, endpoint_strategy);
 
         let services = uris
             .into_iter()
@@ -261,13 +306,14 @@ impl SinkConfig for VectorConfig {
             }
             EndpointStrategy::LoadBalance => {
                 let service = request_settings.distributed_service(
-                    VectorGrpcRetryLogic,
+                    &VectorGrpcRetryLogic,
                     services,
-                    self.routing
+                    &self
+                        .routing
                         .as_ref()
                         .and_then(|routing| routing.health.clone())
                         .unwrap_or_else(default_endpoint_health_config),
-                    VectorGrpcHealthLogic,
+                    &VectorGrpcHealthLogic,
                     1,
                 );
 
@@ -310,14 +356,6 @@ impl SinkConfig for VectorConfig {
         };
 
         Ok((sink, Box::pin(healthcheck)))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -502,9 +540,15 @@ fn failover_request_settings(
     // timeout of slack so the final endpoint attempt is not aborted by
     // scheduling overhead after earlier attempts consume their per-endpoint
     // timeouts.
-    request_settings.timeout = endpoint_timeout
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing timeout calculation."
+    )]
+    let timeout = endpoint_timeout
         .checked_mul((max_endpoint_attempts + 1) as u32)
         .unwrap_or(endpoint_timeout);
+    request_settings.timeout = timeout;
     request_settings
 }
 
@@ -557,7 +601,7 @@ fn failover_next_index(
         })
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct FailoverAdvance {
     state: usize,
     advanced: bool,
@@ -584,15 +628,14 @@ fn failover_next_attempts(
             state: advance.state,
             rebuilt: false,
         };
-    } else {
-        *attempts = stale_failover_attempt_indices(
-            endpoint_strategy,
-            failover_state_index(advance.state, endpoints),
-            endpoints,
-            tried,
-        );
-        *attempt = 0;
     }
+    *attempts = stale_failover_attempt_indices(
+        endpoint_strategy,
+        failover_state_index(advance.state, endpoints),
+        endpoints,
+        tried,
+    );
+    *attempt = 0;
 
     FailoverNextAttempts {
         state: advance.state,
@@ -665,7 +708,7 @@ fn is_retriable_vector_error(error: &crate::Error) -> bool {
 }
 
 impl VectorConfig {
-    fn validate_endpoint_options(&self) -> crate::Result<()> {
+    fn validate_endpoint_options(&self) -> crate::Result<Vec<HttpEndpoint>> {
         match (self.address.as_ref(), self.routing.as_ref()) {
             (Some(_), Some(_)) => Err(
                 "`address` and `routing` options are mutually exclusive. Please use `routing.endpoints` for multiple Vector endpoints."
@@ -677,23 +720,12 @@ impl VectorConfig {
             (None, Some(routing)) if routing.endpoints.is_empty() => {
                 Err("`routing.endpoints` must contain at least one endpoint.".into())
             }
-            (Some(_), None) | (None, Some(_)) => Ok(()),
-        }
-    }
-
-    fn uris(&self, tls: bool) -> crate::Result<Vec<Uri>> {
-        self.validate_endpoint_options()?;
-
-        if let Some(address) = self.address.as_ref() {
-            Ok(vec![with_default_scheme(address, tls)?])
-        } else {
-            self.routing
-                .as_ref()
-                .expect("routing must be present after validation")
+            (Some(address), None) => Ok(vec![HttpEndpoint::parse(address)?]),
+            (None, Some(routing)) => routing
                 .endpoints
                 .iter()
-                .map(|endpoint| with_default_scheme(endpoint, tls))
-                .collect()
+                .map(|endpoint| HttpEndpoint::parse(endpoint).map_err(Into::into))
+                .collect(),
         }
     }
 }
@@ -727,18 +759,18 @@ async fn healthcheck(
 fn healthchecks(
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     uris: &[Uri],
-    options: SinkHealthcheckOptions,
+    options: &SinkHealthcheckOptions,
     endpoint_strategy: EndpointStrategy,
 ) -> Healthcheck {
     if !options.enabled {
         return Box::pin(futures::future::ok(()));
     }
 
-    let healthcheck_uris = healthcheck_uris_for_strategy(uris, &options, endpoint_strategy);
+    let healthcheck_uris = healthcheck_uris_for_strategy(uris, options, endpoint_strategy);
 
+    let timeout = options.timeout;
     let healthchecks = healthcheck_uris.into_iter().map(move |uri| {
         let service = VectorService::new(client.clone(), uri, VectorCompression::None);
-        let timeout = options.timeout;
         healthcheck(
             service,
             SinkHealthcheckOptions {
@@ -784,41 +816,7 @@ fn healthcheck_uris_for_strategy(
 const fn default_endpoint_health_config() -> HealthConfig {
     HealthConfig {
         retry_initial_backoff_secs: 1,
-        retry_max_duration_secs: Duration::from_secs(60 * 60),
-    }
-}
-
-/// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
-/// specified in the address.
-pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
-    let uri: Uri = address.parse()?;
-    if uri.scheme().is_none() {
-        // Default the scheme to http or https.
-        let mut parts = uri.into_parts();
-
-        parts.scheme = if tls {
-            Some(
-                "https"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("https should be valid")),
-            )
-        } else {
-            Some(
-                "http"
-                    .parse()
-                    .unwrap_or_else(|_| unreachable!("http should be valid")),
-            )
-        };
-
-        if parts.path_and_query.is_none() {
-            parts.path_and_query = Some(
-                "/".parse()
-                    .unwrap_or_else(|_| unreachable!("root should be valid")),
-            );
-        }
-        Ok(Uri::from_parts(parts)?)
-    } else {
-        Ok(uri)
+        retry_max_duration_secs: Duration::from_hours(1),
     }
 }
 
@@ -855,8 +853,6 @@ impl RetryLogic for VectorGrpcRetryLogic {
     type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
-        use tonic::Code::*;
-
         match err {
             VectorSinkError::Request { source } => !matches!(
                 source.code(),
@@ -1432,6 +1428,81 @@ mod tests {
         assert_eq!(
             healthcheck_uris_for_strategy(&endpoints, &options, EndpointStrategy::FailoverPrimary),
             vec![endpoints[0].clone()]
+        );
+    }
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config = VectorConfig::from_address(&"http://127.0.0.1:6000".parse().unwrap());
+
+        let validated = config.validate().expect("validation should succeed");
+        assert!(validated.request_settings.timeout > Duration::ZERO);
+        assert!(validated.batch_settings.timeout > Duration::ZERO);
+    }
+
+    #[test]
+    fn validate_rejects_conflicting_endpoint_options() {
+        let config = VectorConfig {
+            address: Some("127.0.0.1:6000".to_owned()),
+            routing: Some(RoutingConfig {
+                endpoints: vec!["127.0.0.1:6001".to_owned()],
+                ..Default::default()
+            }),
+            ..default_config("127.0.0.1:6000")
+        };
+
+        let err = config.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("mutually exclusive"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Parses a `vector` sink config from TOML and returns its validated endpoint URIs.
+    fn validated_uris(config: &str) -> Vec<String> {
+        let config: VectorConfig = toml::from_str(config).expect("config should parse");
+        config
+            .validate()
+            .expect("validation should succeed")
+            .endpoints
+            .iter()
+            .map(|endpoint| endpoint.as_uri().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn endpoint_scheme_does_not_depend_on_tls() {
+        for tls in ["", "tls.enabled = false", "tls.enabled = true"] {
+            for (endpoint, expected) in [
+                ("127.0.0.1:6000", "https://127.0.0.1:6000/"),
+                ("http://127.0.0.1:6000", "http://127.0.0.1:6000/"),
+                ("https://127.0.0.1:6000", "https://127.0.0.1:6000/"),
+            ] {
+                let address = validated_uris(&format!("address = \"{endpoint}\"\n{tls}"));
+                assert_eq!(address, [expected], "address {endpoint:?} with {tls:?}");
+
+                let routing =
+                    validated_uris(&format!("{tls}\n[routing]\nendpoints = [\"{endpoint}\"]"));
+                assert_eq!(routing, [expected], "routing {endpoint:?} with {tls:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn routing_endpoints_apply_default_scheme_per_endpoint() {
+        let uris = validated_uris(
+            r#"
+                [routing]
+                endpoints = ["127.0.0.1:6000", "http://127.0.0.1:6001", "https://127.0.0.1:6002"]
+            "#,
+        );
+        assert_eq!(
+            uris,
+            [
+                "https://127.0.0.1:6000/",
+                "http://127.0.0.1:6001/",
+                "https://127.0.0.1:6002/",
+            ]
         );
     }
 }
