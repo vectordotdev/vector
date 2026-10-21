@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, MaybeAuth, client_v1::HttpClient},
     schema,
     sinks::{
         prelude::*,
@@ -208,7 +208,7 @@ impl GenerateConfig for LokiConfig {
 impl LokiConfig {
     pub(super) fn build_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
         Ok(client)
     }
 }
@@ -235,7 +235,8 @@ impl SinkConfig for LokiConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedLokiSink {
-    /// The push URL: `endpoint` with `path` appended. Used by `LokiService`.
+    /// The push URL: `endpoint` with `path` appended. Used by the request
+    /// builder for the push requests.
     pub(super) endpoint: HttpEndpoint,
     /// The credential-free configured endpoint, including any user-supplied base path.
     /// The healthcheck appends `ready` or `/` to this URL.
