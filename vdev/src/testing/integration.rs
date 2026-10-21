@@ -283,29 +283,56 @@ impl ComposeTest {
 
         let container = self.runner.container_name();
         let features = self.cargo_features();
-        docker_command([
-            "exec",
-            "--env",
-            &format!("CARGO_BUILD_TARGET_DIR={RUNNER_TARGET_PATH}"),
-            &container,
+        let target_dir = format!("CARGO_BUILD_TARGET_DIR={RUNNER_TARGET_PATH}");
+        // Compile exactly what `cargo nextest run` will compile (integration test targets
+        // also build the `vector` binary), so dev-dependency feature unification matches and
+        // the test phase does not recompile Vector.
+        let mut build = docker_command(["exec", "--env", &target_dir, &container]);
+        build.args([
             "cargo",
-            "build",
-            "--bin",
-            "vector",
+            "nextest",
+            "run",
+            "--no-run",
             "--no-default-features",
             "--features",
             &features,
+        ]);
+        match self.config.test {
+            Some(ref test_arg) => build.args(["--test", test_arg]),
+            None => build.arg("--lib"),
+        };
+        build.check_run()?;
+
+        let binary = format!("{RUNNER_TARGET_PATH}/debug/vector");
+        let digest = docker_command(["exec", &container, "sha256sum", &binary]).check_output()?;
+        let digest = digest
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let image = e2e_vector_image_name();
+        let existing = docker_command([
+            "image",
+            "inspect",
+            "--format",
+            "{{ index .Config.Labels \"vector.e2e.binary\" }}",
+            &image,
         ])
-        .check_run()?;
+        .check_output()
+        .unwrap_or_default();
+        if existing.trim() == digest {
+            info!("Reusing {image}: Vector binary unchanged");
+            return Ok(());
+        }
+        docker_command(["exec", &container, "cp", &binary, "/usr/bin/vector"]).check_run()?;
         docker_command([
-            "exec",
+            "commit",
+            "--change",
+            &format!("LABEL vector.e2e.binary={digest}"),
             &container,
-            "cp",
-            &format!("{RUNNER_TARGET_PATH}/debug/vector"),
-            "/usr/bin/vector",
+            &image,
         ])
-        .check_run()?;
-        docker_command(["commit", &container, &e2e_vector_image_name()]).check_run()
+        .check_run()
     }
 
     pub(crate) fn start(&self) -> Result<()> {
