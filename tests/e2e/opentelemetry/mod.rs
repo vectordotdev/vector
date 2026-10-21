@@ -142,8 +142,16 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
     // Leave time to report failures before nextest's two-minute test timeout.
     let deadline = Instant::now() + Duration::from_secs(90);
     let (found_metric, total_events) = loop {
-        let metrics_content = read_file_helper(data_type, "vector-internal-metrics-sink.log")
-            .expect("Failed to read internal metrics file");
+        // The file sink only creates the file once the first scrape is written.
+        let metrics_content = match read_file_helper(data_type, "vector-internal-metrics-sink.log")
+        {
+            Ok(content) => content,
+            Err(_) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_secs(1));
+                continue;
+            }
+            Err(error) => panic!("Failed to read internal metrics file: {error}"),
+        };
 
         // Parse the metrics file to find component_received_events_total
         let mut found_metric = false;
