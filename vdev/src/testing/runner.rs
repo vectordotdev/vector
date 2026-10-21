@@ -17,7 +17,7 @@ use crate::{
 };
 
 const MOUNT_PATH: &str = "/home/vector";
-const TARGET_PATH: &str = "/home/target";
+pub(super) const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
@@ -27,6 +27,13 @@ const TEST_COMMAND: &[&str] = &[
     "nextest",
     "run",
     "--no-fail-fast",
+    "--no-default-features",
+];
+const BUILD_TESTS_COMMAND: &[&str] = &[
+    "cargo",
+    "nextest",
+    "run",
+    "--no-run",
     "--no-default-features",
 ];
 const LOCAL_TEST_COMMAND: &[&str] = &["cargo", "nextest", "run", "--no-fail-fast"];
@@ -64,9 +71,7 @@ pub trait TestRunner {
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
-        features: Option<&[String]>,
         args: &[String],
-        build: bool,
         coverage: bool,
         coverage_env: Option<&str>,
     ) -> Result<()>;
@@ -120,12 +125,7 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(RunnerState::Missing)
     }
 
-    fn ensure_running(
-        &self,
-        features: Option<&[String]>,
-        config_environment_variables: &Environment,
-        build: bool,
-    ) -> Result<()> {
+    fn ensure_running(&self, config_environment_variables: &Environment) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -136,7 +136,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, config_environment_variables, build)?;
+                self.build(config_environment_variables)?;
                 self.create()?;
                 self.start()?;
             }
@@ -164,18 +164,29 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(())
     }
 
-    fn build(
-        &self,
-        features: Option<&[String]>,
-        config_env_vars: &Environment,
-        build: bool,
-    ) -> Result<()> {
+    fn build(&self, config_env_vars: &Environment) -> Result<()> {
         let image_name = self.image_name();
 
         let dockerfile = test_runner_dockerfile();
-        let mut command =
-            prepare_build_command(&image_name, &dockerfile, features, config_env_vars, build);
+        let mut command = prepare_build_command(&image_name, &dockerfile, config_env_vars);
         waiting!("Building image {}", image_name);
+        command.check_run()
+    }
+
+    /// Compile the tests selected by `args` in the running container without running them.
+    fn build_tests(&self, args: &[String]) -> Result<()> {
+        let mut command = docker_command(["exec"]);
+        if *IS_A_TTY {
+            command.arg("--tty");
+        }
+        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
+        if let Ok(color) = std::env::var("CARGO_TERM_COLOR") {
+            command.args(["--env", &format!("CARGO_TERM_COLOR={color}")]);
+        }
+        command.arg(self.container_name());
+        command.args(BUILD_TESTS_COMMAND);
+        command.args(args);
+        waiting!("Compiling tests in {}", self.container_name());
         command.check_run()
     }
 
@@ -252,13 +263,11 @@ where
         &self,
         outer_env: &Environment,
         config_environment_variables: &Environment,
-        features: Option<&[String]>,
         args: &[String],
-        build: bool,
         coverage: bool,
         coverage_env: Option<&str>,
     ) -> Result<()> {
-        self.ensure_running(features, config_environment_variables, build)?;
+        self.ensure_running(config_environment_variables)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -412,9 +421,7 @@ impl TestRunner for LocalTestRunner {
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
-        _features: Option<&[String]>,
         args: &[String],
-        _build: bool,
         coverage: bool,
         coverage_env: Option<&str>,
     ) -> Result<()> {
