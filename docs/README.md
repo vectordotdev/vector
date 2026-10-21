@@ -22,9 +22,6 @@ contributors:
 - **[REVIEWING.md](REVIEWING.md)** - Code review expectations and guidelines.
 - **[USER_EXPERIENCE_DESIGN.md](USER_EXPERIENCE_DESIGN.md)** - User experience
   principles and guidelines.
-- **[Package repository publishing](reference/package-repositories.md)** - COSE
-  signing, publication and recovery commands; activation requires the migration
-  cutover.
 
 ## Project policies
 

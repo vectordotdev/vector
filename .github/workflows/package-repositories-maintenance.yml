@@ -26,6 +26,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Inspect S3 state, prepare a rollback, or recover a lock with the publishing role.
+  # Available even when automated publication is disabled. Recovery requires the exact
+  # control version, a stopped owner and an expired 65-minute recovery window.
   maintain:
     if: github.repository_id == '146327667' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
@@ -109,6 +112,8 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Refresh apt dates/signatures so cached clients accept the archived package selection.
+  # Reuse saved rollback output on retries; the signing job has no AWS credentials.
   sign:
     needs: maintain
     if: inputs.operation == 'rollback'
@@ -146,6 +151,8 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Restore the selected repository state under the shared S3 lock, rejecting stale plans.
+  # Uses AWS OIDC without the signing key; installed clients are not downgraded.
   publish:
     needs: sign
     runs-on: ubuntu-24.04
@@ -184,6 +191,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # Verify the restored indexes and fresh signed roots through public HTTPS.
   endpoints:
     needs: publish
     runs-on: ubuntu-24.04

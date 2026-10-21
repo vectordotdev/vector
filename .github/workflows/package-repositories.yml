@@ -28,6 +28,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Freeze verified release assets and build the tools reused by every job.
+  # Enable only after historical backfill and the repository/key migration are ready.
   inputs:
     if: >-
       github.repository_id == '146327667' &&
@@ -82,6 +84,8 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Read current S3 metadata or restore the exact signed output of a retry.
+  # Uses AWS OIDC without access to the signing key.
   base:
     needs: inputs
     runs-on: ubuntu-24.04
@@ -117,6 +121,8 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Sign new packages and repository metadata; retries reuse saved signatures.
+  # The protected signing job has no AWS credentials.
   sign:
     needs: [inputs, base]
     runs-on: ubuntu-24.04
@@ -153,6 +159,8 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Upload immutable packages/indexes before switching signed repository roots.
+  # Serialize writes with the S3 control lock; this job has no signing key.
   publish:
     needs: [inputs, sign]
     runs-on: ubuntu-24.04
@@ -182,6 +190,7 @@ jobs:
           PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
         run: '"$VDEV" release repositories publish'
 
+  # Check public HTTPS metadata and package bytes against the signed snapshot.
   endpoints:
     needs: [inputs, publish]
     runs-on: ubuntu-24.04
@@ -201,6 +210,7 @@ jobs:
       - name: Verify public HTTPS metadata and new package bytes
         run: '"$VDEV" release repositories verify'
 
+  # Install the selected version through apt/DNF on amd64 and arm64 using pinned trust.
   clients:
     needs: [inputs, endpoints]
     runs-on: ${{ matrix.runner }}
