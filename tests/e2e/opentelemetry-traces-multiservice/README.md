@@ -60,7 +60,10 @@ the Kafka accounting and fraud-detection consumers.
 
 [demo.flagd.json](data/demo.flagd.json) uses the Demo's default flags except
 `cartFailure: 100%`. This generates cart-emptying error spans while checkout
-continues to email and Kafka.
+continues to email and Kafka. The flag sends the cart service to `badhost:1234`,
+which [compose.yaml](config/compose.yaml) resolves to loopback so the cart
+client's 30 connect retries are refused immediately instead of stalling each
+checkout for one to two minutes.
 
 The [ingress Collector](data/collector-source.yaml) writes `input.jsonl` and
 forwards traces to Vector. The [matrix](config/test.yaml) runs each transport
