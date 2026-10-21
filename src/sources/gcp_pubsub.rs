@@ -293,16 +293,13 @@ impl SourceConfig for PubsubConfig {
             if let Some(source) = errors.into_iter().next() {
                 return Err(PubsubError::NativeRoots { source }.into());
             }
-            let native_roots = certs.iter().filter_map(|cert| {
-                webpki::anchor_from_trusted_cert(cert)
-                    .ok()
-                    .map(|anchor| anchor.to_owned())
-            });
+            let mut native_roots = rustls::RootCertStore::empty();
+            native_roots.add_parsable_certificates(certs);
 
             let host = uri.host().unwrap_or("pubsub.googleapis.com");
             let mut tls_config = ClientTlsConfig::new()
                 .domain_name(host)
-                .trust_anchors(native_roots)
+                .trust_anchors(native_roots.roots)
                 .ca_certificates(tls.authorities_pem().map(Certificate::from_pem));
             if let Some((cert, key)) = tls.identity_pem() {
                 tls_config = tls_config.identity(Identity::from_pem(cert, key));

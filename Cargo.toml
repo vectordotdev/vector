@@ -485,7 +485,6 @@ rumqttc = { version = "0.25.1", default-features = false, features = ["use-rustl
 # Keep MQTT on Ring alongside Vector's other Rustls users, including in minimal builds.
 rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
 rustls-native-certs = { version = "0.8", default-features = false, optional = true }
-rustls-webpki = { version = "0.103", default-features = false, features = ["alloc"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -785,7 +784,7 @@ sources-exec = []
 sources-file = ["vector-lib/file-source"]
 sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "sources-utils-net-unix", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
-sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "dep:rustls-native-certs", "dep:rustls-webpki", "protobuf-build", "dep:tonic"]
+sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "dep:rustls", "dep:rustls-native-certs", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics = ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]

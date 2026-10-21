@@ -13420,7 +13420,6 @@ dependencies = [
  "rumqttc",
  "rustls",
  "rustls-native-certs",
- "rustls-webpki 0.103.16",
  "seahash",
  "semver",
  "serde",
