@@ -13,7 +13,7 @@ use std::{
 use chrono::DateTime;
 use derivative::Derivative;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
-use http::uri::{InvalidUri, Scheme, Uri};
+use http_1::uri::{InvalidUri, Scheme, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
@@ -66,11 +66,14 @@ const MAX_ACK_DEADLINE_SECS: u64 = 600;
 // processing.
 const ACK_QUEUE_SIZE: usize = 8;
 
+// The legacy h2 client's default limit on the size of received headers.
+const MAX_HEADER_LIST_SIZE: u32 = 16 << 20;
+
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
 // https://github.com/hyperium/tonic/issues/1350
 #[allow(clippy::missing_const_for_fn)]
-#[allow(warnings)]
+#[allow(warnings, clippy::clone_on_ref_ptr)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
@@ -102,8 +105,8 @@ mod proto {
 pub(crate) enum PubsubError {
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
-    #[snafu(display("Could not create endpoint: {}", source))]
-    Endpoint { source: tonic::transport::Error },
+    #[snafu(display("Could not load native root certificates: {}", source))]
+    NativeRoots { source: rustls_native_certs::Error },
     #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
     EndpointTls { source: tonic::transport::Error },
     #[snafu(display(
@@ -276,28 +279,52 @@ impl SourceConfig for PubsubConfig {
         let auth = self.auth.build(Scope::PubSub).await?;
 
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
-        auth.apply_uri(&mut uri);
-
-        let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let host = uri.host().unwrap_or("pubsub.googleapis.com");
-        let mut tls_config = ClientTlsConfig::new().domain_name(host);
-        if let Some((cert, key)) = tls.identity_pem() {
-            tls_config = tls_config.identity(Identity::from_pem(cert, key));
-        }
-        for authority in tls.authorities_pem() {
-            tls_config = tls_config.ca_certificate(Certificate::from_pem(authority));
-        }
-
-        let mut endpoint: Endpoint = uri.to_string().parse().context(EndpointSnafu)?;
-        if uri.scheme() != Some(&Scheme::HTTP) {
-            endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
-        }
-
-        let token_generator = auth.spawn_regenerate_token();
+        auth.apply_uri_v1(&mut uri);
 
         let protocol = uri
             .scheme()
             .map_or(Protocol::HTTP, |scheme| Protocol(scheme.to_string().into()));
+
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let tls_config = if uri.scheme() == Some(&Scheme::HTTP) {
+            None
+        } else {
+            // Tonic 0.11 loaded the platform roots for every TLS endpoint,
+            // failing on load errors but accepting an empty store. Tonic
+            // 0.12's `with_native_roots` rejects an empty store even when
+            // authorities are configured, so load the roots here instead.
+            // Tonic accepts them only as trust anchors, so convert them the
+            // same way Rustls does, skipping unparsable certificates.
+            let rustls_native_certs::CertificateResult { certs, errors, .. } =
+                rustls_native_certs::load_native_certs();
+            if let Some(source) = errors.into_iter().next() {
+                return Err(PubsubError::NativeRoots { source }.into());
+            }
+            let native_roots = certs.iter().filter_map(|cert| {
+                webpki::anchor_from_trusted_cert(cert)
+                    .ok()
+                    .map(|anchor| anchor.to_owned())
+            });
+
+            let host = uri.host().unwrap_or("pubsub.googleapis.com");
+            let mut tls_config = ClientTlsConfig::new()
+                .domain_name(host)
+                .trust_anchors(native_roots)
+                .ca_certificates(tls.authorities_pem().map(Certificate::from_pem));
+            if let Some((cert, key)) = tls.identity_pem() {
+                tls_config = tls_config.identity(Identity::from_pem(cert, key));
+            }
+            Some(tls_config)
+        };
+
+        // Keep the 16 MiB HTTP/2 header list limit of the legacy h2 client;
+        // the native client defaults to 16 KiB.
+        let mut endpoint = Endpoint::from(uri).http2_max_header_list_size(MAX_HEADER_LIST_SIZE);
+        if let Some(tls_config) = tls_config {
+            endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
+        }
+
+        let token_generator = auth.spawn_regenerate_token();
 
         let source = PubsubSource {
             endpoint,
@@ -460,7 +487,11 @@ impl PubsubSource {
                         timeout_secs = self.retry_delay.as_secs_f64(),
                         "Retrying after timeout."
                     );
-                    tokio::time::sleep(self.retry_delay).await;
+                    tokio::select! {
+                        biased;
+                        _ = &mut self.shutdown => break,
+                        () = tokio::time::sleep(self.retry_delay) => {}
+                    }
                 }
                 State::Shutdown => break,
             }
@@ -468,11 +499,15 @@ impl PubsubSource {
     }
 
     async fn run_once(&mut self, busy_flag: &Arc<AtomicBool>) -> State {
-        let connection = match self.endpoint.connect().await {
-            Ok(connection) => connection,
-            Err(error) => {
-                emit!(GcpPubsubConnectError { error });
-                return State::RetryDelay;
+        let connection = tokio::select! {
+            biased;
+            _ = &mut self.shutdown => return State::Shutdown,
+            result = self.endpoint.connect() => match result {
+                Ok(connection) => connection,
+                Err(error) => {
+                    emit!(GcpPubsubConnectError { error });
+                    return State::RetryDelay;
+                }
             }
         };
 
@@ -519,7 +554,7 @@ impl PubsubSource {
         loop {
             tokio::select! {
                 biased;
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
+                Some((status, receipts)) = ack_stream.next() => {
                     pending_acks -= 1;
                     if status == BatchStatus::Delivered {
                         ack_ids_sender
@@ -742,13 +777,16 @@ fn translate_error(error: tonic::Status) -> State {
     }
 }
 
+/// Find the HTTP/2 reset through Tonic and transport error wrappers.
 fn is_reset(error: &Status) -> bool {
-    error
-        .source()
-        .and_then(|source| source.downcast_ref::<hyper::Error>())
-        .and_then(|error| error.source())
-        .and_then(|source| source.downcast_ref::<h2::Error>())
-        .is_some_and(|error| error.is_remote() && error.is_reset())
+    let mut source = error.source();
+    while let Some(error) = source {
+        if let Some(error) = error.downcast_ref::<h2::Error>() {
+            return error.is_remote() && error.is_reset();
+        }
+        source = error.source();
+    }
+    false
 }
 
 #[pin_project::pin_project]
@@ -767,6 +805,10 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
+    use bytes::Bytes;
+    use tokio::time::timeout;
     use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
@@ -852,6 +894,250 @@ mod tests {
         .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
 
         assert_eq!(definitions, Some(expected_definition));
+    }
+
+    /// How the test server fails each streaming pull after sending its response headers.
+    #[derive(Clone, Copy)]
+    enum StreamFailure {
+        /// The server sends response metadata larger than the native client's
+        /// default 16 KiB header list limit, then resets the stream with `RST_STREAM`.
+        RemoteReset,
+        /// The server sends more data than its declared `content-length`, so the
+        /// client's HTTP/2 stack resets the stream locally with `PROTOCOL_ERROR`.
+        LocalReset,
+    }
+
+    /// Serves streaming pulls, reporting when each stream is ready or has failed.
+    async fn serve_streams(
+        failure: Option<StreamFailure>,
+    ) -> (String, mpsc::UnboundedReceiver<Instant>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let (updates, update_times) = mpsc::unbounded_channel();
+        tokio::spawn(async move {
+            while let Ok((socket, _)) = listener.accept().await {
+                let updates = updates.clone();
+                tokio::spawn(async move {
+                    let Ok(mut connection) = h2::server::handshake(socket).await else {
+                        return;
+                    };
+                    while let Some(Ok((request, mut respond))) = connection.accept().await {
+                        assert_eq!(
+                            request.uri().path(),
+                            "/google.pubsub.v1.Subscriber/StreamingPull"
+                        );
+                        let updates = updates.clone();
+                        tokio::spawn(async move {
+                            let mut requests = request.into_body();
+                            let first = requests.data().await.unwrap().unwrap();
+                            requests
+                                .flow_control()
+                                .release_capacity(first.len())
+                                .unwrap();
+
+                            let response = http_1::Response::builder()
+                                .header("content-type", "application/grpc");
+                            let response = match failure {
+                                Some(StreamFailure::RemoteReset) => {
+                                    response.header("x-large-metadata", "a".repeat(24 << 10))
+                                }
+                                Some(StreamFailure::LocalReset) => {
+                                    response.header("content-length", "0")
+                                }
+                                None => response,
+                            };
+                            let mut stream = respond
+                                .send_response(response.body(()).unwrap(), false)
+                                .unwrap();
+                            stream
+                                .send_data(Bytes::from_static(&[0; 5]), false)
+                                .unwrap();
+
+                            if !matches!(failure, Some(StreamFailure::LocalReset)) {
+                                // The acknowledgement proves the source has consumed the
+                                // response headers and entered its streaming receive loop.
+                                let acknowledgement = requests.data().await.unwrap().unwrap();
+                                requests
+                                    .flow_control()
+                                    .release_capacity(acknowledgement.len())
+                                    .unwrap();
+                                if matches!(failure, Some(StreamFailure::RemoteReset)) {
+                                    stream.send_reset(h2::Reason::INTERNAL_ERROR);
+                                }
+                            }
+                            _ = updates.send(Instant::now());
+                            while let Some(Ok(data)) = requests.data().await {
+                                requests
+                                    .flow_control()
+                                    .release_capacity(data.len())
+                                    .unwrap();
+                            }
+                        });
+                    }
+                });
+            }
+        });
+        (endpoint, update_times)
+    }
+
+    /// Runs the source against streams failing with `failure` and returns the time
+    /// between the first failed streaming pull and the next one.
+    async fn time_until_retry(
+        failure: StreamFailure,
+        retry_delay: Duration,
+        retry_timeout: Duration,
+    ) -> Duration {
+        let (endpoint, mut failure_times) = serve_streams(Some(failure)).await;
+        let config = PubsubConfig {
+            project: "project".into(),
+            subscription: "subscription".into(),
+            endpoint,
+            auth: GcpAuthConfig {
+                skip_authentication: true,
+                ..Default::default()
+            },
+            max_concurrency: 1,
+            full_response_size: default_full_response(),
+            poll_time_seconds: default_poll_time(),
+            ack_deadline_secs: default_ack_deadline(),
+            retry_delay_secs: retry_delay,
+            keepalive_secs: default_keepalive(),
+            ..Default::default()
+        };
+        let (out, _events) = SourceSender::new_test();
+        let source = config
+            .build(SourceContext::new_test(out, None))
+            .await
+            .unwrap();
+        let source = tokio::spawn(source);
+
+        let first = timeout(Duration::from_secs(10), failure_times.recv())
+            .await
+            .expect("The source did not start a streaming pull.")
+            .unwrap();
+        let second = timeout(retry_timeout, failure_times.recv())
+            .await
+            .expect("The source did not retry the streaming pull in time.")
+            .unwrap();
+        source.abort();
+        second - first
+    }
+
+    #[tokio::test]
+    async fn remote_stream_reset_retries_immediately() {
+        let retry_delay = Duration::from_hours(1);
+        let elapsed = time_until_retry(
+            StreamFailure::RemoteReset,
+            retry_delay,
+            Duration::from_secs(10),
+        )
+        .await;
+        assert!(elapsed < retry_delay);
+    }
+
+    #[tokio::test]
+    async fn local_stream_reset_retries_after_delay() {
+        let retry_delay = Duration::from_secs(1);
+        let elapsed = time_until_retry(
+            StreamFailure::LocalReset,
+            retry_delay,
+            retry_delay + Duration::from_secs(10),
+        )
+        .await;
+        assert!(elapsed >= retry_delay);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn active_stream_shuts_down_with_and_without_acknowledgements() {
+        for acknowledgements in [false, true] {
+            let (endpoint, mut activity) = serve_streams(None).await;
+            let config = PubsubConfig {
+                project: "project".into(),
+                subscription: "subscription".into(),
+                endpoint,
+                auth: GcpAuthConfig {
+                    skip_authentication: true,
+                    ..Default::default()
+                },
+                max_concurrency: 1,
+                full_response_size: 10,
+                poll_time_seconds: Duration::from_secs(1),
+                ack_deadline_secs: Duration::from_secs(10),
+                retry_delay_secs: Duration::from_secs(1),
+                keepalive_secs: Duration::from_secs(1),
+                ..Default::default()
+            };
+            let component = crate::config::ComponentKey::from("pubsub");
+            let (out, _events) = SourceSender::new_test();
+            let (mut context, mut shutdown) = SourceContext::new_shutdown(&component, out);
+            context.acknowledgements = acknowledgements;
+            let source = tokio::spawn(config.build(context).await.unwrap());
+            timeout(Duration::from_secs(10), activity.recv())
+                .await
+                .expect("The source did not acknowledge the streaming response.")
+                .unwrap();
+
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+            assert!(shutdown.shutdown_source(&component, deadline).await);
+            source.await.unwrap().unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn connection_setup_and_retry_wait_shut_down() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        for fail_connection in [false, true] {
+            let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+                .await
+                .unwrap();
+            let endpoint = format!("https://{}", listener.local_addr().unwrap());
+            let (ready, connected) = tokio::sync::oneshot::channel();
+            let peer = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut buffer = [0; 4096];
+                socket.read_exact(&mut buffer[..1]).await.unwrap();
+                if fail_connection {
+                    socket.write_all(b"not TLS").await.unwrap();
+                    // The client closes this connection before waiting to retry.
+                    while matches!(socket.read(&mut buffer).await, Ok(size) if size > 0) {}
+                }
+                ready.send(()).unwrap();
+                if !fail_connection {
+                    // Keep the TLS handshake pending until shutdown closes it.
+                    while matches!(socket.read(&mut buffer).await, Ok(size) if size > 0) {}
+                }
+            });
+            let config = PubsubConfig {
+                project: "project".into(),
+                subscription: "subscription".into(),
+                endpoint,
+                auth: GcpAuthConfig {
+                    skip_authentication: true,
+                    ..Default::default()
+                },
+                max_concurrency: 1,
+                full_response_size: default_full_response(),
+                poll_time_seconds: default_poll_time(),
+                ack_deadline_secs: default_ack_deadline(),
+                retry_delay_secs: Duration::from_hours(1),
+                keepalive_secs: default_keepalive(),
+                ..Default::default()
+            };
+            let component = crate::config::ComponentKey::from("pubsub");
+            let (out, _events) = SourceSender::new_test();
+            let (context, mut shutdown) = SourceContext::new_shutdown(&component, out);
+            let source = tokio::spawn(config.build(context).await.unwrap());
+            timeout(Duration::from_secs(10), connected)
+                .await
+                .unwrap()
+                .unwrap();
+
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+            assert!(shutdown.shutdown_source(&component, deadline).await);
+            source.await.unwrap().unwrap();
+            peer.await.unwrap();
+        }
     }
 }
 

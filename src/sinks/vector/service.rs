@@ -2,9 +2,7 @@ use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
+use hyper_1::body::Incoming;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;
@@ -17,6 +15,7 @@ use super::{VectorSinkError, compression::VectorCompression};
 use crate::{
     Error,
     event::{EventFinalizers, EventStatus, Finalizable},
+    http::client_v1::{Http2Client, HttpError},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
@@ -24,7 +23,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
-    pub client: proto_vector::Client<HyperSvc>,
+    pub client: proto_vector::Client<GrpcTransport>,
     pub protocol: String,
     pub endpoint: String,
 }
@@ -67,27 +66,48 @@ impl MetaDescriptive for VectorRequest {
 }
 
 impl VectorService {
+    /// Creates a gRPC client that sends every request to the scheme and authority of `uri`.
+    ///
+    /// The path of `uri` is not used: request paths are the gRPC method paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `uri` has no scheme or authority.
     pub fn new(
-        hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+        client: Http2Client<BoxBody>,
         uri: Uri,
         compression: VectorCompression,
-    ) -> Self {
-        let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let mut proto_client = proto_vector::Client::new(HyperSvc {
-            uri,
-            client: hyper_client,
-        });
+    ) -> crate::Result<Self> {
+        let origin = grpc_origin(&uri)?;
+        let (protocol, endpoint) = uri::protocol_endpoint(uri);
+        let mut proto_client = proto_vector::Client::with_origin(GrpcTransport(client), origin);
 
         if let Some(encoding) = compression.as_tonic_encoding() {
             proto_client = proto_client.send_compressed(encoding);
         }
 
-        Self {
+        Ok(Self {
             client: proto_client,
             protocol,
             endpoint,
-        }
+        })
     }
+}
+
+/// Returns the `scheme://authority/` origin that tonic prefixes to each gRPC method path.
+fn grpc_origin(uri: &Uri) -> crate::Result<http_1::Uri> {
+    let (Some(scheme), Some(authority)) = (uri.scheme_str(), uri.authority()) else {
+        return Err(VectorSinkError::NotAbsoluteUri {
+            uri: uri.to_string(),
+        }
+        .into());
+    };
+
+    Ok(http_1::Uri::builder()
+        .scheme(scheme)
+        .authority(authority.as_str())
+        .path_and_query("/")
+        .build()?)
 }
 
 impl Service<VectorRequest> for VectorService {
@@ -97,11 +117,8 @@ impl Service<VectorRequest> for VectorService {
 
     // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Readiness check of the client is done through the `push_events()`
-        // call happening inside `call()`. That check blocks until the client is
-        // ready to perform another request.
-        //
-        // See: <https://docs.rs/tonic/0.4.2/tonic/client/struct.Grpc.html#method.ready>
+        // Readiness of the gRPC client is awaited by the `push_events()` call inside `call()`,
+        // which blocks until the client is ready to perform another request.
         Poll::Ready(Ok(()))
     }
 
@@ -133,15 +150,13 @@ impl Service<VectorRequest> for VectorService {
     }
 }
 
+/// Sends tonic's gRPC requests over the native HTTP/2 client.
 #[derive(Clone, Debug)]
-pub struct HyperSvc {
-    uri: Uri,
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-}
+pub struct GrpcTransport(Http2Client<BoxBody>);
 
-impl Service<hyper::Request<BoxBody>> for HyperSvc {
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+impl Service<http_1::Request<BoxBody>> for GrpcTransport {
+    type Response = http_1::Response<Incoming>;
+    type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.
@@ -150,16 +165,7 @@ impl Service<hyper::Request<BoxBody>> for HyperSvc {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
-        let uri = Uri::builder()
-            .scheme(self.uri.scheme().unwrap().clone())
-            .authority(self.uri.authority().unwrap().clone())
-            .path_and_query(req.uri().path_and_query().unwrap().clone())
-            .build()
-            .unwrap();
-
-        *req.uri_mut() = uri;
-
-        Box::pin(self.client.request(req))
+    fn call(&mut self, request: http_1::Request<BoxBody>) -> Self::Future {
+        Box::pin(self.0.request(request))
     }
 }

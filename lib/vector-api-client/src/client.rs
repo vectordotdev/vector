@@ -36,7 +36,8 @@ impl Client {
     /// * `uri` - The gRPC server URI (e.g., `"http://localhost:9999".parse().unwrap()`)
     pub fn new(uri: Uri) -> Self {
         Self {
-            endpoint: Endpoint::from(uri),
+            // Preserve the existing 16 MiB HTTP/2 response-header limit.
+            endpoint: Endpoint::from(uri).http2_max_header_list_size(16 * 1024 * 1024),
             channel: None,
             service: None,
         }
