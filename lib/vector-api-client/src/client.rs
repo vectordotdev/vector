@@ -1,6 +1,6 @@
-use http::Uri;
+use http::{Uri, uri::Scheme};
 use tokio_stream::{Stream, StreamExt};
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tonic_health::pb::{
     HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
 };
@@ -45,11 +45,20 @@ impl Client {
 
     /// Connect to the gRPC server
     ///
+    /// `https` URIs use TLS with the platform's native root certificates.
+    ///
     /// # Errors
     ///
-    /// Returns an error if the connection to the server cannot be established.
+    /// Returns an error if TLS cannot be set up or the connection to the server cannot be
+    /// established.
     pub async fn connect(&mut self) -> Result<()> {
-        let channel = self.endpoint.connect().await?;
+        let endpoint = self.endpoint.clone();
+        let endpoint = if endpoint.uri().scheme() == Some(&Scheme::HTTPS) {
+            endpoint.tls_config(ClientTlsConfig::new().with_enabled_roots())?
+        } else {
+            endpoint
+        };
+        let channel = endpoint.connect().await?;
         self.service = Some(ObservabilityServiceClient::new(channel.clone()));
         self.channel = Some(channel);
         Ok(())
@@ -264,5 +273,24 @@ mod tests {
         let result = client.ensure_connected();
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), Error::NotConnected));
+    }
+
+    #[tokio::test]
+    async fn connect_uses_tls_for_https() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let first_byte = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut byte = [0u8; 1];
+            std::io::Read::read_exact(&mut stream, &mut byte).unwrap();
+            byte[0]
+        });
+
+        let mut client = Client::new(format!("https://127.0.0.1:{port}").parse().unwrap());
+        // The server closes the connection after the first byte, so the handshake fails.
+        assert!(client.connect().await.is_err());
+
+        // 0x16 is the TLS handshake record type that starts a ClientHello.
+        assert_eq!(first_byte.join().unwrap(), 0x16);
     }
 }
