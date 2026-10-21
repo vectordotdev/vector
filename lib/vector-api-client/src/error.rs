@@ -25,6 +25,7 @@ pub enum Error {
 
 impl Error {
     /// Returns true if this error is permanent and should not be retried.
+    #[must_use]
     pub fn is_fatal(&self) -> bool {
         match self {
             Error::InvalidUrl { .. } => true,
@@ -55,26 +56,3 @@ impl From<tonic::transport::Error> for Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_error_display() {
-        let err = Error::NotConnected;
-        assert_eq!(err.to_string(), "Not connected to gRPC server");
-
-        let err = Error::InvalidUrl {
-            message: "invalid format".to_string(),
-        };
-        assert_eq!(err.to_string(), "Invalid URL: invalid format");
-    }
-
-    #[test]
-    fn test_error_from_tonic_status() {
-        let status = tonic::Status::unavailable("service down");
-        let err: Error = status.into();
-        assert!(matches!(err, Error::Grpc { .. }));
-    }
-}

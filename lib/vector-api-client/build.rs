@@ -4,7 +4,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=../../lib/vector-core/proto/event.proto");
 
     // First, generate event.proto types
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .build_server(false)
         .compile_protos(
             &["../../lib/vector-core/proto/event.proto"],
@@ -21,9 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "#[allow(clippy::large_enum_variant)]",
     );
 
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .build_server(false)
-        .compile_protos_with_config(
+        .compile_with_config(
             prost_config,
             &["../../proto/vector/observability.proto"],
             &[

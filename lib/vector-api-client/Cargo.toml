@@ -13,6 +13,7 @@ workspace = true
 # gRPC
 tonic.workspace = true
 tonic-health.workspace = true
+tonic-prost.workspace = true
 prost.workspace = true
 prost-types.workspace = true
 
@@ -27,5 +28,5 @@ snafu.workspace = true
 http = { version = "1", default-features = false, features = ["std"] }
 
 [build-dependencies]
-tonic-build.workspace = true
+tonic-prost-build.workspace = true
 prost-build.workspace = true

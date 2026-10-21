@@ -289,12 +289,9 @@ impl SourceConfig for PubsubConfig {
         let tls_config = if uri.scheme() == Some(&Scheme::HTTP) {
             None
         } else {
-            // Tonic 0.11 loaded the platform roots for every TLS endpoint,
-            // failing on load errors but accepting an empty store. Tonic
-            // 0.12's `with_native_roots` rejects an empty store even when
-            // authorities are configured, so load the roots here instead.
-            // Tonic accepts them only as trust anchors, so convert them the
-            // same way Rustls does, skipping unparsable certificates.
+            // Load platform roots explicitly: Tonic's `with_native_roots` rejects
+            // an empty store even when custom authorities are configured. Keep
+            // load errors, but skip certificates Rustls cannot use as trust anchors.
             let rustls_native_certs::CertificateResult { certs, errors, .. } =
                 rustls_native_certs::load_native_certs();
             if let Some(source) = errors.into_iter().next() {

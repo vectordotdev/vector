@@ -20,7 +20,7 @@ use vector_lib::{
 pub(crate) type HttpRequest = http::Request<hyper::Body>;
 
 /// Request served by the native Tonic gRPC listener.
-pub(crate) type GrpcRequest = http_1::Request<tonic::body::BoxBody>;
+pub(crate) type GrpcRequest = http_1::Request<tonic::body::Body>;
 
 /// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
@@ -310,7 +310,7 @@ mod tests {
     use http::StatusCode;
     use hyper::{Body, body::HttpBody};
     use prost::Message;
-    use tonic::body::{BoxBody, empty_body};
+    use tonic::body::Body as TonicBody;
     use vector_lib::event::{BatchNotifier, Event, EventStatus, LogEvent};
 
     use super::*;
@@ -320,14 +320,14 @@ mod tests {
     };
 
     type HttpResponse = http::Response<Body>;
-    type GrpcResponse = http_1::Response<BoxBody>;
+    type GrpcResponse = http_1::Response<TonicBody>;
 
     fn http_request() -> HttpRequest {
         http::Request::new(Body::empty())
     }
 
     fn grpc_request() -> GrpcRequest {
-        http_1::Request::new(empty_body())
+        http_1::Request::new(TonicBody::empty())
     }
 
     fn http_ok() -> HttpResponse {

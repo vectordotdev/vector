@@ -1,7 +1,7 @@
 use futures::TryFutureExt;
 use prost::Message;
 use smallvec::SmallVec;
-use tonic::{Request, Response, Status, body::BoxBody};
+use tonic::{Request, Response, Status, body::Body as TonicBody};
 use vector_lib::opentelemetry::proto::metrics::v1::ResourceMetrics;
 use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 use vector_lib::{
@@ -37,7 +37,7 @@ use crate::{
     },
 };
 
-pub(crate) fn middleware_error_response(error: MiddlewareError) -> http_1::Response<BoxBody> {
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> http_1::Response<TonicBody> {
     Status::unavailable(error.message()).into_http()
 }
 
@@ -186,7 +186,7 @@ fn response_with_acknowledgement<T>(
     let mut response = Response::new(message);
     if let Some(receiver) = receiver {
         // Request control looks this slot up by the native gRPC response type.
-        let pending = PendingAcknowledgement::<http_1::Response<BoxBody>>::new(
+        let pending = PendingAcknowledgement::<http_1::Response<TonicBody>>::new(
             receiver,
             acknowledgement_failure_response,
         );
@@ -197,7 +197,7 @@ fn response_with_acknowledgement<T>(
     response
 }
 
-fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http_1::Response<BoxBody> {
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http_1::Response<TonicBody> {
     match status {
         AcknowledgementFailure::Errored => Status::internal("Delivery error"),
         AcknowledgementFailure::Rejected => Status::data_loss("Delivery failed"),

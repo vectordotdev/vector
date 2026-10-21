@@ -292,7 +292,7 @@ version = "0.1.0"
 dependencies = [
  "antithesis-instrumentation",
  "antithesis_sdk",
- "axum 0.7.9",
+ "axum 0.8.9",
  "clap",
  "reqwest 0.11.26",
  "serde",
@@ -1967,8 +1967,6 @@ dependencies = [
  "http 1.5.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper 1.11.1",
- "hyper-util",
  "itoa",
  "matchit 0.7.3",
  "memchr",
@@ -1978,7 +1976,6 @@ dependencies = [
  "rustversion",
  "serde",
  "sync_wrapper 1.0.2",
- "tokio",
  "tower 0.5.3",
  "tower-layer",
  "tower-service",
@@ -1996,6 +1993,8 @@ dependencies = [
  "http 1.5.0",
  "http-body 1.0.1",
  "http-body-util",
+ "hyper 1.11.1",
+ "hyper-util",
  "itoa",
  "matchit 0.8.4",
  "memchr",
@@ -2004,6 +2003,7 @@ dependencies = [
  "pin-project-lite",
  "serde_core",
  "sync_wrapper 1.0.2",
+ "tokio",
  "tower 0.5.3",
  "tower-layer",
  "tower-service",
@@ -2212,7 +2212,7 @@ dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "regex",
@@ -2891,8 +2891,8 @@ dependencies = [
  "parquet",
  "pin-project",
  "proptest",
- "prost 0.13.5",
- "prost-reflect 0.14.7",
+ "prost 0.14.3",
+ "prost-reflect",
  "rand 0.10.2",
  "regex",
  "rstest",
@@ -3701,7 +3701,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "prost 0.14.3",
- "prost-reflect 0.16.5",
+ "prost-reflect",
  "prost-types 0.14.3",
  "protoc-bin-vendored",
  "reqwest 0.12.28",
@@ -3734,8 +3734,8 @@ dependencies = [
 name = "datadog-proto"
 version = "0.1.0"
 dependencies = [
- "prost 0.13.5",
- "prost-build 0.13.5",
+ "prost 0.14.3",
+ "prost-build 0.14.3",
 ]
 
 [[package]]
@@ -4060,8 +4060,8 @@ dependencies = [
  "dnsmsg-parser",
  "hickory-proto",
  "pastey",
- "prost 0.13.5",
- "prost-build 0.13.5",
+ "prost 0.14.3",
+ "prost-build 0.14.3",
  "snafu 0.9.2",
  "tracing 0.1.44",
  "vector-common",
@@ -6997,9 +6997,9 @@ name = "loki-logproto"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "prost 0.13.5",
- "prost-build 0.13.5",
- "prost-types 0.13.5",
+ "prost 0.14.3",
+ "prost-build 0.14.3",
+ "prost-types 0.14.3",
 ]
 
 [[package]]
@@ -8308,10 +8308,10 @@ dependencies = [
  "glob",
  "hex",
  "ordered-float 5.3.0",
- "prost 0.13.5",
- "prost-build 0.13.5",
- "tonic 0.12.3",
- "tonic-build 0.12.3",
+ "prost 0.14.3",
+ "tonic 0.14.5",
+ "tonic-prost",
+ "tonic-prost-build",
  "vector-common",
  "vector-core",
  "vrl",
@@ -9091,9 +9091,9 @@ version = "0.1.0"
 dependencies = [
  "indexmap 2.14.2",
  "nom 8.0.0",
- "prost 0.13.5",
- "prost-build 0.13.5",
- "prost-types 0.13.5",
+ "prost 0.14.3",
+ "prost-build 0.14.3",
+ "prost-types 0.14.3",
  "snafu 0.9.2",
  "vector-common",
 ]
@@ -9155,7 +9155,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -9175,7 +9175,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -9196,7 +9196,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
@@ -9209,24 +9209,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "prost-reflect"
-version = "0.14.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5edd582b62f5cde844716e66d92565d7faf7ab1445c8cebce6e00fba83ddb2"
-dependencies = [
- "base64 0.22.1",
- "once_cell",
- "prost 0.13.5",
- "prost-types 0.13.5",
- "serde",
- "serde-value",
 ]
 
 [[package]]
@@ -9235,8 +9221,11 @@ version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01b80ea363c31af2de2b92e3c07ed1156628f7838c4afb4df75ee78a37fedbd1"
 dependencies = [
+ "base64 0.22.1",
  "prost 0.14.3",
  "prost-types 0.14.3",
+ "serde",
+ "serde-value",
 ]
 
 [[package]]
@@ -12473,7 +12462,6 @@ dependencies = [
  "axum 0.7.9",
  "base64 0.22.1",
  "bytes",
- "flate2",
  "h2 0.4.19",
  "http 1.5.0",
  "http-body 1.0.1",
@@ -12484,17 +12472,13 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.13.5",
- "rustls-native-certs 0.8.1",
- "rustls-pemfile 2.2.0",
  "socket2 0.5.10",
  "tokio",
- "tokio-rustls 0.26.2",
  "tokio-stream",
  "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing 0.1.44",
- "zstd",
 ]
 
 [[package]]
@@ -12532,20 +12516,6 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9557ce109ea773b399c9b9e5dca39294110b74f1f342cb347a80d1fce8c26a11"
-dependencies = [
- "prettyplease",
- "proc-macro2 1.0.107",
- "prost-build 0.13.5",
- "prost-types 0.13.5",
- "quote 1.0.47",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "tonic-build"
 version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c68f61875ac5293cf72e6c8cf0158086428c82c37229e98c840878f1706b0322"
@@ -12558,15 +12528,15 @@ dependencies = [
 
 [[package]]
 name = "tonic-health"
-version = "0.12.3"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1eaf34ddb812120f5c601162d5429933c9b527d901ab0e7f930d3147e33a09b2"
+checksum = "f4ff0636fef47afb3ec02818f5bceb4377b8abb9d6a386aeade18bd6212f8eb7"
 dependencies = [
- "async-stream",
- "prost 0.13.5",
+ "prost 0.14.3",
  "tokio",
  "tokio-stream",
- "tonic 0.12.3",
+ "tonic 0.14.5",
+ "tonic-prost",
 ]
 
 [[package]]
@@ -12593,20 +12563,21 @@ dependencies = [
  "quote 1.0.47",
  "syn 2.0.119",
  "tempfile",
- "tonic-build 0.14.6",
+ "tonic-build",
 ]
 
 [[package]]
 name = "tonic-reflection"
-version = "0.12.3"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "878d81f52e7fcfd80026b7fdb6a9b578b3c3653ba987f87f0dce4b64043cba27"
+checksum = "aaf0685a51e6d02b502ba0764002e766b7f3042aed13d9234925b6ffbfa3fca7"
 dependencies = [
- "prost 0.13.5",
- "prost-types 0.13.5",
+ "prost 0.14.3",
+ "prost-types 0.14.3",
  "tokio",
  "tokio-stream",
- "tonic 0.12.3",
+ "tonic 0.14.5",
+ "tonic-prost",
 ]
 
 [[package]]
@@ -13345,7 +13316,7 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-types",
- "axum 0.7.9",
+ "axum 0.8.9",
  "azure_core",
  "azure_identity",
  "azure_storage_blob",
@@ -13445,10 +13416,10 @@ dependencies = [
  "procfs",
  "proptest",
  "proptest-derive",
- "prost 0.13.5",
- "prost-build 0.13.5",
- "prost-reflect 0.14.7",
- "prost-types 0.13.5",
+ "prost 0.14.3",
+ "prost-build 0.14.3",
+ "prost-reflect",
+ "prost-types 0.14.3",
  "protobuf",
  "pulsar",
  "quick-junit",
@@ -13501,9 +13472,10 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "toml",
- "tonic 0.12.3",
- "tonic-build 0.12.3",
+ "tonic 0.14.5",
  "tonic-health",
+ "tonic-prost",
+ "tonic-prost-build",
  "tonic-reflection",
  "tower 0.5.3",
  "tower-http 0.4.4",
@@ -13538,15 +13510,16 @@ name = "vector-api-client"
 version = "0.2.0"
 dependencies = [
  "http 1.5.0",
- "prost 0.13.5",
- "prost-build 0.13.5",
- "prost-types 0.13.5",
+ "prost 0.14.3",
+ "prost-build 0.14.3",
+ "prost-types 0.14.3",
  "snafu 0.9.2",
  "tokio",
  "tokio-stream",
- "tonic 0.12.3",
- "tonic-build 0.12.3",
+ "tonic 0.14.5",
  "tonic-health",
+ "tonic-prost",
+ "tonic-prost-build",
 ]
 
 [[package]]
@@ -13726,9 +13699,9 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "proptest",
- "prost 0.13.5",
- "prost-build 0.13.5",
- "prost-types 0.13.5",
+ "prost 0.14.3",
+ "prost-build 0.14.3",
+ "prost-types 0.14.3",
  "quanta",
  "quickcheck",
  "quickcheck_macros",
@@ -13752,7 +13725,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tonic 0.12.3",
+ "tonic 0.14.5",
  "tracing 0.1.44",
  "url",
  "urlencoding",
@@ -13830,7 +13803,7 @@ dependencies = [
  "colored",
  "futures",
  "glob",
- "prost 0.13.5",
+ "prost 0.14.3",
  "serde_json",
  "serde_yaml",
  "tokio",
@@ -13960,8 +13933,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vrl"
-version = "0.36.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#deef5c37daadccd01812bd70dea09cadbc9a74ba"
+version = "0.37.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=prost-0.14-upgrade#060b9a8e95da35faa78c41af424072b1d55a9497"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",
@@ -14031,8 +14004,8 @@ dependencies = [
  "prettytable-rs",
  "proptest",
  "proptest-derive",
- "prost 0.13.5",
- "prost-reflect 0.14.7",
+ "prost 0.14.3",
+ "prost-reflect",
  "psl",
  "psl-types",
  "publicsuffix",
