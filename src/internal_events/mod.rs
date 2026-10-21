@@ -57,10 +57,6 @@ mod exec;
     feature = "sources-file",
     feature = "sources-kubernetes_logs",
     feature = "sinks-file",
-    feature = "sinks-aws_s3",
-    feature = "sinks-azure_blob",
-    feature = "sinks-gcp",
-    feature = "sinks-webhdfs",
 ))]
 mod file;
 #[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
