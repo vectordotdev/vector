@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use http::{Uri, header::HeaderValue};
+use http_1::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{prelude::*, util::HttpEndpoint, util::service::TowerRequestSettings},
 };
 
@@ -174,7 +174,7 @@ impl ValidatedSink for NewRelicConfig {
         } = validated;
 
         let tls_settings = TlsSettings::from_options(None)?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let healthcheck = Self::build_healthcheck(client.clone(), Arc::clone(credentials));
 
@@ -207,13 +207,19 @@ pub struct NewRelicCredentials {
 }
 
 impl NewRelicCredentials {
+    /// Returns the sink endpoint.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the credentials produce an invalid URI.
+    #[must_use]
     pub fn get_uri(&self) -> Uri {
         self.try_get_uri().expect("URI should be valid")
     }
 
     pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
-            return Ok(override_uri.as_uri().clone());
+            return Ok(override_uri.clone().into_v1());
         }
 
         match self.api {
