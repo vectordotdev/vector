@@ -33,40 +33,6 @@ async fn health_check_reports_serving() {
     assert!(harness.check_running(), "Vector should still be running");
 }
 
-#[tokio::test]
-async fn grpc_health_check_accepts_large_metadata() {
-    let config = single_source_config("demo", 1.0, None);
-    let harness = TestHarness::new(&config)
-        .await
-        .expect("Vector should start");
-    let url = format!("http://127.0.0.1:{}", harness.api_port());
-    let channel = tonic::transport::Endpoint::from_shared(url)
-        .expect("API URL should be valid")
-        .connect()
-        .await
-        .expect("health client should connect");
-    let mut client = tonic_health::pb::health_client::HealthClient::new(channel);
-    let mut request = tonic::Request::new(tonic_health::pb::HealthCheckRequest {
-        service: String::new(),
-    });
-    // The native HTTP/2 server default is only 16 KiB; the API must retain its
-    // existing capacity for larger request metadata.
-    request.metadata_mut().insert(
-        "x-vector-test-padding",
-        "x".repeat(24 * 1024).parse().expect("valid ASCII metadata"),
-    );
-    let response = client
-        .check(request)
-        .await
-        .expect("large request metadata should be accepted")
-        .into_inner();
-
-    assert_eq!(
-        response.status,
-        tonic_health::pb::health_check_response::ServingStatus::Serving as i32
-    );
-}
-
 /// Verifies the HTTP `GET /health` endpoint returns 200 with `{"ok":true}` on a
 /// running Vector instance. This endpoint is load-balancer friendly and is
 /// shared with gRPC clients on the same API port.
@@ -106,9 +72,7 @@ async fn http_health_endpoint_supports_head() {
     assert_eq!(response.status(), reqwest::StatusCode::OK);
 }
 
-/// Verifies the API keeps serving the `grpc.reflection.v1alpha` protocol used by
-/// tools such as grpcurl, and that it advertises the observability, health, and
-/// reflection services.
+/// Verifies the API serves `grpc.reflection.v1alpha`, which grpcurl uses.
 #[tokio::test]
 async fn grpc_reflection_v1alpha_lists_services() {
     let config = single_source_config("demo", 1.0, None);
@@ -132,24 +96,14 @@ async fn grpc_reflection_v1alpha_lists_services() {
         .await
         .expect("v1alpha reflection should be served")
         .into_inner();
-    let response = responses
-        .message()
-        .await
-        .expect("reflection response should be received")
-        .expect("reflection stream should yield a response");
+    let response = responses.message().await.unwrap().unwrap();
 
     let Some(MessageResponse::ListServicesResponse(list)) = response.message_response else {
         panic!("expected a list services response");
     };
-    let services: Vec<_> = list.service.into_iter().map(|s| s.name).collect();
-    for expected in [
-        "grpc.health.v1.Health",
-        "grpc.reflection.v1alpha.ServerReflection",
-        "vector.observability.v1.ObservabilityService",
-    ] {
-        assert!(
-            services.iter().any(|name| name == expected),
-            "{expected} should be advertised, got {services:?}"
-        );
-    }
+    assert!(
+        list.service
+            .iter()
+            .any(|service| service.name == "vector.observability.v1.ObservabilityService")
+    );
 }

@@ -103,10 +103,9 @@ impl GrpcServer {
                 .into_axum_router()
                 .merge(http_router(router_serving));
 
-            // Preserve the existing 16 MiB HTTP/2 request-header limit.
             let result = tonic::transport::Server::builder()
                 .accept_http1(true)
-                .http2_max_header_list_size(16 * 1024 * 1024)
+                .http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE)
                 .add_routes(router.into())
                 .serve_with_incoming_shutdown(
                     tokio_stream::wrappers::TcpListenerStream::new(listener),

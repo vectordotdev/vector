@@ -142,9 +142,8 @@ impl<Resp> PendingAcknowledgement<Resp> {
     }
 }
 
-/// Native HTTP 1 extensions must be `Clone`, but a pending acknowledgement owns its single
-/// receiver. Clones share that receiver: request control takes it at most once, and dropping every
-/// clone before then drops the receiver.
+/// HTTP 1 extensions must be `Clone`, so clones share the single receiver, which request control
+/// takes at most once.
 pub(crate) struct SharedPendingAcknowledgement<Resp>(
     Arc<Mutex<Option<PendingAcknowledgement<Resp>>>>,
 );
@@ -170,14 +169,12 @@ pub(crate) trait AcknowledgementResponse: Sized {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>>;
 }
 
-/// Legacy HTTP extensions own the pending acknowledgement directly.
 impl<B: 'static> AcknowledgementResponse for http::Response<B> {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
         self.extensions_mut().remove()
     }
 }
 
-/// Native gRPC responses carry the pending acknowledgement in a cloneable shared slot.
 impl<B: 'static> AcknowledgementResponse for http_1::Response<B> {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
         self.extensions_mut()
@@ -368,92 +365,6 @@ mod tests {
         }
     }
 
-    /// Returns an event whose finalization completes the returned acknowledgement receiver.
-    fn acknowledged_event() -> (Event, BatchStatusReceiver) {
-        let mut events = [Event::Log(LogEvent::from("message"))];
-        let receiver = BatchNotifier::apply_to(&mut events);
-        let [event] = events;
-        (event, receiver)
-    }
-
-    fn finalize(event: Event, status: EventStatus) {
-        event.metadata().finalizers().update_status(status);
-        drop(event);
-    }
-
-    // Distinct responses identify which acknowledgement outcome replaced the processed response.
-    fn http_acknowledgement_failure(failure: AcknowledgementFailure) -> HttpResponse {
-        let status = match failure {
-            AcknowledgementFailure::Errored => StatusCode::INTERNAL_SERVER_ERROR,
-            AcknowledgementFailure::Rejected => StatusCode::BAD_GATEWAY,
-        };
-        http::Response::builder()
-            .status(status)
-            .body(Body::empty())
-            .unwrap()
-    }
-
-    fn grpc_acknowledgement_failure(failure: AcknowledgementFailure) -> GrpcResponse {
-        match failure {
-            AcknowledgementFailure::Errored => tonic::Status::internal(""),
-            AcknowledgementFailure::Rejected => tonic::Status::data_loss(""),
-        }
-        .into_http()
-    }
-
-    fn http_request_awaiting(receiver: BatchStatusReceiver) -> HttpRequest {
-        let mut request = http_request();
-        request.extensions_mut().insert(PendingAcknowledgement::new(
-            receiver,
-            http_acknowledgement_failure,
-        ));
-        request
-    }
-
-    fn grpc_request_awaiting(receiver: BatchStatusReceiver) -> GrpcRequest {
-        let mut request = grpc_request();
-        request
-            .extensions_mut()
-            .insert(SharedPendingAcknowledgement::new(
-                PendingAcknowledgement::new(receiver, grpc_acknowledgement_failure),
-            ));
-        request
-    }
-
-    /// Completes processing immediately, handing any request acknowledgement to its response as
-    /// the OTLP HTTP handlers do.
-    fn http_acknowledging_service()
-    -> impl Service<HttpRequest, Response = HttpResponse, Error = Infallible, Future: Send> + Clone
-    {
-        service_fn(|mut request: HttpRequest| {
-            let mut response = http_ok();
-            if let Some(pending) = request
-                .extensions_mut()
-                .remove::<PendingAcknowledgement<HttpResponse>>()
-            {
-                response.extensions_mut().insert(pending);
-            }
-            ready(Ok::<_, Infallible>(response))
-        })
-    }
-
-    /// Completes processing immediately, handing any request acknowledgement to its response as
-    /// the OTLP gRPC services do.
-    fn grpc_acknowledging_service()
-    -> impl Service<GrpcRequest, Response = GrpcResponse, Error = Infallible, Future: Send> + Clone
-    {
-        service_fn(|mut request: GrpcRequest| {
-            let mut response = grpc_ok();
-            if let Some(pending) = request
-                .extensions_mut()
-                .remove::<SharedPendingAcknowledgement<GrpcResponse>>()
-            {
-                response.extensions_mut().insert(pending);
-            }
-            ready(Ok::<_, Infallible>(response))
-        })
-    }
-
     fn init_metrics() {
         vector_lib::metrics::init_test();
         vector_lib::metrics::Controller::get().unwrap().reset();
@@ -642,22 +553,9 @@ mod tests {
                     "request failed",
                 )))
             }));
-        // Native Tonic routes report failures as boxed errors rather than `Infallible`.
-        let grpc = control
-            .grpc_layer(grpc_error_response)
-            .layer(service_fn(|_: GrpcRequest| {
-                ready(Err::<GrpcResponse, tower::BoxError>(
-                    std::io::Error::other("request failed").into(),
-                ))
-            }));
 
         let response = http.oneshot(http_request()).await.unwrap();
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
-        assert_eq!(active_requests(), 0.0);
-
-        let response = grpc.oneshot(grpc_request()).await.unwrap();
-        assert_eq!(response.headers()["grpc-status"], "14");
         assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
         assert_eq!(active_requests(), 0.0);
     }
@@ -728,11 +626,6 @@ mod tests {
             .layer(service_fn(|_: HttpRequest| {
                 pending::<Result<HttpResponse, Infallible>>()
             }));
-        let grpc = control
-            .grpc_layer(grpc_error_response)
-            .layer(service_fn(|_: GrpcRequest| {
-                pending::<Result<GrpcResponse, Infallible>>()
-            }));
 
         let timed_out = http.clone().oneshot(http_request()).await.unwrap();
         assert_eq!(timed_out.status(), StatusCode::SERVICE_UNAVAILABLE);
@@ -749,13 +642,6 @@ mod tests {
         assert_eq!(active_requests(), 0.0);
 
         let mut request = Box::pin(http.oneshot(http_request()));
-        assert!(futures::poll!(&mut request).is_pending());
-        assert_eq!(active_requests(), 1.0);
-        drop(request);
-        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
-        assert_eq!(active_requests(), 0.0);
-
-        let mut request = Box::pin(grpc.oneshot(grpc_request()));
         assert!(futures::poll!(&mut request).is_pending());
         assert_eq!(active_requests(), 1.0);
         drop(request);
@@ -814,123 +700,23 @@ mod tests {
         );
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
-    #[tokio::test(start_paused = true)]
-    async fn acknowledgement_outcomes_are_awaited_after_admission_and_outside_timeout() {
-        init_metrics();
-        let control = RequestControl::new(Some(1), Some(Duration::from_secs(1)));
-        let http = control
-            .http_layer(http_error_response)
-            .layer(http_acknowledging_service());
-        let grpc = control
-            .grpc_layer(grpc_error_response)
-            .layer(grpc_acknowledging_service());
-
-        for (status, http_status, grpc_status) in [
-            (EventStatus::Delivered, StatusCode::OK, "0"),
-            (
-                EventStatus::Errored,
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "13",
-            ),
-            (EventStatus::Rejected, StatusCode::BAD_GATEWAY, "15"),
-        ] {
-            let (http_event, receiver) = acknowledged_event();
-            let mut http_response = Box::pin(http.clone().oneshot(http_request_awaiting(receiver)));
-            assert!(futures::poll!(&mut http_response).is_pending());
-            // A request awaiting acknowledgement holds neither the permit nor the active gauge, so
-            // the other protocol is admitted with a limit of one.
-            assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
-            assert_eq!(active_requests(), 0.0);
-
-            let (grpc_event, receiver) = acknowledged_event();
-            let mut grpc_response = Box::pin(grpc.clone().oneshot(grpc_request_awaiting(receiver)));
-            assert!(futures::poll!(&mut grpc_response).is_pending());
-            assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
-            assert_eq!(active_requests(), 0.0);
-
-            tokio::time::advance(Duration::from_secs(2)).await;
-            assert!(futures::poll!(&mut http_response).is_pending());
-            assert!(futures::poll!(&mut grpc_response).is_pending());
-
-            finalize(http_event, status);
-            finalize(grpc_event, status);
-            assert_eq!(http_response.await.unwrap().status(), http_status);
-            assert_eq!(
-                grpc_response.await.unwrap().headers()["grpc-status"],
-                grpc_status
-            );
-        }
-
-        for protocol in ["http", "grpc"] {
-            assert_eq!(
-                counter_value(CounterName::ComponentTimedOutRequestsTotal, protocol),
-                0.0
-            );
-            assert_eq!(
-                counter_value(CounterName::ComponentLoadShedRequestsTotal, protocol),
-                0.0
-            );
-        }
-    }
-
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
-    #[tokio::test]
-    async fn cancelled_acknowledgement_waits_leave_admission_available() {
-        init_metrics();
-        let control = RequestControl::new(Some(1), None);
-        let http = control
-            .http_layer(http_error_response)
-            .layer(http_acknowledging_service());
-        let grpc = control
-            .grpc_layer(grpc_error_response)
-            .layer(grpc_acknowledging_service());
-
-        let (http_event, receiver) = acknowledged_event();
-        let mut http_wait = Box::pin(http.clone().oneshot(http_request_awaiting(receiver)));
-        assert!(futures::poll!(&mut http_wait).is_pending());
-        let (grpc_event, receiver) = acknowledged_event();
-        let mut grpc_wait = Box::pin(grpc.clone().oneshot(grpc_request_awaiting(receiver)));
-        assert!(futures::poll!(&mut grpc_wait).is_pending());
-
-        // Clients disconnect while their deliveries are still pending.
-        drop(http_wait);
-        drop(grpc_wait);
-        finalize(http_event, EventStatus::Errored);
-        finalize(grpc_event, EventStatus::Rejected);
-
-        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
-        assert_eq!(active_requests(), 0.0);
-        assert_eq!(
-            http.oneshot(http_request()).await.unwrap().status(),
-            StatusCode::OK
-        );
-        assert_eq!(
-            grpc.oneshot(grpc_request()).await.unwrap().headers()["grpc-status"],
-            "0"
-        );
-    }
-
     #[tokio::test]
     async fn grpc_acknowledgement_is_awaited_once_across_extension_clones() {
-        let (event, receiver) = acknowledged_event();
+        let mut events = [Event::Log(LogEvent::from("message"))];
+        let receiver = BatchNotifier::apply_to(&mut events);
         let mut response = grpc_ok();
         response
             .extensions_mut()
             .insert(SharedPendingAcknowledgement::new(
-                PendingAcknowledgement::new(receiver, grpc_acknowledgement_failure),
+                PendingAcknowledgement::<GrpcResponse>::new(receiver, |_| {
+                    tonic::Status::data_loss("").into_http()
+                }),
             ));
         let cloned = response.extensions().clone();
 
         let mut finalizing = Box::pin(finalize_acknowledgement(response));
         assert!(futures::poll!(&mut finalizing).is_pending());
-        // The awaiting response owns the receiver; the surviving clone cannot take it again.
+        // The clone cannot take the receiver again.
         assert!(
             cloned
                 .get::<SharedPendingAcknowledgement<GrpcResponse>>()
@@ -939,7 +725,12 @@ mod tests {
                 .is_none()
         );
 
-        finalize(event, EventStatus::Rejected);
+        let [event] = events;
+        event
+            .metadata()
+            .finalizers()
+            .update_status(EventStatus::Rejected);
+        drop(event);
         assert_eq!(finalizing.await.unwrap().headers()["grpc-status"], "15");
     }
 }

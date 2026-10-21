@@ -215,8 +215,6 @@ impl GcpAuthenticator {
         }
     }
 
-    /// Applies the API key to a native `http 1` URI, mirroring [`Self::apply_uri`].
-    ///
     /// # Panics
     /// Panics if adding the API key produces an invalid URI.
     pub fn apply_uri_v1(&self, uri: &mut UriV1) {

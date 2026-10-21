@@ -42,10 +42,6 @@ use vector_lib::configurable::configurable_component;
 mod decompression;
 pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLayer};
 
-// gRPC request metadata may use up to 16 MiB of HTTP/2 headers. Set this explicitly rather than
-// inherit Hyper's default, which is 16 KiB since Hyper 1.
-const GRPC_MAX_HEADER_LIST_SIZE: u32 = 16 << 20;
-
 #[cfg(test)]
 static MAX_CONNECTION_AGE_CONNECTION_OBSERVATIONS: std::sync::Mutex<Vec<SocketAddr>> =
     std::sync::Mutex::new(Vec::new());
@@ -386,7 +382,7 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
-        .http2_max_header_list_size(GRPC_MAX_HEADER_LIST_SIZE)
+        .http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've
@@ -445,7 +441,7 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
-        .http2_max_header_list_size(GRPC_MAX_HEADER_LIST_SIZE)
+        .http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // Request admission must see each HTTP/2 stream before its body is decompressed.

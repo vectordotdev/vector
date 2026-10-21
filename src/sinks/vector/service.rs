@@ -66,13 +66,9 @@ impl MetaDescriptive for VectorRequest {
 }
 
 impl VectorService {
-    /// Creates a gRPC client that sends every request to the scheme and authority of `uri`.
+    /// Sends every request to the scheme and authority of `uri`; its path is ignored.
     ///
-    /// The path of `uri` is not used: request paths are the gRPC method paths.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `uri` has no scheme or authority.
+    /// Fails if `uri` has no scheme or authority.
     pub fn new(
         client: Http2Client<BoxBody>,
         uri: Uri,
@@ -117,8 +113,11 @@ impl Service<VectorRequest> for VectorService {
 
     // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Readiness of the gRPC client is awaited by the `push_events()` call inside `call()`,
-        // which blocks until the client is ready to perform another request.
+        // Readiness check of the client is done through the `push_events()`
+        // call happening inside `call()`. That check blocks until the client is
+        // ready to perform another request.
+        //
+        // See: <https://docs.rs/tonic/0.4.2/tonic/client/struct.Grpc.html#method.ready>
         Poll::Ready(Ok(()))
     }
 

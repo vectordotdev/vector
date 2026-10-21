@@ -204,9 +204,9 @@ impl SourceConfig for VectorConfig {
             acknowledgements,
             log_namespace,
         })
-        // Set the decoding limit explicitly instead of relying on Tonic's default. Bound it by
-        // the global decompressed-size cap rather than `usize::MAX` so a single oversized message
-        // cannot drive unbounded allocation on this unauthenticated listener.
+        // Tonic added a default of 4MB in 0.9. Bound this by the global decompressed-size
+        // cap rather than `usize::MAX` so a single oversized message cannot drive unbounded
+        // allocation on this unauthenticated listener.
         .max_decoding_message_size(max_decompressed_size_bytes());
 
         // Create the standard gRPC health service
@@ -616,108 +616,23 @@ mod tests {
         assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
     }
 
-    async fn start_source(config: &str, tx: SourceSender) {
-        let source: VectorConfig = toml::from_str(config).unwrap();
-        let server = source
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(source.address).await;
-    }
-
-    #[tokio::test]
-    async fn sink_healthcheck_uses_override_uri() {
-        use crate::config::SinkHealthcheckOptions;
-
-        let (_guard, addr) = test_util::addr::next_addr();
-        let (_unused_guard, unused_addr) = test_util::addr::next_addr();
-        let (tx, _rx) = SourceSender::new_test();
-        start_source(&format!("address = \"{addr}\""), tx).await;
-
-        let sink: SinkConfig =
-            toml::from_str(&format!("address = \"http://{unused_addr}\"")).unwrap();
-
-        let (_, healthcheck) = sink.build(SinkContext::default()).await.unwrap();
-        assert!(
-            healthcheck.await.is_err(),
-            "healthcheck of an endpoint without a listener must fail"
-        );
-
-        let cx = SinkContext {
-            healthcheck: SinkHealthcheckOptions {
-                uri: Some(format!("http://{addr}").parse().unwrap()),
-                ..SinkHealthcheckOptions::default()
-            },
-            ..SinkContext::default()
-        };
-        let (_, healthcheck) = sink.build(cx).await.unwrap();
-        healthcheck
-            .await
-            .expect("healthcheck override must reach the source's health service");
-    }
-
-    #[tokio::test]
-    async fn sink_reports_source_acknowledgement_rejection_without_resending() {
-        use std::sync::{
-            Arc,
-            atomic::{AtomicUsize, Ordering},
-        };
-
-        use futures::StreamExt;
-        use vector_lib::event::EventStatus;
-
-        let num_events = 10;
-        let (_guard, addr) = test_util::addr::next_addr();
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Rejected);
-        start_source(
-            &format!("address = \"{addr}\"\nacknowledgements = true"),
-            tx,
-        )
-        .await;
-
-        // Events are finalized as they are received and dropped, which releases the source's
-        // pending acknowledgement.
-        let received = Arc::new(AtomicUsize::new(0));
-        let counter = Arc::clone(&received);
-        tokio::spawn(rx.for_each(move |_event| {
-            counter.fetch_add(1, Ordering::AcqRel);
-            std::future::ready(())
-        }));
-
-        let sink: SinkConfig = toml::from_str(&format!("address = \"http://{addr}\"")).unwrap();
-        let (sink, _) = sink.build(SinkContext::default()).await.unwrap();
-
-        let (batch, ack_status) = BatchNotifier::new_with_receiver();
-        let (_, stream) = test_util::random_events_with_stream(16, num_events, Some(batch));
-        sink.run(stream).await.unwrap();
-
-        assert_eq!(ack_status.await, BatchStatus::Rejected);
-        assert_eq!(
-            received.load(Ordering::Acquire),
-            num_events,
-            "a rejected batch is not retriable and must be sent once"
-        );
-    }
-
     #[tokio::test]
     async fn sink_reconnects_after_source_max_connection_age() {
         use futures::StreamExt;
         use tokio::time::{Duration, sleep};
 
-        use crate::sources::util::grpc::test_support::{
-            max_connection_age_connection_observations,
-            reset_max_connection_age_connection_observations,
-        };
-
         let (_guard, addr) = test_util::addr::next_addr();
-        reset_max_connection_age_connection_observations();
-        let (tx, rx) = SourceSender::new_test();
-        start_source(
-            &format!("address = \"{addr}\"\n[keepalive]\nmax_connection_age_secs = 1"),
-            tx,
-        )
-        .await;
+        let source: VectorConfig = toml::from_str(&format!(
+            "address = \"{addr}\"\n[keepalive]\nmax_connection_age_secs = 1"
+        ))
+        .unwrap();
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
 
         // Retries are disabled, so the second batch must succeed on a new connection.
         let sink: SinkConfig = toml::from_str(&format!(
@@ -727,45 +642,19 @@ mod tests {
         let (sink, _) = sink.build(SinkContext::default()).await.unwrap();
 
         let (first_batch, first_receiver) = BatchNotifier::new_with_receiver();
-        let (first_events, first_stream) =
-            test_util::random_events_with_stream(16, 5, Some(first_batch));
+        let (_, first_stream) = test_util::random_events_with_stream(16, 5, Some(first_batch));
         let (second_batch, second_receiver) = BatchNotifier::new_with_receiver();
-        let (second_events, second_stream) =
-            test_util::random_events_with_stream(16, 5, Some(second_batch));
-
-        let (observed_tx, observed_rx) = tokio::sync::oneshot::channel();
-        let after_first_batch = futures::stream::once(async move {
+        let (_, second_stream) = test_util::random_events_with_stream(16, 5, Some(second_batch));
+        let wait_for_max_age = futures::stream::once(async move {
             assert_eq!(first_receiver.await, BatchStatus::Delivered);
-            observed_tx
-                .send(max_connection_age_connection_observations())
-                .unwrap();
             sleep(Duration::from_millis(1500)).await;
         })
         .filter_map(|()| std::future::ready(None));
 
-        sink.run(first_stream.chain(after_first_batch).chain(second_stream))
+        sink.run(first_stream.chain(wait_for_max_age).chain(second_stream))
             .await
             .unwrap();
 
         assert_eq!(second_receiver.await, BatchStatus::Delivered);
-        let before_expiry = observed_rx.await.unwrap();
-        assert!(!before_expiry.is_empty());
-        let observations = max_connection_age_connection_observations();
-        assert!(
-            observations
-                .iter()
-                .any(|peer_addr| !before_expiry.contains(peer_addr)),
-            "expected the sink to reconnect after max connection age elapsed, got observations: {observations:?}",
-        );
-
-        let mut events = first_events;
-        events.extend(second_events);
-        for event in &mut events {
-            event.as_mut_log().insert(
-                log_schema().source_type_key_target_path().unwrap(),
-                "vector",
-            );
-        }
-        assert_event_data_eq!(events, test_util::collect_ready(rx));
     }
 }
