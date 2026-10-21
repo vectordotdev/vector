@@ -393,11 +393,18 @@ where
         // Retry sits outside the adaptive concurrency limit so that a permit is not held while a
         // request sleeps between attempts. Since that means the adaptive limit no longer bounds the
         // requests waiting to be retried, bound whole retry sequences separately.
-        let max_logical_requests = self
-            .settings
-            .concurrency
-            .unwrap_or(self.settings.adaptive_concurrency.max_concurrency_limit)
-            .saturating_mul(RETRY_HEADROOM);
+        //
+        // A concurrency of 1 is how sinks request strict ordering (e.g. Loki's ordered modes, Azure
+        // append blobs, `concurrency: none`), so there the whole retry sequence stays serialized.
+        let max_logical_requests = match self.settings.concurrency {
+            Some(1) => 1,
+            Some(limit) => limit.saturating_mul(RETRY_HEADROOM),
+            None => self
+                .settings
+                .adaptive_concurrency
+                .max_concurrency_limit
+                .saturating_mul(RETRY_HEADROOM),
+        };
         ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
@@ -417,9 +424,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicUsize, Ordering, Ordering::AcqRel},
+    use std::{
+        collections::HashSet,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, AtomicUsize, Ordering, Ordering::AcqRel},
+        },
     };
 
     use futures::{FutureExt, SinkExt, StreamExt, future, stream};
@@ -588,82 +598,114 @@ mod tests {
         );
     }
 
-    #[tokio::test(start_paused = true)]
-    async fn retry_backoff_does_not_hold_concurrency_permit() {
+    fn retry_test_settings(concurrency: usize) -> TowerRequestSettings {
         let cfg: TowerRequestConfig<GlobalTowerRequestConfigDefaults> = TowerRequestConfig {
-            concurrency: Concurrency::Fixed(1),
+            concurrency: Concurrency::Fixed(concurrency),
             retry_initial_backoff_secs: NonZeroU64::new(60).unwrap(),
+            retry_max_duration_secs: NonZeroU64::new(60).unwrap(),
             retry_jitter_mode: JitterMode::None,
             ..TowerRequestConfig::default()
         };
-        let settings = cfg.into_settings();
+        cfg.into_settings()
+    }
 
-        let failed_once = Arc::new(AtomicBool::new(false));
+    fn buffered<S>(
+        settings: TowerRequestSettings,
+        inner: S,
+    ) -> impl Service<usize, Response = usize, Error = tower::BoxError, Future: Send> + Clone
+    where
+        S: Service<usize, Response = usize> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        tower::buffer::Buffer::new(
+            ServiceBuilder::new()
+                .settings(settings, RetryUsize)
+                .service(inner),
+            10,
+        )
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retry_backoff_does_not_hold_concurrency_permit() {
+        // The first attempt of requests 0 and 1 fails and they sleep in backoff, which would
+        // occupy both concurrency permits if retries were nested inside the limiter.
+        let seen = Arc::new(Mutex::new(HashSet::new()));
         let inner = tower::service_fn(move |req: usize| {
-            if req == 0 && !failed_once.swap(true, AcqRel) {
+            if req < 2 && seen.lock().unwrap().insert(req) {
                 future::err::<usize, _>(std::io::Error::other("")).boxed()
             } else {
                 future::ok::<_, std::io::Error>(req).boxed()
             }
         });
-        let svc = tower::buffer::Buffer::new(
-            ServiceBuilder::new()
-                .settings(settings, RetryUsize)
-                .service(inner),
-            10,
-        );
+        let svc = buffered(retry_test_settings(2), inner);
 
-        // The first request fails and sleeps in its retry backoff.
         let first = tokio::spawn(svc.clone().oneshot(0));
+        let second = tokio::spawn(svc.clone().oneshot(1));
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // The second request must not be blocked by the first one's backoff.
-        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(1))
+        // A third request must not be blocked by the other two's retry backoff.
+        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(2))
             .await
-            .expect("second request was blocked by the first request's retry backoff")
+            .expect("request was blocked by other requests' retry backoff")
             .unwrap();
 
         first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
     }
 
     #[tokio::test(start_paused = true)]
     async fn retrying_requests_are_bounded() {
-        let cfg: TowerRequestConfig<GlobalTowerRequestConfigDefaults> = TowerRequestConfig {
-            concurrency: Concurrency::Fixed(1),
-            retry_initial_backoff_secs: NonZeroU64::new(60).unwrap(),
-            retry_jitter_mode: JitterMode::None,
-            ..TowerRequestConfig::default()
-        };
-        let settings = cfg.into_settings();
-
-        let third_calls = Arc::new(AtomicUsize::new(0));
+        let fifth_calls = Arc::new(AtomicUsize::new(0));
         let inner = {
-            let third_calls = Arc::clone(&third_calls);
+            let fifth_calls = Arc::clone(&fifth_calls);
             tower::service_fn(move |req: usize| {
-                if req == 2 {
-                    third_calls.fetch_add(1, AcqRel);
+                if req == 4 {
+                    fifth_calls.fetch_add(1, Ordering::AcqRel);
                 }
                 future::err::<usize, _>(std::io::Error::other("")).boxed()
             })
         };
-        let svc = tower::buffer::Buffer::new(
-            ServiceBuilder::new()
-                .settings(settings, RetryUsize)
-                .service(inner),
-            10,
-        );
+        let svc = buffered(retry_test_settings(2), inner);
 
-        // With a concurrency of 1, two logical requests may be in flight (one attempting, one in
-        // backoff). Both keep failing.
-        tokio::spawn(svc.clone().oneshot(0));
-        tokio::spawn(svc.clone().oneshot(1));
+        // With a concurrency of 2, four logical requests may be in flight. All keep failing.
+        for req in 0..4 {
+            tokio::spawn(svc.clone().oneshot(req));
+        }
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        // A third one must wait instead of piling up behind them.
-        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(2))
+        // A fifth one must wait instead of piling up behind them.
+        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(4))
             .await
-            .expect_err("third request should be held back by the retry bound");
-        assert_eq!(third_calls.load(Ordering::Acquire), 0);
+            .expect_err("request should be held back by the retry bound");
+        assert_eq!(fifth_calls.load(Ordering::Acquire), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn concurrency_of_one_keeps_retries_ordered() {
+        // Request 0 fails once. Request 1 must not overtake it while it is backing off.
+        let failed_once = Arc::new(AtomicBool::new(false));
+        let completed = Arc::new(Mutex::new(Vec::new()));
+        let inner = {
+            let completed = Arc::clone(&completed);
+            tower::service_fn(move |req: usize| {
+                if req == 0 && !failed_once.swap(true, AcqRel) {
+                    future::err::<usize, _>(std::io::Error::other("")).boxed()
+                } else {
+                    completed.lock().unwrap().push(req);
+                    future::ok::<_, std::io::Error>(req).boxed()
+                }
+            })
+        };
+        let svc = buffered(retry_test_settings(1), inner);
+
+        let first = tokio::spawn(svc.clone().oneshot(0));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let second = tokio::spawn(svc.clone().oneshot(1));
+
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
+        assert_eq!(*completed.lock().unwrap(), vec![0, 1]);
     }
 
     #[derive(Clone, Debug, Copy)]

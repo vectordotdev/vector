@@ -214,10 +214,18 @@ impl ValidatedSink for TestConfig {
 
         // Dig deep to get at the internal controller statistics
         let stats = Arc::clone(
-            &Pin::new(&sink.get_ref().get_ref().get_ref().get_ref())
-                .get_ref()
-                .controller
-                .stats,
+            &Pin::new(
+                &sink
+                    .get_ref()
+                    .get_ref()
+                    .get_ref()
+                    .get_ref()
+                    .get_ref()
+                    .get_ref(),
+            )
+            .get_ref()
+            .controller
+            .stats,
         );
         *self.controller_stats.lock().unwrap() = stats;
 
