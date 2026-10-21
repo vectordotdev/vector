@@ -582,6 +582,7 @@ mod tests {
         let cfg: TowerRequestConfig<GlobalTowerRequestConfigDefaults> = TowerRequestConfig {
             concurrency: Concurrency::Fixed(1),
             retry_initial_backoff_secs: NonZeroU64::new(60).unwrap(),
+            retry_jitter_mode: JitterMode::None,
             ..TowerRequestConfig::default()
         };
         let settings = cfg.into_settings();
