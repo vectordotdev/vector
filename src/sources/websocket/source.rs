@@ -136,7 +136,6 @@ impl WebSocketSource {
                             ))
                         });
                         emit!(WebSocketConnectionShutdown);
-                        return Err(error);
                     }
                     WebSocketSourceError::Tungstenite { source: ws_err } => {
                         if is_closed(&ws_err) {
