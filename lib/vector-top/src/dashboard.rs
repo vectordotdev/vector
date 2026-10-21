@@ -664,9 +664,6 @@ pub async fn init_dashboard<'a>(
     mut state_rx: state::StateRx,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Capture key presses, to determine when to quit
-    let (mut key_press_rx, key_press_kill_tx) = capture_key_press();
-
     // Write to stdout, and enter an alternate screen, to avoid overwriting existing
     // terminal output
     let mut stdout = stdout();
@@ -682,6 +679,9 @@ pub async fn init_dashboard<'a>(
 
     // Clear the screen, readying it for output
     terminal.clear()?;
+
+    // Terminal setup must read cursor replies before keyboard polling starts.
+    let (mut key_press_rx, key_press_kill_tx) = capture_key_press();
 
     let widgets = Widgets::new(title, url, interval, human_metrics);
     let mut input_mode = InputMode::Top;

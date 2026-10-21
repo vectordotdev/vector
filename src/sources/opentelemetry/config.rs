@@ -27,7 +27,7 @@ use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
 use serde::{Deserialize, Deserializer, Serialize, de};
 use tokio::sync::Semaphore;
-use tonic::transport::server::RoutesBuilder;
+use tonic::service::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType},

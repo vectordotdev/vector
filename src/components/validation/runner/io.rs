@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 
-use http::{Request, Response};
-use hyper::Body;
+use http_1::{Request, Response};
 use tokio::{pin, select, sync::mpsc};
 use tonic::{
     Status,
@@ -150,7 +149,7 @@ pub fn spawn_grpc_server<S>(
     service: S,
     task_coordinator: &TaskCoordinator<Configuring>,
 ) where
-    S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+    S: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
         + NamedService
         + Clone
         + Send

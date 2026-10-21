@@ -30,12 +30,15 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::{
         config::{LOGS, METRICS, TRACES},
-        request_control::{AcknowledgementFailure, MiddlewareError, PendingAcknowledgement},
+        request_control::{
+            AcknowledgementFailure, MiddlewareError, PendingAcknowledgement,
+            SharedPendingAcknowledgement,
+        },
     },
 };
 
-pub(crate) fn middleware_error_response(error: MiddlewareError) -> http::Response<BoxBody> {
-    Status::unavailable(error.message()).to_http()
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> http_1::Response<BoxBody> {
+    Status::unavailable(error.message()).into_http()
 }
 
 #[derive(Clone)]
@@ -182,20 +185,22 @@ fn response_with_acknowledgement<T>(
 ) -> Response<T> {
     let mut response = Response::new(message);
     if let Some(receiver) = receiver {
+        // Request control looks this slot up by the native gRPC response type.
+        let pending = PendingAcknowledgement::<http_1::Response<BoxBody>>::new(
+            receiver,
+            acknowledgement_failure_response,
+        );
         response
             .extensions_mut()
-            .insert(PendingAcknowledgement::<BoxBody>::new(
-                receiver,
-                acknowledgement_failure_response,
-            ));
+            .insert(SharedPendingAcknowledgement::new(pending));
     }
     response
 }
 
-fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http::Response<BoxBody> {
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http_1::Response<BoxBody> {
     match status {
         AcknowledgementFailure::Errored => Status::internal("Delivery error"),
         AcknowledgementFailure::Rejected => Status::data_loss("Delivery failed"),
     }
-    .to_http()
+    .into_http()
 }

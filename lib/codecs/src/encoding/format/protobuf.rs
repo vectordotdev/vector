@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use crate::encoding::BuildError;
 use bytes::BytesMut;
-use prost_reflect::{MessageDescriptor, prost::Message as _};
+use prost::Message as _;
+use prost_reflect::MessageDescriptor;
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{

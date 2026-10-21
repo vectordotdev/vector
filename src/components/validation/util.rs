@@ -1,6 +1,6 @@
 use std::{fmt, net::SocketAddr};
 
-use http::Uri;
+use http_1::Uri;
 
 /// A gRPC address.
 ///
