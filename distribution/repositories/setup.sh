@@ -15,12 +15,12 @@ Do not use --cose-only while the repository is still signed by Datadog.
 
 Fresh setup options:
   VECTOR_DIST_CHANNEL       stable (default) or beta
-  VECTOR_MAJOR_VERSION      0 (default)
+  VECTOR_MAJOR_VERSION      0 (only supported major)
   VEC_REPO_URL              vector.dev (default repository domain)
   TESTING_APT_URL            HTTPS apt host/path or URL
   TESTING_YUM_URL            HTTPS yum host/path or URL
-  TESTING_APT_REPO_VERSION   "<channel> vector-<major>"
-  TESTING_YUM_VERSION_PATH   "<channel>/vector-<major>"
+  TESTING_APT_REPO_VERSION   "<channel> vector-0"
+  TESTING_YUM_VERSION_PATH   "<channel>/vector-0"
 
 Both modes:
   VECTOR_PUBLIC_KEY_URL          HTTPS armored public-key URL
@@ -28,8 +28,9 @@ Both modes:
   TESTING_KEYS_URL                Compatibility alias: HTTPS host/path containing vector-packages.asc
   CSM_MIGRATE=true               Disable the old timber-vector source, with backup
 
-Existing sources keep their channel, URL and options; fresh setup overrides are
-rejected during migration. Package and repository signatures remain required.
+Existing sources keep their channel and options; the standard ARMv7 repository
+URL is corrected to armv7hl. Fresh setup overrides are rejected during migration.
+Package and repository signatures remain required.
 Other source filenames and deb822 files require manual migration.
 EOF
 }
@@ -61,6 +62,11 @@ if [[ -f /etc/debian_version ]] && command -v apt-get >/dev/null; then
     timber_file=/etc/apt/sources.list.d/timber-vector.list
 elif command -v rpm >/dev/null && { command -v dnf >/dev/null || command -v yum >/dev/null; }; then
     family=rpm
+    # DNF calls ARM hard-float "armhfp"; Vector publishes ARMv7 under "armv7hl".
+    rpm_arch="\$basearch"
+    case "$(rpm --eval '%{_arch}')" in
+        armv7hl|armv7hnl|armv8hl|armv8hnl|armv8hcnl) rpm_arch=armv7hl ;;
+    esac
     source_file=/etc/yum.repos.d/vector.repo
     key_file=/etc/pki/rpm-gpg/RPM-GPG-KEY-vector
     timber_file=/etc/yum.repos.d/timber-vector.repo
@@ -196,7 +202,7 @@ elif "$existing"; then
     fi
     # DNF maintains a separate metadata keyring, so configure gpgkey as well as
     # importing the combined public keys into the RPM database.
-    awk -v key="file://$key_file" '
+    awk -v key="file://$key_file" -v arch="$rpm_arch" '
         BEGIN { keys=0; seen=0 }
         /^[[:space:]]*gpgkey[[:space:]]*=/ {
             if (seen++) exit 2
@@ -208,6 +214,9 @@ elif "$existing"; then
         /^[[:space:]]*([#;]|$)/ { print; next }
         { keys=0 }
         /^[[:space:]]*(gpgcheck|repo_gpgcheck)[[:space:]]*=/ { next }
+        /^[[:space:]]*baseurl[[:space:]]*=/ && arch=="armv7hl" {
+            gsub(/\/vector-0\/\$(basearch|\{basearch\})\//, "/vector-0/armv7hl/")
+        }
         { print }
         END {
             if (!seen) print "gpgkey=" key
@@ -218,22 +227,22 @@ else
     channel=${VECTOR_DIST_CHANNEL:-stable}
     major=${VECTOR_MAJOR_VERSION:-0}
     [[ "$channel" == stable || "$channel" == beta ]] || fail "VECTOR_DIST_CHANNEL must be stable or beta."
-    [[ "$major" =~ ^(0|[1-9][0-9]*)$ ]] || fail "VECTOR_MAJOR_VERSION must be a nonnegative integer."
+    [[ "$major" == 0 ]] || fail "VECTOR_MAJOR_VERSION must be 0; other repository majors are not published."
     domain=${VEC_REPO_URL:-vector.dev}
     [[ "$domain" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || fail "VEC_REPO_URL must be a domain name."
     if [[ "$family" == apt ]]; then
         url=$(https_url "${TESTING_APT_URL:-apt.$domain}")
         selection=${TESTING_APT_REPO_VERSION:-$channel vector-$major}
-        [[ "$selection" =~ ^(stable|beta)\ vector-(0|[1-9][0-9]*)$ ]] || fail "Invalid apt channel/component override."
+        [[ "$selection" =~ ^(stable|beta)\ vector-0$ ]] || fail "Expected stable/beta and vector-0 in the apt override."
         printf 'deb [signed-by=%s] %s/ %s\n' "$key_file" "$url" "$selection" > "$work/source"
     else
         url=$(https_url "${TESTING_YUM_URL:-yum.$domain}")
         selection=${TESTING_YUM_VERSION_PATH:-$channel/vector-$major}
-        [[ "$selection" =~ ^(stable|beta)/vector-(0|[1-9][0-9]*)$ ]] || fail "Invalid yum channel/component override."
+        [[ "$selection" =~ ^(stable|beta)/vector-0$ ]] || fail "Expected stable/beta and vector-0 in the yum override."
         cat > "$work/source" <<EOF
 [vector]
 name=Vector
-baseurl=$url/$selection/\$basearch/
+baseurl=$url/$selection/$rpm_arch/
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1

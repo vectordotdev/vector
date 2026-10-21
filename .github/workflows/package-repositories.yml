@@ -29,6 +29,8 @@ concurrency:
 
 jobs:
   # Freeze verified release assets and build the publisher image reused by each job.
+  # Trust authorized GitHub release publishers: run/tag and checksum checks do not
+  # prove build provenance. Stronger provenance verification is deferred.
   # Enable only after historical backfill and the repository/key migration are ready.
   inputs:
     if: >-
