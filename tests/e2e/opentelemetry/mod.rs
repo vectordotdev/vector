@@ -3,12 +3,7 @@ pub mod metrics;
 pub mod metrics_native;
 pub mod traces;
 
-use std::{
-    io,
-    path::Path,
-    process::Command,
-    time::{Duration, Instant},
-};
+use std::{io, path::Path, process::Command};
 
 use prost::Message as ProstMessage;
 use prost_reflect::{DescriptorPool, prost::Message as ProstReflectMessage};
@@ -131,59 +126,51 @@ pub fn assert_service_name_with<ResourceT, F>(
 /// Verifies that the `component_received_events_total` internal metric counts
 /// individual log records/metrics/spans, not batch requests.
 /// This ensures consistency when OTLP preservation is enabled.
+///
+/// Each suite's Compose readiness gate waits for a post-ingestion scrape before
+/// tests start, so this reads a single snapshot.
 #[allow(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     reason = "Preserve the existing metric-counter conversion used by this fixture assertion. https://github.com/vectordotdev/vector/issues/23659"
 )]
 pub fn assert_component_received_events_total(data_type: &str, expected_count: usize) {
-    // Internal metrics are scraped every 60 seconds in these fixtures. A warm
-    // build can reach this assertion before the first post-traffic scrape.
-    // Leave time to report failures before nextest's two-minute test timeout.
-    let deadline = Instant::now() + Duration::from_secs(90);
-    let (found_metric, total_events) = loop {
-        let metrics_content = read_file_helper(data_type, "vector-internal-metrics-sink.log")
-            .expect("Failed to read internal metrics file");
+    let metrics_content = read_file_helper(data_type, "vector-internal-metrics-sink.log")
+        .expect("Failed to read internal metrics file");
 
-        // Parse the metrics file to find component_received_events_total
-        let mut found_metric = false;
-        let mut total_events = 0u64;
+    // Parse the metrics file to find component_received_events_total
+    let mut found_metric = false;
+    let mut total_events = 0u64;
 
-        for line in metrics_content.lines() {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
+    for line in metrics_content.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
 
-            // Parse the JSON metric
-            let metric: Value = serde_json::from_str(line)
-                .unwrap_or_else(|e| panic!("Failed to parse metrics JSON: {e}"));
+        // Parse the JSON metric
+        let metric: Value = serde_json::from_str(line)
+            .unwrap_or_else(|e| panic!("Failed to parse metrics JSON: {e}"));
 
-            // Look for component_received_events_total metric
-            if let Some(name) = metric.get("name").and_then(|v| v.as_str())
-                && name == "component_received_events_total"
+        // Look for component_received_events_total metric
+        if let Some(name) = metric.get("name").and_then(|v| v.as_str())
+            && name == "component_received_events_total"
+        {
+            // Check if this is for our opentelemetry source
+            if let Some(tags) = metric.get("tags")
+                && let Some(component_id) = tags.get("component_id").and_then(|v| v.as_str())
+                && component_id == "source0"
             {
-                // Check if this is for our opentelemetry source
-                if let Some(tags) = metric.get("tags")
-                    && let Some(component_id) = tags.get("component_id").and_then(|v| v.as_str())
-                    && component_id == "source0"
+                found_metric = true;
+                // Get the counter value
+                if let Some(counter) = metric.get("counter")
+                    && let Some(value) = counter.get("value").and_then(Value::as_f64)
                 {
-                    found_metric = true;
-                    // Get the counter value
-                    if let Some(counter) = metric.get("counter")
-                        && let Some(value) = counter.get("value").and_then(Value::as_f64)
-                    {
-                        total_events = value as u64;
-                    }
+                    total_events = value as u64;
                 }
             }
         }
-
-        if (found_metric && total_events == expected_count as u64) || Instant::now() >= deadline {
-            break (found_metric, total_events);
-        }
-        std::thread::sleep(Duration::from_secs(1));
-    };
+    }
 
     assert!(
         found_metric,

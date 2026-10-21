@@ -66,6 +66,17 @@ services:
           --telemetry-attributes='metric.type="histogram"' \
           --rate=0
 
+  # A detached `compose up` waits for all dependency conditions before starting this service.
+  # This keeps the test runner behind generator completion and a complete capture.
+  metrics-ready:
+    image: alpine:3.20
+    depends_on:
+      metrics-generator:
+        condition: service_completed_successfully
+      otel-collector-sink:
+        condition: service_healthy
+    command: ["true"]
+
   otel-collector-sink:
     container_name: otel-collector-sink-native
     build:
@@ -83,6 +94,17 @@ services:
         rm -rf /output/opentelemetry-metrics-native
         mkdir -p /output/opentelemetry-metrics-native
         exec /otelcol-contrib --config /etc/otelcol-contrib/config.yaml
+    # Lower bounds only: the Rust tests assert exact counts, so duplicates still fail.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          sink=$$(grep -o '"timeUnixNano"' /output/opentelemetry-metrics-native/collector-file-exporter.log 2>/dev/null | wc -l);
+          echo "sink=$$sink";
+          [ "$$sink" -ge 300 ]
+      interval: 500ms
+      timeout: 1s
+      retries: 240
     volumes:
       - type: bind
         source: ../data/collector-sink.yaml
