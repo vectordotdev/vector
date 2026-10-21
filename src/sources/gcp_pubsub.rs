@@ -494,7 +494,11 @@ impl PubsubSource {
                         timeout_secs = self.retry_delay.as_secs_f64(),
                         "Retrying after timeout."
                     );
-                    tokio::time::sleep(self.retry_delay).await;
+                    tokio::select! {
+                        biased;
+                        _ = &mut self.shutdown => break,
+                        () = tokio::time::sleep(self.retry_delay) => {}
+                    }
                 }
                 State::Shutdown => break,
             }
@@ -502,11 +506,15 @@ impl PubsubSource {
     }
 
     async fn run_once(&mut self, busy_flag: &Arc<AtomicBool>) -> State {
-        let connection = match self.endpoint.connect().await {
-            Ok(connection) => connection,
-            Err(error) => {
-                emit!(GcpPubsubConnectError { error });
-                return State::RetryDelay;
+        let connection = tokio::select! {
+            biased;
+            _ = &mut self.shutdown => return State::Shutdown,
+            result = self.endpoint.connect() => match result {
+                Ok(connection) => connection,
+                Err(error) => {
+                    emit!(GcpPubsubConnectError { error });
+                    return State::RetryDelay;
+                }
             }
         };
 
@@ -553,7 +561,9 @@ impl PubsubSource {
         loop {
             tokio::select! {
                 biased;
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
+                // The ack stream ends at shutdown. Disable this arm then, or the biased select
+                // keeps picking it and never reaches the shutdown arm.
+                Some((status, receipts)) = ack_stream.next() => {
                     pending_acks -= 1;
                     if status == BatchStatus::Delivered {
                         ack_ids_sender
@@ -805,7 +815,10 @@ impl Future for Task {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use tokio::time::timeout;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        time::timeout,
+    };
     use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
@@ -1016,6 +1029,84 @@ mod tests {
                 .unwrap();
         }
         source.abort();
+    }
+
+    /// Starts the source, waits for `ready`, and checks that it shuts down.
+    async fn assert_shuts_down(
+        config: PubsubConfig,
+        acknowledgements: bool,
+        ready: impl Future<Output = ()>,
+    ) {
+        let component = crate::config::ComponentKey::from("pubsub");
+        let (out, _events) = SourceSender::new_test();
+        let (mut context, mut shutdown) = SourceContext::new_shutdown(&component, out);
+        context.acknowledgements = acknowledgements;
+        let source = tokio::spawn(config.build(context).await.unwrap());
+        timeout(Duration::from_secs(10), ready).await.unwrap();
+
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        assert!(shutdown.shutdown_source(&component, deadline).await);
+        source.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn active_stream_shuts_down_with_acknowledgements() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let (ready, streaming) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut connection = h2::server::handshake(socket).await.unwrap();
+            let (request, mut respond) = connection.accept().await.unwrap().unwrap();
+            tokio::spawn(async move {
+                let mut requests = request.into_body();
+                requests.data().await.unwrap().unwrap();
+                let response = http_1::Response::builder()
+                    .header("content-type", "application/grpc")
+                    .body(())
+                    .unwrap();
+                let mut stream = respond.send_response(response, false).unwrap();
+                // An empty `StreamingPullResponse`.
+                stream
+                    .send_data(Bytes::from_static(&[0; 5]), false)
+                    .unwrap();
+                // The acknowledgement shows the source is in its receive loop.
+                requests.data().await.unwrap().unwrap();
+                ready.send(()).unwrap();
+                while let Some(Ok(_)) = requests.data().await {}
+            });
+            while connection.accept().await.is_some() {}
+        });
+
+        let ready = async { streaming.await.unwrap() };
+        assert_shuts_down(test_config(endpoint), true, ready).await;
+    }
+
+    #[tokio::test]
+    async fn connection_setup_and_retry_wait_shut_down() {
+        for fail_connection in [false, true] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let endpoint = format!("https://{}", listener.local_addr().unwrap());
+            let (ready, connected) = tokio::sync::oneshot::channel();
+            let peer = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut buffer = [0; 4096];
+                socket.read_exact(&mut buffer[..1]).await.unwrap();
+                if fail_connection {
+                    socket.write_all(b"not TLS").await.unwrap();
+                    // The client closes this connection before waiting to retry.
+                    while matches!(socket.read(&mut buffer).await, Ok(size) if size > 0) {}
+                }
+                ready.send(()).unwrap();
+                if !fail_connection {
+                    // Keep the TLS handshake pending until shutdown closes it.
+                    while matches!(socket.read(&mut buffer).await, Ok(size) if size > 0) {}
+                }
+            });
+            let ready = async { connected.await.unwrap() };
+            assert_shuts_down(test_config(endpoint), false, ready).await;
+            peer.await.unwrap();
+        }
     }
 }
 
