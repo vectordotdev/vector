@@ -500,10 +500,8 @@ impl MessageDecoder {
     }
 }
 
-/// Creates the channel that carries decompressed messages to the inner service.
-///
-/// The channel buffers at most one unread frame, so forwarding the next message waits for the
-/// inner service to consume the previous one, and the upstream body is only read on demand.
+/// Creates the channel to the inner service. It holds one unread message, so the upstream body
+/// is only read on demand.
 fn decompressed_body_channel() -> (Sender<Bytes, Status>, Channel<Bytes, Status>) {
     Channel::new(1)
 }

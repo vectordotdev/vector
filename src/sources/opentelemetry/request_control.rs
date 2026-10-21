@@ -707,11 +707,12 @@ mod tests {
         let mut response = grpc_ok();
         response
             .extensions_mut()
-            .insert(SharedPendingAcknowledgement::new(
-                PendingAcknowledgement::<GrpcResponse>::new(receiver, |_| {
-                    tonic::Status::data_loss("").into_http()
-                }),
-            ));
+            .insert(SharedPendingAcknowledgement::new(PendingAcknowledgement::<
+                GrpcResponse,
+            >::new(
+                receiver,
+                |_| tonic::Status::data_loss("").into_http(),
+            )));
         let cloned = response.extensions().clone();
 
         let mut finalizing = Box::pin(finalize_acknowledgement(response));
