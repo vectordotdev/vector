@@ -56,7 +56,7 @@ impl InputHandler {
                             // Back off before retrying, but stay responsive to shutdown.
                             let delay = backoff.next().expect("backoff never ends");
                             tokio::select! {
-                                _ = tokio::time::sleep(delay) => {}
+                                () = tokio::time::sleep(delay) => {}
                                 _ = &mut shutdown => break,
                             }
                         }
@@ -93,7 +93,7 @@ impl InputHandler {
                 {
                     let delay = backoff.next().expect("backoff never ends");
                     tokio::select! {
-                        _ = tokio::time::sleep(delay) => {}
+                        () = tokio::time::sleep(delay) => {}
                         _ = &mut shutdown => break,
                     }
                 }
