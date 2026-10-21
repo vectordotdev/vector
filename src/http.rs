@@ -890,10 +890,6 @@ impl IntoIterator for QueryParameterValue {
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
-/// HTTP/2 header list limit for gRPC clients and servers. It keeps the 16 MiB default of the
-/// legacy `h2` stack; Hyper 1 defaults to 16 KiB.
-pub const GRPC_MAX_HEADER_LIST_SIZE: u32 = 16 << 20;
-
 pub mod client_v1;
 
 #[cfg(test)]

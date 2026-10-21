@@ -4,6 +4,7 @@ use tonic::transport::{Channel, Endpoint};
 use tonic_health::pb::{
     HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
 };
+use vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE;
 
 use crate::{
     error::{Error, Result},
@@ -36,8 +37,7 @@ impl Client {
     /// * `uri` - The gRPC server URI (e.g., `"http://localhost:9999".parse().unwrap()`)
     pub fn new(uri: Uri) -> Self {
         Self {
-            // Preserve the existing 16 MiB HTTP/2 response-header limit.
-            endpoint: Endpoint::from(uri).http2_max_header_list_size(16 * 1024 * 1024),
+            endpoint: Endpoint::from(uri).http2_max_header_list_size(GRPC_MAX_HEADER_LIST_SIZE),
             channel: None,
             service: None,
         }

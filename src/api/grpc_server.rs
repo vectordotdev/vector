@@ -105,7 +105,7 @@ impl GrpcServer {
 
             let result = tonic::transport::Server::builder()
                 .accept_http1(true)
-                .http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE)
+                .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE)
                 .add_routes(router.into())
                 .serve_with_incoming_shutdown(
                     tokio_stream::wrappers::TcpListenerStream::new(listener),

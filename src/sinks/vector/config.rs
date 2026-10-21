@@ -828,7 +828,7 @@ fn new_client(
     keepalive: Option<VectorKeepaliveConfig>,
 ) -> crate::Result<Http2Client<BoxBody>> {
     let mut builder = Builder::new(TokioExecutor::new());
-    builder.http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE);
+    builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
 
     // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections
     // are detected and evicted before they are reused, not during a request.

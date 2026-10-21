@@ -382,7 +382,7 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
-        .http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE)
+        .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've
@@ -441,7 +441,7 @@ where
     info!(%address, "Building gRPC server.");
 
     Server::builder()
-        .http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE)
+        .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE)
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
         // Request admission must see each HTTP/2 stream before its body is decompressed.

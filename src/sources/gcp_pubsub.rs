@@ -307,8 +307,8 @@ impl SourceConfig for PubsubConfig {
             Some(tls_config)
         };
 
-        let mut endpoint =
-            Endpoint::from(uri).http2_max_header_list_size(crate::http::GRPC_MAX_HEADER_LIST_SIZE);
+        let mut endpoint = Endpoint::from(uri)
+            .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
         if let Some(tls_config) = tls_config {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }

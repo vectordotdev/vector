@@ -26,6 +26,9 @@ snafu.workspace = true
 # Utils
 http = { version = "1", default-features = false, features = ["std"] }
 
+# Internal libs
+vector-common = { path = "../vector-common", default-features = false }
+
 [build-dependencies]
 tonic-build.workspace = true
 prost-build.workspace = true
