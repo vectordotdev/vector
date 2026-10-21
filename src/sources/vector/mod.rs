@@ -210,7 +210,7 @@ impl SourceConfig for VectorConfig {
         .max_decoding_message_size(max_decompressed_size_bytes());
 
         // Create the standard gRPC health service
-        let (mut health_reporter, health_service) = health_reporter();
+        let (health_reporter, health_service) = health_reporter();
 
         // Register the Vector service as serving in the health reporter
         health_reporter

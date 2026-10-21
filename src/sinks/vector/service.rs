@@ -4,7 +4,7 @@ use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
 use hyper_1::body::Incoming;
 use prost::Message;
-use tonic::{IntoRequest, body::BoxBody};
+use tonic::{IntoRequest, body::Body as TonicBody};
 use tower::Service;
 use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -74,7 +74,7 @@ impl VectorService {
     ///
     /// Returns an error if `uri` has no scheme or authority.
     pub fn new(
-        client: Http2Client<BoxBody>,
+        client: Http2Client<TonicBody>,
         uri: Uri,
         compression: VectorCompression,
     ) -> crate::Result<Self> {
@@ -152,9 +152,9 @@ impl Service<VectorRequest> for VectorService {
 
 /// Sends tonic's gRPC requests over the native HTTP/2 client.
 #[derive(Clone, Debug)]
-pub struct GrpcTransport(Http2Client<BoxBody>);
+pub struct GrpcTransport(Http2Client<TonicBody>);
 
-impl Service<http_1::Request<BoxBody>> for GrpcTransport {
+impl Service<http_1::Request<TonicBody>> for GrpcTransport {
     type Response = http_1::Response<Incoming>;
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -165,7 +165,7 @@ impl Service<http_1::Request<BoxBody>> for GrpcTransport {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, request: http_1::Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, request: http_1::Request<TonicBody>) -> Self::Future {
         Box::pin(self.0.request(request))
     }
 }

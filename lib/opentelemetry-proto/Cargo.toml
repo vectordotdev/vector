@@ -9,8 +9,7 @@ publish = false
 workspace = true
 
 [build-dependencies]
-prost-build.workspace = true
-tonic-build.workspace = true
+tonic-prost-build.workspace = true
 glob.workspace = true
 
 [dependencies]
@@ -20,6 +19,7 @@ hex = { version = "0.4.3", default-features = false, features = ["std"] }
 ordered-float.workspace = true
 prost.workspace = true
 tonic.workspace = true
+tonic-prost.workspace = true
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-core = { path = "../vector-core", default-features = false }

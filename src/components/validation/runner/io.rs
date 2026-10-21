@@ -4,7 +4,7 @@ use http_1::{Request, Response};
 use tokio::{pin, select, sync::mpsc};
 use tonic::{
     Status,
-    body::BoxBody,
+    body::Body,
     server::NamedService,
     transport::{Channel, Endpoint},
 };
@@ -149,10 +149,11 @@ pub fn spawn_grpc_server<S>(
     service: S,
     task_coordinator: &TaskCoordinator<Configuring>,
 ) where
-    S: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
+    S: Service<Request<Body>, Response = Response<Body>, Error = Infallible>
         + NamedService
         + Clone
         + Send
+        + Sync
         + 'static,
     S::Future: Send + 'static,
 {

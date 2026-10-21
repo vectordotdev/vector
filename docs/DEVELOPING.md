@@ -9,6 +9,7 @@
     - [Panics](#panics)
   - [Feature flags](#feature-flags)
   - [Dependencies](#dependencies)
+    - [gRPC and protobuf code generation](#grpc-and-protobuf-code-generation)
   - [Minimum Supported Rust Version](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
@@ -204,6 +205,24 @@ see how dependencies are reviewed in the
 If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
 the features corresponding to these components in `Cargo.toml`.
+
+#### gRPC and protobuf code generation
+
+Use `prost-build` for protobuf messages and `tonic-prost-build` for gRPC
+services. Generated gRPC code uses `tonic` for the runtime and `tonic-prost`
+for the protobuf codec. Declare both runtime dependencies in each crate
+that includes generated gRPC code.
+
+Enable the required build and runtime dependencies in each standalone
+component feature. Do not rely on another component to enable the codec.
+Use `protobuf-build` for the root crate's generator dependencies.
+
+Vector's codecs use the protobuf types returned by `vrl::protobuf` directly.
+Keep VRL's `prost` and `prost-reflect` dependencies aligned with the workspace
+versions.
+
+Build scripts write generated Rust to Cargo's `OUT_DIR`. Do not commit
+generated Rust stubs or copy protobuf conversion helpers between crates.
 
 ### Minimum Supported Rust Version
 

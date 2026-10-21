@@ -478,7 +478,7 @@ fn spawn_http_server<H, F, R>(
     handler: H,
 ) -> (Arc<Notify>, oneshot::Sender<()>)
 where
-    H: Fn(Request, Arc<Mutex<RunnerMetrics>>) -> F + Clone + Send + 'static,
+    H: Fn(Request, Arc<Mutex<RunnerMetrics>>) -> F + Clone + Send + Sync + 'static,
     F: Future<Output = R> + Send,
     R: IntoResponse,
 {
