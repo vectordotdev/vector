@@ -545,6 +545,9 @@ approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 base64.workspace = true
 criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
+# The HTTP transport tests serve HTTP/1.1 and HTTP/2 with native Hyper 1 servers.
+hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["server"] }
+hyper-util = { version = "0.1", default-features = false, features = ["server-auto"] }
 itertools.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
