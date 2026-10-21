@@ -132,9 +132,13 @@ jobs:
           # Normalize absolute source paths to relative so they merge cleanly with
           # coverage from the containerized integration tests (which use SF:src/...).
           sed -i "s|SF:$(pwd)/|SF:|g" lcov.info
+          python3 .github/scripts/coverage-experiment.py seal lcov.info coverage-unit
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ inputs.coverage }}
         with:
           name: coverage-unit
-          path: lcov.info
+          path: |
+            lcov.info
+            manifest.json
+          if-no-files-found: error

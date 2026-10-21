@@ -211,13 +211,19 @@ jobs:
           max_attempts: 3
           command: vdev integration run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
+      - name: Validate and identify coverage report
+        if: inputs.coverage && success()
+        run: python3 .github/scripts/coverage-experiment.py seal target/coverage/lcov.info coverage-int-${{ matrix.service }}
+
       - name: Upload coverage artifact
-        if: inputs.coverage && always()
+        if: inputs.coverage && success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-int-${{ matrix.service }}
-          path: target/coverage/lcov.info
-          if-no-files-found: ignore
+          path: |
+            target/coverage/lcov.info
+            target/coverage/manifest.json
+          if-no-files-found: error
 
   e2e-tests:
     runs-on: ubuntu-24.04-8core
@@ -300,13 +306,19 @@ jobs:
           max_attempts: 3
           command: vdev e2e run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
+      - name: Validate and identify coverage report
+        if: inputs.coverage && success()
+        run: python3 .github/scripts/coverage-experiment.py seal target/coverage/lcov.info coverage-e2e-${{ matrix.service }}
+
       - name: Upload coverage artifact
-        if: inputs.coverage && always()
+        if: inputs.coverage && success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-e2e-${{ matrix.service }}
-          path: target/coverage/lcov.info
-          if-no-files-found: ignore
+          path: |
+            target/coverage/lcov.info
+            target/coverage/manifest.json
+          if-no-files-found: error
 
   integration-test-suite:
     name: Integration Test Suite
