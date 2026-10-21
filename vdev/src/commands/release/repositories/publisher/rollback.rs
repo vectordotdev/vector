@@ -13,7 +13,6 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
 };
@@ -169,15 +168,7 @@ fn check_sources(
             for (name, path) in &present {
                 if name.ends_with("/Release") {
                     let suite = path.parent().context("Missing suite")?;
-                    public.verify(&suite.join("InRelease"), None)?;
-                    public.verify(&suite.join("Release.gpg"), Some(path))?;
-                    ensure!(
-                        public.gpg(
-                            [OsStr::new("--decrypt"), suite.join("InRelease").as_os_str()],
-                            None
-                        )? == fs::read(path)?,
-                        "Pending apt roots disagree"
-                    );
+                    public.verify_apt_release(suite)?;
                 } else if name.ends_with("/repomd.xml") {
                     public.verify(
                         &PathBuf::from(format!("{}.asc", path.display())),

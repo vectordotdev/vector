@@ -8,7 +8,6 @@ use super::{
 };
 use anyhow::{Context, Result, ensure};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fs, io::Read, path::Path};
 
 fn bundle_key(config: &Config, input: &str, base: Option<&str>) -> String {
@@ -285,23 +284,8 @@ pub(super) fn verify_snapshot(config: &Config, snapshot: &Snapshot) -> Result<()
             response.url().scheme() == "https",
             "Repository redirected away from HTTPS"
         );
-        let mut source = response.take(expected.size + 1);
-        let mut hash = Sha256::new();
-        let mut size = 0;
-        let mut buffer = vec![0; 1024 * 1024];
-        loop {
-            let count = source.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            size += count as u64;
-            hash.update(&buffer[..count]);
-        }
         ensure!(
-            Entry {
-                sha256: hex::encode(hash.finalize()),
-                size
-            } == *expected,
+            Entry::read(response.take(expected.size + 1))? == *expected,
             "Endpoint differs from snapshot: {name}"
         );
     }

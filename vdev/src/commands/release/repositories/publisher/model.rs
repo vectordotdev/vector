@@ -60,12 +60,14 @@ impl Entry {
             "Expected a regular file: {}",
             path.display()
         );
-        let mut file = fs::File::open(path)?;
+        Self::read(fs::File::open(path)?)
+    }
+    pub fn read(mut source: impl Read) -> Result<Self> {
         let mut hash = Sha256::new();
         let mut size = 0;
         let mut buffer = vec![0; 1024 * 1024];
         loop {
-            let count = file.read(&mut buffer)?;
+            let count = source.read(&mut buffer)?;
             if count == 0 {
                 break;
             }

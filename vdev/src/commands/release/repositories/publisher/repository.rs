@@ -281,6 +281,19 @@ impl<'a> PublicKey<'a> {
         );
         Ok(())
     }
+    pub fn verify_apt_release(&self, suite: &Path) -> Result<Vec<u8>> {
+        self.verify(&suite.join("InRelease"), None)?;
+        self.verify(&suite.join("Release.gpg"), Some(&suite.join("Release")))?;
+        let release = fs::read(suite.join("Release"))?;
+        ensure!(
+            self.gpg(
+                [OsStr::new("--decrypt"), suite.join("InRelease").as_os_str()],
+                None
+            )? == release,
+            "Inline and detached roots disagree"
+        );
+        Ok(release)
+    }
     pub fn rpmdb(&self) -> Result<PathBuf> {
         let path = self.home.join("rpmdb");
         run(
@@ -553,16 +566,7 @@ pub(super) fn verify_metadata(
                 .parent()
                 .context("Missing suite")?
                 .to_owned();
-            public.verify(&suite.join("InRelease"), None)?;
-            public.verify(&suite.join("Release.gpg"), Some(&suite.join("Release")))?;
-            let release = fs::read(suite.join("Release"))?;
-            ensure!(
-                public.gpg(
-                    [OsStr::new("--decrypt"), suite.join("InRelease").as_os_str()],
-                    None
-                )? == release,
-                "Inline and detached roots disagree"
-            );
+            let release = public.verify_apt_release(&suite)?;
             let mut sha256 = false;
             let mut checked = BTreeSet::new();
             for line in std::str::from_utf8(&release)?.lines() {
@@ -798,10 +802,6 @@ fn apt_indexes(
     write(&suite.join("Release"), release.as_bytes())?;
     signer.sign(&suite.join("Release"), true, &suite.join("InRelease"))?;
     signer.sign(&suite.join("Release"), false, &suite.join("Release.gpg"))?;
-    signer.public.verify(&suite.join("InRelease"), None)?;
-    signer
-        .public
-        .verify(&suite.join("Release.gpg"), Some(&suite.join("Release")))?;
     Ok(())
 }
 #[allow(clippy::too_many_lines)] // Ordered admission, signing and final verification phase.
@@ -962,10 +962,6 @@ pub(super) fn prepare(config: &Config, work: &Path) -> Result<String> {
                     false,
                     &target.join("repodata/repomd.xml.asc"),
                 )?;
-                signer.public.verify(
-                    &target.join("repodata/repomd.xml.asc"),
-                    Some(&target.join("repodata/repomd.xml")),
-                )?;
             }
         }
     }
@@ -983,15 +979,7 @@ pub(super) fn prepare(config: &Config, work: &Path) -> Result<String> {
         Some(input_id),
         root.clone(),
     )?;
-    let view = tempfile::tempdir()?;
-    for source in [&base_files, &root] {
-        for (name, path) in files(source)? {
-            if !name.ends_with(".deb") && !name.ends_with(".rpm") {
-                copy(&path, &view.path().join(name))?;
-            }
-        }
-    }
-    verify_metadata(&snapshot, view.path(), &signer.public)?;
+    verify_metadata(&snapshot, &root, &signer.public)?;
     write(&result.join("manifest.json"), &snapshot.data)?;
     copy(&work.join("input.json"), &result.join("input.json"))?;
     Snapshot::local(&root)?;
