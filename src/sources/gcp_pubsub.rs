@@ -286,20 +286,12 @@ impl SourceConfig for PubsubConfig {
         let tls_config = if uri.scheme() == Some(&Scheme::HTTP) {
             None
         } else {
-            // Tonic's `with_native_roots` rejects an empty root store, so load
-            // the roots here, skipping certificates that are not valid anchors.
-            let rustls_native_certs::CertificateResult { certs, errors, .. } =
-                rustls_native_certs::load_native_certs();
-            if let Some(source) = errors.into_iter().next() {
-                return Err(PubsubError::NativeRoots { source }.into());
-            }
-            let mut native_roots = rustls::RootCertStore::empty();
-            native_roots.add_parsable_certificates(certs);
+            let native_roots = native_trust_anchors(rustls_native_certs::load_native_certs())?;
 
             let host = uri.host().unwrap_or("pubsub.googleapis.com");
             let mut tls_config = ClientTlsConfig::new()
                 .domain_name(host)
-                .trust_anchors(native_roots.roots)
+                .trust_anchors(native_roots)
                 .ca_certificates(tls.authorities_pem().map(Certificate::from_pem));
             if let Some((cert, key)) = tls.identity_pem() {
                 tls_config = tls_config.identity(Identity::from_pem(cert, key));
@@ -386,6 +378,32 @@ impl SourceConfig for PubsubConfig {
     fn can_acknowledge(&self) -> bool {
         true
     }
+}
+
+/// Converts the native certificate store into trust anchors.
+///
+/// `rustls-native-certs` 0.8 reports per-entry errors next to the certificates it did load, and
+/// it also scans certificate directories that 0.7 never read. Fail only when nothing loaded, as a
+/// failed load did with 0.7, and log the other errors. An empty store without errors is accepted,
+/// so a configured CA can be the only trust root. Certificates that are not valid trust anchors
+/// are skipped.
+fn native_trust_anchors(
+    result: rustls_native_certs::CertificateResult,
+) -> Result<Vec<rustls::pki_types::TrustAnchor<'static>>, PubsubError> {
+    let rustls_native_certs::CertificateResult { certs, errors, .. } = result;
+    let mut errors = errors.into_iter();
+    if certs.is_empty()
+        && let Some(source) = errors.next()
+    {
+        return Err(PubsubError::NativeRoots { source });
+    }
+    for error in errors {
+        warn!(message = "Skipping native root certificate that failed to load.", %error);
+    }
+
+    let mut roots = rustls::RootCertStore::empty();
+    roots.add_parsable_certificates(certs);
+    Ok(roots.roots)
 }
 
 impl_generate_config_from_default!(PubsubConfig);
@@ -892,6 +910,53 @@ mod tests {
             keepalive_secs: default_keepalive(),
             ..Default::default()
         }
+    }
+
+    fn native_roots(
+        certs: Vec<rustls::pki_types::CertificateDer<'static>>,
+        errors: usize,
+    ) -> rustls_native_certs::CertificateResult {
+        use rustls_native_certs::{Error, ErrorKind};
+
+        let mut result = rustls_native_certs::CertificateResult::default();
+        result.certs = certs;
+        result.errors = (0..errors)
+            .map(|_| Error {
+                context: "failed to read PEM from file",
+                kind: ErrorKind::Io {
+                    inner: std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+                    path: "/etc/ssl/certs/00000000.0".into(),
+                },
+            })
+            .collect();
+        result
+    }
+
+    fn test_ca() -> rustls::pki_types::CertificateDer<'static> {
+        use rustls::pki_types::pem::PemObject;
+
+        rustls::pki_types::CertificateDer::from_pem_file(crate::tls::TEST_PEM_CA_PATH).unwrap()
+    }
+
+    #[test]
+    fn native_trust_anchors_keep_loaded_certificates_on_partial_errors() {
+        let anchors = native_trust_anchors(native_roots(vec![test_ca()], 2)).unwrap();
+        assert_eq!(anchors.len(), 1);
+    }
+
+    #[test]
+    fn native_trust_anchors_fail_when_nothing_loaded() {
+        let error = native_trust_anchors(native_roots(Vec::new(), 1)).unwrap_err();
+        assert!(matches!(error, PubsubError::NativeRoots { .. }));
+    }
+
+    #[test]
+    fn native_trust_anchors_accept_empty_store_without_errors() {
+        assert!(
+            native_trust_anchors(native_roots(Vec::new(), 0))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     /// Serves streaming pulls and resets each stream once the source acknowledges its first
