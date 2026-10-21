@@ -188,38 +188,16 @@ impl HttpClient {
     }
 }
 
-/// A native HTTP/2-only client that shares [`HttpClient`]'s TLS and proxy routing.
+/// An HTTP/2-only client with the TLS and proxy routing of [`HttpClient`].
 ///
-/// The wire protocol is always HTTP/2 with prior knowledge, independent of TLS ALPN. The
-/// configured `tls.alpn_protocols` list is offered unchanged on destination TLS connections and
-/// is neither required nor forced to contain `h2`; whatever ALPN result is negotiated, or none,
-/// the client speaks HTTP/2. This matches the HTTP/2-only `hyper` 0.14 client used by gRPC sinks.
-/// Unlike that client, forward proxy credentials are sent and `tls.server_name` also applies to
-/// destinations tunneled through a proxy.
+/// Every connection speaks HTTP/2 with prior knowledge, whatever ALPN negotiates:
 ///
-/// Routes:
+/// - Direct `http://` destinations use h2c. Direct `https://` destinations use the TLS settings.
+/// - Proxied `https://` destinations use an HTTP/1.1 `CONNECT` tunnel. The proxy connection only
+///   offers `http/1.1` ALPN.
+/// - Proxied `http://` destinations send HTTP/2 to the forward proxy, which must accept it.
 ///
-/// - Direct `http://` destinations use cleartext HTTP/2 (h2c) prior knowledge.
-/// - Direct `https://` destinations use the configured TLS settings, including
-///   `tls.server_name`, identity, and the configured ALPN list.
-/// - `https://` destinations reached through a proxy are tunneled with an HTTP/1.1 `CONNECT`.
-///   The TLS connection to the proxy itself only offers `http/1.1` via ALPN, so the proxy never
-///   negotiates HTTP/2 for the `CONNECT` exchange. HTTP/2 then runs inside the tunnel over the
-///   destination TLS connection, which uses the configured TLS settings and ALPN list.
-/// - `http://` destinations reached through a forward proxy have no tunnel, so the proxy itself
-///   is the HTTP/2 peer: the client sends h2c prior knowledge to the proxy, with the destination
-///   in the `:scheme` and `:authority` pseudo-headers, as the legacy `hyper-proxy` connector did.
-///   Such proxies must accept HTTP/2 prior knowledge. A TLS (`https://`) forward proxy is
-///   connected with the configured TLS settings and ALPN list, except `tls.server_name`, and
-///   receives HTTP/2 over that TLS connection instead of h2c.
-/// - `no_proxy` matches are always connected directly.
-///
-/// Request and response bodies are passed through natively: `B` is neither boxed nor
-/// re-encoded, and the returned [`Incoming`] body yields the peer's data and trailer frames.
-///
-/// Unlike [`HttpClient`], this client adds no `User-Agent` or `Accept-Encoding` header and emits
-/// no HTTP client telemetry; callers own request headers and internal events. The only header it
-/// may add is `Proxy-Authorization`, see [`Http2Client::request`].
+/// Unlike [`HttpClient`], it adds no default headers and emits no HTTP client events.
 pub struct Http2Client<B> {
     client: Client<HttpProxyConnectorV1, B>,
     routes: Arc<RoutePlanner>,
@@ -248,20 +226,14 @@ where
     B::Data: Send,
     B::Error: Into<BoxError>,
 {
-    /// Builds an HTTP/2-only client that routes requests through `proxy` and uses `tls` for
-    /// HTTPS destinations and TLS proxies.
+    /// Builds the client from `builder`, which supplies the pool and HTTP/2 settings.
     ///
-    /// `builder` supplies the executor, connection pool, and HTTP/2 settings such as
-    /// `http2_keep_alive_interval`, `http2_keep_alive_timeout`, and
-    /// `http2_keep_alive_while_idle`. This constructor always enables `http2_only` and installs
-    /// [`TokioTimer`] as both the HTTP/2 timer, which keepalive pings require, and the pool timer,
-    /// which evicts idle connections once the pool idle timeout elapses. Any timers previously set
-    /// on `builder` are replaced.
+    /// This forces `http2_only` and installs the Tokio timers that HTTP/2 keepalive and idle
+    /// connection eviction need.
     ///
     /// # Errors
     ///
-    /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot build a
-    /// connector.
+    /// Returns an error if a proxy URL is invalid or the TLS settings cannot build a connector.
     pub fn new(
         tls: MaybeTlsSettings,
         proxy: &ProxyConfig,
@@ -279,20 +251,12 @@ where
         Ok(Self { client, routes })
     }
 
-    /// Sends `request` over HTTP/2 and resolves to the response head with its streaming body.
-    ///
-    /// The request URI must be absolute with an `http` or `https` scheme. If the destination is
-    /// an `http://` URI routed through a forward proxy whose URL contains credentials, a
-    /// `Proxy-Authorization` header is inserted unless the request already has one. No other
-    /// header is added, and no HTTP client internal events are emitted.
-    ///
-    /// The returned future does not borrow `self`.
+    /// Sends `request`, adding forward proxy credentials when the route needs them.
     ///
     /// # Errors
     ///
-    /// Returns a non-retriable [`HttpError`] if the request URI cannot be routed, for example
-    /// because it has no scheme or an unsupported one. Returns a retriable [`HttpError`] if the
-    /// connection, proxy tunnel, TLS handshake, or HTTP/2 exchange fails.
+    /// Returns a non-retriable error if the URI cannot be routed, and a retriable error if the
+    /// transport fails.
     pub fn request(
         &self,
         mut request: Request<B>,
@@ -494,13 +458,12 @@ enum Route {
 
 type BaseConnector = HttpsConnector<HttpConnector>;
 
-/// ALPN protocols offered on the TLS connection to a forward (non-`CONNECT`) proxy.
+/// ALPN protocols offered to a TLS forward (non-`CONNECT`) proxy.
 #[derive(Clone, Copy)]
 enum ForwardProxyAlpn {
-    /// Offer only `http/1.1`, for clients that speak HTTP/1.1 to forward proxies.
+    /// Only `http/1.1`, for [`HttpClient`].
     Http1,
-    /// Offer the configured `tls.alpn_protocols`, for the HTTP/2-only client whose forward proxy
-    /// is its HTTP/2 peer.
+    /// The configured `tls.alpn_protocols`, for [`Http2Client`].
     Configured,
 }
 
