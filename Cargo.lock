@@ -13622,7 +13622,7 @@ dependencies = [
  "roaring",
  "rstest",
  "rumqttc",
- "rustls 0.23.45",
+ "rustls 0.23.46",
  "seahash",
  "semver",
  "serde",
