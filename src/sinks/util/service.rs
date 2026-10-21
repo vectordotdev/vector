@@ -8,7 +8,7 @@ use tower::{
     buffer::{Buffer, BufferLayer},
     discover::Change,
     layer::{Layer, util::Stack},
-    limit::RateLimit,
+    limit::{ConcurrencyLimit, RateLimit},
     retry::Retry,
     timeout::Timeout,
 };
@@ -37,8 +37,13 @@ mod health;
 mod map;
 pub mod net;
 
-pub type Svc<S, L> =
-    RateLimit<Retry<FibonacciRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
+pub type Svc<S, L> = RateLimit<
+    ConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>,
+>;
+
+/// Multiplier applied to the per-attempt concurrency limit to bound the number of logical requests
+/// that may be in flight at once, including those sleeping between retry attempts.
+const RETRY_HEADROOM: usize = 2;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
@@ -385,11 +390,20 @@ where
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
+        // Retry sits outside the adaptive concurrency limit so that a permit is not held while a
+        // request sleeps between attempts. Since that means the adaptive limit no longer bounds the
+        // requests waiting to be retried, bound whole retry sequences separately.
+        let max_logical_requests = self
+            .settings
+            .concurrency
+            .unwrap_or(self.settings.adaptive_concurrency.max_concurrency_limit)
+            .saturating_mul(RETRY_HEADROOM);
         ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
+            .concurrency_limit(max_logical_requests)
             .retry(policy)
             .layer(AdaptiveConcurrencyLimitLayer::new(
                 self.settings.concurrency,
@@ -405,7 +419,7 @@ where
 mod tests {
     use std::sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering::AcqRel},
+        atomic::{AtomicBool, AtomicUsize, Ordering, Ordering::AcqRel},
     };
 
     use futures::{FutureExt, SinkExt, StreamExt, future, stream};
@@ -610,6 +624,46 @@ mod tests {
             .unwrap();
 
         first.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retrying_requests_are_bounded() {
+        let cfg: TowerRequestConfig<GlobalTowerRequestConfigDefaults> = TowerRequestConfig {
+            concurrency: Concurrency::Fixed(1),
+            retry_initial_backoff_secs: NonZeroU64::new(60).unwrap(),
+            retry_jitter_mode: JitterMode::None,
+            ..TowerRequestConfig::default()
+        };
+        let settings = cfg.into_settings();
+
+        let third_calls = Arc::new(AtomicUsize::new(0));
+        let inner = {
+            let third_calls = Arc::clone(&third_calls);
+            tower::service_fn(move |req: usize| {
+                if req == 2 {
+                    third_calls.fetch_add(1, AcqRel);
+                }
+                future::err::<usize, _>(std::io::Error::other("")).boxed()
+            })
+        };
+        let svc = tower::buffer::Buffer::new(
+            ServiceBuilder::new()
+                .settings(settings, RetryUsize)
+                .service(inner),
+            10,
+        );
+
+        // With a concurrency of 1, two logical requests may be in flight (one attempting, one in
+        // backoff). Both keep failing.
+        tokio::spawn(svc.clone().oneshot(0));
+        tokio::spawn(svc.clone().oneshot(1));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        // A third one must wait instead of piling up behind them.
+        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(2))
+            .await
+            .expect_err("third request should be held back by the retry bound");
+        assert_eq!(third_calls.load(Ordering::Acquire), 0);
     }
 
     #[derive(Clone, Debug, Copy)]
