@@ -1205,7 +1205,7 @@ mod test {
                 "enabled": true,
                 "http": "http://example.com",
                 "https": "https://example.com",
-                "no_proxy": ["no-proxy.com"]
+                "no_proxy": "no-proxy.com"
               },
               "enrichment_tables": {
                 "memory_table": {
