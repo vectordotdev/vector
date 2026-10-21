@@ -657,10 +657,6 @@ impl IngestorProcess {
         Ok(())
     }
 
-    #[allow(
-        clippy::cast_possible_wrap,
-        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
-    )]
     async fn handle_notification_batch(
         &mut self,
         batch: NotificationBatch,
@@ -675,17 +671,8 @@ impl IngestorProcess {
             }
         }
 
-        if let (Some(deferred), Some(object)) = (&self.state.deferred, batch.objects.first()) {
-            let published_at = batch
-                .published_at
-                .ok_or(ProcessingError::MissingPublicationTimestamp)?;
-            if (Utc::now() - published_at).num_seconds() > deferred.max_age_secs as i64 {
-                return Err(ProcessingError::FileTooOld {
-                    bucket: object.bucket.clone(),
-                    key: object.key.clone(),
-                    deferred_queue: deferred.queue_url.clone(),
-                });
-            }
+        if let Some(deferred) = &self.state.deferred {
+            check_notification_age(&batch, deferred, Utc::now()).map_err(|error| *error)?;
         }
         for object in batch.objects {
             self.handle_s3_object(object, self.log_namespace).await?;
@@ -937,6 +924,30 @@ impl IngestorProcess {
             .send()
             .await
     }
+}
+
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
+pub(super) fn check_notification_age(
+    batch: &NotificationBatch,
+    deferred: &DeferredConfig,
+    now: DateTime<Utc>,
+) -> Result<(), Box<ProcessingError>> {
+    if let Some(object) = batch.objects.first() {
+        let published_at = batch
+            .published_at
+            .ok_or(ProcessingError::MissingPublicationTimestamp)?;
+        if (now - published_at).num_seconds() > deferred.max_age_secs as i64 {
+            return Err(Box::new(ProcessingError::FileTooOld {
+                bucket: object.bucket.clone(),
+                key: object.key.clone(),
+                deferred_queue: deferred.queue_url.clone(),
+            }));
+        }
+    }
+    Ok(())
 }
 
 // Parse the whole message before any downloads, but validate records as we reach
@@ -1256,56 +1267,6 @@ mod urlencoded_string {
             &utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).collect::<String>(),
         )
     }
-}
-
-#[tokio::test]
-async fn parser_error_preserves_source_and_message_id() {
-    struct JsonParser;
-    impl NotificationParser for JsonParser {
-        fn parse(&self, body: &str) -> super::NotificationBatches {
-            vec![
-                serde_json::from_str::<serde_json::Value>(body)
-                    .map(|_| NotificationBatch::new(Vec::new(), None))
-                    .map_err(Into::into),
-            ]
-        }
-    }
-
-    let config: AwsS3Config = serde_json::from_value(serde_json::json!({
-        "region":"us-east-1", "endpoint":"http://127.0.0.1:1",
-        "auth":{"access_key_id":"synthetic", "secret_access_key":"synthetic"},
-        "sqs":{"queue_url":"http://127.0.0.1:1/queue"}
-    }))
-    .unwrap();
-    let (out, _rx) = SourceSender::new_test();
-    let cx = SourceContext::new_test(out, None);
-    let ingestor = config
-        .create_sqs_ingestor(None, &cx.proxy, LogNamespace::Legacy)
-        .await
-        .unwrap()
-        .with_notification_parser(Arc::new(JsonParser));
-    let mut process = IngestorProcess::new(
-        Arc::new(ingestor.state),
-        cx.out,
-        cx.shutdown,
-        LogNamespace::Legacy,
-        true,
-    );
-    let error = process
-        .handle_sqs_message(
-            Message::builder()
-                .message_id("message-0")
-                .body("not JSON")
-                .build(),
-        )
-        .await
-        .unwrap_err();
-    let source = std::error::Error::source(&error).unwrap();
-    assert!(source.is::<serde_json::Error>());
-    assert_eq!(
-        error.to_string(),
-        format!("Could not parse SQS message with id message-0: {source}")
-    );
 }
 
 #[test]

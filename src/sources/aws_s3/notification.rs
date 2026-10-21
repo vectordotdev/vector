@@ -88,6 +88,9 @@ pub type NotificationBatches =
 ///
 /// Replaces the built-in S3/SNS parsing, including any message wrappers.
 /// Parsing should not make network requests.
+///
+/// If a later batch fails the age check, the entire original SQS message is
+/// forwarded to the deferred queue, so earlier batches may be delivered again.
 pub trait NotificationParser: Send + Sync {
     /// Parse the original SQS message body.
     /// On error, the source does not delete the message. Retries may repeat

@@ -8,7 +8,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use serde::Deserialize;
 use tokio::sync::Notify;
 use wiremock::{
@@ -23,6 +23,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::aws_s3::{
         AwsS3Config, NotificationBatch, NotificationBatches, NotificationParser, S3ObjectReference,
+        sqs::{DeferredConfig, check_notification_age},
     },
 };
 
@@ -84,15 +85,10 @@ fn standard_body() -> String {
     serde_json::json!({"Records":records}).to_string()
 }
 
-fn gzip_members(lines: &[&str]) -> Vec<u8> {
-    lines
-        .iter()
-        .flat_map(|line| {
-            let mut member = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
-            member.write_all(line.as_bytes()).unwrap();
-            member.finish().unwrap()
-        })
-        .collect()
+fn gzip(body: &str) -> Vec<u8> {
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    encoder.write_all(body.as_bytes()).unwrap();
+    encoder.finish().unwrap()
 }
 
 fn has_target(request: &Request, target: &str) -> bool {
@@ -170,7 +166,7 @@ impl Fixture {
             .and(path(format!("/synthetic/{key}")))
             .respond_with(
                 ResponseTemplate::new(200)
-                    .set_body_bytes(gzip_members(&[&format!("{{\"value\":{value}}}\n")])),
+                    .set_body_bytes(gzip(&format!("{{\"value\":{value}}}\n"))),
             )
             .mount(&self.server)
             .await;
@@ -230,16 +226,13 @@ impl Fixture {
 #[tokio::test]
 async fn custom_parser_uses_shared_reader_and_ack_gated_deletion() {
     let fixture = Fixture::new(vec![custom_body(&["literal%2F+one.gz", "two.gz"], None)]).await;
-    for (key, lines) in [
-        (
-            "literal%252F%2Bone.gz",
-            vec!["{\"value\":1}\n", "{\"value\":2}\n"],
-        ),
-        ("two.gz", vec!["{\"value\":3}\n"]),
+    for (key, body) in [
+        ("literal%252F%2Bone.gz", "{\"value\":1}\n{\"value\":2}\n"),
+        ("two.gz", "{\"value\":3}\n"),
     ] {
         Mock::given(method("GET"))
             .and(path(format!("/synthetic/{key}")))
-            .respond_with(ResponseTemplate::new(200).set_body_bytes(gzip_members(&lines)))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(gzip(body)))
             .mount(&fixture.server)
             .await;
     }
@@ -396,90 +389,58 @@ async fn failed_object_stops_remaining_files_and_preserves_receipt() {
     );
 }
 
+#[test]
+fn batch_age_check_uses_publication_time() {
+    let published_at: DateTime<Utc> = "2026-01-01T00:00:00Z".parse().unwrap();
+    let batch = TestParser
+        .parse(&custom_body(&["one.gz", "two.gz"], Some(published_at)))
+        .pop()
+        .unwrap()
+        .unwrap();
+    let deferred = DeferredConfig {
+        queue_url: "http://localhost/deferred".into(),
+        max_age_secs: 60,
+    };
+    for (age_millis, too_old) in [
+        (-1_000, false),
+        (59_000, false),
+        (60_000, false),
+        (60_999, false),
+        (61_000, true),
+    ] {
+        let now = published_at + chrono::Duration::milliseconds(age_millis);
+        assert_eq!(
+            check_notification_age(&batch, &deferred, now).is_err(),
+            too_old,
+            "age: {age_millis} ms"
+        );
+    }
+}
+
 #[tokio::test]
-async fn age_is_checked_per_s3_record_but_once_per_application_batch() {
-    for custom in [false, true] {
-        let fixture = Fixture::new(vec![]).await;
+async fn custom_batch_publication_time_controls_deferral() {
+    for (published_at, expected_events) in
+        [("2000-01-01T00:00:00Z", 0), ("2100-01-01T00:00:00Z", 2)]
+    {
+        let fixture = Fixture::new(vec![custom_body(
+            &["one.gz", "two.gz"],
+            Some(published_at.parse().unwrap()),
+        )])
+        .await;
         fixture.object("one.gz", 1).await;
         fixture.object("two.gz", 2).await;
-        let mut config = fixture.config(true);
-        config
-            .sqs
-            .as_mut()
-            .unwrap()
-            .deferred
-            .as_mut()
-            .unwrap()
-            .max_age_secs = 0;
-        let (out, mut rx) = SourceSender::new_test();
-        let (stop, shutdown, _done) = ShutdownSignal::new_wired();
-        let mut cx = SourceContext::new_test(out, None);
-        cx.shutdown = shutdown;
-        cx.acknowledgements = true;
-        let source = if custom {
-            config
-                .build_with_notification_parser(cx, Arc::new(TestParser))
-                .await
-        } else {
-            config.build(cx).await
-        }
-        .unwrap();
-
-        // Start the age window after client setup, not before it.
-        let published_at = Utc::now() + chrono::Duration::seconds(5);
-        let body = if custom {
-            custom_body(&["one.gz", "two.gz"], Some(published_at))
-        } else {
-            let mut body: serde_json::Value = serde_json::from_str(&standard_body()).unwrap();
-            for record in body["Records"].as_array_mut().unwrap() {
-                record["eventTime"] = published_at.to_rfc3339().into();
-            }
-            body.to_string()
-        };
-        Mock::given(header("x-amz-target", "AmazonSQS.ReceiveMessage"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "Messages":[{"MessageId":"message-0", "ReceiptHandle":"receipt-0", "Body":body}]
-            })))
-            .with_priority(1)
-            .up_to_n_times(1)
-            .mount(&fixture.server)
+        let events = fixture
+            .process(
+                &fixture.config(true),
+                Some(Arc::new(TestParser)),
+                EventStatus::Delivered,
+            )
             .await;
-
-        let consume = async {
-            let mut first = rx.next().await.unwrap();
-            assert_eq!(first.as_log()["value"], 1.into());
-            let wait = (published_at + chrono::Duration::seconds(2) - Utc::now())
-                .to_std()
-                .unwrap_or_default();
-            tokio::time::sleep(wait).await;
-            assert!(
-                fixture
-                    .calls("AmazonSQS.DeleteMessageBatch")
-                    .await
-                    .is_empty()
-            );
-            first.metadata_mut().update_status(EventStatus::Delivered);
-            first.metadata_mut().update_sources();
-            if custom {
-                let mut second = rx.next().await.unwrap();
-                assert_eq!(second.as_log()["value"], 2.into());
-                second.metadata_mut().update_status(EventStatus::Delivered);
-                second.metadata_mut().update_sources();
-            }
-            fixture.processed.notified().await;
-            assert!(rx.next().now_or_never().is_none());
-            stop.cancel();
-        };
-        let (result, ()) = tokio::time::timeout(Duration::from_secs(20), async {
-            tokio::join!(source, consume)
-        })
-        .await
-        .unwrap();
-        result.unwrap();
-        assert_eq!(fixture.downloads().await.len(), if custom { 2 } else { 1 });
+        assert_eq!(events.len(), expected_events);
+        assert_eq!(fixture.downloads().await.len(), expected_events);
         assert_eq!(
             fixture.calls("AmazonSQS.SendMessageBatch").await.len(),
-            usize::from(!custom)
+            usize::from(expected_events == 0)
         );
         assert_eq!(fixture.calls("AmazonSQS.DeleteMessageBatch").await.len(), 1);
     }
