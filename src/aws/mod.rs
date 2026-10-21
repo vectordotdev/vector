@@ -20,7 +20,9 @@ use aws_config::{
 };
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
-    http_request::{PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings},
+    http_request::{
+        PayloadChecksumKind, SignableBody, SignableRequest, SigningInstructions, SigningSettings,
+    },
     sign::v4,
 };
 use aws_smithy_async::rt::sleep::TokioSleep;
@@ -304,23 +306,112 @@ pub async fn sign_request(
     region: Option<&Region>,
     payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
-    let headers = request
-        .headers()
-        .iter()
-        .map(|(k, v)| {
-            Ok((
-                k.as_str(),
-                std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
-            ))
-        })
-        .collect::<Result<Vec<_>, SigningError>>()?;
+    let headers = signable_headers(
+        request
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_bytes())),
+    )?;
 
-    let signable_request = SignableRequest::new(
+    let signing_instructions = sign_request_helper(
+        service_name,
         request.method().as_str(),
         request.uri().to_string(),
-        headers.into_iter(),
-        SignableBody::Bytes(request.body().as_ref()),
+        headers,
+        request.body().as_ref(),
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+        SystemTime::now,
+    )
+    .await?;
+
+    signing_instructions.apply_to_request_http0x(request);
+
+    Ok(())
+}
+
+/// Sign the request prior to sending to AWS, using `http` 1.x request types.
+///
+/// This is the `http` 1 counterpart of [`sign_request`]; the signature is added to the provided
+/// `request`. Both functions produce identical signatures for identical inputs.
+///
+/// # Errors
+///
+/// Returns an error if a header value is not valid UTF-8, the credentials cannot be
+/// provided, or the request cannot be signed.
+pub async fn sign_request_v1(
+    service_name: &str,
+    request: &mut http_1::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+) -> crate::Result<()> {
+    let headers = signable_headers(
+        request
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_bytes())),
     )?;
+
+    let signing_instructions = sign_request_helper(
+        service_name,
+        request.method().as_str(),
+        request.uri().to_string(),
+        headers,
+        request.body().as_ref(),
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+        SystemTime::now,
+    )
+    .await?;
+
+    signing_instructions.apply_to_request_http1x(request);
+
+    Ok(())
+}
+
+/// Collect a request's headers as `(&str, &str)` pairs for signing, rejecting headers whose
+/// values are not valid UTF-8 with [`SigningError::NotUTF8Header`].
+fn signable_headers<'a>(
+    headers: impl Iterator<Item = (&'a str, &'a [u8])>,
+) -> Result<Vec<(&'a str, &'a str)>, SigningError> {
+    headers
+        .map(|(k, v)| {
+            Ok((
+                k,
+                std::str::from_utf8(v).map_err(|_| SigningError::NotUTF8Header)?,
+            ))
+        })
+        .collect()
+}
+
+/// Version-neutral request signing core shared by [`sign_request`] and [`sign_request_v1`].
+///
+/// Builds the `SignableRequest` from the given request parts and produces the
+/// `SigningInstructions` to apply to a request of either `http` crate version.
+///
+/// `signing_time` is called after the credentials are provided, so a slow credential lookup
+/// does not make the signature's `x-amz-date` stale.
+// https://github.com/vectordotdev/vector/issues/19179
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Takes request parts so both `http` versions share one signing path; fold into `sign_request_v1` and remove this allow once the http 0.2 `sign_request` is deleted."
+)]
+async fn sign_request_helper(
+    service_name: &str,
+    method: &str,
+    uri: String,
+    headers: Vec<(&str, &str)>,
+    body: &[u8],
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+    signing_time: impl FnOnce() -> SystemTime,
+) -> crate::Result<SigningInstructions> {
+    let signable_request =
+        SignableRequest::new(method, uri, headers.into_iter(), SignableBody::Bytes(body))?;
 
     let credentials = credentials_provider.provide_credentials().await?;
     let identity = Identity::new(credentials, None);
@@ -337,7 +428,7 @@ pub async fn sign_request(
         .identity(&identity)
         .region(region.as_ref().map_or("", std::convert::AsRef::as_ref))
         .name(service_name)
-        .time(SystemTime::now())
+        .time(signing_time())
         .settings(signing_settings);
 
     let signing_params = signing_params_builder
@@ -346,9 +437,7 @@ pub async fn sign_request(
 
     let (signing_instructions, _signature) =
         aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
-    signing_instructions.apply_to_request_http0x(request);
-
-    Ok(())
+    Ok(signing_instructions)
 }
 
 #[derive(Debug)]
@@ -586,5 +675,115 @@ impl Body for MeasuredBody {
         _cx: &mut Context<'_>,
     ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
         Poll::Ready(Ok(None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aws_credential_types::Credentials;
+
+    /// The `http` 1.x signing path must produce signatures identical to the legacy `http` 0.2
+    /// path for the same request, credentials, region, and signing time.
+    #[tokio::test]
+    async fn sign_request_v1_signs_identically_to_sign_request() {
+        const SERVICE_NAME: &str = "example-service";
+        const URI: &str =
+            "https://example.us-east-1.amazonaws.com/path/to/resource?query=param&value=42";
+        const BODY: &[u8] = b"some non-empty request body";
+        let signing_time = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+
+        let credentials_provider =
+            SharedCredentialsProvider::new(Credentials::from_keys("AKID", "SECRET", None));
+        let region = Region::new("us-east-1");
+
+        let mut request0 = http::Request::post(URI)
+            .header("content-type", "application/json")
+            .body(Bytes::from_static(BODY))
+            .expect("valid request");
+        let mut request1 = http_1::Request::post(URI)
+            .header("content-type", "application/json")
+            .body(Bytes::from_static(BODY))
+            .expect("valid request");
+
+        let headers0 = signable_headers(
+            request0
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_bytes())),
+        )
+        .expect("request headers are valid UTF-8");
+        let headers1 = signable_headers(
+            request1
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_bytes())),
+        )
+        .expect("request headers are valid UTF-8");
+
+        let instructions0 = sign_request_helper(
+            SERVICE_NAME,
+            request0.method().as_str(),
+            request0.uri().to_string(),
+            headers0,
+            request0.body().as_ref(),
+            &credentials_provider,
+            Some(&region),
+            true,
+            || signing_time,
+        )
+        .await
+        .expect("signing should succeed");
+        let instructions1 = sign_request_helper(
+            SERVICE_NAME,
+            request1.method().as_str(),
+            request1.uri().to_string(),
+            headers1,
+            request1.body().as_ref(),
+            &credentials_provider,
+            Some(&region),
+            true,
+            || signing_time,
+        )
+        .await
+        .expect("signing should succeed");
+
+        instructions0.apply_to_request_http0x(&mut request0);
+        instructions1.apply_to_request_http1x(&mut request1);
+
+        for name in ["authorization", "x-amz-date", "x-amz-content-sha256"] {
+            let value0 = request0
+                .headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_else(|| {
+                    panic!("`{name}` header must be set by signing on http 0.2 request")
+                });
+            let value1 = request1
+                .headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_else(|| {
+                    panic!("`{name}` header must be set by signing on http 1 request")
+                });
+            assert_eq!(
+                value0, value1,
+                "`{name}` header must match between http 0.2 and http 1 signatures"
+            );
+        }
+        let authorization1 = request1
+            .headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .expect("`authorization` header must be set by signing on http 1 request");
+        assert!(
+            authorization1.starts_with("AWS4-HMAC-SHA256 Credential=AKID/"),
+            "http 1 `authorization` header must be an AWS v4 signature for the test credentials: {authorization1}"
+        );
+        assert_eq!(
+            request0.uri().to_string(),
+            request1.uri().to_string(),
+            "URI (including signed query) must match between http 0.2 and http 1 signatures"
+        );
     }
 }

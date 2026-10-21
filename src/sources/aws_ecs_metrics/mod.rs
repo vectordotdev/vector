@@ -102,8 +102,8 @@ pub struct AwsEcsMetricsSourceConfig {
     namespace: String,
 }
 
-const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI";
-const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI_V4";
+const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI_V4";
+const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI";
 
 #[must_use]
 pub fn default_endpoint() -> String {
