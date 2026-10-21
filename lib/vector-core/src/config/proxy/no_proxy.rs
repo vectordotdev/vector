@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet, fmt, net::IpAddr, str::FromStr};
+use std::{collections::HashSet, fmt, net::IpAddr, str::FromStr};
 
 use cidr::IpCidr;
 use serde::{
@@ -6,15 +6,12 @@ use serde::{
     de::{self, SeqAccess, Visitor},
     ser::SerializeSeq,
 };
-use vector_config::{
-    Configurable, GenerateError, Metadata, ToValue,
-    attributes::CustomAttribute,
-    constants::DOCS_META_ENUM_TAGGING,
-    schema::{SchemaGenerator, SchemaObject, apply_metadata, generate_one_of_schema},
-};
+use vector_config::Configurable;
 
 /// Hosts and networks that should be contacted without using a proxy.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Configurable, Debug, Default, Deserialize, Eq, PartialEq)]
+// Derive the schema from the input forms while retaining the visitor and streaming serializer.
+#[serde(from = "NoProxyRepr", into = "NoProxyRepr")]
 pub struct NoProxy {
     patterns: HashSet<Pattern>,
     has_wildcard: bool,
@@ -175,10 +172,23 @@ impl Serialize for NoProxy {
     }
 }
 
+/// Hosts and networks that should be contacted without using a proxy.
+#[derive(Configurable, Serialize)]
+#[serde(untagged)]
+enum NoProxyRepr {
+    /// Comma-separated bypass patterns.
+    // The docs resolver collapses string-or-array schemas to strings, which conflicts with
+    // the [] default. Keep documenting the list form while accepting both input forms.
+    #[configurable(metadata(docs::hidden))]
+    String(String),
+    /// Individual bypass patterns, without splitting entries on commas.
+    Array(Vec<String>),
+}
+
 struct NoProxyVisitor;
 
 impl<'de> Visitor<'de> for NoProxyVisitor {
-    type Value = NoProxy;
+    type Value = NoProxyRepr;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("a comma-separated string or a list of strings")
@@ -188,14 +198,14 @@ impl<'de> Visitor<'de> for NoProxyVisitor {
     where
         E: de::Error,
     {
-        Ok(NoProxy::from(value))
+        Ok(NoProxyRepr::String(value.to_owned()))
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Ok(NoProxy::from(value))
+        Ok(NoProxyRepr::String(value))
     }
 
     fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
@@ -206,11 +216,11 @@ impl<'de> Visitor<'de> for NoProxyVisitor {
         while let Some(entry) = sequence.next_element::<String>()? {
             entries.push(entry);
         }
-        Ok(NoProxy::from_entries(entries))
+        Ok(NoProxyRepr::Array(entries))
     }
 }
 
-impl<'de> Deserialize<'de> for NoProxy {
+impl<'de> Deserialize<'de> for NoProxyRepr {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -219,30 +229,27 @@ impl<'de> Deserialize<'de> for NoProxy {
     }
 }
 
-impl Configurable for NoProxy {
-    fn metadata() -> Metadata {
-        let mut metadata = Metadata::with_transparent(true);
-        metadata.add_custom_attribute(CustomAttribute::kv(DOCS_META_ENUM_TAGGING, "untagged"));
-        metadata
-    }
-
-    fn generate_schema(
-        generator: &RefCell<SchemaGenerator>,
-    ) -> Result<SchemaObject, GenerateError> {
-        // Serde splits scalar strings on commas but preserves each array entry as one pattern.
-        let mut string = String::generate_schema(generator)?;
-        // Keep documenting the list form, as before.
-        let mut metadata = Metadata::with_transparent(true);
-        metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
-        apply_metadata(&mut string, metadata);
-        let array = Vec::<String>::generate_schema(generator)?;
-        Ok(generate_one_of_schema(&[string, array]))
+impl From<NoProxyRepr> for NoProxy {
+    fn from(value: NoProxyRepr) -> Self {
+        match value {
+            NoProxyRepr::String(value) => Self::from(value),
+            NoProxyRepr::Array(entries) => Self::from_entries(entries),
+        }
     }
 }
 
-impl ToValue for NoProxy {
-    fn to_value(&self) -> serde_json::Value {
-        serde_json::to_value(self).expect("no-proxy patterns must serialize")
+impl From<NoProxy> for NoProxyRepr {
+    fn from(value: NoProxy) -> Self {
+        Self::Array(
+            value
+                .patterns
+                .into_iter()
+                .map(|pattern| match pattern {
+                    Pattern::Wildcard => "*".to_owned(),
+                    Pattern::IpCidr { source, .. } | Pattern::Host { source, .. } => source,
+                })
+                .collect(),
+        )
     }
 }
 
@@ -318,6 +325,50 @@ mod tests {
         assert!(no_proxy.matches("localhost,127.0.0.1"));
         assert!(!no_proxy.matches("localhost"));
         assert!(!no_proxy.matches("127.0.0.1"));
+    }
+
+    #[test]
+    fn rejects_invalid_inputs_with_existing_errors() {
+        for (input, expected) in [
+            (
+                json!(true),
+                "invalid type: boolean `true`, expected a comma-separated string or a list of strings",
+            ),
+            (
+                json!(null),
+                "invalid type: null, expected a comma-separated string or a list of strings",
+            ),
+            (
+                json!({}),
+                "invalid type: map, expected a comma-separated string or a list of strings",
+            ),
+            (json!([42]), "invalid type: integer `42`, expected a string"),
+        ] {
+            assert_eq!(
+                serde_json::from_value::<NoProxy>(input)
+                    .unwrap_err()
+                    .to_string(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn representation_matches_streaming_serializer() {
+        for input in [
+            json!("localhost,127.0.0.1"),
+            json!(["localhost", "127.0.0.1"]),
+            json!(["localhost,127.0.0.1"]),
+            json!(["localhost", "localhost", " "]),
+            json!(["*", "192.168.0.0/16"]),
+            json!([]),
+        ] {
+            let no_proxy: NoProxy = serde_json::from_value(input).unwrap();
+
+            let expected = serde_json::to_value(&no_proxy).unwrap();
+            let actual = serde_json::to_value(NoProxyRepr::from(no_proxy)).unwrap();
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]
