@@ -8,7 +8,9 @@ use serde::{
 };
 use vector_config::{
     Configurable, GenerateError, Metadata, ToValue,
-    schema::{SchemaGenerator, SchemaObject},
+    attributes::CustomAttribute,
+    constants::DOCS_META_ENUM_TAGGING,
+    schema::{SchemaGenerator, SchemaObject, apply_metadata, generate_one_of_schema},
 };
 
 /// Hosts and networks that should be contacted without using a proxy.
@@ -219,13 +221,22 @@ impl<'de> Deserialize<'de> for NoProxy {
 
 impl Configurable for NoProxy {
     fn metadata() -> Metadata {
-        Metadata::with_transparent(true)
+        let mut metadata = Metadata::with_transparent(true);
+        metadata.add_custom_attribute(CustomAttribute::kv(DOCS_META_ENUM_TAGGING, "untagged"));
+        metadata
     }
 
     fn generate_schema(
         generator: &RefCell<SchemaGenerator>,
     ) -> Result<SchemaObject, GenerateError> {
-        Vec::<String>::generate_schema(generator)
+        // Serde splits scalar strings on commas but preserves each array entry as one pattern.
+        let mut string = String::generate_schema(generator)?;
+        // Keep documenting the list form, as before.
+        let mut metadata = Metadata::with_transparent(true);
+        metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
+        apply_metadata(&mut string, metadata);
+        let array = Vec::<String>::generate_schema(generator)?;
+        Ok(generate_one_of_schema(&[string, array]))
     }
 }
 
@@ -238,6 +249,10 @@ impl ToValue for NoProxy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+    use vector_config::schema::generate_root_schema;
+
+    use crate::config::proxy::ProxyConfig;
 
     #[test]
     fn matches_supported_patterns() {
@@ -294,6 +309,31 @@ mod tests {
         let from_list: NoProxy = serde_json::from_str(r#"["localhost", "127.0.0.1"]"#).unwrap();
 
         assert_eq!(from_string, from_list);
+    }
+
+    #[test]
+    fn list_entries_are_not_split_on_commas() {
+        let no_proxy: NoProxy = serde_json::from_value(json!(["localhost,127.0.0.1"])).unwrap();
+
+        assert!(no_proxy.matches("localhost,127.0.0.1"));
+        assert!(!no_proxy.matches("localhost"));
+        assert!(!no_proxy.matches("127.0.0.1"));
+    }
+
+    #[test]
+    fn schema_describes_both_input_forms() {
+        let schema = serde_json::to_value(generate_root_schema::<ProxyConfig>().unwrap()).unwrap();
+        let no_proxy = &schema["properties"]["no_proxy"];
+        let variants = no_proxy["oneOf"].as_array().unwrap();
+
+        assert_eq!(variants.len(), 2);
+        assert_eq!(variants[0]["type"], "string");
+        assert_eq!(variants[1]["type"], "array");
+        assert_eq!(variants[1]["items"]["type"], "string");
+        assert_eq!(no_proxy["_metadata"]["docs::enum_tagging"], "untagged");
+        // Continue documenting the list form and its default.
+        assert_eq!(variants[0]["_metadata"]["docs::hidden"], true);
+        assert_eq!(no_proxy["default"], json!([]));
     }
 
     #[test]
