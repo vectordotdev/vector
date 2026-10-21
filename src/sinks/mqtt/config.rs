@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use rand::RngExt;
-use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
+use rumqttc::{MqttOptions, QoS};
 use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
 
@@ -9,12 +9,10 @@ use crate::{
     codecs::EncodingConfig,
     common::mqtt::{
         ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
-        TlsSnafu,
     },
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
     template::{ConfinementConfig, Template},
-    tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `mqtt` sink
@@ -187,8 +185,7 @@ impl MqttSinkConfig {
         if client_id.is_empty() {
             return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
         }
-        let tls =
-            MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
+        let tls_transport = self.common.tls_transport()?;
         let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
         options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
         options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
@@ -204,26 +201,8 @@ impl MqttSinkConfig {
                 });
             }
         }
-        if let Some(tls) = tls.tls() {
-            let ca = tls.authorities_pem().flatten().collect();
-            let client_auth = tls.identity_pem();
-            // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
-            // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
-            let alpn = self
-                .common
-                .tls
-                .as_ref()
-                .and_then(|tls| tls.options.alpn_protocols.as_ref())
-                .filter(|protocols| !protocols.is_empty())
-                .map_or_else(
-                    || vec![b"mqtt".to_vec()],
-                    |protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect(),
-                );
-            options.set_transport(Transport::Tls(TlsConfiguration::Simple {
-                ca,
-                client_auth,
-                alpn: Some(alpn),
-            }));
+        if let Some(transport) = tls_transport {
+            options.set_transport(transport);
         }
         Ok(MqttConnector::new(options))
     }

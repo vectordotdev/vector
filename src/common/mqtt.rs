@@ -1,7 +1,7 @@
-use rumqttc::{AsyncClient, EventLoop, MqttOptions};
-use snafu::Snafu;
+use rumqttc::{AsyncClient, EventLoop, MqttOptions, TlsConfiguration, Transport};
+use snafu::{ResultExt, Snafu};
 use vector_config_macros::configurable_component;
-use vector_lib::tls::{TlsEnableableConfig, TlsError};
+use vector_lib::tls::{MaybeTlsSettings, TlsEnableableConfig, TlsError};
 
 use crate::template::TemplateParseError;
 
@@ -58,6 +58,55 @@ const fn default_max_packet_size() -> usize {
     10 * 1024
 }
 
+impl MqttCommonConfig {
+    /// Builds the TLS transport from the `tls` options, or returns `None` when TLS is disabled.
+    ///
+    /// Configured CA certificates replace the system roots, matching Vector's other TLS clients.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TLS options are invalid or the TLS connector cannot be built.
+    pub fn tls_transport(&self) -> Result<Option<Transport>, MqttError> {
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false).context(TlsSnafu)?;
+        let Some(tls) = tls.tls() else {
+            return Ok(None);
+        };
+
+        let mut builder = native_tls::TlsConnector::builder();
+        let mut has_authorities = false;
+        for pem in tls.authorities_pem() {
+            has_authorities = true;
+            let cert = native_tls::Certificate::from_pem(&pem).context(TlsConnectorSnafu)?;
+            builder.add_root_certificate(cert);
+        }
+        builder.disable_built_in_roots(has_authorities);
+
+        if let Some((cert, key)) = tls.identity_pem() {
+            let identity =
+                native_tls::Identity::from_pkcs8(&cert, &key).context(TlsConnectorSnafu)?;
+            builder.identity(identity);
+        }
+
+        // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
+        // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
+        let alpn: Vec<&str> = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.options.alpn_protocols.as_ref())
+            .filter(|protocols| !protocols.is_empty())
+            .map_or_else(
+                || vec!["mqtt"],
+                |protocols| protocols.iter().map(String::as_str).collect(),
+            );
+        builder.request_alpns(&alpn);
+
+        let connector = builder.build().context(TlsConnectorSnafu)?;
+        Ok(Some(Transport::Tls(TlsConfiguration::NativeConnector(
+            connector,
+        ))))
+    }
+}
+
 /// MQTT Error Types
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
@@ -73,6 +122,12 @@ pub enum MqttError {
     Tls {
         /// Source of error
         source: TlsError,
+    },
+    /// TLS connector error
+    #[snafu(display("TLS connector error: {source}"))]
+    TlsConnector {
+        /// Source of error
+        source: native_tls::Error,
     },
     /// Configuration error
     #[snafu(display("MQTT configuration error: {source}"))]
@@ -128,16 +183,5 @@ impl MqttConnector {
     )]
     pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn tls_crypto_provider_is_unambiguous() {
-        // Rustls panics here if no provider, or both Ring and AWS-LC, are enabled.
-        let _config = rustls::ClientConfig::builder()
-            .with_root_certificates(rustls::RootCertStore::empty())
-            .with_no_client_auth();
     }
 }
