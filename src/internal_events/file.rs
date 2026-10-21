@@ -1,19 +1,12 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
-use std::borrow::Cow;
-
 use vector_lib::{
     NamedInternalEvent,
     configurable::configurable_component,
-    counter, gauge,
-    internal_event::{
-        ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
-        error_stage, error_type,
-    },
+    gauge,
+    internal_event::{GaugeName, InternalEvent},
 };
 
-use crate::sinks::util::path_confinement::ConfineError;
-
+#[cfg(feature = "sinks-file")]
+pub use self::sink::*;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
 
@@ -43,100 +36,115 @@ impl InternalEvent for FileOpen {
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct FileBytesSent<'a> {
-    pub byte_size: usize,
-    pub file: Cow<'a, str>,
-    pub include_file_metric_tag: bool,
-}
+#[cfg(feature = "sinks-file")]
+mod sink {
+    use std::borrow::Cow;
 
-impl InternalEvent for FileBytesSent<'_> {
-    fn emit(self) {
-        trace!(
-            message = "Bytes sent.",
-            byte_size = %self.byte_size,
-            protocol = "file",
-            file = %self.file,
-        );
-        if self.include_file_metric_tag {
-            counter!(
-                CounterName::ComponentSentBytesTotal,
-                "protocol" => "file",
-                "file" => self.file.clone().into_owned(),
-            )
-        } else {
-            counter!(
-                CounterName::ComponentSentBytesTotal,
-                "protocol" => "file",
-            )
-        }
-        .increment(self.byte_size as u64);
+    use vector_lib::{
+        NamedInternalEvent, counter, emit,
+        internal_event::{
+            ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+            error_stage, error_type,
+        },
+    };
+
+    use crate::sinks::util::path_confinement::ConfineError;
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileBytesSent<'a> {
+        pub byte_size: usize,
+        pub file: Cow<'a, str>,
+        pub include_file_metric_tag: bool,
     }
-}
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct FileIoError<'a, P> {
-    pub error: std::io::Error,
-    pub code: &'static str,
-    pub message: &'static str,
-    pub path: &'a P,
-    pub dropped_events: usize,
-}
+    impl InternalEvent for FileBytesSent<'_> {
+        fn emit(self) {
+            trace!(
+                message = "Bytes sent.",
+                byte_size = %self.byte_size,
+                protocol = "file",
+                file = %self.file,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    CounterName::ComponentSentBytesTotal,
+                    "protocol" => "file",
+                    "file" => self.file.clone().into_owned(),
+                )
+            } else {
+                counter!(
+                    CounterName::ComponentSentBytesTotal,
+                    "protocol" => "file",
+                )
+            }
+            .increment(self.byte_size as u64);
+        }
+    }
 
-impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
-    fn emit(self) {
-        error!(
-            message = %self.message,
-            path = ?self.path,
-            error = %self.error,
-            error_code = %self.code,
-            error_type = error_type::IO_FAILED,
-            stage = error_stage::SENDING,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_code" => self.code,
-            "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileIoError<'a, P> {
+        pub error: std::io::Error,
+        pub code: &'static str,
+        pub message: &'static str,
+        pub path: &'a P,
+        pub dropped_events: usize,
+    }
 
-        if self.dropped_events > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: self.dropped_events,
-                reason: self.message,
+    impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
+        fn emit(self) {
+            error!(
+                message = %self.message,
+                path = ?self.path,
+                error = %self.error,
+                error_code = %self.code,
+                error_type = error_type::IO_FAILED,
+                stage = error_stage::SENDING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => self.code,
+                "error_type" => error_type::IO_FAILED,
+                "stage" => error_stage::SENDING,
+            )
+            .increment(1);
+
+            if self.dropped_events > 0 {
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: self.dropped_events,
+                    reason: self.message,
+                });
+            }
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FilePathOutsideBaseDirError<'a> {
+        pub path: &'a std::path::Path,
+        pub base_dir: &'a std::path::Path,
+        pub error: ConfineError,
+    }
+
+    impl InternalEvent for FilePathOutsideBaseDirError<'_> {
+        fn emit(self) {
+            error!(
+                message = "Rendered path is outside the configured base directory; dropping event.",
+                path = ?self.path,
+                base_dir = ?self.base_dir,
+                error = %self.error,
+                error_type = error_type::CONFINEMENT_FAILED,
+                stage = error_stage::PROCESSING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_type" => error_type::CONFINEMENT_FAILED,
+                "stage" => error_stage::PROCESSING,
+            )
+            .increment(1);
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "Rendered path outside base_dir.",
             });
         }
-    }
-}
-
-#[derive(Debug, NamedInternalEvent)]
-pub struct FilePathOutsideBaseDirError<'a> {
-    pub path: &'a std::path::Path,
-    pub base_dir: &'a std::path::Path,
-    pub error: ConfineError,
-}
-
-impl InternalEvent for FilePathOutsideBaseDirError<'_> {
-    fn emit(self) {
-        error!(
-            message = "Rendered path is outside the configured base directory; dropping event.",
-            path = ?self.path,
-            base_dir = ?self.base_dir,
-            error = %self.error,
-            error_type = error_type::CONFINEMENT_FAILED,
-            stage = error_stage::PROCESSING,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONFINEMENT_FAILED,
-            "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
-            count: 1,
-            reason: "Rendered path outside base_dir.",
-        });
     }
 }
 
@@ -145,17 +153,19 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use bytes::BytesMut;
+    #[cfg(feature = "sources-file")]
+    use vector_lib::json_size::JsonSize;
     use vector_lib::{
         NamedInternalEvent, counter, emit,
         file_source_common::internal_events::FileSourceInternalEvents,
         internal_event::{
             ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
         },
-        json_size::JsonSize,
     };
 
     use super::{FileOpen, InternalEvent};
 
+    #[cfg(feature = "sources-file")]
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
         pub byte_size: usize,
@@ -163,6 +173,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
+    #[cfg(feature = "sources-file")]
     impl InternalEvent for FileBytesReceived<'_> {
         fn emit(self) {
             trace!(
@@ -187,6 +198,7 @@ mod source {
         }
     }
 
+    #[cfg(feature = "sources-file")]
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileEventsReceived<'a> {
         pub count: usize,
@@ -195,6 +207,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
+    #[cfg(feature = "sources-file")]
     impl InternalEvent for FileEventsReceived<'_> {
         fn emit(self) {
             trace!(
