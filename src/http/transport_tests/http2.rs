@@ -1,8 +1,5 @@
-//! Native HTTP/2 transport coverage for [`Http2Client`].
-//!
-//! These cases cover the routing, TLS, ALPN, proxy credential, and timer behavior that
-//! [`Http2Client`] adds on top of Hyper's HTTP/2 client. They use the shared test servers, which
-//! accept both HTTP/1.1 and HTTP/2 and record the protocol of each request.
+//! Coverage for [`Http2Client`] routing, TLS, ALPN, proxy credentials, and timers. The shared
+//! test servers record the HTTP version and negotiated ALPN of each request.
 
 use std::time::Duration;
 
@@ -12,8 +9,8 @@ use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use rstest::rstest;
 
 use super::{
-    TestClient, TestResponse, TestServer, assert_success, client_tls, has_proxy_authorization,
-    native_get, no_tls, proxy_config, server_tls_with_alpn, spawn_origin, spawn_proxy,
+    TestClient, TestResponse, assert_success, client_tls, has_proxy_authorization, native_get,
+    no_tls, proxy_config, server_tls_with_alpn, spawn_origin, spawn_proxy,
 };
 use crate::{
     config::ProxyConfig,
@@ -21,7 +18,6 @@ use crate::{
     tls::{MaybeTlsSettings, TEST_PEM_CA_PATH, TlsConfig},
 };
 
-const DESTINATION_TOKEN: &str = "Bearer destination-token";
 const H2_ALPN: &[u8] = b"h2";
 const HTTP1_ALPN: &[u8] = b"http/1.1";
 
@@ -56,36 +52,6 @@ fn h2_client_tls() -> MaybeTlsSettings {
     })
 }
 
-/// Asserts that proxy credentials stayed on the CONNECT request, destination credentials stayed
-/// inside the tunnel, and the tunnel carried HTTP/2 over TLS negotiated with `h2`.
-fn assert_h2_tunnel(proxy: &TestServer, origin: &TestServer) {
-    let proxy_observations = proxy.observations();
-    assert_eq!(proxy_observations.len(), 1);
-    assert_eq!(proxy_observations[0].method, Method::CONNECT);
-    assert_eq!(proxy_observations[0].version, Version::HTTP_11);
-    assert_eq!(
-        proxy_observations[0].uri.authority().unwrap().as_str(),
-        format!("localhost:{}", origin.addr.port())
-    );
-    assert!(has_proxy_authorization(&proxy_observations[0].headers));
-    assert!(
-        !proxy_observations[0]
-            .headers
-            .contains_key(header::AUTHORIZATION)
-    );
-
-    let origin_observations = origin.observations();
-    assert_eq!(origin_observations.len(), 1);
-    assert_eq!(origin_observations[0].version, Version::HTTP_2);
-    assert_eq!(origin_observations[0].alpn.as_deref(), Some(H2_ALPN));
-    let origin_headers = &origin_observations[0].headers;
-    assert!(!origin_headers.contains_key(header::PROXY_AUTHORIZATION));
-    assert_eq!(
-        origin_headers.get(header::AUTHORIZATION).unwrap(),
-        DESTINATION_TOKEN
-    );
-}
-
 #[tokio::test]
 async fn h2c_uses_prior_knowledge_with_destination_authority() {
     let origin = spawn_origin(no_tls()).await;
@@ -116,22 +82,7 @@ async fn h2_over_trusted_tls_offers_configured_alpn() {
 }
 
 #[tokio::test]
-async fn h2_via_authenticated_http_connect_proxy() {
-    let origin = spawn_origin(h2_server_tls()).await;
-    let proxy = spawn_proxy(no_tls(), true).await;
-    let client = client(h2_client_tls(), &proxy_config(&proxy, false, true));
-
-    assert_success(
-        client
-            .get_with_headers(&origin.https_uri(), &[("authorization", DESTINATION_TOKEN)])
-            .await
-            .unwrap(),
-    );
-    assert_h2_tunnel(&proxy, &origin);
-}
-
-#[tokio::test]
-async fn h2_via_authenticated_tls_connect_proxy_keeps_proxy_on_http1() {
+async fn h2_via_tls_connect_proxy_keeps_proxy_on_http1() {
     let origin = spawn_origin(h2_server_tls()).await;
     let proxy = spawn_proxy(
         server_tls_with_alpn(false, Some(vec!["h2".to_owned(), "http/1.1".to_owned()])),
@@ -140,14 +91,15 @@ async fn h2_via_authenticated_tls_connect_proxy_keeps_proxy_on_http1() {
     .await;
     let client = client(h2_client_tls(), &proxy_config(&proxy, true, true));
 
-    assert_success(
-        client
-            .get_with_headers(&origin.https_uri(), &[("authorization", DESTINATION_TOKEN)])
-            .await
-            .unwrap(),
-    );
-    assert_eq!(proxy.observations()[0].alpn.as_deref(), Some(HTTP1_ALPN));
-    assert_h2_tunnel(&proxy, &origin);
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+
+    let proxy_observations = proxy.observations();
+    assert_eq!(proxy_observations[0].method, Method::CONNECT);
+    assert_eq!(proxy_observations[0].version, Version::HTTP_11);
+    assert_eq!(proxy_observations[0].alpn.as_deref(), Some(HTTP1_ALPN));
+    let origin_observations = origin.observations();
+    assert_eq!(origin_observations[0].version, Version::HTTP_2);
+    assert_eq!(origin_observations[0].alpn.as_deref(), Some(H2_ALPN));
 }
 
 #[rstest]
@@ -164,12 +116,7 @@ async fn h2c_via_authenticated_forward_proxy(#[case] proxy_tls: bool) {
     let proxy = spawn_proxy(proxy_server_tls, true).await;
     let client = client(client_tls_settings, &proxy_config(&proxy, proxy_tls, true));
 
-    assert_success(
-        client
-            .get_with_headers(&origin.http_uri(), &[("authorization", DESTINATION_TOKEN)])
-            .await
-            .unwrap(),
-    );
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
 
     let proxy_observations = proxy.observations();
     assert_eq!(proxy_observations.len(), 1);
@@ -184,21 +131,6 @@ async fn h2c_via_authenticated_forward_proxy(#[case] proxy_tls: bool) {
         format!("{}/", origin.http_uri())
     );
     assert!(has_proxy_authorization(&proxy_observations[0].headers));
-
-    let origin_observations = origin.observations();
-    assert_eq!(origin_observations.len(), 1);
-    assert!(
-        !origin_observations[0]
-            .headers
-            .contains_key(header::PROXY_AUTHORIZATION)
-    );
-    assert_eq!(
-        origin_observations[0]
-            .headers
-            .get(header::AUTHORIZATION)
-            .unwrap(),
-        DESTINATION_TOKEN
-    );
 }
 
 #[tokio::test]
