@@ -38,7 +38,7 @@ mod map;
 pub mod net;
 
 pub type Svc<S, L> =
-    RateLimit<AdaptiveConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, Timeout<S>>, L>>;
+    RateLimit<Retry<FibonacciRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
@@ -393,12 +393,12 @@ where
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
+            .retry(policy)
             .layer(AdaptiveConcurrencyLimitLayer::new(
                 self.settings.concurrency,
                 self.settings.adaptive_concurrency,
                 self.retry_logic.clone(),
             ))
-            .retry(policy)
             .timeout(self.settings.timeout)
             .service(inner)
     }
@@ -413,6 +413,7 @@ mod tests {
 
     use futures::{FutureExt, SinkExt, StreamExt, future, stream};
     use tokio::time::Duration;
+    use tower::ServiceExt as _;
     use vector_lib::json_size::JsonSize;
 
     use super::*;
@@ -574,6 +575,60 @@ mod tests {
             &*output,
             &vec![(0..10).collect::<Vec<_>>(), (10..20).collect::<Vec<_>>(),]
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retry_backoff_does_not_hold_concurrency_permit() {
+        let cfg: TowerRequestConfig<GlobalTowerRequestConfigDefaults> = TowerRequestConfig {
+            concurrency: Concurrency::Fixed(1),
+            retry_initial_backoff_secs: NonZeroU64::new(60).unwrap(),
+            ..TowerRequestConfig::default()
+        };
+        let settings = cfg.into_settings();
+
+        let failed_once = Arc::new(AtomicBool::new(false));
+        let inner = tower::service_fn(move |req: usize| {
+            if req == 0 && !failed_once.swap(true, AcqRel) {
+                future::err::<usize, _>(std::io::Error::other("")).boxed()
+            } else {
+                future::ok::<_, std::io::Error>(req).boxed()
+            }
+        });
+        let svc = tower::buffer::Buffer::new(
+            ServiceBuilder::new()
+                .settings(settings, RetryUsize)
+                .service(inner),
+            10,
+        );
+
+        // The first request fails and sleeps in its retry backoff.
+        let first = tokio::spawn(svc.clone().oneshot(0));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        // The second request must not be blocked by the first one's backoff.
+        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(1))
+            .await
+            .expect("second request was blocked by the first request's retry backoff")
+            .unwrap();
+
+        first.await.unwrap().unwrap();
+    }
+
+    #[derive(Clone, Debug, Copy)]
+    struct RetryUsize;
+
+    impl RetryLogic for RetryUsize {
+        type Error = std::io::Error;
+        type Request = usize;
+        type Response = usize;
+
+        fn is_retriable_error(&self, _: &Self::Error) -> bool {
+            true
+        }
+
+        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction<Self::Request> {
+            RetryAction::Successful
+        }
     }
 
     #[derive(Clone, Debug, Copy)]
