@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use http::StatusCode;
 use http_1::Request;
 use snafu::Snafu;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
@@ -380,9 +379,7 @@ async fn healthcheck(
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    healthcheck_status(status, HealthcheckError::NotFound.into())
+    healthcheck_status(response.status(), HealthcheckError::NotFound.into())
 }
 
 #[cfg(test)]

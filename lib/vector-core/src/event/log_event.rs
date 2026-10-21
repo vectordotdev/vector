@@ -47,6 +47,9 @@ static VECTOR_SOURCE_TYPE_PATH: LazyLock<Option<OwnedTargetPath>> = LazyLock::ne
     )))
 });
 
+const _: () = assert!(AtomicCell::<Option<NonZeroUsize>>::is_lock_free());
+const _: () = assert!(AtomicCell::<Option<NonZeroJsonSize>>::is_lock_free());
+
 #[derive(Debug, Deserialize)]
 struct Inner {
     #[serde(flatten)]

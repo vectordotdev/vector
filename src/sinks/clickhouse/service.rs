@@ -3,9 +3,9 @@
 use std::fmt::Write as _;
 
 use bytes::Bytes;
-use http::{StatusCode, Uri};
+use http::Uri;
 use http_1::{
-    Request,
+    Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
@@ -39,8 +39,7 @@ impl RetryLogic for ClickhouseRetryLogic {
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        let status = StatusCode::from_u16(response.response.status().as_u16())
-            .expect("HTTP status codes are valid u16 values");
+        let status = response.response.status();
 
         if !status.is_success() {
             debug!(

@@ -17,7 +17,6 @@ use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     extra_context::ExtraContext,
-    http::HttpError,
     sinks::{
         VectorSink,
         datadog::test_utils::{ApiStatus, test_server},
@@ -35,7 +34,6 @@ use crate::{
         },
         generate_lines_with_stream, random_lines_with_stream,
     },
-    tls::TlsError,
 };
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
@@ -447,28 +445,106 @@ async fn error_is_retriable() {
     // not retry-able
     assert!(!retry.is_retriable_error(&DatadogApiError::BadRequest));
     assert!(!retry.is_retriable_error(&DatadogApiError::PayloadTooLarge));
-    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
-        error: HttpError::BuildRequest {
-            source: http::status::StatusCode::from_u16(6666).unwrap_err().into()
-        }
-    }));
-    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
-        error: HttpError::MakeProxyConnector {
-            source: http::Uri::try_from("").unwrap_err()
-        }
-    }));
 
     // retry-able
     assert!(retry.is_retriable_error(&DatadogApiError::ServerError));
     assert!(retry.is_retriable_error(&DatadogApiError::Forbidden));
-    assert!(retry.is_retriable_error(&DatadogApiError::HttpError {
-        error: HttpError::BuildTlsConnector {
-            source: TlsError::MissingKey
+}
+
+#[tokio::test]
+async fn retries_transport_errors() {
+    use std::{
+        convert::Infallible,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
+
+    use hyper::{
+        Body, Response, Server,
+        service::{make_service_fn, service_fn},
+    };
+
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+        default_api_key = "atoken"
+        compression = "none"
+        batch.max_events = 1
+        request.retry_attempts = 1
+        request.retry_initial_backoff_secs = 1
+    "#})
+    .unwrap();
+    let (_guard, addr) = next_addr();
+    config.local_dd_common.endpoint = Some(format!("http://{addr}"));
+
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let make_service = make_service_fn({
+        let requests = Arc::clone(&requests);
+        move |_| {
+            let requests = Arc::clone(&requests);
+            async move {
+                Ok::<_, Infallible>(service_fn(move |request: hyper::Request<Body>| {
+                    let requests = Arc::clone(&requests);
+                    async move {
+                        let body = http_body::Body::collect(request.into_body())
+                            .await
+                            .unwrap()
+                            .to_bytes();
+                        let attempt = {
+                            let mut requests = requests.lock().unwrap();
+                            requests.push(body);
+                            requests.len()
+                        };
+                        if attempt == 1 {
+                            // Reading the complete request before closing prevents a transparent client retry.
+                            Err(std::io::Error::other(
+                                "close the first connection without a response",
+                            ))
+                        } else {
+                            Ok(Response::builder()
+                                .status(hyper::StatusCode::ACCEPTED)
+                                .body(Body::empty())
+                                .unwrap())
+                        }
+                    }
+                }))
+            }
         }
-    }));
-    // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
-    //       but are not straightforward to instantiate due to the design of
-    //       the crates they originate from.
+    });
+    let (shutdown, stopped) = tokio::sync::oneshot::channel();
+    let server = Server::bind(&addr)
+        .serve(make_service)
+        .with_graceful_shutdown(async move {
+            _ = stopped.await;
+        });
+    let server = tokio::spawn(server);
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (batch, status) = BatchNotifier::new_with_receiver();
+    let event =
+        crate::event::Event::from(crate::event::LogEvent::from("retry after connection close"))
+            .with_batch_notifier(&batch);
+    drop(batch);
+
+    tokio::time::timeout(Duration::from_secs(10), sink.run_events([event]))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(5), status)
+            .await
+            .unwrap(),
+        BatchStatus::Delivered
+    );
+    shutdown.send(()).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), server)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0], requests[1]);
+    let payload: serde_json::Value = serde_json::from_slice(&requests[1]).unwrap();
+    assert_eq!(payload[0]["message"], "retry after connection close");
 }
 
 #[tokio::test]

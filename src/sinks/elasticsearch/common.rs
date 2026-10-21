@@ -23,6 +23,22 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
+/// The backend selected by the sink constructor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Distribution {
+    Elasticsearch,
+    OpenSearch,
+}
+
+impl Distribution {
+    pub(super) const fn component_name(self) -> &'static str {
+        match self {
+            Self::Elasticsearch => "elasticsearch",
+            Self::OpenSearch => "opensearch",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
@@ -50,6 +66,7 @@ impl ElasticsearchCommon {
     #[allow(clippy::too_many_lines, reason = "Keep endpoint setup together.")]
     pub async fn parse_config(
         config: &ElasticsearchConfig,
+        distribution: Distribution,
         endpoint: &HttpEndpoint,
         proxy_config: &ProxyConfig,
         version: &mut Option<usize>,
@@ -69,7 +86,7 @@ impl ElasticsearchCommon {
 
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
-        let mode = config.common_mode()?;
+        let mode = config.common_mode(distribution.component_name())?;
 
         let tower_request = config.request.tower.into_settings();
 
@@ -157,6 +174,9 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::V6 => 6,
                 ElasticsearchApiVersion::V7 => 7,
                 ElasticsearchApiVersion::V8 => 8,
+                // OpenSearch's bulk API is compatible with Elasticsearch 7. Its own
+                // major version is unrelated, so no cluster-version probe is needed.
+                ElasticsearchApiVersion::Auto if distribution == Distribution::OpenSearch => 7,
                 ElasticsearchApiVersion::Auto => {
                     match get_version(
                         &base_url,
@@ -286,6 +306,7 @@ impl ElasticsearchCommon {
     /// or any endpoint fails [`Self::parse_config`].
     pub async fn parse_many(
         config: &ElasticsearchConfig,
+        distribution: Distribution,
         proxy_config: &ProxyConfig,
     ) -> crate::Result<Vec<Self>> {
         let mut version = None;
@@ -295,7 +316,8 @@ impl ElasticsearchCommon {
             );
             if config.endpoints.is_empty() {
                 Ok(vec![
-                    Self::parse_config(config, endpoint, proxy_config, &mut version).await?,
+                    Self::parse_config(config, distribution, endpoint, proxy_config, &mut version)
+                        .await?,
                 ])
             } else {
                 Err(ParseError::EndpointsExclusive.into())
@@ -305,8 +327,10 @@ impl ElasticsearchCommon {
         } else {
             let mut commons = Vec::new();
             for endpoint in &config.endpoints {
-                commons
-                    .push(Self::parse_config(config, endpoint, proxy_config, &mut version).await?);
+                commons.push(
+                    Self::parse_config(config, distribution, endpoint, proxy_config, &mut version)
+                        .await?,
+                );
             }
             Ok(commons)
         }
@@ -321,8 +345,12 @@ impl ElasticsearchCommon {
     /// Panics if the configuration contains more than one endpoint.
     #[cfg(test)]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
-        let mut commons =
-            Self::parse_many(config, crate::config::SinkContext::default().proxy()).await?;
+        let mut commons = Self::parse_many(
+            config,
+            Distribution::Elasticsearch,
+            crate::config::SinkContext::default().proxy(),
+        )
+        .await?;
         assert_eq!(commons.len(), 1);
         Ok(commons.remove(0))
     }
