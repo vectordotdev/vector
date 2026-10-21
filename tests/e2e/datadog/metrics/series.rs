@@ -233,36 +233,50 @@ fn assert_v2_resource(series: &[MetricPayload]) {
     );
 }
 
-async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
-    info!("getting v2 series payloads");
-    let payloads =
-        get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SERIES_ENDPOINT_V2).await;
-
-    info!("unpacking payloads");
-    let payloads = unpack_proto_payloads::<MetricPayload>(&payloads)
-        .await
-        .expect("Failed to unpack v2 series payloads");
-    assert_v2_resource(&payloads);
-
-    info!("generating series intake");
-    let intake = generate_series_intake(&payloads);
-
-    common_series_assertions(&intake);
-
-    info!("{intake:?}");
-
-    intake
+fn has_expected_series(payloads: &[MetricPayload]) -> bool {
+    ["rate", "gauge", "set", "histogram", "resource"]
+        .iter()
+        .all(|suffix| {
+            let prefix = format!("foo_metric.{suffix}");
+            payloads
+                .iter()
+                .flat_map(|payload| &payload.series)
+                .any(|series| series.metric.starts_with(&prefix))
+        })
 }
 
-async fn get_v3_series_from_pipeline(address: String) -> SeriesIntake {
-    info!("getting v3 series payloads");
-    let payloads =
-        get_fakeintake_payloads::<FakeIntakeResponseJson>(&address, SERIES_ENDPOINT_V3).await;
+async fn get_series_from_pipeline(
+    address: String,
+    api_version: &str,
+    deadline: Instant,
+) -> SeriesIntake {
+    let payloads = loop {
+        info!("getting {api_version} series payloads from {address}");
+        let payloads = match api_version {
+            "v2" => {
+                let payloads =
+                    get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SERIES_ENDPOINT_V2)
+                        .await;
+                unpack_proto_payloads::<MetricPayload>(&payloads)
+                    .await
+                    .expect("Failed to unpack v2 series payloads")
+            }
+            "v3" => {
+                let payloads =
+                    get_fakeintake_payloads::<FakeIntakeResponseJson>(&address, SERIES_ENDPOINT_V3)
+                        .await;
+                unpack_v3_series(&payloads.payloads)
+            }
+            v => panic!("Unknown CONFIG_SERIES_API_VERSION: {v}"),
+        };
 
-    info!("unpacking payloads");
-    let payloads = unpack_v3_series(&payloads.payloads);
-    // V3 carries resources in a dedicated column just like V2 does, so the V2 expectations
-    // (structured resource present, not duplicated back into the tags) hold unchanged.
+        if has_expected_series(&payloads) || Instant::now() >= deadline {
+            break payloads;
+        }
+        sleep(Duration::from_secs(1)).await;
+    };
+
+    // Both V2 and V3 carry resources separately from tags.
     assert_v2_resource(&payloads);
 
     info!("generating series intake");
@@ -358,19 +372,37 @@ fn compare_intakes(agent_intake: &SeriesIntake, vector_intake: &SeriesIntake) {
         });
 }
 
-pub(super) async fn validate() {
+pub(super) async fn validate(deadline: Instant) {
     let api_version = std::env::var("CONFIG_SERIES_API_VERSION")
         .expect("CONFIG_SERIES_API_VERSION must be set ('v2' or 'v3')");
 
     info!("==== getting series data from agent-only pipeline ==== ");
-    let agent_intake = get_v2_series_from_pipeline(fake_intake_agent_address()).await;
+    let agent_intake = get_series_from_pipeline(fake_intake_agent_address(), "v2", deadline).await;
 
     info!("==== getting series data from agent-vector pipeline ({api_version}) ====");
-    let vector_intake = match api_version.as_str() {
-        "v2" => get_v2_series_from_pipeline(fake_intake_vector_address()).await,
-        "v3" => get_v3_series_from_pipeline(fake_intake_vector_address()).await,
-        v => panic!("Unknown CONFIG_SERIES_API_VERSION: {v}"),
-    };
+    let vector_intake =
+        get_series_from_pipeline(fake_intake_vector_address(), &api_version, deadline).await;
 
     compare_intakes(&agent_intake, &vector_intake);
+}
+
+#[test]
+fn series_readiness_requires_all_workload_metrics() {
+    let names = [
+        "foo_metric.rate",
+        "foo_metric.gauge",
+        "foo_metric.set",
+        "foo_metric.histogram.avg",
+        RESOURCE_METRIC_NAME,
+    ];
+    let mut payload = MetricPayload::default();
+    for name in names {
+        assert!(!has_expected_series(std::slice::from_ref(&payload)));
+        payload.series.push(MetricSeries {
+            metric: name.into(),
+            ..Default::default()
+        });
+    }
+    assert!(has_expected_series(std::slice::from_ref(&payload)));
+    assert!(!has_expected_series(&[]));
 }

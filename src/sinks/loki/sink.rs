@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     common::expansion::pair_expansion,
-    http::{HttpClient, get_http_scheme_from_uri},
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,

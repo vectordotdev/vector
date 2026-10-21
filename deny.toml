@@ -53,4 +53,5 @@ ignore = [
   { id = "RUSTSEC-2026-0258", reason = "h2 0.3 via aws-smithy-http-client (hyper 0.14) and tonic 0.11 - http 1.0 / AWS SDK upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
   { id = "RUSTSEC-2026-0346", reason = "rustls 0.22 is vulnerable - unpatched crate (https://github.com/bytebeamio/rumqtt) & tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
   { id = "RUSTSEC-2026-0349", reason = "rustls 0.22 is vulnerable - unpatched crate (https://github.com/bytebeamio/rumqtt) & tonic upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
+  { id = "RUSTSEC-2026-0382", reason = "rustls-webpki 0.102 has no patched release; retained by tonic 0.11 and rumqttc 0.24 pending upgrade (https://github.com/vectordotdev/vector/issues/19179); 0.103 already patched to 0.103.16" },
 ]
