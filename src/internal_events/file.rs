@@ -5,6 +5,8 @@ use vector_lib::{
     internal_event::{GaugeName, InternalEvent},
 };
 
+#[cfg(feature = "sources-file")]
+pub use self::file_source::*;
 #[cfg(feature = "sinks-file")]
 pub use self::sink::*;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
@@ -148,24 +150,14 @@ mod sink {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
-mod source {
-    use std::{io::Error, path::Path, time::Duration};
-
-    use bytes::BytesMut;
-    #[cfg(feature = "sources-file")]
-    use vector_lib::json_size::JsonSize;
+#[cfg(feature = "sources-file")]
+mod file_source {
     use vector_lib::{
-        NamedInternalEvent, counter, emit,
-        file_source_common::internal_events::FileSourceInternalEvents,
-        internal_event::{
-            ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
-        },
+        NamedInternalEvent, counter,
+        internal_event::{CounterName, InternalEvent},
+        json_size::JsonSize,
     };
 
-    use super::{FileOpen, InternalEvent};
-
-    #[cfg(feature = "sources-file")]
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
         pub byte_size: usize,
@@ -173,7 +165,6 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    #[cfg(feature = "sources-file")]
     impl InternalEvent for FileBytesReceived<'_> {
         fn emit(self) {
             trace!(
@@ -198,7 +189,6 @@ mod source {
         }
     }
 
-    #[cfg(feature = "sources-file")]
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileEventsReceived<'a> {
         pub count: usize,
@@ -207,7 +197,6 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    #[cfg(feature = "sources-file")]
     impl InternalEvent for FileEventsReceived<'_> {
         fn emit(self) {
             trace!(
@@ -234,6 +223,22 @@ mod source {
             }
         }
     }
+}
+
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+mod source {
+    use std::{io::Error, path::Path, time::Duration};
+
+    use bytes::BytesMut;
+    use vector_lib::{
+        NamedInternalEvent, counter, emit,
+        file_source_common::internal_events::FileSourceInternalEvents,
+        internal_event::{
+            ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
+        },
+    };
+
+    use super::{FileOpen, InternalEvent};
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileChecksumFailed<'a> {
