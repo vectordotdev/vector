@@ -18,6 +18,7 @@ use crate::{
 
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
+pub(super) const RUNNER_TARGET_PATH: &str = TARGET_PATH;
 const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
