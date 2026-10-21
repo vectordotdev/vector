@@ -26,8 +26,8 @@ pub enum VectorSinkError {
     #[snafu(display("Vector source unhealthy: {:?}", status))]
     Health { status: Option<&'static str> },
 
-    #[snafu(display("URL has no host."))]
-    NoHost,
+    #[snafu(display("URI `{uri}` must include a scheme and an authority."))]
+    NotAbsoluteUri { uri: String },
 }
 
 #[cfg(test)]
@@ -732,7 +732,7 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "15") // data loss
                 .header("content-type", "application/grpc")
-                .body(tonic::body::empty_body())
+                .body(hyper::Body::empty())
                 .unwrap()
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
@@ -936,7 +936,7 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "7") // permission denied
                 .header("content-type", "application/grpc")
-                .body(tonic::body::empty_body())
+                .body(hyper::Body::empty())
                 .unwrap()
         });
 
@@ -949,6 +949,29 @@ mod tests {
 
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+    }
+
+    #[tokio::test]
+    async fn healthcheck_rejects_override_uri_without_authority() {
+        let config: VectorConfig = toml::from_str(r#"address = "http://127.0.0.1:6000""#).unwrap();
+        let cx = SinkContext {
+            healthcheck: crate::config::SinkHealthcheckOptions {
+                uri: Some("/health".parse().unwrap()),
+                ..Default::default()
+            },
+            ..SinkContext::default()
+        };
+
+        let (_, healthcheck) = config.build(cx).await.unwrap();
+        let error = healthcheck.await.unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<VectorSinkError>(),
+                Some(VectorSinkError::NotAbsoluteUri { .. })
+            ),
+            "{error}"
+        );
     }
 
     async fn get_received(
