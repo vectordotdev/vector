@@ -1,0 +1,14 @@
+// Remember to recompile `integration.desc` when you update this file:
+// protoc -I . -o integration.desc integration.proto
+
+syntax = "proto2";
+
+package test;
+
+message Integration {
+  required int64 time = 1;
+  required int64 count = 2;
+  optional float percentile = 3;
+  required string message = 4;
+  optional string user = 5;
+}

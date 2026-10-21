@@ -130,6 +130,25 @@ impl ProtobufSerializer {
     pub fn descriptor_proto(&self) -> &prost_reflect::prost_types::DescriptorProto {
         self.message_descriptor.descriptor_proto()
     }
+
+    /// Get the fully qualified name of the message type used in serialization.
+    #[must_use]
+    pub fn message_full_name(&self) -> &str {
+        self.message_descriptor.full_name()
+    }
+
+    /// Get the syntax of the file that defines the message type.
+    #[must_use]
+    pub fn syntax(&self) -> prost_reflect::Syntax {
+        self.message_descriptor.parent_file().syntax()
+    }
+
+    /// Encode the descriptor proto to bytes.
+    #[must_use]
+    pub fn encode_descriptor_proto(&self) -> Vec<u8> {
+        use prost_reflect::prost::Message as _;
+        self.message_descriptor.descriptor_proto().encode_to_vec()
+    }
 }
 
 impl Encoder<Event> for ProtobufSerializer {

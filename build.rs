@@ -136,7 +136,11 @@ fn main() {
 
     #[cfg(feature = "protobuf-build")]
     {
+        println!(
+            "cargo:rerun-if-changed=proto/third-party/google/cloud/bigquery/storage/v1/storage.proto"
+        );
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
+        println!("cargo:rerun-if-changed=proto/third-party/google/rpc/code.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
@@ -151,6 +155,8 @@ fn main() {
         let mut prost_build = prost_build::Config::new();
         prost_build
             .btree_map(["."])
+            // Rows are cloned for retries, so use `Bytes` to make that a refcount bump instead of a copy.
+            .bytes([".google.cloud.bigquery.storage.v1.ProtoRows.serialized_rows"])
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
@@ -161,13 +167,14 @@ fn main() {
                 &[
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
+                    "proto/third-party/google/cloud/bigquery/storage/v1/storage.proto",
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
+                    "proto/third-party/google/rpc/code.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",
                     "proto/vector/observability.proto",
                 ],
                 &[
-                    "proto",
                     "proto/third-party",
                     "proto/vector",
                     "lib/vector-core/proto/",

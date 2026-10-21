@@ -72,6 +72,13 @@ impl RequestMetadataBuilder {
         self.grouped_events_byte_size.add_event(event, json_size);
     }
 
+    /// Adds the events tracked by `other` to this builder.
+    pub fn merge(&mut self, other: Self) {
+        self.event_count += other.event_count;
+        self.events_byte_size += other.events_byte_size;
+        self.grouped_events_byte_size += other.grouped_events_byte_size;
+    }
+
     /// Builds the [`RequestMetadata`] with the given size.
     /// This is used when there is no encoder in the process to provide an `EncodeResult`
     #[must_use]
