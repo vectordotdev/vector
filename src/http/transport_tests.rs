@@ -579,6 +579,66 @@ async fn direct_https_supports_mtls(#[case] client_version: ClientVersion) {
     assert_success(with_identity.get(&origin.https_uri()).await.unwrap());
 }
 
+fn mtls_client_tls() -> MaybeTlsSettings {
+    client_tls(TlsConfig {
+        ca_file: Some(TEST_PEM_CA_PATH.into()),
+        crt_file: Some(TEST_PEM_CLIENT_CRT_PATH.into()),
+        key_file: Some(TEST_PEM_CLIENT_KEY_PATH.into()),
+        ..Default::default()
+    })
+}
+
+#[tokio::test]
+async fn v1_reload_tls_applies_to_clones() {
+    let origin = spawn_origin(server_tls(true)).await;
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    client
+        .get(&origin.https_uri())
+        .await
+        .expect_err("the server requires a client certificate");
+
+    let handle = client.clone().tls_reload_handle();
+    assert!(handle.reload(mtls_client_tls()).unwrap());
+
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+}
+
+#[tokio::test]
+async fn v1_tls_reload_handle_does_not_keep_client_alive() {
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    let handle = client.tls_reload_handle();
+    let clone = client.clone();
+    drop(client);
+    assert!(!handle.is_closed());
+
+    drop(clone);
+    assert!(handle.is_closed());
+    assert!(!handle.reload(mtls_client_tls()).unwrap());
+}
+
+#[tokio::test]
+async fn v1_reload_tls_does_not_reuse_pooled_connections() {
+    let origin = spawn_origin(server_tls(false)).await;
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+
+    let reloaded = client
+        .tls_reload_handle()
+        .reload(client_tls(TlsConfig {
+            ca_file: Some(INVALID_CA_PATH.into()),
+            ..Default::default()
+        }))
+        .unwrap();
+    assert!(reloaded);
+
+    // The pooled connection was verified against the trusted CA, so only a new connection made
+    // with the reloaded settings rejects the server.
+    client
+        .get(&origin.https_uri())
+        .await
+        .expect_err("requests after a reload must use the new TLS settings");
+}
+
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]

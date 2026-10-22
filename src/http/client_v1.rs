@@ -5,7 +5,7 @@ use std::{
     future::Future,
     io,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, PoisonError, RwLock, Weak},
     task::{Context, Poll},
 };
 
@@ -103,9 +103,12 @@ pub fn full_body(bytes: Bytes) -> RequestBody {
         .boxed_unsync()
 }
 
+type PooledClient = Client<HttpProxyConnectorV1, RequestBody>;
+
 #[derive(Clone)]
 pub struct HttpClient {
-    client: Client<HttpProxyConnectorV1, RequestBody>,
+    // Shared by every clone so that a TLS reload reaches all of them.
+    client: Arc<RwLock<PooledClient>>,
     routes: Arc<RoutePlanner>,
     user_agent: HeaderValue,
 }
@@ -126,15 +129,32 @@ impl HttpClient {
     /// build a connector.
     pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
         let routes = Arc::new(RoutePlanner::new(proxy)?);
-        let connector =
-            HttpProxyConnectorV1::new(tls, Arc::clone(&routes), ForwardProxyAlpn::Http1)?;
-        let client = Client::builder(TokioExecutor::new()).build(connector);
+        let client = Self::build_client(tls, &routes)?;
 
         Ok(Self {
-            client,
+            client: Arc::new(RwLock::new(client)),
             routes,
             user_agent: default_user_agent(),
         })
+    }
+
+    /// Returns a handle that replaces the TLS settings of this client and of every clone of it,
+    /// for example after certificate rotation. The handle does not keep the client alive.
+    #[must_use]
+    pub fn tls_reload_handle(&self) -> TlsReloadHandle {
+        TlsReloadHandle {
+            client: Arc::downgrade(&self.client),
+            routes: Arc::clone(&self.routes),
+        }
+    }
+
+    fn build_client(
+        tls: MaybeTlsSettings,
+        routes: &Arc<RoutePlanner>,
+    ) -> Result<PooledClient, BoxError> {
+        let connector =
+            HttpProxyConnectorV1::new(tls, Arc::clone(routes), ForwardProxyAlpn::Http1)?;
+        Ok(Client::builder(TokioExecutor::new()).build(connector))
     }
 
     /// Sends `request`, adding the default request headers and any forward proxy credentials.
@@ -161,7 +181,12 @@ impl HttpClient {
             }
 
             let before = std::time::Instant::now();
-            let response = self.client.request(request).await;
+            let client = self
+                .client
+                .read()
+                .unwrap_or_else(PoisonError::into_inner)
+                .clone();
+            let response = client.request(request).await;
             let roundtrip = before.elapsed();
 
             match response {
@@ -185,6 +210,45 @@ impl HttpClient {
         }
         .instrument(span)
         .await
+    }
+}
+
+/// Replaces the TLS settings of an [`HttpClient`] and its clones. Obtained from
+/// [`HttpClient::tls_reload_handle`].
+#[derive(Clone)]
+pub struct TlsReloadHandle {
+    client: Weak<RwLock<PooledClient>>,
+    routes: Arc<RoutePlanner>,
+}
+
+impl fmt::Debug for TlsReloadHandle {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TlsReloadHandle")
+            .finish_non_exhaustive()
+    }
+}
+
+impl TlsReloadHandle {
+    /// Returns `true` once the client and all of its clones have been dropped.
+    #[must_use]
+    pub fn is_closed(&self) -> bool {
+        self.client.strong_count() == 0
+    }
+
+    /// Replaces the client's TLS settings. Later requests use a new connection pool; in-flight
+    /// requests finish on the old one. Returns `Ok(false)` if the client has been dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error, keeping the previous settings, if `tls` cannot build a connector.
+    pub fn reload(&self, tls: MaybeTlsSettings) -> Result<bool, BoxError> {
+        let Some(client) = self.client.upgrade() else {
+            return Ok(false);
+        };
+        let rebuilt = HttpClient::build_client(tls, &self.routes)?;
+        *client.write().unwrap_or_else(PoisonError::into_inner) = rebuilt;
+        Ok(true)
     }
 }
 
