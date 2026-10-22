@@ -373,76 +373,79 @@ mod tests {
         #[case] disconnect: bool,
     ) {
         trace_init();
-        tokio::time::timeout(TEST_TIMEOUT, async {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let mqtt = MqttSinkConfig {
-                common: MqttCommonConfig {
-                    host: "127.0.0.1".into(),
-                    port: listener.local_addr().unwrap().port(),
+        tokio::time::timeout(
+            TEST_TIMEOUT,
+            Box::pin(async {
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let mqtt = MqttSinkConfig {
+                    common: MqttCommonConfig {
+                        host: "127.0.0.1".into(),
+                        port: listener.local_addr().unwrap().port(),
+                        ..Default::default()
+                    },
+                    topic: Template::try_from("test").unwrap(),
+                    quality_of_service: MqttQoS::ExactlyOnce,
                     ..Default::default()
-                },
-                topic: Template::try_from("test").unwrap(),
-                quality_of_service: MqttQoS::ExactlyOnce,
-                ..Default::default()
-            };
-            let (mut input, source) = basic_source();
-            let mut config = Config::builder();
-            config.graceful_shutdown_duration = grace;
-            config.add_source("input", source);
-            config.add_sink("mqtt", &["input"], mqtt.clone());
-            let mut replacement = config.clone();
-            replacement.sinks[&ComponentKey::from("mqtt")].inner = Box::new(MqttSinkConfig {
-                retain: true,
-                ..mqtt
-            });
-            let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            input
-                .send_event(Event::Log(LogEvent::from("before reload")))
-                .await
-                .unwrap();
-            let mut stream = accept_connection(&listener).await;
-            let publish = read_packet(&mut stream).await;
-            assert_eq!(publish[0], 0x34);
+                };
+                let (mut input, source) = basic_source();
+                let mut config = Config::builder();
+                config.graceful_shutdown_duration = grace;
+                config.add_source("input", source);
+                config.add_sink("mqtt", &["input"], mqtt.clone());
+                let mut replacement = config.clone();
+                replacement.sinks[&ComponentKey::from("mqtt")].inner = Box::new(MqttSinkConfig {
+                    retain: true,
+                    ..mqtt
+                });
+                let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+                input
+                    .send_event(Event::Log(LogEvent::from("before reload")))
+                    .await
+                    .unwrap();
+                let mut stream = accept_connection(&listener).await;
+                let publish = read_packet(&mut stream).await;
+                assert_eq!(publish[0], 0x34);
 
-            {
-                let mut reload = Box::pin(topology.reload_config_and_respawn(
-                    replacement.build().unwrap(),
-                    ExtraContext::default(),
-                ));
-                if grace.is_none() {
-                    tokio::time::timeout(Duration::from_millis(150), &mut reload)
-                        .await
-                        .expect_err("unlimited reload abandoned the QoS exchange");
-                    if disconnect {
-                        drop(stream);
-                    } else {
-                        assert!(!acknowledge(&mut stream, &publish).await);
-                        let release = read_packet(&mut stream).await;
-                        assert!(acknowledge(&mut stream, &release).await);
+                {
+                    let mut reload = Box::pin(topology.reload_config_and_respawn(
+                        replacement.build().unwrap(),
+                        ExtraContext::default(),
+                    ));
+                    if grace.is_none() {
+                        tokio::time::timeout(Duration::from_millis(150), &mut reload)
+                            .await
+                            .expect_err("unlimited reload abandoned the QoS exchange");
+                        if disconnect {
+                            drop(stream);
+                        } else {
+                            assert!(!acknowledge(&mut stream, &publish).await);
+                            let release = read_packet(&mut stream).await;
+                            assert!(acknowledge(&mut stream, &release).await);
+                        }
                     }
+                    reload.await.unwrap();
                 }
-                reload.await.unwrap();
-            }
-            let mut replacement = accept_connection(&listener).await;
-            input
-                .send_event(Event::Log(LogEvent::from("after reload")))
-                .await
-                .unwrap();
-            let publish = read_packet(&mut replacement).await;
-            assert_eq!(
-                publish[0], 0x35,
-                "replacement retain setting was not applied"
-            );
-            let payload: serde_json::Value = serde_json::from_slice(&publish[10..]).unwrap();
-            assert_eq!(payload["message"], "after reload");
-            replacement
-                .write_all(&[0x50, 2, publish[8], publish[9]])
-                .await
-                .unwrap();
-            let release = read_packet(&mut replacement).await;
-            assert!(acknowledge(&mut replacement, &release).await);
-            assert!(topology.stop().await);
-        })
+                let mut replacement = accept_connection(&listener).await;
+                input
+                    .send_event(Event::Log(LogEvent::from("after reload")))
+                    .await
+                    .unwrap();
+                let publish = read_packet(&mut replacement).await;
+                assert_eq!(
+                    publish[0], 0x35,
+                    "replacement retain setting was not applied"
+                );
+                let payload: serde_json::Value = serde_json::from_slice(&publish[10..]).unwrap();
+                assert_eq!(payload["message"], "after reload");
+                replacement
+                    .write_all(&[0x50, 2, publish[8], publish[9]])
+                    .await
+                    .unwrap();
+                let release = read_packet(&mut replacement).await;
+                assert!(acknowledge(&mut replacement, &release).await);
+                assert!(topology.stop().await);
+            }),
+        )
         .await
         .unwrap();
     }
