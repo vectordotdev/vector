@@ -21,6 +21,8 @@ permissions:
 
 jobs:
   changes:
+    # The real check below is upstream-only, so skip the filter and status jobs on forks too.
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -127,7 +129,7 @@ jobs:
           exit 1
 
   check-generated-vrl-docs:
-    if: always()
+    if: always() && github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04
     needs: run-check-generated-vrl-docs
     steps:

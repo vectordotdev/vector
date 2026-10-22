@@ -66,6 +66,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn delimiter_schema_matches_its_ascii_string_representation() {
+        let schema = serde_json::to_value(
+            vector_config::schema::generate_root_schema::<CharacterDelimitedEncoderOptions>()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(schema["properties"]["delimiter"]["type"], "string");
+
+        let input = serde_json::json!({"delimiter": "1"});
+        let options: CharacterDelimitedEncoderOptions =
+            serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(options.delimiter.as_byte(), b'1');
+        assert_eq!(serde_json::to_value(options).unwrap(), input);
+        assert!(
+            serde_json::from_value::<CharacterDelimitedEncoderOptions>(
+                serde_json::json!({"delimiter": 1})
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn encode() {
         let mut codec = CharacterDelimitedEncoder::new(b'\n');
 

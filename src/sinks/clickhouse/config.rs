@@ -2,9 +2,9 @@
 
 use std::{collections::BTreeMap, fmt};
 
-use http::{StatusCode, Uri};
+use http::Uri;
 use http_1::{
-    HeaderMap, HeaderName, HeaderValue, Request,
+    HeaderMap, HeaderName, HeaderValue, Request, StatusCode,
     header::{AUTHORIZATION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::{ResultExt, Snafu};
@@ -575,11 +575,9 @@ async fn healthcheck(
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    match status {
+    match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 

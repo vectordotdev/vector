@@ -2,8 +2,7 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http::StatusCode;
-use http_1::Request;
+use http_1::{Request, StatusCode};
 use http_body_util::BodyExt;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
@@ -184,8 +183,7 @@ async fn healthcheck(
 
     let res = client.send(req).await?;
 
-    let status = StatusCode::from_u16(res.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
+    let status = res.status();
     let body = res.into_body().collect().await?.to_bytes();
 
     match status {

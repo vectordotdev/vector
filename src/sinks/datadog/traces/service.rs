@@ -3,11 +3,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{Request, StatusCode, Uri};
-use http_body::{Body as _, Collected};
-use hyper::Body;
+use http_1::{Request, StatusCode, Uri};
+use http_body_util::BodyExt;
 use snafu::ResultExt;
 use tower::Service;
 use vector_lib::{
@@ -17,8 +16,11 @@ use vector_lib::{
 };
 
 use crate::{
-    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
-    sinks::util::retries::{RetryAction, RetryLogic},
+    http::client_v1::{HttpClient, HttpError, full_body},
+    sinks::{
+        HTTPV1RequestBuilderSnafu,
+        util::retries::{RetryAction, RetryLogic},
+    },
 };
 
 #[derive(Debug, Default, Clone)]
@@ -66,12 +68,17 @@ pub struct TraceApiRequest {
 }
 
 impl TraceApiRequest {
-    pub fn into_http_request(self) -> http::Result<Request<Body>> {
+    /// Builds a native HTTP request from the encoded trace payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a header name or value is invalid.
+    pub fn into_http_request(self) -> http_1::Result<Request<Bytes>> {
         let mut request = Request::post(self.uri);
         for (k, v) in &self.headers {
             request = request.header(k, v);
         }
-        request.body(Body::from(self.body))
+        request.body(self.body)
     }
 }
 
@@ -141,8 +148,8 @@ impl Service<TraceApiRequest> for TraceApiService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of Error internal event is handled upstream by the caller
-    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.client.poll_ready(cx)
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     // Emission of Error internal event is handled upstream by the caller
@@ -153,16 +160,14 @@ impl Service<TraceApiRequest> for TraceApiService {
             let metadata = std::mem::take(request.metadata_mut());
             let byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let uncompressed_size = request.uncompressed_size;
-            let http_request = request.into_http_request().context(BuildRequestSnafu)?;
+            let http_request = request
+                .into_http_request()
+                .context(HTTPV1RequestBuilderSnafu)
+                .map_err(crate::Error::from)?;
 
-            let response = client.send(http_request).await?;
+            let response = client.send(http_request.map(full_body)).await?;
             let (parts, body) = response.into_parts();
-            let mut body = body
-                .collect()
-                .await
-                .map(Collected::aggregate)
-                .context(CallRequestSnafu)?;
-            let body = body.copy_to_bytes(body.remaining());
+            let body = body.collect().await.map_err(HttpError::new)?.to_bytes();
 
             Ok(TraceApiResponse {
                 status_code: parts.status,

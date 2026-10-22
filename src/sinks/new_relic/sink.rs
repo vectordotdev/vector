@@ -4,9 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 
 use super::{NewRelicApiRequest, NewRelicCredentials, NewRelicEncoder};
-use crate::{
-    http::get_http_scheme_from_uri, internal_events::SinkRequestBuildError, sinks::prelude::*,
-};
+use crate::{internal_events::SinkRequestBuildError, sinks::prelude::*};
 
 #[derive(Debug)]
 pub struct NewRelicSinkError {
@@ -120,7 +118,11 @@ where
             compression: self.compression,
             credentials: Arc::clone(&self.credentials),
         };
-        let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
+        let protocol = if self.credentials.get_uri().scheme_str() == Some("https") {
+            "https"
+        } else {
+            "http"
+        };
 
         input
             .batched(self.batcher_settings.as_byte_size_config())

@@ -40,6 +40,7 @@ use vector_lib::{
     source_sender::SendError,
 };
 
+use super::{BUCKET, METADATA, OBJECT, REGION, TIMESTAMP};
 use crate::{
     SourceSender,
     aws::AwsTimeout,
@@ -202,6 +203,10 @@ const fn default_max_number_of_messages() -> u32 {
 const fn default_true() -> bool {
     true
 }
+
+const SOURCE_TYPE: &str = "source_type";
+const INGEST_TIMESTAMP: &str = "ingest_timestamp";
+const VECTOR: &str = "vector";
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
@@ -931,23 +936,23 @@ fn handle_single_log(
     log_namespace.insert_source_metadata(
         AwsS3Config::NAME,
         log,
-        Some(LegacyKey::Overwrite(path!("bucket"))),
-        path!("bucket"),
+        Some(LegacyKey::Overwrite(path!(BUCKET))),
+        path!(BUCKET),
         Value::from(s3_event.s3.bucket.name.clone()),
     );
 
     log_namespace.insert_source_metadata(
         AwsS3Config::NAME,
         log,
-        Some(LegacyKey::Overwrite(path!("object"))),
-        path!("object"),
+        Some(LegacyKey::Overwrite(path!(OBJECT))),
+        path!(OBJECT),
         Value::from(s3_event.s3.object.key.clone()),
     );
     log_namespace.insert_source_metadata(
         AwsS3Config::NAME,
         log,
-        Some(LegacyKey::Overwrite(path!("region"))),
-        path!("region"),
+        Some(LegacyKey::Overwrite(path!(REGION))),
+        path!(REGION),
         Value::from(s3_event.aws_region.clone()),
     );
 
@@ -957,7 +962,7 @@ fn handle_single_log(
                 AwsS3Config::NAME,
                 log,
                 Some(LegacyKey::Overwrite(path!(key))),
-                path!("metadata", key.as_str()),
+                path!(METADATA, key.as_str()),
                 value.clone(),
             );
         }
@@ -966,7 +971,7 @@ fn handle_single_log(
     log_namespace.insert_vector_metadata(
         log,
         log_schema().source_type_key(),
-        path!("source_type"),
+        path!(SOURCE_TYPE),
         Value::from_static_str(AwsS3Config::NAME),
     );
 
@@ -976,10 +981,10 @@ fn handle_single_log(
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(timestamp) = timestamp {
-                log.insert(metadata_path!(AwsS3Config::NAME, "timestamp"), timestamp);
+                log.insert(metadata_path!(AwsS3Config::NAME, TIMESTAMP), timestamp);
             }
 
-            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+            log.insert(metadata_path!(VECTOR, INGEST_TIMESTAMP), Utc::now());
         }
         LogNamespace::Legacy => {
             if let Some(timestamp_key) = log_schema().timestamp_key() {
