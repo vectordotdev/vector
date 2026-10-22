@@ -4,7 +4,7 @@ use std::time::Duration;
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, identity::IdentityCache, imds,
     profile::ProfileFileCredentialsProvider, provider_config::ProviderConfig,
-    sts::AssumeRoleProviderBuilder,
+    sts::AssumeRoleProviderBuilder, timeout::TimeoutConfig,
 };
 use aws_credential_types::{Credentials, provider::SharedCredentialsProvider};
 use aws_runtime::env_config::file::{EnvConfigFileKind, EnvConfigFiles};
@@ -247,18 +247,20 @@ impl AwsAuthentication {
         assume_role: &str,
         external_id: Option<&str>,
         session_name: Option<&str>,
+        load_timeout_secs: Option<u64>,
     ) -> crate::Result<AssumeRoleProviderBuilder> {
         let connector = super::AwsHttpClient {
             http: super::connector(proxy, tls_options)?,
             region: region.clone(),
             emit_bytes_sent: false,
         };
-        let config = SdkConfig::builder()
+        let mut config_builder = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
             .time_source(SystemTimeSource::new())
-            .use_fips(resolve_use_fips().await.unwrap_or(false))
-            .build();
+            .use_fips(resolve_use_fips().await.unwrap_or(false));
+        config_builder.set_timeout_config(assume_role_timeout_config(load_timeout_secs));
+        let config = config_builder.build();
 
         let mut builder = AssumeRoleProviderBuilder::new(assume_role)
             .region(region.clone())
@@ -311,6 +313,7 @@ impl AwsAuthentication {
                         assume_role,
                         external_id.as_deref(),
                         session_name.as_deref(),
+                        None,
                     )
                     .await?;
 
@@ -351,10 +354,10 @@ impl AwsAuthentication {
             AwsAuthentication::Role {
                 assume_role,
                 external_id,
+                load_timeout_secs,
                 imds,
                 region,
                 session_name,
-                ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let builder = Self::assume_role_provider_builder(
@@ -364,6 +367,7 @@ impl AwsAuthentication {
                     assume_role,
                     external_id.as_deref(),
                     session_name.as_deref(),
+                    *load_timeout_secs,
                 )
                 .await?;
 
@@ -402,6 +406,22 @@ impl AwsAuthentication {
             session_token: None,
         }
     }
+}
+
+/// Builds the timeout configuration for the STS client used to assume a role.
+///
+/// Credential providers that are not wrapped in an `IdentityCache` (such as those used for request
+/// signing) never see the cache's load timeout, so the STS client would otherwise fall back to the
+/// SDK's default connect timeout. Returns `None` when no timeout is configured, preserving the SDK
+/// defaults.
+fn assume_role_timeout_config(load_timeout_secs: Option<u64>) -> Option<TimeoutConfig> {
+    load_timeout_secs.map(|secs| {
+        let timeout = Duration::from_secs(secs);
+        TimeoutConfig::builder()
+            .connect_timeout(timeout)
+            .operation_timeout(timeout)
+            .build()
+    })
 }
 
 /// Resolves the FIPS endpoint setting from the environment variable
@@ -765,5 +785,24 @@ mod tests {
             }
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn assume_role_timeout_config_uses_load_timeout() {
+        let timeout_config = assume_role_timeout_config(Some(15)).unwrap();
+
+        assert_eq!(
+            timeout_config.connect_timeout(),
+            Some(Duration::from_secs(15))
+        );
+        assert_eq!(
+            timeout_config.operation_timeout(),
+            Some(Duration::from_secs(15))
+        );
+    }
+
+    #[test]
+    fn assume_role_timeout_config_defaults_to_sdk() {
+        assert!(assume_role_timeout_config(None).is_none());
     }
 }
