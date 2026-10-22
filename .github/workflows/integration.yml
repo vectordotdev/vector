@@ -19,7 +19,7 @@ on:
         type: boolean
         default: false
       coverage:
-        description: "Collect code coverage (outputs target/coverage/lcov.info per service)"
+        description: "Collect per-environment integration coverage (requires ci-coverage-tools from coverage.yml)"
         required: false
         type: boolean
         default: false
@@ -192,9 +192,22 @@ jobs:
       - uses: ./.github/actions/setup
         if: steps.check.outputs.should_run == 'true'
         with:
-          vdev: true
+          vdev: ${{ !inputs.coverage }}
           mold: false
           datadog-ci: true
+
+      - name: Download coverage tooling
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ci-coverage-tools
+          path: ${{ runner.temp }}/coverage-tools
+
+      - name: Use workflow coverage tooling
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
+        run: |
+          chmod +x "$RUNNER_TEMP/coverage-tools/vdev"
+          echo "$RUNNER_TEMP/coverage-tools" >> "$GITHUB_PATH"
 
       - name: Pull test runner image
         if: steps.check.outputs.should_run == 'true'
@@ -211,13 +224,23 @@ jobs:
           max_attempts: 3
           command: vdev integration run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
+      - name: Seal integration reports
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
+        env:
+          COVERAGE_ARTIFACT: coverage-int-${{ matrix.service }}
+        run: |
+          vdev build coverage seal \
+            --plan "$RUNNER_TEMP/coverage-tools/plan.json" \
+            --artifact "$COVERAGE_ARTIFACT" --directory target/coverage
+
       - name: Upload coverage artifact
-        if: inputs.coverage && always()
+        if: inputs.coverage && steps.check.outputs.should_run == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-int-${{ matrix.service }}
-          path: target/coverage/lcov.info
-          if-no-files-found: ignore
+          path: target/coverage/
+          if-no-files-found: error
+          overwrite: true
 
   e2e-tests:
     runs-on: ubuntu-24.04-8core
@@ -298,15 +321,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: vdev e2e run ${{ inputs.coverage && '--coverage' || '' }} ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
-
-      - name: Upload coverage artifact
-        if: inputs.coverage && always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-e2e-${{ matrix.service }}
-          path: target/coverage/lcov.info
-          if-no-files-found: ignore
+          command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   integration-test-suite:
     name: Integration Test Suite

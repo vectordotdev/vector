@@ -8,8 +8,10 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use headers::{Authorization, HeaderMapExt, authorization::Credentials};
-use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
+use headers::{Authorization, HeaderMapExt};
+use headers_1::{
+    Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1, authorization::Credentials,
+};
 use http::{
     HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
     uri::InvalidUri,
@@ -595,16 +597,16 @@ impl VectorAuthConfig {
     ///
     /// Returns an error naming the invalid option if the credentials cannot be encoded into a
     /// header value. The error never contains the credentials.
-    pub fn authorization_header(&self) -> crate::Result<HeaderValue> {
+    pub fn authorization_header(&self) -> crate::Result<http_1::HeaderValue> {
         let mut header = match self {
             Self::Basic { user, password } => {
-                Authorization::basic(user, password.inner()).0.encode()
+                AuthorizationV1::basic(user, password.inner()).0.encode()
             }
-            Self::Bearer { token } => Authorization::bearer(token.inner())
+            Self::Bearer { token } => AuthorizationV1::bearer(token.inner())
                 .map_err(|_| "The configured `auth.token` is not a valid header value.")?
                 .0
                 .encode(),
-            Self::Custom { value } => HeaderValue::from_str(value.inner())
+            Self::Custom { value } => http_1::HeaderValue::from_str(value.inner())
                 .map_err(|_| "The configured `auth.value` is not a valid header value.")?,
         };
         header.set_sensitive(true);
@@ -1047,7 +1049,7 @@ mod tests {
 
         for (auth, expected) in cases {
             let header = auth.authorization_header().unwrap();
-            assert_eq!(header, HeaderValue::from_static(expected));
+            assert_eq!(header, http_1::HeaderValue::from_static(expected));
             assert!(header.is_sensitive(), "{expected} should be sensitive");
         }
     }

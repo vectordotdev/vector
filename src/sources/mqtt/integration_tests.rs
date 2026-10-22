@@ -46,7 +46,7 @@ fn get_mqtt_client() -> AsyncClient {
         mqtt_broker_address(),
         mqtt_broker_port(),
     );
-    mqtt_options.set_keep_alive(Duration::from_secs(5));
+    mqtt_options.set_keep_alive(5);
 
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 

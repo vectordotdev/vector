@@ -1,10 +1,9 @@
 use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
-use http::{HeaderValue, Uri, header::AUTHORIZATION};
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
+use http::Uri;
+use http_1::{HeaderValue, header::AUTHORIZATION};
+use hyper_1::body::Incoming;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;
@@ -17,6 +16,7 @@ use super::{VectorSinkError, compression::VectorCompression};
 use crate::{
     Error,
     event::{EventFinalizers, EventStatus, Finalizable},
+    http::client_v1::{Http2Client, HttpError},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
@@ -24,7 +24,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
-    pub client: proto_vector::Client<HyperSvc>,
+    pub client: proto_vector::Client<GrpcTransport>,
     pub protocol: String,
     pub endpoint: String,
 }
@@ -67,29 +67,46 @@ impl MetaDescriptive for VectorRequest {
 }
 
 impl VectorService {
+    /// Sends every request to the scheme and authority of `uri`; its path is ignored.
+    ///
+    /// Fails if `uri` has no scheme or authority.
     pub fn new(
-        hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+        client: Http2Client<BoxBody>,
         uri: Uri,
         compression: VectorCompression,
         auth: Option<HeaderValue>,
-    ) -> Self {
-        let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let mut proto_client = proto_vector::Client::new(HyperSvc {
-            uri,
-            client: hyper_client,
-            auth,
-        });
+    ) -> crate::Result<Self> {
+        let origin = grpc_origin(&uri)?;
+        let (protocol, endpoint) = uri::protocol_endpoint(uri);
+        let mut proto_client =
+            proto_vector::Client::with_origin(GrpcTransport { client, auth }, origin);
 
         if let Some(encoding) = compression.as_tonic_encoding() {
             proto_client = proto_client.send_compressed(encoding);
         }
 
-        Self {
+        Ok(Self {
             client: proto_client,
             protocol,
             endpoint,
-        }
+        })
     }
+}
+
+/// Returns the `scheme://authority/` origin that tonic prefixes to each gRPC method path.
+fn grpc_origin(uri: &Uri) -> crate::Result<http_1::Uri> {
+    let (Some(scheme), Some(authority)) = (uri.scheme_str(), uri.authority()) else {
+        return Err(VectorSinkError::NotAbsoluteUri {
+            uri: uri.to_string(),
+        }
+        .into());
+    };
+
+    Ok(http_1::Uri::builder()
+        .scheme(scheme)
+        .authority(authority.as_str())
+        .path_and_query("/")
+        .build()?)
 }
 
 impl Service<VectorRequest> for VectorService {
@@ -135,16 +152,16 @@ impl Service<VectorRequest> for VectorService {
     }
 }
 
+/// Sends tonic's gRPC requests over the native HTTP/2 client.
 #[derive(Clone, Debug)]
-pub struct HyperSvc {
-    uri: Uri,
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+pub struct GrpcTransport {
+    client: Http2Client<BoxBody>,
     auth: Option<HeaderValue>,
 }
 
-impl Service<hyper::Request<BoxBody>> for HyperSvc {
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+impl Service<http_1::Request<BoxBody>> for GrpcTransport {
+    type Response = http_1::Response<Incoming>;
+    type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.
@@ -153,20 +170,11 @@ impl Service<hyper::Request<BoxBody>> for HyperSvc {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
-        let uri = Uri::builder()
-            .scheme(self.uri.scheme().unwrap().clone())
-            .authority(self.uri.authority().unwrap().clone())
-            .path_and_query(req.uri().path_and_query().unwrap().clone())
-            .build()
-            .unwrap();
-
-        *req.uri_mut() = uri;
-
+    fn call(&mut self, mut request: http_1::Request<BoxBody>) -> Self::Future {
         if let Some(auth) = &self.auth {
-            req.headers_mut().insert(AUTHORIZATION, auth.clone());
+            request.headers_mut().insert(AUTHORIZATION, auth.clone());
         }
 
-        Box::pin(self.client.request(req))
+        Box::pin(self.client.request(request))
     }
 }

@@ -1,24 +1,29 @@
+use http_1::{Request, StatusCode};
+
 use super::append_loki_path;
 
 use crate::{
-    http::{Auth, HttpClient},
+    http::{
+        Auth,
+        client_v1::{HttpClient, empty_body},
+    },
     sinks::util::{HttpEndpoint, UriSerde},
 };
 
 async fn fetch_status(
-    endpoint: &http::Uri,
+    uri: http_1::Uri,
     auth: Option<&Auth>,
     client: &HttpClient,
-) -> crate::Result<http::StatusCode> {
-    let mut req = http::Request::get(endpoint)
-        .body(hyper::Body::empty())
-        .expect("Building request never fails.");
+) -> crate::Result<StatusCode> {
+    let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply(&mut req);
+        auth.apply_v1(&mut request);
     }
 
-    Ok(client.send(req).await?.status())
+    let response = client.send(request).await?;
+
+    Ok(response.status())
 }
 
 pub async fn healthcheck(
@@ -29,30 +34,30 @@ pub async fn healthcheck(
 ) -> crate::Result<()> {
     // Healthcheck URI has been explicitly configured
     if let Some(uri) = healthcheck_uri {
-        let auth = uri.auth.or(auth);
-        let status = fetch_status(&uri.uri, auth.as_ref(), &client).await?;
+        let status =
+            fetch_status(uri.uri_v1()?, uri.auth.as_ref().or(auth.as_ref()), &client).await?;
         return match status {
-            http::StatusCode::OK => Ok(()),
+            StatusCode::OK => Ok(()),
             _ => Err(format!("A non-successful status returned: {status}").into()),
         };
     }
 
     let status = match fetch_status(
-        append_loki_path(&base_endpoint, "ready")?.as_uri(),
+        append_loki_path(&base_endpoint, "ready")?.into_v1(),
         auth.as_ref(),
         &client,
     )
     .await?
     {
         // Issue https://github.com/vectordotdev/vector/issues/6463
-        http::StatusCode::NOT_FOUND => {
+        StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
             // Probe the normalized base path with one trailing slash (`/loki/`,
             // not `/loki`), matching the pre-`HttpEndpoint` behavior. Reverse
             // proxies commonly redirect `/loki` to `/loki/`, and the healthcheck
             // rejects non-200 responses rather than following them.
             fetch_status(
-                append_loki_path(&base_endpoint, "/")?.as_uri(),
+                append_loki_path(&base_endpoint, "/")?.into_v1(),
                 auth.as_ref(),
                 &client,
             )
@@ -62,7 +67,7 @@ pub async fn healthcheck(
     };
 
     match status {
-        http::StatusCode::OK => Ok(()),
+        StatusCode::OK => Ok(()),
         _ => Err(format!("A non-successful status returned: {status}").into()),
     }
 }
