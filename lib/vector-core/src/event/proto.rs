@@ -17,7 +17,7 @@ pub use proto_event::*;
 use vrl::value::{ObjectMap, Value as VrlValue};
 
 use super::EventFinalizers;
-use super::metadata::{Inner, default_schema_definition};
+use super::metadata::Inner;
 use super::ser::DecodeError;
 use super::{EventMetadata, array, metric::MetricSketch};
 
@@ -711,7 +711,7 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
-                schema_definition: default_schema_definition(),
+                schema_definition: None,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
                 datadog_metric_unit: datadog_metric_unit.map(Arc::from),

@@ -1466,7 +1466,7 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
         &["dd.traces"],
         serde_yaml::from_str::<VectorSinkConfig>(&format!(
             r#"
-                address: "{relay_addr}"
+                address: "http://{relay_addr}"
                 batch:
                   max_events: 1
             "#
@@ -2731,10 +2731,10 @@ fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
 
 fn encode_v3_varint(mut value: u64, encoded: &mut Vec<u8>) {
     while value >= 0x80 {
-        encoded.push((value as u8 & 0x7f) | 0x80);
+        encoded.push(u8::try_from(value & 0x7f).unwrap() | 0x80);
         value >>= 7;
     }
-    encoded.push(value as u8);
+    encoded.push(u8::try_from(value).unwrap());
 }
 
 fn encode_v3_length_delimited(field: u8, value: &[u8], encoded: &mut Vec<u8>) {
@@ -3119,7 +3119,7 @@ async fn decode_series_endpoint_v3() {
                 source_type_name_refs: vec![1, 0],
                 origin_info_refs: vec![1, 0],
                 unit_refs: vec![1],
-                timestamps: vec![1542182950, 1],
+                timestamps: vec![1_542_182_950, 1],
                 vals_sint64: Vec::new(),
                 vals_float32: Vec::new(),
                 vals_float64: vec![3.14, 3.1415],
@@ -3155,38 +3155,11 @@ async fn decode_series_endpoint_v3() {
                 "source_type_name" => "system"
             ),
         );
-        assert_eq!(
-            metric
-                .metadata()
-                .datadog_origin_metadata()
-                .unwrap()
-                .product(),
-            Some(10)
-        );
-        assert_eq!(
-            metric
-                .metadata()
-                .datadog_origin_metadata()
-                .unwrap()
-                .category(),
-            Some(10)
-        );
-        assert_eq!(
-            metric
-                .metadata()
-                .datadog_origin_metadata()
-                .unwrap()
-                .service(),
-            Some(42)
-        );
-        assert_eq!(
-            metric
-                .metadata()
-                .datadog_origin_metadata()
-                .unwrap()
-                .metric_type(),
-            Some(9)
-        );
+        let origin = metric.metadata().datadog_origin_metadata().unwrap();
+        assert_eq!(origin.product(), Some(10));
+        assert_eq!(origin.category(), Some(10));
+        assert_eq!(origin.service(), Some(42));
+        assert_eq!(origin.metric_type(), Some(9));
         assert_eq!(metric.metadata().datadog_metric_unit(), Some("byte"));
     })
     .await;

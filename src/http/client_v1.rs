@@ -1,5 +1,3 @@
-#![allow(dead_code)] // The remaining unused pieces will be exercised as more sinks migrate.
-
 use std::{
     convert::Infallible,
     error::Error,
@@ -21,10 +19,10 @@ use hyper_1::{body::Incoming, rt};
 use hyper_openssl_1::{SslStream, client::legacy::HttpsConnector};
 use hyper_util::{
     client::legacy::{
-        Client,
+        Builder, Client,
         connect::{Connected, Connection, HttpConnector},
     },
-    rt::TokioExecutor,
+    rt::{TokioExecutor, TokioTimer},
 };
 use openssl::ssl::SslConnector;
 use percent_encoding::percent_decode_str;
@@ -42,24 +40,25 @@ use crate::{
 };
 
 type BoxError = Box<dyn Error + Send + Sync>;
-pub(crate) type RequestBody = UnsyncBoxBody<Bytes, BoxError>;
+pub type RequestBody = UnsyncBoxBody<Bytes, BoxError>;
 const HTTP1_ALPN: &[u8] = b"\x08http/1.1";
 
 #[derive(Debug)]
-pub(crate) struct HttpError {
+pub struct HttpError {
     source: BoxError,
     retriable: bool,
 }
 
 impl HttpError {
-    pub(crate) fn new(source: impl Error + Send + Sync + 'static) -> Self {
+    pub fn new(source: impl Error + Send + Sync + 'static) -> Self {
         Self {
             source: Box::new(source),
             retriable: true,
         }
     }
 
-    pub(crate) const fn is_retriable(&self) -> bool {
+    #[must_use]
+    pub const fn is_retriable(&self) -> bool {
         self.retriable
     }
 }
@@ -91,20 +90,21 @@ impl crate::sinks::util::http::HttpErrorClassify for HttpError {
     }
 }
 
-pub(crate) fn empty_body() -> RequestBody {
+#[must_use]
+pub fn empty_body() -> RequestBody {
     Empty::<Bytes>::new()
         .map_err(|never: Infallible| match never {})
         .boxed_unsync()
 }
 
-pub(crate) fn full_body(bytes: Bytes) -> RequestBody {
+pub fn full_body(bytes: Bytes) -> RequestBody {
     Full::new(bytes)
         .map_err(|never: Infallible| match never {})
         .boxed_unsync()
 }
 
 #[derive(Clone)]
-pub(crate) struct HttpClient {
+pub struct HttpClient {
     client: Client<HttpProxyConnectorV1, RequestBody>,
     routes: Arc<RoutePlanner>,
     user_agent: HeaderValue,
@@ -117,9 +117,17 @@ impl fmt::Debug for HttpClient {
 }
 
 impl HttpClient {
-    pub(crate) fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
+    /// Builds a client that routes requests through `proxy` and uses `tls` for HTTPS
+    /// destinations and TLS proxies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
+    /// build a connector.
+    pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
         let routes = Arc::new(RoutePlanner::new(proxy)?);
-        let connector = HttpProxyConnectorV1::new(tls, Arc::clone(&routes))?;
+        let connector =
+            HttpProxyConnectorV1::new(tls, Arc::clone(&routes), ForwardProxyAlpn::Http1)?;
         let client = Client::builder(TokioExecutor::new()).build(connector);
 
         Ok(Self {
@@ -129,7 +137,13 @@ impl HttpClient {
         })
     }
 
-    pub(crate) async fn send(
+    /// Sends `request`, adding the default request headers and any forward proxy credentials.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be routed through the configured proxy or the
+    /// request fails in transport.
+    pub async fn send(
         &self,
         mut request: Request<RequestBody>,
     ) -> Result<Response<Incoming>, HttpError> {
@@ -137,16 +151,7 @@ impl HttpClient {
         async move {
             default_request_headers(&mut request, &self.user_agent);
 
-            if let Route::ForwardProxy {
-                authorization: Some(authorization),
-                ..
-            } = self.routes.route(request.uri()).map_err(HttpError::from)?
-                && !request.headers().contains_key(PROXY_AUTHORIZATION)
-            {
-                request
-                    .headers_mut()
-                    .insert(PROXY_AUTHORIZATION, authorization);
-            }
+            add_forward_proxy_authorization(&self.routes, &mut request).map_err(HttpError::from)?;
 
             {
                 let telemetry = HttpRequestV1Telemetry::new(&request);
@@ -181,6 +186,109 @@ impl HttpClient {
         .instrument(span)
         .await
     }
+}
+
+/// An HTTP/2-only client with the TLS and proxy routing of [`HttpClient`].
+///
+/// Every connection speaks HTTP/2 with prior knowledge, whatever ALPN negotiates:
+///
+/// - Direct `http://` destinations use h2c. Direct `https://` destinations use the TLS settings.
+/// - Proxied `https://` destinations use an HTTP/1.1 `CONNECT` tunnel. The proxy connection only
+///   offers `http/1.1` ALPN.
+/// - Proxied `http://` destinations send HTTP/2 to the forward proxy, which must accept it.
+///
+/// Unlike [`HttpClient`], it adds no default headers and emits no HTTP client events.
+pub struct Http2Client<B> {
+    client: Client<HttpProxyConnectorV1, B>,
+    routes: Arc<RoutePlanner>,
+}
+
+impl<B> Clone for Http2Client<B> {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            routes: Arc::clone(&self.routes),
+        }
+    }
+}
+
+impl<B> fmt::Debug for Http2Client<B> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Http2Client")
+            .finish_non_exhaustive()
+    }
+}
+
+impl<B> Http2Client<B>
+where
+    B: http_body_1::Body + Send + Unpin + 'static,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
+{
+    /// Builds the client from `builder`, which supplies the pool and HTTP/2 settings.
+    ///
+    /// This forces `http2_only` and installs the Tokio timers that HTTP/2 keepalive and idle
+    /// connection eviction need.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a proxy URL is invalid or the TLS settings cannot build a connector.
+    pub fn new(
+        tls: MaybeTlsSettings,
+        proxy: &ProxyConfig,
+        mut builder: Builder,
+    ) -> Result<Self, BoxError> {
+        let routes = Arc::new(RoutePlanner::new(proxy)?);
+        let connector =
+            HttpProxyConnectorV1::new(tls, Arc::clone(&routes), ForwardProxyAlpn::Configured)?;
+        let client = builder
+            .http2_only(true)
+            .timer(TokioTimer::new())
+            .pool_timer(TokioTimer::new())
+            .build(connector);
+
+        Ok(Self { client, routes })
+    }
+
+    /// Sends `request`, adding forward proxy credentials when the route needs them.
+    ///
+    /// # Errors
+    ///
+    /// Returns a non-retriable error if the URI cannot be routed, and a retriable error if the
+    /// transport fails.
+    pub fn request(
+        &self,
+        mut request: Request<B>,
+    ) -> impl Future<Output = Result<Response<Incoming>, HttpError>> + Send + 'static + use<B> {
+        let response = add_forward_proxy_authorization(&self.routes, &mut request)
+            .map(|()| self.client.request(request));
+
+        async move {
+            match response {
+                Ok(response) => response.await.map_err(HttpError::new),
+                Err(error) => Err(HttpError::from(error)),
+            }
+        }
+    }
+}
+
+/// Inserts the forward proxy credentials for `request` unless it already carries them.
+fn add_forward_proxy_authorization<B>(
+    routes: &RoutePlanner,
+    request: &mut Request<B>,
+) -> Result<(), BoxError> {
+    if let Route::ForwardProxy {
+        authorization: Some(authorization),
+        ..
+    } = routes.route(request.uri())?
+        && !request.headers().contains_key(PROXY_AUTHORIZATION)
+    {
+        request
+            .headers_mut()
+            .insert(PROXY_AUTHORIZATION, authorization);
+    }
+    Ok(())
 }
 
 fn default_user_agent() -> HeaderValue {
@@ -350,10 +458,20 @@ enum Route {
 
 type BaseConnector = HttpsConnector<HttpConnector>;
 
+/// ALPN protocols offered to a TLS forward (non-`CONNECT`) proxy.
+#[derive(Clone, Copy)]
+enum ForwardProxyAlpn {
+    /// Only `http/1.1`, for [`HttpClient`].
+    Http1,
+    /// The configured `tls.alpn_protocols`, for [`Http2Client`].
+    Configured,
+}
+
 #[derive(Clone)]
 struct HttpProxyConnectorV1 {
     direct: BaseConnector,
-    proxy: BaseConnector,
+    forward_proxy: BaseConnector,
+    connect_proxy: BaseConnector,
     destination_tls: SslConnector,
     tls_settings: Option<TlsSettings>,
     routes: Arc<RoutePlanner>,
@@ -365,15 +483,26 @@ impl HttpProxyConnectorV1 {
         clippy::needless_pass_by_value,
         reason = "Preserve ownership and drop timing"
     )]
-    fn new(tls: MaybeTlsSettings, routes: Arc<RoutePlanner>) -> Result<Self, BoxError> {
+    fn new(
+        tls: MaybeTlsSettings,
+        routes: Arc<RoutePlanner>,
+        forward_proxy_alpn: ForwardProxyAlpn,
+    ) -> Result<Self, BoxError> {
         let tls_settings = tls.tls().cloned();
-        let direct = https_connector(&tls, false)?;
-        let proxy = https_connector(&tls, true)?;
+        let direct = https_connector(&tls, false, false)?;
+        // `CONNECT` is always driven through HTTP/1.1. Do not allow a TLS proxy to negotiate h2
+        // from the destination's configured ALPN list.
+        let connect_proxy = https_connector(&tls, true, true)?;
+        let forward_proxy = match forward_proxy_alpn {
+            ForwardProxyAlpn::Http1 => connect_proxy.clone(),
+            ForwardProxyAlpn::Configured => https_connector(&tls, true, false)?,
+        };
         let destination_tls = tls_connector_builder(&tls)?.build();
 
         Ok(Self {
             direct,
-            proxy,
+            forward_proxy,
+            connect_proxy,
             destination_tls,
             tls_settings,
             routes,
@@ -447,7 +576,8 @@ impl Service<Uri> for HttpProxyConnectorV1 {
     fn call(&mut self, destination: Uri) -> Self::Future {
         let route = self.routes.route(&destination);
         let mut direct = self.direct.clone();
-        let mut proxy = self.proxy.clone();
+        let mut forward_proxy = self.forward_proxy.clone();
+        let connect_proxy = self.connect_proxy.clone();
         let destination_tls = self.destination_tls.clone();
         let tls_settings = self.tls_settings.clone();
 
@@ -456,7 +586,7 @@ impl Service<Uri> for HttpProxyConnectorV1 {
                 Route::Direct { destination } => direct.call(destination).await.map(BoxedIo::new),
                 Route::ForwardProxy {
                     proxy: proxy_uri, ..
-                } => proxy
+                } => forward_proxy
                     .call(proxy_uri)
                     .await
                     .map(|stream| BoxedIo::new(ForwardProxyIo(stream))),
@@ -466,7 +596,7 @@ impl Service<Uri> for HttpProxyConnectorV1 {
                     authorization,
                 } => {
                     Self::connect_tunnel(
-                        proxy,
+                        connect_proxy,
                         destination_tls,
                         tls_settings,
                         proxy_uri,
@@ -483,13 +613,12 @@ impl Service<Uri> for HttpProxyConnectorV1 {
 fn https_connector(
     tls: &MaybeTlsSettings,
     skip_server_name: bool,
+    http1_alpn: bool,
 ) -> Result<BaseConnector, BoxError> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
     let mut tls_builder = tls_connector_builder(tls)?;
-    if skip_server_name {
-        // Proxy connections are driven through HTTP/1.1, including CONNECT. Do not allow a TLS
-        // proxy to negotiate h2 from the destination's configured ALPN list.
+    if http1_alpn {
         tls_builder.set_alpn_protos(HTTP1_ALPN)?;
     }
     let mut https = HttpsConnector::with_connector(http, tls_builder)?;
