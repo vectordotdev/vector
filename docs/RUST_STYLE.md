@@ -59,22 +59,9 @@ Code in Vector should **NOT** panic under normal circumstances.
 
 ## Synchronization
 
-Synchronization can be a very common sight when writing multi-threaded code in any language, and
-this document does not aim to familiarize you with all of the common synchronization primitives and
-their intended usage. Instead, however, there are some caveats that you must be aware of when using
-synchronization primitives in synchronous versus asynchronous code.
+Prefer `std::sync` primitives such as `Mutex` and `RwLock` for synchronous code.
 
-Generally speaking, developers will lean on the synchronization primitives in `std::sync`, such as
-`Mutex`, `RwLock`, and so on. These are typically the right choice -- in terms of using the ones
-provided by `std`, vs alternative implementations of the same primitives -- as they're well-tested,
-and have been improving over time in terms of performance. However, developers must be careful when
-using these primitives in asynchronous code, as their behavior can sometimes adversely affect the
-performance and correctness of the program.
-
-To wit, developers must exercise caution when using synchronous (i.e. `std::sync`, `parking_lot`,
-etc) synchronization primitives in asynchronous code, as they can be used in a way that deadlocks
-the asynchronous runtime even though the code compiles and appears to be correct. In some cases,
-you'll need to use asynchronous synchronization primitives, namely the ones from `tokio`
-itself. The documentation on `tokio`'s own
-[`Mutex`](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html), for example, calls out the
-specifics of when and where you might need to use it vs the one from `std::sync`.
+In async code, synchronous locks can block runtime threads and cause deadlocks. Use Tokio's
+async primitives when needed; see the
+[`tokio::sync::Mutex` documentation](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html)
+for guidance on choosing between synchronous and async mutexes.
