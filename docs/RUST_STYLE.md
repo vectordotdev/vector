@@ -1,19 +1,11 @@
 # Rust Style Guide for Vector
 
-This guide covers general Rust coding practices used in Vector, including conventions that
-automated tooling does not fully capture. For repository layout, telemetry, dependency policy,
-component feature flags, and configuration design, see the [Vector Style Guide](../STYLE.md).
+For Vector-specific conventions, see the [Vector Style Guide](../STYLE.md).
 
 ## Formatting
 
-Format all Rust code with `rustfmt`. Vector's [`.rustfmt.toml`](../.rustfmt.toml) is applied
-automatically when running `cargo fmt` from the repository. Use `make fmt` to apply repository
-formatting and `make check-fmt` to check it without changing files. Use `make check-clippy`
-to enforce the workspace Clippy lints configured in [`Cargo.toml`](../Cargo.toml).
-
-For installation instructions, see the
-[rustfmt documentation](https://github.com/rust-lang/rustfmt#on-the-stable-toolchain).
-`rustfmt` cannot always format code inside macros; adjust such code manually when needed.
+Use `make fmt` to format, `make check-fmt` to check formatting, and `make check-clippy` to lint.
+Manually format macro contents that `rustfmt` cannot handle.
 
 ## Import Statements (`use`)
 
