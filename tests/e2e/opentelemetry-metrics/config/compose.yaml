@@ -112,16 +112,15 @@ services:
         condition: service_completed_successfully
     user: "0:0" # test only, override special user with root
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
-    # Lower bounds only: the Rust tests assert exact counts, so duplicates still fail.
     healthcheck:
       test:
-        - CMD-SHELL
-        - >-
-          sink=$$(grep -o '"timeUnixNano"' /output/opentelemetry-metrics/collector-file-exporter.log 2>/dev/null | wc -l);
-          vector=$$(grep -o '"timeUnixNano"' /output/opentelemetry-metrics/vector-file-sink.log 2>/dev/null | wc -l);
-          received=$$(grep '"name":"component_received_events_total"' /output/opentelemetry-metrics/vector-internal-metrics-sink.log 2>/dev/null | grep '"component_id":"source0"' | tail -n 1 | sed -E 's/.*"value":([0-9.]+).*/\1/');
-          echo "sink=$$sink vector=$$vector received=$${received:-0}";
-          [ "$$sink" -ge 400 ] && [ "$$vector" -ge 400 ] && awk -v n="$${received:-0}" 'BEGIN { exit !(n >= 400) }'
+        - CMD
+        - sh
+        - /capture_ready.sh
+        - /output/opentelemetry-metrics
+        - count:collector-file-exporter.log:timeUnixNano:400
+        - count:vector-file-sink.log:timeUnixNano:400
+        - received:400
       interval: 500ms
       timeout: 1s
       retries: 240
@@ -129,6 +128,10 @@ services:
       - type: bind
         source: ../data/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: bind
+        source: ../../opentelemetry-common/capture_ready.sh
+        target: /capture_ready.sh
         read_only: true
       - type: volume
         source: vector_target

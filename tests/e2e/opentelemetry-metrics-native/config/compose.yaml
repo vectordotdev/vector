@@ -94,14 +94,13 @@ services:
         rm -rf /output/opentelemetry-metrics-native
         mkdir -p /output/opentelemetry-metrics-native
         exec /otelcol-contrib --config /etc/otelcol-contrib/config.yaml
-    # Lower bounds only: the Rust tests assert exact counts, so duplicates still fail.
     healthcheck:
       test:
-        - CMD-SHELL
-        - >-
-          sink=$$(grep -o '"timeUnixNano"' /output/opentelemetry-metrics-native/collector-file-exporter.log 2>/dev/null | wc -l);
-          echo "sink=$$sink";
-          [ "$$sink" -ge 300 ]
+        - CMD
+        - sh
+        - /capture_ready.sh
+        - /output/opentelemetry-metrics-native
+        - count:collector-file-exporter.log:timeUnixNano:300
       interval: 500ms
       timeout: 1s
       retries: 240
@@ -109,6 +108,10 @@ services:
       - type: bind
         source: ../data/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: bind
+        source: ../../opentelemetry-common/capture_ready.sh
+        target: /capture_ready.sh
         read_only: true
       - type: volume
         source: vector_target

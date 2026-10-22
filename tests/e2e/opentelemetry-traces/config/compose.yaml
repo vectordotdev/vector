@@ -79,13 +79,13 @@ services:
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     healthcheck:
       test:
-        - CMD-SHELL
-        - >-
-          source_spans=$$(grep -o '"spanId"' /output/opentelemetry-traces/collector-source-file-exporter.log 2>/dev/null | wc -l);
-          sink_spans=$$(grep -o '"spanId"' /output/opentelemetry-traces/collector-file-exporter.log 2>/dev/null | wc -l);
-          metrics_ready=$$(grep '"name":"component_received_events_total"' /output/opentelemetry-traces/vector-internal-metrics-sink.log 2>/dev/null | grep '"component_id":"source0"' | grep -Ec '"value":400(\.0)?');
-          echo "source=$$source_spans sink=$$sink_spans metrics_ready=$$metrics_ready";
-          [ "$$source_spans" -ge 200 ] && [ "$$sink_spans" -ge 400 ] && [ "$$metrics_ready" -ge 1 ]
+        - CMD
+        - sh
+        - /capture_ready.sh
+        - /output/opentelemetry-traces
+        - count:collector-source-file-exporter.log:spanId:200
+        - count:collector-file-exporter.log:spanId:400
+        - received:400
       interval: 500ms
       timeout: 1s
       retries: 240
@@ -93,6 +93,10 @@ services:
       - type: bind
         source: ../data/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: bind
+        source: ../../opentelemetry-common/capture_ready.sh
+        target: /capture_ready.sh
         read_only: true
       - type: volume
         source: vector_target
