@@ -60,6 +60,10 @@ pub struct InternalMetricsConfig {
     ///   `greptimedb_metrics` for histograms.
     /// - The `opentelemetry` sink and the `otlp` codec switch to delta temporality.
     /// - Sinks that require an interval on incremental counters, such as `new_relic`, drop them.
+    ///
+    /// When `expire_metrics_secs` is set, using several `internal_metrics` sources with this option
+    /// enabled is not recommended: a series expired and recreated between two scrapes can be
+    /// under-counted.
     #[serde(default)]
     pub emit_incremental: bool,
 }
