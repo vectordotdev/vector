@@ -5,11 +5,12 @@ use std::{
     future::Future,
     io,
     pin::Pin,
-    sync::{Arc, PoisonError, RwLock, Weak},
+    sync::{Arc, Weak},
     task::{Context, Poll},
     time::Duration,
 };
 
+use arc_swap::ArcSwap;
 use bytes::Bytes;
 use http_1::{
     HeaderValue, Method, Request, Response, Uri,
@@ -109,7 +110,11 @@ pub fn full_body(bytes: Bytes) -> RequestBody {
 type PooledClient = Client<HttpProxyConnectorV1, RequestBody>;
 
 /// Optional connection behavior for [`HttpClient::new_with_options`]. The default changes nothing.
+///
+/// Start from [`ConnectionOptions::default`] and set the fields you need, so that code keeps
+/// compiling as options are added.
 #[derive(Clone, Copy, Debug, Default)]
+#[non_exhaustive]
 pub struct ConnectionOptions {
     /// Closes each connection once it is older than this, so it is re-established. A request
     /// in flight on a connection that reaches its age fails and should be retried.
@@ -122,7 +127,7 @@ pub struct ConnectionOptions {
 #[derive(Clone)]
 pub struct HttpClient {
     // Shared by every clone so that a TLS reload reaches all of them.
-    client: Arc<RwLock<PooledClient>>,
+    client: Arc<ArcSwap<PooledClient>>,
     routes: Arc<RoutePlanner>,
     options: ConnectionOptions,
     user_agent: HeaderValue,
@@ -161,7 +166,7 @@ impl HttpClient {
         let client = Self::build_client(tls, &routes, options)?;
 
         Ok(Self {
-            client: Arc::new(RwLock::new(client)),
+            client: Arc::new(ArcSwap::from_pointee(client)),
             routes,
             options,
             user_agent: default_user_agent(),
@@ -214,12 +219,10 @@ impl HttpClient {
             }
 
             let before = std::time::Instant::now();
-            let client = self
-                .client
-                .read()
-                .unwrap_or_else(PoisonError::into_inner)
-                .clone();
-            let response = client.request(request).await;
+            // The response future owns its own client clone, so the guard is dropped before
+            // awaiting.
+            let response_future = self.client.load().request(request);
+            let response = response_future.await;
             let roundtrip = before.elapsed();
 
             match response {
@@ -250,7 +253,7 @@ impl HttpClient {
 /// [`HttpClient::tls_reload_handle`].
 #[derive(Clone)]
 pub struct TlsReloadHandle {
-    client: Weak<RwLock<PooledClient>>,
+    client: Weak<ArcSwap<PooledClient>>,
     routes: Arc<RoutePlanner>,
     options: ConnectionOptions,
 }
@@ -281,7 +284,7 @@ impl TlsReloadHandle {
             return Ok(false);
         };
         let rebuilt = HttpClient::build_client(tls, &self.routes, self.options)?;
-        *client.write().unwrap_or_else(PoisonError::into_inner) = rebuilt;
+        client.store(Arc::new(rebuilt));
         Ok(true)
     }
 }
@@ -830,8 +833,9 @@ impl Connection for BoxedIo {
     }
 }
 
-/// Closes the connection once `deadline` passes: reads report EOF, so hyper drops the connection
-/// instead of returning it to the pool, and writes fail, so a request sent on it is retried.
+/// Closes the connection once `deadline` passes: reads and writes fail, so hyper drops the
+/// connection instead of returning it to the pool. Reads fail rather than report EOF, which would
+/// complete a close-delimited response body with truncated data.
 struct MaxAgeIo<T> {
     inner: T,
     // `Sleep` is `!Unpin`, and hyper requires connections to be `Unpin`.
@@ -871,8 +875,7 @@ impl<T: rt::Read + Unpin> rt::Read for MaxAgeIo<T> {
     ) -> Poll<io::Result<()>> {
         let this = self.get_mut();
         if this.poll_expired(cx) {
-            // Completing without filling `buffer` signals EOF.
-            return Poll::Ready(Ok(()));
+            return Poll::Ready(Err(connection_expired()));
         }
         Pin::new(&mut this.inner).poll_read(cx, buffer)
     }
@@ -1085,10 +1088,11 @@ mod tests {
         io.read_exact(&mut buffer).await.unwrap();
         assert_eq!(&buffer, b"hello");
 
-        // Past the deadline, reads report EOF even with data available, and writes fail.
+        // Past the deadline, reads fail even with data available, and so do writes.
         server.write_all(b"world").await.unwrap();
         tokio::time::advance(Duration::from_secs(11)).await;
-        assert_eq!(io.read(&mut buffer).await.unwrap(), 0);
+        let error = io.read(&mut buffer).await.unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::BrokenPipe);
         let error = io.write(b"data").await.unwrap_err();
         assert_eq!(error.kind(), ErrorKind::BrokenPipe);
     }

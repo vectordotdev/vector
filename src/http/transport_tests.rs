@@ -19,7 +19,7 @@ use hyper_util::{
 };
 use rstest::rstest;
 use tokio::{
-    io::copy_bidirectional,
+    io::{AsyncReadExt as _, AsyncWriteExt as _, copy_bidirectional},
     net::TcpStream,
     task::{JoinHandle, JoinSet},
     time::timeout,
@@ -654,15 +654,11 @@ async fn v1_max_connection_age_recycles_connections(
     #[case] expected_connections: usize,
 ) {
     let origin = spawn_origin(no_tls()).await;
-    let client = HttpClient::new_with_options(
-        no_tls(),
-        &ProxyConfig::default(),
-        ConnectionOptions {
-            max_connection_age,
-            max_connection_age_jitter_factor: 0.0,
-        },
-    )
-    .unwrap();
+    let options = ConnectionOptions {
+        max_connection_age,
+        ..ConnectionOptions::default()
+    };
+    let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
 
     assert_success(client.get(&origin.http_uri()).await.unwrap());
     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -675,6 +671,49 @@ async fn v1_max_connection_age_recycles_connections(
         .collect();
     connections.dedup();
     assert_eq!(connections.len(), expected_connections);
+}
+
+#[tokio::test]
+async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
+    // A close-delimited response (no `Content-Length` or `Transfer-Encoding`) whose body is
+    // still streaming when the connection reaches its maximum age.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0u8; 1024];
+        let _ = stream.read(&mut request).await.unwrap();
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\npartial ")
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // The client may already have dropped the connection.
+        stream.write_all(b"rest of the body").await.ok();
+    });
+
+    let options = ConnectionOptions {
+        max_connection_age: Some(Duration::from_millis(300)),
+        ..ConnectionOptions::default()
+    };
+    let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
+
+    let response = client
+        .send(
+            Request::get(format!("http://{addr}/"))
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = timeout(REQUEST_TIMEOUT, response.into_body().collect())
+        .await
+        .expect("response body timed out");
+    assert!(
+        body.is_err(),
+        "a body cut off by the maximum age must fail, not complete truncated"
+    );
+    server.abort();
 }
 
 #[rstest]
