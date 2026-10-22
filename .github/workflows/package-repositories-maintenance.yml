@@ -27,15 +27,19 @@ concurrency:
 
 jobs:
   # Inspect S3 state, prepare a rollback, or recover a lock with the publishing role.
+  # Capture PACKAGE_REPOSITORIES_IMAGE once so every rollback job uses the same digest.
   # Available even when automated publication is disabled. Recovery requires the exact
   # control version, a stopped owner and an expired 65-minute recovery window.
   maintain:
     if: github.repository_id == '146327667' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      publisher_image: ${{ steps.image.outputs.image }}
     environment: package-repositories-publishing
     permissions:
       contents: read
+      packages: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,8 +63,11 @@ jobs:
         with:
           vdev: true
           mold: false
-      - name: Build the reviewed publisher image
-        run: '"$VDEV" release repositories build-image'
+      - uses: ./.github/actions/package-repository-tools
+        id: image
+        with:
+          image: ${{ vars.PACKAGE_REPOSITORIES_IMAGE }}
+          token: ${{ github.token }}
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
@@ -93,18 +100,6 @@ jobs:
             cat target/package-repository-status.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Save the publisher image for the rollback jobs
-        if: inputs.operation == 'rollback'
-        run: |
-          mkdir -p target/package-repository-tools
-          docker save vector-package-publisher:local | gzip > target/package-repository-tools/image.tar.gz
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: inputs.operation == 'rollback'
-        with:
-          name: package-repository-tools
-          path: target/package-repository-tools/
-          retention-days: 1
-          if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: inputs.operation == 'rollback'
         with:
@@ -123,6 +118,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -133,6 +129,9 @@ jobs:
           vdev: true
           mold: false
       - uses: ./.github/actions/package-repository-tools
+        with:
+          image: ${{ needs.maintain.outputs.publisher_image }}
+          token: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-rollback-base
@@ -159,12 +158,13 @@ jobs:
   # Restore the selected repository state under the shared S3 lock, rejecting stale plans.
   # Uses AWS OIDC without the signing key; installed clients are not downgraded.
   publish:
-    needs: sign
+    needs: [maintain, sign]
     runs-on: ubuntu-24.04
     environment: package-repositories-publishing
     timeout-minutes: 20
     permissions:
       contents: read
+      packages: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -176,6 +176,9 @@ jobs:
           vdev: true
           mold: false
       - uses: ./.github/actions/package-repository-tools
+        with:
+          image: ${{ needs.maintain.outputs.publisher_image }}
+          token: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-rollback-signed
@@ -202,11 +205,12 @@ jobs:
 
   # Verify the restored indexes and fresh signed roots through public HTTPS.
   endpoints:
-    needs: publish
+    needs: [maintain, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
+      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -217,6 +221,9 @@ jobs:
           vdev: true
           mold: false
       - uses: ./.github/actions/package-repository-tools
+        with:
+          image: ${{ needs.maintain.outputs.publisher_image }}
+          token: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-rollback-signed
