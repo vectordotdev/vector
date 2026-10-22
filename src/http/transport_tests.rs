@@ -24,11 +24,9 @@ use tokio::{
     task::{JoinHandle, JoinSet},
     time::timeout,
 };
+use vector_http::{RequestBody, empty_body};
 
-use super::{
-    HttpClient as LegacyHttpClient,
-    client_v1::{HttpClient, RequestBody, empty_body},
-};
+use super::{HttpClient as LegacyHttpClient, client_v1::HttpClient};
 use crate::{
     config::ProxyConfig,
     tls::{

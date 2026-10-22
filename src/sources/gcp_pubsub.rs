@@ -13,16 +13,14 @@ use std::{
 use chrono::DateTime;
 use derivative::Derivative;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
-use http_1::uri::{InvalidUri, Scheme, Uri};
+use http_1::uri::{InvalidUri, Uri};
+use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{
-    Code, Request, Status,
-    metadata::MetadataValue,
-    transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
-};
+use tonic::{Code, Request, Status, body::BoxBody, metadata::MetadataValue};
+use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     codecs::decoding::{DeserializerConfig, FramingConfig},
@@ -102,10 +100,6 @@ mod proto {
 pub(crate) enum PubsubError {
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
-    #[snafu(display("Could not load native root certificates: {}", source))]
-    NativeRoots { source: rustls_native_certs::Error },
-    #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
-    EndpointTls { source: tonic::transport::Error },
     #[snafu(display(
         "`ack_deadline_secs` is outside the valid range of {} to {}",
         MIN_ACK_DEADLINE_SECS,
@@ -282,33 +276,21 @@ impl SourceConfig for PubsubConfig {
             .scheme()
             .map_or(Protocol::HTTP, |scheme| Protocol(scheme.to_string().into()));
 
-        let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let tls_config = if uri.scheme() == Some(&Scheme::HTTP) {
-            None
-        } else {
-            let native_roots = native_trust_anchors(rustls_native_certs::load_native_certs())?;
-
-            let host = uri.host().unwrap_or("pubsub.googleapis.com");
-            let mut tls_config = ClientTlsConfig::new()
-                .domain_name(host)
-                .trust_anchors(native_roots)
-                .ca_certificates(tls.authorities_pem().map(Certificate::from_pem));
-            if let Some((cert, key)) = tls.identity_pem() {
-                tls_config = tls_config.identity(Identity::from_pem(cert, key));
-            }
-            Some(tls_config)
-        };
-
-        let mut endpoint = Endpoint::from(uri)
-            .http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
-        if let Some(tls_config) = tls_config {
-            endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
-        }
+        let mut tls_config = self.tls.clone().unwrap_or_default();
+        // Preserve Tonic's default ALPN while honoring an explicit protocol list.
+        tls_config
+            .alpn_protocols
+            .get_or_insert_with(|| vec!["h2".to_owned()]);
+        let tls = TlsSettings::from_options(Some(&tls_config))?;
+        let mut builder = Builder::new(TokioExecutor::new());
+        builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
+        let client = Http2Client::new(tls.into(), &cx.proxy, builder)?;
 
         let token_generator = auth.spawn_regenerate_token();
 
         let source = PubsubSource {
-            endpoint,
+            client,
+            origin: uri,
             auth,
             token_generator,
             subscription: format!(
@@ -380,37 +362,12 @@ impl SourceConfig for PubsubConfig {
     }
 }
 
-/// Converts the native certificate store into trust anchors.
-///
-/// `rustls-native-certs` 0.8 reports per-entry errors next to the certificates it did load, and
-/// it also scans certificate directories that 0.7 never read. Fail only when nothing loaded, as a
-/// failed load did with 0.7, and log the other errors. An empty store without errors is accepted,
-/// so a configured CA can be the only trust root. Certificates that are not valid trust anchors
-/// are skipped.
-fn native_trust_anchors(
-    result: rustls_native_certs::CertificateResult,
-) -> Result<Vec<rustls::pki_types::TrustAnchor<'static>>, PubsubError> {
-    let rustls_native_certs::CertificateResult { certs, errors, .. } = result;
-    let mut errors = errors.into_iter();
-    if certs.is_empty()
-        && let Some(source) = errors.next()
-    {
-        return Err(PubsubError::NativeRoots { source });
-    }
-    for error in errors {
-        warn!(message = "Skipping native root certificate that failed to load.", %error);
-    }
-
-    let mut roots = rustls::RootCertStore::empty();
-    roots.add_parsable_certificates(certs);
-    Ok(roots.roots)
-}
-
 impl_generate_config_from_default!(PubsubConfig);
 
 #[derive(Clone)]
 struct PubsubSource {
-    endpoint: Endpoint,
+    client: Http2Client<BoxBody>,
+    origin: Uri,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
     subscription: String,
@@ -502,28 +459,9 @@ impl PubsubSource {
     }
 
     async fn run_once(&mut self, busy_flag: &Arc<AtomicBool>) -> State {
-        let connection = match self.endpoint.connect().await {
-            Ok(connection) => connection,
-            Err(error) => {
-                emit!(GcpPubsubConnectError { error });
-                return State::RetryDelay;
-            }
-        };
-
-        let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
-            connection,
-            |mut req: Request<()>| {
-                if let Some(token) = self.auth.make_token() {
-                    let authorization = MetadataValue::try_from(&token).map_err(|_| {
-                        Status::new(
-                            Code::FailedPrecondition,
-                            "Invalid token text returned by GCP",
-                        )
-                    })?;
-                    req.metadata_mut().insert("authorization", authorization);
-                }
-                Ok(req)
-            },
+        let mut client = proto::subscriber_client::SubscriberClient::with_origin(
+            GrpcTransport(self.client.clone()),
+            self.origin.clone(),
         )
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
@@ -532,14 +470,33 @@ impl PubsubSource {
 
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
-        let request_stream = self.request_stream(ack_ids_receiver);
+        let mut request = Request::new(self.request_stream(ack_ids_receiver));
+        if let Some(token) = self.auth.make_token() {
+            let Ok(authorization) = MetadataValue::try_from(&token) else {
+                emit!(GcpPubsubStreamingPullError {
+                    error: Status::new(
+                        Code::FailedPrecondition,
+                        "Invalid token text returned by GCP",
+                    ),
+                });
+                return State::RetryDelay;
+            };
+            request
+                .metadata_mut()
+                .insert("authorization", authorization);
+        }
         debug!("Starting streaming pull.");
         let stream = tokio::select! {
             _ = &mut self.shutdown => return State::Shutdown,
-            result = client.streaming_pull(request_stream) => match result {
+            result = client.streaming_pull(request) => match result {
                 Ok(stream) => stream,
                 Err(error) => {
-                    emit!(GcpPubsubStreamingPullError { error });
+                    // The pooled transport connects on the first request, not at construction.
+                    if is_connect_error(&error) {
+                        emit!(GcpPubsubConnectError { error });
+                    } else {
+                        emit!(GcpPubsubStreamingPullError { error });
+                    }
                     return State::RetryDelay;
                 }
             }
@@ -776,6 +733,18 @@ fn translate_error(error: tonic::Status) -> State {
     }
 }
 
+/// Connection failures now arrive through the first streaming pull's status.
+fn is_connect_error(error: &Status) -> bool {
+    let mut source = error.source();
+    while let Some(error) = source {
+        if let Some(error) = error.downcast_ref::<hyper_util::client::legacy::Error>() {
+            return error.is_connect();
+        }
+        source = error.source();
+    }
+    false
+}
+
 /// Find the HTTP/2 reset through Tonic and transport error wrappers.
 fn is_reset(error: &Status) -> bool {
     let mut source = error.source();
@@ -809,6 +778,10 @@ mod tests {
     use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
+    use crate::tls::{
+        MaybeTlsSettings, TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH,
+        TlsEnableableConfig,
+    };
 
     #[test]
     fn generate_config() {
@@ -912,68 +885,32 @@ mod tests {
         }
     }
 
-    fn native_roots(
-        certs: Vec<rustls::pki_types::CertificateDer<'static>>,
-        errors: usize,
-    ) -> rustls_native_certs::CertificateResult {
-        use rustls_native_certs::{Error, ErrorKind};
-
-        let mut result = rustls_native_certs::CertificateResult::default();
-        result.certs = certs;
-        result.errors = (0..errors)
-            .map(|_| Error {
-                context: "failed to read PEM from file",
-                kind: ErrorKind::Io {
-                    inner: std::io::Error::from(std::io::ErrorKind::PermissionDenied),
-                    path: "/etc/ssl/certs/00000000.0".into(),
-                },
-            })
-            .collect();
-        result
-    }
-
-    fn test_ca() -> rustls::pki_types::CertificateDer<'static> {
-        use rustls::pki_types::pem::PemObject;
-
-        rustls::pki_types::CertificateDer::from_pem_file(crate::tls::TEST_PEM_CA_PATH).unwrap()
-    }
-
-    #[test]
-    fn native_trust_anchors_keep_loaded_certificates_on_partial_errors() {
-        let anchors = native_trust_anchors(native_roots(vec![test_ca()], 2)).unwrap();
-        assert_eq!(anchors.len(), 1);
-    }
-
-    #[test]
-    fn native_trust_anchors_fail_when_nothing_loaded() {
-        let error = native_trust_anchors(native_roots(Vec::new(), 1)).unwrap_err();
-        assert!(matches!(error, PubsubError::NativeRoots { .. }));
-    }
-
-    #[test]
-    fn native_trust_anchors_accept_empty_store_without_errors() {
-        assert!(
-            native_trust_anchors(native_roots(Vec::new(), 0))
-                .unwrap()
-                .is_empty()
-        );
-    }
-
     /// Serves streaming pulls and resets each stream once the source acknowledges its first
     /// response, then signals.
-    async fn serve_streams() -> (String, mpsc::UnboundedReceiver<()>) {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    async fn serve_streams(
+        tls: MaybeTlsSettings,
+    ) -> (String, mpsc::UnboundedReceiver<Option<Vec<u8>>>) {
+        let scheme = if tls.is_tls() { "https" } else { "http" };
+        let mut listener = tls.bind(&"127.0.0.1:0".parse().unwrap()).await.unwrap();
+        let endpoint = format!("{scheme}://{}", listener.local_addr().unwrap());
         let (ready, streams) = mpsc::unbounded_channel();
         tokio::spawn(async move {
-            while let Ok((socket, _)) = listener.accept().await {
+            while let Ok(mut socket) = listener.accept().await {
                 let ready = ready.clone();
                 tokio::spawn(async move {
+                    if socket.handshake().await.is_err() {
+                        return;
+                    }
+                    let alpn = socket
+                        .ssl_stream()
+                        .and_then(|stream| stream.ssl().selected_alpn_protocol())
+                        .map(<[u8]>::to_vec);
                     let Ok(mut connection) = h2::server::handshake(socket).await else {
                         return;
                     };
                     while let Some(Ok((request, mut respond))) = connection.accept().await {
                         let ready = ready.clone();
+                        let alpn = alpn.clone();
                         tokio::spawn(async move {
                             let mut requests = request.into_body();
                             requests.data().await.unwrap().unwrap();
@@ -989,7 +926,7 @@ mod tests {
                             // The acknowledgement shows the source is in its receive loop.
                             requests.data().await.unwrap().unwrap();
                             stream.send_reset(h2::Reason::INTERNAL_ERROR);
-                            _ = ready.send(());
+                            _ = ready.send(alpn);
                             while let Some(Ok(_)) = requests.data().await {}
                         });
                     }
@@ -1001,7 +938,7 @@ mod tests {
 
     #[tokio::test]
     async fn remote_stream_reset_retries_immediately() {
-        let (endpoint, mut streams) = serve_streams().await;
+        let (endpoint, mut streams) = serve_streams(MaybeTlsSettings::Raw(())).await;
         let (out, _events) = SourceSender::new_test();
         let source = test_config(endpoint)
             .build(SourceContext::new_test(out, None))
@@ -1016,6 +953,111 @@ mod tests {
                 .unwrap();
         }
         source.abort();
+    }
+
+    #[rstest::rstest]
+    #[case::server_name(Some(true), Some(true), Some("localhost"), None)]
+    #[case::hostname_verification(Some(true), Some(false), None, None)]
+    #[case::certificate_verification(Some(false), Some(true), Some("localhost"), None)]
+    #[case::configured_alpn(Some(true), Some(true), Some("localhost"), Some("pubsub-test"))]
+    #[tokio::test]
+    async fn streaming_pull_uses_tls_settings(
+        #[case] verify_certificate: Option<bool>,
+        #[case] verify_hostname: Option<bool>,
+        #[case] server_name: Option<&str>,
+        #[case] alpn: Option<&str>,
+    ) {
+        let protocol = alpn.unwrap_or("h2");
+        let tls = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    alpn_protocols: Some(vec![protocol.to_owned()]),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .unwrap();
+        let (endpoint, mut streams) = serve_streams(tls).await;
+        let mut config = test_config(endpoint);
+        config.tls = Some(TlsConfig {
+            ca_file: (verify_certificate != Some(false)).then(|| TEST_PEM_CA_PATH.into()),
+            verify_certificate,
+            verify_hostname,
+            server_name: server_name.map(str::to_owned),
+            alpn_protocols: alpn.map(|protocol| vec![protocol.to_owned()]),
+            ..Default::default()
+        });
+        let (out, _events) = SourceSender::new_test();
+        let source = config
+            .build(SourceContext::new_test(out, None))
+            .await
+            .unwrap();
+        let source = tokio::spawn(source);
+        // The peer has received an acknowledgement, not just a TLS handshake.
+        let negotiated = timeout(Duration::from_secs(10), streams.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(negotiated.as_deref(), Some(protocol.as_bytes()));
+        source.abort();
+    }
+
+    #[tokio::test]
+    async fn streaming_pull_uses_source_proxy() {
+        let (proxy, mut streams) = serve_streams(MaybeTlsSettings::Raw(())).await;
+        let (out, _events) = SourceSender::new_test();
+        let mut cx = SourceContext::new_test(out, None);
+        cx.proxy.http = Some(proxy);
+        let source = test_config("http://pubsub.invalid/".into())
+            .build(cx)
+            .await
+            .unwrap();
+        let source = tokio::spawn(source);
+        timeout(Duration::from_secs(10), streams.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        source.abort();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn connection_failures_keep_error_event_and_retry_delay() {
+        use crate::test_util::components::{COMPONENT_TESTS_ERROR, init_test};
+        use tokio::{io::AsyncReadExt as _, time::Instant};
+
+        init_test();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("https://{}", listener.local_addr().unwrap());
+        let (attempts, mut received) = mpsc::unbounded_channel();
+        let server = tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                // Abort TLS after the client hello. Each attempt must use the delayed retry path.
+                socket.read_u8().await.unwrap();
+                attempts.send(Instant::now()).unwrap();
+            }
+        });
+        let (out, _events) = SourceSender::new_test();
+        let mut config = test_config(endpoint);
+        config.retry_delay_secs = Duration::from_secs(5);
+        let source = config
+            .build(SourceContext::new_test(out, None))
+            .await
+            .unwrap();
+        let source = tokio::spawn(source);
+        let first = received.recv().await.unwrap();
+        let second = timeout(Duration::from_secs(20), received.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(second.duration_since(first) >= config.retry_delay_secs);
+        vector_lib::event_test_util::contains_name_once("GcpPubsubConnectError").unwrap();
+        COMPONENT_TESTS_ERROR.assert(&["error_code", "error_type", "stage"]);
+        source.abort();
+        server.abort();
     }
 }
 
