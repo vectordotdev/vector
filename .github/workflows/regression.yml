@@ -6,11 +6,13 @@
 #   - On demand, via the `/ci-run-regression` (or `/ci-run-all`) PR review comment,
 #     which invokes this workflow via `workflow_call` from `ci-review-trigger.yml`.
 #
-# The workflow accepts two optional inputs:
+# The workflow accepts three optional inputs:
 #   - The baseline ref:
 #     - If not specified, the SHA from 7 days ago on origin/master is used.
 #   - The comparison ref:
 #     - If not specified, the current HEAD of origin/master is used.
+#   - The suite:
+#     - If not specified, all regression cases are run.
 #
 # Both inputs accept any git ref that `git rev-parse` can resolve: a full commit
 # SHA, a short SHA, a branch name (e.g. `origin/master`), or a tag.
@@ -36,6 +38,15 @@ on:
       comparison-sha:
         description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
         required: false
+      suite:
+        description: "Regression suite to run."
+        required: false
+        type: choice
+        options:
+          - all
+          - metrics
+          - logs
+        default: all
   workflow_call:
     inputs:
       baseline-sha:
@@ -46,6 +57,11 @@ on:
         description: "Comparison git ref (full/short SHA, branch such as `origin/master`, or tag). Defaults to the current HEAD of origin/master."
         required: false
         type: string
+      suite:
+        description: "Regression suite to run."
+        required: false
+        type: string
+        default: all
   schedule:
     - cron: "0 7 * * 1" # Runs at 7 AM UTC on Mondays
 
@@ -67,6 +83,7 @@ jobs:
       comparison-sha: ${{ steps.set_and_validate_shas.outputs.COMPARISON_SHA }}
       baseline-tag: ${{ steps.set_and_validate_shas.outputs.BASELINE_TAG }}
       comparison-tag: ${{ steps.set_and_validate_shas.outputs.COMPARISON_TAG }}
+      suite: ${{ steps.set_and_validate_shas.outputs.SUITE }}
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
     steps:
       - name: Checkout repository
@@ -79,7 +96,19 @@ jobs:
         env:
           BASELINE_INPUT: ${{ inputs.baseline-sha }}
           COMPARISON_INPUT: ${{ inputs.comparison-sha }}
+          SUITE_INPUT: ${{ inputs.suite }}
         run: |
+          SUITE="${SUITE_INPUT:-all}"
+          case "${SUITE}" in
+            all|metrics|logs)
+              ;;
+            *)
+              echo "Invalid suite: '${SUITE}'. Expected all, metrics, or logs."
+              exit 1
+              ;;
+          esac
+          echo "Using regression suite: ${SUITE}"
+
           # Resolve baseline ref to a full commit SHA
           if [ -z "${BASELINE_INPUT}" ]; then
             BASELINE_SHA=$(git rev-list -n 1 --before="7 days ago" origin/master)
@@ -114,6 +143,7 @@ jobs:
 
             echo "BASELINE_TAG=${BASELINE_TAG}"
             echo "COMPARISON_TAG=${COMPARISON_TAG}"
+            echo "SUITE=${SUITE}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set SMP version
@@ -386,7 +416,7 @@ jobs:
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.resolve-inputs.outputs.comparison-tag }}
 
   submit-job:
-    name: Submit regression job
+    name: Submit regression job (${{ needs.resolve-inputs.outputs.suite }})
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     needs:
@@ -401,6 +431,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
+
+      - name: Checkout workflow revision for suite metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: workflow-vector
+          sparse-checkout: |
+            regression/cases
+          sparse-checkout-cone-mode: true
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -417,6 +456,77 @@ jobs:
         run: |
           aws s3 cp s3://smp-cli-releases/v${{ needs.resolve-inputs.outputs.smp-version }}/x86_64-unknown-linux-musl/smp ${{ runner.temp }}/bin/smp
 
+      - name: Prepare regression config
+        env:
+          SUITE: ${{ needs.resolve-inputs.outputs.suite }}
+        run: |
+          membership_root="${GITHUB_WORKSPACE}/workflow-vector/regression"
+
+          suite_file_for_case() {
+            local case_dir="$1"
+            local case_name="${case_dir%/}"
+            case_name="${case_name##*/}"
+
+            if [[ -f "${case_dir}/suite" ]]; then
+              printf '%s\n' "${case_dir}/suite"
+            else
+              printf '%s\n' "${membership_root}/cases/${case_name}/suite"
+            fi
+          }
+
+          validate_suite_file() {
+            local suite_file="$1"
+            if [[ -f "${suite_file}" ]]; then
+              [[ -s "${suite_file}" ]] || {
+                echo "Suite file is empty: ${suite_file}"
+                exit 1
+              }
+
+              while IFS= read -r case_suite || [[ -n "${case_suite}" ]]; do
+                case "${case_suite}" in
+                  metrics|logs)
+                    ;;
+                  *)
+                    echo "Invalid suite '${case_suite}' in ${suite_file}. Expected metrics or logs."
+                    exit 1
+                    ;;
+                esac
+              done < "${suite_file}"
+            fi
+          }
+
+          for case_dir in regression/cases/*/; do
+            validate_suite_file "$(suite_file_for_case "${case_dir}")"
+          done
+
+          if [[ "${SUITE}" == "all" ]]; then
+            echo "TARGET_CONFIG_DIR=${GITHUB_WORKSPACE}/regression" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          target_config_dir="${RUNNER_TEMP}/regression-${SUITE}"
+          mkdir -p "${target_config_dir}/cases"
+          cp regression/config.yaml "${target_config_dir}/config.yaml"
+
+          selected_cases=0
+          for case_dir in regression/cases/*/; do
+            suite_file="$(suite_file_for_case "${case_dir}")"
+
+            if { [[ "${SUITE}" == "logs" && ! -f "${suite_file}" ]]; } ||
+              { [[ -f "${suite_file}" ]] && grep --fixed-strings --line-regexp --quiet "${SUITE}" "${suite_file}"; }; then
+              cp --archive "${case_dir}" "${target_config_dir}/cases/"
+              selected_cases=$((selected_cases + 1))
+            fi
+          done
+
+          if [[ "${selected_cases}" -eq 0 ]]; then
+            echo "No cases selected for the ${SUITE} suite."
+            exit 1
+          fi
+
+          echo "Selected ${selected_cases} cases for the ${SUITE} suite."
+          echo "TARGET_CONFIG_DIR=${target_config_dir}" >> "$GITHUB_ENV"
+
       - name: Submit job
         env:
           RUST_LOG: info
@@ -428,7 +538,7 @@ jobs:
             --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.resolve-inputs.outputs.comparison-tag }} \
             --baseline-sha ${{ needs.resolve-inputs.outputs.baseline-sha }} \
             --comparison-sha ${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            --target-config-dir ${{ github.workspace }}/regression/ \
+            --target-config-dir "${TARGET_CONFIG_DIR}" \
             --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }} \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --replicas ${{ env.SMP_REPLICAS }}

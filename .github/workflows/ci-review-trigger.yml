@@ -33,6 +33,10 @@
 #                                 /ci-run-regression
 #                                 /ci-run-regression origin/master
 #                                 /ci-run-regression v0.55.0
+# /ci-run-regression-metrics  : runs only the metrics Regression Detection Suite, with
+#                               the same optional baseline ref.
+# /ci-run-regression-logs     : runs only the logs Regression Detection Suite, with
+#                               the same optional baseline ref.
 #                               Not included in `/ci-run-all` because it is expensive.
 
 name: CI Review Trigger
@@ -219,17 +223,35 @@ jobs:
     timeout-minutes: 5
     outputs:
       baseline-sha: ${{ steps.parse.outputs.baseline }}
+      suite: ${{ steps.parse.outputs.suite }}
     steps:
       - name: Parse baseline ref from review body
         id: parse
         env:
           REVIEW_BODY: ${{ github.event.review.body }}
         run: |
-          # The body starts with `/ci-run-regression`; take the second whitespace-
-          # delimited token on the first line as the optional baseline ref.
-          read -r _ BASELINE _ <<< "${REVIEW_BODY}"
+          # The body starts with a supported regression command; take the second
+          # whitespace-delimited token on the first line as the optional baseline ref.
+          read -r COMMAND BASELINE _ <<< "${REVIEW_BODY}"
+          case "${COMMAND}" in
+            /ci-run-regression)
+              SUITE=all
+              ;;
+            /ci-run-regression-metrics)
+              SUITE=metrics
+              ;;
+            /ci-run-regression-logs)
+              SUITE=logs
+              ;;
+            *)
+              echo "Invalid regression command: '${COMMAND}'"
+              exit 1
+              ;;
+          esac
+          echo "Parsed regression suite: '${SUITE}'"
           echo "Parsed baseline ref: '${BASELINE}'"
           echo "baseline=${BASELINE}" >> "$GITHUB_OUTPUT"
+          echo "suite=${SUITE}" >> "$GITHUB_OUTPUT"
 
   regression:
     needs: [validate, regression-parse]
@@ -241,6 +263,7 @@ jobs:
     with:
       baseline-sha: ${{ needs.regression-parse.outputs.baseline-sha }}
       comparison-sha: ${{ github.event.review.commit_id }}
+      suite: ${{ needs.regression-parse.outputs.suite }}
     secrets: inherit
 
   coverage:

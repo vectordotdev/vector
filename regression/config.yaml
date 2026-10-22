@@ -3,6 +3,12 @@ lading:
 
 target:
 
+# Optional partial-suite membership:
+# - A case with no `suite` file belongs to the `logs` suite.
+# - A `suite` file lists one or more exact suite names, one per line:
+#   `metrics` and/or `logs`.
+# - The full suite ignores these files and runs every case.
+
 # Link templates for reports.
 #
 # Values may be removed to disable corresponding links in reports.
