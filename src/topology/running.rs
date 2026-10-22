@@ -8,7 +8,7 @@ use metrics::Gauge;
 use snafu::Snafu;
 use stream_cancel::Trigger;
 use tokio::{
-    sync::{mpsc, watch},
+    sync::{mpsc, oneshot, watch},
     time::{Duration, Instant, interval, sleep_until},
 };
 use tracing::Instrument;
@@ -66,6 +66,7 @@ pub struct RunningTopology {
     tasks: HashMap<ComponentKey, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
+    reload_shutdown_triggers: HashMap<ComponentKey, oneshot::Sender<Instant>>,
     pub(crate) config: Config,
     pub(crate) abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
@@ -90,6 +91,7 @@ impl RunningTopology {
             component_type_names: HashMap::new(),
             shutdown_coordinator: SourceShutdownCoordinator::default(),
             detach_triggers: HashMap::new(),
+            reload_shutdown_triggers: HashMap::new(),
             source_tasks: HashMap::new(),
             tasks: HashMap::new(),
             abort_tx,
@@ -649,13 +651,31 @@ impl RunningTopology {
             .chain(changed_disk_buffer_sinks.iter().cloned())
             .collect::<HashSet<_>>();
 
-        // First, we remove any inputs to removed sinks so they can naturally shut down.
+        // Give all retiring sinks the same deadline, including sinks we do not wait for.
         let removed_sinks = diff
             .sinks
             .to_remove
             .iter()
             .chain(diff.enrichment_tables.sinks.to_remove.iter())
             .collect::<Vec<_>>();
+        let sinks_to_change = diff
+            .sinks
+            .to_change
+            .iter()
+            .chain(diff.enrichment_tables.sinks.to_change.iter())
+            .collect::<Vec<_>>();
+        let deadline = self
+            .graceful_shutdown_duration
+            .map(|grace| Instant::now() + grace);
+        for key in removed_sinks.iter().chain(&sinks_to_change) {
+            if let Some(trigger) = self.reload_shutdown_triggers.remove(*key)
+                && let Some(deadline) = deadline
+            {
+                _ = trigger.send(deadline);
+            }
+        }
+
+        // Removed sinks keep reading their buffers until they finish or reach the deadline.
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config);
@@ -668,13 +688,6 @@ impl RunningTopology {
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
         // they can naturally shutdown and allow us to recover their buffers if possible.
         let mut buffer_tx = HashMap::new();
-
-        let sinks_to_change = diff
-            .sinks
-            .to_change
-            .iter()
-            .chain(diff.enrichment_tables.sinks.to_change.iter())
-            .collect::<Vec<_>>();
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
@@ -1008,6 +1021,9 @@ impl RunningTopology {
             .detach_triggers
             .remove(key)
             .map(|trigger| self.detach_triggers.insert(key.clone(), trigger.into()));
+        if let Some(trigger) = new_pieces.reload_shutdown_triggers.remove(key) {
+            self.reload_shutdown_triggers.insert(key.clone(), trigger);
+        }
     }
 
     fn remove_outputs(&mut self, key: &ComponentKey) {
@@ -1017,6 +1033,7 @@ impl RunningTopology {
     fn remove_inputs(&mut self, key: &ComponentKey, diff: &ConfigDiff, new_config: &Config) {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);
+        self.reload_shutdown_triggers.remove(key);
 
         let old_inputs = self.config.inputs_for_node(key).expect("node exists");
         let new_inputs = new_config
@@ -1516,18 +1533,68 @@ fn enrichment_table_sink_buffer(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, time::Duration};
 
+    use futures::StreamExt;
     use vector_lib::config::ComponentKey;
 
     use crate::{
         config::Config,
+        event::{EventArray, LogEvent},
         extra_context::ExtraContext,
         test_util::{
-            mock::{basic_sink, basic_source, basic_transform},
+            mock::{backpressure_sink, basic_sink, basic_source, basic_transform},
             start_topology, trace_init,
         },
     };
+
+    #[tokio::test(start_paused = true)]
+    async fn sink_reload_deadline_preserves_unread_buffers() {
+        trace_init();
+        let grace = Duration::from_secs(1);
+        let (_source_tx, source) = basic_source();
+        let mut config = Config::builder();
+        config.graceful_shutdown_duration = Some(grace);
+        config.add_source("in", source);
+        config.add_sink("out", &["in"], backpressure_sink(0));
+        config.add_sink("other", &["in"], backpressure_sink(0));
+        let mut replacement = config.clone();
+        let (mut received, sink) = basic_sink(1);
+        replacement.sinks[&ComponentKey::from("out")].inner = Box::new(sink);
+        let (_other_received, other_sink) = basic_sink(1);
+        replacement.sinks[&ComponentKey::from("other")].inner = Box::new(other_sink);
+
+        let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        let event = LogEvent::from("buffered before reload");
+        topology
+            .inputs
+            .get_mut(&ComponentKey::from("out"))
+            .unwrap()
+            .send(EventArray::Logs(vec![event.clone()]), None)
+            .await
+            .unwrap();
+
+        let started = tokio::time::Instant::now();
+        tokio::time::timeout(
+            grace * 3,
+            topology
+                .reload_config_and_respawn(replacement.build().unwrap(), ExtraContext::default()),
+        )
+        .await
+        .expect("reload did not cancel stalled sinks")
+        .unwrap();
+        assert_eq!(
+            started.elapsed(),
+            grace,
+            "sinks must share one reload deadline"
+        );
+        let forwarded = tokio::time::timeout(grace, received.next())
+            .await
+            .unwrap()
+            .unwrap();
+        vector_common::assert_event_data_eq!(forwarded.events, EventArray::Logs(vec![event]));
+        assert!(topology.stop().await);
+    }
 
     #[tokio::test]
     async fn pending_component_reloads_are_consumed_after_reload() {

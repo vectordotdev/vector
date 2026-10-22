@@ -132,7 +132,7 @@ async fn drive_event_loop(
             Err(error) => {
                 emit!(MqttConnectionError { error });
                 if input_done.is_cancelled() {
-                    return Err(());
+                    return Ok(());
                 }
             }
         }
@@ -162,13 +162,15 @@ mod tests {
     use super::drive_event_loop;
     use crate::{
         common::mqtt::MqttCommonConfig,
-        config::{SinkConfig, SinkContext},
+        config::{ComponentKey, Config, SinkConfig, SinkContext},
         event::{Event, LogEvent},
+        extra_context::ExtraContext,
         sinks::{
             VectorSink,
             mqtt::{MqttSinkConfig, config::MqttQoS},
         },
         template::Template,
+        test_util::{mock::basic_source, start_topology, trace_init},
     };
 
     const TEST_TIMEOUT: Duration = Duration::from_secs(10);
@@ -342,24 +344,104 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn drain_connection_error_fails_without_reconnecting() {
+    async fn drain_connection_error_finishes_sink_without_reconnecting() {
         tokio::time::timeout(TEST_TIMEOUT, async {
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let (client, connection) = client(listener.local_addr().unwrap().port(), 1);
-            publish(&client, QoS::ExactlyOnce, b"message").await;
-            let done = CancellationToken::new();
-            done.cancel();
-            drop(client);
-            let task = tokio::spawn(drive_event_loop(connection, done));
+            let sink = sink(listener.local_addr().unwrap().port(), MqttQoS::ExactlyOnce).await;
+            let task = tokio::spawn(sink.run_events([Event::Log(LogEvent::from("message"))]));
             let mut stream = accept_connection(&listener).await;
             assert_eq!(read_packet(&mut stream).await[0], 0x34);
             drop(stream);
-            assert!(task.await.unwrap().is_err());
+            task.await.unwrap().unwrap();
             assert!(
                 tokio::time::timeout(Duration::from_millis(100), listener.accept())
                     .await
                     .is_err()
             );
+        })
+        .await
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case::deadline(Some(Duration::from_millis(100)), false)]
+    #[case::unlimited(None, false)]
+    #[case::broker_disconnect(None, true)]
+    #[tokio::test]
+    async fn reload_drains_with_vector_shutdown_policy(
+        #[case] grace: Option<Duration>,
+        #[case] disconnect: bool,
+    ) {
+        trace_init();
+        tokio::time::timeout(TEST_TIMEOUT, async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let mqtt = MqttSinkConfig {
+                common: MqttCommonConfig {
+                    host: "127.0.0.1".into(),
+                    port: listener.local_addr().unwrap().port(),
+                    ..Default::default()
+                },
+                topic: Template::try_from("test").unwrap(),
+                quality_of_service: MqttQoS::ExactlyOnce,
+                ..Default::default()
+            };
+            let (mut input, source) = basic_source();
+            let mut config = Config::builder();
+            config.graceful_shutdown_duration = grace;
+            config.add_source("input", source);
+            config.add_sink("mqtt", &["input"], mqtt.clone());
+            let mut replacement = config.clone();
+            replacement.sinks[&ComponentKey::from("mqtt")].inner = Box::new(MqttSinkConfig {
+                retain: true,
+                ..mqtt
+            });
+            let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+            input
+                .send_event(Event::Log(LogEvent::from("before reload")))
+                .await
+                .unwrap();
+            let mut stream = accept_connection(&listener).await;
+            let publish = read_packet(&mut stream).await;
+            assert_eq!(publish[0], 0x34);
+
+            {
+                let mut reload = Box::pin(topology.reload_config_and_respawn(
+                    replacement.build().unwrap(),
+                    ExtraContext::default(),
+                ));
+                if grace.is_none() {
+                    tokio::time::timeout(Duration::from_millis(150), &mut reload)
+                        .await
+                        .expect_err("unlimited reload abandoned the QoS exchange");
+                    if disconnect {
+                        drop(stream);
+                    } else {
+                        assert!(!acknowledge(&mut stream, &publish).await);
+                        let release = read_packet(&mut stream).await;
+                        assert!(acknowledge(&mut stream, &release).await);
+                    }
+                }
+                reload.await.unwrap();
+            }
+            let mut replacement = accept_connection(&listener).await;
+            input
+                .send_event(Event::Log(LogEvent::from("after reload")))
+                .await
+                .unwrap();
+            let publish = read_packet(&mut replacement).await;
+            assert_eq!(
+                publish[0], 0x35,
+                "replacement retain setting was not applied"
+            );
+            let payload: serde_json::Value = serde_json::from_slice(&publish[10..]).unwrap();
+            assert_eq!(payload["message"], "after reload");
+            replacement
+                .write_all(&[0x50, 2, publish[8], publish[9]])
+                .await
+                .unwrap();
+            let release = read_packet(&mut replacement).await;
+            assert!(acknowledge(&mut replacement, &release).await);
+            assert!(topology.stop().await);
         })
         .await
         .unwrap();
