@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
-use rumqttc::{ConnectionError, EventLoop};
+use rumqttc::{AsyncClient, EventLoop};
 use tokio_util::sync::CancellationToken;
 
 use super::{
@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{common::mqtt::MqttConnector, internal_events::MqttConnectionError, sinks::prelude::*};
 
-/// Time that the event loop can use to send requests that are queued when the sink stops.
+/// Time that the event loop can use to send queued requests and finish QoS handshakes on shutdown.
 const STOPPED_SINK_FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub struct MqttSink {
@@ -75,6 +75,7 @@ impl MqttSink {
         // This is necessary to keep the mqtt event loop moving forward.
         crate::spawn_in_current_span(drive_event_loop(
             connection,
+            client.clone(),
             sink_stopped,
             STOPPED_SINK_FLUSH_TIMEOUT,
         ));
@@ -114,10 +115,11 @@ impl MqttSink {
 /// Polls the MQTT event loop until the sink stops.
 ///
 /// After `sink_stopped` is cancelled, the loop continues for at most `flush_timeout` to send
-/// queued requests. It ends earlier on `RequestsDone`, which `poll` reports while connected after
-/// the client is dropped and the queued requests are sent, or on the next connection error.
+/// queued requests and finish QoS handshakes, or until the next connection error. Retaining
+/// the client prevents `RequestsDone` from closing the socket before acknowledgements arrive.
 async fn drive_event_loop(
     mut connection: EventLoop,
+    _client: AsyncClient,
     sink_stopped: CancellationToken,
     flush_timeout: Duration,
 ) {
@@ -128,15 +130,10 @@ async fn drive_event_loop(
             // delivery guarantees.
             // We need this issue resolved first:
             // https://github.com/bytebeamio/rumqtt/issues/349
-            match connection.poll().await {
-                Ok(_) => {}
-                // The sink dropped its client. Polling again would reconnect to the broker.
-                Err(ConnectionError::RequestsDone) => break,
-                Err(error) => {
-                    emit!(MqttConnectionError { error });
-                    if sink_stopped.is_cancelled() {
-                        break;
-                    }
+            if let Err(error) = connection.poll().await {
+                emit!(MqttConnectionError { error });
+                if sink_stopped.is_cancelled() {
+                    break;
                 }
             }
         }
@@ -166,10 +163,11 @@ impl StreamSink<Event> for MqttSink {
 mod tests {
     use std::time::Duration;
 
-    use rumqttc::{AsyncClient, MqttOptions};
+    use rstest::rstest;
+    use rumqttc::{AsyncClient, MqttOptions, QoS};
     use tokio::{
-        io::AsyncWriteExt,
-        net::TcpListener,
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
         sync::mpsc::{UnboundedReceiver, unbounded_channel},
         task::JoinHandle,
     };
@@ -206,37 +204,88 @@ mod tests {
         AsyncClient::new(MqttOptions::new("vector-test", "127.0.0.1", port), 10)
     }
 
+    /// Reads the short MQTT packets used by these tests.
+    async fn read_packet(stream: &mut TcpStream) -> Vec<u8> {
+        let header = stream.read_u8().await.unwrap();
+        let len = stream.read_u8().await.unwrap();
+        assert!(len < 128, "test packet needs a multi-byte remaining length");
+        let mut packet = vec![0; usize::from(len) + 2];
+        packet[0] = header;
+        packet[1] = len;
+        stream.read_exact(&mut packet[2..]).await.unwrap();
+        packet
+    }
+
     #[tokio::test]
-    async fn event_loop_stops_without_reconnecting_after_client_is_dropped() {
-        let (port, mut connections, broker) = spawn_broker(true).await;
-        let (client, connection) = client(port);
-        drop(client);
+    async fn event_loop_completes_qos2_handshake_after_sink_stops() {
+        tokio::time::timeout(TEST_TIMEOUT, async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let (client, connection) = client(listener.local_addr().unwrap().port());
+            client
+                .publish("test", QoS::ExactlyOnce, false, "message")
+                .await
+                .unwrap();
+            let sink_stopped = CancellationToken::new();
+            sink_stopped.cancel();
+            let event_loop = tokio::spawn(drive_event_loop(
+                connection,
+                client,
+                sink_stopped,
+                Duration::from_secs(1),
+            ));
 
-        // The sink is still running, so only `RequestsDone` can end the loop.
-        tokio::time::timeout(
-            TEST_TIMEOUT,
-            drive_event_loop(connection, CancellationToken::new(), Duration::ZERO),
-        )
+            let (mut stream, _) = listener.accept().await.unwrap();
+            assert_eq!(read_packet(&mut stream).await[0], 0x10); // CONNECT
+            stream.write_all(&[0x20, 0x02, 0x00, 0x00]).await.unwrap(); // CONNACK
+            let publish = read_packet(&mut stream).await;
+            assert_eq!(publish[0], 0x34); // PUBLISH, QoS 2
+            assert_eq!(&publish[2..8], b"\x00\x04test");
+            assert_eq!(&publish[10..], b"message");
+            let pkid = &publish[8..10];
+
+            // Let the client poll with an empty request queue before acknowledging the publish.
+            tokio::time::timeout(Duration::from_millis(100), stream.read_u8())
+                .await
+                .expect_err("connection closed before PUBREC");
+            stream
+                .write_all(&[0x50, 0x02, pkid[0], pkid[1]])
+                .await
+                .unwrap(); // PUBREC
+            assert_eq!(
+                read_packet(&mut stream).await,
+                [0x62, 0x02, pkid[0], pkid[1]] // PUBREL
+            );
+            tokio::time::timeout(Duration::from_millis(100), stream.read_u8())
+                .await
+                .expect_err("connection closed before PUBCOMP");
+            stream
+                .write_all(&[0x70, 0x02, pkid[0], pkid[1]])
+                .await
+                .unwrap(); // PUBCOMP
+
+            event_loop.await.unwrap();
+            assert_eq!(stream.read(&mut [0]).await.unwrap(), 0);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), listener.accept())
+                    .await
+                    .is_err()
+            );
+        })
         .await
-        .expect("event loop kept polling after the client was dropped");
-        broker.abort();
-
-        assert_eq!(connections.recv().await, Some(()));
-        assert_eq!(connections.try_recv().ok(), None);
+        .expect("QoS 2 shutdown did not finish");
     }
 
     #[tokio::test]
     async fn event_loop_stops_retrying_after_sink_stops() {
         let (port, mut connections, broker) = spawn_broker(false).await;
         let (client, connection) = client(port);
-        drop(client);
         let sink_stopped = CancellationToken::new();
         sink_stopped.cancel();
 
         // The flush timeout is long, so only the connection error can end the loop.
         tokio::time::timeout(
             TEST_TIMEOUT,
-            drive_event_loop(connection, sink_stopped, Duration::from_hours(1)),
+            drive_event_loop(connection, client, sink_stopped, Duration::from_hours(1)),
         )
         .await
         .expect("event loop kept retrying after the sink stopped");
@@ -246,15 +295,25 @@ mod tests {
         assert_eq!(connections.try_recv().ok(), None);
     }
 
+    #[rstest]
+    #[case::idle(0)]
+    #[case::full_inflight_window(2)]
     #[tokio::test]
-    async fn event_loop_stops_after_flush_timeout_when_poll_is_blocked() {
+    async fn event_loop_stops_after_flush_timeout_when_poll_is_blocked(#[case] publishes: usize) {
         let (port, mut connections, broker) = spawn_broker(true).await;
-        // The client stays alive, so `poll` waits for requests and never reports `RequestsDone`.
-        let (_client, connection) = client(port);
+        let (client, mut connection) = client(port);
+        connection.mqtt_options.set_inflight(1);
+        for _ in 0..publishes {
+            client
+                .publish("test", QoS::ExactlyOnce, false, "message")
+                .await
+                .unwrap();
+        }
         let sink_stopped = CancellationToken::new();
 
         let event_loop = tokio::spawn(drive_event_loop(
             connection,
+            client,
             sink_stopped.clone(),
             Duration::from_millis(100),
         ));
@@ -269,5 +328,6 @@ mod tests {
             .expect("event loop kept polling after the flush timeout")
             .unwrap();
         broker.abort();
+        assert_eq!(connections.try_recv().ok(), None);
     }
 }
