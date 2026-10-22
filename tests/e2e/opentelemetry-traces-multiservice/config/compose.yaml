@@ -43,6 +43,10 @@ services:
       vector.otel-traces-multiservice.producer: "true"
   cart:
     image: ghcr.io/open-telemetry/demo:3.1.0-cart
+    # cartFailure points EmptyCart at `badhost:1234`. Resolve it to loopback so each of the
+    # client's connect retries is refused immediately instead of waiting on DNS/connect timeouts.
+    extra_hosts:
+      - "badhost:127.0.0.1"
     depends_on:
       flagd:
         condition: service_started
