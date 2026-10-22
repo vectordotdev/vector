@@ -48,8 +48,6 @@ tests belong with the composing type, not in a catch-all tests file for the crat
 When the same non-dynamic string literal is used more than once, prefer a
 [compile-time constant](https://doc.rust-lang.org/std/keyword.const.html) when reasonable.
 This reduces the risk of typos, especially for similar names such as event metadata fields.
-Take the opportunity to replace repeated raw string literals with constants when modifying
-existing code.
 
 ## Panics
 
