@@ -206,11 +206,15 @@ impl ComposeTest {
 
         // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
         // If using per-test runner: use test-specific features from test.yaml
-        args.push(if self.runner.is_shared_runner() {
-            format!("{},vendored", self.local_config.feature_flag)
-        } else {
-            format!("{},vendored", self.config.features.join(","))
-        });
+        // Integration suites compile only their own features: CI jobs never share a target
+        // directory, so compiling `all-integration-tests` in every job buys nothing.
+        args.push(
+            if self.runner.is_shared_runner() && self.local_config.kind == ComposeTestKind::E2E {
+                format!("{},vendored", self.local_config.feature_flag)
+            } else {
+                format!("{},vendored", self.config.features.join(","))
+            },
+        );
 
         // If the test field is not present then use the --lib flag
         match self.config.test {
