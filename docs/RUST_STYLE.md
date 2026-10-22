@@ -14,7 +14,9 @@ This is for consistency.
 
 ```rust
 use std::time::Duration;
+
 use governor::clock;
+
 use crate::config::TransformConfig;
 
 fn my_function() {
@@ -63,32 +65,15 @@ This reduces the risk of typos, especially for similar names such as event metad
 
 ## Code Organization
 
-Code is primarily split into two main directories: `lib/` and `src/`.
-
-### `lib/`: shared libraries, etc
-
-We use `lib` almost entirely for shared libraries and for isolating specific pieces of code. As
-Vector itself involves a large number of dependencies, it can be beneficial to move code into
-isolated crates under `lib/` in order to allow them not only to be shared, but also to reduce the
-amount of code that must be processed by helper tools like `cargo check` and `rust-analyzer` during
-normal development, which in turn speeds up the feedback loop between writing code and getting
-informed about errors, warnings, and so on.
-
-### `src/`: main binary and all related functionality
-
-The bulk of functional code resides in the `src/` directory/crate.  When we refer to functional
-code, we're talking about code that powers user-visible aspects of Vector, such as the sources,
-transforms, and sinks themselves. There is also, of course, the requisite glue code such as parsing
-command-line arguments, reading the configuration, constructing and configuring components, and
-wiring them together.
+- `lib/`: shared libraries and isolated crates. Use these boundaries to enable reuse and keep
+  dependency sets manageable.
+- `src/`: Vector's application, components, configuration loading, and topology wiring.
 
 ## Internal telemetry: logging, metrics, traces
 
-As a tool for ingesting, transforming, enriching, and shipping observability data, Vector has a
-significant amount of its own internal telemetry. This telemetry is primarily logging and metrics,
-but also includes some amount of tracing. Follow the
-[Instrumentation Specification](specs/instrumentation.md) for event emission and naming
-requirements; the examples below illustrate logging and metrics syntax.
+Emit component telemetry through internal events. Reuse existing events where possible; see the
+[Instrumentation Specification](specs/instrumentation.md) for emission and naming requirements.
+The examples below illustrate code inside event implementations.
 
 ### Logging
 
@@ -128,152 +113,76 @@ Debug formatting (`?error`).
 
 #### Writing a good log message
 
-In general, there are both a few rules and a few suggestions to follow when it comes to writing a
-(good) log message:
-
-- Messages must be written in English. No preference on which specific English dialect is used e.g.
-  American English, British English, Canadian English, etc.
-- Sentences must be capitalized, and end with a period.
-- Proper spelling and grammar when possible. Not all of us are native English speakers, and so this
-  is simply an ask, but not a hard requirement.
-- Identifiers, or passages of note, should be called out by some means i.e. wrapping them in
-  backticks or quotes.  Wrapping with special characters can be helpful in drawing the users eye to
-  anything of importance.
-- If it's longer than one or two sentences, it's probably better suited as a single sentence briefly
-  explaining the event, with a link to external documentation that explains further.
+- Write in English, capitalize sentences, and end them with a period.
+- Keep messages short. Link to documentation when an explanation needs more than two sentences.
+- Put variable values in structured fields; quote identifiers when they must appear in prose.
 
 #### Choosing the right log level
 
-Similarly, choosing the right level can be important, both from the perspective of making it easy
-for users to grok what they should pay attention to, but also to avoid the performance overhead of
-excess logging (even if we filter it out and it never makes it to the console).
-
-- **TRACE**: Typically contains a high level of detail for deep/rich debugging.
-
-  As trace logging is typically reached for when instrumenting algorithms and core pieces of logic,
-  care should be taken to avoid trace logging being added to tight loops, or commonly used
-  codepaths, where possible. Even when disabled, there can still be a small overhead associated with
-  logging an event at all.
-- **DEBUG**: Basic information that can be helpful for initially debugging issues.
-
-  Should typically not be used for things that happen per-event, or scales with event throughput,
-  but in some cases -- i.e. if it happens every 1000th event, etc -- it can safely be used.
-- **INFO**: Common information about normal processes.
-
-  This includes logical/temporal events such as notifications when components are stopped and
-  started, or other high-level events that, crucially, do not represent an event that an operator
-  needs to worry about.
-
-  Said another way, **INFO** is primarily there for information that lets them know that an action
-  they just took completed successfully, whether that's the server initially starting up
-  successfully, or reloading a configuration successfully, or exiting Vector after receiving
-  SIGTERM.
-- **WARN**: Something unexpected happened, but no data has been lost, nothing has crashed, and we
-  can recover from it without an issue. An operator might be interested in something at the **WARN**
-  level, but it shouldn't be informing them of things serious enough to require immediate attention.
-- **ERROR**: Data loss, unrecoverable errors, and anything else that will require an operator to
-  intervene and recover from. These should be rare so that they maintain a high signal-to-noise
-  ratio in the observability tooling that operators themselves are using.
+- **TRACE**: Detailed diagnostics. Avoid unnecessary work in hot paths, even when logging is disabled.
+- **DEBUG**: Troubleshooting information. Avoid logs proportional to event throughput unless rate limited.
+- **INFO**: Normal lifecycle events, such as startup, reload, and shutdown.
+- **WARN**: Unexpected conditions that operators should know about.
+- **ERROR**: Failed operations and component errors, including failures that can be retried.
+  Follow the instrumentation specification's error-event requirements; an error log does not
+  necessarily mean data was lost or the process cannot recover.
 
 ### Metrics
 
-For metrics, we use **[`metrics`](https://docs.rs/metrics/latest/metrics/)**, which like `tracing`,
-provides macros for emitting counters, gauges, and histograms.
+Use Vector's typed `counter!`, `gauge!`, and `histogram!` wrappers, re-exported by `vector_lib`,
+with `CounterName`, `GaugeName`, and `HistogramName`. Add new names to
+[`metric_name.rs`](../lib/vector-common/src/internal_event/metric_name.rs).
+Direct `metrics` macros with raw names are disallowed by [Clippy](../clippy.toml).
 
-#### Basic Usage
-
-There are three basic metric types: counters, gauges, and histograms. **Counters** are meant for
-counting things, such as the total number of requests processed, where the count only grows over
-time. This is also sometimes called a *monotonic counter*, or a *monotonically increasing* counter.
-**Gauges** are for tracking a single value that changes over time, and can go up and down, such as
-the number of current connections. **Histograms** are for tracking multiple observations of the same
-logical event, such as the time it takes to serve a request.
-
-Emitting metrics always involves a metric name and a value being measured. They can optionally
-accept descriptive labels:
+The wrappers return handles: update counters with `.increment()`, gauges with `.set()`,
+`.increment()`, or `.decrement()`, and histograms with `.record()`.
 
 ```rust
-// Counters can be incremented by an arbitrary amount, or `increment_counter!`
-// can be used to simply increment by one:
-counter!("bytes_sent_total", 212);
-increment_counter!("requests_processed_total", "service" => "admin_grpc");
+use std::time::Duration;
 
-// Gauges can be set to an absolute value, such as setting it to the latest value of an
-// external measurement, or it can be incremented and decremented by an arbitrary amount:
-gauge!("bytes_allocated", 42.0);
-increment_gauge!("bytes_allocated", 2048.0, "table_name" => self.table_name.to_string());
-increment_gauge!("bytes_allocated", 512.0, "table_name" => self.table_name.to_string());
-decrement_gauge!("bytes_allocated", 2560.0, "table_name" => self.table_name.to_string())
+use vector_lib::{
+    counter, gauge, histogram,
+    internal_event::{CounterName, GaugeName, HistogramName},
+};
 
-// Histograms simply record a measurement, but there's a fun little trait that `metrics`
-// uses called `IntoF64` that lets custom types provide a way to convert themselves to a
-// `f64`, which there's a default implementation of for `Duration`:
-let delta = Duration::from_micros(750);
-histogram!("request_duration_ns", delta);
-histogram!("request_duration_ns", 742_130, "endpoint" => "frontend");
+counter!(CounterName::HttpServerRequestsReceivedTotal).increment(1);
+gauge!(GaugeName::OpenConnections).set(42.0);
+gauge!(GaugeName::OpenConnections).increment(1.0);
+gauge!(GaugeName::OpenConnections).decrement(1.0);
+histogram!(HistogramName::HttpServerHandlerDurationSeconds, "status" => "200")
+    .record(Duration::from_micros(750));
 ```
 
-#### Avoiding pitfalls with gauges
+`metrics` converts `Duration` to seconds, so use a metric name with a seconds unit.
+See the [metrics API](https://docs.rs/metrics/0.24.6/metrics/) and existing
+[HTTP events](../src/internal_events/http.rs) for examples.
 
-Many values can appear, at first, to be best tracked as a gauge: current connection count, in-flight
-request count, and so on. However, in some cases, the value being measured may change too frequently
-to be reliably tracked.  Metrics are typically collected on an interval, which is fine for counters
-and histograms: they're purely additive.  However, since a gauge is simply the _latest_ value, you
-cannot know _how_ it's changed since the last time you've observed it.
+#### Choosing metric types
 
-This is a common problem where a gauge tracks something like a queue size. If there's an event where
-the queue grows rapidly but drains back down quickly, you may not ever observe the gauge having
-changed if your collection interval is greater than the duration of such events.
+- **Counters** track cumulative totals, such as requests or bytes processed.
+- **Gauges** track current values, such as open connections or queue size. Scrapes can miss
+  short-lived peaks; cumulative enqueue/dequeue counters can expose activity between scrapes,
+  but do not recover the peak queue size.
+- **Histograms** track distributions, such as request latency or batch size. Their observation
+  count is not necessarily an event count: one sample may represent a whole batch.
 
-A simple pattern to follow to handle these scenarios is to use two counters -- one for the
-increments, one for the decrements -- so that you can graph the difference between them, giving you
-the equivalent of the "current" value. In our example above, we might have `queue_items_pushed` and
-`queued_items_popped`, and if `queue_items_pushed` equals 100, and `queued_items_popped` equals 80,
-we know our queue size is 20. More importantly, if we queried both of them at the same time, and
-they were both zero, and then queried them both a second later, and saw that both were 100,000, we
-would know that the queue size was _currently_ zero but we'd also know that we just processed
-100,000 items in the past second.
+#### Best practices
 
-#### Best Practices
-
-- **Do** attempt to limit the cardinality, or number of unique values, of label values. If the
-  number of unique values for a label grows over time, this can represent a large amount of consumed
-  memory. This is a problem we expect to be fixed in the medium-term
-  ([#11995](https://github.com/vectordotdev/vector/issues/11995)) but is a good rule to follow
-  unless there's a competing reason to do so, such as when following the guidelines in the
-  [Component
-  Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md).
-- **Don't** emit metrics in tight loops. Each metric emission carries an overhead, and emitting them
-  in tight loops can cause that overhead to become noticeable in terms of CPU usage and throughput
-  reduction. Instead of incrementing a counter every time a loop iteration occurs, you might
-  consider incrementing a local variable instead, and then emitting that sum after the loop is over.
-- **Don't** update a counter to measure the total number of operations/events/etc if you're already
-  tracking a histogram of those operations/events/etc. Histograms have a `count` property that
-  counts how many samples the histogram has recorded, as well as a `sum` property that is a sum of
-  the value of all samples the histogram has recorded. This means you can potentially get three
-  metrics for the cost of emitting one.
+- Bound label cardinality. Metric expiration removes idle series; it does not bound the number
+  of active label combinations. Follow the component specification when particular labels are required.
+- Batch metric updates where possible instead of emitting on every iteration of a tight loop.
+- Reuse registered events and cached handles for frequent updates; see
+  [`registered_event!`](../lib/vector-common/src/internal_event/mod.rs).
+- Avoid redundant counters only when the histogram exposes the same quantity with the same labels
+  through the relevant exporter. Preserve counters required by the component specification.
 
 ## Dependencies
 
 ### Error handling
 
-For error handling, there are two parts: _creating errors_ and _working with errors_.
-
-For **creating errors**, we prefer **[`snafu`](https://docs.rs/snafu)**. The `snafu` crate provides
-a derive for generating the boilerplate `std::error::Error` implementation on your custom error
-struct or enum. It additionally provides helpers for defining the `Display` output for your error
-(potentially on a per-variant basis when working with enums).
-
-While there are popular alternatives such as [`failure`](https://docs.rs/failure) and
-[`thiserror`](https://docs.rs/thiserror), they generally lack either the thoroughness in
-documentation or the flexibility of `snafu`.
-
-For **working with errors**, we have a more lax approach. At the highest level, we use a boxed trait
-approach -- `Box<dyn std::error::Error + Send + Sync + 'static>` -- for maximum flexibility. This
-allows developers to avoid needing to _always_ derive custom error types in order to return errors
-back up the call stack. This does not prevent, and indeed, should not discourage developers from
-using `snafu` to create rich error types that provide additional context, whether through
-descriptive error messages, source errors, or backtraces.
+Prefer [`snafu`](https://docs.rs/snafu) for structured errors with context and source errors.
+Use `vector_lib::Error` (a boxed `std::error::Error + Send + Sync + 'static`) at boundaries that
+need to accept different error types. Preserve useful context when propagating errors.
 
 #### Panics
 
@@ -285,53 +194,35 @@ Code in Vector should **NOT** panic under normal circumstances.
 
 ### Concurrency and synchronization
 
-Prefer `std::sync` primitives such as `Mutex` and `RwLock` for synchronous code.
-
-In async code, synchronous locks can block runtime threads and cause deadlocks. Use Tokio's
-async primitives when needed; see the
-[`tokio::sync::Mutex` documentation](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html)
-for guidance on choosing between synchronous and async mutexes.
+Prefer `std::sync` locks for short critical sections that do not cross `.await`, including in
+async code. Do not hold a synchronous lock across `.await` or block runtime threads on long work.
+Use Tokio's async locks when a guard must span `.await`; see
+[`tokio::sync::Mutex`](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html).
 
 #### Atomics
 
-In general, we strive to use the atomic types in the [standard
-library](https://doc.rust-lang.org/stable/std/sync/atomic/index.html) when possible, as they are the
-most portable and well-tested. In cases where the standard library atomics cannot be used, such as
-when using a 64-bit atomic but wanting to support a 32-bit platform, or support a platform without
-atomic instructions at all, we prefer to use
-**[`crossbeam-utils`](https://docs.rs/crossbeam-utils)** and its `AtomicCell` helper. This type will
-automatically handle either using native atomic support or ensuring mutually exclusive access, and
-handle it in a transparent way. It uses a fixed acquire/release ordering that generally provides the
-expected behavior when using atomics, but may not be suitable for usages which require stronger
-ordering.
+Prefer [standard-library atomics](https://doc.rust-lang.org/std/sync/atomic/index.html).
+Choose memory ordering to match the synchronization requirements.
+
+Use [`crossbeam_utils::atomic::AtomicCell`](https://docs.rs/crossbeam-utils/latest/crossbeam_utils/atomic/struct.AtomicCell.html)
+when a suitable standard atomic type is unavailable. It can fall back to locks; use
+`AtomicCell::is_lock_free()` when lock-free operation matters. Its loads use acquire ordering
+and stores use release ordering; use standard atomics when explicit ordering control is required.
 
 #### Global state
 
-When there is a need or desire to share global state, there are a few options depending on the
-required constraints.
+Use [`LazyLock`](https://doc.rust-lang.org/std/sync/struct.LazyLock.html) for values initialized
+on first access, or [`OnceLock`](https://doc.rust-lang.org/std/sync/struct.OnceLock.html) when
+initialization needs runtime inputs. Prefer these standard types over `once_cell` and `lazy_static`.
 
-If you're working with data that _never changes after initialization_,
-we prefer `std::sync::OnceLock` over **[`once_cell`](https://docs.rs/once_cell)** or
-[`lazy_static`](https://docs.rs/lazy-static). It is slightly faster and provides a richer API than
-`lazy_static`, and has equivalent features to the `once_cell` version.
-
-If you're working with data that _changes over time_, but has a very high read-to-write ratio, such
-as _many readers_, but _one writer_ and infrequent writes, we prefer
-**[`arc-swap`](https://docs.rs/arc-swap)**.  The main feature of this crate is allowing a piece of
-data to be atomically updated while being shared concurrently. It does this by wrapping all data in
-`Arc<T>` to provide the safe, concurrent access, while adding the ability to atomically swap the
-`Arc<T>` itself. As it cannot be constructed in a const fashion, `arc-swap` pairs well with
-`std::sync::OnceLock` for actually storing it in a global static variable.
+For shared snapshots with frequent reads and infrequent replacements, prefer
+[`arc-swap`](https://docs.rs/arc-swap). It atomically replaces an `Arc<T>` while readers retain
+access to their snapshots. Use `LazyLock` or `OnceLock` when storing it in a static.
 
 #### Concurrent data structures
 
-When there is a need for a concurrent and _indexable_ storage, we prefer
-**[`sharded-slab`](https://docs.rs/sharded-slab)**.  This crate provides a means to insert items
-such that the caller gets back to the index by which it can access the item again in the future.
-Additionally, when an item is removed, its storage can be reused by future inserts, making
-`sharded-slab` a good choice for long-running processes where memory allocation reduction is
-paramount. There is also a pool data structure based on the same underlying design of the slab
-itself for use cases where pooling is desired.
+For concurrent indexed storage, prefer [`sharded-slab`](https://docs.rs/sharded-slab).
+It reuses storage after entries are removed and also provides a pool for reusable objects.
 
 ## Feature Flags
 
@@ -341,14 +232,18 @@ New components (sources, sinks, transforms) must be behind feature flags:
 
 ```bash
 # Build only specific component for faster iteration
-cargo test --lib --no-default-features --features sinks-console sinks::console
+make test FEATURES="sinks-console" SCOPE="sinks::console"
 ```
 
 See the `features` section in [`Cargo.toml`](../Cargo.toml) for examples.
 
 ### Cargo Dependency Feature Placement
 
-[Cargo features are additive](https://doc.rust-lang.org/cargo/reference/features.html#feature-unification): once any crate in the dependency graph enables a feature, it is enabled for the entire build. This can be surprising — enabling a feature in one crate silently turns it on everywhere.
+[Cargo features are additive](https://doc.rust-lang.org/cargo/reference/features.html#feature-unification).
+Cargo combines features requested for the same dependency, subject to
+[resolver boundaries](https://doc.rust-lang.org/cargo/reference/resolver.html#feature-resolver-version-2)
+for build dependencies, targets, and dev dependencies. Declare the features each crate needs;
+do not rely on another crate enabling them incidentally.
 
 Always set `default-features = false` in `[workspace.dependencies]`. For feature declarations, the rule is simple:
 
@@ -361,28 +256,21 @@ Add a short comment near the dependency when the feature setup is non-obvious.
 
 ```bash
 # Show the full feature tree for the workspace
-cargo tree -e features
+cargo tree --workspace -e features
 
 # Narrow down to a specific dependency
 cargo tree -e features -i <crate-name>
 ```
 
-The `-i` flag shows which crates depend on `<crate-name>` and which features they activate, useful for tracing where a feature is coming from. If a feature only appears because another crate enables it, and your crate relies on that feature being present, declare it explicitly — otherwise your crate silently breaks if the other crate ever stops enabling it.
+The `-i` flag shows which packages enable the dependency's features. Check the package and feature
+selection you intend to build; a workspace-wide build can hide missing feature declarations.
 
 ## New Configuration Fields vs CLI flags
 
-Vector makes the distinction between configuration items that are essential to understand data
-pipelines and runtime flags that determine the details of the runtime behavior. The main configuration
-generally lives in a file in the current directory or in `/etc/vector`.
+Use configuration fields for the data pipeline: sources, transforms, sinks, and persistent buffers.
+Use CLI flags for process behavior such as shutdown timing.
 
-Examples of main configuration fields are source, transformation, and sink declaration, as well as
-information about where any disk buffers should be persisted.
-
-For configuration items that purely inform details of Vector's runtime behavior, CLI flags without
-corresponding configuration fields should be used.
-
-An example of a runtime flag is
-`vector run --no-graceful-shutdown-limit`, which tells Vector to ignore SIGINTs and to continue running
-as normal until a SIGKILL is received. In this case, as the configuration describes the desired runtime
-behavior in a specific environment and not to the underlying data pipeline, no corresponding field in
-the configuration file should exist.
+For example, `vector --no-graceful-shutdown-limit` removes the timeout on graceful shutdown after
+SIGINT or SIGTERM. Vector still starts shutting down and exits when draining finishes; a further
+shutdown signal can force it to quit. See [`Opts`](../src/cli.rs) and the
+[shutdown handler](../src/app.rs).
