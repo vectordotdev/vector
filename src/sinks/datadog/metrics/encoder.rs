@@ -511,7 +511,7 @@ fn sketch_to_proto_message(
     let host_key = log_schema.host_key().map(ToString::to_string);
     let host = host_key
         .as_deref()
-        .and_then(|key| tag_value(metric_tags, key))
+        .and_then(|key| metric_tags.and_then(|tags| tags.get(key)))
         .unwrap_or_default()
         .to_owned();
     let tags = encode_tag_pairs(
@@ -586,7 +586,8 @@ pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> Seri
     if let Some(host_key) = host_key.as_deref() {
         resources.push((
             "host".to_owned(),
-            tag_value(metric_tags, host_key)
+            metric_tags
+                .and_then(|tags| tags.get(host_key))
                 .unwrap_or_default()
                 .to_owned(),
         ));
@@ -594,7 +595,7 @@ pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> Seri
 
     // The Agent source preserves `device` as a plain tag for v1/v2 compatibility.
     if host_key.as_deref() != Some("device")
-        && let Some(device) = tag_value(metric_tags, "device")
+        && let Some(device) = metric_tags.and_then(|tags| tags.get("device"))
     {
         resources.push(("device".to_owned(), device.to_owned()));
     }
@@ -602,7 +603,8 @@ pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> Seri
     let source_type_name = if host_key.as_deref() == Some("source_type_name") {
         String::new()
     } else {
-        tag_value(metric_tags, "source_type_name")
+        metric_tags
+            .and_then(|tags| tags.get("source_type_name"))
             .unwrap_or_default()
             .to_owned()
     };
@@ -775,10 +777,6 @@ fn encode_tag(name: &str, value: Option<&str>) -> String {
         Some(value) => format!("{name}:{value}"),
         None => name.into(),
     }
-}
-
-fn tag_value<'a>(tags: Option<&'a MetricTags>, name: &str) -> Option<&'a str> {
-    tags.and_then(|tags| tags.get(name))
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
