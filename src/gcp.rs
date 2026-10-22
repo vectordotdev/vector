@@ -215,7 +215,9 @@ impl GcpAuthenticator {
         }
     }
 
-    fn apply_uri_v1(&self, uri: &mut UriV1) {
+    /// # Panics
+    /// Panics if adding the API key produces an invalid URI.
+    pub fn apply_uri_v1(&self, uri: &mut UriV1) {
         match self {
             Self::Credentials(_) | Self::None => (),
             Self::ApiKey(api_key) => {
