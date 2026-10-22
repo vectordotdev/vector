@@ -2,13 +2,12 @@ use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
-use vector_common::internal_event::{ComponentEventsDropped, INTENTIONAL, emit};
+use vector_common::internal_event::emit;
 use vector_config::configurable_component;
 use vector_core::serde::AsciiChar;
 
 use super::BoxedFramingError;
-
-const OVERSIZED_FRAME_DROPPED_REASON: &str = "Frame exceeded max_length.";
+use crate::internal_events::DecoderFrameTooLongError;
 
 /// The behavior to apply when a frame exceeds the maximum allowed byte size.
 #[configurable_component]
@@ -167,14 +166,9 @@ impl Decoder for CharacterDelimitedDecoder {
                     if next_delimiter_idx > self.max_length {
                         match self.oversized_action {
                             OversizedAction::Drop => {
-                                warn!(
-                                    message = "Discarding frame larger than max_length.",
-                                    buf_len = buf.len(),
-                                    max_length = self.max_length,
-                                );
-                                emit(ComponentEventsDropped::<INTENTIONAL> {
-                                    count: 1,
-                                    reason: OVERSIZED_FRAME_DROPPED_REASON,
+                                emit(DecoderFrameTooLongError {
+                                    length: next_delimiter_idx,
+                                    max_length: self.max_length,
                                 });
                                 buf.advance(next_delimiter_idx + 1);
                             }
@@ -213,14 +207,9 @@ impl Decoder for CharacterDelimitedDecoder {
                 } else if buf.len() > self.max_length {
                     match self.oversized_action {
                         OversizedAction::Drop => {
-                            warn!(
-                                message = "Discarding frame larger than max_length.",
-                                buf_len = buf.len(),
-                                max_length = self.max_length,
-                            );
-                            emit(ComponentEventsDropped::<INTENTIONAL> {
-                                count: 1,
-                                reason: OVERSIZED_FRAME_DROPPED_REASON,
+                            emit(DecoderFrameTooLongError {
+                                length: buf.len(),
+                                max_length: self.max_length,
                             });
                             buf.clear();
                             Ok(None)
@@ -286,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn decode_drop_emits_intentional_discarded_events() {
+    fn decode_drop_emits_frame_too_long_error() {
         use vector_core::{
             event::MetricValue,
             metrics::{Controller, init_test},
@@ -301,21 +290,30 @@ mod tests {
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("ok")));
         assert_eq!(codec.decode_eof(buf).unwrap(), None);
 
-        let discarded = Controller::get()
+        let metrics = Controller::get()
             .expect("There must be a controller")
-            .capture_metrics()
-            .into_iter()
-            .filter(|metric| metric.name() == "component_discarded_events_total")
+            .capture_metrics();
+
+        let errors = metrics
+            .iter()
+            .filter(|metric| metric.name() == "component_errors_total")
             .collect::<Vec<_>>();
-        assert_eq!(discarded.len(), 1);
-        assert_eq!(
-            discarded[0].tags().and_then(|tags| tags.get("intentional")),
-            Some("true")
-        );
-        let MetricValue::Counter { value } = discarded[0].value() else {
-            panic!("component_discarded_events_total has invalid type")
+        assert_eq!(errors.len(), 1);
+        let tags = errors[0].tags().expect("component_errors_total has tags");
+        assert_eq!(tags.get("error_code"), Some("decoder_frame_too_long"));
+        assert_eq!(tags.get("error_type"), Some("parser_failed"));
+        assert_eq!(tags.get("stage"), Some("processing"));
+        let MetricValue::Counter { value } = errors[0].value() else {
+            panic!("component_errors_total has invalid type")
         };
         assert!((*value - 2.0).abs() < f64::EPSILON);
+
+        // Frames are dropped before any event exists, so no events are counted as discarded.
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| metric.name() == "component_discarded_events_total")
+        );
     }
 
     // Regression test for [infinite loop bug](https://github.com/vectordotdev/vector/issues/2564)
