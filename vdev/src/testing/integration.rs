@@ -9,7 +9,9 @@ use super::{
     config::{
         ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
     },
-    runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _},
+    runner::{
+        ContainerTestRunner as _, IntegrationTestRunner, RUNNER_TARGET_PATH, TestRunner as _,
+    },
 };
 use crate::{
     app::CommandExt as _,
@@ -28,6 +30,13 @@ fn docker_image_exists(image_name: &str) -> Result<bool> {
     let output =
         docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"]).check_output()?;
     Ok(output.lines().any(|line| line == image_name))
+}
+
+fn e2e_vector_image_name() -> String {
+    format!(
+        "vector-e2e-vector-{}:latest",
+        RustToolchainConfig::rust_version()
+    )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -125,7 +134,12 @@ impl ComposeTest {
             compose.is_some().then_some(network_name),
         )?;
 
-        env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
+        let vector_image = if local_config.kind == ComposeTestKind::E2E && !coverage {
+            e2e_vector_image_name()
+        } else {
+            runner.image_name()
+        };
+        env_config.insert("VECTOR_IMAGE".to_string(), Some(vector_image));
 
         let compose_test = ComposeTest {
             local_config,
@@ -203,14 +217,7 @@ impl ComposeTest {
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
-
-        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
-        // If using per-test runner: use test-specific features from test.yaml
-        args.push(if self.runner.is_shared_runner() {
-            format!("{},vendored", self.local_config.feature_flag)
-        } else {
-            format!("{},vendored", self.config.features.join(","))
-        });
+        args.push(self.cargo_features());
 
         // If the test field is not present then use the --lib flag
         match self.config.test {
@@ -254,16 +261,93 @@ impl ComposeTest {
         Ok(())
     }
 
+    /// If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
+    /// If using per-test runner: use test-specific features from test.yaml
+    fn cargo_features(&self) -> String {
+        if self.runner.is_shared_runner() {
+            format!("{},vendored", self.local_config.feature_flag)
+        } else {
+            format!("{},vendored", self.config.features.join(","))
+        }
+    }
+
+    /// Build the Vector binary inside the test runner, into the same target directory and
+    /// with the same features the test binary uses, then snapshot it into the image that
+    /// the compose `vector` services run. The later `cargo nextest run` reuses these
+    /// artifacts instead of compiling Vector a second time.
+    fn build_vector_in_runner(&self) -> Result<()> {
+        self.runner.ensure_network()?;
+        self.runner.ensure_external_volumes()?;
+        self.runner
+            .ensure_running(Some(&self.config.features), &self.env_config, false)?;
+
+        let container = self.runner.container_name();
+        let features = self.cargo_features();
+        let target_dir = format!("CARGO_BUILD_TARGET_DIR={RUNNER_TARGET_PATH}");
+        // Compile exactly what `cargo nextest run` will compile (integration test targets
+        // also build the `vector` binary), so dev-dependency feature unification matches and
+        // the test phase does not recompile Vector.
+        let mut build = docker_command(["exec", "--env", &target_dir, &container]);
+        build.args([
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--no-default-features",
+            "--features",
+            &features,
+        ]);
+        match self.config.test {
+            Some(ref test_arg) => build.args(["--test", test_arg]),
+            None => build.arg("--lib"),
+        };
+        build.check_run()?;
+
+        let binary = format!("{RUNNER_TARGET_PATH}/debug/vector");
+        let digest = docker_command(["exec", &container, "sha256sum", &binary]).check_output()?;
+        let digest = digest
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let image = e2e_vector_image_name();
+        let existing = docker_command([
+            "image",
+            "inspect",
+            "--format",
+            "{{ index .Config.Labels \"vector.e2e.binary\" }}",
+            &image,
+        ])
+        .check_output()
+        .unwrap_or_default();
+        if existing.trim() == digest {
+            info!("Reusing {image}: Vector binary unchanged");
+            return Ok(());
+        }
+        docker_command(["exec", &container, "cp", &binary, "/usr/bin/vector"]).check_run()?;
+        docker_command([
+            "commit",
+            "--change",
+            &format!("LABEL vector.e2e.binary={digest}"),
+            &container,
+            &image,
+        ])
+        .check_run()
+    }
+
     pub(crate) fn start(&self) -> Result<()> {
-        // For end-to-end tests, we want to run vector as a service, leveraging the
-        // image for the runner. So we must build that image before starting the
-        // compose so that it is available.
+        // For end-to-end tests, we want to run vector as a service. Build it in the runner
+        // so the compile is shared with the test binary.
         if self.local_config.kind == ComposeTestKind::E2E {
-            self.runner.build(
-                Some(&self.config.features),
-                &self.env_config,
-                true, // E2E tests build Vector in the image
-            )?;
+            if self.coverage {
+                self.runner.build(
+                    Some(&self.config.features),
+                    &self.env_config,
+                    true, // Coverage keeps the image-based Vector build
+                )?;
+            } else {
+                self.build_vector_in_runner()?;
+            }
         }
 
         self.config.check_required()?;
