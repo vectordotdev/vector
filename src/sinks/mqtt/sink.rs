@@ -1,15 +1,13 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
-use rumqttc::{Event as MqttNotification, EventLoop, Incoming, Outgoing};
+use rumqttc::{ConnectionError, EventLoop};
 use tokio_util::sync::CancellationToken;
 
 use super::{
     MqttSinkConfig,
     config::MqttQoS,
     request_builder::{MqttEncoder, MqttRequestBuilder},
-    service::{MqttClient, MqttService},
+    service::MqttService,
 };
 use crate::{common::mqtt::MqttConnector, internal_events::MqttConnectionError, sinks::prelude::*};
 
@@ -65,11 +63,10 @@ impl MqttSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let (client, connection) = self.connector.connect();
-        let client = Arc::new(MqttClient::new(client));
         let input_done = CancellationToken::new();
 
         let service = ServiceBuilder::new().service(MqttService {
-            client: Arc::clone(&client),
+            client,
             quality_of_service: self.quality_of_service,
             retain: self.retain,
         });
@@ -105,119 +102,38 @@ impl MqttSink {
                 input_done.cancel();
                 result
             },
-            drive_event_loop(connection, client, input_done.clone()),
+            drive_event_loop(connection, input_done.clone()),
         );
         result.and(drained)
     }
 }
 
-#[derive(Clone, Copy, Default)]
-struct PublishState {
-    awaiting_ack: bool,
-    awaiting_comp: bool,
-}
-
-/// Associates terminal acknowledgements with publishes, including replay and packet-ID reuse.
-struct PublishTracker {
-    states: Vec<PublishState>,
-}
-
-impl PublishTracker {
-    fn new(max_inflight: u16) -> Self {
-        Self {
-            states: vec![PublishState::default(); usize::from(max_inflight) + 1],
-        }
-    }
-
-    fn completed(&mut self, event: MqttNotification) -> usize {
-        let awaiting = match event {
-            MqttNotification::Outgoing(Outgoing::Publish(0)) => return 1,
-            MqttNotification::Outgoing(Outgoing::Publish(pkid)) => {
-                self.states[usize::from(pkid)].awaiting_ack = true;
-                return 0;
-            }
-            MqttNotification::Outgoing(Outgoing::PubRel(pkid)) => {
-                let state = &mut self.states[usize::from(pkid)];
-                state.awaiting_ack = false;
-                state.awaiting_comp = true;
-                return 0;
-            }
-            MqttNotification::Incoming(Incoming::PubAck(ack)) => self
-                .states
-                .get_mut(usize::from(ack.pkid))
-                .map(|state| &mut state.awaiting_ack),
-            MqttNotification::Incoming(Incoming::PubComp(ack)) => self
-                .states
-                .get_mut(usize::from(ack.pkid))
-                .map(|state| &mut state.awaiting_comp),
-            _ => return 0,
-        };
-        // rumqttc can leave an unsolicited acknowledgement in its event queue after an error.
-        // Only retire a publish in the corresponding phase. Replay can reuse an ID while an
-        // earlier PUBREL is still outstanding, so the two phases are tracked independently.
-        awaiting.map_or(0, |awaiting| usize::from(std::mem::take(awaiting)))
-    }
-
-    fn reset(&mut self) {
-        self.states.fill(PublishState::default());
-    }
-}
-
-/// Drains queued publishes and QoS exchanges after input ends, without a sink-local deadline.
-/// Retaining the client prevents `RequestsDone` from closing the socket before acknowledgements.
+/// Dropping the driver's clients lets rumqttc drain queued requests and QoS exchanges.
+/// In 0.34, `RequestsDone` is returned only after that outbound work has completed.
 async fn drive_event_loop(
     mut connection: EventLoop,
-    client: Arc<MqttClient>,
     input_done: CancellationToken,
 ) -> Result<(), ()> {
-    let mut tracker = PublishTracker::new(connection.mqtt_options.inflight());
-    let mut draining = false;
-    loop {
-        draining |= input_done.is_cancelled();
-        if draining && !client.has_pending() {
+    if input_done.is_cancelled() {
+        let state = connection.diagnostics();
+        if state.queues.requests_rx_len == 0
+            && state.queues.pending_len == 0
+            && state.outbound.outbound_drained
+        {
+            // Empty input needs no connection, including when the broker is unavailable.
             return Ok(());
         }
+    }
 
-        // On a fresh broker session rumqttc discards its replay queue and any collided publish.
-        // Those publishes must also leave our count. Requests still in the client channel remain.
-        let replayed = if connection.network.is_none() {
-            connection.pending.len() + usize::from(connection.state.collision.is_some())
-        } else {
-            0
-        };
-        let result = {
-            let poll = connection.poll();
-            tokio::pin!(poll);
-            tokio::select! {
-                result = &mut poll => result,
-                () = input_done.cancelled(), if !draining => {
-                    draining = true;
-                    if !client.has_pending() {
-                        return Ok(());
-                    }
-                    // Do not cancel an in-progress write just because input ended.
-                    poll.await
-                }
-            }
-        };
-
-        match result {
-            Ok(MqttNotification::Incoming(Incoming::ConnAck(ack))) if !ack.session_present => {
-                client.complete(replayed);
-            }
-            Ok(event) => client.complete(tracker.completed(event)),
+    loop {
+        match connection.poll().await {
+            Ok(_) => {}
+            Err(ConnectionError::RequestsDone) => return Ok(()),
             Err(error) => {
                 emit!(MqttConnectionError { error });
                 if input_done.is_cancelled() {
                     return Err(());
                 }
-                // A network read can process several acknowledgements before a later read fails.
-                // Consume those buffered events before replay so each publish is counted once.
-                while let Some(event) = connection.state.events.pop_front() {
-                    client.complete(tracker.completed(event));
-                }
-                // Replay will register packet IDs again, without counting new submissions.
-                tracker.reset();
             }
         }
     }
@@ -232,11 +148,11 @@ impl StreamSink<Event> for MqttSink {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::time::Duration;
 
     use bytes::Bytes;
     use rstest::rstest;
-    use rumqttc::{AsyncClient, EventLoop, MqttOptions, QoS};
+    use rumqttc::{AsyncClient, EventLoop, MqttOptions, PublishOptions, QoS};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
@@ -250,7 +166,7 @@ mod tests {
         event::{Event, LogEvent},
         sinks::{
             VectorSink,
-            mqtt::{MqttSinkConfig, config::MqttQoS, service::MqttClient},
+            mqtt::{MqttSinkConfig, config::MqttQoS},
         },
         template::Template,
     };
@@ -274,16 +190,19 @@ mod tests {
         .0
     }
 
-    fn client(port: u16, inflight: u16) -> (Arc<MqttClient>, EventLoop) {
-        let mut options = MqttOptions::new("vector-test", "127.0.0.1", port);
+    fn client(port: u16, inflight: u16) -> (AsyncClient, EventLoop) {
+        let mut options = MqttOptions::new("vector-test", ("127.0.0.1", port));
         options.set_clean_session(false).set_inflight(inflight);
-        let (client, connection) = AsyncClient::new(options, 10);
-        (Arc::new(MqttClient::new(client)), connection)
+        AsyncClient::builder(options).capacity(10).build()
     }
 
-    async fn publish(client: &MqttClient, qos: QoS, payload: &'static [u8]) {
+    async fn publish(client: &AsyncClient, qos: QoS, payload: &'static [u8]) {
         client
-            .publish("test".into(), qos, false, Bytes::from_static(payload))
+            .publish(
+                "test",
+                Bytes::from_static(payload),
+                PublishOptions::new(qos),
+            )
             .await
             .unwrap();
     }
@@ -302,14 +221,16 @@ mod tests {
 
     async fn accept_connection(listener: &TcpListener) -> TcpStream {
         let (mut stream, _) = listener.accept().await.unwrap();
-        assert_eq!(read_packet(&mut stream).await[0], 0x10);
+        let connect = read_packet(&mut stream).await;
+        assert_eq!(connect[0], 0x10);
+        assert_eq!(&connect[2..9], b"\x00\x04MQTT\x04", "expected MQTT 3.1.1");
         stream.write_all(&[0x20, 0x02, 0x00, 0x00]).await.unwrap();
         stream
     }
 
     /// Acknowledges publishes and releases, returning true for a completed QoS exchange.
     async fn acknowledge(stream: &mut TcpStream, packet: &[u8]) -> bool {
-        let (header, pkid, complete) = match packet[0] {
+        let (header, pkid, complete) = match packet[0] & !0x08 {
             0x32 => (0x40, &packet[8..10], true),
             0x34 => (0x50, &packet[8..10], false),
             0x62 => (0x70, &packet[2..4], true),
@@ -428,7 +349,8 @@ mod tests {
             publish(&client, QoS::ExactlyOnce, b"message").await;
             let done = CancellationToken::new();
             done.cancel();
-            let task = tokio::spawn(drive_event_loop(connection, client, done));
+            drop(client);
+            let task = tokio::spawn(drive_event_loop(connection, done));
             let mut stream = accept_connection(&listener).await;
             assert_eq!(read_packet(&mut stream).await[0], 0x34);
             drop(stream);
@@ -456,7 +378,8 @@ mod tests {
             }
             let done = CancellationToken::new();
             done.cancel();
-            let task = tokio::spawn(drive_event_loop(connection, client, done));
+            drop(client);
+            let task = tokio::spawn(drive_event_loop(connection, done));
             let mut stream = accept_connection(&listener).await;
             let mut completed = 0;
             while completed < 4 {
@@ -490,11 +413,7 @@ mod tests {
             publish(&client, qos, b"message").await;
             publish(&client, qos, b"message").await;
             let done = CancellationToken::new();
-            let task = tokio::spawn(drive_event_loop(
-                connection,
-                Arc::clone(&client),
-                done.clone(),
-            ));
+            let task = tokio::spawn(drive_event_loop(connection, done.clone()));
             let mut stream = accept_connection(&listener).await;
             let packet = read_packet(&mut stream).await;
             if released {
@@ -519,16 +438,15 @@ mod tests {
                 .write_all(&[0x20, 2, u8::from(session_present), 0])
                 .await
                 .unwrap();
+            drop(client);
             done.cancel();
-            let expected = if session_present { 3 } else { 1 };
-            let mut completed = 0;
             let mut saw_new_publish = false;
-            while completed < expected {
+            while stream.peek(&mut [0]).await.unwrap() != 0 {
                 let packet = read_packet(&mut stream).await;
                 if packet[0] >> 4 == 3 {
                     saw_new_publish |= &packet[10..] == b"later";
                 }
-                completed += usize::from(acknowledge(&mut stream, &packet).await);
+                acknowledge(&mut stream, &packet).await;
             }
             assert!(
                 saw_new_publish,
@@ -546,19 +464,17 @@ mod tests {
         let (client, connection) = client(0, 1);
         assert!(
             client
-                .publish("invalid/#".into(), QoS::AtLeastOnce, false, Bytes::new())
+                .publish("invalid/#", Bytes::new(), PublishOptions::at_least_once())
                 .await
                 .is_err()
         );
+        drop(client);
         let done = CancellationToken::new();
         done.cancel();
         // There is no broker: a completed rejection must not leave any work to drain.
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            drive_event_loop(connection, client, done),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        tokio::time::timeout(Duration::from_secs(1), drive_event_loop(connection, done))
+            .await
+            .unwrap()
+            .unwrap();
     }
 }

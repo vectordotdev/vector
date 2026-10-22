@@ -116,8 +116,9 @@ impl MqttConnector {
 
     /// Connects the connector and generates a client and eventloop
     pub fn connect(&self) -> (AsyncClient, EventLoop) {
-        let (client, eventloop) = AsyncClient::new(self.options.clone(), 1024);
-        (client, eventloop)
+        AsyncClient::builder(self.options.clone())
+            .capacity(1024)
+            .build()
     }
 
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>

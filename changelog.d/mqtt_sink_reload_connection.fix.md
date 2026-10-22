@@ -2,4 +2,6 @@ The `mqtt` sink now closes its broker connection after the sink stops, for examp
 
 The sink drains queued messages and QoS exchanges as part of its shutdown. Process shutdown follows Vector's `--graceful-shutdown-limit-secs` or `--no-graceful-shutdown-limit` setting. A connection error ends the drain instead of reconnecting a stopped sink.
 
+The MQTT source and sink now use `rumqttc-v4-next` 0.34.0 and retain MQTT 3.1.1 support.
+
 authors: thomasqueirozb

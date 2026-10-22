@@ -481,7 +481,7 @@ rdkafka = { workspace = true, features = ["curl-static", "tokio", "libz", "ssl",
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
-rumqttc = { package = "rumqttc-next", version = "0.26.1", default-features = false, features = ["use-rustls-no-provider"], optional = true }
+rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-no-provider"], optional = true }
 # Keep MQTT on Ring alongside Vector's other Rustls users, including in minimal builds.
 rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
 rustls-native-certs = { version = "0.8", default-features = false, optional = true }

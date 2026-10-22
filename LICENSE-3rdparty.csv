@@ -66,6 +66,7 @@ async-stream,https://github.com/tokio-rs/async-stream,MIT,Carl Lerche <me@carlle
 async-stream-impl,https://github.com/tokio-rs/async-stream,MIT,Carl Lerche <me@carllerche.com>
 async-task,https://github.com/smol-rs/async-task,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-trait,https://github.com/dtolnay/async-trait,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
+async-tungstenite,https://github.com/sdroege/async-tungstenite,MIT,Sebastian Dröge <sebastian@centricular.com>
 asyncband,https://github.com/fast/asyncband,Apache-2.0,The asyncband Authors
 atoi,https://github.com/pacman82/atoi-rs,MIT,Markus Klein
 atomic-waker,https://github.com/smol-rs/atomic-waker,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, Contributors to futures-rs"
@@ -504,6 +505,7 @@ mongocrypt,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egn
 mongocrypt-sys,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egnor <abraham.egnor@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>"
 mongodb,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>"
 mongodb-internal-macros,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>"
+mqttbytes-core-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
 multiversion,https://github.com/calebzulawski/multiversion,MIT OR Apache-2.0,Caleb Zulawski <caleb.zulawski@gmail.com>
 multiversion-macros,https://github.com/calebzulawski/multiversion,MIT OR Apache-2.0,Caleb Zulawski <caleb.zulawski@gmail.com>
 multiversion_no_op,https://github.com/hsivonen/multiversion_no_op,Apache-2.0 OR MIT,Henri Sivonen <hsivonen@hsivonen.fi>
@@ -698,7 +700,8 @@ rmpv,https://github.com/3Hren/msgpack-rust,MIT,Evgeny Safronov <division494@gmai
 roaring,https://github.com/RoaringBitmap/roaring-rs,MIT OR Apache-2.0,"Wim Looman <wim@nemo157.com>, Kerollmops <kero@meilisearch.com>"
 roxmltree,https://github.com/RazrFalcon/roxmltree,MIT OR Apache-2.0,Yevhenii Reizner <razrfalcon@gmail.com>
 rsa,https://github.com/RustCrypto/RSA,MIT OR Apache-2.0,"RustCrypto Developers, dignifiedquire <dignifiedquire@gmail.com>"
-rumqttc-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
+rumqttc-core-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
+rumqttc-v4-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
 rust_decimal,https://github.com/paupino/rust-decimal,MIT,Paul Mason <paul@form1.co.nz>
 rustc-hash,https://github.com/rust-lang/rustc-hash,Apache-2.0 OR MIT,The Rust Project Developers
 rustc_version,https://github.com/djc/rustc-version-rs,MIT OR Apache-2.0,The rustc_version Authors
