@@ -22,7 +22,10 @@ use vrl::value::{Kind, kind::Collection};
 
 use super::util::MultilineConfig;
 use crate::{
-    aws::{RegionOrEndpoint, auth::AwsAuthentication, create_client, create_client_and_region},
+    aws::{
+        AwsTimeout, RegionOrEndpoint, auth::AwsAuthentication, create_client,
+        create_client_and_region,
+    },
     codecs::DecodingConfig,
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
     config::{
@@ -137,6 +140,14 @@ pub struct AwsS3Config {
     acknowledgements: SourceAcknowledgementsConfig,
 
     tls_options: Option<TlsConfig>,
+
+    // Client timeout configuration for S3 operations, such as `GetObject`. Unset by default,
+    // which means no timeout. These only cover the request up to the response headers; stalls
+    // while downloading an object body are handled by the AWS SDK's stalled stream protection.
+    #[serde(default)]
+    #[serde(flatten)]
+    #[derivative(Default)]
+    timeout: Option<AwsTimeout>,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -264,6 +275,21 @@ impl SourceConfig for AwsS3Config {
 }
 
 impl AwsS3Config {
+    async fn create_s3_client(&self, proxy: &ProxyConfig) -> crate::Result<aws_sdk_s3::Client> {
+        create_client::<S3ClientBuilder>(
+            &S3ClientBuilder {
+                force_path_style: Some(self.force_path_style),
+            },
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint(),
+            proxy,
+            self.tls_options.as_ref(),
+            self.timeout.as_ref(),
+        )
+        .await
+    }
+
     async fn create_sqs_ingestor(
         &self,
         multiline: Option<line_agg::Config>,
@@ -273,18 +299,7 @@ impl AwsS3Config {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
 
-        let s3_client = create_client::<S3ClientBuilder>(
-            &S3ClientBuilder {
-                force_path_style: Some(self.force_path_style),
-            },
-            &self.auth,
-            region.clone(),
-            endpoint.clone(),
-            proxy,
-            self.tls_options.as_ref(),
-            None,
-        )
-        .await?;
+        let s3_client = self.create_s3_client(proxy).await?;
 
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
@@ -419,6 +434,8 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use tokio::io::AsyncReadExt;
 
     use super::*;
@@ -432,6 +449,138 @@ mod test {
         assert_eq!(config.request_payer, Some(S3RequestPayer::Requester));
 
         assert!(serde_yaml::from_str::<AwsS3Config>("request_payer: bucket_owner").is_err());
+    }
+
+    #[test]
+    fn s3_timeout_config() {
+        let config: AwsS3Config = serde_yaml::from_str("{}").unwrap();
+        let timeout = config.timeout.unwrap_or_default();
+        assert_eq!(timeout.connect_timeout(), None);
+        assert_eq!(timeout.read_timeout(), None);
+        assert_eq!(timeout.operation_timeout(), None);
+
+        let config: AwsS3Config = serde_yaml::from_str(indoc::indoc! {r"
+            region: us-east-1
+            connect_timeout_seconds: 5
+            read_timeout_seconds: 30
+            operation_timeout_seconds: 60
+            sqs:
+              queue_url: https://sqs.us-east-1.amazonaws.com/123456789012/queue
+              connect_timeout_seconds: 1
+              read_timeout_seconds: 2
+              operation_timeout_seconds: 3
+        "})
+        .unwrap();
+
+        let s3 = config.timeout.expect("s3 timeout should be set");
+        assert_eq!(s3.connect_timeout(), Some(5));
+        assert_eq!(s3.read_timeout(), Some(30));
+        assert_eq!(s3.operation_timeout(), Some(60));
+
+        let sqs = config
+            .sqs
+            .unwrap()
+            .timeout
+            .expect("sqs timeout should be set");
+        assert_eq!(sqs.connect_timeout(), Some(1));
+        assert_eq!(sqs.read_timeout(), Some(2));
+        assert_eq!(sqs.operation_timeout(), Some(3));
+
+        // Unknown top-level keys are still rejected alongside the flattened fields.
+        assert!(serde_yaml::from_str::<AwsS3Config>("read_timeout_secs: 30").is_err());
+    }
+
+    /// Starts a TCP server that accepts connections but never responds, and returns its
+    /// endpoint. Accepted sockets are kept open for the lifetime of the task.
+    async fn unresponsive_endpoint() -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let mut sockets = Vec::new();
+            while let Ok((socket, _)) = listener.accept().await {
+                sockets.push(socket);
+            }
+        });
+        format!("http://{addr}")
+    }
+
+    async fn get_object_against_unresponsive_endpoint(
+        timeouts: &str,
+        wait: Duration,
+    ) -> Result<
+        Result<
+            aws_sdk_s3::operation::get_object::GetObjectOutput,
+            aws_sdk_s3::error::SdkError<aws_sdk_s3::operation::get_object::GetObjectError>,
+        >,
+        tokio::time::error::Elapsed,
+    > {
+        let endpoint = unresponsive_endpoint().await;
+        let config: AwsS3Config = serde_yaml::from_str(&format!(
+            indoc::indoc! {r"
+                region: us-east-1
+                endpoint: {}
+                force_path_style: true
+                auth:
+                  access_key_id: AKIAIOSFODNN7EXAMPLE
+                  secret_access_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+                {}
+            "},
+            endpoint, timeouts
+        ))
+        .unwrap();
+
+        let client = config
+            .create_s3_client(&ProxyConfig::default())
+            .await
+            .unwrap();
+
+        tokio::time::timeout(wait, client.get_object().bucket("bucket").key("key").send()).await
+    }
+
+    #[tokio::test]
+    async fn s3_client_read_timeout_against_unresponsive_endpoint() {
+        let started = std::time::Instant::now();
+        let result = get_object_against_unresponsive_endpoint(
+            "read_timeout_seconds: 1",
+            Duration::from_secs(10),
+        )
+        .await
+        .expect("GetObject should fail via the read timeout, not hang");
+        let err = result.expect_err("GetObject should fail");
+        let aws_sdk_s3::error::SdkError::DispatchFailure(dispatch) = &err else {
+            panic!("expected a dispatch failure, got {err:?}");
+        };
+        assert!(dispatch.is_timeout(), "expected a timeout, got {err:?}");
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[tokio::test]
+    async fn s3_client_operation_timeout_against_unresponsive_endpoint() {
+        let started = std::time::Instant::now();
+        let result = get_object_against_unresponsive_endpoint(
+            "operation_timeout_seconds: 1",
+            Duration::from_secs(10),
+        )
+        .await
+        .expect("GetObject should fail via the operation timeout, not hang");
+        let err = result.expect_err("GetObject should fail");
+        assert!(
+            matches!(err, aws_sdk_s3::error::SdkError::TimeoutError(_)),
+            "expected an operation timeout, got {err:?}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[tokio::test]
+    async fn s3_client_without_timeout_hangs_against_unresponsive_endpoint() {
+        // Documents the default (and previous) behavior: without a timeout the request
+        // waits on the unresponsive peer indefinitely.
+        assert!(
+            get_object_against_unresponsive_endpoint("", Duration::from_secs(3))
+                .await
+                .is_err(),
+            "GetObject without a timeout should still be pending"
+        );
     }
 
     #[test]
