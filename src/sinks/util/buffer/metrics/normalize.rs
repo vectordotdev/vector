@@ -706,7 +706,15 @@ impl MetricSet {
         self.maybe_cleanup();
         match metric.kind() {
             MetricKind::Absolute => self.absolute_to_incremental(metric),
-            MetricKind::Incremental => Some(metric),
+            MetricKind::Incremental => {
+                // A series that switches from absolute to incremental, for example after a config
+                // reload, leaves a stale baseline behind. Subtracting it from the next absolute
+                // value would re-emit every increment passed through in between.
+                if !self.is_empty() {
+                    self.remove(metric.series());
+                }
+                Some(metric)
+            }
         }
     }
 
@@ -874,6 +882,26 @@ mod tests {
 
         // Absolute metrics are not stored in the set
         assert!(set.is_empty());
+    }
+
+    #[test]
+    fn incremental_drops_stale_absolute_baseline() {
+        let mut set = MetricSet::default();
+
+        assert!(
+            set.make_incremental(counter("hits", 10.0, MetricKind::Absolute))
+                .is_none()
+        );
+        let out = set.make_incremental(counter("hits", 3.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 3.0 });
+
+        // Back to absolute: the 13.0 total is a new baseline, not a 3.0 delta over the stale 10.0.
+        assert!(
+            set.make_incremental(counter("hits", 13.0, MetricKind::Absolute))
+                .is_none()
+        );
+        let out = set.make_incremental(counter("hits", 15.0, MetricKind::Absolute));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 2.0 });
     }
 
     // Verifies that capacity policy switches to the LruCache (Bounded) path.
