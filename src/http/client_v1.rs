@@ -7,6 +7,7 @@ use std::{
     pin::Pin,
     sync::{Arc, PoisonError, RwLock, Weak},
     task::{Context, Poll},
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -26,10 +27,12 @@ use hyper_util::{
 };
 use openssl::ssl::SslConnector;
 use percent_encoding::percent_decode_str;
+use tokio::time::{Instant, Sleep};
 use tower::Service;
 use tracing::Instrument;
 use url::{Host, Url};
 
+use super::MaxConnectionAgeLayer;
 use crate::{
     config::ProxyConfig,
     internal_events::http_client::{
@@ -105,11 +108,23 @@ pub fn full_body(bytes: Bytes) -> RequestBody {
 
 type PooledClient = Client<HttpProxyConnectorV1, RequestBody>;
 
+/// Optional connection behavior for [`HttpClient::new_with_options`]. The default changes nothing.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ConnectionOptions {
+    /// Closes each connection once it is older than this, so it is re-established. A request
+    /// in flight on a connection that reaches its age fails and should be retried.
+    pub max_connection_age: Option<Duration>,
+    /// Randomizes each connection's age limit by up to this fraction, in `0.0..=1.0`, so that
+    /// connections opened together do not all close at once.
+    pub max_connection_age_jitter_factor: f64,
+}
+
 #[derive(Clone)]
 pub struct HttpClient {
     // Shared by every clone so that a TLS reload reaches all of them.
     client: Arc<RwLock<PooledClient>>,
     routes: Arc<RoutePlanner>,
+    options: ConnectionOptions,
     user_agent: HeaderValue,
 }
 
@@ -128,12 +143,27 @@ impl HttpClient {
     /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
     /// build a connector.
     pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
+        Self::new_with_options(tls, proxy, ConnectionOptions::default())
+    }
+
+    /// Like [`HttpClient::new`], with the given connection `options`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
+    /// build a connector.
+    pub fn new_with_options(
+        tls: MaybeTlsSettings,
+        proxy: &ProxyConfig,
+        options: ConnectionOptions,
+    ) -> Result<Self, BoxError> {
         let routes = Arc::new(RoutePlanner::new(proxy)?);
-        let client = Self::build_client(tls, &routes)?;
+        let client = Self::build_client(tls, &routes, options)?;
 
         Ok(Self {
             client: Arc::new(RwLock::new(client)),
             routes,
+            options,
             user_agent: default_user_agent(),
         })
     }
@@ -145,15 +175,18 @@ impl HttpClient {
         TlsReloadHandle {
             client: Arc::downgrade(&self.client),
             routes: Arc::clone(&self.routes),
+            options: self.options,
         }
     }
 
     fn build_client(
         tls: MaybeTlsSettings,
         routes: &Arc<RoutePlanner>,
+        options: ConnectionOptions,
     ) -> Result<PooledClient, BoxError> {
         let connector =
-            HttpProxyConnectorV1::new(tls, Arc::clone(routes), ForwardProxyAlpn::Http1)?;
+            HttpProxyConnectorV1::new(tls, Arc::clone(routes), ForwardProxyAlpn::Http1)?
+                .with_options(options);
         Ok(Client::builder(TokioExecutor::new()).build(connector))
     }
 
@@ -219,6 +252,7 @@ impl HttpClient {
 pub struct TlsReloadHandle {
     client: Weak<RwLock<PooledClient>>,
     routes: Arc<RoutePlanner>,
+    options: ConnectionOptions,
 }
 
 impl fmt::Debug for TlsReloadHandle {
@@ -246,7 +280,7 @@ impl TlsReloadHandle {
         let Some(client) = self.client.upgrade() else {
             return Ok(false);
         };
-        let rebuilt = HttpClient::build_client(tls, &self.routes)?;
+        let rebuilt = HttpClient::build_client(tls, &self.routes, self.options)?;
         *client.write().unwrap_or_else(PoisonError::into_inner) = rebuilt;
         Ok(true)
     }
@@ -539,6 +573,7 @@ struct HttpProxyConnectorV1 {
     destination_tls: SslConnector,
     tls_settings: Option<TlsSettings>,
     routes: Arc<RoutePlanner>,
+    max_connection_age: Option<(Duration, f64)>,
 }
 
 impl HttpProxyConnectorV1 {
@@ -570,7 +605,16 @@ impl HttpProxyConnectorV1 {
             destination_tls,
             tls_settings,
             routes,
+            max_connection_age: None,
         })
+    }
+
+    const fn with_options(mut self, options: ConnectionOptions) -> Self {
+        self.max_connection_age = match options.max_connection_age {
+            Some(age) => Some((age, options.max_connection_age_jitter_factor)),
+            None => None,
+        };
+        self
     }
 
     async fn connect_tunnel(
@@ -644,9 +688,10 @@ impl Service<Uri> for HttpProxyConnectorV1 {
         let connect_proxy = self.connect_proxy.clone();
         let destination_tls = self.destination_tls.clone();
         let tls_settings = self.tls_settings.clone();
+        let max_connection_age = self.max_connection_age;
 
         Box::pin(async move {
-            match route? {
+            let io = match route? {
                 Route::Direct { destination } => direct.call(destination).await.map(BoxedIo::new),
                 Route::ForwardProxy {
                     proxy: proxy_uri, ..
@@ -669,7 +714,14 @@ impl Service<Uri> for HttpProxyConnectorV1 {
                     )
                     .await
                 }
-            }
+            }?;
+            Ok(match max_connection_age {
+                Some((age, jitter_factor)) => BoxedIo::new(MaxAgeIo::new(
+                    io,
+                    Instant::now() + MaxConnectionAgeLayer::jittered_duration(age, jitter_factor),
+                )),
+                None => io,
+            })
         })
     }
 }
@@ -775,6 +827,98 @@ impl rt::Write for BoxedIo {
 impl Connection for BoxedIo {
     fn connected(&self) -> Connected {
         self.0.as_ref().get_ref().connected()
+    }
+}
+
+/// Closes the connection once `deadline` passes: reads report EOF, so hyper drops the connection
+/// instead of returning it to the pool, and writes fail, so a request sent on it is retried.
+struct MaxAgeIo<T> {
+    inner: T,
+    // `Sleep` is `!Unpin`, and hyper requires connections to be `Unpin`.
+    deadline: Pin<Box<Sleep>>,
+    expired: bool,
+}
+
+impl<T> MaxAgeIo<T> {
+    fn new(inner: T, deadline: Instant) -> Self {
+        Self {
+            inner,
+            deadline: Box::pin(tokio::time::sleep_until(deadline)),
+            expired: false,
+        }
+    }
+
+    fn poll_expired(&mut self, cx: &mut Context<'_>) -> bool {
+        if !self.expired && self.deadline.as_mut().poll(cx).is_ready() {
+            self.expired = true;
+        }
+        self.expired
+    }
+}
+
+fn connection_expired() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::BrokenPipe,
+        "connection exceeded its maximum age",
+    )
+}
+
+impl<T: rt::Read + Unpin> rt::Read for MaxAgeIo<T> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: rt::ReadBufCursor<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this = self.get_mut();
+        if this.poll_expired(cx) {
+            // Completing without filling `buffer` signals EOF.
+            return Poll::Ready(Ok(()));
+        }
+        Pin::new(&mut this.inner).poll_read(cx, buffer)
+    }
+}
+
+impl<T: rt::Write + Unpin> rt::Write for MaxAgeIo<T> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.get_mut();
+        if this.poll_expired(cx) {
+            return Poll::Ready(Err(connection_expired()));
+        }
+        Pin::new(&mut this.inner).poll_write(cx, buffer)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().inner).poll_shutdown(cx)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffers: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.get_mut();
+        if this.poll_expired(cx) {
+            return Poll::Ready(Err(connection_expired()));
+        }
+        Pin::new(&mut this.inner).poll_write_vectored(cx, buffers)
+    }
+}
+
+impl<T: Connection> Connection for MaxAgeIo<T> {
+    fn connected(&self) -> Connected {
+        self.inner.connected()
     }
 }
 
@@ -888,7 +1032,15 @@ fn invalid_input(message: impl Into<String>) -> BoxError {
 
 #[cfg(test)]
 mod tests {
-    use super::{connect_authority, tls_host};
+    use std::{io::ErrorKind, time::Duration};
+
+    use hyper_util::rt::TokioIo;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt, duplex},
+        time::Instant,
+    };
+
+    use super::{MaxAgeIo, connect_authority, tls_host};
 
     #[test]
     fn connect_authority_includes_a_port() {
@@ -920,5 +1072,24 @@ mod tests {
             tls_host(&"https://example.com/path".parse().unwrap()).unwrap(),
             "example.com"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn max_age_io_closes_after_deadline() {
+        let (client, mut server) = duplex(64);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut io = TokioIo::new(MaxAgeIo::new(TokioIo::new(client), deadline));
+
+        server.write_all(b"hello").await.unwrap();
+        let mut buffer = [0u8; 5];
+        io.read_exact(&mut buffer).await.unwrap();
+        assert_eq!(&buffer, b"hello");
+
+        // Past the deadline, reads report EOF even with data available, and writes fail.
+        server.write_all(b"world").await.unwrap();
+        tokio::time::advance(Duration::from_secs(11)).await;
+        assert_eq!(io.read(&mut buffer).await.unwrap(), 0);
+        let error = io.write(b"data").await.unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::BrokenPipe);
     }
 }

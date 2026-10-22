@@ -27,7 +27,7 @@ use tokio::{
 
 use super::{
     HttpClient as LegacyHttpClient,
-    client_v1::{HttpClient, RequestBody, empty_body},
+    client_v1::{ConnectionOptions, HttpClient, RequestBody, empty_body},
 };
 use crate::{
     config::ProxyConfig,
@@ -54,6 +54,8 @@ struct RequestObservation {
     headers: HeaderMap,
     /// The ALPN protocol negotiated on the request's TLS connection, if any.
     alpn: Option<Vec<u8>>,
+    /// Identifies the connection that carried the request, in accept order.
+    connection: usize,
 }
 
 struct TestServer {
@@ -283,11 +285,14 @@ where
 
     let task = tokio::spawn(async move {
         let mut connections = JoinSet::new();
+        let mut next_connection = 0;
         loop {
             let Ok(mut stream) = listener.accept().await else {
                 continue;
             };
             while connections.try_join_next().is_some() {}
+            let connection = next_connection;
+            next_connection += 1;
             let observations = Arc::clone(&server_observations);
             let handler = handler.clone();
             connections.spawn(async move {
@@ -302,6 +307,7 @@ where
                         version: request.version(),
                         headers: request.headers().clone(),
                         alpn: alpn.clone(),
+                        connection,
                     });
                     let response = handler(request);
                     async move { Ok::<_, Infallible>(response.await) }
@@ -637,6 +643,38 @@ async fn v1_reload_tls_does_not_reuse_pooled_connections() {
         .get(&origin.https_uri())
         .await
         .expect_err("requests after a reload must use the new TLS settings");
+}
+
+#[rstest]
+#[case::without_max_age(None, 1)]
+#[case::with_max_age(Some(Duration::from_millis(500)), 2)]
+#[tokio::test]
+async fn v1_max_connection_age_recycles_connections(
+    #[case] max_connection_age: Option<Duration>,
+    #[case] expected_connections: usize,
+) {
+    let origin = spawn_origin(no_tls()).await;
+    let client = HttpClient::new_with_options(
+        no_tls(),
+        &ProxyConfig::default(),
+        ConnectionOptions {
+            max_connection_age,
+            max_connection_age_jitter_factor: 0.0,
+        },
+    )
+    .unwrap();
+
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
+
+    let mut connections: Vec<_> = origin
+        .observations()
+        .iter()
+        .map(|observation| observation.connection)
+        .collect();
+    connections.dedup();
+    assert_eq!(connections.len(), expected_connections);
 }
 
 #[rstest]
