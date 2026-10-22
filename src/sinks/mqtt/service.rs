@@ -1,8 +1,14 @@
-use std::task::{Context, Poll};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use rumqttc::{AsyncClient, ClientError};
+use rumqttc::{AsyncClient, ClientError, QoS};
 use snafu::Snafu;
 
 use super::config::MqttQoS;
@@ -50,8 +56,49 @@ impl MetaDescriptive for MqttRequest {
     }
 }
 
+/// Keeps the request channel open and counts publishes until they leave the MQTT pipeline.
+pub(super) struct MqttClient {
+    client: AsyncClient,
+    pending: AtomicUsize,
+}
+
+impl MqttClient {
+    pub(super) const fn new(client: AsyncClient) -> Self {
+        Self {
+            client,
+            pending: AtomicUsize::new(0),
+        }
+    }
+
+    pub(super) fn has_pending(&self) -> bool {
+        self.pending.load(Ordering::Relaxed) != 0
+    }
+
+    pub(super) fn complete(&self, count: usize) {
+        if count != 0 {
+            self.pending.fetch_sub(count, Ordering::Relaxed);
+        }
+    }
+
+    pub(super) async fn publish(
+        &self,
+        topic: String,
+        qos: QoS,
+        retain: bool,
+        body: Bytes,
+    ) -> Result<(), ClientError> {
+        // Count before sending: the event loop can process a request before send_async returns.
+        self.pending.fetch_add(1, Ordering::Relaxed);
+        let result = self.client.publish(topic, qos, retain, body).await;
+        if result.is_err() {
+            self.complete(1);
+        }
+        result
+    }
+}
+
 pub(super) struct MqttService {
-    pub(super) client: AsyncClient,
+    pub(super) client: Arc<MqttClient>,
     pub(super) quality_of_service: MqttQoS,
     pub(super) retain: bool,
 }
@@ -74,13 +121,13 @@ impl Service<MqttRequest> for MqttService {
     fn call(&mut self, req: MqttRequest) -> Self::Future {
         let quality_of_service = self.quality_of_service;
         let retain = self.retain;
-        let client = self.client.clone();
+        let client = Arc::clone(&self.client);
 
         Box::pin(async move {
             let byte_size = req.body.len();
 
             let res = client
-                .publish(&req.topic, quality_of_service.into(), retain, req.body)
+                .publish(req.topic, quality_of_service.into(), retain, req.body)
                 .await;
             match res {
                 Ok(()) => Ok(MqttResponse {
