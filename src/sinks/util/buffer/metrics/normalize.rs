@@ -722,13 +722,12 @@ impl MetricSet {
     /// for example across config reloads, would re-emit every increment passed through in
     /// between when the next absolute value is subtracted from the stale baseline.
     fn absorb_increment(&mut self, metric: &Metric) {
-        let timestamp = self.create_timestamp();
         let Some(reference) = self.inner.get_mut(metric.series()) else {
             return;
         };
         let mut new_reference = reference.clone();
         if new_reference.data.value.add(metric.value()) {
-            new_reference.timestamp = timestamp;
+            new_reference.timestamp = self.create_timestamp();
             self.insert_with_tracking(metric.series().clone(), new_reference);
         } else {
             // Incompatible values, such as histograms with different buckets: the baseline can no
