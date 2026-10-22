@@ -32,7 +32,7 @@ impl DeltaState {
     ///
     /// Gauges are already meaningful as absolute values and pass through untouched.
     pub(super) fn convert(&mut self, metrics: &mut [Metric]) {
-        self.generation = self.generation.wrapping_add(1);
+        self.generation += 1;
         let generation = self.generation;
 
         for metric in metrics {
@@ -76,13 +76,11 @@ impl DeltaState {
 fn is_cumulative(metric: &Metric) -> bool {
     // The cardinality counter is declared a counter but reports the current series count, so it is
     // not monotonic and has to stay absolute.
-    if metric.name() == CARDINALITY_COUNTER_KEY_NAME {
-        return false;
-    }
-    matches!(
-        metric.value(),
-        MetricValue::Counter { .. } | MetricValue::AggregatedHistogram { .. }
-    )
+    metric.name() != CARDINALITY_COUNTER_KEY_NAME
+        && matches!(
+            metric.value(),
+            MetricValue::Counter { .. } | MetricValue::AggregatedHistogram { .. }
+        )
 }
 
 #[cfg(test)]
