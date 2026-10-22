@@ -11,10 +11,11 @@ use std::{
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use flate2::write::GzDecoder;
 use futures_util::FutureExt;
-use http::{HeaderValue, Request, Response};
-use hyper::{
-    Body,
-    body::{HttpBody, Sender},
+use http_1::{HeaderValue, Request, Response};
+use http_body_1::Body;
+use http_body_util::{
+    BodyExt,
+    channel::{Channel, Sender},
 };
 use tokio::{pin, select};
 use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
@@ -103,7 +104,7 @@ enum CompressionScheme {
 }
 
 impl CompressionScheme {
-    fn from_encoding_header(req: &Request<Body>) -> Result<Option<Self>, Status> {
+    fn from_encoding_header(req: &Request<BoxBody>) -> Result<Option<Self>, Status> {
         req.headers()
             .get(GRPC_ENCODING_HEADER)
             .map(|s| {
@@ -499,46 +500,57 @@ impl MessageDecoder {
     }
 }
 
-async fn drive_body_decompression(
-    mut source: Body,
-    mut destination: Sender,
+/// Creates the channel to the inner service. It holds one unread message, so the upstream body
+/// is only read on demand.
+fn decompressed_body_channel() -> (Sender<Bytes, Status>, Channel<Bytes, Status>) {
+    Channel::new(1)
+}
+
+async fn drive_body_decompression<B>(
+    mut source: B,
+    mut destination: Sender<Bytes, Status>,
     scheme: Option<CompressionScheme>,
-) -> Result<usize, Status> {
+) -> Result<usize, Status>
+where
+    B: Body<Data = Bytes> + Unpin,
+{
     let mut decoder = MessageDecoder::new(scheme);
 
-    // Drain all message chunks from the body first.
-    while let Some(result) = source.data().await {
-        let chunk = result.map_err(|_| Status::internal("failed to read from underlying body"))?;
+    while let Some(result) = source.frame().await {
+        let frame = result.map_err(|_| Status::internal("failed to read from underlying body"))?;
 
-        if let Some(message) = decoder.process_chunk(chunk)? {
-            // We got a decompressed (or passthrough) message chunk, so just forward it to the destination.
-            if destination.send_data(message).await.is_err() {
-                return Err(Status::internal("destination body abnormally closed"));
+        match frame.into_data() {
+            Ok(chunk) => {
+                if let Some(message) = decoder.process_chunk(chunk)? {
+                    // We got a decompressed (or passthrough) message chunk, so just forward it to the destination.
+                    if destination.send_data(message).await.is_err() {
+                        return Err(Status::internal("destination body abnormally closed"));
+                    }
+                }
+            }
+            // Trailers end the underlying body, so forward them after all of its messages.
+            Err(frame) => {
+                if let Ok(trailers) = frame.into_trailers()
+                    && destination.send_trailers(trailers).await.is_err()
+                {
+                    return Err(Status::internal("destination body abnormally closed"));
+                }
             }
         }
-    }
-
-    // When we've exhausted all the message chunks, we try sending any trailers that came in on the underlying body.
-    let result = source.trailers().await;
-    let maybe_trailers =
-        result.map_err(|_| Status::internal("error reading trailers from underlying body"))?;
-    if let Some(trailers) = maybe_trailers
-        && destination.send_trailers(trailers).await.is_err()
-    {
-        return Err(Status::internal("destination body abnormally closed"));
     }
 
     Ok(decoder.bytes_received())
 }
 
-async fn drive_request<F, E>(
-    source: Body,
-    destination: Sender,
+async fn drive_request<B, F, E>(
+    source: B,
+    destination: Sender<Bytes, Status>,
     inner: F,
     bytes_received: Registered<BytesReceived>,
     scheme: Option<CompressionScheme>,
 ) -> Result<Response<BoxBody>, E>
 where
+    B: Body<Data = Bytes> + Unpin,
     F: Future<Output = Result<Response<BoxBody>, E>>,
     E: std::fmt::Display,
 {
@@ -560,7 +572,7 @@ where
             // Drive the core decompression loop, reading chunks from the underlying body, decompressing them if needed,
             // and eventually handling trailers at the end, if they're present.
             result = &mut body_decompression, if !body_eof => match result {
-                Err(e) => break Ok(e.to_http()),
+                Err(e) => break Ok(e.into_http()),
                 Ok(bytes_received) => {
                     body_bytes_received = bytes_received;
                     body_eof = true;
@@ -606,9 +618,9 @@ pub struct DecompressionAndMetrics<S> {
     bytes_received: Registered<BytesReceived>,
 }
 
-impl<S> Service<Request<Body>> for DecompressionAndMetrics<S>
+impl<S> Service<Request<BoxBody>> for DecompressionAndMetrics<S>
 where
-    S: Service<Request<Body>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    S: Service<Request<BoxBody>, Response = Response<BoxBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     S::Error: std::fmt::Display,
 {
@@ -620,19 +632,19 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<Body>) -> Self::Future {
+    fn call(&mut self, req: Request<BoxBody>) -> Self::Future {
         match CompressionScheme::from_encoding_header(&req) {
             // There was a header for the encoding, but it was either invalid data or a scheme we don't support.
             Err(status) => {
                 emit!(GrpcInvalidCompressionSchemeError { status: &status });
-                Box::pin(async move { Ok(status.to_http()) })
+                Box::pin(async move { Ok(status.into_http()) })
             }
 
             // The request either isn't using compression, or it has indicated compression may be used and we know we
             // can support decompression based on the indicated compression scheme... so wrap the body to decompress, if
             // need be, and then track the bytes that flowed through.
             Ok(scheme) => {
-                let (destination, decompressed_body) = Body::channel();
+                let (destination, decompressed_body) = decompressed_body_channel();
                 let (mut req_parts, req_body) = req.into_parts();
                 // Since this layer owns compression negotiation and is about to hand the
                 // inner service a fully decompressed body (with the per-message compressed
@@ -642,7 +654,7 @@ where
                 if scheme.is_some() {
                     req_parts.headers.remove(GRPC_ENCODING_HEADER);
                 }
-                let mapped_req = Request::from_parts(req_parts, decompressed_body);
+                let mapped_req = Request::from_parts(req_parts, decompressed_body.boxed_unsync());
 
                 let inner = self.inner.call(mapped_req);
 
@@ -706,7 +718,9 @@ mod tests {
 
     use flate2::{Compression, read::GzEncoder};
     use futures::{Stream, StreamExt as _, stream};
-    use http::HeaderMap;
+    use http_1::HeaderMap;
+    use http_body_1::Frame;
+    use http_body_util::{Full, StreamBody};
     use tokio_test::{assert_pending, assert_ready, task};
     use tonic::Code;
 
@@ -775,21 +789,27 @@ mod tests {
         trailers: Option<HeaderMap>,
     }
 
-    async fn decompress_body(
+    async fn decompress_body<B>(
         scheme: Option<CompressionScheme>,
-        body: Body,
-    ) -> Result<Decompressed, Status> {
-        let (destination, mut decompressed) = Body::channel();
+        body: B,
+    ) -> Result<Decompressed, Status>
+    where
+        B: Body<Data = Bytes> + Unpin,
+    {
+        let (destination, mut decompressed) = decompressed_body_channel();
 
         let read_all = async {
             let mut data = Vec::new();
-            while let Some(Ok(chunk)) = decompressed.data().await {
-                data.extend_from_slice(&chunk);
+            let mut trailers = None;
+            while let Some(frame) = decompressed.frame().await {
+                match frame
+                    .expect("the destination body must not fail")
+                    .into_data()
+                {
+                    Ok(chunk) => data.extend_from_slice(&chunk),
+                    Err(frame) => trailers = frame.into_trailers().ok(),
+                }
             }
-            let trailers = decompressed
-                .trailers()
-                .await
-                .expect("destination trailers must be readable");
             (data, trailers)
         };
 
@@ -805,6 +825,19 @@ mod tests {
         })
     }
 
+    /// Returns an upstream body holding `data` in a single DATA frame.
+    fn full_body(data: Vec<u8>) -> Full<Bytes> {
+        Full::new(Bytes::from(data))
+    }
+
+    /// Returns an upstream body yielding every chunk of `chunks` as a DATA frame.
+    fn stream_body<S, E>(chunks: S) -> StreamBody<impl Stream<Item = Result<Frame<Bytes>, E>>>
+    where
+        S: Stream<Item = Result<Vec<u8>, E>>,
+    {
+        StreamBody::new(chunks.map(|chunk| chunk.map(|chunk| Frame::data(Bytes::from(chunk)))))
+    }
+
     /// Yields `chunks` as an upstream body stream, counting every chunk read from it.
     fn counting_stream(
         chunks: Vec<Vec<u8>>,
@@ -818,12 +851,14 @@ mod tests {
     }
 
     /// Returns the next message already buffered in `body`.
-    fn next_message(body: &mut Body) -> Bytes {
-        body.data()
+    fn next_message(body: &mut Channel<Bytes, Status>) -> Bytes {
+        body.frame()
             .now_or_never()
             .expect("a message must be buffered")
             .expect("the body must not have ended")
             .expect("the body must not have failed")
+            .into_data()
+            .expect("the frame must carry a message")
     }
 
     fn identity_frames(count: usize) -> Vec<Vec<u8>> {
@@ -908,7 +943,7 @@ mod tests {
         let payload = b"an uncompressed gRPC message payload".repeat(100);
         let frame = grpc_frame(false, &payload);
 
-        let out = decompress_body(None, Body::from(frame.clone()))
+        let out = decompress_body(None, full_body(frame.clone()))
             .await
             .expect("passthrough must succeed");
 
@@ -920,7 +955,7 @@ mod tests {
         let payload = b"a gzip-compressed gRPC message payload".repeat(100);
         let frame = grpc_frame(true, &gzip_compress(&payload));
 
-        let out = decompress_body(Some(CompressionScheme::Gzip), Body::from(frame))
+        let out = decompress_body(Some(CompressionScheme::Gzip), full_body(frame))
             .await
             .expect("decompression must succeed");
 
@@ -939,7 +974,7 @@ mod tests {
             .chunks(3)
             .map(|chunk| Ok::<_, Infallible>(chunk.to_vec()))
             .collect::<Vec<_>>();
-        let body = Body::wrap_stream(stream::iter(chunks));
+        let body = stream_body(stream::iter(chunks));
 
         let out = decompress_body(Some(CompressionScheme::Gzip), body)
             .await
@@ -953,7 +988,7 @@ mod tests {
         let payload = b"a zstd-compressed gRPC message payload".repeat(100);
         let frame = grpc_frame(true, &compress(&CompressionScheme::Zstd, &payload));
 
-        let out = decompress_body(Some(CompressionScheme::Zstd), Body::from(frame))
+        let out = decompress_body(Some(CompressionScheme::Zstd), full_body(frame))
             .await
             .expect("decompression must succeed");
 
@@ -971,7 +1006,7 @@ mod tests {
 
         let status = decompress_body(
             Some(CompressionScheme::Gzip),
-            Body::from(grpc_frame(true, &compressed)),
+            full_body(grpc_frame(true, &compressed)),
         )
         .await
         .expect_err("corrupt payload must be rejected");
@@ -987,7 +1022,7 @@ mod tests {
 
         let status = decompress_body(
             Some(CompressionScheme::Zstd),
-            Body::from(grpc_frame(true, &compressed)),
+            full_body(grpc_frame(true, &compressed)),
         )
         .await
         .expect_err("corrupt payload must be rejected");
@@ -999,7 +1034,7 @@ mod tests {
     async fn rejects_compressed_frame_without_negotiated_scheme() {
         let frame = grpc_frame(true, &gzip_compress(b"data"));
 
-        let status = decompress_body(None, Body::from(frame))
+        let status = decompress_body(None, full_body(frame))
             .await
             .expect_err("compressed frame without a negotiated scheme must be rejected");
 
@@ -1007,20 +1042,19 @@ mod tests {
     }
 
     #[tokio::test]
+
     async fn forwards_trailers_after_messages() {
         let payload = b"a compressed message followed by trailers".repeat(100);
         let mut trailers = HeaderMap::new();
         trailers.insert("x-vector-test", HeaderValue::from_static("trailer"));
 
-        let (mut upstream, body) = Body::channel();
-        upstream
-            .try_send_data(Bytes::from(grpc_frame(true, &gzip_compress(&payload))))
-            .expect("the body channel must buffer one chunk");
-        upstream
-            .send_trailers(trailers.clone())
-            .await
-            .expect("the body channel must accept trailers");
-        drop(upstream);
+        let body = StreamBody::new(stream::iter([
+            Ok::<_, Infallible>(Frame::data(Bytes::from(grpc_frame(
+                true,
+                &gzip_compress(&payload),
+            )))),
+            Ok(Frame::trailers(trailers.clone())),
+        ]));
 
         let out = decompress_body(Some(CompressionScheme::Gzip), body)
             .await
@@ -1036,8 +1070,8 @@ mod tests {
     fn waits_for_destination_before_reading_more_upstream() {
         let frames = identity_frames(3);
         let pulled = Arc::new(AtomicUsize::new(0));
-        let source = Body::wrap_stream(counting_stream(frames.clone(), &pulled));
-        let (destination, mut decompressed) = Body::channel();
+        let source = stream_body(counting_stream(frames.clone(), &pulled));
+        let (destination, mut decompressed) = decompressed_body_channel();
         let mut driver = task::spawn(drive_body_decompression(source, destination, None));
 
         // The destination buffers one message; the driver then waits to forward the second
@@ -1059,16 +1093,17 @@ mod tests {
 
         assert_eq!(next_message(&mut decompressed), frames[2]);
         let end = decompressed
-            .data()
+            .frame()
             .now_or_never()
             .expect("a finished driver must close the destination");
         assert!(end.is_none());
     }
 
     #[test]
+
     fn body_error_becomes_grpc_error_response() {
-        let source = Body::from(grpc_header(false, max_decompressed_size_bytes() + 1));
-        let (destination, _decompressed) = Body::channel();
+        let source = full_body(grpc_header(false, max_decompressed_size_bytes() + 1));
+        let (destination, _decompressed) = decompressed_body_channel();
         let inner = futures::future::pending::<Result<Response<BoxBody>, Infallible>>();
         let mut request = task::spawn(drive_request(
             source,

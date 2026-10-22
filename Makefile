@@ -326,7 +326,8 @@ test-component-validation: ## Runs component validation tests
 
 .PHONY: coverage-report
 coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
-	cargo llvm-cov report --lcov --output-path lcov.info
+	# Report every workspace package, not only Vector's non-virtual root package.
+	cargo llvm-cov report --package '*' --lcov --output-path lcov.info
 
 ##@ Benching
 
