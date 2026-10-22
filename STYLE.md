@@ -1,40 +1,13 @@
 # Vector Style Guide
 
 As a large, open-source project, it can be a struggle to ensure a consistent level of code quality.
-This style guide is meant to be the canonical reference for all things style: code comments,
-formatting, acceptable (or unacceptable) crates, data structures, or algorithms, and so on.
+This guide covers Vector-specific conventions: repository layout, internal telemetry, dependency
+choices, feature policy, and configuration design. General Rust coding practices, including
+formatting, imports, string constants, tests, panics, and synchronization, belong in the
+[Rust Style Guide](docs/RUST_STYLE.md).
 
 In essence, we hope to turn pull request review comments like "why did you do it this way?" or "I
 think you could try doing it this way" into "we always do X this way: <link to style guide>".
-
-## Formatting
-
-At a high-level, code formatting is straightforward: we use the native `rustfmt` exclusively, and
-comprehensively.  All Rust source code within the repository should be formatted using `rustfmt`.
-
-You can acquire `rustfmt` -- which is invoked as `cargo fmt` -- by following the directions listed
-out [in the rustfmt repository](https://github.com/rust-lang/rustfmt#on-the-stable-toolchain).
-
-Vector has its own formatting rules (`.rustfmt.toml`) that will automatically be used when you run
-`cargo fmt` within the repository.  If you're ever in doubt, you can also run `make check-fmt` which
-will invoke `cargo fmt` in a dry-run mode, checking to see if any changed files are not currently
-formatted correctly.
-
-As an additional note, `rustfmt` sometimes can fail to format code within macros, so if you happen
-to see such code that doesn't look like it's formatted correctly, you may need to manually tweak it
-if `rustfmt` cannot be persuaded to format it correctly for you. :)
-
-### Const strings
-
-When re-typing the same raw string literal more than once, this can lead to typo
-errors, especially when names ares similar. In general, when reasonable, it is
-preferred to use [Compile-time constants](https://doc.rust-lang.org/std/keyword.const.html)
-when dealing with non-dynamic strings. For example, when working with field names
-for event metadata.
-
-As this has not always been a consistently enforced code style for the project,
-please take the opportunity to update existing raw strings to use constants
-when modifying existing code
 
 ## Code Organization
 
@@ -61,7 +34,9 @@ wiring them together.
 
 As a tool for ingesting, transforming, enriching, and shipping observability data, Vector has a
 significant amount of its own internal telemetry. This telemetry is primarily logging and metrics,
-but also includes some amount of tracing.
+but also includes some amount of tracing. Follow the
+[Instrumentation Specification](docs/specs/instrumentation.md) for event emission and naming
+requirements; the examples below illustrate logging and metrics syntax.
 
 ### Logging
 
@@ -71,45 +46,33 @@ metadata by utilizing [spans](https://docs.rs/tracing/latest/tracing/#spans).
 
 #### Basic Usage
 
-For logging, we use `tracing`'s event macros which should look very similar to almost all other
-logging libraries, with names that emulate the logging level being used i.e. `info!("A wild log has
-appeared.");`.
-
-All of tracing's event macros -- `trace!`, `debug!`, `info!`, `warn!`, and `error!` -- support the
-same argument format, which allows logging in some common ways:
-
-```rust
-// Basic string literal message, no formatting:
-info!("Server has started.");
-
-// A formatted message, with the same formatting support as `println!`/`format!`:
-debug!("User connected: {}", username);
-
-// Adding structured fields to the even, mixing and matching the message format:
-trace!(bytes_sent = 22, "Sent heartbeat packet to client.");
-error!(client_addr = %conn.get_ref().peer_addr, "Client actor received malformed packet: {}", parse_err.to_string())
-```
-
-While this does not cover all the permutations of what the macros in `tracing` support, these
-examples represent the preferred style of using the macros.
+Use `tracing`'s event macros -- `trace!`, `debug!`, `info!`, `warn!`, and `error!` -- with
+structured key/value fields. Put variable values in fields so they can be filtered and queried,
+rather than interpolating them into the message.
 
 #### Passing in the event message
 
-The `tracing` event macros support passing the event message itself in a few ways, but we prefer the
-**fields/message/message arguments** order:
+Use the `message` field followed by the event's other fields:
+
+```rust
+info!(message = "Server has started.");
+debug!(message = "User connected.", %username);
+trace!(message = "Sent heartbeat packet to client.", bytes_sent = 22);
+warn!(message = "Failed to merge value.", %error);
+info!(message = "Processing batch.", batch_size, internal_log_rate_secs = 1);
+```
+
+Avoid putting error values into the message:
 
 ```rust
 // Don't do this:
-info!(message = "Something happened.");
+warn!("Failed to merge value: {}.", err);
 // Do this instead:
-info!("Something happened.");
-
-// Don't do this:
-debug!(%client_id, message = "Client entered authentication phase.");
-debug!(message = "Client entered authentication phase.", %client_id);
-// Do this instead:
-debug!(%client_id, "Client entered authentication phase.");
+warn!(message = "Failed to merge value.", %error);
 ```
+
+Use `error` (not `e` or `err`) for error fields, and prefer Display formatting (`%error`) over
+Debug formatting (`?error`).
 
 #### Writing a good log message
 
@@ -262,6 +225,9 @@ descriptive error messages, source errors, or backtraces.
 
 ### Concurrency and synchronization
 
+The following choices describe Vector's preferred libraries. For general advice on using locks
+in async code, see [Synchronization](docs/RUST_STYLE.md#synchronization).
+
 #### Atomics
 
 In general, we strive to use the atomic types in the [standard
@@ -291,7 +257,7 @@ as _many readers_, but _one writer_ and infrequent writes, we prefer
 data to be atomically updated while being shared concurrently. It does this by wrapping all data in
 `Arc<T>` to provide the safe, concurrent access, while adding the ability to atomically swap the
 `Arc<T>` itself. As it cannot be constructed in a const fashion, `arc-swap` pairs well with
-`once_cell` for actually storing it in a global static variable.
+`std::sync::OnceLock` for actually storing it in a global static variable.
 
 #### Concurrent data structures
 
@@ -303,28 +269,41 @@ Additionally, when an item is removed, its storage can be reused by future inser
 paramount. There is also a pool data structure based on the same underlying design of the slab
 itself for use cases where pooling is desired.
 
-### Synchronization
+## Feature Flags
 
-Synchronization can be a very common sight when writing multi-threaded code in any language, and
-this document does not aim to familiarize you with all of the common synchronization primitives and
-their intended usage. Instead, however, there are some caveats that you must be aware of when using
-synchronization primitives in synchronous versus asynchronous code.
+### Component Feature Flags
 
-Generally speaking, developers will lean on the synchronization primitives in `std::sync`, such as
-`Mutex`, `RwLock`, and so on. These are typically the right choice -- in terms of using the ones
-provided by `std`, vs alternative implementations of the same primitives -- as they're well-tested,
-and have been improving over time in terms of performance. However, developers must be careful when
-using these primitives in asynchronous code, as their behavior can sometimes adversely affect the
-performance and correctness of Vector.
+New components (sources, sinks, transforms) must be behind feature flags:
 
-To wit, developers must exercise caution when using synchronous (i.e. `std::sync`, `parking_lot`,
-etc) synchronization primitives in asynchronous code, as they can be used in a way that deadlocks
-the asynchronous runtime even though the code compiles and appears to be correct. In some cases,
-you'll need to use an asynchronous-specific synchronization primitives, namely the ones from `tokio`
-itself. The documentation on `tokio`'s own
-[`Mutex`](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html), for example, calls out the
-specifics of when and where you might need to use it vs the one from `std::sync`.
+```bash
+# Build only specific component for faster iteration
+cargo test --lib --no-default-features --features sinks-console sinks::console
+```
 
+See the `features` section in [`Cargo.toml`](Cargo.toml) for examples.
+
+### Cargo Dependency Feature Placement
+
+[Cargo features are additive](https://doc.rust-lang.org/cargo/reference/features.html#feature-unification): once any crate in the dependency graph enables a feature, it is enabled for the entire build. This can be surprising — enabling a feature in one crate silently turns it on everywhere.
+
+Always set `default-features = false` in `[workspace.dependencies]`. For feature declarations, the rule is simple:
+
+- If only one crate needs a feature, declare it in that crate's own `Cargo.toml`.
+- If multiple crates need it, declare it in `[workspace.dependencies]`.
+
+Add a short comment near the dependency when the feature setup is non-obvious.
+
+**Auditing:** when unsure whether a feature is truly needed or only transitively enabled, verify with:
+
+```bash
+# Show the full feature tree for the workspace
+cargo tree -e features
+
+# Narrow down to a specific dependency
+cargo tree -e features -i <crate-name>
+```
+
+The `-i` flag shows which crates depend on `<crate-name>` and which features they activate, useful for tracing where a feature is coming from. If a feature only appears because another crate enables it, and your crate relies on that feature being present, declare it explicitly — otherwise your crate silently breaks if the other crate ever stops enabling it.
 
 ## New Configuration Fields vs CLI flags
 

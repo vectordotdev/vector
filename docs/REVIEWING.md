@@ -62,7 +62,7 @@ This checklist is specific for Vector's sinks.
       Check that the return value from `SinkConfig::build` is the return from `VectorSink::from_event_streamsink`.
 - [ ] Is it gated by sensible feature flags?
 - [ ] Is the code modularized into `mod.rs`, `config.rs`, `sink.rs`,  `request_builder.rs`, `service.rs`
-- [ ] Does the code follow our [style guidelines].
+- [ ] Does the code follow our [Vector style guidelines][style guidelines] and [Rust style guidelines](RUST_STYLE.md)?
 
 #### Documentation
 
@@ -175,4 +175,4 @@ on its importance.
 
 For integrations, consider whether the code could be integration tested.
 
-[style guidelines]: https://github.com/vectordotdev/vector/blob/master/STYLE.md
+[style guidelines]: ../STYLE.md
