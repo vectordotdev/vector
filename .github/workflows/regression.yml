@@ -236,8 +236,6 @@ jobs:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve-inputs.outputs.baseline-sha }}
           path: baseline-vector
@@ -273,8 +271,6 @@ jobs:
       - resolve-inputs
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -430,16 +426,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
-
-      - name: Checkout workflow revision for suite metadata
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
           ref: ${{ github.workflow_sha }}
-          path: workflow-vector
-          sparse-checkout: |
-            regression/cases
-          sparse-checkout-cone-mode: true
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -460,23 +447,14 @@ jobs:
         env:
           SUITE: ${{ needs.resolve-inputs.outputs.suite }}
         run: |
-          membership_root="${GITHUB_WORKSPACE}/workflow-vector/regression"
-
-          suite_file_for_case() {
-            local case_dir="$1"
-            local case_name="${case_dir%/}"
-            case_name="${case_name##*/}"
-
-            if [[ -f "${case_dir}/suite" ]]; then
-              printf '%s\n' "${case_dir}/suite"
-            else
-              printf '%s\n' "${membership_root}/cases/${case_name}/suite"
-            fi
-          }
-
           validate_suite_file() {
             local suite_file="$1"
-            if [[ -f "${suite_file}" ]]; then
+            if [[ -e "${suite_file}" || -L "${suite_file}" ]]; then
+              [[ -f "${suite_file}" && ! -L "${suite_file}" ]] || {
+                echo "Suite path is not a regular file: ${suite_file}"
+                exit 1
+              }
+
               [[ -s "${suite_file}" ]] || {
                 echo "Suite file is empty: ${suite_file}"
                 exit 1
@@ -496,7 +474,7 @@ jobs:
           }
 
           for case_dir in regression/cases/*/; do
-            validate_suite_file "$(suite_file_for_case "${case_dir}")"
+            validate_suite_file "${case_dir}/suite"
           done
 
           if [[ "${SUITE}" == "all" ]]; then
@@ -510,7 +488,7 @@ jobs:
 
           selected_cases=0
           for case_dir in regression/cases/*/; do
-            suite_file="$(suite_file_for_case "${case_dir}")"
+            suite_file="${case_dir}/suite"
 
             if { [[ "${SUITE}" == "logs" && ! -f "${suite_file}" ]]; } ||
               { [[ -f "${suite_file}" ]] && grep --fixed-strings --line-regexp --quiet "${SUITE}" "${suite_file}"; }; then
@@ -582,13 +560,9 @@ jobs:
       - submit-job
       - should-run-gate
       - resolve-inputs
-    # Job level permissions for downloading SMP results
     permissions:
-      contents: read # Required to checkout code
       id-token: write # Required for GitHub OIDC token exchange
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
@@ -624,13 +598,8 @@ jobs:
       - submit-job
       - resolve-inputs
     permissions:
-      contents: read # Required to checkout code
       id-token: write # Required for GitHub OIDC token exchange
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
