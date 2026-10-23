@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use metrics::Histogram;
-use vector_lib::{histogram, internal_event::HistogramName};
+use vector_lib::{
+    histogram,
+    internal_event::{HistogramName, ToF64Lossy},
+};
 
 #[derive(Clone, Copy)]
 pub struct AdaptiveConcurrencyLimitData {
@@ -25,12 +28,7 @@ registered_event! {
     }
 
     fn emit(&self, data: AdaptiveConcurrencyLimitData) {
-        // https://github.com/vectordotdev/vector/issues/23659
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "Metrics use f64"
-        )]
-        self.limit.record(data.concurrency as f64);
+        self.limit.record(data.concurrency.to_f64_lossy());
         let reached_limit = if data.reached_limit { 1.0 } else { Default::default() };
         self.reached_limit.record(reached_limit);
         let back_pressure = if data.had_back_pressure { 1.0 } else { Default::default() };
@@ -46,12 +44,7 @@ registered_event! {
     }
 
     fn emit(&self, in_flight: u64) {
-        // https://github.com/vectordotdev/vector/issues/23659
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "Metrics use f64"
-        )]
-        self.in_flight.record(in_flight as f64);
+        self.in_flight.record(in_flight.to_f64_lossy());
     }
 }
 

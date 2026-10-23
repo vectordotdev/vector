@@ -3,7 +3,9 @@ use std::{error::Error, time::Duration};
 use http::Response;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
-    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
+    internal_event::{
+        CounterName, HistogramName, InternalEvent, ToF64Lossy, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 
@@ -69,8 +71,6 @@ pub struct HttpEventsReceived<'a> {
 }
 
 impl InternalEvent for HttpEventsReceived<'_> {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -80,7 +80,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
             protocol = %self.protocol,
         );
 
-        histogram!(HistogramName::ComponentReceivedEventsCount).record(self.count as f64);
+        histogram!(HistogramName::ComponentReceivedEventsCount).record(self.count.to_f64_lossy());
         counter!(
             CounterName::ComponentReceivedEventsTotal,
             "http_path" => self.http_path.to_string(),
