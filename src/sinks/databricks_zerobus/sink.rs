@@ -60,6 +60,7 @@ impl ZerobusSink {
                     }
                 })
                 .into_driver(tower_service)
+                .protocol("grpc")
                 .run()
                 .await
         };
