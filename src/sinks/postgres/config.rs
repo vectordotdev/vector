@@ -32,6 +32,25 @@ const fn default_pool_size() -> u32 {
     5
 }
 
+/// How the sink handles rows that violate a unique or exclusion constraint on insert.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OnConflict {
+    /// Fail the whole batch when any row conflicts with an existing row.
+    #[default]
+    Error,
+
+    /// Skip rows that conflict with an existing row and insert the rest of the batch.
+    ///
+    /// This appends `ON CONFLICT DO NOTHING` to the insert statement. Skipped rows are reported
+    /// as intentionally discarded events.
+    ///
+    /// PostgreSQL rejects this statement on a table that has a `DEFERRABLE` unique or exclusion
+    /// constraint, even when no row conflicts. Keep the default for such tables.
+    DoNothing,
+}
+
 /// Configuration for the `postgres` sink.
 #[configurable_component(sink("postgres", "Deliver log data to a PostgreSQL database."))]
 #[derive(Clone, Default, Debug)]
@@ -59,12 +78,17 @@ pub struct PostgresConfig {
     /// a single event in the batch can make the whole batch to fail. For example, if a single event within the batch triggers
     /// a unique constraint violation in the destination table, the whole event batch will fail.
     ///
-    /// As a workaround, [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html) on constraint violations
-    /// can be defined at a database level to change the behavior of the insert operation on specific tables.
+    /// To skip rows that violate a unique constraint without failing the batch, set `on_conflict` to `do_nothing`.
+    ///
+    /// For other kinds of constraint violations, [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html)
+    /// on constraint violations can be defined at a database level to change the behavior of the insert operation on specific tables.
     /// Alternatively, setting `max_events` batch setting to `1` will make each event to be inserted independently,
     /// so events that trigger a constraint violation will not affect the rest of the events.
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[serde(default)]
+    pub on_conflict: OnConflict,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -199,7 +223,12 @@ impl ValidatedSink for PostgresConfig {
 
         // The endpoint label must not carry credentials or query parameters.
         let endpoint = protocol_endpoint(endpoint_uri.uri).1;
-        let service = PostgresService::new(connection_pool, self.table.clone(), endpoint);
+        let service = PostgresService::new(
+            connection_pool,
+            self.table.clone(),
+            endpoint,
+            self.on_conflict,
+        );
         let service = ServiceBuilder::new()
             .settings(request_settings, PostgresRetryLogic)
             .service(service);
@@ -233,6 +262,24 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.endpoint, "postgres://user:password@localhost/default");
         assert_eq!(cfg.table, "mytable");
+    }
+
+    #[test]
+    fn parse_on_conflict() {
+        let default_cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+        "#})
+        .unwrap();
+        assert_eq!(default_cfg.on_conflict, OnConflict::Error);
+
+        let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
+            endpoint: "postgres://user:password@localhost/default"
+            table: "mytable"
+            on_conflict: do_nothing
+        "#})
+        .unwrap();
+        assert_eq!(cfg.on_conflict, OnConflict::DoNothing);
     }
 
     #[test]
