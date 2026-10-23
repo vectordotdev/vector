@@ -163,7 +163,7 @@ where
                             in_flight_requests = in_flight.len(),
                             request_id,
                         );
-                        let finalizers = req.take_finalizers();
+                        let finalizers = InFlightFinalizers(Some(req.take_finalizers()));
                         let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
                         let event_count = req.get_metadata().event_count();
@@ -199,11 +199,12 @@ where
     fn handle_response(
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
-        finalizers: EventFinalizers,
+        finalizers: InFlightFinalizers,
         event_count: usize,
         bytes_sent: Option<&Registered<BytesSent>>,
         events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
     ) {
+        let finalizers = finalizers.into_inner();
         match result {
             Err(error) => {
                 Self::emit_call_error(Some(error), request_id, event_count);
@@ -242,6 +243,27 @@ where
     }
 }
 
+/// Finalizers of a request that the service has not completed yet.
+///
+/// If the request future is dropped before it completes, for example because the sink is
+/// cancelled, the events are marked as errored. Otherwise, their finalizers would report them as
+/// delivered.
+struct InFlightFinalizers(Option<EventFinalizers>);
+
+impl InFlightFinalizers {
+    fn into_inner(mut self) -> EventFinalizers {
+        self.0.take().unwrap_or_default()
+    }
+}
+
+impl Drop for InFlightFinalizers {
+    fn drop(&mut self) {
+        if let Some(finalizers) = self.0.take() {
+            finalizers.update_status(EventStatus::Errored);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -265,7 +287,9 @@ mod tests {
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
     use vector_common::{
-        finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        finalization::{
+            BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+        },
         internal_event::CountByteSize,
         json_size::JsonSize,
         request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -454,5 +478,51 @@ mod tests {
         // Make sure the final finalizer task runs.
         tokio::task::yield_now().await;
         assert_eq!(input_total, counter.load(Ordering::SeqCst));
+    }
+
+    /// Service whose calls either complete immediately or never complete.
+    struct FixedService {
+        complete: bool,
+    }
+
+    impl Service<DelayRequest> for FixedService {
+        type Response = DelayResponse;
+        type Error = ();
+        type Future =
+            Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: DelayRequest) -> Self::Future {
+            if self.complete {
+                Box::pin(futures::future::ready(Ok(DelayResponse::new())))
+            } else {
+                Box::pin(futures::future::pending())
+            }
+        }
+    }
+
+    /// Runs one request through the driver, and drops the driver if the request does not complete.
+    async fn single_request_status(complete: bool) -> BatchStatus {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let request = DelayRequest(
+            EventFinalizers::new(EventFinalizer::new(batch)),
+            RequestMetadata::default(),
+        );
+        let driver = Driver::new(stream::iter([request]), FixedService { complete });
+        _ = tokio::time::timeout(Duration::from_secs(1), driver.run()).await;
+        receiver.await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancelled_request_is_errored() {
+        assert_eq!(single_request_status(false).await, BatchStatus::Errored);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn completed_request_keeps_response_status() {
+        assert_eq!(single_request_status(true).await, BatchStatus::Delivered);
     }
 }
