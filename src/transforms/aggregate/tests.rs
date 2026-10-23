@@ -193,6 +193,7 @@ fn system_time_config(mode: AggregationMode) -> AggregateConfig {
         interval_ms: 1000,
         mode,
         event_time: None,
+        set_interval_ms: false,
     }
 }
 
@@ -201,6 +202,7 @@ fn event_time_config(interval_ms: u64, mode: AggregationMode) -> AggregateConfig
         interval_ms,
         mode,
         event_time: Some(EventTimeConfig::default()),
+        set_interval_ms: false,
     }
 }
 
@@ -215,6 +217,7 @@ fn event_time_config_with(
         interval_ms,
         mode,
         event_time: Some(event_time),
+        set_interval_ms: false,
     }
 }
 
@@ -1704,4 +1707,324 @@ fn event_time_count_counts_mixed_kinds_in_same_bucket() {
     let out = flush_final(&mut agg);
     assert_eq!(out.len(), 1);
     assert_counter(&out[0], 2.0);
+}
+
+fn with_set_interval_ms(config: AggregateConfig) -> AggregateConfig {
+    AggregateConfig {
+        set_interval_ms: true,
+        ..config
+    }
+}
+
+fn interval_ms_of(event: &Event) -> Option<u32> {
+    event
+        .as_metric()
+        .interval_ms()
+        .map(std::num::NonZeroU32::get)
+}
+
+#[test]
+fn set_interval_ms_parses_and_defaults_to_false() {
+    use crate::config::GenerateConfig;
+
+    let generated = AggregateConfig::generate_config();
+    assert_eq!(
+        generated.get("set_interval_ms"),
+        Some(&serde_json::Value::Bool(false))
+    );
+
+    let cfg: AggregateConfig = toml::from_str("interval_ms = 5000").unwrap();
+    assert!(!cfg.set_interval_ms);
+
+    let cfg: AggregateConfig = toml::from_str(
+        r"
+        interval_ms = 5000
+        set_interval_ms = true
+    ",
+    )
+    .unwrap();
+    assert!(cfg.set_interval_ms);
+}
+
+#[test]
+fn set_interval_ms_rejects_interval_above_u32() {
+    // The smallest whole-second interval above `u32::MAX` milliseconds.
+    let too_large = 4_294_968_000;
+
+    let err = Aggregate::new(&with_set_interval_ms(event_time_config(
+        too_large,
+        AggregationMode::Auto,
+    )))
+    .expect_err("interval_ms above u32::MAX must be rejected with set_interval_ms");
+    assert!(
+        err.to_string().contains("maximum supported value"),
+        "error should mention the maximum, got: {err}"
+    );
+
+    Aggregate::new(&event_time_config(too_large, AggregationMode::Auto))
+        .expect("the u32 limit only applies when set_interval_ms is enabled");
+    Aggregate::new(&with_set_interval_ms(event_time_config(
+        4_294_967_000,
+        AggregationMode::Auto,
+    )))
+    .expect("the largest whole-second interval within u32::MAX is accepted");
+}
+
+#[test]
+fn set_interval_ms_requires_whole_seconds() {
+    for interval_ms in [1, 500, 1_500, 10_001] {
+        let config = AggregateConfig {
+            interval_ms,
+            ..system_time_config(AggregationMode::Auto)
+        };
+        let err = Aggregate::new(&with_set_interval_ms(config))
+            .expect_err("a fractional-second interval must be rejected with set_interval_ms");
+        assert!(
+            err.to_string().contains("whole number of seconds"),
+            "interval_ms = {interval_ms}, got: {err}"
+        );
+        Aggregate::new(&config)
+            .expect("fractional-second intervals are allowed without set_interval_ms");
+    }
+    for interval_ms in [1_000, 2_000, 60_000] {
+        let config = AggregateConfig {
+            interval_ms,
+            ..system_time_config(AggregationMode::Auto)
+        };
+        Aggregate::new(&with_set_interval_ms(config))
+            .expect("whole-second intervals are accepted with set_interval_ms");
+    }
+}
+
+#[test]
+fn set_interval_ms_disabled_leaves_interval_unset() {
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
+    agg.record(make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    ));
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+    assert_eq!(interval_ms_of(&out[0]), None);
+}
+
+#[test]
+fn set_interval_ms_sets_interval_on_flushed_incremental_metrics() {
+    let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
+        AggregationMode::Auto,
+    )))
+    .unwrap();
+    agg.record(make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 42.0 },
+    ));
+    agg.record(make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 43.0 },
+    ));
+    agg.record(make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 7.0 },
+    ));
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(2, out.len());
+    for event in &out {
+        match event.as_metric().series().name.name.as_str() {
+            "counter_a" => {
+                assert_counter(event, 85.0);
+                assert_eq!(interval_ms_of(event), Some(1000));
+            }
+            "gauge_a" => {
+                assert_gauge(event, 7.0);
+                assert_eq!(
+                    interval_ms_of(event),
+                    None,
+                    "absolute metrics keep no interval"
+                );
+            }
+            other => panic!("Unexpected metric name in aggregate output: {other}"),
+        }
+    }
+
+    // The final flush on shutdown sets the interval too.
+    agg.record(make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    ));
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    assert_eq!(interval_ms_of(&out[0]), Some(1000));
+}
+
+#[tokio::test]
+async fn set_interval_ms_slow_start_does_not_backdate_windows() {
+    use crate::transforms::TaskTransform;
+
+    let agg = Aggregate::new(&with_set_interval_ms(system_time_config(
+        AggregationMode::Auto,
+    )))
+    .unwrap();
+    let (tx, rx) = mpsc::channel(10);
+    let mut out = Box::new(agg).transform(Box::pin(ReceiverStream::new(rx)));
+
+    // The stream is first polled more than one interval after it is built, with input ready.
+    tokio::time::sleep(Duration::from_millis(1_500)).await;
+    let sent = Utc::now();
+    tx.send(make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    ))
+    .await
+    .unwrap();
+    let event = tokio::time::timeout(Duration::from_secs(5), out.next())
+        .await
+        .expect("a flush within the timeout")
+        .expect("an aggregated metric");
+    let received = Utc::now();
+
+    let window_start = event.as_metric().timestamp().expect("the window start");
+    assert!(window_start <= received, "window start is in the future");
+    assert!(
+        window_start >= sent - chrono::Duration::milliseconds(1_000),
+        "window start is {} ms before the metric was sent",
+        (sent - window_start).num_milliseconds()
+    );
+}
+
+#[test]
+fn set_interval_ms_gives_untimestamped_metrics_their_window_start() {
+    let untimestamped = || {
+        make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+    };
+    let flush = |agg: &mut Aggregate| {
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        out
+    };
+    let timestamp_of = |event: &Event| event.as_metric().timestamp();
+    let one_second = chrono::Duration::milliseconds(1000);
+
+    let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
+        AggregationMode::Auto,
+    )))
+    .unwrap();
+
+    // The first window starts one interval before the first flush.
+    let before = Utc::now();
+    agg.record(untimestamped());
+    let out = flush(&mut agg);
+    let after = Utc::now();
+    let first = timestamp_of(&out[0]).expect("an untimestamped metric gets its window start");
+    assert!(before - one_second <= first && first <= after - one_second);
+
+    // Later windows start exactly one interval apart, also after a flush with no output.
+    agg.record(untimestamped());
+    let out = flush(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), Some(first + one_second));
+    assert!(flush(&mut agg).is_empty());
+    agg.record(untimestamped());
+    let out = flush_final(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), Some(first + one_second * 3));
+
+    // A metric that already has a timestamp keeps it.
+    let sample_ts = Utc.timestamp_opt(1_600_000_000, 0).single().unwrap();
+    agg.record(make_metric_with_timestamp(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+        sample_ts,
+    ));
+    let out = flush(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), Some(sample_ts));
+
+    // Flag off: untimestamped output stays untimestamped.
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
+    agg.record(untimestamped());
+    let out = flush(&mut agg);
+    assert_eq!(timestamp_of(&out[0]), None);
+}
+
+#[test]
+fn set_interval_ms_overwrites_input_interval() {
+    let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
+        AggregationMode::Sum,
+    )))
+    .unwrap();
+    let mut counter = make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    );
+    counter.as_mut_metric().data_mut().time.interval_ms = std::num::NonZeroU32::new(250);
+    agg.record(counter);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+    assert_eq!(interval_ms_of(&out[0]), Some(1000));
+}
+
+#[test]
+fn set_interval_ms_does_not_touch_passthrough_or_existing_output() {
+    let mut agg = Aggregate::new(&with_set_interval_ms(system_time_config(
+        AggregationMode::Latest,
+    )))
+    .unwrap();
+    let passthrough = make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    );
+    let passed = agg
+        .record(passthrough.clone())
+        .expect("Latest passes incremental metrics through");
+    assert_eq!(interval_ms_of(&passed), None);
+
+    // Events already in the output buffer before a flush are left alone.
+    let mut out = vec![passed];
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+    assert_eq!(out[0], passthrough);
+}
+
+#[test]
+fn set_interval_ms_sets_interval_on_event_time_buckets() {
+    let interval_ms = 10_000;
+    let mut agg = Aggregate::new(&with_set_interval_ms(event_time_config(
+        interval_ms,
+        AggregationMode::Auto,
+    )))
+    .unwrap();
+    let base_time = open_bucket_timestamp(interval_ms);
+    agg.record(make_metric_with_timestamp(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 2.0 },
+        base_time,
+    ));
+    agg.record(make_metric_with_timestamp(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 3.0 },
+        base_time + chrono::Duration::milliseconds(100),
+    ));
+
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    assert_counter(&out[0], 5.0);
+    assert_eq!(interval_ms_of(&out[0]), Some(10_000));
 }
