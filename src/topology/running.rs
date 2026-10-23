@@ -43,6 +43,10 @@ use crate::{
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 
+/// Gives Windows time to release ports held by components stopped during a reload.
+/// This value is guess work. Issue: https://github.com/vectordotdev/vector/issues/3035
+const WINDOWS_RELOAD_PORT_RELEASE_DELAY: Duration = Duration::from_millis(200);
+
 #[derive(Debug, Snafu)]
 pub enum ReloadError {
     #[snafu(display("global options changed: {}", changed_fields.join(", ")))]
@@ -328,12 +332,8 @@ impl RunningTopology {
         let diff = ConfigDiff::new(&self.config, &new_config, components_to_reload);
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
-        // Gives windows some time to make available any port
-        // released by shutdown components.
-        // Issue: https://github.com/vectordotdev/vector/issues/3035
         if cfg!(windows) {
-            // This value is guess work.
-            tokio::time::sleep(Duration::from_millis(200)).await;
+            tokio::time::sleep(WINDOWS_RELOAD_PORT_RELEASE_DELAY).await;
         }
 
         // Try to build all of the new components coming from the new configuration.  If we can
@@ -1538,6 +1538,8 @@ mod tests {
     use futures::StreamExt;
     use vector_lib::config::ComponentKey;
 
+    use super::WINDOWS_RELOAD_PORT_RELEASE_DELAY;
+
     use crate::{
         config::Config,
         event::{EventArray, LogEvent},
@@ -1583,9 +1585,15 @@ mod tests {
         .await
         .expect("reload did not cancel stalled sinks")
         .unwrap();
+        // Reload also waits for the Windows port release delay after the sinks stop.
+        let expected = if cfg!(windows) {
+            grace + WINDOWS_RELOAD_PORT_RELEASE_DELAY
+        } else {
+            grace
+        };
         assert_eq!(
             started.elapsed(),
-            grace,
+            expected,
             "sinks must share one reload deadline"
         );
         let forwarded = tokio::time::timeout(grace, received.next())
