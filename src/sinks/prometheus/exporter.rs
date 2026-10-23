@@ -19,6 +19,7 @@ use hyper::{
 use indexmap::{IndexMap, map::Entry};
 use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
+use tokio::task::JoinHandle;
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
@@ -228,7 +229,8 @@ impl ValidatedSink for PrometheusExporterConfig {
 }
 
 struct PrometheusExporter {
-    server_shutdown_trigger: Option<Trigger>,
+    /// Shutdown trigger and task of the running HTTP server.
+    server: Option<(Trigger, JoinHandle<()>)>,
     config: PrometheusExporterConfig,
     metrics: Arc<RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>>,
 }
@@ -430,14 +432,14 @@ impl Handler {
 impl PrometheusExporter {
     fn new(config: PrometheusExporterConfig) -> Self {
         Self {
-            server_shutdown_trigger: None,
+            server: None,
             config,
             metrics: Arc::new(RwLock::new(IndexMap::new())),
         }
     }
 
     async fn start_server_if_needed(&mut self) -> crate::Result<()> {
-        if self.server_shutdown_trigger.is_some() {
+        if self.server.is_some() {
             return Ok(());
         }
 
@@ -480,20 +482,21 @@ impl PrometheusExporter {
         let tls = MaybeTlsSettings::from_config(tls.as_ref(), true)?;
         let listener = tls.bind(&address).await?;
 
-        crate::spawn_in_current_span(async move {
+        let server = crate::spawn_in_current_span(async move {
             info!(message = "Building HTTP server.", address = %address);
 
-            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
-                .serve(new_service)
-                .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
-                .instrument(span)
-                .await
-                .map_err(|error| error!("Server error: {error}."))?;
-
-            Ok::<(), ()>(())
+            if let Err(error) =
+                Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                    .serve(new_service)
+                    .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
+                    .instrument(span)
+                    .await
+            {
+                error!("Server error: {error}.");
+            }
         });
 
-        self.server_shutdown_trigger = Some(trigger);
+        self.server = Some((trigger, server));
         Ok(())
     }
 
@@ -614,6 +617,15 @@ impl StreamSink<Event, SinkError> for PrometheusExporter {
             finalizers.update_status(EventStatus::Delivered);
         }
 
+        // Wait for the server to stop so its listener is closed before the sink finishes. A
+        // reload that binds the same address starts only after the old sink finishes.
+        if let Some((trigger, server)) = self.server.take() {
+            drop(trigger);
+            if let Err(error) = server.await {
+                error!("Prometheus exporter server task failed: {error}.");
+            }
+        }
+
         Ok(())
     }
 }
@@ -667,6 +679,25 @@ mod tests {
         PrometheusExporterConfig::default()
             .validate()
             .expect("default config should validate");
+    }
+
+    #[tokio::test]
+    async fn finished_sink_releases_address() {
+        let (_guard, address) = next_addr();
+        let config = PrometheusExporterConfig {
+            address,
+            ..Default::default()
+        };
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
+
+        sink.run(stream::empty::<Event>().map(Into::into))
+            .await
+            .unwrap();
+
+        // A reload binds the address again as soon as the old sink finishes.
+        std::net::TcpListener::bind(address).expect("finished sink still holds its address");
     }
 
     #[tokio::test]
