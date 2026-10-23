@@ -4,8 +4,6 @@
 #
 # Usage: capture_ready.sh DIR CHECK...
 #   count:FILE:KEY:MIN  DIR/FILE has at least MIN occurrences of the JSON key "KEY"
-#   received:MIN        the latest component_received_events_total for source0 in
-#                       DIR/vector-internal-metrics-sink.log is at least MIN
 #
 # Checks are lower bounds: the Rust tests assert exact counts, so duplicates fail there
 # instead of stalling this healthcheck.
@@ -27,14 +25,6 @@ for check in "$@"; do
         found=$(grep -o "\"$key\"" "$dir/$file" 2>/dev/null | wc -l)
         report="$report $file=$found/$min"
         [ "$found" -ge "$min" ] || status=1
-        ;;
-    received:*)
-        min=${check#received:}
-        found=$(grep '"name":"component_received_events_total"' "$dir/vector-internal-metrics-sink.log" 2>/dev/null |
-            grep '"component_id":"source0"' | tail -n 1 | sed -E 's/.*"value":([0-9.]+).*/\1/')
-        found=${found:-0}
-        report="$report received=$found/$min"
-        awk -v found="$found" -v min="$min" 'BEGIN { exit !(found >= min) }' || status=1
         ;;
     *)
         echo "unknown check: $check" >&2
