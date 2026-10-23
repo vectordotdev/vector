@@ -106,18 +106,30 @@ pub fn full_body(bytes: Bytes) -> RequestBody {
 type PooledClient = Client<HttpProxyConnector, RequestBody>;
 
 /// Optional connection behavior for [`HttpClient::new_with_options`]. The default changes nothing.
-///
-/// Start from [`ConnectionOptions::default`] and set the fields you need, so that code keeps
-/// compiling as options are added.
 #[derive(Clone, Copy, Debug, Default)]
-#[non_exhaustive]
 pub struct ConnectionOptions {
+    max_connection_age: Option<Duration>,
+    max_connection_age_jitter_factor: f64,
+}
+
+impl ConnectionOptions {
     /// Closes each connection once it is older than this, so it is re-established. A request
     /// in flight on a connection that reaches its age fails and should be retried.
-    pub max_connection_age: Option<Duration>,
+    ///
+    /// `None` disables the age limit.
+    #[must_use]
+    pub const fn max_connection_age(mut self, max_connection_age: Option<Duration>) -> Self {
+        self.max_connection_age = max_connection_age;
+        self
+    }
+
     /// Randomizes each connection's age limit by up to this fraction, in `0.0..=1.0`, so that
     /// connections opened together do not all close at once.
-    pub max_connection_age_jitter_factor: f64,
+    #[must_use]
+    pub const fn max_connection_age_jitter_factor(mut self, jitter_factor: f64) -> Self {
+        self.max_connection_age_jitter_factor = jitter_factor;
+        self
+    }
 }
 
 /// Randomizes a connection's age limit by the given fraction, clamped to `0.0..=1.0`.

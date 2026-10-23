@@ -652,8 +652,7 @@ async fn v1_max_connection_age_recycles_connections(
     #[case] expected_connections: usize,
 ) {
     let origin = spawn_origin(no_tls()).await;
-    let mut options = ConnectionOptions::default();
-    options.max_connection_age = max_connection_age;
+    let options = ConnectionOptions::default().max_connection_age(max_connection_age);
     let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
 
     assert_success(client.get(&origin.http_uri()).await.unwrap());
@@ -688,8 +687,7 @@ async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
         stream.write_all(b"rest of the body").await.ok();
     });
 
-    let mut options = ConnectionOptions::default();
-    options.max_connection_age = Some(Duration::from_millis(300));
+    let options = ConnectionOptions::default().max_connection_age(Some(Duration::from_millis(300)));
     let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
 
     let response = client
