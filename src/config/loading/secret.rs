@@ -14,7 +14,7 @@ use crate::{
         SecretBackend,
         loading::{
             deserialize_config_map,
-            loader::{AssemblyMode, ConfigLoader, ConfigScope, ParsedInputs},
+            loader::{ConfigLoader, ConfigScope, LoadMode, ParsedInputs},
             representation::ConfigMap,
         },
     },
@@ -52,10 +52,10 @@ pub struct SecretBackendLoader {
 }
 
 impl ConfigLoader for SecretBackendLoader {
-    const MODE: AssemblyMode = AssemblyMode::SecretBackends;
+    const MODE: LoadMode = LoadMode::SecretBackends;
 
-    fn visit_document(&mut self, document: &ConfigMap) {
-        collect_secret_keys_from_map(document, &mut self.secret_keys);
+    fn visit_string(&mut self, value: &str) {
+        collect_secret_keys(value, &mut self.secret_keys);
     }
 
     fn merge(&mut self, mut map: ConfigMap, _scope: ConfigScope) -> Result<(), Vec<String>> {
@@ -110,7 +110,7 @@ impl SecretBackendLoader {
 
     /// Discovers secrets from the same environment-expanded snapshot used by the builder.
     pub(crate) fn load_prepared(mut self, inputs: &ParsedInputs) -> Result<Self, Vec<String>> {
-        inputs.assemble(&mut self)?;
+        inputs.load_into(&mut self)?;
         Ok(self)
     }
 

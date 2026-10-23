@@ -7,16 +7,13 @@ use std::{
 use serde_json::Value;
 
 use super::{
-    ConfigPath, Format, component_name, interpolate_config_map_with_env_vars,
-    interpolation::ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX,
+    ConfigPath, Format, component_name,
+    interpolation::{self, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX},
+    merge::ConfigNode,
     open_file, read_dir,
-    representation::{
-        ConfigMap, DeferredConflict, deserialize_config_value, merge_into_map, merge_maps_deferred,
-        merge_values, merge_values_deferred, parse_config_value, resolve_merge_conflicts,
-    },
+    representation::{ConfigMap, deserialize_config_value, parse_config_value},
     schema_coercion::ValueCoercer,
-    secret::{COLLECTOR, SECRET_KEY, interpolate_config_map_with_secrets},
-    source::SourceLoader,
+    secret::{self, COLLECTOR, SECRET_KEY},
 };
 
 /// Provides a hint to the loading system of the type of components that should be found
@@ -58,29 +55,22 @@ pub(crate) enum ConfigScope {
     Component(ComponentHint),
 }
 
-/// Which values can be validated while assembling retained documents.
 #[derive(Clone, Copy)]
-pub(super) enum AssemblyMode {
-    /// Preserve raw values and reject conflicting types without coercion.
+pub(super) enum LoadMode {
     Raw,
-    /// Validate backend settings while component values may still contain secrets.
     SecretBackends,
-    /// Validate the complete configuration after substitutions.
     Configuration,
 }
 
-/// Consumes assembled configuration using the policy appropriate to its loading stage.
+/// Assembly has already happened. Consumers choose which values to resolve and
+/// how each original file/directory boundary contributes to the final result.
 pub(super) trait ConfigLoader {
-    const MODE: AssemblyMode;
+    const MODE: LoadMode;
 
-    /// Observes each visited document before merging can discard its values.
-    fn visit_document(&mut self, _document: &ConfigMap) {}
+    fn visit_string(&mut self, _value: &str) {}
 
     fn merge(&mut self, map: ConfigMap, scope: ConfigScope) -> Result<(), Vec<String>>;
 }
-
-type DocumentId = usize;
-type DirectoryId = usize;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct DocumentOrigin {
@@ -89,103 +79,37 @@ struct DocumentOrigin {
 }
 
 #[derive(Debug)]
-struct ParsedDocument {
-    origin: DocumentOrigin,
-    value: Result<ConfigMap, Vec<String>>,
+struct ConfigBatch {
+    scope: ConfigScope,
+    tree: Result<ConfigNode, Vec<String>>,
 }
 
-#[derive(Debug)]
-enum ParsedInput {
-    File(DocumentId),
-    Directory {
-        root: DirectoryId,
-        components: Vec<(ComponentHint, DirectoryId)>,
-    },
-}
-
-#[derive(Debug)]
-struct NamedFile {
-    name: String,
-    document: DocumentId,
-    nested: Option<DirectoryId>,
-}
-
-#[derive(Debug, Default)]
-struct ParsedDirectory {
-    files: Vec<NamedFile>,
-    folders: Vec<(String, DirectoryId)>,
-    errors: Vec<String>,
-}
-
-/// Parsed documents and their original assembly boundaries, retained across secret resolution.
-///
-/// Documents are not merged here: substitutions must precede same-name file merges, and
-/// secret discovery must still see references in values that a later file overwrites.
+/// A single filesystem snapshot, already assembled into merge trees. Separate
+/// inputs keep their append boundaries; each scalar keeps all its contributions.
 #[derive(Debug, Default)]
 pub(crate) struct ParsedInputs {
-    documents: Vec<ParsedDocument>,
-    directories: Vec<Result<ParsedDirectory, Vec<String>>>,
-    inputs: Vec<ParsedInput>,
+    inputs: Vec<Vec<ConfigBatch>>,
     environment_interpolated: bool,
     secrets_substituted: bool,
+    #[cfg(test)]
+    documents: Vec<DocumentOrigin>,
 }
 
 impl ParsedInputs {
     pub(crate) fn from_paths(paths: &[ConfigPath]) -> Self {
-        let mut reader = InputReader::default();
-        for path in paths {
-            match path {
-                ConfigPath::File(path, format) => {
-                    let format = format
-                        .or_else(|| Format::from_path(path).ok())
-                        .unwrap_or_default();
-                    if let Some((_, document)) = reader.file(path, format) {
-                        reader.parsed.inputs.push(ParsedInput::File(document));
-                    }
-                }
-                ConfigPath::Dir(path) => {
-                    let root = reader.directory(path, false, &ConfigMap::new());
-                    let mut components = Vec::new();
-                    for hint in [
-                        ComponentHint::Source,
-                        ComponentHint::Transform,
-                        ComponentHint::Sink,
-                        ComponentHint::Test,
-                        ComponentHint::EnrichmentTable,
-                    ] {
-                        let path = hint.join_path(path);
-                        if path.exists() && path.is_dir() {
-                            let directory = reader.directory(
-                                &path,
-                                matches!(hint, ComponentHint::Transform),
-                                &ConfigMap::new(),
-                            );
-                            components.push((hint, directory));
-                        }
-                    }
-                    reader
-                        .parsed
-                        .inputs
-                        .push(ParsedInput::Directory { root, components });
-                }
-            }
-        }
-        reader.parsed
+        InputReader::default().read_paths(paths)
     }
 
     pub(crate) fn from_input(input: impl Read, format: Format) -> Self {
         Self {
-            documents: vec![ParsedDocument {
-                origin: DocumentOrigin { path: None, format },
-                value: parse_document(input, format),
-            }],
-            inputs: vec![ParsedInput::File(0)],
+            inputs: vec![vec![ConfigBatch {
+                scope: ConfigScope::Root,
+                tree: parse_document(input, format).map(ConfigNode::from_map),
+            }]],
             ..Self::default()
         }
     }
 
-    /// Applies one environment snapshot to every retained document. Errors remain attached
-    /// to documents, so an ignored recursive folder cannot make its parent configuration fail.
     pub(crate) fn interpolate_environment(&mut self, enabled: bool) {
         if self.environment_interpolated {
             return;
@@ -193,7 +117,7 @@ impl ParsedInputs {
         self.environment_interpolated = true;
         if enabled {
             let vars = environment_variables();
-            self.update_documents(|map| interpolate_config_map_with_env_vars(map, &vars));
+            self.interpolate_strings(|value| interpolation::interpolate(value, &vars));
         }
     }
 
@@ -203,145 +127,49 @@ impl ParsedInputs {
         }
         self.secrets_substituted = true;
         if !secrets.is_empty() {
-            self.update_documents(|map| interpolate_config_map_with_secrets(map, secrets));
+            self.interpolate_strings(|value| secret::interpolate(value, secrets));
         }
     }
 
-    fn update_documents(
-        &mut self,
-        mut update: impl FnMut(&ConfigMap) -> Result<ConfigMap, Vec<String>>,
-    ) {
-        for document in &mut self.documents {
-            if let Ok(map) = &document.value {
-                document.value = update(map);
+    fn interpolate_strings(&mut self, interpolate: impl Fn(&str) -> Result<String, Vec<String>>) {
+        for batch in self.inputs.iter_mut().flatten() {
+            if let Ok(tree) = &mut batch.tree
+                && let Err(errors) = tree.interpolate(&interpolate)
+            {
+                batch.tree = Err(errors);
             }
         }
     }
 
-    /// Replays the original assembly policy without filesystem access.
-    pub(super) fn assemble(&self, loader: &mut impl ConfigLoader) -> Result<(), Vec<String>> {
+    pub(super) fn load_into<L: ConfigLoader>(&self, loader: &mut L) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
+        let mut schema = None;
         for input in &self.inputs {
-            if let Err(failures) = self.assemble_input(input, loader) {
-                errors.extend(failures);
-            }
-        }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
-    }
-
-    fn assemble_input<L: ConfigLoader>(
-        &self,
-        input: &ParsedInput,
-        loader: &mut L,
-    ) -> Result<(), Vec<String>> {
-        match input {
-            ParsedInput::File(document) => {
-                let map = self.document(*document, loader)?;
-                loader.merge(map, ConfigScope::Root)
-            }
-            ParsedInput::Directory { root, components } => {
-                let defer_conflicts = !matches!(L::MODE, AssemblyMode::Raw);
-                let mut root_map = ConfigMap::new();
-                let mut conflicts = Vec::new();
-                self.assemble_directory(
-                    *root,
-                    &mut root_map,
-                    loader,
-                    defer_conflicts.then_some(&mut conflicts),
-                )?;
-                let root_map = resolve_directory_root(root_map, conflicts, L::MODE)?;
-                loader.merge(root_map, ConfigScope::Root)?;
-                for (hint, directory) in components {
-                    let mut map = ConfigMap::new();
-                    let mut conflicts = Vec::new();
-                    self.assemble_directory(
-                        *directory,
-                        &mut map,
-                        loader,
-                        defer_conflicts.then_some(&mut conflicts),
-                    )?;
-                    let map = resolve_component_conflicts(map, conflicts, *hint, L::MODE)?;
-                    loader.merge(map, ConfigScope::Component(*hint))?;
-                }
-                Ok(())
-            }
-        }
-    }
-
-    fn document(
-        &self,
-        document: DocumentId,
-        loader: &mut impl ConfigLoader,
-    ) -> Result<ConfigMap, Vec<String>> {
-        let map = self.documents[document]
-            .value
-            .as_ref()
-            .map_err(Clone::clone)?;
-        loader.visit_document(map);
-        Ok(map.clone())
-    }
-
-    fn assemble_directory(
-        &self,
-        directory: DirectoryId,
-        result: &mut ConfigMap,
-        loader: &mut impl ConfigLoader,
-        mut conflicts: Option<&mut Vec<DeferredConflict>>,
-    ) -> Result<(), Vec<String>> {
-        let directory = self.directories[directory].as_ref().map_err(Clone::clone)?;
-        let mut errors = directory.errors.clone();
-        for file in &directory.files {
-            let mut nested_conflicts = Vec::new();
-            match self.assemble_file(
-                file,
-                loader,
-                conflicts.as_ref().map(|_| &mut nested_conflicts),
-            ) {
-                Ok(map) => {
-                    let merged = if let Some(conflicts) = conflicts.as_deref_mut() {
-                        let merged = merge_with_deferred_value(
-                            result,
-                            file.name.clone(),
-                            Value::Object(map),
-                            &mut nested_conflicts,
-                        );
-                        prefix_conflicts(&mut nested_conflicts, &file.name);
-                        conflicts.extend(nested_conflicts);
-                        merged
-                    } else {
-                        merge_with_value(result, file.name.clone(), Value::Object(map))
-                    };
-                    if let Err(failures) = merged {
-                        errors.extend(failures);
-                    }
-                }
-                Err(failures) => errors.extend(failures),
-            }
-        }
-        for (name, directory) in &directory.folders {
-            // Inline keys and successfully loaded files take precedence over standalone
-            // folders. Evaluate this after file merges, using the parent's existing map.
-            if !result.contains_key(name) {
-                let mut map = ConfigMap::new();
-                let mut nested_conflicts = Vec::new();
-                match self.assemble_directory(
-                    *directory,
-                    &mut map,
-                    loader,
-                    conflicts.as_ref().map(|_| &mut nested_conflicts),
-                ) {
-                    Ok(()) => {
-                        result.insert(name.clone(), Value::Object(map));
-                        if let Some(conflicts) = conflicts.as_deref_mut() {
-                            prefix_conflicts(&mut nested_conflicts, name);
-                            conflicts.extend(nested_conflicts);
+            for batch in input {
+                let result = batch.tree.as_ref().map_err(Clone::clone).and_then(|tree| {
+                    tree.visit_strings(&mut |value| loader.visit_string(value));
+                    let map = match L::MODE {
+                        LoadMode::Raw => deserialize_config_value(tree.raw()?)?,
+                        LoadMode::SecretBackends => {
+                            // Component secrets remain unresolved during backend discovery.
+                            let Some(backends) = tree.fields().get(SECRET_KEY) else {
+                                return loader.merge(ConfigMap::new(), batch.scope);
+                            };
+                            let projection = ConfigNode::Object(
+                                [(SECRET_KEY.to_owned(), backends.clone())]
+                                    .into_iter()
+                                    .collect(),
+                            );
+                            coerce_tree(&projection, &mut schema)?
                         }
-                    }
-                    Err(failures) => errors.extend(failures),
+                        LoadMode::Configuration => resolve_batch(tree, batch.scope, &mut schema)?,
+                    };
+                    loader.merge(map, batch.scope)
+                });
+                if let Err(failures) = result {
+                    errors.extend(failures);
+                    // Preserve the root-before-components boundary of each directory.
+                    break;
                 }
             }
         }
@@ -351,19 +179,46 @@ impl ParsedInputs {
             Err(errors)
         }
     }
+}
 
-    fn assemble_file(
-        &self,
-        file: &NamedFile,
-        loader: &mut impl ConfigLoader,
-        conflicts: Option<&mut Vec<DeferredConflict>>,
-    ) -> Result<ConfigMap, Vec<String>> {
-        let mut map = self.document(file.document, loader)?;
-        if let Some(nested) = file.nested {
-            self.assemble_directory(nested, &mut map, loader, conflicts)?;
-        }
-        Ok(map)
+fn resolve_batch(
+    tree: &ConfigNode,
+    scope: ConfigScope,
+    schema: &mut Option<Result<Value, Vec<String>>>,
+) -> Result<ConfigMap, Vec<String>> {
+    let ConfigScope::Component(hint) = scope else {
+        return coerce_tree(tree, schema);
+    };
+    let key = hint.as_component_field();
+    let names: Vec<_> = tree.fields().keys().cloned().collect();
+    let components = if matches!(hint, ComponentHint::Test) {
+        ConfigNode::Array(tree.fields().values().cloned().collect())
+    } else {
+        tree.clone()
+    };
+    let root = ConfigNode::Object([(key.to_owned(), components)].into_iter().collect());
+    let mut root = coerce_tree(&root, schema)?;
+    let value = root.remove(key).expect("component field survives coercion");
+    if matches!(hint, ComponentHint::Test) {
+        let values: Vec<Value> = deserialize_config_value(value)?;
+        Ok(names.into_iter().zip(values).collect())
+    } else {
+        deserialize_config_value(value)
     }
+}
+
+fn coerce_tree(
+    tree: &ConfigNode,
+    schema: &mut Option<Result<Value, Vec<String>>>,
+) -> Result<ConfigMap, Vec<String>> {
+    let schema = schema
+        .get_or_insert_with(config_schema)
+        .as_ref()
+        .map_err(Clone::clone)?;
+    let value = ValueCoercer::new(schema)
+        .coerce_tree(tree)
+        .map_err(|error| vec![error.to_string()])?;
+    deserialize_config_value(value)
 }
 
 #[derive(Clone, Default)]
@@ -373,141 +228,174 @@ struct DirectoryListing {
     errors: Vec<String>,
 }
 
-/// Filesystem access is confined to snapshot construction. Listings and documents are shared,
-/// but directory plans are specific to their parent's inline fields.
+/// Files and listings are read once. Directory traversal builds the merge tree
+/// directly, using inline keys to skip shadowed folders before opening them.
 #[derive(Default)]
 struct InputReader {
-    parsed: ParsedInputs,
-    documents: HashMap<DocumentOrigin, Option<DocumentId>>,
+    documents: HashMap<DocumentOrigin, Option<Result<ConfigNode, Vec<String>>>>,
     listings: HashMap<PathBuf, Result<DirectoryListing, Vec<String>>>,
     active_directories: HashSet<(PathBuf, Vec<String>)>,
 }
 
 impl InputReader {
-    fn file(&mut self, path: &Path, format: Format) -> Option<(String, DocumentId)> {
+    fn read_paths(mut self, paths: &[ConfigPath]) -> ParsedInputs {
+        let inputs = paths
+            .iter()
+            .map(|path| match path {
+                ConfigPath::File(path, format) => {
+                    let format = format
+                        .or_else(|| Format::from_path(path).ok())
+                        .unwrap_or_default();
+                    self.file(path, format)
+                        .map(|(_, tree)| ConfigBatch {
+                            scope: ConfigScope::Root,
+                            tree,
+                        })
+                        .into_iter()
+                        .collect()
+                }
+                ConfigPath::Dir(path) => {
+                    let root =
+                        self.directory(path, false, ConfigNode::object())
+                            .and_then(|files| {
+                                let mut root = ConfigNode::object();
+                                for file in files.into_fields().into_values() {
+                                    root.merge(file)?;
+                                }
+                                Ok(root)
+                            });
+                    let mut batches = vec![ConfigBatch {
+                        scope: ConfigScope::Root,
+                        tree: root,
+                    }];
+                    for hint in [
+                        ComponentHint::Source,
+                        ComponentHint::Transform,
+                        ComponentHint::Sink,
+                        ComponentHint::Test,
+                        ComponentHint::EnrichmentTable,
+                    ] {
+                        let path = hint.join_path(path);
+                        if path.is_dir() {
+                            batches.push(ConfigBatch {
+                                scope: ConfigScope::Component(hint),
+                                tree: self.directory(
+                                    &path,
+                                    matches!(hint, ComponentHint::Transform),
+                                    ConfigNode::object(),
+                                ),
+                            });
+                        }
+                    }
+                    batches
+                }
+            })
+            .collect();
+        ParsedInputs {
+            inputs,
+            #[cfg(test)]
+            documents: self
+                .documents
+                .into_iter()
+                .filter_map(|(origin, value)| value.map(|_| origin))
+                .collect(),
+            ..ParsedInputs::default()
+        }
+    }
+
+    fn file(
+        &mut self,
+        path: &Path,
+        format: Format,
+    ) -> Option<(String, Result<ConfigNode, Vec<String>>)> {
         let name = component_name(path).ok()?;
         let origin = DocumentOrigin {
             path: Some(path.to_owned()),
             format,
         };
-        if let Some(document) = self.documents.get(&origin) {
-            return document.map(|document| (name, document));
-        }
-        if let Some(input) = open_file(path) {
-            let document = ParsedDocument {
-                origin,
-                value: parse_document(input, format),
-            };
-            let id = self.parsed.documents.len();
-            self.documents.insert(document.origin.clone(), Some(id));
-            self.parsed.documents.push(document);
-            Some((name, id))
-        } else {
-            self.documents.insert(origin, None);
-            None
-        }
+        let document = self.documents.entry(origin).or_insert_with(|| {
+            open_file(path).map(|input| parse_document(input, format).map(ConfigNode::from_map))
+        });
+        document.clone().map(|tree| (name, tree))
     }
 
-    fn directory(&mut self, path: &Path, recurse: bool, initial: &ConfigMap) -> DirectoryId {
-        let directory = self.parsed.directories.len();
-        self.parsed.directories.push(Ok(ParsedDirectory::default()));
-        // A revisit with different inline fields can suppress the link that led here.
-        // Only reject a repeated ancestor with the same initial field names.
+    fn directory(
+        &mut self,
+        path: &Path,
+        recurse: bool,
+        initial: ConfigNode,
+    ) -> Result<ConfigNode, Vec<String>> {
         let canonical = path.canonicalize().unwrap_or_else(|_| path.to_owned());
-        let mut keys = initial.keys().cloned().collect::<Vec<_>>();
+        let mut keys = initial.fields().keys().cloned().collect::<Vec<_>>();
         keys.sort_unstable();
         let context = (canonical, keys);
-        let parsed = if self.active_directories.insert(context.clone()) {
-            let parsed = self.read_directory(path, recurse, initial);
-            self.active_directories.remove(&context);
-            parsed
-        } else {
-            Err(vec![format!(
+        if !self.active_directories.insert(context.clone()) {
+            return Err(vec![format!(
                 "Configuration directory contains a symbolic-link cycle: {path:?}."
-            )])
-        };
-        self.parsed.directories[directory] = parsed;
-        directory
+            )]);
+        }
+        let result = self.read_directory(path, recurse, initial);
+        self.active_directories.remove(&context);
+        result
     }
 
     fn read_directory(
         &mut self,
         path: &Path,
         recurse: bool,
-        initial: &ConfigMap,
-    ) -> Result<ParsedDirectory, Vec<String>> {
+        mut result: ConfigNode,
+    ) -> Result<ConfigNode, Vec<String>> {
         let listing = self
             .listings
             .entry(path.to_owned())
             .or_insert_with(|| Self::list_directory(path))
             .clone()?;
-        let mut directory = ParsedDirectory {
-            errors: listing.errors,
-            ..ParsedDirectory::default()
-        };
-        // Interpolation only changes string contents, not keys or value shapes. Replay
-        // raw assembly to determine which standalone folders are actually reachable.
-        // If interpolation later fails, assembly reports that error without reading a
-        // previously hidden folder solely to discover additional secondary failures.
-        let mut preview = initial.clone();
-        let mut loader = SourceLoader::new();
+        let mut errors = listing.errors;
         for path in listing.files {
             let Ok(format) = Format::from_path(&path) else {
                 continue;
             };
             if let Some((name, document)) = self.file(&path, format) {
-                let nested = if recurse {
-                    let initial = self.parsed.documents[document].value.as_ref().ok().cloned();
-                    path.parent()
-                        .map(|parent| parent.join(&name))
-                        .filter(|path| path.is_dir() && path.exists())
-                        .zip(initial)
-                        .map(|(path, initial)| self.directory(&path, true, &initial))
-                } else {
-                    None
-                };
-                let file = NamedFile {
-                    name,
-                    document,
-                    nested,
-                };
-                let mut conflicts = Vec::new();
-                if recurse
-                    && let Ok(map) =
-                        self.parsed
-                            .assemble_file(&file, &mut loader, Some(&mut conflicts))
-                {
-                    // Keep the normal merge's key-removal behavior on failure, too.
-                    drop(merge_with_deferred_value(
-                        &mut preview,
-                        file.name.clone(),
-                        Value::Object(map),
-                        &mut conflicts,
-                    ));
+                let document = document.and_then(|tree| {
+                    let nested = path.parent().map(|parent| parent.join(&name));
+                    if recurse && let Some(nested) = nested.filter(|path| path.is_dir()) {
+                        self.directory(&nested, true, tree)
+                    } else {
+                        Ok(tree)
+                    }
+                });
+                match document {
+                    Ok(tree) => {
+                        if let Err(failures) =
+                            result.merge(ConfigNode::Object([(name, tree)].into_iter().collect()))
+                        {
+                            errors.extend(failures);
+                        }
+                    }
+                    Err(failures) => errors.extend(failures),
                 }
-                directory.files.push(file);
             }
         }
         if recurse {
             for path in listing.folders {
                 if let Ok(name) = component_name(&path)
-                    && !preview.contains_key(&name)
+                    && !result.fields().contains_key(&name)
                 {
-                    let nested = self.directory(&path, true, &ConfigMap::new());
-                    let mut map = ConfigMap::new();
-                    let mut conflicts = Vec::new();
-                    if self
-                        .parsed
-                        .assemble_directory(nested, &mut map, &mut loader, Some(&mut conflicts))
-                        .is_ok()
-                    {
-                        preview.insert(name.clone(), Value::Object(map));
+                    match self.directory(&path, true, ConfigNode::object()) {
+                        Ok(tree) => {
+                            result
+                                .merge(ConfigNode::Object([(name, tree)].into_iter().collect()))?;
+                        }
+                        Err(failures) => errors.extend(failures),
                     }
-                    directory.folders.push((name, nested));
                 }
             }
         }
-        Ok(directory)
+        if errors.is_empty() {
+            Ok(result)
+        } else {
+            Err(errors)
+        }
     }
 
     #[expect(
@@ -557,164 +445,17 @@ fn parse_document(input: impl Read, format: Format) -> Result<ConfigMap, Vec<Str
     deserialize_config_value(value)
 }
 
-/// Updates a configuration map with the merged values of a named key. Inserts if absent.
-fn merge_with_value(res: &mut ConfigMap, name: String, value: Value) -> Result<(), Vec<String>> {
-    if let Some(existing) = res.remove(&name) {
-        res.insert(name, merge_values(existing, value)?);
-    } else {
-        res.insert(name, value);
-    }
-    Ok(())
-}
-
-fn merge_with_deferred_value(
-    res: &mut ConfigMap,
-    name: String,
-    value: Value,
-    conflicts: &mut Vec<DeferredConflict>,
-) -> Result<(), Vec<String>> {
-    if let Some(existing) = res.remove(&name) {
-        res.insert(name, merge_values_deferred(existing, value, conflicts)?);
-    } else {
-        res.insert(name, value);
-    }
-    Ok(())
-}
-
-fn prefix_conflicts(conflicts: &mut [DeferredConflict], name: &str) {
-    for conflict in conflicts {
-        conflict.path.insert(0, name.to_owned());
-    }
-}
-
-fn resolve_directory_root(
-    mut files: ConfigMap,
-    mut conflicts: Vec<DeferredConflict>,
-    mode: AssemblyMode,
-) -> Result<ConfigMap, Vec<String>> {
-    if matches!(mode, AssemblyMode::Raw) {
-        let mut root = ConfigMap::new();
-        for value in files.into_values() {
-            if let Value::Object(map) = value {
-                merge_into_map(&mut root, map)?;
-            }
-        }
-        return Ok(root);
-    }
-    // Root filenames are assembly boundaries, not configuration field names.
-    for conflict in &mut conflicts {
-        drop(conflict.path.remove(0));
-    }
-    if matches!(mode, AssemblyMode::SecretBackends) {
-        for value in files.values_mut() {
-            if let Value::Object(map) = value {
-                map.retain(|key, _| key == SECRET_KEY);
-            }
-        }
-        conflicts.retain(|conflict| conflict.path.first().is_some_and(|key| key == SECRET_KEY));
-    }
-    let maps = files.into_values().filter_map(|value| match value {
-        Value::Object(map) => Some(map),
-        _ => None,
-    });
-    let (merged, root_conflicts) = merge_maps_deferred(maps)?;
-    conflicts.extend(root_conflicts);
-    coerce_merge_conflicts(merged, conflicts)
-}
-
-fn resolve_component_conflicts(
-    mut map: ConfigMap,
-    mut conflicts: Vec<DeferredConflict>,
-    hint: ComponentHint,
-    mode: AssemblyMode,
-) -> Result<ConfigMap, Vec<String>> {
-    if matches!(mode, AssemblyMode::Raw) || conflicts.is_empty() {
-        return Ok(map);
-    }
-    if matches!(mode, AssemblyMode::SecretBackends) {
-        // Match secret discovery's existing projection. All other component conflicts
-        // remain deferred until their secret values have been substituted.
-        conflicts.retain(|conflict| conflict.path.first().is_some_and(|key| key == SECRET_KEY));
-        let projection = map
-            .get(SECRET_KEY)
-            .map(|value| (SECRET_KEY.to_owned(), value.clone()))
-            .into_iter()
-            .collect();
-        let mut projection = coerce_merge_conflicts(projection, conflicts)?;
-        if let Some(backends) = projection.remove(SECRET_KEY) {
-            map.insert(SECRET_KEY.to_owned(), backends);
-        }
-        return Ok(map);
-    }
-
-    let field = hint.as_component_field();
-    if matches!(hint, ComponentHint::Test) {
-        let names: Vec<_> = map.keys().cloned().collect();
-        for conflict in &mut conflicts {
-            if let Some(index) = names
-                .iter()
-                .position(|name| conflict.path.first() == Some(name))
-            {
-                conflict.path[0] = index.to_string();
-            }
-        }
-        prefix_conflicts(&mut conflicts, field);
-        let root =
-            ConfigMap::from_iter([(field.to_owned(), Value::Array(map.into_values().collect()))]);
-        let mut root = coerce_merge_conflicts(root, conflicts)?;
-        let values: Vec<Value> =
-            deserialize_config_value(root.remove(field).unwrap_or(Value::Null))?;
-        Ok(names.into_iter().zip(values).collect())
-    } else {
-        prefix_conflicts(&mut conflicts, field);
-        let root = ConfigMap::from_iter([(field.to_owned(), Value::Object(map))]);
-        let mut root = coerce_merge_conflicts(root, conflicts)?;
-        deserialize_config_value(root.remove(field).unwrap_or(Value::Null))
-    }
-}
-
-/// Coerces a root configuration before serde performs authoritative deserialization.
+/// Deserialization follows resolution; Serde owns component validation and defaults.
 pub(super) fn deserialize_config_map<T: serde::de::DeserializeOwned>(
     map: ConfigMap,
 ) -> Result<T, Vec<String>> {
-    let mut value = Value::Object(map);
-    coerce_config(&mut value)?;
-    deserialize_config_value(value)
+    deserialize_config_value(Value::Object(map))
 }
 
-fn coerce_merge_conflicts(
-    map: ConfigMap,
-    conflicts: Vec<DeferredConflict>,
-) -> Result<ConfigMap, Vec<String>> {
-    // Generate at most one schema, and only when a conflict needs to be checked.
-    let mut schema = None;
-    resolve_merge_conflicts(map, conflicts, |value| {
-        let schema = schema
-            .get_or_insert_with(config_schema)
-            .as_ref()
-            .map_err(Clone::clone)?;
-        ValueCoercer::new(schema)
-            .coerce(value)
-            .map_err(|error| vec![error.to_string()])
-    })
-}
-
-/// Coerces a namespaced component map using its schema at the root configuration field.
 pub(super) fn deserialize_component_map<T: serde::de::DeserializeOwned>(
     map: ConfigMap,
-    hint: ComponentHint,
 ) -> Result<indexmap::IndexMap<crate::config::ComponentKey, T>, Vec<String>> {
-    let key = hint.as_component_field();
-    let mut value = Value::Object(ConfigMap::from_iter([(key.to_owned(), Value::Object(map))]));
-    coerce_config(&mut value)?;
-    deserialize_config_value(value[key].take())
-}
-
-fn coerce_config(value: &mut Value) -> Result<(), Vec<String>> {
-    let schema = config_schema()?;
-    ValueCoercer::new(&schema)
-        .coerce(value)
-        .map_err(|error| vec![error.to_string()])
+    deserialize_config_map(map)
 }
 
 fn config_schema() -> Result<Value, Vec<String>> {

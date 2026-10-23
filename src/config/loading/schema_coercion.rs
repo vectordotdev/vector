@@ -4,10 +4,13 @@
 //! authoritative for final component validation.
 //! The loader invokes this pass after environment-variable and secret substitution.
 
+use std::collections::HashSet;
+
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
-use std::collections::HashSet;
 use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_STRING_ONLY, SERDE_VARIANT_ALIASES};
+
+use super::merge::ConfigNode;
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -27,6 +30,9 @@ const PROVIDER: &str = "provider";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("{message}"))]
+    Merge { message: String },
+
     #[snafu(display("Expected boolean at '{path}', found '{actual}'"))]
     ExpectedBool { path: String, actual: &'static str },
 
@@ -93,6 +99,7 @@ macro_rules! fail_expected {
 /// error paths. The schema is borrowed and may be reused across calls.
 pub struct ValueCoercer<'a> {
     schema: &'a Value,
+    tree: Option<ConfigNode>,
     definitions: Option<&'a Value>,
     component_schemas: Vec<&'a Value>,
     path: Vec<String>,
@@ -104,6 +111,7 @@ impl<'a> ValueCoercer<'a> {
     pub fn new(schema: &'a Value) -> Self {
         let mut coercer = Self {
             schema,
+            tree: None,
             definitions: schema.get("definitions"),
             component_schemas: Vec::new(),
             path: Vec::new(),
@@ -130,6 +138,46 @@ impl<'a> ValueCoercer<'a> {
     pub fn coerce(&mut self, value: &mut Value) -> Result<(), Error> {
         self.path.clear();
         self.coerce_value(value, self.schema)
+    }
+
+    /// Resolves a merge tree in its final configuration coordinates. Histories are
+    /// checked at the corresponding field, using that field's schema only.
+    pub(super) fn coerce_tree(&mut self, tree: &ConfigNode) -> Result<Value, Error> {
+        self.path.clear();
+        self.tree = Some(tree.clone());
+        let mut value = tree.latest();
+        let result = self.coerce_field(&mut value, self.schema);
+        let tree = self
+            .tree
+            .take()
+            .expect("merge tree is retained during coercion");
+        result?;
+        // Fields without a schema still follow the raw merge rules. Typed fields
+        // have already converted their scalar histories in place.
+        tree.check_raw_merges().map_err(|errors| Error::Merge {
+            message: errors.join("\n"),
+        })?;
+        Ok(value)
+    }
+
+    fn coerce_field(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        self.coerce_value(value, schema)?;
+        if let Some(node) = self
+            .tree
+            .as_mut()
+            .and_then(|tree| tree.at_path_mut(&self.path))
+            && matches!(node, ConfigNode::Scalar(values) if values.len() > 1 && values.iter().any(Value::is_string))
+        {
+            let mut scalar_coercer = Self::new(self.schema);
+            scalar_coercer.path.clone_from(&self.path);
+            node.resolve_scalar_history(value, &self.path, |previous| {
+                scalar_coercer
+                    .coerce_value(previous, schema)
+                    .map_err(|error| error.to_string())
+            })
+            .map_err(|message| Error::Merge { message })?;
+        }
+        Ok(())
     }
 
     fn definition(&self, reference: &str) -> Option<&'a Value> {
@@ -610,7 +658,7 @@ impl<'a> ValueCoercer<'a> {
                     .fail();
                 }
 
-                let result = self.coerce_value(field, field_schema);
+                let result = self.coerce_field(field, field_schema);
                 self.path.truncate(initial_len);
                 result?;
             } else {
@@ -664,7 +712,7 @@ impl<'a> ValueCoercer<'a> {
                             .fail();
                         }
 
-                        let result = self.coerce_value(item_val, item_schema);
+                        let result = self.coerce_field(item_val, item_schema);
                         self.path.truncate(initial_len);
                         result?;
                     } else {
@@ -677,7 +725,7 @@ impl<'a> ValueCoercer<'a> {
                 for (idx, item_val) in arr.iter_mut().enumerate() {
                     let initial_len = self.path.len();
                     self.path.push(idx.to_string());
-                    let result = self.coerce_value(item_val, item_schema);
+                    let result = self.coerce_field(item_val, item_schema);
                     self.path.truncate(initial_len);
                     result?;
                 }
@@ -690,8 +738,10 @@ impl<'a> ValueCoercer<'a> {
     /// Prefer shape-preserving variants, leaving final validation to serde.
     fn coerce_one_of(&mut self, value: &mut Value, schemas: &[Value]) -> Result<(), Error> {
         let initial_len = self.path.len();
-        if self.coerce_any_of(value, schemas).is_ok() {
-            return Ok(());
+        match self.coerce_any_of(value, schemas) {
+            Ok(()) => return Ok(()),
+            Err(error @ Error::Merge { .. }) => return Err(error),
+            Err(_) => {}
         }
 
         // No variant succeeded. If the value carries a `type` discriminant that matches a known
@@ -870,9 +920,18 @@ impl<'a> ValueCoercer<'a> {
 
                 self.path.truncate(initial_len);
                 let mut candidate = value.clone();
-                if self.coerce_value(&mut candidate, schema).is_ok() {
+                // Choose the variant from the final definitions. Historical values
+                // must not cause a different branch to win or disappear in a fallback.
+                let tree = self.tree.take();
+                let result = self.coerce_value(&mut candidate, schema);
+                self.tree = tree;
+                if result.is_ok() {
                     self.path.truncate(initial_len);
-                    *value = candidate;
+                    if self.tree.is_some() {
+                        self.coerce_value(value, schema)?;
+                    } else {
+                        *value = candidate;
+                    }
                     return Ok(());
                 }
             }

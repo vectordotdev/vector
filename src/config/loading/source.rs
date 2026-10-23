@@ -1,5 +1,5 @@
 use super::{
-    loader::{AssemblyMode, ConfigLoader, ConfigScope, ParsedInputs},
+    loader::{ConfigLoader, ConfigScope, LoadMode, ParsedInputs},
     representation::{ConfigMap, merge_into_map},
 };
 
@@ -40,13 +40,13 @@ impl SourceLoader {
     }
 
     fn load_prepared(mut self, inputs: &ParsedInputs) -> Result<ConfigMap, Vec<String>> {
-        inputs.assemble(&mut self)?;
+        inputs.load_into(&mut self)?;
         Ok(self.map)
     }
 }
 
 impl ConfigLoader for SourceLoader {
-    const MODE: AssemblyMode = AssemblyMode::Raw;
+    const MODE: LoadMode = LoadMode::Raw;
 
     fn merge(&mut self, map: ConfigMap, _scope: ConfigScope) -> Result<(), Vec<String>> {
         merge_into_map(&mut self.map, map)

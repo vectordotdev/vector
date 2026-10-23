@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Read};
 
 use super::{
     ComponentHint, deserialize_component_map, deserialize_config_map,
-    loader::{AssemblyMode, ConfigLoader, ConfigScope, ParsedInputs},
+    loader::{ConfigLoader, ConfigScope, LoadMode, ParsedInputs},
     representation::ConfigMap,
 };
 use crate::config::ConfigBuilder;
@@ -68,39 +68,34 @@ impl ConfigBuilderLoader {
         mut self,
         inputs: &ParsedInputs,
     ) -> Result<ConfigBuilder, Vec<String>> {
-        inputs.assemble(&mut self)?;
+        inputs.load_into(&mut self)?;
         Ok(self.builder)
     }
 }
 
 impl ConfigLoader for ConfigBuilderLoader {
-    const MODE: AssemblyMode = AssemblyMode::Configuration;
+    const MODE: LoadMode = LoadMode::Configuration;
 
     fn merge(&mut self, map: ConfigMap, scope: ConfigScope) -> Result<(), Vec<String>> {
         match scope {
-            ConfigScope::Component(hint @ ComponentHint::Source) => {
-                self.builder
-                    .sources
-                    .extend(deserialize_component_map(map, hint)?);
+            ConfigScope::Component(ComponentHint::Source) => {
+                self.builder.sources.extend(deserialize_component_map(map)?);
             }
-            ConfigScope::Component(hint @ ComponentHint::Sink) => {
-                self.builder
-                    .sinks
-                    .extend(deserialize_component_map(map, hint)?);
+            ConfigScope::Component(ComponentHint::Sink) => {
+                self.builder.sinks.extend(deserialize_component_map(map)?);
             }
-            ConfigScope::Component(hint @ ComponentHint::Transform) => {
+            ConfigScope::Component(ComponentHint::Transform) => {
                 self.builder
                     .transforms
-                    .extend(deserialize_component_map(map, hint)?);
+                    .extend(deserialize_component_map(map)?);
             }
-            ConfigScope::Component(hint @ ComponentHint::EnrichmentTable) => {
+            ConfigScope::Component(ComponentHint::EnrichmentTable) => {
                 self.builder
                     .enrichment_tables
-                    .extend(deserialize_component_map(map, hint)?);
+                    .extend(deserialize_component_map(map)?);
             }
             ConfigScope::Component(hint @ ComponentHint::Test) => {
-                // Tests use a root array, not a component map. Discard filenames while
-                // preserving their order, then use the same coercion as top-level tests.
+                // Tests use a root array. Discard filenames while preserving their order.
                 let map = ConfigMap::from_iter([(
                     hint.as_component_field().to_owned(),
                     serde_json::Value::Array(map.into_values().collect()),

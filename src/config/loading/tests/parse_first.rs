@@ -254,10 +254,14 @@ fn quoted_yaml_flow_placeholders_are_substituted() {
     let value = serde_json::to_value(builder).unwrap();
     assert_eq!(value["proxy"]["enabled"], false);
     assert_eq!(value["proxy"]["http"], "http://proxy.example:8080");
-    assert_eq!(
-        value["proxy"]["no_proxy"],
-        json!(["localhost", "internal.example"])
-    );
+    let mut no_proxy: Vec<_> = value["proxy"]["no_proxy"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap())
+        .collect();
+    no_proxy.sort_unstable();
+    assert_eq!(no_proxy, ["internal.example", "localhost"]);
 }
 
 #[test]

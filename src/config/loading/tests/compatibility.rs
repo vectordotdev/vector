@@ -766,3 +766,88 @@ fn toml_numeric_substitutions_match_literal_values() {
         }
     }
 }
+
+#[test]
+#[cfg(feature = "sources-fluent")]
+fn fluent_defaults_to_tcp_before_coercing_its_fields() {
+    const CONFIG: &str = indoc! {r"
+        sources:
+          incoming:
+            type: fluent
+            address: 127.0.0.1:24224
+            connection_limit: ${VECTOR_TEST_COMPAT_UNSET:-2}
+    "};
+    let config = with_absent_env_var(CONFIG);
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .load_from_input(config.as_bytes(), crate::config::Format::Yaml)
+        .unwrap();
+    let source = &serde_json::to_value(builder).unwrap()["sources"]["incoming"];
+    assert_eq!(source["mode"], "tcp");
+    assert_eq!(source["connection_limit"], 2);
+}
+
+#[test]
+#[cfg(feature = "sources-http_server")]
+fn http_auth_defaults_to_basic_after_secret_substitution() {
+    const CONFIG: &str = indoc! {r"
+        sources:
+          web:
+            type: http_server
+            address: 127.0.0.1:8080
+            auth:
+              username: user
+              password: SECRET[backend.password]
+    "};
+    let builder = ConfigBuilderLoader::default()
+        .secrets(HashMap::from([("backend.password".into(), "pass".into())]))
+        .load_from_input(CONFIG.as_bytes(), crate::config::Format::Yaml)
+        .unwrap();
+    let auth = &serde_json::to_value(builder).unwrap()["sources"]["web"]["auth"];
+    assert_eq!(
+        auth,
+        &json!({"strategy": "basic", "username": "user", "password": "pass"})
+    );
+}
+
+#[test]
+#[cfg(feature = "sources-static_metrics")]
+fn histogram_bounds_preserve_special_strings() {
+    const CONFIG: &str = indoc! {r#"
+        sources:
+          fixed:
+            type: static_metrics
+            metrics:
+              - name: latency
+                kind: absolute
+                tags: {}
+                value:
+                  aggregated_histogram:
+                    buckets:
+                      - upper_limit: "inf"
+                        count: 1
+                      - upper_limit: "-inf"
+                        count: 2
+                      - upper_limit: "NaN"
+                        count: 3
+                      - upper_limit: 1.5
+                        count: 4
+                    count: 10
+                    sum: 0
+    "#};
+    let builder = ConfigBuilderLoader::default()
+        .load_from_input(CONFIG.as_bytes(), crate::config::Format::Yaml)
+        .unwrap();
+    let value = serde_json::to_value(builder).unwrap();
+    let buckets =
+        &value["sources"]["fixed"]["metrics"][0]["value"]["aggregated_histogram"]["buckets"];
+    assert_eq!(
+        buckets,
+        &json!([
+            {"upper_limit": "inf", "count": 1},
+            {"upper_limit": "-inf", "count": 2},
+            {"upper_limit": "NaN", "count": 3},
+            {"upper_limit": 1.5, "count": 4}
+        ])
+    );
+}

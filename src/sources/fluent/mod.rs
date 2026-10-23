@@ -47,10 +47,9 @@ pub struct FluentConfig {
 }
 
 /// Listening mode for the `fluent` source.
-#[configurable_component(no_deser)]
+#[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(tag = "mode", rename_all = "snake_case")]
-#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[serde(from = "deser::FluentModeDe", into = "deser::FluentModeDe")]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum FluentMode {
     /// Listen on TCP port
@@ -66,37 +65,52 @@ pub enum FluentMode {
 ///
 /// See [serde-rs/serde#2231](https://github.com/serde-rs/serde/issues/2231)
 mod deser {
-    use super::{Deserialize, FluentMode, FluentTcpConfig, FluentUnixConfig, UnixOnly};
+    use vector_config::configurable_component;
 
+    use super::{FluentMode, FluentTcpConfig, FluentUnixConfig, UnixOnly};
+
+    /// Explicit listening mode for Fluent.
     #[allow(clippy::large_enum_variant)]
-    #[derive(Deserialize)]
+    #[configurable_component]
     #[serde(tag = "mode")]
-    enum FluentModeTagged {
+    #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+    pub(super) enum FluentModeTagged {
+        /// Listen on TCP port.
         #[serde(rename = "tcp")]
         Tcp(FluentTcpConfig),
 
+        /// Listen on a Unix stream socket.
         #[serde(rename = "unix")]
         Unix(UnixOnly<FluentUnixConfig>),
     }
 
-    #[derive(Deserialize)]
+    /// Fluent accepts an explicit mode or a TCP configuration without a mode tag.
+    #[configurable_component]
     #[serde(untagged)]
-    enum FluentModeDe {
+    pub(super) enum FluentModeDe {
+        /// Explicit TCP or Unix listening mode.
         Tagged(FluentModeTagged),
 
-        // Note: this must be last as serde attempts variants in order
+        // Note: this must be last as serde attempts variants in order.
+        /// TCP is the default when mode is omitted.
         Untagged(FluentTcpConfig),
     }
 
-    impl<'de> Deserialize<'de> for FluentMode {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            Ok(match FluentModeDe::deserialize(deserializer)? {
-                FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => FluentMode::Unix(config),
+    impl From<FluentModeDe> for FluentMode {
+        fn from(input: FluentModeDe) -> Self {
+            match input {
+                FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => Self::Unix(config),
                 FluentModeDe::Tagged(FluentModeTagged::Tcp(config))
-                | FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
+                | FluentModeDe::Untagged(config) => Self::Tcp(config),
+            }
+        }
+    }
+
+    impl From<FluentMode> for FluentModeDe {
+        fn from(mode: FluentMode) -> Self {
+            Self::Tagged(match mode {
+                FluentMode::Tcp(config) => FluentModeTagged::Tcp(config),
+                FluentMode::Unix(config) => FluentModeTagged::Unix(config),
             })
         }
     }

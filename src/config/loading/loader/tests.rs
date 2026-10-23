@@ -2,23 +2,16 @@ use indoc::indoc;
 
 use serde_json::{Value, json};
 
-use super::{AssemblyMode, ConfigLoader, ConfigMap, ConfigPath, ConfigScope, Format, ParsedInputs};
+use super::{ConfigLoader, ConfigMap, ConfigPath, ConfigScope, Format, LoadMode, ParsedInputs};
 
 #[derive(Default)]
 struct RecordingLoader {
     roots: Vec<Value>,
     components: ConfigMap,
-    nested_visits: usize,
 }
 
 impl ConfigLoader for RecordingLoader {
-    const MODE: AssemblyMode = AssemblyMode::Raw;
-
-    fn visit_document(&mut self, document: &ConfigMap) {
-        if document.contains_key("nested") {
-            self.nested_visits += 1;
-        }
-    }
+    const MODE: LoadMode = LoadMode::Raw;
 
     fn merge(&mut self, map: ConfigMap, scope: ConfigScope) -> Result<(), Vec<String>> {
         match scope {
@@ -42,10 +35,10 @@ fn repeated_file_paths_share_one_parsed_document() {
     let parsed = ParsedInputs::from_paths(&[input.clone(), input]);
 
     assert_eq!(parsed.documents.len(), 1);
-    assert_eq!(parsed.documents[0].origin.path.as_ref(), Some(&path));
-    assert_eq!(parsed.documents[0].origin.format, Format::Yaml);
+    assert_eq!(parsed.documents[0].path.as_ref(), Some(&path));
+    assert_eq!(parsed.documents[0].format, Format::Yaml);
     let mut loader = RecordingLoader::default();
-    parsed.assemble(&mut loader).unwrap();
+    parsed.load_into(&mut loader).unwrap();
     assert_eq!(loader.roots, vec![json!({"value": "retained"}); 2]);
     assert!(loader.components.is_empty());
 }
@@ -71,9 +64,9 @@ fn same_stem_files_share_their_nested_documents() {
 
     assert_eq!(parsed.documents.len(), 3);
     let mut loader = RecordingLoader::default();
-    parsed.assemble(&mut loader).unwrap();
+    parsed.load_into(&mut loader).unwrap();
     // Sharing reads must not remove either file's contribution during assembly.
-    assert_eq!(loader.nested_visits, 2);
+    assert_eq!(contributions_at(&parsed, &["parent", "child", "nested"]), 2);
     assert_eq!(
         Value::Object(loader.components),
         json!({"parent": {"first": 1, "second": 2, "child": {"nested": 3}}})
@@ -102,9 +95,9 @@ fn inline_transform_fields_prevent_reading_matching_folders() {
     // Even a parse failure is retained when a file is read. Only mapper.yaml should
     // exist in the snapshot; the inline source field hides the entire source folder.
     assert_eq!(parsed.documents.len(), 1);
-    assert_eq!(parsed.documents[0].origin.path.as_ref(), Some(&mapper));
+    assert_eq!(parsed.documents[0].path.as_ref(), Some(&mapper));
     let mut loader = RecordingLoader::default();
-    parsed.assemble(&mut loader).unwrap();
+    parsed.load_into(&mut loader).unwrap();
     assert_eq!(
         Value::Object(loader.components),
         json!({"mapper": {"type": "remap", "source": "."}})
@@ -133,8 +126,11 @@ fn same_stem_files_apply_their_own_inline_folder_masks() {
 
     assert_eq!(parsed.documents.len(), 3);
     let mut loader = RecordingLoader::default();
-    parsed.assemble(&mut loader).unwrap();
-    assert_eq!(loader.nested_visits, 1);
+    parsed.load_into(&mut loader).unwrap();
+    assert_eq!(
+        contributions_at(&parsed, &["parent", "child", "disk", "nested"]),
+        1
+    );
     assert_eq!(
         Value::Object(loader.components),
         json!({"parent": {"child": {"inline": true, "disk": {"nested": true}}, "other": true}})
@@ -161,7 +157,7 @@ fn inline_fields_do_not_suppress_nested_files() {
 
     assert_eq!(parsed.documents.len(), 2);
     let mut loader = RecordingLoader::default();
-    parsed.assemble(&mut loader).unwrap();
+    parsed.load_into(&mut loader).unwrap();
     assert_eq!(
         Value::Object(loader.components),
         json!({"parent": {"child": {"inline": true, "disk": true}}})
@@ -189,10 +185,16 @@ fn directory_cycles_only_fail_when_assembly_reaches_them() {
         std::os::unix::fs::symlink(&nested, nested.join("blocked")).unwrap();
         let parsed = ParsedInputs::from_paths(&[ConfigPath::Dir(temp.path().to_owned())]);
         let mut loader = RecordingLoader::default();
-        let result = parsed.assemble(&mut loader);
+        let result = parsed.load_into(&mut loader);
 
         if ignored {
-            assert!(parsed.directories.iter().all(Result::is_ok));
+            assert!(
+                parsed
+                    .inputs
+                    .iter()
+                    .flatten()
+                    .all(|batch| batch.tree.is_ok())
+            );
             result.unwrap();
             assert_eq!(
                 Value::Object(loader.components),
@@ -208,4 +210,22 @@ fn directory_cycles_only_fail_when_assembly_reaches_them() {
             );
         }
     }
+}
+
+fn contributions_at(parsed: &ParsedInputs, path: &[&str]) -> usize {
+    parsed
+        .inputs
+        .iter()
+        .flatten()
+        .filter_map(|batch| {
+            path.iter()
+                .try_fold(batch.tree.as_ref().ok()?, |node, key| {
+                    node.fields().get(*key)
+                })
+        })
+        .map(|node| match node {
+            super::ConfigNode::Scalar(values) => values.len(),
+            _ => panic!("expected scalar contribution"),
+        })
+        .sum()
 }
