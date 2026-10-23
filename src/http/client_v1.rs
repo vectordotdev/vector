@@ -6,7 +6,7 @@ use http_1::{
 };
 use hyper_1::body::Incoming;
 use tracing::Instrument;
-use vector_http::{HttpError, RequestBody};
+use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
 
 use crate::{
     config::ProxyConfig,
@@ -40,10 +40,31 @@ impl HttpClient {
     /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
     /// build a connector.
     pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> crate::Result<Self> {
+        Self::new_with_options(tls, proxy, ConnectionOptions::default())
+    }
+
+    /// Like [`HttpClient::new`], with the given connection `options`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
+    /// build a connector.
+    pub fn new_with_options(
+        tls: MaybeTlsSettings,
+        proxy: &ProxyConfig,
+        options: ConnectionOptions,
+    ) -> crate::Result<Self> {
         Ok(Self {
-            client: vector_http::HttpClient::new(tls, proxy)?,
+            client: vector_http::HttpClient::new_with_options(tls, proxy, options)?,
             user_agent: default_user_agent(),
         })
+    }
+
+    /// Returns a handle that replaces the TLS settings of this client and of every clone of it,
+    /// for example after certificate rotation. The handle does not keep the client alive.
+    #[must_use]
+    pub fn tls_reload_handle(&self) -> TlsReloadHandle {
+        self.client.tls_reload_handle()
     }
 
     /// Sends `request`, adding the default request headers and any forward proxy credentials.

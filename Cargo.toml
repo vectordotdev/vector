@@ -401,7 +401,7 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
-arc-swap = { workspace = true, default-features = false, optional = true }
+arc-swap = { workspace = true, default-features = false }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
 arrow = { version = "59.2.0", default-features = false, features = ["ipc"], optional = true }
 parquet = { version = "59.2.0", default-features = false, features = [
@@ -875,7 +875,7 @@ transforms-metrics = [
 ]
 
 transforms-aggregate = []
-transforms-aws_ec2_metadata = ["dep:arc-swap"]
+transforms-aws_ec2_metadata = []
 transforms-dedupe = ["transforms-impl-dedupe"]
 transforms-delay = []
 transforms-filter = []

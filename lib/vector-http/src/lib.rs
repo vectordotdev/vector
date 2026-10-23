@@ -21,10 +21,12 @@ use std::{
     fmt,
     future::Future,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Weak},
     task::{Context, Poll},
+    time::Duration,
 };
 
+use arc_swap::ArcSwap;
 use bytes::Bytes;
 use http::{Request, Response, header::PROXY_AUTHORIZATION};
 use http_body_util::{BodyExt, Empty, Full, combinators::UnsyncBoxBody};
@@ -33,6 +35,7 @@ use hyper_util::{
     client::legacy::{Builder, Client},
     rt::{TokioExecutor, TokioTimer},
 };
+use rand::RngExt as _;
 use tower::Service;
 use vector_core::{config::proxy::ProxyConfig, tls::MaybeTlsSettings};
 
@@ -100,6 +103,38 @@ pub fn full_body(bytes: Bytes) -> RequestBody {
         .boxed_unsync()
 }
 
+type PooledClient = Client<HttpProxyConnector, RequestBody>;
+
+/// Optional connection behavior for [`HttpClient::new_with_options`]. The default changes nothing.
+///
+/// Start from [`ConnectionOptions::default`] and set the fields you need, so that code keeps
+/// compiling as options are added.
+#[derive(Clone, Copy, Debug, Default)]
+#[non_exhaustive]
+pub struct ConnectionOptions {
+    /// Closes each connection once it is older than this, so it is re-established. A request
+    /// in flight on a connection that reaches its age fails and should be retried.
+    pub max_connection_age: Option<Duration>,
+    /// Randomizes each connection's age limit by up to this fraction, in `0.0..=1.0`, so that
+    /// connections opened together do not all close at once.
+    pub max_connection_age_jitter_factor: f64,
+}
+
+/// Randomizes a connection's age limit by the given fraction, clamped to `0.0..=1.0`.
+///
+/// # Panics
+///
+/// Panics if `jitter_factor` is NaN or the result cannot be represented as a [`Duration`].
+#[must_use]
+pub fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
+    // Ensure the jitter_factor is between 0.0 and 1.0
+    let jitter_factor = jitter_factor.clamp(0.0, 1.0);
+    // Generate a random jitter factor between `1 - jitter_factor` and `1 + jitter_factor`.
+    let mut rng = rand::rng();
+    let random_jitter_factor = rng.random_range(-jitter_factor..=jitter_factor) + 1.;
+    duration.mul_f64(random_jitter_factor)
+}
+
 /// An HTTP/1.1 and HTTP/2 client that routes requests through the configured proxy.
 ///
 /// Sending takes two steps, so a caller can observe the request with its proxy credentials
@@ -107,8 +142,10 @@ pub fn full_body(bytes: Bytes) -> RequestBody {
 /// A TLS forward (non-`CONNECT`) proxy is only offered `http/1.1` ALPN.
 #[derive(Clone)]
 pub struct HttpClient {
-    client: Client<HttpProxyConnector, RequestBody>,
+    // Shared by every clone so that a TLS reload reaches all of them.
+    client: Arc<ArcSwap<PooledClient>>,
     routes: Arc<RoutePlanner>,
+    options: ConnectionOptions,
 }
 
 impl fmt::Debug for HttpClient {
@@ -126,11 +163,49 @@ impl HttpClient {
     /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
     /// build a connector.
     pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> Result<Self, BoxError> {
-        let routes = Arc::new(RoutePlanner::new(proxy)?);
-        let connector = HttpProxyConnector::new(tls, Arc::clone(&routes), ForwardProxyAlpn::Http1)?;
-        let client = Client::builder(TokioExecutor::new()).build(connector);
+        Self::new_with_options(tls, proxy, ConnectionOptions::default())
+    }
 
-        Ok(Self { client, routes })
+    /// Like [`HttpClient::new`], with the given connection `options`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
+    /// build a connector.
+    pub fn new_with_options(
+        tls: MaybeTlsSettings,
+        proxy: &ProxyConfig,
+        options: ConnectionOptions,
+    ) -> Result<Self, BoxError> {
+        let routes = Arc::new(RoutePlanner::new(proxy)?);
+        let client = Self::build_client(tls, &routes, options)?;
+
+        Ok(Self {
+            client: Arc::new(ArcSwap::from_pointee(client)),
+            routes,
+            options,
+        })
+    }
+
+    /// Returns a handle that replaces the TLS settings of this client and of every clone of it,
+    /// for example after certificate rotation. The handle does not keep the client alive.
+    #[must_use]
+    pub fn tls_reload_handle(&self) -> TlsReloadHandle {
+        TlsReloadHandle {
+            client: Arc::downgrade(&self.client),
+            routes: Arc::clone(&self.routes),
+            options: self.options,
+        }
+    }
+
+    fn build_client(
+        tls: MaybeTlsSettings,
+        routes: &Arc<RoutePlanner>,
+        options: ConnectionOptions,
+    ) -> Result<PooledClient, BoxError> {
+        let connector = HttpProxyConnector::new(tls, Arc::clone(routes), ForwardProxyAlpn::Http1)?
+            .with_options(options);
+        Ok(Client::builder(TokioExecutor::new()).build(connector))
     }
 
     /// Inserts the forward proxy credentials that the route of `request` needs, unless it
@@ -156,7 +231,49 @@ impl HttpClient {
         &self,
         request: Request<RequestBody>,
     ) -> Result<Response<Incoming>, HttpError> {
-        self.client.request(request).await.map_err(HttpError::new)
+        // The response future owns a client clone, so the guard is dropped before awaiting.
+        let response = self.client.load().request(request);
+        response.await.map_err(HttpError::new)
+    }
+}
+
+/// Replaces the TLS settings of an [`HttpClient`] and its clones. Obtained from
+/// [`HttpClient::tls_reload_handle`].
+#[derive(Clone)]
+pub struct TlsReloadHandle {
+    client: Weak<ArcSwap<PooledClient>>,
+    routes: Arc<RoutePlanner>,
+    options: ConnectionOptions,
+}
+
+impl fmt::Debug for TlsReloadHandle {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TlsReloadHandle")
+            .finish_non_exhaustive()
+    }
+}
+
+impl TlsReloadHandle {
+    /// Returns `true` once the client and all of its clones have been dropped.
+    #[must_use]
+    pub fn is_closed(&self) -> bool {
+        self.client.strong_count() == 0
+    }
+
+    /// Replaces the client's TLS settings. Later requests use a new connection pool; in-flight
+    /// requests finish on the old one. Returns `Ok(false)` if the client has been dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error, keeping the previous settings, if `tls` cannot build a connector.
+    pub fn reload(&self, tls: MaybeTlsSettings) -> Result<bool, BoxError> {
+        let Some(client) = self.client.upgrade() else {
+            return Ok(false);
+        };
+        let rebuilt = HttpClient::build_client(tls, &self.routes, self.options)?;
+        client.store(Arc::new(rebuilt));
+        Ok(true)
     }
 }
 

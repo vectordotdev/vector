@@ -19,12 +19,12 @@ use hyper_util::{
 };
 use rstest::rstest;
 use tokio::{
-    io::copy_bidirectional,
+    io::{AsyncReadExt as _, AsyncWriteExt as _, copy_bidirectional},
     net::TcpStream,
     task::{JoinHandle, JoinSet},
     time::timeout,
 };
-use vector_http::{RequestBody, empty_body};
+use vector_http::{ConnectionOptions, RequestBody, empty_body};
 
 use super::{HttpClient as LegacyHttpClient, client_v1::HttpClient};
 use crate::{
@@ -52,6 +52,8 @@ struct RequestObservation {
     headers: HeaderMap,
     /// The ALPN protocol negotiated on the request's TLS connection, if any.
     alpn: Option<Vec<u8>>,
+    /// Identifies the connection that carried the request, in accept order.
+    connection: usize,
 }
 
 struct TestServer {
@@ -281,11 +283,14 @@ where
 
     let task = tokio::spawn(async move {
         let mut connections = JoinSet::new();
+        let mut next_connection = 0;
         loop {
             let Ok(mut stream) = listener.accept().await else {
                 continue;
             };
             while connections.try_join_next().is_some() {}
+            let connection = next_connection;
+            next_connection += 1;
             let observations = Arc::clone(&server_observations);
             let handler = handler.clone();
             connections.spawn(async move {
@@ -300,6 +305,7 @@ where
                         version: request.version(),
                         headers: request.headers().clone(),
                         alpn: alpn.clone(),
+                        connection,
                     });
                     let response = handler(request);
                     async move { Ok::<_, Infallible>(response.await) }
@@ -575,6 +581,133 @@ async fn direct_https_supports_mtls(#[case] client_version: ClientVersion) {
         )
         .unwrap();
     assert_success(with_identity.get(&origin.https_uri()).await.unwrap());
+}
+
+fn mtls_client_tls() -> MaybeTlsSettings {
+    client_tls(TlsConfig {
+        ca_file: Some(TEST_PEM_CA_PATH.into()),
+        crt_file: Some(TEST_PEM_CLIENT_CRT_PATH.into()),
+        key_file: Some(TEST_PEM_CLIENT_KEY_PATH.into()),
+        ..Default::default()
+    })
+}
+
+#[tokio::test]
+async fn v1_reload_tls_applies_to_clones() {
+    let origin = spawn_origin(server_tls(true)).await;
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    client
+        .get(&origin.https_uri())
+        .await
+        .expect_err("the server requires a client certificate");
+
+    let handle = client.clone().tls_reload_handle();
+    assert!(handle.reload(mtls_client_tls()).unwrap());
+
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+}
+
+#[tokio::test]
+async fn v1_tls_reload_handle_does_not_keep_client_alive() {
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    let handle = client.tls_reload_handle();
+    let clone = client.clone();
+    drop(client);
+    assert!(!handle.is_closed());
+
+    drop(clone);
+    assert!(handle.is_closed());
+    assert!(!handle.reload(mtls_client_tls()).unwrap());
+}
+
+#[tokio::test]
+async fn v1_reload_tls_does_not_reuse_pooled_connections() {
+    let origin = spawn_origin(server_tls(false)).await;
+    let client = HttpClient::new(trusted_client_tls(), &ProxyConfig::default()).unwrap();
+    assert_success(client.get(&origin.https_uri()).await.unwrap());
+
+    let reloaded = client
+        .tls_reload_handle()
+        .reload(client_tls(TlsConfig {
+            ca_file: Some(INVALID_CA_PATH.into()),
+            ..Default::default()
+        }))
+        .unwrap();
+    assert!(reloaded);
+
+    // The pooled connection was verified against the trusted CA, so only a new connection made
+    // with the reloaded settings rejects the server.
+    client
+        .get(&origin.https_uri())
+        .await
+        .expect_err("requests after a reload must use the new TLS settings");
+}
+
+#[rstest]
+#[case::without_max_age(None, 1)]
+#[case::with_max_age(Some(Duration::from_millis(500)), 2)]
+#[tokio::test]
+async fn v1_max_connection_age_recycles_connections(
+    #[case] max_connection_age: Option<Duration>,
+    #[case] expected_connections: usize,
+) {
+    let origin = spawn_origin(no_tls()).await;
+    let mut options = ConnectionOptions::default();
+    options.max_connection_age = max_connection_age;
+    let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
+
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_success(client.get(&origin.http_uri()).await.unwrap());
+
+    let mut connections: Vec<_> = origin
+        .observations()
+        .iter()
+        .map(|observation| observation.connection)
+        .collect();
+    connections.dedup();
+    assert_eq!(connections.len(), expected_connections);
+}
+
+#[tokio::test]
+async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
+    // A close-delimited response (no `Content-Length` or `Transfer-Encoding`) whose body is
+    // still streaming when the connection reaches its maximum age.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0u8; 1024];
+        let _ = stream.read(&mut request).await.unwrap();
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\npartial ")
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // The client may already have dropped the connection.
+        stream.write_all(b"rest of the body").await.ok();
+    });
+
+    let mut options = ConnectionOptions::default();
+    options.max_connection_age = Some(Duration::from_millis(300));
+    let client = HttpClient::new_with_options(no_tls(), &ProxyConfig::default(), options).unwrap();
+
+    let response = client
+        .send(
+            Request::get(format!("http://{addr}/"))
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = timeout(REQUEST_TIMEOUT, response.into_body().collect())
+        .await
+        .expect("response body timed out");
+    assert!(
+        body.is_err(),
+        "a body cut off by the maximum age must fail, not complete truncated"
+    );
+    server.abort();
 }
 
 #[rstest]

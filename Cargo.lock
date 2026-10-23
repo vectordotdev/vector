@@ -13713,6 +13713,7 @@ dependencies = [
 name = "vector-http"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "bytes",
  "http 1.5.0",
  "http-body 1.0.1",
@@ -13722,6 +13723,7 @@ dependencies = [
  "hyper-util",
  "openssl",
  "percent-encoding",
+ "rand 0.10.2",
  "tokio",
  "tower 0.5.3",
  "tracing 0.1.44",
