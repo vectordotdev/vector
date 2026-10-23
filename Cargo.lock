@@ -13706,6 +13706,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "serial_test",
+ "simdutf8",
  "similar-asserts",
  "smallvec",
  "snafu 0.9.2",

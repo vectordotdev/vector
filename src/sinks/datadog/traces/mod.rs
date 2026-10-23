@@ -16,6 +16,8 @@ mod config;
 mod request_builder;
 mod service;
 mod sink;
+#[cfg(feature = "typed-trace")]
+mod typed;
 
 #[allow(
     warnings,
