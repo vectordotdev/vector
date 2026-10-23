@@ -965,6 +965,12 @@ impl<T: Send> HttpRequest<T> {
     pub fn take_payload(&mut self) -> Bytes {
         std::mem::take(&mut self.payload)
     }
+
+    /// The encoded request body.
+    #[must_use]
+    pub fn payload(&self) -> &Bytes {
+        &self.payload
+    }
 }
 
 impl<T: Send> Finalizable for HttpRequest<T> {
