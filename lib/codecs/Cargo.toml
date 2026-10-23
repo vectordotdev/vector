@@ -83,6 +83,8 @@ zstd = { workspace = true, features = ["zdict_builder"] }
 arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
+# Encode OTLP traces through the typed trace model (RFC 25329).
+typed-trace = ["opentelemetry-proto?/typed-trace"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]
 test = []
 
