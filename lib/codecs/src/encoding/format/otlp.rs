@@ -10,7 +10,7 @@ use opentelemetry_proto::proto::{
 use opentelemetry_proto::typed_trace::legacy_to_typed;
 use prost::Message;
 use tokio_util::codec::Encoder;
-use vector_common::internal_event::emit;
+use vector_common::internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit};
 use vector_config_macros::configurable_component;
 use vector_core::{
     config::DataType,
@@ -139,10 +139,12 @@ impl Encoder<Event> for OtlpSerializer {
             Event::Trace(trace) => {
                 if trace.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
                     self.traces_descriptor.encode(Event::Trace(trace), buffer)
+                } else if let Some(request) = native_trace_to_export_request(trace)? {
+                    request.encode(buffer).map_err(Into::into)
                 } else {
-                    native_trace_to_export_request(trace)?
-                        .encode(buffer)
-                        .map_err(Into::into)
+                    // Every span was rejected. The conversion already reported that, and
+                    // RFC 25329 treats a conversion that yields no events as success.
+                    Ok(())
                 }
             }
             Event::Metric(metric) => {
@@ -156,21 +158,29 @@ impl Encoder<Event> for OtlpSerializer {
 /// Convert a native trace event from the `opentelemetry` source (one flattened span per event)
 /// into an OTLP export request, through the typed trace model (RFC 25329).
 ///
-/// Fails for traces in other layouts, such as Datadog traces, and for traces where every span
-/// is rejected, so that nothing is sent for them.
+/// Returns `Ok(None)` when every span was rejected. That is a successful conversion with
+/// nothing to send, so one bad span does not fail the rest of the batch. Fails for traces
+/// in other layouts, such as Datadog traces.
 fn native_trace_to_export_request(
     trace: TraceEvent,
-) -> vector_common::Result<ExportTraceServiceRequest> {
+) -> vector_common::Result<Option<ExportTraceServiceRequest>> {
     let mut reporter = EmitTraceConversionIssue;
     let events = legacy_to_typed(trace, &mut reporter)
         .map_err(|failed| -> vector_common::Error { Box::new(failed.error()) })?;
     if events.is_empty() {
-        return Err("trace event has no spans that can be encoded as OTLP".into());
+        // Links and attributes dropped inside a span that is still encoded are counted by
+        // `OtlpTraceConversionIssue`. This is the case where the Vector event itself
+        // contributed no spans.
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: "Trace event has no spans that can be encoded as OTLP.",
+        });
+        return Ok(None);
     }
     // The finalizers belong to the input event. Sinks take them before encoding, so this
     // set is empty and dropping it acknowledges nothing.
     let (request, _finalizers) = ExportTraceServiceRequest::from_events(events, &mut reporter);
-    Ok(request)
+    Ok(Some(request))
 }
 
 struct EmitTraceConversionIssue;
@@ -351,7 +361,7 @@ mod tests {
 
         /// Decode one span the way the `opentelemetry` source does without
         /// `use_otlp_decoding`, giving a flattened native trace event.
-        fn flattened_trace(trace_id: &[u8]) -> Event {
+        fn flattened_trace(trace_id: &[u8], end_time_unix_nano: u64) -> Event {
             let resource_spans = ResourceSpans {
                 resource: Some(Resource {
                     attributes: vec![KeyValue {
@@ -370,7 +380,7 @@ mod tests {
                         name: "GET /cart".into(),
                         kind: 2,
                         start_time_unix_nano: 1_000,
-                        end_time_unix_nano: 2_000,
+                        end_time_unix_nano,
                         ..Default::default()
                     }],
                     schema_url: String::new(),
@@ -382,12 +392,20 @@ mod tests {
             events.remove(0)
         }
 
+        fn capture_metrics(encode: impl FnOnce()) -> Vec<vector_core::event::Metric> {
+            vector_core::metrics::init_test();
+            let controller = vector_core::metrics::Controller::get().unwrap();
+            controller.reset();
+            encode();
+            controller.capture_metrics()
+        }
+
         #[test]
         fn flattened_trace_is_converted() {
             let mut buffer = BytesMut::new();
             OtlpSerializer::new()
                 .unwrap()
-                .encode(flattened_trace(&TRACE_ID), &mut buffer)
+                .encode(flattened_trace(&TRACE_ID, 2_000), &mut buffer)
                 .expect("native trace must be converted, not rejected");
 
             let request = ExportTraceServiceRequest::decode(buffer.freeze()).unwrap();
@@ -406,13 +424,58 @@ mod tests {
         }
 
         #[test]
-        fn trace_with_only_rejected_spans_is_an_error() {
+        fn trace_with_only_rejected_spans_encodes_nothing() {
             let mut buffer = BytesMut::new();
-            let result = OtlpSerializer::new()
-                .unwrap()
-                .encode(flattened_trace(&[0; 16]), &mut buffer);
-            assert!(result.is_err());
+            let metrics = capture_metrics(|| {
+                OtlpSerializer::new()
+                    .unwrap()
+                    .encode(flattened_trace(&[0; 16], 2_000), &mut buffer)
+                    .expect("rejected spans are omitted, not a batch failure");
+            });
             assert!(buffer.is_empty());
+            assert!(
+                metrics.iter().any(|metric| {
+                    metric.name() == "component_errors_total"
+                        && metric.tag_matches("error_code", "invalid_trace_id")
+                }),
+                "expected invalid_trace_id in {metrics:?}"
+            );
+            assert!(
+                metrics.iter().any(|metric| {
+                    metric.name() == "component_discarded_events_total"
+                        && metric.tag_matches("intentional", "false")
+                }),
+                "expected the empty trace to count as a discarded event in {metrics:?}"
+            );
+        }
+
+        #[test]
+        fn reversed_timestamps_are_reported_and_the_span_is_still_encoded() {
+            let mut buffer = BytesMut::new();
+            let metrics = capture_metrics(|| {
+                OtlpSerializer::new()
+                    .unwrap()
+                    .encode(flattened_trace(&TRACE_ID, 500), &mut buffer)
+                    .expect("a clamped span is still encoded");
+            });
+
+            let request = ExportTraceServiceRequest::decode(buffer.freeze()).unwrap();
+            let span = &request.resource_spans[0].scope_spans[0].spans[0];
+            assert_eq!(span.start_time_unix_nano, 1_000);
+            assert_eq!(span.end_time_unix_nano, 1_000);
+            assert!(
+                metrics.iter().any(|metric| {
+                    metric.name() == "component_errors_total"
+                        && metric.tag_matches("error_code", "reversed_span_timestamps")
+                }),
+                "expected reversed_span_timestamps in {metrics:?}"
+            );
+            assert!(
+                metrics
+                    .iter()
+                    .all(|metric| metric.name() != "component_discarded_events_total"),
+                "a delivered span is not a discarded event: {metrics:?}"
+            );
         }
 
         #[test]
@@ -422,10 +485,14 @@ mod tests {
             trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
 
             let mut buffer = BytesMut::new();
-            let result = OtlpSerializer::new()
+            let error = OtlpSerializer::new()
                 .unwrap()
-                .encode(Event::Trace(trace), &mut buffer);
-            assert!(result.is_err());
+                .encode(Event::Trace(trace), &mut buffer)
+                .expect_err("a Datadog trace is not an OTLP layout");
+            assert!(
+                error.to_string().contains("not a recognized OTLP layout"),
+                "{error}"
+            );
             assert!(buffer.is_empty());
         }
     }

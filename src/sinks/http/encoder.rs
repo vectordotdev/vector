@@ -69,9 +69,7 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
 
             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
-            encoder
-                .encode(event, &mut body)
-                .map_err(|_| io::Error::other("unable to encode event"))?;
+            encoder.encode(event, &mut body).map_err(io::Error::other)?;
         }
 
         match (self.encoder.serializer(), self.encoder.framer()) {
