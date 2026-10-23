@@ -1,5 +1,7 @@
 //! Implementation of the `clickhouse` sink.
 
+use std::collections::BTreeMap;
+
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 
@@ -8,6 +10,7 @@ pub struct ClickhouseSink<S> {
     service: S,
     database: ConfinedTemplate,
     table: ConfinedTemplate,
+    headers: BTreeMap<String, ConfinedTemplate>,
     format: Format,
     request_builder: ClickhouseRequestBuilder,
 }
@@ -24,6 +27,7 @@ where
         service: S,
         database: ConfinedTemplate,
         table: ConfinedTemplate,
+        headers: BTreeMap<String, ConfinedTemplate>,
         format: Format,
         request_builder: ClickhouseRequestBuilder,
     ) -> Self {
@@ -32,6 +36,7 @@ where
             service,
             database,
             table,
+            headers,
             format,
             request_builder,
         }
@@ -42,7 +47,7 @@ where
 
         input
             .batched_partitioned(
-                KeyPartitioner::new(self.database, self.table, self.format),
+                KeyPartitioner::new(self.database, self.table, self.headers, self.format),
                 batch_settings.timeout,
                 |_| batch_settings.as_byte_size_config(),
             )
@@ -82,26 +87,34 @@ where
     }
 }
 
-/// `PartitionKey` used to partition events by (database, table) pair.
+/// Groups events that share a destination, format, and rendered HTTP headers.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub database: String,
     pub table: String,
     pub format: Format,
+    pub headers: BTreeMap<String, String>,
 }
 
-/// `KeyPartitioner` that partitions events by (database, table) pair.
+/// Renders destination and header templates before batching.
 struct KeyPartitioner {
     database: ConfinedTemplate,
     table: ConfinedTemplate,
+    headers: BTreeMap<String, ConfinedTemplate>,
     format: Format,
 }
 
 impl KeyPartitioner {
-    const fn new(database: ConfinedTemplate, table: ConfinedTemplate, format: Format) -> Self {
+    const fn new(
+        database: ConfinedTemplate,
+        table: ConfinedTemplate,
+        headers: BTreeMap<String, ConfinedTemplate>,
+        format: Format,
+    ) -> Self {
         Self {
             database,
             table,
+            headers,
             format,
         }
     }
@@ -127,10 +140,20 @@ impl Partitioner for KeyPartitioner {
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let database = Self::render(&self.database, item, "database_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
+
+        let headers = self
+            .headers
+            .iter()
+            .map(|(name, template)| {
+                Self::render(template, item, "request.headers").map(|value| (name.clone(), value))
+            })
+            .collect::<Option<BTreeMap<_, _>>>()?;
+
         Some(PartitionKey {
             database,
             table,
             format: self.format,
+            headers,
         })
     }
 }

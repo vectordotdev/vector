@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
-use http_1::{Request, StatusCode};
+use http_1::{HeaderMap, Request, StatusCode};
 use http_body_util::BodyExt;
 use serde::Deserialize;
 use url::form_urlencoded;
@@ -50,6 +50,7 @@ pub async fn fetch_table_schema(
     database: &str,
     table: &str,
     auth: Option<&Auth>,
+    headers: &HeaderMap,
 ) -> crate::Result<Schema> {
     let query = format!(
         "SELECT name, type, default_kind \
@@ -70,6 +71,8 @@ pub async fn fetch_table_schema(
     let mut request = Request::get(&uri)
         .body(empty_body())
         .map_err(|e| format!("Failed to build request: {e}"))?;
+
+    request.headers_mut().extend(headers.clone());
 
     if let Some(auth) = auth {
         auth.apply_v1(&mut request);
@@ -113,6 +116,7 @@ pub struct ClickHouseSchemaProvider {
     database: String,
     table: String,
     auth: Option<Auth>,
+    headers: HeaderMap,
 }
 
 impl ClickHouseSchemaProvider {
@@ -123,6 +127,7 @@ impl ClickHouseSchemaProvider {
         database: String,
         table: String,
         auth: Option<Auth>,
+        headers: HeaderMap,
     ) -> Self {
         Self {
             client,
@@ -130,6 +135,7 @@ impl ClickHouseSchemaProvider {
             database,
             table,
             auth,
+            headers,
         }
     }
 }
@@ -143,6 +149,7 @@ impl SchemaProvider for ClickHouseSchemaProvider {
             &self.database,
             &self.table,
             self.auth.as_ref(),
+            &self.headers,
         )
         .await
         .map_err(|e| ArrowEncodingError::SchemaFetchError {

@@ -30,7 +30,7 @@ use crate::{
     config::{SinkConfig, SinkContext, log_schema},
     sinks::{
         clickhouse::config::{ClickhouseBatchEncoding, ClickhouseConfig},
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, TowerRequestConfig, http::RequestConfig},
     },
     test_util::{
         components::{SINK_TAGS, init_test, run_and_assert_sink_compliance},
@@ -58,8 +58,11 @@ async fn insert_events() {
         table: table.clone().try_into().unwrap(),
         compression: Compression::None,
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -108,8 +111,11 @@ async fn skip_unknown_fields() {
         skip_unknown_fields: Some(true),
         compression: Compression::None,
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -156,8 +162,11 @@ async fn insert_events_unix_timestamps() {
         compression: Compression::None,
         encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -517,8 +526,11 @@ async fn insert_events_arrow_format() {
             ArrowStreamSerializerConfig::default(),
         )),
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -591,8 +603,11 @@ async fn insert_events_arrow_with_schema_fetching() {
             ArrowStreamSerializerConfig::default(),
         )),
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -676,8 +691,11 @@ async fn test_complex_types() {
         format: crate::sinks::clickhouse::config::Format::ArrowStream,
         batch_encoding: Some(ClickhouseBatchEncoding::ArrowStream(arrow_config)),
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -1282,8 +1300,11 @@ async fn test_missing_required_field_emits_null_constraint_error() {
             ArrowStreamSerializerConfig::default(),
         )),
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -1375,8 +1396,11 @@ async fn arrow_schema_excludes_non_insertable_columns() {
             ArrowStreamSerializerConfig::default(),
         )),
         batch,
-        request: TowerRequestConfig {
-            retry_attempts: 1,
+        request: RequestConfig {
+            tower: TowerRequestConfig {
+                retry_attempts: 1,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()

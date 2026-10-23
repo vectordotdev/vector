@@ -34,7 +34,7 @@ components: sinks: clickhouse: {
 			proxy: enabled: true
 			request: {
 				enabled: true
-				headers: false
+				headers: true
 			}
 			tls: {
 				enabled:                true
@@ -79,6 +79,21 @@ components: sinks: clickhouse: {
 	}
 
 	how_it_works: {
+		request_headers: {
+			title: "Request Headers"
+			body: """
+				Use `request.headers` for custom headers, with templated values such as
+				`X-My-Custom-Header: prefix-{{ value }}`. Different rendered values create separate batches.
+				Templates follow routing confinement rules; missing fields drop the event.
+
+				Only static headers are sent during schema discovery and healthchecks. Arrow inserts
+				share the startup schema, so tables selected by templated headers must be compatible.
+
+				`Authorization` conflicts with configured auth, including endpoint credentials.
+				`Content-Type`, `Content-Length`, and `Content-Encoding` cannot be configured.
+				"""
+		}
+
 		data_formats: {
 			title: "Data Formats"
 			body: """

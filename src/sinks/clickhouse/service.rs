@@ -5,13 +5,16 @@ use std::fmt::Write as _;
 use bytes::Bytes;
 use http::Uri;
 use http_1::{
-    Request, StatusCode,
+    HeaderMap, Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
 use tracing::debug;
 
-use super::{config::QuerySettingsConfig, sink::PartitionKey};
+use super::{
+    config::{QuerySettingsConfig, validate_headers},
+    sink::PartitionKey,
+};
 use crate::{
     http::{Auth, client_v1::HttpError},
     sinks::{
@@ -76,6 +79,7 @@ impl RetryLogic for ClickhouseRetryLogic {
 
 #[derive(Debug, Clone)]
 pub(super) struct ClickhouseServiceRequestBuilder {
+    pub(super) headers: HeaderMap,
     pub(super) auth: Option<Auth>,
     pub(super) endpoint: Uri,
     pub(super) skip_unknown_fields: Option<bool>,
@@ -105,6 +109,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
 
         // Extract format before taking payload to avoid borrow checker issues
         let format = metadata.format;
+        let dynamic_headers = validate_headers(&metadata.headers)?;
         let payload = request.take_payload();
 
         // Set content type based on format
@@ -113,13 +118,20 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             _ => "application/x-ndjson",
         };
 
-        let mut builder = Request::post(uri.to_string())
-            .header(CONTENT_TYPE, content_type)
-            .header(CONTENT_LENGTH, payload.len());
+        let payload_len = payload.len();
+        let mut request = Request::post(uri.to_string()).body(payload)?;
+        let headers = request.headers_mut();
+        headers.extend(self.headers.clone());
+
+        headers.extend(dynamic_headers);
+        headers.insert(CONTENT_TYPE, content_type.parse()?);
+        headers.insert(CONTENT_LENGTH, payload_len.into());
+
+        // An uncompressed payload must not inherit a custom Content-Encoding.
+        headers.remove(CONTENT_ENCODING);
         if let Some(ce) = self.compression.content_encoding() {
-            builder = builder.header(CONTENT_ENCODING, ce);
+            headers.insert(CONTENT_ENCODING, ce.parse()?);
         }
-        let mut request = builder.body(payload).map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
             auth.apply_v1(&mut request);
         }
@@ -217,6 +229,45 @@ fn set_uri_query(
 mod tests {
     use super::super::config::AsyncInsertSettingsConfig;
     use super::*;
+
+    #[test]
+    fn inserts_static_and_rendered_headers() {
+        let builder = ClickhouseServiceRequestBuilder {
+            headers: validate_headers(&std::collections::BTreeMap::from([(
+                "X-Static".into(),
+                "static-value".into(),
+            )]))
+            .unwrap(),
+            auth: None,
+            endpoint: "http://localhost:8123".parse().unwrap(),
+            skip_unknown_fields: None,
+            date_time_best_effort: false,
+            insert_random_shard: false,
+            compression: Compression::None,
+            query_settings: QuerySettingsConfig::default(),
+        };
+        let request = builder
+            .build(HttpRequest::new(
+                Bytes::from_static(b"payload"),
+                EventFinalizers::default(),
+                RequestMetadata::default(),
+                PartitionKey {
+                    database: "default".into(),
+                    table: "events".into(),
+                    format: Format::JsonEachRow,
+                    headers: std::collections::BTreeMap::from([(
+                        "X-Custom".into(),
+                        "custom-a".into(),
+                    )]),
+                },
+            ))
+            .unwrap();
+        assert_eq!(request.headers()["x-static"], "static-value");
+        assert_eq!(request.headers()["x-custom"], "custom-a");
+        assert_eq!(request.headers()[CONTENT_TYPE], "application/x-ndjson");
+        assert_eq!(request.headers()[CONTENT_LENGTH], "7");
+        assert!(!request.headers().contains_key(CONTENT_ENCODING));
+    }
 
     fn parse_query_params(uri: &Uri) -> std::collections::HashMap<String, String> {
         url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes())

@@ -1,9 +1,13 @@
 //! Configuration for the `Clickhouse` sink.
 
-use std::fmt;
+use std::{collections::BTreeMap, fmt};
 
 use http::Uri;
-use http_1::{Request, StatusCode};
+use http_1::{
+    HeaderMap, HeaderName, HeaderValue, Request, StatusCode,
+    header::{AUTHORIZATION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+};
+use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::{
@@ -26,7 +30,10 @@ use crate::{
     },
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
+        util::{
+            RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::RequestConfig,
+            http_v1::HttpService,
+        },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
@@ -138,8 +145,11 @@ pub struct ClickhouseConfig {
 
     pub auth: Option<Auth>,
 
+    /// HTTP request settings.
+    ///
+    /// Header values support event templates for inserts. Schema discovery and healthchecks use only static headers.
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
 
     pub tls: Option<TlsConfig>,
 
@@ -155,6 +165,38 @@ pub struct ClickhouseConfig {
 
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
+}
+
+#[derive(Debug, Snafu)]
+pub(super) enum HeaderValidationError {
+    #[snafu(display("Authorization header cannot be used with configured authentication"))]
+    AuthorizationConflict,
+    #[snafu(display(
+        "Request header `{name}` is controlled by the ClickHouse sink and cannot be configured"
+    ))]
+    ReservedHeader { name: String },
+    #[snafu(display("Invalid request header name '{name}': {source}"))]
+    InvalidHeaderName {
+        name: String,
+        source: http_1::header::InvalidHeaderName,
+    },
+    #[snafu(display("Invalid value for request header '{name}': {source}"))]
+    InvalidHeaderValue {
+        name: String,
+        source: http_1::header::InvalidHeaderValue,
+    },
+}
+
+pub(super) fn validate_headers(headers: &BTreeMap<String, String>) -> crate::Result<HeaderMap> {
+    let mut validated = HeaderMap::new();
+    for (name, value) in headers {
+        let header_name = HeaderName::from_bytes(name.as_bytes())
+            .with_context(|_| InvalidHeaderNameSnafu { name })?;
+        let header_value =
+            HeaderValue::from_str(value).with_context(|_| InvalidHeaderValueSnafu { name })?;
+        validated.insert(header_name, header_value);
+    }
+    Ok(validated)
 }
 
 /// Query settings for the `clickhouse` sink.
@@ -262,6 +304,8 @@ impl ValidatedSink for ClickhouseConfig {
         // Resolve auth choice
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
 
+        let (headers, template_headers) = self.resolve_headers(auth.as_ref())?;
+
         // Compute batch settings
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -276,6 +320,8 @@ impl ValidatedSink for ClickhouseConfig {
                 .confine(&self.confinement, ClickhouseConfig::NAME, "database")?;
 
         Ok(ValidatedClickhouse {
+            template_headers,
+            headers,
             database,
             auth,
             batch_settings,
@@ -290,6 +336,8 @@ impl ValidatedSink for ClickhouseConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedClickhouse {
+            template_headers,
+            headers,
             database,
             auth,
             batch_settings,
@@ -301,6 +349,7 @@ impl ValidatedSink for ClickhouseConfig {
         let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
+            headers: headers.clone(),
             auth: auth.clone(),
             endpoint: endpoint.clone(),
             skip_unknown_fields: self.skip_unknown_fields,
@@ -313,7 +362,7 @@ impl ValidatedSink for ClickhouseConfig {
         let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
             HttpService::new(client.clone(), clickhouse_service_request_builder);
 
-        let request_limits = self.request.into_settings();
+        let request_limits = self.request.tower.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, ClickhouseRetryLogic)
@@ -322,7 +371,7 @@ impl ValidatedSink for ClickhouseConfig {
         // Resolve the encoding strategy (format + encoder) based on configuration.
         // This happens here in build because Arrow schema fetching requires network access.
         let (format, encoder_kind) = self
-            .resolve_strategy(&client, &endpoint, database, auth.as_ref())
+            .resolve_strategy(&client, &endpoint, database, auth.as_ref(), headers)
             .await?;
 
         let request_builder = ClickhouseRequestBuilder {
@@ -336,11 +385,12 @@ impl ValidatedSink for ClickhouseConfig {
             service,
             confined_database.clone(),
             confined_table.clone(),
+            template_headers.clone(),
             format,
             request_builder,
         );
 
-        let healthcheck = Box::pin(healthcheck(client, endpoint, auth.clone()));
+        let healthcheck = Box::pin(healthcheck(client, endpoint, auth.clone(), headers.clone()));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
@@ -356,6 +406,7 @@ impl ClickhouseConfig {
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
+        headers: &HeaderMap,
     ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
         if let Some(batch_encoding) = &self.batch_encoding {
             // Validate that batch_encoding is only compatible with ArrowStream format
@@ -375,6 +426,7 @@ impl ClickhouseConfig {
                 endpoint.to_string(),
                 database,
                 auth,
+                headers,
                 &mut arrow_config,
             )
             .await?;
@@ -400,6 +452,7 @@ impl ClickhouseConfig {
         endpoint: String,
         database: &Template,
         auth: Option<&Auth>,
+        headers: &HeaderMap,
         config: &mut ArrowStreamSerializerConfig,
     ) -> crate::Result<()> {
         if self.table.is_dynamic() || database.is_dynamic() {
@@ -420,6 +473,7 @@ impl ClickhouseConfig {
             database_str.to_string(),
             table_str.to_string(),
             auth.cloned(),
+            headers.clone(),
         );
 
         let schema = provider
@@ -436,6 +490,41 @@ impl ClickhouseConfig {
 
         Ok(())
     }
+
+    fn resolve_headers(
+        &self,
+        auth: Option<&Auth>,
+    ) -> crate::Result<(HeaderMap, BTreeMap<String, ConfinedTemplate>)> {
+        // Validate names and configured values before splitting out event templates.
+        let configured_headers = validate_headers(&self.request.headers)?;
+        snafu::ensure!(
+            auth.is_none() || !configured_headers.contains_key(AUTHORIZATION),
+            AuthorizationConflictSnafu
+        );
+
+        // ensure headers don't have any reserved headers set by the clickhouse sink
+        for name in configured_headers.keys() {
+            snafu::ensure!(
+                name != CONTENT_TYPE && name != CONTENT_LENGTH && name != CONTENT_ENCODING,
+                ReservedHeaderSnafu {
+                    name: name.as_str()
+                }
+            );
+        }
+        let (static_headers, template_headers) = self.request.split_headers();
+
+        let headers = validate_headers(&static_headers)?;
+        let template_headers = template_headers
+            .into_iter()
+            .map(|(name, template)| {
+                template
+                    .confine(&self.confinement, Self::NAME, "request.headers")
+                    .map(|template| (name, template))
+            })
+            .collect::<crate::Result<BTreeMap<_, _>>>()?;
+
+        Ok((headers, template_headers))
+    }
 }
 
 /// Purely validated ClickHouse sink configuration.
@@ -445,6 +534,10 @@ impl ClickhouseConfig {
 /// The actual sink building consumes these values without recomputing them.
 #[derive(Clone, Debug)]
 pub struct ValidatedClickhouse {
+    /// Confined event templates for insert headers.
+    template_headers: BTreeMap<String, ConfinedTemplate>,
+    /// Parsed static HTTP headers.
+    headers: HeaderMap,
     /// The database template, validated.
     database: Template,
     /// Resolved auth (pure validation without network).
@@ -466,9 +559,15 @@ fn get_healthcheck_uri(endpoint: &Uri) -> String {
     uri
 }
 
-async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
+async fn healthcheck(
+    client: HttpClient,
+    endpoint: Uri,
+    auth: Option<Auth>,
+    headers: HeaderMap,
+) -> crate::Result<()> {
     let uri = get_healthcheck_uri(&endpoint);
     let mut request = Request::get(uri).body(empty_body())?;
+    request.headers_mut().extend(headers);
 
     if let Some(auth) = auth {
         auth.apply_v1(&mut request);
@@ -491,6 +590,74 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ClickhouseConfig>();
+    }
+
+    #[test]
+    fn resolves_static_and_template_headers() {
+        let config: ClickhouseConfig = serde_yaml::from_str(
+            r"
+            endpoint: http://localhost:8123
+            table: events
+            request:
+              retry_attempts: 3
+              headers:
+                X-Static: static-value
+                X-Custom: prefix-{{ dynamic_value }}
+            ",
+        )
+        .unwrap();
+        let validated = config.validate().unwrap();
+        assert_eq!(config.request.tower.retry_attempts, 3);
+        assert_eq!(validated.headers["x-static"], "static-value");
+        assert!(!validated.headers.contains_key("x-custom"));
+        assert!(validated.template_headers.contains_key("X-Custom"));
+    }
+
+    #[test]
+    fn rejects_invalid_and_conflicting_headers() {
+        for (name, value) in [
+            // bad header
+            ("bad header", "value"),
+            // bad header value
+            ("X-Custom", "secret\r\nvalue"),
+            // reserved headers
+            ("Content-Type", "custom/type"),
+            ("content-length", "123"),
+            ("CONTENT-ENCODING", "gzip"),
+            // unconfined template
+            ("X-Custom", "{{ custom_value }}"),
+        ] {
+            let mut config = create_test_config(Format::JsonEachRow, None);
+            config.request.headers.insert(name.into(), value.into());
+            assert!(config.validate().is_err(), "accepted header {name}");
+        }
+
+        // make sure both auth and the custom authorization header can't be set at the same time
+        // while the auth can be configured through both the auth config value or the endpoint
+        for endpoint_auth in [false, true] {
+            let mut config = create_test_config(Format::JsonEachRow, None);
+            config
+                .request
+                .headers
+                .insert("authorization".into(), "Bearer {{ token }}".into());
+            assert!(config.validate().is_ok());
+
+            if endpoint_auth {
+                config.endpoint = "http://user:pass@localhost:8123".parse().unwrap();
+            } else {
+                config.auth = Some(Auth::Bearer {
+                    token: "configured".to_owned().into(),
+                });
+            }
+
+            assert!(matches!(
+                config
+                    .validate()
+                    .unwrap_err()
+                    .downcast_ref::<HeaderValidationError>(),
+                Some(HeaderValidationError::AuthorizationConflict)
+            ));
+        }
     }
 
     #[test]
