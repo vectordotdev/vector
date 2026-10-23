@@ -8,10 +8,7 @@ use vector_lib::{
 #[cfg(feature = "sources-kubernetes_logs")]
 pub use self::kubernetes_logs::*;
 
-#[allow(dead_code)]
 pub const DROP_EVENT: bool = true;
-#[allow(dead_code)]
-pub const RETAIN_EVENT: bool = false;
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct ParserMissingFieldError<'a, const DROP_EVENT: bool> {
