@@ -60,6 +60,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         provider: _,
         secret,
         graceful_shutdown_duration,
+        reload_sink_drain_duration,
         allow_empty: _,
     } = builder;
     let graph = match Graph::new(nodes, global.wildcard_matching.unwrap_or_default()) {
@@ -126,6 +127,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             secret,
             graceful_shutdown_duration,
+            reload_sink_drain_duration,
         };
 
         // Validate sinks in place

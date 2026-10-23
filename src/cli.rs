@@ -259,6 +259,15 @@ pub struct RootOpts {
     )]
     pub no_graceful_shutdown_limit: bool,
 
+    /// Set the duration in seconds that removed and changed sinks can take to finish during a
+    /// configuration reload. All of these sinks share one deadline, including sinks that finish
+    /// in the background. After the duration has passed, Vector cancels their in-flight work and
+    /// continues the reload. A replacement sink that reuses the buffer receives the unread
+    /// events. Other unread and in-flight events are lost. If not set, Vector waits until the
+    /// sinks finish.
+    #[arg(long, env = "VECTOR_RELOAD_SINK_DRAIN_LIMIT_SECS")]
+    pub reload_sink_drain_limit_secs: Option<NonZeroU64>,
+
     /// Set runtime allocation tracing
     #[cfg(all(unix, feature = "tikv-jemallocator"))]
     #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]

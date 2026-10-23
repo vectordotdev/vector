@@ -72,6 +72,13 @@ pub struct ConfigBuilder {
     #[doc(hidden)]
     pub graceful_shutdown_duration: Option<Duration>,
 
+    /// The duration to wait for removed and changed sinks to finish during a configuration reload.
+    /// No limit applies when unset. This value can be set using a
+    /// [cli arg](crate::cli::RootOpts::reload_sink_drain_limit_secs).
+    #[serde(default, skip)]
+    #[doc(hidden)]
+    pub reload_sink_drain_duration: Option<Duration>,
+
     /// Allow the configuration to be empty, resulting in a topology with no components.
     #[serde(default, skip)]
     #[doc(hidden)]
@@ -93,6 +100,7 @@ impl From<Config> for ConfigBuilder {
             tests,
             secret,
             graceful_shutdown_duration,
+            reload_sink_drain_duration,
         } = config;
 
         let transforms = transforms
@@ -126,6 +134,7 @@ impl From<Config> for ConfigBuilder {
             tests,
             secret,
             graceful_shutdown_duration,
+            reload_sink_drain_duration,
             allow_empty: false,
         }
     }

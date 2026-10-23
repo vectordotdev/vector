@@ -168,6 +168,11 @@ cli: {
 			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
 			type:        "integer"
 		}
+		"reload-sink-drain-limit-secs": {
+			description: env_vars.VECTOR_RELOAD_SINK_DRAIN_LIMIT_SECS.description
+			env_var:     "VECTOR_RELOAD_SINK_DRAIN_LIMIT_SECS"
+			type:        "integer"
+		}
 		"watch-config-poll-interval-seconds": {
 			description: env_vars.VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS.description
 			env_var:     "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS"
@@ -752,6 +757,20 @@ cli: {
 		VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT: {
 			description: "Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`."
 			type: bool: default: false
+		}
+		VECTOR_RELOAD_SINK_DRAIN_LIMIT_SECS: {
+			description: """
+				Set the duration in seconds that removed and changed sinks can take to finish during a
+				configuration reload. All of these sinks share one deadline, including sinks that finish
+				in the background. After the duration has passed, Vector cancels their in-flight work and
+				continues the reload. A replacement sink that reuses the buffer receives the unread
+				events. Other unread and in-flight events are lost. If not set, Vector waits until the
+				sinks finish.
+				"""
+			type: uint: {
+				default: null
+				unit:    "seconds"
+			}
 		}
 		VECTOR_OPENSSL_NO_PROBE: {
 			description: """

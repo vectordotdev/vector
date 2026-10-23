@@ -137,6 +137,7 @@ struct Builder<'a> {
     inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
     healthchecks: HashMap<ComponentKey, Task>,
     detach_triggers: HashMap<ComponentKey, Trigger>,
+    reload_shutdown_triggers: HashMap<ComponentKey, oneshot::Sender<tokio::time::Instant>>,
     extra_context: ExtraContext,
     utilization_emitter: Option<UtilizationEmitter>,
     utilization_registry: UtilizationRegistry,
@@ -169,6 +170,7 @@ impl<'a> Builder<'a> {
             inputs: HashMap::new(),
             healthchecks: HashMap::new(),
             detach_triggers: HashMap::new(),
+            reload_shutdown_triggers: HashMap::new(),
             extra_context,
             utilization_emitter: emitter,
             utilization_registry: registry,
@@ -196,6 +198,7 @@ impl<'a> Builder<'a> {
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
                 detach_triggers: self.detach_triggers,
+                reload_shutdown_triggers: self.reload_shutdown_triggers,
                 metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
                     .utilization_emitter
@@ -719,6 +722,7 @@ impl<'a> Builder<'a> {
         };
 
         let (trigger, tripwire) = Tripwire::new();
+        let (reload_shutdown_tx, reload_shutdown_rx) = oneshot::channel();
 
         let utilization_sender = self
             .utilization_registry
@@ -742,24 +746,40 @@ impl<'a> Builder<'a> {
             let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
             let events_received = register!(EventsReceived);
-            sink.run(
-                rx.by_ref()
-                    .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
-                    .inspect(|events| {
-                        events_received.emit(CountByteSize(
-                            events.len(),
-                            events.estimated_json_encoded_size_of(),
-                        ));
-                    })
-                    .take_until_if(tripwire),
-            )
-            .await
-            .map(|()| {
-                debug!("Sink finished normally.");
-                TaskOutput::Sink(rx)
-            })
-            .inspect_err(|error| debug!(%error, "Sink finished with an error."))
-            .map_err(Into::into)
+            let reload_deadline = async move {
+                if let Ok(deadline) = reload_shutdown_rx.await {
+                    tokio::time::sleep_until(deadline).await;
+                } else {
+                    // Dropping the topology during process shutdown must not cancel the sink here.
+                    futures::future::pending::<()>().await;
+                }
+            };
+            let result = select! {
+                biased;
+                result = sink.run(
+                    rx.by_ref()
+                        .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
+                        .inspect(|events| {
+                            events_received.emit(CountByteSize(
+                                events.len(),
+                                events.estimated_json_encoded_size_of(),
+                            ));
+                        })
+                        .take_until_if(tripwire),
+                ) => result,
+                () = reload_deadline => {
+                    warn!("Sink did not finish before the reload deadline. Cancelling in-flight work.");
+                    // Drop only the sink future, retaining unread buffered events for its replacement.
+                    Ok(())
+                }
+            };
+            result
+                .map(|()| {
+                    debug!("Sink stopped.");
+                    TaskOutput::Sink(rx)
+                })
+                .inspect_err(|error| debug!(%error, "Sink finished with an error."))
+                .map_err(Into::into)
         };
 
         let task = Task::new(key.clone(), typetag, sink);
@@ -806,6 +826,8 @@ impl<'a> Builder<'a> {
         self.healthchecks.insert(key.clone(), healthcheck_task);
         self.tasks.insert(key.clone(), task);
         self.detach_triggers.insert(key.clone(), trigger);
+        self.reload_shutdown_triggers
+            .insert(key.clone(), reload_shutdown_tx);
     }
 
     fn build_transform(
@@ -1104,6 +1126,8 @@ pub struct TopologyPieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
+    pub(crate) reload_shutdown_triggers:
+        HashMap<ComponentKey, oneshot::Sender<tokio::time::Instant>>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
 }
