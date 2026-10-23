@@ -1,5 +1,6 @@
 features:
   - e2e-tests-opentelemetry
+  - typed-trace
 
 test: e2e
 test_filter: "opentelemetry::multiservice_traces::"

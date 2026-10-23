@@ -204,10 +204,13 @@ impl ComposeTest {
 
         args.push("--features".to_string());
 
-        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
-        // If using per-test runner: use test-specific features from test.yaml
+        // The shared runner also needs test-specific features from test.yaml.
         args.push(if self.runner.is_shared_runner() {
-            format!("{},vendored", self.local_config.feature_flag)
+            format!(
+                "{},{},vendored",
+                self.local_config.feature_flag,
+                self.config.features.join(",")
+            )
         } else {
             format!("{},vendored", self.config.features.join(","))
         });

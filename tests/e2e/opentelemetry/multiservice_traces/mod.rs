@@ -14,6 +14,12 @@ use vector_lib::opentelemetry::proto::{
 
 use crate::opentelemetry::parse_export_traces_request;
 
+#[cfg(feature = "typed-trace")]
+use vector_lib::event::{
+    EventMetadata,
+    typed_trace::{TraceConversionIssue, TraceConversionReporter},
+};
+
 const OUTPUT: &str = "/output/opentelemetry-traces-multiservice";
 const REQUIRED_SERVICES: &[&str] = &[
     "ad",
@@ -311,6 +317,43 @@ fn trace_round_trip() {
     };
     let directory = Path::new(OUTPUT).join(&exporter);
     validate_captures(&directory, transport).unwrap_or_else(|error| panic!("{error}"));
+}
+
+#[cfg(feature = "typed-trace")]
+#[test]
+fn typed_trace_round_trip() {
+    #[derive(Default)]
+    struct Issues(Vec<String>);
+
+    impl TraceConversionReporter for Issues {
+        fn report(&mut self, issue: TraceConversionIssue<'_>) {
+            self.0.push(format!("{issue:?}"));
+        }
+    }
+
+    let exporter = std::env::var("CONFIG_INGRESS_EXPORTER").unwrap();
+    let directory = Path::new(OUTPUT).join(exporter);
+    assert!(directory.join("capture-complete").exists());
+    let input = read_capture(&directory, "input.jsonl").unwrap();
+    let mut issues = Issues::default();
+    let events = input
+        .resource_spans
+        .clone()
+        .into_iter()
+        .flat_map(|spans| spans.into_typed_events(&EventMetadata::default(), &mut issues))
+        .collect::<Vec<_>>();
+    let (encoded, _) = ExportTraceServiceRequest::from_events(events, &mut issues);
+    assert!(
+        issues.0.is_empty(),
+        "typed conversion issues: {:#?}",
+        issues.0
+    );
+    let differences = compare(&input, &encoded);
+    assert!(
+        differences.is_empty(),
+        "typed trace round trip changed captured spans: {}",
+        differences.join("\n\n")
+    );
 }
 
 #[cfg(test)]
