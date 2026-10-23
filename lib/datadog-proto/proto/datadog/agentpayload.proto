@@ -14,7 +14,11 @@ message CommonMetadata {
 }
 
 message Origin {
-  reserved 1, 2, 3;
+  reserved 1, 2;
+  // The Agent's v2 serializer writes field 3 for no-index series even though the public
+  // agent-payload schema reserves it. Keep the wire field so Vector can preserve no-index
+  // metadata when receiving or forwarding v2 series.
+  int32 metric_type = 3;
   uint32 origin_product = 4;
   uint32 origin_category = 5;
   uint32 origin_service = 6;
