@@ -7,7 +7,7 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde_json::{Value as JsonValue, value::RawValue};
 use smallvec::SmallVec;
-use vrl::value::{KeyString, Value};
+use vrl::value::{KeyString, ObjectMap, Value};
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type
@@ -176,6 +176,12 @@ impl ByteSizeOf for JsonValue {
             JsonValue::Array(a) => a.size_of(),
             JsonValue::Object(o) => o.iter().map(|(k, v)| k.size_of() + v.size_of()).sum(),
         }
+    }
+}
+
+impl ByteSizeOf for ObjectMap {
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(|(k, v)| k.size_of() + v.size_of()).sum()
     }
 }
 

@@ -900,7 +900,7 @@ mod test {
         ];
 
         for (value, path, expect) in cases {
-            let value: ObjectMap = value;
+            let value: ObjectMap = value.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -1008,7 +1008,7 @@ mod test {
         ];
 
         for (object, path, value, expect, result) in cases {
-            let object: ObjectMap = object;
+            let object: ObjectMap = object.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -1020,7 +1020,7 @@ mod test {
                 &info,
                 MetricTagMode::Single,
             );
-            let expect = LogEvent::from(expect);
+            let expect = LogEvent::from(ObjectMap::from(expect));
             let value: Value = value;
             let path = OwnedTargetPath::event(path);
 
@@ -1112,6 +1112,7 @@ mod test {
         ];
 
         for (object, path, compact, expect) in cases {
+            let object: ObjectMap = object.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -1190,7 +1191,7 @@ mod test {
                 },
                 expect
                     .into_iter()
-                    .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
+                    .map(|v| Event::Log(LogEvent::from_map(v.into(), metadata.clone())))
                     .collect::<Vec<_>>()
             );
         }
@@ -1198,7 +1199,7 @@ mod test {
 
     #[test]
     fn trace_scalar_root_into_log_drops_trace_layout() {
-        let mut trace = TraceEvent::from(btreemap! {"foo" => "bar"});
+        let mut trace = TraceEvent::from(ObjectMap::from(btreemap! {"foo" => "bar"}));
         trace
             .metadata_mut()
             .set_trace_layout(super::super::TraceLayout::Datadog);
@@ -1401,7 +1402,7 @@ mod test {
         let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
-            Value::Object(BTreeMap::from([("a".into(), "b".into())])),
+            Value::Object(ObjectMap::from([("a".into(), "b".into())])),
         );
 
         match target {
@@ -1521,7 +1522,7 @@ mod test {
 
         assert_eq!(
             vrl_tags_value,
-            &Value::Object(BTreeMap::from([(
+            &Value::Object(ObjectMap::from([(
                 "foo".into(),
                 Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()])
             )]))
@@ -1567,7 +1568,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([("env".into(), Value::from("prod"))])),
+            Value::Object(ObjectMap::from([("env".into(), Value::from("prod"))])),
         );
     }
 
@@ -1601,7 +1602,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([(
+            Value::Object(ObjectMap::from([(
                 "shard".into(),
                 Value::Array(vec!["a".into(), "b".into()])
             )])),
@@ -1640,7 +1641,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([
+            Value::Object(ObjectMap::from([
                 ("env".into(), Value::from("prod")),
                 ("shard".into(), Value::Array(vec!["a".into(), "b".into()])),
             ])),
@@ -1774,7 +1775,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([(
+            Value::Object(ObjectMap::from([(
                 "region".into(),
                 Value::from("us-east-1"),
             )])),
@@ -1810,7 +1811,7 @@ mod test {
 
         assert_eq!(
             tags,
-            Value::Object(BTreeMap::from([("empty".into(), Value::Array(vec![]))])),
+            Value::Object(ObjectMap::from([("empty".into(), Value::Array(vec![]))])),
             "empty tag set must surface as an empty array, not as null",
         );
     }
@@ -1921,7 +1922,7 @@ mod test {
 
         assert_eq!(
             removed,
-            Value::Object(BTreeMap::from([
+            Value::Object(ObjectMap::from([
                 ("env".into(), Value::from("prod")),
                 ("shard".into(), Value::Array(vec!["a".into(), "b".into()]))
             ]))

@@ -6,6 +6,7 @@ use criterion::{
 use tokio_util::codec::Encoder;
 use vector_common::{Error, btreemap, byte_size_of::ByteSizeOf};
 use vector_core::event::{Event, LogEvent};
+use vrl::value::ObjectMap;
 
 #[derive(Debug, Clone)]
 pub struct JsonLogSerializer;
@@ -38,11 +39,11 @@ impl Encoder<Event> for JsonLogVecSerializer {
 fn encoder(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> = c.benchmark_group("encoder");
 
-    let input: Event = Event::Log(LogEvent::from(btreemap! {
+    let input: Event = Event::Log(LogEvent::from(ObjectMap::from(btreemap! {
         "key1" => "value1",
         "key2" => "value2",
         "key3" => "value3"
-    }));
+    })));
 
     group.throughput(Throughput::Bytes(input.size_of() as u64));
     group.bench_with_input("JsonLogVecSerializer::encode", &(), |b, ()| {
