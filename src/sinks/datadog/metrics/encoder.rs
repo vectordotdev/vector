@@ -26,7 +26,9 @@ use vector_lib::{
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::DATADOG_METRIC_RESOURCE_TAG_PREFIX,
-    sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
+    sinks::util::{
+        Compression, Compressor, encode_metric_tag, encode_namespace, request_builder::EncodeResult,
+    },
 };
 
 pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
@@ -757,12 +759,13 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
 fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter_all()
-        .map(|(name, value)| match value {
-            Some(value) => format!("{name}:{value}"),
-            None => name.into(),
+        .map(|(name, value)| {
+            let mut encoded = String::new();
+            encode_metric_tag(&mut encoded, name, value);
+            encoded
         })
         .collect();
-    pairs.sort();
+    pairs.sort_unstable();
     pairs
 }
 
