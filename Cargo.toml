@@ -60,7 +60,6 @@ assets = [
   ["distribution/debian/vector.yaml", "/etc/vector/vector.yaml", "644"],
   ["config/vector.yaml", "/usr/share/vector/examples/vector.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
-  ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"],
   ["licenses/*", "/usr/share/vector/licenses/", "644"],
   ["NOTICE", "/usr/share/vector/NOTICE", "644"],
