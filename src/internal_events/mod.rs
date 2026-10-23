@@ -78,13 +78,7 @@ mod heartbeat;
 mod host_metrics;
 mod http;
 pub mod http_client;
-#[cfg(any(
-    feature = "sources-apache_metrics",
-    feature = "sources-aws_ecs_metrics",
-    feature = "sources-http_client",
-    feature = "sources-okta",
-    feature = "sources-prometheus_scrape",
-))]
+#[cfg(feature = "sources-utils-http-client")]
 mod http_client_source;
 #[cfg(feature = "sinks-influxdb")]
 mod influxdb;
@@ -238,13 +232,7 @@ pub(crate) use self::gcp_pubsub::*;
 pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-#[cfg(any(
-    feature = "sources-apache_metrics",
-    feature = "sources-aws_ecs_metrics",
-    feature = "sources-http_client",
-    feature = "sources-okta",
-    feature = "sources-prometheus_scrape",
-))]
+#[cfg(feature = "sources-utils-http-client")]
 pub(crate) use self::http_client_source::*;
 #[cfg(feature = "sinks-influxdb")]
 pub(crate) use self::influxdb::*;
