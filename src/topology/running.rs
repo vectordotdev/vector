@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -13,7 +14,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_lib::{
-    buffers::topology::channel::BufferSender,
+    buffers::{BufferConfig, topology::channel::BufferSender},
     gauge,
     internal_event::GaugeName,
     shutdown::ShutdownSignal,
@@ -25,7 +26,9 @@ use super::{
     BuiltBuffer, TaskHandle, TaskResult,
     builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
-    handle_errors, retain, take_healthchecks,
+    handle_errors,
+    orphaned_disk_buffers::{OrphanedDiskBufferScanner, referenced_disk_buffer_directories},
+    retain, take_healthchecks,
     task::{Task, TaskOutput},
 };
 use crate::{
@@ -35,6 +38,7 @@ use crate::{
     },
     event::EventArray,
     extra_context::ExtraContext,
+    internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
@@ -77,6 +81,7 @@ pub struct RunningTopology {
     metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
     sink_confinement_gauges: HashMap<ComponentKey, Gauge>,
+    orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner,
 }
 
 impl RunningTopology {
@@ -103,6 +108,7 @@ impl RunningTopology {
             metrics_task_shutdown_trigger: None,
             pending_reload: None,
             sink_confinement_gauges: HashMap::new(),
+            orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner::new(),
         }
     }
 
@@ -353,6 +359,9 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces);
                 self.spawn_diff(&diff, new_pieces);
+                let previous_disk_buffer_paths = referenced_disk_buffer_directories(&self.config);
+                self.orphaned_disk_buffer_scanner
+                    .scan(&new_config, previous_disk_buffer_paths);
                 self.config = new_config;
                 self.refresh_confinement_gauges();
 
@@ -380,6 +389,8 @@ impl RunningTopology {
         {
             self.connect_diff(&diff, &mut new_pieces);
             self.spawn_diff(&diff, new_pieces);
+            self.orphaned_disk_buffer_scanner
+                .scan(&self.config, HashSet::new());
             // `self.config` still holds the old config on the rollback path, so
             // this restores the gauges for the re-spawned old sinks.
             self.refresh_confinement_gauges();
@@ -658,6 +669,36 @@ impl RunningTopology {
             .collect::<Vec<_>>();
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
+
+            if sink_buffer(&self.config, key).is_some_and(|buffer| buffer.has_disk_stage()) {
+                let usage = self
+                    .inputs
+                    .get(*key)
+                    .expect("removed sink input must exist")
+                    .disk_usage_snapshot();
+                let buffer_dirs = disk_buffer_directories(&self.config, key);
+                let drain_in_background = !wait_for_sinks.contains(*key);
+                match usage {
+                    Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
+                        emit!(TopologyDiskBufferRemoved {
+                            component_id: key,
+                            buffer_dirs: &buffer_dirs,
+                            usage: Some(usage),
+                            drain_in_background,
+                        });
+                    }
+                    None => {
+                        emit!(TopologyDiskBufferRemoved {
+                            component_id: key,
+                            buffer_dirs: &buffer_dirs,
+                            usage: None,
+                            drain_in_background,
+                        });
+                    }
+                    Some(_) => {}
+                }
+            }
+
             self.remove_inputs(key, diff, new_config);
 
             if let Some(registry) = self.utilization_registry.as_ref() {
@@ -678,6 +719,33 @@ impl RunningTopology {
 
         for key in &sinks_to_change {
             debug!(component_id = %key, "Changing sink.");
+            let old_buffer = sink_buffer(&self.config, key);
+            if old_buffer
+                .as_ref()
+                .is_some_and(BufferConfig::has_disk_stage)
+            {
+                let usage = self
+                    .inputs
+                    .get(*key)
+                    .expect("changed sink input must exist")
+                    .disk_usage_snapshot();
+                let buffer_dirs = disk_buffer_directories(&self.config, key);
+                let new_buffer_dirs = disk_buffer_directories(new_config, key);
+
+                if !reuse_buffers.contains(key)
+                    && !buffer_dirs
+                        .iter()
+                        .any(|path| new_buffer_dirs.contains(path))
+                {
+                    emit!(TopologyDiskBufferReplacementUnreferenced {
+                        component_id: key,
+                        buffer_dirs: &buffer_dirs,
+                        new_buffer_dirs: &new_buffer_dirs,
+                        usage,
+                    });
+                }
+            }
+
             if reuse_buffers.contains(key) || changed_disk_buffer_sinks.contains(key) {
                 self.detach_triggers
                     .remove(key)
@@ -1430,6 +1498,9 @@ impl RunningTopology {
         running_topology.spawn_diff(&diff, pieces);
         // `running_topology.config` was set from the initial config in `new()`.
         running_topology.refresh_confinement_gauges();
+        running_topology
+            .orphaned_disk_buffer_scanner
+            .scan(&running_topology.config, HashSet::new());
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();
@@ -1495,6 +1566,23 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: &Inputs<OutputId>) -> Vec<
         .iter()
         .filter(|id| producer_destroyed(&id.component) && producer_recreated(&id.component))
         .cloned()
+        .collect()
+}
+
+fn sink_buffer(config: &Config, sink_key: &ComponentKey) -> Option<BufferConfig> {
+    config
+        .sink(sink_key)
+        .map(|sink| sink.buffer.clone())
+        .or_else(|| enrichment_table_sink_buffer(config, sink_key))
+}
+
+fn disk_buffer_directories(config: &Config, sink_key: &ComponentKey) -> Vec<PathBuf> {
+    let global_data_dir = config.global.data_dir.clone();
+    sink_buffer(config, sink_key)
+        .into_iter()
+        .flat_map(|buffer| buffer.stages().to_vec())
+        .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), sink_key))
+        .map(|usage| usage.data_dir().to_path_buf())
         .collect()
 }
 
