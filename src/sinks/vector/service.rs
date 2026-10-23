@@ -2,6 +2,7 @@ use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
+use http_1::{HeaderValue, header::AUTHORIZATION};
 use hyper_1::body::Incoming;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
@@ -73,10 +74,12 @@ impl VectorService {
         client: Http2Client<BoxBody>,
         uri: Uri,
         compression: VectorCompression,
+        auth: Option<HeaderValue>,
     ) -> crate::Result<Self> {
         let origin = grpc_origin(&uri)?;
         let (protocol, endpoint) = uri::protocol_endpoint(uri);
-        let mut proto_client = proto_vector::Client::with_origin(GrpcTransport(client), origin);
+        let mut proto_client =
+            proto_vector::Client::with_origin(GrpcTransport { client, auth }, origin);
 
         if let Some(encoding) = compression.as_tonic_encoding() {
             proto_client = proto_client.send_compressed(encoding);
@@ -151,7 +154,10 @@ impl Service<VectorRequest> for VectorService {
 
 /// Sends tonic's gRPC requests over the native HTTP/2 client.
 #[derive(Clone, Debug)]
-pub struct GrpcTransport(Http2Client<BoxBody>);
+pub struct GrpcTransport {
+    client: Http2Client<BoxBody>,
+    auth: Option<HeaderValue>,
+}
 
 impl Service<http_1::Request<BoxBody>> for GrpcTransport {
     type Response = http_1::Response<Incoming>;
@@ -164,7 +170,11 @@ impl Service<http_1::Request<BoxBody>> for GrpcTransport {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, request: http_1::Request<BoxBody>) -> Self::Future {
-        Box::pin(self.0.request(request))
+    fn call(&mut self, mut request: http_1::Request<BoxBody>) -> Self::Future {
+        if let Some(auth) = &self.auth {
+            request.headers_mut().insert(AUTHORIZATION, auth.clone());
+        }
+
+        Box::pin(self.client.request(request))
     }
 }
