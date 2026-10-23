@@ -53,8 +53,7 @@ services:
           --rate=0
 
   # A detached `compose up` waits for all dependency conditions before starting this service.
-  # This keeps the test runner behind generator completion, exporter readiness, and a
-  # post-ingestion internal metrics scrape.
+  # This keeps the test runner behind generator completion and complete captures.
   traces-ready:
     image: alpine:3.20
     depends_on:
@@ -85,7 +84,6 @@ services:
         - /output/opentelemetry-traces
         - count:collector-source-file-exporter.log:spanId:200
         - count:collector-file-exporter.log:spanId:400
-        - received:400
       interval: 500ms
       timeout: 1s
       retries: 240
