@@ -26,7 +26,7 @@ use crate::{
         HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
     },
-    tls::TlsEnableableConfig,
+    tls::{TlsAcceptorReloader, TlsEnableableConfig},
 };
 
 /// Configuration for the `http_server` source.
@@ -295,10 +295,25 @@ pub fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParam
         .collect::<crate::Result<Vec<HttpConfigParamKind>>>()
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "http_server")]
-impl SourceConfig for SimpleHttpConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+impl SimpleHttpConfig {
+    /// The source's TLS configuration, if any. Exposed so a wrapping source can build a
+    /// [`TlsAcceptorReloader`] and watch the certificate files for rotation.
+    #[must_use]
+    pub const fn tls_config(&self) -> Option<&TlsEnableableConfig> {
+        self.tls.as_ref()
+    }
+
+    /// Build the source serving a runtime-swappable TLS acceptor when `tls_reloader` is set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder, TLS, or authentication cannot be built, or if `tls_reloader`
+    /// is set but TLS is disabled.
+    pub fn build_with_tls_reloader(
+        &self,
+        cx: SourceContext,
+        tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder = self
             .get_decoding_config()
@@ -323,11 +338,20 @@ impl SourceConfig for SimpleHttpConfig {
             self.response_code,
             self.strict_path,
             self.tls.as_ref(),
+            tls_reloader,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,
             self.keepalive.clone(),
         )
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "http_server")]
+impl SourceConfig for SimpleHttpConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.build_with_tls_reloader(cx, None)
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -492,6 +516,7 @@ mod tests {
             owned_value_path, path,
         },
         schema::Definition,
+        tls::{MaybeTlsSettings, TlsEnableableConfig, TlsError},
     };
     use vrl::{
         path::ValuePath as _,
@@ -1677,6 +1702,25 @@ mod tests {
             Authorization::bearer("my-token").unwrap().0.encode(),
         );
         assert_eq!(200, send_with_headers(addr, "", headers).await);
+    }
+
+    #[tokio::test]
+    async fn tls_reloader_requires_tls() {
+        let reloader =
+            MaybeTlsSettings::from_config(Some(&TlsEnableableConfig::test_config()), true)
+                .unwrap()
+                .reloadable_acceptor()
+                .unwrap();
+        assert!(reloader.is_some());
+
+        let (sender, _recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let result = SimpleHttpConfig::default()
+            .build_with_tls_reloader(SourceContext::new_test(sender, None), reloader);
+        let error = result.err().expect("must not silently serve plaintext");
+        assert!(
+            matches!(error.downcast_ref(), Some(TlsError::ReloaderWithoutTls)),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

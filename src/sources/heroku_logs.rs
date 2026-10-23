@@ -202,6 +202,7 @@ impl SourceConfig for LogplexConfig {
             StatusCode::OK,
             true,
             self.tls.as_ref(),
+            None,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,
