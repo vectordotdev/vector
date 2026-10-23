@@ -6,7 +6,9 @@ use vector_common::byte_size_of::ByteSizeOf;
 /// OTLP `Span.flags` / `Link.flags` bitfield.
 ///
 /// Unknown bits are retained so reserved OTLP bits and future W3C flags round-trip.
-/// [`From<u32>`] keeps the raw word; [`Self::truncate`] drops bits that have no named flag.
+/// [`From<u32>`] keeps the raw word. Do not call [`Self::truncate`] on wire data: it clears
+/// every bit that has no named flag, including OTLP reserved bits 10-31, future W3C flags,
+/// and Datadog's bit-31 link sentinel, all of which must round-trip.
 #[bitmask(u32)]
 #[derive(Default)]
 pub enum OtlpSpanFlags {
@@ -65,6 +67,12 @@ impl TraceState {
         &self.0
     }
 
+    /// Returns the raw header string, consuming the value.
+    #[must_use]
+    pub fn into_raw(self) -> String {
+        self.0
+    }
+
     /// Returns `true` when the raw header is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -80,7 +88,8 @@ impl TraceState {
     /// Inserts or updates `key`, moving it to the head of the list.
     ///
     /// Every other entry is copied through unchanged, including empty entries,
-    /// whitespace-only entries, and the original text of retained members.
+    /// whitespace-only entries, and the original text of retained members. Note that the inputs are
+    /// not validated to produce a valid W3C `tracestate` header.
     pub fn insert(&mut self, key: &str, val: &str) {
         let mut out = String::with_capacity(self.0.len() + key.len() + val.len() + 2);
         out.push_str(key);
