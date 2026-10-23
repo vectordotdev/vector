@@ -3,8 +3,8 @@ use std::net::Ipv4Addr;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL,
-        error_stage, error_type,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, ToF64Lossy,
+        UNINTENTIONAL, error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -35,8 +35,6 @@ pub struct SocketBytesReceived {
 }
 
 impl InternalEvent for SocketBytesReceived {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         let protocol = self.mode.as_str();
         trace!(
@@ -49,7 +47,7 @@ impl InternalEvent for SocketBytesReceived {
             "protocol" => protocol,
         )
         .increment(self.byte_size as u64);
-        histogram!(HistogramName::ComponentReceivedBytes).record(self.byte_size as f64);
+        histogram!(HistogramName::ComponentReceivedBytes).record(self.byte_size.to_f64_lossy());
     }
 }
 
@@ -61,8 +59,6 @@ pub struct SocketEventsReceived {
 }
 
 impl InternalEvent for SocketEventsReceived {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         let mode = self.mode.as_str();
         trace!(
@@ -76,7 +72,7 @@ impl InternalEvent for SocketEventsReceived {
         counter!(CounterName::ComponentReceivedEventBytesTotal, "mode" => mode)
             .increment(self.byte_size.get() as u64);
         histogram!(HistogramName::ComponentReceivedBytes, "mode" => mode)
-            .record(self.byte_size.get() as f64);
+            .record(self.byte_size.get().to_f64_lossy());
     }
 }
 
