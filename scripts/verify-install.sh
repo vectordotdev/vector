@@ -58,6 +58,17 @@ case "$package" in
     ;;
 esac
 test -f /usr/share/vector/examples/vector.yaml || (echo "/usr/share/vector/examples/vector.yaml doesn't exist" && exit 1)
+test -f /usr/share/bash-completion/completions/vector || (echo "bash completion missing" && exit 1)
+test -f /usr/share/fish/vendor_completions.d/vector.fish || (echo "fish completion missing" && exit 1)
+
+case "$package" in
+  *.deb)
+    test -f /usr/share/zsh/vendor-completions/_vector || (echo "zsh completion missing" && exit 1)
+    ;;
+  *.rpm)
+    test -f /usr/share/zsh/site-functions/_vector || (echo "zsh completion missing" && exit 1)
+    ;;
+esac
 
 mkdir -p /etc/vector
 echo "FOO=bar" > /etc/default/vector
