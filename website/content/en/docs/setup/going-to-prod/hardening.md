@@ -57,6 +57,8 @@ Vector implements an affine type system via Rust that achieves memory safety and
 
 #### Securing Vector’s Configuration
 
+Only trusted operators should be allowed to create or modify Vector’s configuration, including external VRL programs.
+
 - **Never use plain text secrets.** Never add plain text secrets to Vector’s configuration files.
 - **Restrict Vector’s configuration directory.** Vector’s configuration directory (i.e., `/etc/vector`) should be read restricted to Vector’s unprivileged service account and write restricted to your operational account used when deploying Vector.
 
