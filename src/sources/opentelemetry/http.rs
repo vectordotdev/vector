@@ -44,7 +44,7 @@ use crate::{
         opentelemetry::{
             config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
             request_control::{
-                AcknowledgementFailure, MiddlewareError, PendingAcknowledgement,
+                AcknowledgementFailure, HttpRequest, MiddlewareError, PendingAcknowledgement,
                 RequestControlLayer,
             },
         },
@@ -83,6 +83,7 @@ pub(crate) async fn run_http_server(
     keepalive_settings: KeepaliveConfig,
     request_control: RequestControlLayer<
         impl Fn(MiddlewareError) -> Response + Clone + Send + 'static,
+        HttpRequest,
     >,
 ) -> crate::Result<()> {
     let listener = tls_settings
