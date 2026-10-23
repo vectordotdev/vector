@@ -26,10 +26,10 @@ impl InternalEvent for TopologyDiskBufferRemoved<'_> {
                 "Removing sink with attached disk buffer containing buffered bytes. Configuration reload will wait for its current instance to drain the buffer."
             }
             (false, true) => {
-                "Removing sink with attached disk buffer whose buffered-byte count is unavailable. Its current instance will continue draining in the background until the buffer is empty or Vector shuts down."
+                "Removing sink with attached disk buffer. A disk buffer writer was busy writing or waiting for free space, so the buffer's usage could not be read. Its current instance will continue draining in the background until the buffer is empty or Vector shuts down."
             }
             (false, false) => {
-                "Removing sink with attached disk buffer whose buffered-byte count is unavailable. Configuration reload will wait for its current instance to drain the buffer."
+                "Removing sink with attached disk buffer. A disk buffer writer was busy writing or waiting for free space, so the buffer's usage could not be read. Configuration reload will wait for its current instance to drain the buffer."
             }
         };
         if let Some(usage) = self.usage {
@@ -90,7 +90,7 @@ impl InternalEvent for TopologyDiskBufferReplacementUnreferenced<'_> {
                 buffer_dirs = ?self.buffer_dirs,
                 new_buffer_dirs = ?self.new_buffer_dirs,
                 usage_unavailable = true,
-                message = "Replacement sink does not use the previous disk buffer, and its buffered-byte count is unavailable. If reload succeeds, any buffered bytes will be left unreferenced.",
+                message = "Replacement sink does not use the previous disk buffer. A disk buffer writer was busy writing or waiting for free space, so the buffer's usage could not be read. If reload succeeds, any buffered bytes will be left unreferenced.",
             ),
         }
         counter!(
@@ -112,7 +112,7 @@ impl InternalEvent for TopologyDiskBufferUnreferenced<'_> {
         warn!(
             buffer_id = self.buffer_id.to_string_lossy().as_ref(),
             buffer_dir = self.buffer_dir.to_string_lossy().as_ref(),
-            message = "Found disk buffer not referenced by the current configuration. It may still be draining through a detached sink instance; otherwise its buffered bytes are not being processed.",
+            message = "Found disk buffer not referenced by the current configuration. It may still be draining through a detached sink instance. If not, any buffered bytes it holds are not being processed.",
         );
         counter!(
             CounterName::TopologyDiskBufferLifecycleEventsTotal,

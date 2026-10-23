@@ -725,24 +725,12 @@ impl RunningTopology {
                         .iter()
                         .any(|path| new_buffer_dirs.contains(path))
                 {
-                    match usage {
-                        Some(usage) => {
-                            emit!(TopologyDiskBufferReplacementUnreferenced {
-                                component_id: key,
-                                buffer_dirs: &buffer_dirs,
-                                new_buffer_dirs: &new_buffer_dirs,
-                                usage: Some(usage),
-                            });
-                        }
-                        None => {
-                            emit!(TopologyDiskBufferReplacementUnreferenced {
-                                component_id: key,
-                                buffer_dirs: &buffer_dirs,
-                                new_buffer_dirs: &new_buffer_dirs,
-                                usage: None,
-                            });
-                        }
-                    }
+                    emit!(TopologyDiskBufferReplacementUnreferenced {
+                        component_id: key,
+                        buffer_dirs: &buffer_dirs,
+                        new_buffer_dirs: &new_buffer_dirs,
+                        usage,
+                    });
                 }
             }
 
