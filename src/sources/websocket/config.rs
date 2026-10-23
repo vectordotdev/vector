@@ -1,12 +1,16 @@
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
 use futures::TryFutureExt;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_config::configurable_component;
 use vector_lib::{
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        EncodingConfig,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LogNamespace, SourceOutput},
+    lookup::lookup_v2::ConfigValuePath,
 };
 
 use super::source::{WebSocketSource, WebSocketSourceParams};
@@ -75,6 +79,58 @@ impl PongValidation {
     }
 }
 
+/// Configuration for ACK support for message replay.
+///
+/// Enabling ACK support removes the need for client to keep track of latest received message.
+/// It moves the burden of tracking latest received messages from this component to the server.
+/// This will only work if the server has it enabled. This will make the client respond to received
+/// messages with an ACK.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
+pub struct ReplayAckConfig {
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    /// Name of the field that should contain the ACKed message ID.
+    ///
+    /// Use "." if message ID is the root of the message.
+    pub message_id_path: ConfigValuePath,
+}
+
+/// Configuration for message replay which allows replaying missed messages from servers that
+/// support message buffering.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct MessageReplayConfig {
+    /// The directory used to persist latest received message ID.
+    ///
+    /// By default, the [global `data_dir` option][global_data_dir] is used.
+    /// Make sure the running user has write permissions to this directory.
+    ///
+    /// If this directory is specified, then Vector will attempt to create it.
+    ///
+    /// This is only in effect if [`Self::stateful`] is enabled.
+    ///
+    /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/local/lib/vector/"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
+    pub data_dir: Option<PathBuf>,
+
+    /// Whether the latest received message ID should be kept across Vector restarts.
+    #[serde(default)]
+    pub stateful: bool,
+
+    /// Message ID path.
+    ///
+    /// This has to be defined to read message ID from messages. Using that ID,
+    /// replay can be requested at reconnection and ACK messages can be sent.
+    pub message_id_path: ConfigValuePath,
+
+    #[configurable(derived)]
+    pub ack: Option<ReplayAckConfig>,
+}
+
 /// Configuration for the `websocket` source.
 #[serde_as]
 #[configurable_component(source("websocket", "Collect events from a websocket endpoint.",))]
@@ -120,6 +176,10 @@ pub struct WebSocketConfig {
     #[serde(default)]
     pub pong_message: Option<PongMessage>,
 
+    #[configurable(derived)]
+    #[serde(default)]
+    pub replay: Option<MessageReplayConfig>,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
@@ -145,6 +205,7 @@ impl Default for WebSocketConfig {
             initial_message_timeout_secs: default_initial_message_timeout_secs(),
             ping_message: None,
             pong_message: None,
+            replay: None,
             log_namespace: None,
         }
     }
@@ -160,19 +221,31 @@ impl SourceConfig for WebSocketConfig {
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
         let connector = WebSocketConnector::from_validated(uri, tls, self.common.auth.clone());
-
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let params = WebSocketSourceParams {
-            connector,
-            decoder,
-            log_namespace,
+        let data_dir = if self.replay.as_ref().map(|r| r.stateful).unwrap_or(false) {
+            // add the source name as a subdir, so that multiple sources can
+            // operate within the same given data_dir (e.g. the global one)
+            Some(cx.globals.resolve_and_make_data_subdir(
+                self.replay.as_ref().and_then(|r| r.data_dir.as_ref()),
+                cx.key.id(),
+            )?)
+        } else {
+            None
         };
 
-        let source = WebSocketSource::new(self.clone(), params);
+        let params = WebSocketSourceParams {
+            connector,
+            tls,
+            decoder,
+            log_namespace,
+            data_dir,
+        };
+
+        let source = WebSocketSource::new(self.clone(), params)?;
 
         Ok(Box::pin(source.run(cx).map_err(Into::into)))
     }

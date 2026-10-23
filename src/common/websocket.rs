@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt::Debug,
     net::SocketAddr,
     num::NonZeroU64,
@@ -232,6 +233,15 @@ pub struct WebSocketCommonConfig {
     #[configurable(metadata(docs::examples = "wss://example.com/socket"))]
     pub uri: String,
 
+    /// Headers to apply to the connection request.
+    ///
+    /// One or more values for the same header can be provided.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and its value(s)."
+    ))]
+    pub headers: HashMap<String, Vec<String>>,
+
     /// The interval, in seconds, between sending [Ping][ping]s to the remote peer.
     ///
     /// If this option is not configured, pings are not sent on an interval.
@@ -265,6 +275,7 @@ impl Default for WebSocketCommonConfig {
     fn default() -> Self {
         Self {
             uri: "ws://127.0.0.1:8080".to_owned(),
+            headers: Default::default(),
             ping_interval: None,
             ping_timeout: None,
             tls: None,

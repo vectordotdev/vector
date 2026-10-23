@@ -237,6 +237,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
+                headers: Default::default(),
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
@@ -262,6 +263,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
+                headers: Default::default(),
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
@@ -286,6 +288,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("wss://{addr}"),
+                headers: Default::default(),
                 tls: Some(TlsEnableableConfig {
                     enabled: Some(true),
                     options: TlsConfig {
@@ -314,6 +317,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
+                headers: Default::default(),
                 tls: None,
                 ping_interval: None,
                 ping_timeout: None,
