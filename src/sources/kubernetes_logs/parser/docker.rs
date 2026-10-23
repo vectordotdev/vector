@@ -21,7 +21,7 @@ pub const TIMESTAMP_KEY: &str = "time";
 
 /// Parser for the Docker log format.
 ///
-/// Expects logs to arrive in a JSONLines format with the fields names and
+/// Expects logs to arrive in a `JSONLines` format with the fields names and
 /// contents specific to the implementation of the Docker `json-file` log driver.
 ///
 /// Normalizes parsed data for consistency.
@@ -85,7 +85,7 @@ fn parse_json(log: &mut LogEvent, log_namespace: LogNamespace) -> Result<(), Par
                         value,
                     ),
                     _ => unreachable!("all json-file keys should be matched"),
-                };
+                }
             }
             Ok(())
         }
@@ -117,7 +117,7 @@ fn normalize_event(
     if let Some(timestamp_key) = timestamp_key {
         let time = log.remove(&timestamp_key).context(TimeFieldMissingSnafu)?;
         let time = time
-            .as_str()
+            .to_str_lossy()
             .ok_or(NormalizationError::TimeValueUnexpectedType)?;
         let time = DateTime::parse_from_rfc3339(time.as_ref()).context(TimeParsingSnafu)?;
         log_namespace.insert_source_metadata(
@@ -149,10 +149,10 @@ fn normalize_event(
     // an exception and make them non-partial.
     // This is still not ideal, and can potentially be improved.
     let mut is_partial = message.len() == DOCKER_MESSAGE_SPLIT_THRESHOLD;
-    if message.last().map(|&b| b as char == '\n').unwrap_or(false) {
+    if message.last().is_some_and(|&b| b as char == '\n') {
         message.truncate(message.len() - 1);
         is_partial = false;
-    };
+    }
     log.insert(&message_path, message);
 
     // For partial messages add a partial event indicator.

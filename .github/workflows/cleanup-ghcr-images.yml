@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   cleanup-test-runner:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     runs-on: ubuntu-24.04
     permissions:
       packages: write # Required to delete package versions from GHCR

@@ -85,6 +85,11 @@ pub(crate) struct MemoryEnrichmentTableFlushed {
 }
 
 impl InternalEvent for MemoryEnrichmentTableFlushed {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn emit(self) {
         counter!(CounterName::MemoryEnrichmentTableFlushesTotal,).increment(1);
         gauge!(GaugeName::MemoryEnrichmentTableObjectsCount,).set(self.new_objects_count as f64);
@@ -215,6 +220,10 @@ mod tests {
     }
 
     /// Validate a retrieved metric's type, tags, and value.
+    #[expect(
+        clippy::float_cmp,
+        reason = "These assertions check exact counter and gauge values."
+    )]
     fn assert_counter(metric: &Metric, key: Option<&str>) {
         assert!(matches!(metric.value(), MetricValue::Counter { value } if *value == 1.0));
         assert_eq!(metric.tag_value("key").as_deref(), key);
@@ -269,6 +278,15 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
+    #[expect(
+        clippy::float_cmp,
+        reason = "These assertions check exact counter and gauge values."
+    )]
     fn ttl_expired_count_emits_total_and_legacy() {
         let count = 7;
         let metrics = capture_metrics(|| {

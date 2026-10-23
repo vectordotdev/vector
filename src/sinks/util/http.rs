@@ -145,7 +145,7 @@ where
     pub fn new(
         sink: T,
         batch: B,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -173,7 +173,7 @@ where
         sink: T,
         batch: B,
         retry_logic: RL,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -291,7 +291,7 @@ where
     pub fn new(
         sink: T,
         batch: B,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -321,7 +321,7 @@ where
         sink: T,
         batch: B,
         retry_logic: RL,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -346,6 +346,7 @@ where
     }
 
     /// Enforces per partition ordering of request.
+    #[must_use]
     pub fn ordered(mut self) -> Self {
         self.inner.ordered();
         self
@@ -420,11 +421,11 @@ pub struct SigV4Config {
     pub(crate) service: String,
 }
 
-/// @struct HttpBatchService
+/// @struct `HttpBatchService`
 ///
 /// NOTE: This has been deprecated, please do not use directly when creating new sinks.
 ///       The `HttpService` currently wraps this structure. Eventually all sinks currently using the
-///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
+///       `HttpBatchService` directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.
 pub struct HttpBatchService<F, B = Bytes> {
     inner: HttpClient<Body>,
@@ -634,7 +635,8 @@ impl RetryStrategy {
     ///
     /// For the `All` strategy, all non-success status codes will be retried.
     #[must_use]
-    pub fn retry_action<Req>(&self, status: http::StatusCode) -> RetryAction<Req> {
+    pub fn retry_action<Req>(&self, status: impl IntoStatusCode) -> RetryAction<Req> {
+        let status = status.into_status_code();
         if status.is_success() {
             return RetryAction::Successful;
         }
@@ -670,6 +672,28 @@ impl RetryStrategy {
                 }
             }
         }
+    }
+}
+
+/// A response status code from either `http` crate version.
+///
+/// Retry logic and healthcheck errors accept both versions through this trait, so callers never
+/// convert between them. This is the only place that converts.
+// TODO: Use `http_1::StatusCode` natively and remove the `http` 0.2 impl once the HTTP v1
+// migration is complete: https://github.com/vectordotdev/vector/issues/19179
+pub trait IntoStatusCode {
+    fn into_status_code(self) -> StatusCode;
+}
+
+impl IntoStatusCode for StatusCode {
+    fn into_status_code(self) -> StatusCode {
+        self
+    }
+}
+
+impl IntoStatusCode for http_1::StatusCode {
+    fn into_status_code(self) -> StatusCode {
+        StatusCode::from_u16(self.as_u16()).expect("HTTP status codes are valid u16 values")
     }
 }
 
@@ -742,9 +766,10 @@ impl HttpErrorClassify for HttpError {
     }
 }
 
-impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
+impl<F, S, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
@@ -759,9 +784,10 @@ where
     }
 }
 
-impl<F, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
+impl<F, S, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
     E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
@@ -777,9 +803,10 @@ where
     }
 }
 
-impl<F, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
+impl<F, S, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
     E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
@@ -848,6 +875,7 @@ fn headers_examples() -> BTreeMap<String, String> {
 
 impl RequestConfig {
     /// Split headers into static (non-dynamic) and template (dynamic) maps.
+    #[must_use]
     pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
@@ -884,6 +912,11 @@ pub enum HeaderValidationError {
     },
 }
 
+/// Validates HTTP header names and values.
+///
+/// # Errors
+///
+/// Returns an error if a header name or value is invalid.
 pub fn validate_headers(
     headers: &BTreeMap<String, String>,
 ) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
@@ -984,6 +1017,7 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Creates a `RetryLogic` for use with `HttpResponse`.
+#[must_use]
 pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: RetryStrategy,
 ) -> HttpStatusRetryLogic<
@@ -1021,6 +1055,9 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
 
 /// HTTP request builder for HTTP stream sinks using the generic `HttpService`
 pub trait HttpServiceRequestBuilder<T: Send> {
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be built.
     fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
 }
 
@@ -1169,7 +1206,7 @@ mod test {
             retry_strategy: RetryStrategy::None,
         };
         let status_logic =
-            HttpStatusRetryLogic::<_, (), ()>::new(|_: &()| StatusCode::OK, RetryStrategy::None);
+            HttpStatusRetryLogic::<_, (), ()>::new(|(): &()| StatusCode::OK, RetryStrategy::None);
 
         assert!(!logic.is_retriable_timeout());
         assert!(!status_logic.is_retriable_timeout());

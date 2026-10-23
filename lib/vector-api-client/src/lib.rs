@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Vector gRPC API client library
 //!
 //! This library provides a Rust client for the Vector gRPC observability API.

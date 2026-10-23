@@ -26,11 +26,11 @@ releases: "0.44.0": {
 			description: """
 				VRL was updated to v0.21.0. This includes the following changes:
 
-				#### Breaking Changes & Upgrade Guide
+				#### Breaking Changes & Upgrade Guide {#vrl-breaking-changes--upgrade-guide}
 
 				- `to_unix_timestamp`, `to_float`, and `uuid_v7` can now return an error if the supplied timestamp is unrepresentable as a nanosecond timestamp. Previously the function calls would panic. (https://github.com/vectordotdev/vrl/pull/979)
 
-				#### New Features
+				#### New Features {#vrl-new-features}
 
 				- Added new `crc` function to calculate CRC (Cyclic Redundancy Check) checksum
 				- Add `parse_cbor` function (https://github.com/vectordotdev/vrl/pull/1152)
@@ -44,7 +44,7 @@ releases: "0.44.0": {
 				- Add `main` log format for `parse_nginx_log`. (https://github.com/vectordotdev/vrl/pull/1202)
 				- Added support for optional `timezone` argument in the `parse_timestamp` function. (https://github.com/vectordotdev/vrl/pull/1207)
 
-				#### Fixes
+				#### Fixes {#vrl-fixes}
 
 				- Fix a panic in float subtraction that produces NaN values. (https://github.com/vectordotdev/vrl/pull/1186)
 				"""

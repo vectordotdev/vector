@@ -67,30 +67,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusNormalizationError;
-
-impl InternalEvent for PrometheusNormalizationError {
-    fn emit(self) {
-        let normalization_reason = "Prometheus metric normalization failed.";
-        error!(
-            message = normalization_reason,
-            error_type = error_type::CONVERSION_FAILED,
-            stage = error_stage::PROCESSING,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONVERSION_FAILED,
-            "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: normalization_reason
-        });
-    }
-}
-
-#[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusInvalidMetricError;
 
 impl InternalEvent for PrometheusInvalidMetricError {

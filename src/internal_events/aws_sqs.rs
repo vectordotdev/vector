@@ -20,7 +20,7 @@ mod s3 {
     use vector_lib::histogram;
     use vector_lib::internal_event::HistogramName;
 
-    use super::*;
+    use super::{CounterName, InternalEvent, NamedInternalEvent, counter, error_stage, error_type};
     use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug, NamedInternalEvent)]

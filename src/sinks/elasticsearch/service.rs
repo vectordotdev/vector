@@ -114,6 +114,13 @@ impl HttpRequestBuilder {
         }
     }
 
+    /// Builds and authenticates a bulk request.
+    ///
+    /// # Errors
+    /// Returns an error if AWS credentials cannot be loaded or the request cannot be signed.
+    ///
+    /// # Panics
+    /// Panics if the configured URI or headers are invalid for an HTTP request.
     pub async fn build_request(
         &self,
         es_req: ElasticsearchRequest,
@@ -200,8 +207,8 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
 
             let event_status = get_event_status(&http_response);
             Ok(ElasticsearchResponse {
-                event_status,
                 http_response,
+                event_status,
                 events_byte_size,
             })
         })

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use rand::RngExt;
 use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
@@ -57,14 +55,14 @@ pub struct MqttSinkConfig {
 #[serde(rename_all = "lowercase")]
 #[allow(clippy::enum_variant_names)]
 pub enum MqttQoS {
-    /// AtLeastOnce.
+    /// `AtLeastOnce`.
     #[default]
     AtLeastOnce,
 
-    /// AtMostOnce.
+    /// `AtMostOnce`.
     AtMostOnce,
 
-    /// ExactlyOnce.
+    /// `ExactlyOnce`.
     ExactlyOnce,
 }
 
@@ -190,7 +188,7 @@ impl MqttSinkConfig {
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
-        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
+        options.set_keep_alive(self.common.keep_alive);
         options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
         options.set_clean_session(self.clean_session);
         match (&self.common.user, &self.common.password) {
@@ -215,8 +213,10 @@ impl MqttSinkConfig {
                 .as_ref()
                 .and_then(|tls| tls.options.alpn_protocols.as_ref())
                 .filter(|protocols| !protocols.is_empty())
-                .map(|protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect())
-                .unwrap_or_else(|| vec![b"mqtt".to_vec()]);
+                .map_or_else(
+                    || vec![b"mqtt".to_vec()],
+                    |protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect(),
+                );
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,

@@ -51,7 +51,8 @@ fn create_event_with_notifier(id: i64) -> (Event, BatchStatusReceiver) {
 }
 
 fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
-    let mut events = (0..count as i64).map(create_event).collect::<Vec<_>>();
+    let count = i64::try_from(count).expect("test event count fits in i64");
+    let mut events = (0..count).map(create_event).collect::<Vec<_>>();
     let receiver = BatchNotifier::apply_to(&mut events);
     (events, receiver)
 }
@@ -419,7 +420,7 @@ async fn extra_fields_are_ignored() {
     let expected_value = input_log_event
         .get_message()
         .unwrap()
-        .as_str()
+        .to_str_lossy()
         .unwrap()
         .into_owned();
 

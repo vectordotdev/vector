@@ -499,7 +499,7 @@ impl ZerobusService {
                     return Err(ZerobusSinkError::StreamClosed);
                 };
                 match s.ingest_batch(batch).await {
-                    Ok(offset) => s.wait_for_offset(offset).await.map(|_| ()),
+                    Ok(offset) => s.wait_for_offset(offset).await,
                     Err(e) => Err(e),
                 }
             }
@@ -726,9 +726,9 @@ mod tests {
             },
             user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: crate::sinks::util::BatchConfig::default(),
+            request: crate::sinks::util::TowerRequestConfig::default(),
+            acknowledgements: crate::config::AcknowledgementsConfig::default(),
         }
     }
 

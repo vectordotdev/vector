@@ -55,6 +55,9 @@ pub(super) trait MetricCollector {
         true
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep metric variants together.")]
+    #[allow(clippy::cast_precision_loss, reason = "Preserve f64 count rounding.")]
     fn encode_metric(
         &mut self,
         default_namespace: Option<&str>,
@@ -76,10 +79,7 @@ pub(super) trait MetricCollector {
             self.emit_metadata(metric.name(), name, metric.value());
 
             match metric.value() {
-                MetricValue::Counter { value } => {
-                    self.emit_value(timestamp, name, "", *value, tags, None);
-                }
-                MetricValue::Gauge { value } => {
+                MetricValue::Counter { value } | MetricValue::Gauge { value } => {
                     self.emit_value(timestamp, name, "", *value, tags, None);
                 }
                 MetricValue::Set { values } => {
@@ -120,7 +120,7 @@ pub(super) trait MetricCollector {
                 } => {
                     if let Some(statistic) = DistributionStatistic::from_samples(samples, quantiles)
                     {
-                        for (q, v) in statistic.quantiles.iter() {
+                        for (q, v) in &statistic.quantiles {
                             self.emit_value(
                                 timestamp,
                                 name,
@@ -243,7 +243,7 @@ pub(super) trait MetricCollector {
                             timestamp,
                             name,
                             "_count",
-                            ddsketch.count() as f64,
+                            f64::from(ddsketch.count()),
                             tags,
                             None,
                         );
@@ -318,7 +318,7 @@ impl StringCollector {
                     .collect::<Vec<_>>();
 
                 if let Some((key, value)) = tag {
-                    parts.push(Self::format_tag(key, value))
+                    parts.push(Self::format_tag(key, value));
                 }
 
                 parts.sort();
@@ -415,8 +415,8 @@ impl MetricCollector for TimeSeries {
 
     fn new() -> Self {
         Self {
-            buffer: Default::default(),
-            metadata: Default::default(),
+            buffer: IndexMap::default(),
+            metadata: IndexMap::default(),
             timestamp: None,
         }
     }
@@ -476,14 +476,14 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
         MetricValue::Distribution {
             statistic: StatisticKind::Histogram,
             ..
-        } => MetricType::Histogram,
+        }
+        | MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
         MetricValue::Distribution {
             statistic: StatisticKind::Summary,
             ..
-        } => MetricType::Summary,
-        MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
-        MetricValue::AggregatedSummary { .. } => MetricType::Summary,
-        MetricValue::Sketch { .. } => MetricType::Summary,
+        }
+        | MetricValue::AggregatedSummary { .. }
+        | MetricValue::Sketch { .. } => MetricType::Summary,
     }
 }
 
@@ -573,7 +573,7 @@ mod tests {
     fn encodes_counter_request() {
         assert_eq!(
             encode_counter::<TimeSeries>(),
-            write_request!("vector_hits", "hits", Counter ["" @ 1612325106789 = 10.0 ["code" => "200"]])
+            write_request!("vector_hits", "hits", Counter ["" @ 1_612_325_106_789 = 10.0 ["code" => "200"]])
         );
     }
 
@@ -604,7 +604,7 @@ mod tests {
     fn encodes_gauge_request() {
         assert_eq!(
             encode_gauge::<TimeSeries>(),
-            write_request!("vector_temperature", "temperature", Gauge ["" @ 1612325106789 = -1.1 ["code" => "200"]])
+            write_request!("vector_temperature", "temperature", Gauge ["" @ 1_612_325_106_789 = -1.1 ["code" => "200"]])
         );
     }
 
@@ -635,7 +635,7 @@ mod tests {
     fn encodes_set_request() {
         assert_eq!(
             encode_set::<TimeSeries>(),
-            write_request!("vector_users", "users", Gauge [ "" @ 1612325106789 = 1.0 []])
+            write_request!("vector_users", "users", Gauge [ "" @ 1_612_325_106_789 = 1.0 []])
         );
     }
 
@@ -667,7 +667,7 @@ mod tests {
     fn encodes_expired_set_request() {
         assert_eq!(
             encode_expired_set::<TimeSeries>(),
-            write_request!("vector_users", "users", Gauge ["" @ 1612325106789 = 0.0 []])
+            write_request!("vector_users", "users", Gauge ["" @ 1_612_325_106_789 = 0.0 []])
         );
     }
 
@@ -706,12 +706,12 @@ mod tests {
             encode_distribution::<TimeSeries>(),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 1612325106789 = 0.0 ["le" => "0"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "2.5"],
-                        "_bucket" @ 1612325106789 = 8.0 ["le" => "5"],
-                        "_bucket" @ 1612325106789 = 8.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 15.0 [],
-                        "_count" @ 1612325106789 = 8.0 []
+                        "_bucket" @ 1_612_325_106_789 = 0.0 ["le" => "0"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "2.5"],
+                        "_bucket" @ 1_612_325_106_789 = 8.0 ["le" => "5"],
+                        "_bucket" @ 1_612_325_106_789 = 8.0 ["le" => "+Inf"],
+                        "_sum" @ 1_612_325_106_789 = 15.0 [],
+                        "_count" @ 1_612_325_106_789 = 8.0 []
                 ]
             )
         );
@@ -753,12 +753,12 @@ mod tests {
             encode_histogram::<TimeSeries>(false),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
-                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 11.5 [],
-                        "_count" @ 1612325106789 = 6.0 []
+                        "_bucket" @ 1_612_325_106_789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1_612_325_106_789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "+Inf"],
+                        "_sum" @ 1_612_325_106_789 = 11.5 [],
+                        "_count" @ 1_612_325_106_789 = 6.0 []
                     ]
             )
         );
@@ -787,18 +787,18 @@ mod tests {
             encode_histogram::<TimeSeries>(true),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
-                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 11.5 [],
-                        "_count" @ 1612325106789 = 6.0 []
+                        "_bucket" @ 1_612_325_106_789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1_612_325_106_789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "+Inf"],
+                        "_sum" @ 1_612_325_106_789 = 11.5 [],
+                        "_count" @ 1_612_325_106_789 = 6.0 []
                     ]
             )
         );
     }
 
-    /// OpenMetrics makes the `_sum` series recommended rather than required, and forbids it for
+    /// `OpenMetrics` makes the `_sum` series recommended rather than required, and forbids it for
     /// histograms with negative bucket thresholds, so a histogram that reports no sum must omit the
     /// series rather than publish a zero that readers cannot tell from a measurement.
     #[test]
@@ -823,11 +823,11 @@ mod tests {
             encode_histogram_without_sum::<TimeSeries>(),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
-                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
-                        "_count" @ 1612325106789 = 6.0 []
+                        "_bucket" @ 1_612_325_106_789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1_612_325_106_789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "+Inf"],
+                        "_count" @ 1_612_325_106_789 = 6.0 []
                     ]
             )
         );
@@ -894,11 +894,11 @@ mod tests {
             encode_summary::<TimeSeries>(),
             write_request!(
                 "ns_requests", "requests", Summary [
-                    "" @ 1612325106789 = 1.5 ["code" => "200", "quantile" => "0.01"],
-                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.5"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.99"],
-                    "_sum" @ 1612325106789 = 12.0 ["code" => "200"],
-                    "_count" @ 1612325106789 = 6.0 ["code" => "200"]
+                    "" @ 1_612_325_106_789 = 1.5 ["code" => "200", "quantile" => "0.01"],
+                    "" @ 1_612_325_106_789 = 2.0 ["code" => "200", "quantile" => "0.5"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.99"],
+                    "_sum" @ 1_612_325_106_789 = 12.0 ["code" => "200"],
+                    "_count" @ 1_612_325_106_789 = 6.0 ["code" => "200"]
                 ]
             )
         );
@@ -946,16 +946,16 @@ mod tests {
             encode_distribution_summary::<TimeSeries>(),
             write_request!(
                 "ns_requests", "requests", Summary [
-                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.5"],
-                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.75"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.9"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.95"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.99"],
-                    "_sum" @ 1612325106789 = 15.0 ["code" => "200"],
-                    "_count" @ 1612325106789 = 8.0 ["code" => "200"],
-                    "_min" @ 1612325106789 = 1.0 ["code" => "200"],
-                    "_max" @ 1612325106789 = 3.0 ["code" => "200"],
-                    "_avg" @ 1612325106789 = 1.875 ["code" => "200"]
+                    "" @ 1_612_325_106_789 = 2.0 ["code" => "200", "quantile" => "0.5"],
+                    "" @ 1_612_325_106_789 = 2.0 ["code" => "200", "quantile" => "0.75"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.9"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.95"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.99"],
+                    "_sum" @ 1_612_325_106_789 = 15.0 ["code" => "200"],
+                    "_count" @ 1_612_325_106_789 = 8.0 ["code" => "200"],
+                    "_min" @ 1_612_325_106_789 = 1.0 ["code" => "200"],
+                    "_max" @ 1_612_325_106_789 = 3.0 ["code" => "200"],
+                    "_avg" @ 1_612_325_106_789 = 1.875 ["code" => "200"]
                 ]
             )
         );
@@ -991,7 +991,7 @@ mod tests {
     fn encodes_timestamp_request() {
         assert_eq!(
             encode_timestamp::<TimeSeries>(),
-            write_request!("temperature", "temperature", Counter ["" @ 1612325106789 = 2.0 []])
+            write_request!("temperature", "temperature", Counter ["" @ 1_612_325_106_789 = 2.0 []])
         );
     }
 
@@ -1104,11 +1104,11 @@ mod tests {
         let encoded = collector.finish();
         assert_eq!(
             encoded,
-            indoc! {r#"
+            indoc! {r"
                 # HELP requests_count requests_count
                 # TYPE requests_count gauge
                 requests_count 2
-            "#}
+            "}
         );
         parse_text(&encoded).unwrap();
     }

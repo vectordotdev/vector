@@ -35,13 +35,13 @@ impl HostMetrics {
             // Skip non-finite readings: sysinfo can return `NaN` when a sensor
             // file exists but the read fails, and downstream sinks reject NaN.
             if let Some(temperature) = component.temperature().filter(|t| t.is_finite()) {
-                output.gauge(TEMPERATURE_CELSIUS, temperature as f64, tags());
+                output.gauge(TEMPERATURE_CELSIUS, f64::from(temperature), tags());
             }
             if let Some(max) = component.max().filter(|m| m.is_finite()) {
-                output.gauge(TEMPERATURE_MAX_CELSIUS, max as f64, tags());
+                output.gauge(TEMPERATURE_MAX_CELSIUS, f64::from(max), tags());
             }
             if let Some(critical) = component.critical().filter(|c| c.is_finite()) {
-                output.gauge(TEMPERATURE_CRITICAL_CELSIUS, critical as f64, tags());
+                output.gauge(TEMPERATURE_CRITICAL_CELSIUS, f64::from(critical), tags());
             }
         }
     }

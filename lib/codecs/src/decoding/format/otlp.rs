@@ -107,7 +107,7 @@ impl OtlpDeserializerConfig {
 /// However, these events can be forwarded directly to a downstream OTEL collector.
 ///
 /// This is the inverse of what the OTLP encoder does, ensuring round-trip compatibility
-/// with the `opentelemetry` source when `use_otlp_decoding` is enabled.
+/// with the `opentelemetry` source when `decoding.codec` is `otlp` for the corresponding signal.
 #[derive(Debug, Clone)]
 pub struct OtlpDeserializer {
     logs_deserializer: ProtobufDeserializer,
@@ -266,6 +266,7 @@ mod tests {
                         trace_id: vec![],
                         span_id: vec![],
                         observed_time_unix_nano: 0,
+                        event_name: String::new(),
                     }],
                     schema_url: String::new(),
                 }],

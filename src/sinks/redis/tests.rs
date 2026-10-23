@@ -27,7 +27,7 @@ fn redis_log_event_json() {
         evt.into(),
         "key".to_string(),
         None,
-        &Default::default(),
+        &Transformer::default(),
         &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         &mut byte_size,
     )
@@ -46,7 +46,7 @@ fn redis_log_event_text() {
         evt.into(),
         "key".to_string(),
         None,
-        &Default::default(),
+        &Transformer::default(),
         &mut Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         &mut byte_size,
     )
@@ -90,7 +90,7 @@ fn redis_metric_encode_event() {
         metric.into(),
         "metrics.counter".to_string(),
         None,
-        &Default::default(),
+        &Transformer::default(),
         &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         &mut byte_size,
     )
@@ -115,7 +115,7 @@ fn redis_log_scoring() {
         evt.into(),
         "key".to_string(),
         Some(64),
-        &Default::default(),
+        &Transformer::default(),
         &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         &mut byte_size,
     )

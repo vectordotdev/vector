@@ -16,7 +16,7 @@ generated: components: sources: aws_s3: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
@@ -258,7 +258,7 @@ generated: components: sources: aws_s3: configuration: {
 					Defaults to 10
 
 					Should be set to a smaller value when the files are large to help prevent the ingestion of
-					one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+					one file from causing the other files to exceed the `visibility_timeout`. Valid values are 1 - 10
 					"""
 				required: false
 				type: uint: {

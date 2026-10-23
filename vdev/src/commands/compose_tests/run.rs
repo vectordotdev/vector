@@ -38,7 +38,7 @@ pub fn exec(
     }
 
     if coverage {
-        super::test::clear_coverage();
+        super::test::clear_coverage()?;
     }
 
     let mut covered_environments = Vec::new();
@@ -93,7 +93,7 @@ pub fn exec(
     }
 
     if coverage {
-        super::test::merge_coverage(&covered_environments)?;
+        super::test::validate_coverage(&covered_environments)?;
     }
 
     Ok(())
@@ -121,11 +121,11 @@ fn cleanup_test_output(test_name: &str) -> Result<()> {
             "run",
             "--rm",
             "-v",
-            &format!("vector_target:/output/{test_name}"),
+            "vector_target:/output",
             "alpine:3.20",
             "sh",
             "-c",
-            &format!("rm -rf /output/{test_name}/*"),
+            &format!("rm -rf /output/{test_name}"),
         ])
         .status()
         .map_err(|e| anyhow::anyhow!("Failed to run cleanup command: {e}"))?;

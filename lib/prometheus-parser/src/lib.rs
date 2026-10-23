@@ -1,5 +1,4 @@
 #![deny(warnings)]
-#![warn(clippy::pedantic)]
 
 use std::{collections::BTreeMap, convert::TryFrom};
 
