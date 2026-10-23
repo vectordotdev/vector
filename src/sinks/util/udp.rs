@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,

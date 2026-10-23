@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use chrono::Local;
 use futures_util::future::join_all;
-use http::Uri;
+use http_1::Uri;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
 use vector_lib::api_client::{Client, RECONNECT_DELAY_MS};
@@ -84,7 +84,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
     )
     .await
     {
-        Ok(_) => {
+        Ok(()) => {
             connection.abort();
             exitcode::OK
         }
@@ -111,12 +111,9 @@ async fn subscription(
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(uri.clone(), &opts.components).await {
-            Ok(state) => state,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
+        let Ok(state) = metrics::init_components(uri.clone(), &opts.components).await else {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
         };
         let initial_components = state
             .components
@@ -126,20 +123,17 @@ async fn subscription(
         _ = tx.send(EventType::InitializeState(state)).await;
 
         // Subscribe to updated metrics via gRPC streaming
-        let handles = match metrics::subscribe(
+        let Ok(handles) = metrics::subscribe(
             uri.clone(),
             tx.clone(),
-            opts.interval as i64,
+            i64::from(opts.interval),
             opts.components.clone(),
             initial_components,
         )
         .await
-        {
-            Ok(handles) => handles,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-                continue;
-            }
+        else {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
         };
 
         _ = tx

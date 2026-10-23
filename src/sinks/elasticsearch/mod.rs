@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod common;
 mod config;
 pub mod encoder;
@@ -311,7 +309,10 @@ impl ElasticsearchCommonMode {
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 #[derive(Default)]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the API version.
+    /// Automatically select the API version.
+    ///
+    /// The `opensearch` sink selects an OpenSearch-compatible API version without querying the server.
+    /// The `elasticsearch` sink detects the version from the server.
     ///
     /// If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
     /// stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to

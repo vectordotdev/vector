@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 pub mod logs;
 pub mod metrics;
 
@@ -9,6 +7,7 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
+use serde::{Deserialize, Deserializer, de::Error as _};
 use tower::Service;
 use vector_lib::{
     configurable::configurable_component,
@@ -40,33 +39,17 @@ pub(in crate::sinks) enum ProtocolVersion {
     V2,
 }
 
-/// The InfluxDB API version to use.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum InfluxDbVersion {
-    /// InfluxDB v0.x/v1.x.
-    #[serde(rename = "1")]
-    V1,
-    /// InfluxDB v2.x.
-    #[serde(rename = "2")]
-    V2,
-}
-
 /// Configuration settings for InfluxDB v0.x/v1.x.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDb1Settings {
     /// The name of the database to write into.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "vector-database"))]
     #[configurable(metadata(docs::examples = "iot-store"))]
     database: String,
 
     /// The consistency level to use for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "any"))]
     #[configurable(metadata(docs::examples = "one"))]
     #[configurable(metadata(docs::examples = "quorum"))]
@@ -74,22 +57,16 @@ pub struct InfluxDb1Settings {
     consistency: Option<String>,
 
     /// The target retention policy for writes.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "autogen"))]
     #[configurable(metadata(docs::examples = "one_day_only"))]
     retention_policy_name: Option<String>,
 
     /// The username to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "todd"))]
     #[configurable(metadata(docs::examples = "vector-source"))]
     username: Option<String>,
 
     /// The password to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v0.x/v1.x.
     #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
     #[configurable(metadata(docs::examples = "influxdb4ever"))]
     password: Option<SensitiveString>,
@@ -101,22 +78,16 @@ pub struct InfluxDb1Settings {
 #[serde(deny_unknown_fields)]
 pub struct InfluxDb2Settings {
     /// The name of the organization to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "my-org"))]
     #[configurable(metadata(docs::examples = "33f2cff0a28e5b63"))]
     org: String,
 
     /// The name of the bucket to write into.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     #[configurable(metadata(docs::examples = "vector-bucket"))]
     #[configurable(metadata(docs::examples = "4d2225e4d3d49f75"))]
     bucket: String,
 
     /// The [token][token_docs] to authenticate with.
-    ///
-    /// Only relevant when using InfluxDB v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
@@ -124,18 +95,54 @@ pub struct InfluxDb2Settings {
     token: SensitiveString,
 }
 
-/// InfluxDB connection settings, either for v0.x/v1.x or v2.x.
+/// InfluxDB connection settings, selected by the `version` option.
 ///
-/// The two versions have disjoint configuration fields, so exactly one version's
-/// settings must be provided. Providing both or neither is a configuration error.
-#[configurable_component]
+/// Each version only accepts its own settings.
+#[configurable_component(no_deser)]
 #[derive(Clone, Debug)]
-#[serde(untagged)]
+#[serde(tag = "version")]
+#[configurable(metadata(docs::enum_tag_description = "The InfluxDB API version to use."))]
 pub enum InfluxDbSettings {
-    /// Settings for InfluxDB v0.x/v1.x.
+    /// InfluxDB v0.x/v1.x.
+    #[serde(rename = "1")]
     V1(InfluxDb1Settings),
-    /// Settings for InfluxDB v2.x.
+    /// InfluxDB v2.x.
+    #[serde(rename = "2")]
     V2(InfluxDb2Settings),
+}
+
+// The derived internally tagged deserializer would match integer tags by variant index, so an
+// unquoted `version: 1` would resolve to v2. Parse the tag with a plain enum instead, which only
+// accepts the strings "1" and "2", and hand the remaining fields to the per-version settings.
+impl<'de> Deserialize<'de> for InfluxDbSettings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        enum Version {
+            #[serde(rename = "1")]
+            V1,
+            #[serde(rename = "2")]
+            V2,
+        }
+
+        #[derive(Deserialize)]
+        struct Tagged {
+            version: Version,
+            #[serde(flatten)]
+            settings: serde_json::Map<String, serde_json::Value>,
+        }
+
+        let Tagged { version, settings } = Tagged::deserialize(deserializer)?;
+
+        let settings = serde_json::Value::Object(settings);
+        match version {
+            Version::V1 => InfluxDb1Settings::deserialize(settings).map(Self::V1),
+            Version::V2 => InfluxDb2Settings::deserialize(settings).map(Self::V2),
+        }
+        .map_err(D::Error::custom)
+    }
 }
 
 trait InfluxDbConnection: std::fmt::Debug {

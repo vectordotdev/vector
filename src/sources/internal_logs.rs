@@ -113,7 +113,7 @@ impl SourceConfig for InternalLogsConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(run(
+        Ok(crate::sources::source_with_error(run(
             host_key,
             pid_key,
             subscription,
@@ -145,7 +145,7 @@ async fn run(
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
@@ -198,10 +198,10 @@ async fn run(
             Utc::now(),
         );
 
-        if (out.send_event(Event::from(log)).await).is_err() {
+        if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(StreamClosedError { count: 1 });
-            return Err(());
+            return Err(error);
         }
     }
 
@@ -422,8 +422,7 @@ mod tests {
             .filter(|e| {
                 e.as_log()
                     .get(event_path!("message"))
-                    .map(|m| m.to_string_lossy() == "Repeated test message.")
-                    .unwrap_or(false)
+                    .is_some_and(|m| m.to_string_lossy() == "Repeated test message.")
             })
             .collect();
 
@@ -468,7 +467,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -502,7 +501,7 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     // Verify that broadcast lag is surfaced via `component_discarded_events_total` rather

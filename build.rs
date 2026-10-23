@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
 struct TrackedEnv {
@@ -158,7 +156,7 @@ fn main() {
 
         tonic_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
-            .compile_with_config(
+            .compile_protos_with_config(
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",

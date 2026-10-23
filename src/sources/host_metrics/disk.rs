@@ -17,6 +17,10 @@ pub struct DiskConfig {
 }
 
 impl HostMetrics {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn disk_metrics(&self, output: &mut super::MetricsBuffer) {
         match heim::disk::io_counters().await {
             Ok(counters) => {

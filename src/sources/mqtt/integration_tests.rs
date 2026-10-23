@@ -46,7 +46,7 @@ fn get_mqtt_client() -> AsyncClient {
         mqtt_broker_address(),
         mqtt_broker_port(),
     );
-    mqtt_options.set_keep_alive(Duration::from_secs(5));
+    mqtt_options.set_keep_alive(5);
 
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
@@ -89,7 +89,7 @@ async fn mqtt_one_topic_happy() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -109,9 +109,10 @@ async fn mqtt_one_topic_happy() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
     })
@@ -153,7 +154,7 @@ async fn mqtt_many_topics_happy() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -175,9 +176,10 @@ async fn mqtt_many_topics_happy() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
     })

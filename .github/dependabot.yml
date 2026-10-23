@@ -256,7 +256,7 @@ updates:
       time: "05:00" # UTC
     labels:
       - "dependencies"
-      - "javascript"
+      - "domain: website"
       - "no-changelog"
     commit-message:
       prefix: "chore(website deps)"

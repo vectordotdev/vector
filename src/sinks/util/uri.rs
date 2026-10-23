@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
@@ -79,6 +77,18 @@ impl UriSerde {
     pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
         self.auth = auth;
         self
+    }
+
+    /// Returns the URI as an `http 1` `Uri`.
+    ///
+    /// The two `http` crate versions share no conversion traits, so the bridge is a string
+    /// round-trip, as in [`HttpEndpoint::into_v1`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `http 1` cannot parse the URI.
+    pub fn uri_v1(&self) -> Result<http_1::Uri, http_1::uri::InvalidUri> {
+        self.uri.to_string().parse()
     }
 }
 
@@ -360,27 +370,7 @@ impl HttpEndpoint {
     ///
     /// Returns an error if the endpoint cannot be parsed or fails [`Self::new`].
     pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
-        Self::parse_with_default_scheme(endpoint, "https")
-    }
-
-    /// Parses `endpoint` and requires it to be an absolute `http`/`https` URL.
-    ///
-    /// A missing scheme is defaulted to `http` (unlike [`Self::parse`], which
-    /// defaults to `https`). An explicit `http`/`https` scheme is preserved.
-    /// Endpoints that still lack a host after defaulting are rejected.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the endpoint cannot be parsed or fails [`Self::new`].
-    pub fn parse_default_http(endpoint: &str) -> Result<Self, HttpEndpointError> {
-        Self::parse_with_default_scheme(endpoint, "http")
-    }
-
-    fn parse_with_default_scheme(
-        endpoint: &str,
-        default_scheme: &str,
-    ) -> Result<Self, HttpEndpointError> {
-        // Default a missing scheme to `default_scheme`. `http::Uri` cannot
+        // Default a missing scheme to `https`. `http::Uri` cannot
         // parse `host:port/path` without a scheme (it reads `host` as a
         // scheme), so the scheme is added up front rather than relying on
         // the parser to accept authority-form input.
@@ -395,7 +385,7 @@ impl HttpEndpoint {
         let uri = if has_scheme(endpoint) {
             parse(endpoint)?
         } else {
-            parse(&format!("{default_scheme}://{endpoint}"))?
+            parse(&format!("https://{endpoint}"))?
         };
         Self::new(uri)
     }
@@ -403,11 +393,6 @@ impl HttpEndpoint {
     /// Returns the underlying `Uri`.
     pub const fn as_uri(&self) -> &Uri {
         &self.0
-    }
-    /// Returns the URI as a string, redacting any userinfo credentials so
-    /// they are never written to logs.
-    pub fn redacted_uri(&self) -> String {
-        redact_uri(&self.0)
     }
 
     /// Consumes the endpoint, returning the underlying `Uri`.
@@ -577,7 +562,7 @@ fn authority_has_invalid_port(uri: &Uri) -> bool {
 /// The scheme must be at the very start: a `://` later in the path or query
 /// (for example `localhost:8080/write?target=http://upstream`) is not a scheme
 /// marker, so the endpoint is still defaulted to `https`.
-pub(crate) fn has_scheme(endpoint: &str) -> bool {
+fn has_scheme(endpoint: &str) -> bool {
     let Some(scheme_end) = endpoint.find("://") else {
         return false;
     };
@@ -759,21 +744,20 @@ mod tests {
 
     #[test]
     fn http_endpoint_defaults_missing_scheme_to_https() {
-        for endpoint in [
-            "example.com",
-            "example.com:8080",
-            "localhost:8080/path",
-            "[::1]:8080",
+        // Only the scheme is added; host, port, path, and userinfo are kept.
+        for (endpoint, expected) in [
+            ("example.com", "https://example.com/"),
+            ("example.com:8080", "https://example.com:8080/"),
+            ("localhost:8080/path", "https://localhost:8080/path"),
+            ("[::1]:8080", "https://[::1]:8080/"),
+            (
+                "user:pass@example.com:8080",
+                "https://user:pass@example.com:8080/",
+            ),
         ] {
-            let endpoint =
+            let parsed =
                 HttpEndpoint::parse(endpoint).expect("should default a missing scheme to https");
-            assert_eq!(endpoint.as_uri().scheme_str(), Some("https"));
-            assert!(
-                endpoint
-                    .as_uri()
-                    .host()
-                    .is_some_and(|host| !host.is_empty())
-            );
+            assert_eq!(parsed.as_uri().to_string(), expected, "{endpoint:?}");
         }
         // An explicit scheme is preserved.
         assert_eq!(
@@ -782,34 +766,6 @@ mod tests {
                 .as_uri()
                 .scheme_str(),
             Some("http")
-        );
-    }
-
-    #[test]
-    fn http_endpoint_defaults_missing_scheme_to_http() {
-        for endpoint in [
-            "example.com",
-            "example.com:8080",
-            "localhost:8080/path",
-            "[::1]:8080",
-        ] {
-            let endpoint = HttpEndpoint::parse_default_http(endpoint)
-                .expect("should default a missing scheme to http");
-            assert_eq!(endpoint.as_uri().scheme_str(), Some("http"));
-            assert!(
-                endpoint
-                    .as_uri()
-                    .host()
-                    .is_some_and(|host| !host.is_empty())
-            );
-        }
-        // An explicit scheme is preserved.
-        assert_eq!(
-            HttpEndpoint::parse_default_http("https://example.com")
-                .unwrap()
-                .as_uri()
-                .scheme_str(),
-            Some("https")
         );
     }
 

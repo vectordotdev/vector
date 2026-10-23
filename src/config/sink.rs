@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;

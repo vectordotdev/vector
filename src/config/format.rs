@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Support for loading configs from multiple formats.
 
 #![deny(missing_docs, missing_debug_implementations)]

@@ -33,7 +33,7 @@ pub enum ProcessingStatus {
     /// A non-recoverable error occurred while decoding the payload.
     Failed,
     /// The downstream channel is closed, and the source should shut down.
-    ChannelClosed,
+    ChannelClosed(vector_lib::source_sender::SendError),
 }
 
 /// Processes a single NATS message, sending decoded events downstream.
@@ -84,9 +84,9 @@ pub async fn process_message(
                     event
                 });
 
-                if out.send_batch(events).await.is_err() {
+                if let Err(error) = out.send_batch(events).await {
                     emit!(StreamClosedError { count });
-                    return ProcessingStatus::ChannelClosed;
+                    return ProcessingStatus::ChannelClosed(error);
                 }
             }
             Err(error) => {
@@ -137,7 +137,7 @@ pub async fn run_nats_jetstream(
     log_namespace: LogNamespace,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     let mut backoff = ExponentialBackoff::default().max_delay(std::time::Duration::from_secs(30));
@@ -179,7 +179,7 @@ pub async fn run_nats_jetstream(
                                         error!(message = "Failed to acknowledge JetStream message.", %err);
                                     }
                                 }
-                                ProcessingStatus::ChannelClosed => return Err(()),
+                                ProcessingStatus::ChannelClosed(error) => return Err(error),
                                 // Do not acknowledge on failure; the message will be redelivered.
                                 ProcessingStatus::Failed => {}
                             }
@@ -206,7 +206,7 @@ pub async fn run_nats_jetstream(
             let delay = backoff.next().expect("backoff never ends");
             tokio::select! {
                 _ = &mut shutdown => return Ok(()),
-                _ = tokio::time::sleep(delay) => {},
+                () = tokio::time::sleep(delay) => {},
             }
 
             match create_consumer_stream(&connection, js_config).await {
@@ -232,7 +232,7 @@ pub async fn run_nats_core(
     log_namespace: LogNamespace,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
 
@@ -261,8 +261,8 @@ pub async fn run_nats_core(
                         )
                         .await;
 
-                        if let ProcessingStatus::ChannelClosed = status {
-                            return Err(());
+                        if let ProcessingStatus::ChannelClosed(error) = status {
+                            return Err(error);
                         }
                     },
                     None => {

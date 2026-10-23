@@ -21,7 +21,7 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         elasticsearch::{
-            ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
+            Distribution, ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
             ElasticsearchCommonMode, ElasticsearchMode, ParseError, VersionType,
             health::ElasticsearchHealthLogic,
             retry::ElasticsearchRetryLogic,
@@ -257,7 +257,10 @@ impl ElasticsearchConfig {
     ///
     /// # Errors
     /// Returns an error if an active routing template fails confinement validation.
-    pub fn common_mode(&self) -> crate::Result<ElasticsearchCommonMode> {
+    pub fn common_mode(
+        &self,
+        component_name: &'static str,
+    ) -> crate::Result<ElasticsearchCommonMode> {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
                 // Only `index` is a routing field, so it is the only bulk template that is confined.
@@ -265,7 +268,7 @@ impl ElasticsearchConfig {
                 // `UnconfinedTemplate` type.
                 index: self.bulk.index.clone().confine(
                     &self.confinement,
-                    Self::NAME,
+                    component_name,
                     "bulk.index",
                 )?,
                 template_fallback_index: self.bulk.template_fallback_index.clone(),
@@ -277,7 +280,7 @@ impl ElasticsearchConfig {
                 self.data_stream
                     .clone()
                     .unwrap_or_default()
-                    .confine(&self.confinement, Self::NAME)?,
+                    .confine(&self.confinement, component_name)?,
             )),
         }
     }
@@ -748,6 +751,24 @@ impl ValidatedSink for ElasticsearchConfig {
     type Validated = ValidatedElasticsearch;
 
     fn validate(&self) -> crate::Result<ValidatedElasticsearch> {
+        self.validate_with_distribution(Distribution::Elasticsearch)
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedElasticsearch,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.build_with_distribution(validated, cx, Distribution::Elasticsearch)
+            .await
+    }
+}
+
+impl ElasticsearchConfig {
+    pub(crate) fn validate_with_distribution(
+        &self,
+        distribution: Distribution,
+    ) -> crate::Result<ValidatedElasticsearch> {
         // Mirror the pure endpoint-required/exclusive checks from
         // `ElasticsearchCommon::parse_many` so configs that deterministically
         // fail at build time are rejected here instead.
@@ -795,7 +816,7 @@ impl ValidatedSink for ElasticsearchConfig {
         // so unconfined `bulk.index` / `data_stream.*` templates are rejected
         // here. The confined mode itself is reconstructed during build (inside
         // `ElasticsearchCommon::parse_many`).
-        self.common_mode()?;
+        self.common_mode(distribution.component_name())?;
 
         // Mirror the pure batch-settings and versioning checks from
         // `ElasticsearchCommon::parse_config` so configs that deterministically
@@ -829,16 +850,17 @@ impl ValidatedSink for ElasticsearchConfig {
         })
     }
 
-    async fn build(
+    pub(crate) async fn build_with_distribution(
         &self,
         validated: &ValidatedElasticsearch,
         cx: SinkContext,
+        distribution: Distribution,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         // Confinement of the active mode's routing templates happens in
         // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
         // parsing (which performs I/O: AWS credential resolution and API-version autodetection).
         // The pure request/health settings were resolved during `validate`.
-        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
+        let commons = ElasticsearchCommon::parse_many(self, distribution, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;

@@ -25,14 +25,14 @@ pub fn is_default<E: Default + PartialEq>(e: &E) -> bool {
 /// Returns the error from deserializing the underlying struct.
 pub fn bool_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
-    T: Deserialize<'de> + From<bool>,
+    T: Deserialize<'de> + From<bool> + Configurable,
     D: Deserializer<'de>,
 {
     struct BoolOrStruct<T>(PhantomData<fn() -> T>);
 
     impl<'de, T> de::Visitor<'de> for BoolOrStruct<T>
     where
-        T: Deserialize<'de> + From<bool>,
+        T: Deserialize<'de> + From<bool> + Configurable,
     {
         type Value = T;
 
@@ -44,6 +44,12 @@ where
         where
             E: de::Error,
         {
+            // Already-deprecated types retain their existing migration guidance.
+            if !T::metadata().deprecated() {
+                tracing::warn!(
+                    "DEPRECATED: Boolean shorthand for an object-valued configuration option. Use the object form instead. See https://vector.dev/deprecations/ for migration instructions."
+                );
+            }
             Ok(value.into())
         }
 
@@ -61,7 +67,7 @@ where
 /// One ASCII character, represented as a string in configuration and a byte in codecs.
 #[derive(Clone, Copy, Configurable, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
-#[configurable(metadata(docs::type_override = "ascii_char"))]
+#[configurable(metadata(docs::type_override = "ascii_char", serde::string_only))]
 pub struct AsciiChar(#[configurable(validation(pattern = r"^[\x00-\x7F]$"))] char);
 
 impl AsciiChar {
@@ -166,6 +172,7 @@ mod tests {
         assert_eq!(property["minLength"], 1);
         assert_eq!(property["maxLength"], 1);
         assert_eq!(property["pattern"], r"^[\x00-\x7F]$");
+        assert_eq!(property["_metadata"]["serde::string_only"], true);
     }
 
     /// Options accepting a boolean shorthand while retaining other defaults.

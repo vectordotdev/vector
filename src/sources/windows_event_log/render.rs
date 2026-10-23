@@ -14,11 +14,17 @@ use windows::core::HSTRING;
 use super::error::WindowsEventLogError;
 
 /// Render an event handle to XML using reusable buffers.
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(super) fn render_event_xml(
     render_buffer: &mut Vec<u8>,
     decode_buffer: &mut Vec<u16>,
     event_handle: EVT_HANDLE,
 ) -> Result<String, WindowsEventLogError> {
+    const SHRINK_THRESHOLD: usize = 64 * 1024;
+
     const MAX_BUFFER_SIZE: u32 = 10 * 1024 * 1024; // 10MB limit
 
     let buffer_size = render_buffer.len() as u32;
@@ -67,7 +73,6 @@ pub(super) fn render_event_xml(
             let result = decode_utf16_buffer(render_buffer, second_buffer_used, decode_buffer);
 
             // Shrink if buffer grew very large (match normal-path threshold)
-            const SHRINK_THRESHOLD: usize = 64 * 1024;
             if render_buffer.len() > SHRINK_THRESHOLD {
                 render_buffer.resize(SHRINK_THRESHOLD, 0);
                 render_buffer.shrink_to_fit();
@@ -82,7 +87,6 @@ pub(super) fn render_event_xml(
 
     // Shrink the buffer back down if a large event caused it to grow.
     // 64 KB covers the vast majority of events without repeated reallocation.
-    const SHRINK_THRESHOLD: usize = 64 * 1024;
     if render_buffer.len() > SHRINK_THRESHOLD {
         render_buffer.resize(SHRINK_THRESHOLD, 0);
         render_buffer.shrink_to_fit();
@@ -91,11 +95,17 @@ pub(super) fn render_event_xml(
     Ok(result)
 }
 
-/// Update the channel record count gauge using EvtGetLogInfo.
+/// Update the channel record count gauge using `EvtGetLogInfo`.
 ///
 /// Reports total records in the channel. SOC teams compare this against
 /// `rate(events_read_total)` to detect ingestion lag.
 /// Best-effort: if any API call fails, the gauge is left unchanged.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_ptr_alignment,
+    reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
     let channel_hstring = HSTRING::from(channel);
     let log_handle = unsafe {
@@ -131,7 +141,7 @@ pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
     }
 }
 
-/// Decode a UTF-16LE buffer (as returned by Windows EvtRender) into a String.
+/// Decode a UTF-16LE buffer (as returned by Windows `EvtRender`) into a String.
 ///
 /// Uses a reusable `Vec<u16>` decode buffer to avoid per-event heap allocations.
 /// Copies byte pairs into the properly-aligned buffer instead of casting the

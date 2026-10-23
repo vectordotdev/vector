@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 // Copyright (c) 2016 Alex Crichton
 // Copyright (c) 2017 The Tokio Authors
 

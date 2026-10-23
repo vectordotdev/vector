@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! The [AppSignal](https://www.appsignal.com/) sink
 //!
 //! This sink provides downstream support for `AppSignal` to collect logs and a subset of Vector
