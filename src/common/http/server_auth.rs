@@ -1,13 +1,10 @@
 //! Shared authentication config between components that use HTTP.
-use std::{collections::HashMap, fmt, net::SocketAddr};
+use std::net::SocketAddr;
 
 use bytes::Bytes;
 use headers::{Authorization, authorization::Credentials};
 use http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
-use serde::{
-    Deserialize,
-    de::{Error, MapAccess, Visitor},
-};
+use serde::{Deserialize, de::Error};
 use vector_config::configurable_component;
 use vector_lib::{
     TimeZone, compile_vrl,
@@ -32,10 +29,9 @@ use super::ErrorMessage;
 ///
 /// Use the HTTP authentication with HTTPS only. The authentication credentials are passed as an
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
-#[configurable_component(no_deser)]
+#[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
-#[serde(tag = "strategy", rename_all = "snake_case")]
+#[serde(try_from = "HttpServerAuthRepr", into = "HttpServerAuthRepr")]
 pub enum HttpServerAuthConfig {
     /// Basic authentication.
     ///
@@ -44,13 +40,9 @@ pub enum HttpServerAuthConfig {
     /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
         /// The basic authentication username.
-        #[configurable(metadata(docs::examples = "${USERNAME}"))]
-        #[configurable(metadata(docs::examples = "username"))]
         username: String,
 
         /// The basic authentication password.
-        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
-        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
@@ -59,8 +51,6 @@ pub enum HttpServerAuthConfig {
     /// The token is matched against the `Authorization` header using the `Bearer` scheme.
     Bearer {
         /// The bearer token to match against incoming requests.
-        #[configurable(metadata(docs::examples = "SECRET[backend.token]"))]
-        #[configurable(metadata(docs::examples = "my-secret-token"))]
         token: SensitiveString,
     },
 
@@ -73,81 +63,129 @@ pub enum HttpServerAuthConfig {
     },
 }
 
-// Custom deserializer implementation to default `strategy` to `basic`
-impl<'de> Deserialize<'de> for HttpServerAuthConfig {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct HttpServerAuthConfigVisitor;
+/// HTTP authentication input, including the default basic strategy.
+#[configurable_component]
+#[derive(Default)]
+#[serde(deny_unknown_fields)]
+struct HttpServerAuthRepr {
+    /// The authentication strategy to use.
+    #[serde(default)]
+    strategy: HttpServerAuthStrategy,
 
-        const FIELD_KEYS: [&str; 5] = ["strategy", "username", "password", "token", "source"];
+    /// The basic authentication username. Required for the basic strategy.
+    #[configurable(metadata(docs::examples = "${USERNAME}"))]
+    #[configurable(metadata(docs::examples = "username"))]
+    #[serde(
+        default,
+        deserialize_with = "optional_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    username: Option<String>,
 
-        impl<'de> Visitor<'de> for HttpServerAuthConfigVisitor {
-            type Value = HttpServerAuthConfig;
+    /// The basic authentication password. Required for the basic strategy.
+    #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+    #[configurable(metadata(docs::examples = "password"))]
+    #[serde(
+        default,
+        deserialize_with = "optional_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    password: Option<SensitiveString>,
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a valid authentication strategy (basic, bearer, or custom)")
-            }
+    /// The bearer token to match against incoming requests. Required for the bearer strategy.
+    #[configurable(metadata(docs::examples = "SECRET[backend.token]"))]
+    #[configurable(metadata(docs::examples = "my-secret-token"))]
+    #[serde(
+        default,
+        deserialize_with = "optional_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    token: Option<SensitiveString>,
 
-            fn visit_map<A>(self, mut map: A) -> Result<HttpServerAuthConfig, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut fields: HashMap<&str, String> = HashMap::default();
+    /// The VRL boolean expression. Required for the custom strategy.
+    #[serde(
+        default,
+        deserialize_with = "optional_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    source: Option<String>,
+}
 
-                while let Some(key) = map.next_key::<String>()? {
-                    if let Some(field_index) = FIELD_KEYS.iter().position(|k| *k == key.as_str()) {
-                        if fields.contains_key(FIELD_KEYS[field_index]) {
-                            return Err(Error::duplicate_field(FIELD_KEYS[field_index]));
-                        }
-                        fields.insert(FIELD_KEYS[field_index], map.next_value()?);
-                    } else {
-                        return Err(Error::unknown_field(&key, &FIELD_KEYS));
-                    }
-                }
+/// HTTP authentication strategy.
+#[configurable_component]
+#[derive(Default)]
+#[serde(rename_all = "snake_case")]
+enum HttpServerAuthStrategy {
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded using [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    #[default]
+    Basic,
+    /// Bearer authentication.
+    ///
+    /// The token is matched against the `Authorization` header using the `Bearer` scheme.
+    Bearer,
+    /// Custom authentication using VRL code.
+    ///
+    /// Takes in request and validates it using VRL code. The VRL program must return a boolean.
+    Custom,
+}
 
-                // Default to "basic" if strategy is missing
-                let strategy = fields
-                    .get("strategy")
-                    .map_or_else(|| "basic", String::as_str);
+// Preserve the original String deserializer for present fields; missing fields default to None.
+fn optional_string<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: From<String>,
+{
+    String::deserialize(deserializer).map(|value| Some(T::from(value)))
+}
 
-                match strategy {
-                    "basic" => {
-                        let username = fields
-                            .remove("username")
-                            .ok_or_else(|| Error::missing_field("username"))?;
-                        let password = fields
-                            .remove("password")
-                            .ok_or_else(|| Error::missing_field("password"))?;
-                        Ok(HttpServerAuthConfig::Basic {
-                            username,
-                            password: SensitiveString::from(password),
-                        })
-                    }
-                    "bearer" => {
-                        let token = fields
-                            .remove("token")
-                            .ok_or_else(|| Error::missing_field("token"))?;
-                        Ok(HttpServerAuthConfig::Bearer {
-                            token: SensitiveString::from(token),
-                        })
-                    }
-                    "custom" => {
-                        let source = fields
-                            .remove("source")
-                            .ok_or_else(|| Error::missing_field("source"))?;
-                        Ok(HttpServerAuthConfig::Custom { source })
-                    }
-                    _ => Err(Error::unknown_variant(
-                        strategy,
-                        &["basic", "bearer", "custom"],
-                    )),
-                }
-            }
+impl TryFrom<HttpServerAuthRepr> for HttpServerAuthConfig {
+    type Error = serde::de::value::Error;
+
+    fn try_from(input: HttpServerAuthRepr) -> Result<Self, Self::Error> {
+        fn required<T>(
+            value: Option<T>,
+            field: &'static str,
+        ) -> Result<T, serde::de::value::Error> {
+            value.ok_or_else(|| serde::de::value::Error::missing_field(field))
         }
+        Ok(match input.strategy {
+            HttpServerAuthStrategy::Basic => Self::Basic {
+                username: required(input.username, "username")?,
+                password: required(input.password, "password")?,
+            },
+            HttpServerAuthStrategy::Bearer => Self::Bearer {
+                token: required(input.token, "token")?,
+            },
+            HttpServerAuthStrategy::Custom => Self::Custom {
+                source: required(input.source, "source")?,
+            },
+        })
+    }
+}
 
-        deserializer.deserialize_map(HttpServerAuthConfigVisitor)
+impl From<HttpServerAuthConfig> for HttpServerAuthRepr {
+    fn from(config: HttpServerAuthConfig) -> Self {
+        match config {
+            HttpServerAuthConfig::Basic { username, password } => Self {
+                username: Some(username),
+                password: Some(password),
+                ..Self::default()
+            },
+            HttpServerAuthConfig::Bearer { token } => Self {
+                strategy: HttpServerAuthStrategy::Bearer,
+                token: Some(token),
+                ..Self::default()
+            },
+            HttpServerAuthConfig::Custom { source } => Self {
+                strategy: HttpServerAuthStrategy::Custom,
+                source: Some(source),
+                ..Self::default()
+            },
+        }
     }
 }
 
@@ -424,6 +462,53 @@ mod tests {
         } else {
             panic!("Expected HttpServerAuthConfig::Custom");
         }
+    }
+
+    #[test]
+    fn config_rejects_invalid_or_missing_auth_fields() {
+        for config in [
+            "username: user",
+            "strategy: bearer",
+            "strategy: custom",
+            "strategy: unknown",
+            "username: user\npassword: pass\nextra: field",
+            "username: user\nusername: other\npassword: pass",
+        ] {
+            assert!(
+                serde_yaml::from_str::<HttpServerAuthConfig>(config).is_err(),
+                "{config}"
+            );
+        }
+        // The configuration parser supplies typed values to Serde. Present null
+        // or numeric fields must not acquire Option's missing-field behavior.
+        for value in [serde_json::Value::Null, serde_json::json!(42)] {
+            for field in ["username", "password", "token", "source"] {
+                let mut config = serde_json::json!({"strategy": "bearer", "token": "secret"});
+                config[field] = value.clone();
+                assert!(
+                    serde_json::from_value::<HttpServerAuthConfig>(config).is_err(),
+                    "{field}: {value}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn config_ignores_recognized_fields_for_other_strategies() {
+        const CONFIG: &str = indoc! {r"
+            strategy: bearer
+            token: secret
+            username: unused
+            password: unused
+            source: unused
+        "};
+        let config: HttpServerAuthConfig = serde_yaml::from_str(CONFIG).unwrap();
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            serde_json::json!({
+                "strategy": "bearer", "token": "secret"
+            })
+        );
     }
 
     #[test]

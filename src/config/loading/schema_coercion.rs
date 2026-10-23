@@ -2,12 +2,15 @@
 //!
 //! This is a preparation pass, not a general JSON Schema validator. Serde remains
 //! authoritative for final component validation.
-//! The loader does not invoke this pass yet.
+//! The loader invokes this pass after environment-variable and secret substitution.
+
+use std::collections::HashSet;
 
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
-use std::collections::HashSet;
 use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_STRING_ONLY, SERDE_VARIANT_ALIASES};
+
+use super::merge::ConfigNode;
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -27,6 +30,9 @@ const PROVIDER: &str = "provider";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("{message}"))]
+    Merge { message: String },
+
     #[snafu(display("Expected boolean at '{path}', found '{actual}'"))]
     ExpectedBool { path: String, actual: &'static str },
 
@@ -93,6 +99,7 @@ macro_rules! fail_expected {
 /// error paths. The schema is borrowed and may be reused across calls.
 pub struct ValueCoercer<'a> {
     schema: &'a Value,
+    tree: Option<ConfigNode>,
     definitions: Option<&'a Value>,
     component_schemas: Vec<&'a Value>,
     path: Vec<String>,
@@ -104,6 +111,7 @@ impl<'a> ValueCoercer<'a> {
     pub fn new(schema: &'a Value) -> Self {
         let mut coercer = Self {
             schema,
+            tree: None,
             definitions: schema.get("definitions"),
             component_schemas: Vec::new(),
             path: Vec::new(),
@@ -130,6 +138,46 @@ impl<'a> ValueCoercer<'a> {
     pub fn coerce(&mut self, value: &mut Value) -> Result<(), Error> {
         self.path.clear();
         self.coerce_value(value, self.schema)
+    }
+
+    /// Resolves a merge tree in its final configuration coordinates. Histories are
+    /// checked at the corresponding field, using that field's schema only.
+    pub(super) fn coerce_tree(&mut self, tree: &ConfigNode) -> Result<Value, Error> {
+        self.path.clear();
+        self.tree = Some(tree.clone());
+        let mut value = tree.latest();
+        let result = self.coerce_field(&mut value, self.schema);
+        let tree = self
+            .tree
+            .take()
+            .expect("merge tree is retained during coercion");
+        result?;
+        // Fields without a schema still follow the raw merge rules. Typed fields
+        // have already converted their scalar histories in place.
+        tree.check_raw_merges().map_err(|errors| Error::Merge {
+            message: errors.join("\n"),
+        })?;
+        Ok(value)
+    }
+
+    fn coerce_field(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        self.coerce_value(value, schema)?;
+        if let Some(node) = self
+            .tree
+            .as_mut()
+            .and_then(|tree| tree.at_path_mut(&self.path))
+            && matches!(node, ConfigNode::Scalar(values) if values.len() > 1 && values.iter().any(Value::is_string))
+        {
+            let mut scalar_coercer = Self::new(self.schema);
+            scalar_coercer.path.clone_from(&self.path);
+            node.resolve_scalar_history(value, &self.path, |previous| {
+                scalar_coercer
+                    .coerce_value(previous, schema)
+                    .map_err(|error| error.to_string())
+            })
+            .map_err(|message| Error::Merge { message })?;
+        }
+        Ok(())
     }
 
     fn definition(&self, reference: &str) -> Option<&'a Value> {
@@ -415,7 +463,7 @@ impl<'a> ValueCoercer<'a> {
             let s_trimmed = s.trim();
 
             // String → Bool
-            if let Ok(b) = s_trimmed.parse::<bool>()
+            if let Some(b) = parse_bool(s_trimmed)
                 && allowed.iter().any(|opt| opt.as_bool() == Some(b))
             {
                 *value = Value::Bool(b);
@@ -431,9 +479,7 @@ impl<'a> ValueCoercer<'a> {
             }
 
             // String → Null
-            if s_trimmed.eq_ignore_ascii_case("null")
-                && allowed.iter().any(serde_json::Value::is_null)
-            {
+            if is_null_literal(s_trimmed) && allowed.iter().any(serde_json::Value::is_null) {
                 *value = Value::Null;
                 return true;
             }
@@ -612,7 +658,7 @@ impl<'a> ValueCoercer<'a> {
                     .fail();
                 }
 
-                let result = self.coerce_value(field, field_schema);
+                let result = self.coerce_field(field, field_schema);
                 self.path.truncate(initial_len);
                 result?;
             } else {
@@ -666,7 +712,7 @@ impl<'a> ValueCoercer<'a> {
                             .fail();
                         }
 
-                        let result = self.coerce_value(item_val, item_schema);
+                        let result = self.coerce_field(item_val, item_schema);
                         self.path.truncate(initial_len);
                         result?;
                     } else {
@@ -679,7 +725,7 @@ impl<'a> ValueCoercer<'a> {
                 for (idx, item_val) in arr.iter_mut().enumerate() {
                     let initial_len = self.path.len();
                     self.path.push(idx.to_string());
-                    let result = self.coerce_value(item_val, item_schema);
+                    let result = self.coerce_field(item_val, item_schema);
                     self.path.truncate(initial_len);
                     result?;
                 }
@@ -692,8 +738,10 @@ impl<'a> ValueCoercer<'a> {
     /// Prefer shape-preserving variants, leaving final validation to serde.
     fn coerce_one_of(&mut self, value: &mut Value, schemas: &[Value]) -> Result<(), Error> {
         let initial_len = self.path.len();
-        if self.coerce_any_of(value, schemas).is_ok() {
-            return Ok(());
+        match self.coerce_any_of(value, schemas) {
+            Ok(()) => return Ok(()),
+            Err(error @ Error::Merge { .. }) => return Err(error),
+            Err(_) => {}
         }
 
         // No variant succeeded. If the value carries a `type` discriminant that matches a known
@@ -872,9 +920,18 @@ impl<'a> ValueCoercer<'a> {
 
                 self.path.truncate(initial_len);
                 let mut candidate = value.clone();
-                if self.coerce_value(&mut candidate, schema).is_ok() {
+                // Choose the variant from the final definitions. Historical values
+                // must not cause a different branch to win or disappear in a fallback.
+                let tree = self.tree.take();
+                let result = self.coerce_value(&mut candidate, schema);
+                self.tree = tree;
+                if result.is_ok() {
                     self.path.truncate(initial_len);
-                    *value = candidate;
+                    if self.tree.is_some() {
+                        self.coerce_value(value, schema)?;
+                    } else {
+                        *value = candidate;
+                    }
                     return Ok(());
                 }
             }
@@ -932,8 +989,8 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_bool(&mut self, value: &mut Value) -> Result<(), Error> {
         match value {
             Value::Bool(_) => Ok(()),
-            Value::String(s) => match s.trim().parse::<bool>() {
-                Ok(b) => {
+            Value::String(s) => match parse_bool(s) {
+                Some(b) => {
                     *value = Value::Bool(b);
                     Ok(())
                 }
@@ -1001,7 +1058,7 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_null(&mut self, value: &mut Value) -> Result<(), Error> {
         match value {
             Value::Null => Ok(()),
-            Value::String(s) if s.trim().eq_ignore_ascii_case("null") => {
+            Value::String(s) if is_null_literal(s) => {
                 *value = Value::Null;
                 Ok(())
             }
@@ -1036,21 +1093,65 @@ fn value_matches_type(value: &Value, schema_type: &str) -> bool {
     }
 }
 
-fn parse_integer(input: &str) -> Option<Number> {
-    if let Ok(i) = input.trim().parse::<i64>() {
-        Some(Number::from(i))
-    } else if let Ok(u) = input.trim().parse::<u64>() {
-        Some(Number::from(u))
-    } else {
-        None
+fn is_null_literal(input: &str) -> bool {
+    // YAML also represents null with a tilde or an empty scalar.
+    let input = input.trim();
+    matches!(input, "" | "~") || input.eq_ignore_ascii_case("null")
+}
+
+fn parse_bool(input: &str) -> Option<bool> {
+    // Preserve YAML's boolean spellings when substitution happens after parsing.
+    match input.trim() {
+        "true" | "True" | "TRUE" => Some(true),
+        "false" | "False" | "FALSE" => Some(false),
+        _ => None,
     }
+}
+
+fn remove_digit_separators(input: &str, radix: u32) -> Option<String> {
+    // TOML permits underscores only between digits, including exponent digits.
+    let is_digit = |byte: u8| char::from(byte).is_digit(radix);
+    if input.starts_with('_')
+        || input.ends_with('_')
+        || input
+            .as_bytes()
+            .windows(3)
+            .any(|bytes| bytes[1] == b'_' && (!is_digit(bytes[0]) || !is_digit(bytes[2])))
+    {
+        return None;
+    }
+    Some(input.replace('_', ""))
+}
+
+fn parse_integer(input: &str) -> Option<Number> {
+    let input = input.trim();
+    let (sign, digits) = if let Some(digits) = input.strip_prefix('-') {
+        ("-", digits)
+    } else {
+        ("", input.strip_prefix('+').unwrap_or(input))
+    };
+    let (digits, radix) = [("0x", 16), ("0o", 8), ("0b", 2)]
+        .into_iter()
+        .find_map(|(prefix, radix)| digits.strip_prefix(prefix).map(|digits| (digits, radix)))
+        .unwrap_or((digits, 10));
+    if digits.starts_with(['+', '-']) {
+        return None;
+    }
+    // Keep the sign for checked parsing, including i64::MIN, without accepting
+    // arrays, maps, tags, or other configuration syntax from substituted values.
+    let digits = remove_digit_separators(digits, radix)?;
+    let number = format!("{sign}{digits}");
+    i64::from_str_radix(&number, radix)
+        .map(Number::from)
+        .or_else(|_| u64::from_str_radix(&number, radix).map(Number::from))
+        .ok()
 }
 
 fn parse_number(input: &str) -> Option<Number> {
     if let Some(num) = parse_integer(input) {
         return Some(num);
     }
-    if let Ok(f) = input.trim().parse::<f64>() {
+    if let Ok(f) = remove_digit_separators(input.trim(), 10)?.parse::<f64>() {
         return Number::from_f64(f);
     }
     None

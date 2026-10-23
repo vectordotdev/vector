@@ -101,13 +101,38 @@ fn generated_optional_sensitive_string_preserves_literal_null() {
         vector_config::schema::generate_root_schema::<Option<SensitiveString>>().unwrap(),
     )
     .unwrap();
-    for mut value in [json!("null"), json!("NULL"), json!(null)] {
+    for mut value in [
+        json!("null"),
+        json!("NULL"),
+        json!("~"),
+        json!(""),
+        json!(null),
+    ] {
         let expected = serde_json::from_value::<Option<SensitiveString>>(value.clone()).unwrap();
         ValueCoercer::new(&schema).coerce(&mut value).unwrap();
         assert_eq!(
             serde_json::from_value::<Option<SensitiveString>>(value).unwrap(),
             expected
         );
+    }
+}
+
+#[test]
+fn yaml_null_spellings_match_nullable_scalar_schemas() {
+    for schema in [
+        json!({"type": ["boolean", "null"]}),
+        json!({"const": null}),
+        json!({"enum": [null]}),
+    ] {
+        for input in ["~", "", "  ", "null", "Null", "NULL"] {
+            CoercionCase {
+                name: "YAML null spelling",
+                schema: schema.clone(),
+                input: json!(input),
+                expected: Value::Null,
+            }
+            .check();
+        }
     }
 }
 
@@ -1306,5 +1331,107 @@ mod test {
             result.is_ok(),
             "unknown component type should pass through coercion, got: {result:?}"
         );
+    }
+}
+
+#[test]
+fn yaml_scalar_spellings_survive_schema_coercion() {
+    for input in [
+        "0x2",
+        "0o2",
+        "0b10",
+        "+0x2",
+        "-0x2",
+        "-0o2",
+        "-0b10",
+        "-0x8000000000000000",
+        "0x7fffffffffffffff",
+        "true",
+        "True",
+        "TRUE",
+        "false",
+        "False",
+        "FALSE",
+    ] {
+        let expected: Value = serde_yaml::from_str(input).unwrap();
+        let kind = if expected.is_boolean() {
+            "boolean"
+        } else {
+            "integer"
+        };
+        for schema in [json!({"type": kind}), json!({"const": expected})] {
+            CoercionCase {
+                name: input,
+                schema,
+                input: json!(input),
+                expected: expected.clone(),
+            }
+            .check();
+        }
+    }
+    for input in [
+        "0x",
+        "0x-2",
+        "--2",
+        "-0x8000000000000001",
+        "0x10000000000000000",
+        "[2]",
+        "{value: 2}",
+    ] {
+        let mut value = json!(input);
+        assert!(
+            ValueCoercer::new(&json!({"type": "integer"}))
+                .coerce(&mut value)
+                .is_err(),
+            "{input}"
+        );
+        assert_eq!(value, json!(input));
+    }
+}
+
+#[test]
+fn numeric_digit_separators_survive_schema_coercion() {
+    for (kind, input, expected) in [
+        ("integer", "1_000", json!(1000)),
+        ("integer", "-1_000", json!(-1000)),
+        ("integer", "0xFF_FF", json!(65535)),
+        ("integer", "0o7_7", json!(63)),
+        ("integer", "0b1_0", json!(2)),
+        ("number", "1_000.5", json!(1000.5)),
+        ("number", "1.0_5", json!(1.05)),
+        ("number", "1e1_0", json!(1e10)),
+    ] {
+        for schema in [json!({"type": kind}), json!({"const": expected})] {
+            CoercionCase {
+                name: input,
+                schema,
+                input: json!(input),
+                expected: expected.clone(),
+            }
+            .check();
+        }
+    }
+    for input in [
+        "_1",
+        "1_",
+        "1__0",
+        "1_.0",
+        "1._0",
+        "1_e2",
+        "1e_2",
+        "1e+_2",
+        "0x_FF",
+        "1_000\ninjected = true",
+    ] {
+        for kind in ["integer", "number"] {
+            let mut value = json!(input);
+            assert!(
+                ValueCoercer::new(&json!({"type": kind}))
+                    .coerce(&mut value)
+                    .is_err(),
+                "{kind}: {input}"
+            );
+            assert_eq!(value, json!(input));
+        }
     }
 }

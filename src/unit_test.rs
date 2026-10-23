@@ -160,7 +160,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
     {
         println!("Running tests");
     }
-    match config::build_unit_tests_main(&paths, signal_handler).await {
+    match Box::pin(config::build_unit_tests_main(&paths, signal_handler)).await {
         Ok(tests) => {
             if tests.is_empty() {
                 #[allow(clippy::print_stdout)]

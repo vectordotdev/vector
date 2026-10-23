@@ -186,7 +186,7 @@ pub async fn validate(
 
     let mut validated = true;
 
-    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt).await else {
+    let Some(mut config) = Box::pin(validate_config(opts, signal_handler, &mut fmt)).await else {
         return exitcode::CONFIG;
     };
 
@@ -237,7 +237,12 @@ pub async fn validate_config(
     let builder = if opts.no_environment && !opts.resolve_secrets {
         ConfigBuilderLoader::default().load_from_paths(&paths)
     } else {
-        config::loading::load_builder_from_paths_with_secrets(&paths, signal_handler, false).await
+        Box::pin(config::loading::load_builder_from_paths_with_secrets(
+            &paths,
+            signal_handler,
+            false,
+        ))
+        .await
     }
     .map_err(&mut report_error)
     .ok()?;
