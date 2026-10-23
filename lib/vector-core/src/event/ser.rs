@@ -312,6 +312,46 @@ impl Bufferable for EventArray {
         check_event_array_nesting_cost(self).is_ok()
     }
 
+    fn split_in_half(self) -> Result<(Self, Self), Self> {
+        fn halve<E>(mut events: Vec<E>) -> Result<(Vec<E>, Vec<E>), Vec<E>> {
+            if events.len() < 2 {
+                return Err(events);
+            }
+            let back = events.split_off(events.len() / 2);
+            Ok((events, back))
+        }
+
+        match self {
+            EventArray::Logs(logs) => halve(logs)
+                .map(|(front, back)| (EventArray::Logs(front), EventArray::Logs(back)))
+                .map_err(EventArray::Logs),
+            EventArray::Metrics(metrics) => halve(metrics)
+                .map(|(front, back)| (EventArray::Metrics(front), EventArray::Metrics(back)))
+                .map_err(EventArray::Metrics),
+            EventArray::Traces(traces) => halve(traces)
+                .map(|(front, back)| (EventArray::Traces(front), EventArray::Traces(back)))
+                .map_err(EventArray::Traces),
+        }
+    }
+
+    fn rejoin(self, back: Self) -> Self {
+        match (self, back) {
+            (EventArray::Logs(mut front), EventArray::Logs(back)) => {
+                front.extend(back);
+                EventArray::Logs(front)
+            }
+            (EventArray::Metrics(mut front), EventArray::Metrics(back)) => {
+                front.extend(back);
+                EventArray::Metrics(front)
+            }
+            (EventArray::Traces(mut front), EventArray::Traces(back)) => {
+                front.extend(back);
+                EventArray::Traces(front)
+            }
+            _ => unreachable!("halves of one `EventArray` always share its variant"),
+        }
+    }
+
     fn filter_unencodable(self) -> Option<Self> {
         let exceeds =
             |value: &Value| check_value_nesting_cost(value, 0, MAX_VALUE_NESTING_FRAMES).is_err();
