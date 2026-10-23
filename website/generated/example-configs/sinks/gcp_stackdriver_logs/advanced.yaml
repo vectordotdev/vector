@@ -4,6 +4,7 @@ sinks:
     inputs:
       - my-source-or-transform-id
     dangerously_allow_unconfined_template_resolution: false
+    insert_id_key: insert_id
     labels:
       label_1: value_1
       label_2: label-{{ template_value_2 }}
