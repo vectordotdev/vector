@@ -987,6 +987,27 @@ mod test {
         }
     }
 
+    /// A histogram with no observations sums to zero whatever it reports, so it must not erase the
+    /// other side's sum. Otherwise one empty, sum-less sample would drop `_sum` from an accumulated
+    /// series for good.
+    #[test]
+    fn add_aggregated_histograms_keeps_the_sum_of_a_non_empty_side() {
+        let mut value = histogram_with_sum(0, None);
+        assert!(value.add(&histogram_with_sum(2, Some(2.0))));
+        assert_eq!(value, histogram_with_sum(2, Some(2.0)));
+
+        let mut value = histogram_with_sum(2, Some(2.0));
+        assert!(value.add(&histogram_with_sum(0, None)));
+        assert_eq!(value, histogram_with_sum(2, Some(2.0)));
+    }
+
+    #[test]
+    fn subtract_aggregated_histograms_keeps_the_sum_over_an_empty_baseline() {
+        let mut value = histogram_with_sum(3, Some(3.0));
+        assert!(value.subtract(&histogram_with_sum(0, None)));
+        assert_eq!(value, histogram_with_sum(3, Some(3.0)));
+    }
+
     /// Zeroing the observations says nothing about whether the source reports a sum, so a histogram
     /// that never had one must not acquire one.
     #[test]

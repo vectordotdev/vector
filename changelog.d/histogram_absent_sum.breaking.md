@@ -67,4 +67,9 @@ series disappear for these histograms. Omitting it is valid under OpenMetrics, w
 series outright for histograms with negative bucket thresholds. Queries deriving an average from
 `<name>_sum` should tolerate its absence; `histogram_quantile` never reads it and is unaffected.
 
+Vector instances exchanging events with the `native_json` codec must run 0.60.0 or later on the
+receiving side before senders upgrade: older versions reject a histogram whose `sum` is omitted.
+The `native` protobuf codec, the `vector` source and sink, and disk buffers are unaffected, since
+older versions read a missing sum there as zero.
+
 authors: gwenaskell

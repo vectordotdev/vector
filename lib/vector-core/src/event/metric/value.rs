@@ -258,10 +258,16 @@ impl MetricValue {
                 for (b1, b2) in buckets.iter_mut().zip(buckets2) {
                     b1.count += b2.count;
                 }
+                // A histogram with no observations sums to zero whether or not it reports a sum, so
+                // only a non-empty side without one makes the total unknown. Treating that one as
+                // zero would silently under-report the total.
+                *sum = match (*sum, *sum2) {
+                    (Some(s1), Some(s2)) => Some(s1 + s2),
+                    (None, s2) if *count == 0 => s2,
+                    (s1, None) if *count2 == 0 => s1,
+                    _ => None,
+                };
                 *count += count2;
-                // The sum of a known and an unknown quantity is unknown, so absence on either side
-                // has to win. Treating a missing sum as zero would silently under-report the total.
-                *sum = (*sum).zip(*sum2).map(|(s1, s2)| s1 + s2);
                 true
             }
             (Self::Sketch { sketch }, Self::Sketch { sketch: sketch2 }) => {
@@ -361,11 +367,16 @@ impl MetricValue {
                 for (b1, b2) in buckets.iter_mut().zip(buckets2) {
                     b1.count -= b2.count;
                 }
+                // As in `add`, a delta against an unknown quantity is unknown, unless that quantity is
+                // an empty baseline and so sums to zero. This matters for the absolute-to-incremental
+                // conversion feeding sketch-based sinks: the sketch conversion needs to see an absent
+                // sum to know it must estimate one.
+                *sum = match (*sum, *sum2) {
+                    (Some(s1), Some(s2)) => Some(s1 - s2),
+                    (s1, None) if *count2 == 0 => s1,
+                    _ => None,
+                };
                 *count -= count2;
-                // As in `add`, a delta against an unknown quantity is unknown. This matters for the
-                // absolute-to-incremental conversion feeding sketch-based sinks: the sketch
-                // conversion needs to see the absent sum to know it must estimate one.
-                *sum = (*sum).zip(*sum2).map(|(s1, s2)| s1 - s2);
                 true
             }
             _ => false,
