@@ -212,3 +212,68 @@ async fn test_bytes_unread_skipped_gzip_is_unknown() {
         assert_eq!(info.bytes_unread, None);
     }
 }
+
+/// A file skipped by `ignore_older` has not been read, so it must not count as
+/// read to EOF for `remove_after` until new data is actually read from it.
+#[tokio::test]
+async fn test_skipped_unread_for_ignored_file() {
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("old.log");
+
+    {
+        let mut f = fs::File::create(&path).expect("could not create file");
+        f.write_all(b"unread line 1\nunread line 2\n").unwrap();
+        f.flush().unwrap();
+        f.set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(90))
+            .unwrap();
+    }
+
+    let ignore_before: DateTime<Utc> = Utc::now() - chrono::Duration::seconds(60);
+    let mut fw = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        Some(ignore_before),
+        100_000,
+        Bytes::from("\n"),
+    )
+    .await
+    .expect("could not create file watcher");
+
+    assert!(fw.read_line().await.unwrap().raw_line.is_none());
+    assert!(fw.skipped_unread());
+
+    {
+        let mut f = fs::OpenOptions::new().append(true).open(&path).unwrap();
+        f.write_all(b"new line\n").unwrap();
+        f.flush().unwrap();
+    }
+
+    let line = fw
+        .read_line()
+        .await
+        .unwrap()
+        .raw_line
+        .expect("expected a line");
+    assert_eq!(line.bytes, Bytes::from("new line"));
+    assert!(!fw.skipped_unread());
+}
+
+#[tokio::test]
+async fn test_not_skipped_unread_for_recent_file() {
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("new.log");
+    fs::write(&path, b"line\n").unwrap();
+
+    let ignore_before: DateTime<Utc> = Utc::now() - chrono::Duration::seconds(60);
+    let fw = FileWatcher::new(
+        path,
+        ReadFrom::Beginning,
+        Some(ignore_before),
+        100_000,
+        Bytes::from("\n"),
+    )
+    .await
+    .expect("could not create file watcher");
+
+    assert!(!fw.skipped_unread());
+}
