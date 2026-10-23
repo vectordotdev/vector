@@ -1,0 +1,22 @@
+data_dir: /tmp/vector-regex-bench-data
+
+sources:
+  logs:
+    type: http_server
+    address: "0.0.0.0:8282"
+    encoding: text
+
+transforms:
+  apache_common_parser:
+    type: remap
+    inputs: [logs]
+    source: |
+      . = parse_regex_all!(.message, r'^(?P<host>\d{1,3}\.\d{1,3}.\d{1,3}\.\d{1,3}) - (?P<user>-|\S+) \[(?P<timestamp>.*)\] "(?P<method>GET|PUT|POST|HEAD|DELETE) (?P<path>[/\S]+) (?P<protocol>HTTP/[12].[012])" (?P<status>\d+) (?P<bytes_out>\d+)$')
+
+sinks:
+  out:
+    type: http
+    inputs: [apache_common_parser]
+    uri: "http://localhost:8080"
+    encoding:
+      codec: json
