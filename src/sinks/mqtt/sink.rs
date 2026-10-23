@@ -364,14 +364,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case::deadline(Some(Duration::from_millis(100)), false)]
-    #[case::unlimited(None, false)]
-    #[case::broker_disconnect(None, true)]
+    #[case::acknowledged(false)]
+    #[case::broker_disconnect(true)]
     #[tokio::test]
-    async fn reload_drains_with_vector_shutdown_policy(
-        #[case] grace: Option<Duration>,
-        #[case] disconnect: bool,
-    ) {
+    async fn reload_waits_for_qos_drain(#[case] disconnect: bool) {
         trace_init();
         tokio::time::timeout(
             TEST_TIMEOUT,
@@ -389,7 +385,6 @@ mod tests {
                 };
                 let (mut input, source) = basic_source();
                 let mut config = Config::builder();
-                config.graceful_shutdown_duration = grace;
                 config.add_source("input", source);
                 config.add_sink("mqtt", &["input"], mqtt.clone());
                 let mut replacement = config.clone();
@@ -411,17 +406,15 @@ mod tests {
                         replacement.build().unwrap(),
                         ExtraContext::default(),
                     ));
-                    if grace.is_none() {
-                        tokio::time::timeout(Duration::from_millis(150), &mut reload)
-                            .await
-                            .expect_err("unlimited reload abandoned the QoS exchange");
-                        if disconnect {
-                            drop(stream);
-                        } else {
-                            assert!(!acknowledge(&mut stream, &publish).await);
-                            let release = read_packet(&mut stream).await;
-                            assert!(acknowledge(&mut stream, &release).await);
-                        }
+                    tokio::time::timeout(Duration::from_millis(150), &mut reload)
+                        .await
+                        .expect_err("reload abandoned the QoS exchange");
+                    if disconnect {
+                        drop(stream);
+                    } else {
+                        assert!(!acknowledge(&mut stream, &publish).await);
+                        let release = read_packet(&mut stream).await;
+                        assert!(acknowledge(&mut stream, &release).await);
                     }
                     reload.await.unwrap();
                 }

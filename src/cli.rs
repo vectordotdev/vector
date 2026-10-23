@@ -237,10 +237,9 @@ pub struct RootOpts {
     #[arg(long, env = "VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT")]
     pub internal_logs_source_rate_limit: Option<NonZeroU64>,
 
-    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM.
-    /// Also limit how long old sinks can drain during a configuration reload. After this duration,
-    /// Vector forces shutdown or stops the old sinks. To wait without a limit, use
-    /// `--no-graceful-shutdown-limit`.
+    /// Set the duration in seconds to wait for graceful shutdown after SIGINT or SIGTERM are
+    /// received. After the duration has passed, Vector will force shutdown. To never force
+    /// shutdown, use `--no-graceful-shutdown-limit`.
     #[arg(
         long,
         default_value = "60",
@@ -249,9 +248,9 @@ pub struct RootOpts {
     )]
     pub graceful_shutdown_limit_secs: NonZeroU64,
 
-    /// Never time out while waiting for graceful shutdown or for old sinks to drain during a
-    /// configuration reload. Vector attempts to send data until it is terminated by SIGKILL.
-    /// Overrides/cannot be set with `--graceful-shutdown-limit-secs`.
+    /// Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received.
+    /// This is useful when you would like for Vector to attempt to send data until terminated
+    /// by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`.
     #[arg(
         long,
         default_value = "false",
