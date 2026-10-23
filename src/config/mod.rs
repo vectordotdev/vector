@@ -165,6 +165,7 @@ pub struct Config {
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
     pub graceful_shutdown_duration: Option<Duration>,
+    pub reload_sink_drain_duration: Option<Duration>,
 }
 
 impl Config {

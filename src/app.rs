@@ -75,6 +75,9 @@ impl ApplicationConfig {
 
         let graceful_shutdown_duration = (!opts.no_graceful_shutdown_limit)
             .then(|| Duration::from_secs(u64::from(opts.graceful_shutdown_limit_secs)));
+        let reload_sink_drain_duration = opts
+            .reload_sink_drain_limit_secs
+            .map(|secs| Duration::from_secs(u64::from(secs)));
 
         let watcher_conf = if opts.watch_config {
             Some(watcher_config(
@@ -91,6 +94,7 @@ impl ApplicationConfig {
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
+            reload_sink_drain_duration,
             signal_handler,
         )
         .await?;
@@ -650,6 +654,7 @@ pub async fn load_configs(
     require_healthy: Option<bool>,
     allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
+    reload_sink_drain_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
@@ -732,6 +737,7 @@ pub async fn load_configs(
     }
     config.healthchecks.set_require_healthy(require_healthy);
     config.graceful_shutdown_duration = graceful_shutdown_duration;
+    config.reload_sink_drain_duration = reload_sink_drain_duration;
 
     Ok(config)
 }
