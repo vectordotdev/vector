@@ -2,7 +2,7 @@
 //!
 //! This is a preparation pass, not a general JSON Schema validator. Serde remains
 //! authoritative for final component validation.
-//! The loader does not invoke this pass yet.
+//! The loader invokes this pass after environment-variable and secret substitution.
 
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
@@ -415,7 +415,7 @@ impl<'a> ValueCoercer<'a> {
             let s_trimmed = s.trim();
 
             // String → Bool
-            if let Ok(b) = s_trimmed.parse::<bool>()
+            if let Some(b) = parse_bool(s_trimmed)
                 && allowed.iter().any(|opt| opt.as_bool() == Some(b))
             {
                 *value = Value::Bool(b);
@@ -431,9 +431,7 @@ impl<'a> ValueCoercer<'a> {
             }
 
             // String → Null
-            if s_trimmed.eq_ignore_ascii_case("null")
-                && allowed.iter().any(serde_json::Value::is_null)
-            {
+            if is_null_literal(s_trimmed) && allowed.iter().any(serde_json::Value::is_null) {
                 *value = Value::Null;
                 return true;
             }
@@ -932,8 +930,8 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_bool(&mut self, value: &mut Value) -> Result<(), Error> {
         match value {
             Value::Bool(_) => Ok(()),
-            Value::String(s) => match s.trim().parse::<bool>() {
-                Ok(b) => {
+            Value::String(s) => match parse_bool(s) {
+                Some(b) => {
                     *value = Value::Bool(b);
                     Ok(())
                 }
@@ -1001,7 +999,7 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_null(&mut self, value: &mut Value) -> Result<(), Error> {
         match value {
             Value::Null => Ok(()),
-            Value::String(s) if s.trim().eq_ignore_ascii_case("null") => {
+            Value::String(s) if is_null_literal(s) => {
                 *value = Value::Null;
                 Ok(())
             }
@@ -1036,21 +1034,65 @@ fn value_matches_type(value: &Value, schema_type: &str) -> bool {
     }
 }
 
-fn parse_integer(input: &str) -> Option<Number> {
-    if let Ok(i) = input.trim().parse::<i64>() {
-        Some(Number::from(i))
-    } else if let Ok(u) = input.trim().parse::<u64>() {
-        Some(Number::from(u))
-    } else {
-        None
+fn is_null_literal(input: &str) -> bool {
+    // YAML also represents null with a tilde or an empty scalar.
+    let input = input.trim();
+    matches!(input, "" | "~") || input.eq_ignore_ascii_case("null")
+}
+
+fn parse_bool(input: &str) -> Option<bool> {
+    // Preserve YAML's boolean spellings when substitution happens after parsing.
+    match input.trim() {
+        "true" | "True" | "TRUE" => Some(true),
+        "false" | "False" | "FALSE" => Some(false),
+        _ => None,
     }
+}
+
+fn remove_digit_separators(input: &str, radix: u32) -> Option<String> {
+    // TOML permits underscores only between digits, including exponent digits.
+    let is_digit = |byte: u8| char::from(byte).is_digit(radix);
+    if input.starts_with('_')
+        || input.ends_with('_')
+        || input
+            .as_bytes()
+            .windows(3)
+            .any(|bytes| bytes[1] == b'_' && (!is_digit(bytes[0]) || !is_digit(bytes[2])))
+    {
+        return None;
+    }
+    Some(input.replace('_', ""))
+}
+
+fn parse_integer(input: &str) -> Option<Number> {
+    let input = input.trim();
+    let (sign, digits) = if let Some(digits) = input.strip_prefix('-') {
+        ("-", digits)
+    } else {
+        ("", input.strip_prefix('+').unwrap_or(input))
+    };
+    let (digits, radix) = [("0x", 16), ("0o", 8), ("0b", 2)]
+        .into_iter()
+        .find_map(|(prefix, radix)| digits.strip_prefix(prefix).map(|digits| (digits, radix)))
+        .unwrap_or((digits, 10));
+    if digits.starts_with(['+', '-']) {
+        return None;
+    }
+    // Keep the sign for checked parsing, including i64::MIN, without accepting
+    // arrays, maps, tags, or other configuration syntax from substituted values.
+    let digits = remove_digit_separators(digits, radix)?;
+    let number = format!("{sign}{digits}");
+    i64::from_str_radix(&number, radix)
+        .map(Number::from)
+        .or_else(|_| u64::from_str_radix(&number, radix).map(Number::from))
+        .ok()
 }
 
 fn parse_number(input: &str) -> Option<Number> {
     if let Some(num) = parse_integer(input) {
         return Some(num);
     }
-    if let Ok(f) = input.trim().parse::<f64>() {
+    if let Ok(f) = remove_digit_separators(input.trim(), 10)?.parse::<f64>() {
         return Number::from_f64(f);
     }
     None

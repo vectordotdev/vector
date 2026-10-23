@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::Path};
 
-#[cfg(feature = "sources-demo_logs")]
 use indoc::indoc;
 use serde_json::{Value, json};
 
@@ -17,6 +16,46 @@ fn write_files(root: &Path, files: &[(&str, &str)]) {
         let path = root.join(name);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, with_absent_env_var(content)).unwrap();
+    }
+}
+
+#[test]
+fn no_proxy_preserves_string_and_list_matching() {
+    for (input, matches_hosts) in [
+        (json!("localhost,127.0.0.1"), true),
+        (json!(["localhost", "127.0.0.1"]), true),
+        (json!(["localhost,127.0.0.1"]), false),
+        (
+            json!("${VECTOR_TEST_COMPAT_UNSET:-localhost,127.0.0.1}"),
+            true,
+        ),
+        (
+            json!(["${VECTOR_TEST_COMPAT_UNSET:-localhost,127.0.0.1}"]),
+            false,
+        ),
+        (json!("SECRET[backend.no_proxy]"), true),
+        (json!(["SECRET[backend.no_proxy]"]), false),
+    ] {
+        let content = serde_yaml::to_string(&json!({"proxy": {"no_proxy": input}})).unwrap();
+        let content = with_absent_env_var(&content);
+        let builder = ConfigBuilderLoader::default()
+            .interpolate_env(true)
+            .secrets(HashMap::from([(
+                "backend.no_proxy".into(),
+                "localhost,127.0.0.1".into(),
+            )]))
+            .load_from_input(content.as_bytes(), crate::config::Format::Yaml)
+            .unwrap_or_else(|errors| panic!("{input}: {errors:?}"));
+        let no_proxy = &builder.global.proxy.no_proxy;
+        for host in ["localhost", "127.0.0.1"] {
+            assert_eq!(no_proxy.matches(host), matches_hosts, "{input}: {host}");
+        }
+        assert!(!no_proxy.matches("example.com"), "{input}");
+        assert_eq!(
+            no_proxy.matches("localhost,127.0.0.1"),
+            !matches_hosts,
+            "{input}"
+        );
     }
 }
 
@@ -51,14 +90,14 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
             enabled: Some(true),
         },
         Case {
-            name: "quoted environment boolean is a string",
+            name: "interpolated environment boolean shorthand",
             input: json!("${VECTOR_TEST_COMPAT_UNSET:-false}"),
-            enabled: None,
+            enabled: Some(false),
         },
         Case {
-            name: "quoted secret boolean is a string",
+            name: "interpolated secret boolean shorthand",
             input: json!("SECRET[backend.healthcheck]"),
-            enabled: None,
+            enabled: Some(false),
         },
         Case {
             name: "integer",
@@ -109,20 +148,16 @@ fn healthchecks_accept_boolean_shorthand_and_objects() {
 #[test]
 #[cfg(feature = "sources-demo_logs")]
 fn namespaced_files_load_interpolated_scalars() {
-    let directory = tempfile::tempdir().unwrap();
-    write_files(
-        directory.path(),
-        &[(
-            "sources/demo.yaml",
-            indoc! {"
+    const CONFIG: &str = indoc! {r"
         type: demo_logs
         format: json
         count: ${VECTOR_TEST_COMPAT_UNSET:-42}
         batch_interval: ${VECTOR_TEST_COMPAT_UNSET:-1.5}
         log_namespace: ${VECTOR_TEST_COMPAT_UNSET:-true}
-    "},
-        )],
-    );
+    "};
+
+    let directory = tempfile::tempdir().unwrap();
+    write_files(directory.path(), &[("sources/demo.yaml", CONFIG)]);
     let builder = ConfigBuilderLoader::default()
         .interpolate_env(true)
         .load_from_paths(&[ConfigPath::Dir(directory.path().to_owned())])
@@ -136,14 +171,22 @@ fn namespaced_files_load_interpolated_scalars() {
 
 #[test]
 fn namespaced_tests_load_interpolated_event_counts() {
+    const CONFIG: &str = indoc! {r"
+        name: event count
+        outputs:
+          - extract_from: transform
+            expected_event_count: @COUNT@
+    "};
+
     for (name, count) in [
         ("environment", "${VECTOR_TEST_COMPAT_UNSET:-42}"),
         ("secret", "SECRET[backend.count]"),
-    ] {
+    ]
+    .into_iter()
+    .flat_map(|(name, count)| [(name, count.to_owned()), (name, format!("'{count}'"))])
+    {
         let directory = tempfile::tempdir().unwrap();
-        let input = format!(
-            "name: event count\noutputs:\n  - extract_from: transform\n    expected_event_count: {count}\n"
-        );
+        let input = CONFIG.replace("@COUNT@", &count);
         write_files(directory.path(), &[("tests/events.yaml", &input)]);
         let builder = ConfigBuilderLoader::default()
             .interpolate_env(true)
@@ -167,12 +210,28 @@ fn namespaced_tests_load_interpolated_event_counts() {
     reason = "Keep the merge cases with their shared setup and assertions"
 )]
 fn directory_fragments_preserve_merge_semantics() {
+    const SOURCE_TYPE: &str = indoc! {r"
+        sources:
+          demo:
+            type: demo_logs
+    "};
+    const SOURCE_FORMAT: &str = indoc! {r"
+        sources:
+          demo:
+            format: json
+    "};
+    const FRAGMENT: &str = indoc! {r"
+        sources:
+          demo:
+            @FIELD@: @VALUE@
+    "};
+
     struct Case {
         name: &'static str,
         field: &'static str,
         first: &'static str,
         second: &'static str,
-        expected: Option<Value>,
+        expected: Result<Value, &'static str>,
     }
 
     for case in [
@@ -181,70 +240,70 @@ fn directory_fragments_preserve_merge_semantics() {
             field: "count",
             first: "43",
             second: "43",
-            expected: Some(json!(43)),
+            expected: Ok(json!(43)),
         },
         Case {
             name: "environment integer merges with literal",
             field: "count",
             first: "43",
             second: "${VECTOR_TEST_COMPAT_UNSET:-43}",
-            expected: Some(json!(43)),
+            expected: Ok(json!(43)),
         },
         Case {
             name: "secret integer merges with literal",
             field: "count",
             first: "SECRET[backend.count]",
             second: "43",
-            expected: Some(json!(43)),
+            expected: Ok(json!(43)),
         },
         Case {
             name: "environment float merges with literal",
             field: "interval",
             first: "2.5",
             second: "${VECTOR_TEST_COMPAT_UNSET:-2.5}",
-            expected: Some(json!(2.5)),
+            expected: Ok(json!(2.5)),
         },
         Case {
             name: "environment boolean merges with literal",
             field: "log_namespace",
             first: "true",
             second: "${VECTOR_TEST_COMPAT_UNSET:-true}",
-            expected: Some(json!(true)),
+            expected: Ok(json!(true)),
         },
         Case {
             name: "integer conflicts with boolean",
             field: "count",
             first: "1",
             second: "true",
-            expected: None,
+            expected: Err("Incompatible types"),
         },
         Case {
             name: "integer conflicts with float",
             field: "interval",
             first: "1.5",
             second: "2",
-            expected: None,
+            expected: Err("Incompatible types"),
         },
         Case {
             name: "array conflicts with string",
             field: "lines",
             first: "[first]",
             second: "second",
-            expected: None,
+            expected: Err("Incompatible types"),
         },
         Case {
             name: "invalid interpolation cannot be hidden",
             field: "count",
             first: "${VECTOR_TEST_COMPAT_UNSET:-invalid}",
             second: "43",
-            expected: None,
+            expected: Err("Expected integer at 'sources.demo.count'"),
         },
         Case {
-            name: "quoted interpolation conflicts with integer",
+            name: "quoted interpolation merges with integer",
             field: "count",
             first: "'${VECTOR_TEST_COMPAT_UNSET:-43}'",
             second: "43",
-            expected: None,
+            expected: Ok(json!(43)),
         },
     ] {
         for reversed in [false, true] {
@@ -256,13 +315,12 @@ fn directory_fragments_preserve_merge_semantics() {
             };
             write_files(
                 directory.path(),
-                &[
-                    ("type.yaml", "sources:\n  demo:\n    type: demo_logs\n"),
-                    ("format.yaml", "sources:\n  demo:\n    format: json\n"),
-                ],
+                &[("type.yaml", SOURCE_TYPE), ("format.yaml", SOURCE_FORMAT)],
             );
             for (index, value) in fragments.iter().enumerate() {
-                let input = format!("sources:\n  demo:\n    {}: {value}\n", case.field);
+                let input = FRAGMENT
+                    .replace("@FIELD@", case.field)
+                    .replace("@VALUE@", value);
                 write_files(
                     directory.path(),
                     &[(&format!("fragment-{index}.yaml"), &input)],
@@ -274,7 +332,7 @@ fn directory_fragments_preserve_merge_semantics() {
                 .interpolate_env(true)
                 .secrets(HashMap::from([("backend.count".into(), "43".into())]))
                 .load_from_paths(&[ConfigPath::Dir(directory.path().to_owned())]);
-            if let Some(expected) = &case.expected {
+            if let Ok(expected) = &case.expected {
                 let builder = result.unwrap_or_else(|errors| {
                     panic!("{} / reversed={reversed}: {errors:?}", case.name)
                 });
@@ -289,7 +347,7 @@ fn directory_fragments_preserve_merge_semantics() {
                 assert!(
                     errors
                         .iter()
-                        .any(|error| error.contains("Incompatible types")),
+                        .any(|error| error.contains(case.expected.as_ref().unwrap_err())),
                     "{} / reversed={reversed}: {errors:?}",
                     case.name
                 );
@@ -301,6 +359,14 @@ fn directory_fragments_preserve_merge_semantics() {
 #[test]
 #[cfg(feature = "sources-demo_logs")]
 fn file_and_directory_inputs_preserve_append_boundaries() {
+    const CONFIG: &str = indoc! {r"
+        sources:
+          demo:
+            type: demo_logs
+            format: json
+            count: 43
+    "};
+
     struct Case {
         name: &'static str,
         paths: fn(&Path, &Path) -> Vec<ConfigPath>,
@@ -345,10 +411,9 @@ fn file_and_directory_inputs_preserve_append_boundaries() {
         },
     ] {
         let directory = tempfile::tempdir().unwrap();
-        let input = "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: 43\n";
         write_files(
             directory.path(),
-            &[("first.yaml", input), ("second.yaml", input)],
+            &[("first.yaml", CONFIG), ("second.yaml", CONFIG)],
         );
         let result = ConfigBuilderLoader::default()
             .interpolate_env(false)
@@ -379,6 +444,15 @@ fn file_and_directory_inputs_preserve_append_boundaries() {
 
 #[test]
 fn inline_fields_shadow_matching_directories_but_not_files() {
+    const PARENT: &str = indoc! {r"
+        inline:
+          retained: true
+    "};
+    const INVALID_CONFIG: &str = "invalid: [yaml";
+    const REQUIRED_ENVIRONMENT: &str = "value: ${VECTOR_TEST_COMPAT_UNSET:?must not be read}";
+    const SECRET_REFERENCE: &str = "value: SECRET[missing.shadowed]";
+    const NESTED_FILE: &str = "from_file: true";
+
     struct Case {
         name: &'static str,
         nested_path: &'static str,
@@ -390,25 +464,25 @@ fn inline_fields_shadow_matching_directories_but_not_files() {
         Case {
             name: "invalid YAML in shadowed folder",
             nested_path: "inline/ignored.yaml",
-            content: "invalid: [yaml",
+            content: INVALID_CONFIG,
             expected: json!({"retained": true}),
         },
         Case {
             name: "required environment in shadowed folder",
             nested_path: "inline/ignored.yaml",
-            content: "value: ${VECTOR_TEST_COMPAT_UNSET:?must not be read}",
+            content: REQUIRED_ENVIRONMENT,
             expected: json!({"retained": true}),
         },
         Case {
             name: "secret in shadowed folder",
             nested_path: "inline/ignored.yaml",
-            content: "value: SECRET[missing.shadowed]",
+            content: SECRET_REFERENCE,
             expected: json!({"retained": true}),
         },
         Case {
             name: "nested file still contributes",
             nested_path: "inline.yaml",
-            content: "from_file: true",
+            content: NESTED_FILE,
             expected: json!({"retained": true, "from_file": true}),
         },
     ] {
@@ -416,7 +490,7 @@ fn inline_fields_shadow_matching_directories_but_not_files() {
         write_files(
             directory.path(),
             &[
-                ("transforms/parent.yaml", "inline:\n  retained: true\n"),
+                ("transforms/parent.yaml", PARENT),
                 (
                     &format!("transforms/parent/{}", case.nested_path),
                     case.content,
@@ -431,13 +505,22 @@ fn inline_fields_shadow_matching_directories_but_not_files() {
 
 #[test]
 fn same_stem_files_preserve_nested_contributions() {
+    const YAML_PARENT: &str = indoc! {r"
+        child:
+          inline: true
+    "};
+    const JSON_PARENT: &str = r#"{"other":true}"#;
+    const NESTED: &str = indoc! {r"
+        nested: true
+    "};
+
     let directory = tempfile::tempdir().unwrap();
     write_files(
         directory.path(),
         &[
-            ("transforms/parent.yaml", "child:\n  inline: true\n"),
-            ("transforms/parent.json", r#"{"other":true}"#),
-            ("transforms/parent/child/disk.yaml", "nested: true\n"),
+            ("transforms/parent.yaml", YAML_PARENT),
+            ("transforms/parent.json", JSON_PARENT),
+            ("transforms/parent/child/disk.yaml", NESTED),
         ],
     );
     let map = load_source_from_paths(&[ConfigPath::Dir(directory.path().to_owned())]).unwrap();
@@ -457,44 +540,44 @@ fn interpolated_scalars_follow_format_quoting() {
         accepted: bool,
     }
 
-    // These are the text-first loader's expectations. Quoted numeric/boolean
-    // placeholders are strings, not values of the destination field's type.
+    // Parse-first loading requires syntactically valid input before substitution.
+    // Quoted numeric and boolean placeholders are coerced using the field schema.
     for case in [
         Case {
-            name: "YAML plain placeholders",
+            name: "YAML plain placeholders and a field alias",
             format: Format::Yaml,
-            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: @COUNT@\n    interval: @INTERVAL@\n    log_namespace: @BOOL@\n",
+            template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: @COUNT@\n    batch_interval: @INTERVAL@\n    log_namespace: @BOOL@\n",
             accepted: true,
         },
         Case {
             name: "YAML quoted placeholders",
             format: Format::Yaml,
             template: "sources:\n  demo:\n    type: demo_logs\n    format: json\n    count: '@COUNT@'\n    interval: '@INTERVAL@'\n    log_namespace: '@BOOL@'\n",
-            accepted: false,
+            accepted: true,
         },
         Case {
             name: "TOML unquoted placeholders",
             format: Format::Toml,
             template: "[sources.demo]\ntype = 'demo_logs'\nformat = 'json'\ncount = @COUNT@\ninterval = @INTERVAL@\nlog_namespace = @BOOL@\n",
-            accepted: true,
+            accepted: false,
         },
         Case {
             name: "TOML quoted placeholders",
             format: Format::Toml,
             template: "[sources.demo]\ntype = 'demo_logs'\nformat = 'json'\ncount = '@COUNT@'\ninterval = '@INTERVAL@'\nlog_namespace = '@BOOL@'\n",
-            accepted: false,
+            accepted: true,
         },
         Case {
             name: "JSON unquoted placeholders",
             format: Format::Json,
             template: r#"{"sources":{"demo":{"type":"demo_logs","format":"json","count":@COUNT@,"interval":@INTERVAL@,"log_namespace":@BOOL@}}}"#,
-            accepted: true,
+            accepted: false,
         },
         Case {
             name: "JSON quoted placeholders",
             format: Format::Json,
             template: r#"{"sources":{"demo":{"type":"demo_logs","format":"json","count":"@COUNT@","interval":"@INTERVAL@","log_namespace":"@BOOL@"}}}"#,
-            accepted: false,
+            accepted: true,
         },
     ] {
         for (source, count, interval, boolean) in [
@@ -554,7 +637,7 @@ fn disabled_environment_interpolation_preserves_strings() {
             type: demo_logs
             format: shuffle
             lines: ['${VECTOR_TEST_COMPAT_DISABLED_UNSET:?must not be read}', '$$literal']
-            count: 42
+            count: '42'
     "};
     let builder = ConfigBuilderLoader::default()
         .interpolate_env(false)
@@ -569,4 +652,117 @@ fn disabled_environment_interpolation_preserves_strings() {
         ])
     );
     assert_eq!(value["sources"]["demo"]["count"], 42);
+}
+
+#[test]
+#[cfg(feature = "sources-demo_logs")]
+fn yaml_scalar_substitutions_match_literal_values() {
+    const CONFIG: &str = indoc! {r"
+        sources:
+          demo:
+            type: demo_logs
+            format: json
+            count: @COUNT@
+            log_namespace: @NAMESPACE@
+        proxy:
+          enabled: @ENABLED@
+    "};
+
+    for (count, enabled, namespace) in [
+        ("0x2", "TRUE", "~"),
+        ("0o2", "True", ""),
+        ("0b10", "FALSE", "Null"),
+        ("+0x2", "False", "NULL"),
+    ] {
+        let literal = CONFIG
+            .replace("@COUNT@", count)
+            .replace("@ENABLED@", enabled)
+            .replace("@NAMESPACE@", namespace);
+        let expected = ConfigBuilderLoader::default()
+            .load_from_input(literal.as_bytes(), Format::Yaml)
+            .unwrap();
+        let expected = serde_json::to_value(expected).unwrap();
+        for input in [
+            CONFIG
+                .replace(
+                    "@COUNT@",
+                    &format!("${{VECTOR_TEST_COMPAT_UNSET:-{count}}}"),
+                )
+                .replace(
+                    "@ENABLED@",
+                    &format!("${{VECTOR_TEST_COMPAT_UNSET:-{enabled}}}"),
+                )
+                .replace(
+                    "@NAMESPACE@",
+                    &format!("${{VECTOR_TEST_COMPAT_UNSET:-{namespace}}}"),
+                ),
+            CONFIG
+                .replace("@COUNT@", "SECRET[backend.count]")
+                .replace("@ENABLED@", "SECRET[backend.enabled]")
+                .replace("@NAMESPACE@", "SECRET[backend.namespace]"),
+        ] {
+            let input = with_absent_env_var(&input);
+            let actual = ConfigBuilderLoader::default()
+                .interpolate_env(true)
+                .secrets(HashMap::from([
+                    ("backend.count".into(), count.into()),
+                    ("backend.enabled".into(), enabled.into()),
+                    ("backend.namespace".into(), namespace.into()),
+                ]))
+                .load_from_input(input.as_bytes(), Format::Yaml)
+                .unwrap_or_else(|errors| panic!("{count} / {enabled} / {namespace:?}: {errors:?}"));
+            assert_eq!(serde_json::to_value(actual).unwrap(), expected);
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "sources-demo_logs")]
+fn toml_numeric_substitutions_match_literal_values() {
+    const CONFIG: &str = indoc! {r#"
+        [sources.demo]
+        type = "demo_logs"
+        format = "json"
+        count = @COUNT@
+        interval = @INTERVAL@
+    "#};
+
+    for (count, interval) in [
+        ("1_000", "1_000.5"),
+        ("0xFF_FF", "1.0_5"),
+        ("0b1_0", "1e1_0"),
+    ] {
+        let literal = CONFIG
+            .replace("@COUNT@", count)
+            .replace("@INTERVAL@", interval);
+        let expected = ConfigBuilderLoader::default()
+            .load_from_input(literal.as_bytes(), Format::Toml)
+            .unwrap();
+        let expected = serde_json::to_value(expected).unwrap();
+        for input in [
+            CONFIG
+                .replace(
+                    "@COUNT@",
+                    &format!(r#""${{VECTOR_TEST_COMPAT_UNSET:-{count}}}""#),
+                )
+                .replace(
+                    "@INTERVAL@",
+                    &format!(r#""${{VECTOR_TEST_COMPAT_UNSET:-{interval}}}""#),
+                ),
+            CONFIG
+                .replace("@COUNT@", r#""SECRET[backend.count]""#)
+                .replace("@INTERVAL@", r#""SECRET[backend.interval]""#),
+        ] {
+            let input = with_absent_env_var(&input);
+            let actual = ConfigBuilderLoader::default()
+                .interpolate_env(true)
+                .secrets(HashMap::from([
+                    ("backend.count".into(), count.into()),
+                    ("backend.interval".into(), interval.into()),
+                ]))
+                .load_from_input(input.as_bytes(), Format::Toml)
+                .unwrap_or_else(|errors| panic!("{count} / {interval}: {errors:?}"));
+            assert_eq!(serde_json::to_value(actual).unwrap(), expected);
+        }
+    }
 }
