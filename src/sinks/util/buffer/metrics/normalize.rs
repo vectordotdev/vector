@@ -706,7 +706,33 @@ impl MetricSet {
         self.maybe_cleanup();
         match metric.kind() {
             MetricKind::Absolute => self.absolute_to_incremental(metric),
-            MetricKind::Incremental => Some(metric),
+            MetricKind::Incremental => {
+                if !self.is_empty() {
+                    self.absorb_increment(&metric);
+                }
+                Some(metric)
+            }
+        }
+    }
+
+    /// Adds an increment to the stored absolute baseline of its series, if any.
+    ///
+    /// Within a series, an absolute value is the full total, so increments of that series are
+    /// part of it. Without this, a series that switches from absolute to incremental and back,
+    /// for example across config reloads, would re-emit every increment passed through in
+    /// between when the next absolute value is subtracted from the stale baseline.
+    fn absorb_increment(&mut self, metric: &Metric) {
+        let Some(reference) = self.inner.get_mut(metric.series()) else {
+            return;
+        };
+        let mut new_reference = reference.clone();
+        if new_reference.data.value.add(metric.value()) {
+            new_reference.timestamp = self.create_timestamp();
+            self.insert_with_tracking(metric.series().clone(), new_reference);
+        } else {
+            // Incompatible values, such as histograms with different buckets: the baseline can no
+            // longer be trusted.
+            self.remove(metric.series());
         }
     }
 
@@ -873,6 +899,53 @@ mod tests {
         assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 42.0 });
 
         // Absolute metrics are not stored in the set
+        assert!(set.is_empty());
+    }
+
+    fn histogram(upper_limit: f64, count: u64, kind: MetricKind) -> Metric {
+        Metric::new(
+            "latency",
+            kind,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![vector_lib::event::metric::Bucket { upper_limit, count }],
+                count,
+                sum: 0.0,
+            },
+        )
+    }
+
+    #[test]
+    fn increments_are_absorbed_into_absolute_baseline() {
+        let mut set = MetricSet::default();
+
+        assert!(
+            set.make_incremental(counter("hits", 10.0, MetricKind::Absolute))
+                .is_none()
+        );
+        let out = set.make_incremental(counter("hits", 3.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 3.0 });
+        let out = set.make_incremental(counter("hits", 2.0, MetricKind::Incremental));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 2.0 });
+
+        // The 15.0 total already includes the 5.0 passed through as increments.
+        let out = set.make_incremental(counter("hits", 15.0, MetricKind::Absolute));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 0.0 });
+        let out = set.make_incremental(counter("hits", 18.0, MetricKind::Absolute));
+        assert_eq!(out.unwrap().value(), &MetricValue::Counter { value: 3.0 });
+    }
+
+    #[test]
+    fn incompatible_increment_drops_absolute_baseline() {
+        let mut set = MetricSet::default();
+
+        assert!(
+            set.make_incremental(histogram(1.0, 4, MetricKind::Absolute))
+                .is_none()
+        );
+        assert!(
+            set.make_incremental(histogram(2.0, 1, MetricKind::Incremental))
+                .is_some()
+        );
         assert!(set.is_empty());
     }
 
