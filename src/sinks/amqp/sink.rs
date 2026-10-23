@@ -107,9 +107,13 @@ impl AmqpSink {
                 transformer: self.transformer.clone(),
             },
         };
-        let service = ServiceBuilder::new().service(AmqpService {
-            channels: self.channels.clone(),
-        });
+        // Bound pending requests as well as active channels. Each sink owns its
+        // limit, so a stalled broker cannot consume another sink's capacity.
+        let service = ServiceBuilder::new()
+            .concurrency_limit(self.channels.status().max_size)
+            .service(AmqpService {
+                channels: self.channels.clone(),
+            });
 
         input
             .filter_map(|event| std::future::ready(self.make_amqp_event(event)))
