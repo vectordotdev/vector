@@ -1,0 +1,232 @@
+name: Package Repository Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect state, restore a package selection, or recover an abandoned lock
+        type: choice
+        options: [status, rollback, recover-lock]
+        default: status
+      snapshot:
+        description: Exact archived snapshot SHA-256 for rollback
+        type: string
+      expected_version:
+        description: Exact control-object S3 version reported by status, for lock recovery
+        type: string
+      confirm_owner_stopped:
+        description: The previous workflow/process and its in-flight writes have stopped
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: package-repositories
+  cancel-in-progress: false
+
+jobs:
+  # Inspect S3 state, prepare a rollback, or recover a lock with the publishing role.
+  # Capture PACKAGE_REPOSITORIES_IMAGE once so every rollback job uses the same digest.
+  # Available even when automated publication is disabled. Recovery requires the exact
+  # control version, a stopped owner and an expired 65-minute recovery window.
+  maintain:
+    if: github.repository_id == '146327667' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      publisher_image: ${{ steps.image.outputs.image }}
+    environment: package-repositories-publishing
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate the requested maintenance operation
+        env:
+          OPERATION: ${{ inputs.operation }}
+          SNAPSHOT: ${{ inputs.snapshot }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          OWNER_STOPPED: ${{ inputs.confirm_owner_stopped }}
+        run: |
+          case "$OPERATION" in
+            status) ;;
+            rollback) [[ "$SNAPSHOT" =~ ^[0-9a-f]{64}$ ]] ;;
+            recover-lock) test -n "$EXPECTED_VERSION" && test "$OWNER_STOPPED" = true ;;
+            *) exit 1 ;;
+          esac
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+      - uses: ./.github/actions/package-repository-tools
+        id: image
+        with:
+          image: ${{ vars.PACKAGE_REPOSITORIES_IMAGE }}
+          token: ${{ github.token }}
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 900
+          role-session-name: package-maintenance-${{ github.run_id }}
+          allowed-account-ids: "486234852809"
+          unset-current-credentials: true
+      - name: Prepare rollback or run maintenance, and record the current state
+        env:
+          PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          OPERATION: ${{ inputs.operation }}
+          SNAPSHOT: ${{ inputs.snapshot }}
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          case "$OPERATION" in
+            status) ;;
+            rollback)
+              "$VDEV" release repositories rollback base "$SNAPSHOT"
+              ;;
+            recover-lock)
+              "$VDEV" release repositories recover-lock \
+                --expected-version "$EXPECTED_VERSION" --confirm-owner-stopped
+              ;;
+          esac
+          "$VDEV" release repositories status > target/package-repository-status.json
+          cat target/package-repository-status.json
+          {
+            echo '```json'
+            cat target/package-repository-status.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.operation == 'rollback'
+        with:
+          name: package-repository-rollback-base
+          path: target/package-repositories/
+          retention-days: 1
+          if-no-files-found: error
+
+  # Refresh apt dates/signatures so cached clients accept the archived package selection.
+  # Reuse saved rollback output on retries; the signing job has no AWS credentials.
+  sign:
+    needs: maintain
+    if: inputs.operation == 'rollback'
+    runs-on: ubuntu-24.04
+    environment: package-repositories-signing
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+      - uses: ./.github/actions/package-repository-tools
+        with:
+          image: ${{ needs.maintain.outputs.publisher_image }}
+          token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-rollback-base
+          path: target/package-repositories
+      - id: cached
+        run: |
+          if test -f target/package-repositories/result/manifest.json; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Sign fresh apt roots for the selected archived indexes
+        if: steps.cached.outputs.ready != 'true'
+        env:
+          PACKAGE_SIGNING_SUBKEY: ${{ secrets.PACKAGE_SIGNING_SUBKEY }}
+          PACKAGE_SIGNING_PASSPHRASE: ${{ secrets.PACKAGE_SIGNING_PASSPHRASE }}
+        run: '"$VDEV" release repositories rollback prepare'
+      # Private material stays in the container's tmpfs, outside this artifact.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-repository-rollback-signed
+          path: target/package-repositories/
+          retention-days: 1
+          if-no-files-found: error
+
+  # Restore the selected repository state under the shared S3 lock, rejecting stale plans.
+  # Uses AWS OIDC without the signing key; installed clients are not downgraded.
+  publish:
+    needs: [maintain, sign]
+    runs-on: ubuntu-24.04
+    environment: package-repositories-publishing
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+      - uses: ./.github/actions/package-repository-tools
+        with:
+          image: ${{ needs.maintain.outputs.publisher_image }}
+          token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-rollback-signed
+          path: target/package-repositories
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 900
+          allowed-account-ids: "486234852809"
+          unset-current-credentials: true
+      - name: Publish the fresh rollback against its expected repository state
+        env:
+          PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+        run: |
+          "$VDEV" release repositories rollback publish
+          "$VDEV" release repositories status > target/package-repository-status.json
+          cat target/package-repository-status.json
+          {
+            echo '```json'
+            cat target/package-repository-status.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Verify the restored indexes and fresh signed roots through public HTTPS.
+  endpoints:
+    needs: [maintain, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+      - uses: ./.github/actions/package-repository-tools
+        with:
+          image: ${{ needs.maintain.outputs.publisher_image }}
+          token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-rollback-signed
+          path: target/package-repositories
+      - name: Verify the selected indexes and fresh roots through public HTTPS
+        run: '"$VDEV" release repositories rollback verify'

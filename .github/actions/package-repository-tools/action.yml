@@ -1,0 +1,34 @@
+name: Pull package repository image
+description: Pull the selected immutable publisher image from private GHCR storage.
+inputs:
+  image:
+    description: Publisher image pinned by its full GHCR SHA-256 digest
+    required: true
+  token:
+    description: GitHub token with read access to the container package
+    required: true
+outputs:
+  image:
+    description: Exact image reference used by this job
+    value: ${{ steps.pull.outputs.image }}
+runs:
+  using: composite
+  steps:
+    - id: pull
+      shell: bash
+      env:
+        PUBLISHER_IMAGE: ${{ inputs.image }}
+        GHCR_TOKEN: ${{ inputs.token }}
+      run: |
+        [[ "$PUBLISHER_IMAGE" =~ ^ghcr\.io/vectordotdev/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || {
+          echo 'Set PACKAGE_REPOSITORIES_IMAGE to the digest reported by Package Repository Image.' >&2
+          exit 1
+        }
+        # Keep registry credentials in memory and remove them before any signing/AWS step.
+        export DOCKER_CONFIG
+        DOCKER_CONFIG=$(mktemp -d /dev/shm/package-registry.XXXXXX)
+        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+        printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        docker pull "$PUBLISHER_IMAGE"
+        docker tag "$PUBLISHER_IMAGE" vector-package-publisher:local
+        echo "image=$PUBLISHER_IMAGE" >> "$GITHUB_OUTPUT"

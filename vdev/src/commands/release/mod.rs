@@ -2,6 +2,7 @@ mod channel;
 mod generate_cue;
 mod github;
 mod prepare;
+mod repositories;
 mod workflow;
 
 use anyhow::{Result, ensure};
@@ -40,6 +41,7 @@ enum Commands {
     GenerateCue(generate_cue::Cli),
     Github(github::Cli),
     Prepare(prepare::Cli),
+    Repositories(repositories::Cli),
     Workflow(workflow::Cli),
     /// Uploads archives and packages to AWS S3
     S3(ScriptArgs),
@@ -53,6 +55,7 @@ impl Cli {
             Commands::GenerateCue(cli) => cli.exec(),
             Commands::Github(cli) => cli.exec(),
             Commands::Prepare(cli) => cli.exec(),
+            Commands::Repositories(cli) => cli.exec(),
             Commands::Workflow(cli) => cli.exec(),
             Commands::S3(args) => args.exec("release-s3.sh"),
         }

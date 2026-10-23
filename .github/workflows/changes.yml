@@ -52,6 +52,8 @@ on:
         value: ${{ jobs.source.outputs.website_tests }}
       install:
         value: ${{ jobs.source.outputs.install }}
+      package_repositories:
+        value: ${{ jobs.source.outputs.package_repositories }}
       actionlint:
         value: ${{ jobs.source.outputs.actionlint }}
       prettier:
@@ -187,6 +189,7 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       scripts: ${{ steps.filter.outputs.scripts }}
       install: ${{ steps.filter.outputs.install }}
+      package_repositories: ${{ steps.filter.outputs.package_repositories }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
       website_tests: ${{ steps.website_filter.outputs.website_tests }}
@@ -282,6 +285,15 @@ jobs:
             install:
               - ".github/workflows/install-sh.yml"
               - "distribution/install.sh"
+              - ".github/workflows/changes.yml"
+            package_repositories:
+              - "distribution/repositories/**"
+              - "vdev/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
+              - ".github/actions/package-repository-tools/**"
+              - ".github/workflows/package-repositories*.yml"
               - ".github/workflows/changes.yml"
             k8s:
               - "src/sources/kubernetes_logs/**"
