@@ -224,33 +224,26 @@ impl PodMetadataAnnotator {
 
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata, self.log_namespace);
 
-        let container;
         if let Some(ref pod_spec) = pod.spec {
             annotate_from_pod_spec(log, &self.fields_spec, pod_spec, self.log_namespace);
 
-            container = pod_spec
-                .containers
-                .iter()
-                .find(|c| c.name == file_info.container_name);
-            if let Some(container) = container {
+            if let Some(container) = find_container(pod_spec, file_info.container_name) {
                 annotate_from_container(log, &self.fields_spec, container, self.log_namespace);
             }
         }
 
         if let Some(ref pod_status) = pod.status {
             annotate_from_pod_status(log, &self.fields_spec, pod_status, self.log_namespace);
-            if let Some(ref container_statuses) = pod_status.container_statuses {
-                let container_status = container_statuses
-                    .iter()
-                    .find(|c| c.name == file_info.container_name);
-                if let Some(container_status) = container_status {
-                    annotate_from_container_status(
-                        log,
-                        &self.fields_spec,
-                        container_status,
-                        self.log_namespace,
-                    );
-                }
+
+            if let Some(container_status) =
+                find_container_status(pod_status, file_info.container_name)
+            {
+                annotate_from_container_status(
+                    log,
+                    &self.fields_spec,
+                    container_status,
+                    self.log_namespace,
+                );
             }
         }
         Some(file_info)
@@ -478,6 +471,33 @@ fn annotate_from_pod_status(
     }
 }
 
+/// Finds the spec of the container a log file belongs to.
+///
+/// Init containers, sidecars (init containers with `restartPolicy: Always`)
+/// included, are listed apart from the regular containers. Container names are
+/// unique across both lists.
+fn find_container<'a>(pod_spec: &'a PodSpec, container_name: &str) -> Option<&'a Container> {
+    pod_spec
+        .containers
+        .iter()
+        .chain(pod_spec.init_containers.iter().flatten())
+        .find(|c| c.name == container_name)
+}
+
+/// Finds the status of the container a log file belongs to; see
+/// [`find_container`].
+fn find_container_status<'a>(
+    pod_status: &'a PodStatus,
+    container_name: &str,
+) -> Option<&'a ContainerStatus> {
+    pod_status
+        .container_statuses
+        .iter()
+        .flatten()
+        .chain(pod_status.init_container_statuses.iter().flatten())
+        .find(|c| c.name == container_name)
+}
+
 fn annotate_from_container_status(
     log: &mut LogEvent,
     fields_spec: &FieldsSpec,
@@ -546,8 +566,11 @@ mod tests {
     use std::path::PathBuf;
 
     use k8s_openapi::api::core::v1::PodIP;
+    use kube::runtime::{reflector::store::Writer, watcher};
     use similar_asserts::assert_eq;
     use vector_lib::lookup::{event_path, metadata_path};
+
+    use crate::event::Value;
 
     use super::*;
 
@@ -1175,5 +1198,85 @@ mod tests {
             annotate_from_container(&mut log, &fields_spec, &container, log_namespace);
             assert_eq!(log, expected);
         }
+    }
+
+    #[test]
+    fn test_annotate_container_metadata_by_container_kind() {
+        let container = |name: &str, restart_policy: Option<&str>| Container {
+            name: name.to_owned(),
+            image: Some(format!("{name}-image:1")),
+            restart_policy: restart_policy.map(str::to_owned),
+            ..Container::default()
+        };
+        let container_status = |name: &str| ContainerStatus {
+            name: name.to_owned(),
+            container_id: Some(format!("containerd://{name}-id")),
+            image_id: format!("{name}-image-id"),
+            ..ContainerStatus::default()
+        };
+        let pod = Pod {
+            metadata: ObjectMeta {
+                name: Some("sandbox0-name".to_owned()),
+                namespace: Some("sandbox0-ns".to_owned()),
+                uid: Some("sandbox0-uid".to_owned()),
+                ..ObjectMeta::default()
+            },
+            spec: Some(PodSpec {
+                containers: vec![container("app", None)],
+                init_containers: Some(vec![
+                    container("init", None),
+                    container("sidecar", Some("Always")),
+                ]),
+                ..PodSpec::default()
+            }),
+            status: Some(PodStatus {
+                container_statuses: Some(vec![container_status("app")]),
+                init_container_statuses: Some(vec![
+                    container_status("init"),
+                    container_status("sidecar"),
+                ]),
+                ..PodStatus::default()
+            }),
+        };
+        let mut writer = Writer::default();
+        writer.apply_watcher_event(&watcher::Event::Apply(pod));
+        let annotator = PodMetadataAnnotator::new(
+            writer.as_reader(),
+            FieldsSpec::default(),
+            LogNamespace::Legacy,
+        );
+
+        for name in ["app", "init", "sidecar"] {
+            let mut event = Event::Log(LogEvent::default());
+            let file = format!("/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/{name}/0.log");
+            annotator.annotate(&mut event, &file).unwrap();
+            let log = event.as_log();
+            assert_eq!(
+                log.get(event_path!("kubernetes", "container_id")),
+                Some(&Value::from(format!("containerd://{name}-id"))),
+                "container_id of {name}",
+            );
+            assert_eq!(
+                log.get(event_path!("kubernetes", "container_image")),
+                Some(&Value::from(format!("{name}-image:1"))),
+                "container_image of {name}",
+            );
+            assert_eq!(
+                log.get(event_path!("kubernetes", "container_image_id")),
+                Some(&Value::from(format!("{name}-image-id"))),
+                "container_image_id of {name}",
+            );
+        }
+
+        let mut event = Event::Log(LogEvent::default());
+        annotator
+            .annotate(
+                &mut event,
+                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/unknown/0.log",
+            )
+            .unwrap();
+        let log = event.as_log();
+        assert_eq!(log.get(event_path!("kubernetes", "container_id")), None);
+        assert_eq!(log.get(event_path!("kubernetes", "container_image")), None);
     }
 }
