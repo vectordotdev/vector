@@ -1,0 +1,6 @@
+# Each credential routes to its own vminsert tenant.
+users:
+  - bearer_token: "tenant-1-token"
+    url_prefix: "http://vminsert:8480/insert/1/prometheus"
+  - bearer_token: "tenant-2-token"
+    url_prefix: "http://vminsert:8480/insert/2/prometheus"
