@@ -4,7 +4,7 @@ use vector_common::internal_event::emit;
 use vector_core::event::Event;
 
 #[cfg(feature = "arrow")]
-use crate::encoding::ArrowStreamSerializer;
+use crate::encoding::{ArrowStreamSerializer, WireToArrowSerializer};
 #[cfg(feature = "parquet")]
 use crate::encoding::ParquetSerializer;
 use crate::{
@@ -31,6 +31,9 @@ pub enum BatchOutput {
 pub enum BatchSerializer {
     /// Arrow IPC stream format serializer.
     Arrow(ArrowStreamSerializer),
+    /// Wire-to-Arrow serializer: decodes proto wire bytes straight into an
+    /// Arrow `RecordBatch`.
+    WireToArrow(WireToArrowSerializer),
     /// Parquet format serializer.
     #[cfg(feature = "parquet")]
     Parquet(Box<ParquetSerializer>),
@@ -61,7 +64,9 @@ impl BatchEncoder {
     #[must_use]
     pub const fn content_type(&self) -> Option<&'static str> {
         match &self.serializer {
-            BatchSerializer::Arrow(_) => Some("application/vnd.apache.arrow.stream"),
+            BatchSerializer::Arrow(_) | BatchSerializer::WireToArrow(_) => {
+                Some("application/vnd.apache.arrow.stream")
+            }
             #[cfg(feature = "parquet")]
             BatchSerializer::Parquet(_) => Some("application/vnd.apache.parquet"),
         }
@@ -85,6 +90,12 @@ impl BatchEncoder {
                         _ => Error::SerializingError(Box::new(err)),
                     }
                 })?;
+                Ok(BatchOutput::Arrow(record_batch))
+            }
+            BatchSerializer::WireToArrow(serializer) => {
+                let record_batch = serializer
+                    .encode_to_record_batch(events)
+                    .map_err(|err| Error::SerializingError(Box::new(err)))?;
                 Ok(BatchOutput::Arrow(record_batch))
             }
             #[cfg(feature = "parquet")]
@@ -112,6 +123,9 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
                     }
                 })
             }
+            BatchSerializer::WireToArrow(_) => Err(Error::SerializingError(Box::from(
+                "WireToArrow serializer does not support the streaming Encoder interface; use encode_batch() instead",
+            ))),
             #[cfg(feature = "parquet")]
             BatchSerializer::Parquet(serializer) => serializer
                 .encode(events, buffer)
