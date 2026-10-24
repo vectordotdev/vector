@@ -16,7 +16,7 @@ use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
     sync::{Mutex as AsyncMutex, mpsc::UnboundedSender, oneshot},
-    time::timeout,
+    time::{sleep, timeout},
 };
 use tracing::{Instrument, Span};
 use vector_lib::{
@@ -719,6 +719,8 @@ impl<'a> Builder<'a> {
         };
 
         let (trigger, tripwire) = Tripwire::new();
+        let detached = tripwire.clone();
+        let detach_limit = self.config.graceful_shutdown_duration;
 
         let utilization_sender = self
             .utilization_registry
@@ -742,7 +744,7 @@ impl<'a> Builder<'a> {
             let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
 
             let events_received = register!(EventsReceived);
-            sink.run(
+            let run = sink.run(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
@@ -752,14 +754,43 @@ impl<'a> Builder<'a> {
                         ));
                     })
                     .take_until_if(tripwire),
-            )
-            .await
-            .map(|()| {
-                debug!("Sink finished normally.");
-                TaskOutput::Sink(rx)
-            })
-            .inspect_err(|error| debug!(%error, "Sink finished with an error."))
-            .map_err(Into::into)
+            );
+
+            // When a reload detaches this sink's inputs, the sink is expected to finish once it
+            // sees the end of its input stream. A sink that never polls its input again, such as
+            // one retrying a connection forever, would never finish and would hang the reload,
+            // which waits for this task to get the buffer back. So once the inputs are detached,
+            // give the sink up to the graceful shutdown limit, then drop it and return the
+            // buffer anyway. Events the sink already took from the buffer are dropped.
+            let abandon = async move {
+                if let Some(limit) = detach_limit
+                    && detached.await
+                {
+                    sleep(limit).await;
+                } else {
+                    std::future::pending::<()>().await;
+                }
+            };
+
+            let result = select! {
+                result = run => result,
+                () = abandon => {
+                    warn!(
+                        message = "Sink did not finish after its inputs were detached; dropping it and any events it has in flight.",
+                        limit_secs = detach_limit.unwrap_or_default().as_secs(),
+                        internal_log_rate_limit = false,
+                    );
+                    Ok(())
+                }
+            };
+
+            result
+                .map(|()| {
+                    debug!("Sink finished normally.");
+                    TaskOutput::Sink(rx)
+                })
+                .inspect_err(|error| debug!(%error, "Sink finished with an error."))
+                .map_err(Into::into)
         };
 
         let task = Task::new(key.clone(), typetag, sink);
