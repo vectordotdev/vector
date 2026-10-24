@@ -304,9 +304,6 @@ test-integration-%-cleanup:
 
 test-integration-%:
 	$(VDEV) --verbose integration test $*
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-$*-cleanup
-endif
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests
