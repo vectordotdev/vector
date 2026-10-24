@@ -1,0 +1,3 @@
+HTTP-based sinks no longer hold an adaptive concurrency permit while a request sleeps between retry attempts. The retry layer now wraps the concurrency limiter, so a permit is acquired and released around each individual attempt. This prevents a few requests stuck in long retry backoffs from starving healthy traffic after a transient downstream error, and gives the adaptive concurrency controller per-attempt latency and outcome signals. The number of requests waiting on retries is bounded at twice the concurrency limit, and sinks with a concurrency of 1 (for example `concurrency: none`, or the ordered Loki modes) still process each request, including its retries, one at a time to preserve ordering.
+
+authors: valerypetrov

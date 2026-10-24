@@ -290,7 +290,7 @@ where
             .as_ref()
             .map(|resp| self.logic.should_retry_response(resp));
         let is_back_pressure = match &response_action {
-            Ok(action) => matches!(action, RetryAction::Retry(_)),
+            Ok(action) => action.is_retryable(),
             Err(error) => {
                 if let Some(error) = error.downcast_ref::<L::Error>() {
                     self.logic.is_retriable_error(error)
