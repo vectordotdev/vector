@@ -45,12 +45,32 @@ generated: components: sources: redis: configuration: {
 	list: {
 		description: "Options for the Redis `list` data type."
 		required:    false
-		type: object: options: method: {
-			description: "Method for getting events from the `list` data type."
-			required:    true
-			type: string: enum: {
-				lpop: "Pop messages from the head of the list."
-				rpop: "Pop messages from the tail of the list."
+		type: object: options: {
+			batch_size: {
+				description: """
+					The maximum number of entries to read from the list per round trip.
+
+					The source blocks until at least one entry is available, then reads up to `batch_size - 1`
+					more without waiting, so batches only fill up when entries are queued. Values greater than
+					`1` use the `count` argument of `LPOP`/`RPOP` (Redis 6.2 or newer). On older servers the
+					source falls back to pipelining single pops, which still saves round trips.
+
+					Entries are removed from the list as they are read, so up to `batch_size` entries can be
+					lost if Vector stops unexpectedly before they are processed.
+					"""
+				required: false
+				type: uint: {
+					default: 1
+					examples: [100]
+				}
+			}
+			method: {
+				description: "Method for getting events from the `list` data type."
+				required:    true
+				type: string: enum: {
+					lpop: "Pop messages from the head of the list."
+					rpop: "Pop messages from the tail of the list."
+				}
 			}
 		}
 	}
