@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{any::Any, sync::Arc};
 
 use enum_dispatch::enum_dispatch;

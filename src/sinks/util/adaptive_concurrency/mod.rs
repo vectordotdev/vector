@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Limit the max number of requests being concurrently processed.
 
 mod controller;

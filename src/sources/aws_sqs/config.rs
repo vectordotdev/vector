@@ -111,7 +111,7 @@ impl SourceConfig for AwsSqsConfig {
                 .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
-        Ok(Box::pin(
+        Ok(crate::sources::opaque_source(
             SqsSource {
                 client,
                 queue_url: self.queue_url.clone(),
@@ -119,8 +119,7 @@ impl SourceConfig for AwsSqsConfig {
                 poll_secs: self.poll_secs,
                 concurrency: self
                     .client_concurrency
-                    .map(|n| n.get())
-                    .unwrap_or_else(crate::num_threads),
+                    .map_or_else(crate::num_threads, NonZeroUsize::get),
                 visibility_timeout_secs: self.visibility_timeout_secs,
                 delete_message: self.delete_message,
                 acknowledgements,

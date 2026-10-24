@@ -258,7 +258,7 @@ generated: components: sources: aws_s3: configuration: {
 					Defaults to 10
 
 					Should be set to a smaller value when the files are large to help prevent the ingestion of
-					one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+					one file from causing the other files to exceed the `visibility_timeout`. Valid values are 1 - 10
 					"""
 				required: false
 				type: uint: {

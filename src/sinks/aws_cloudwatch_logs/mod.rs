@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 mod config;
 mod healthcheck;
 mod request;

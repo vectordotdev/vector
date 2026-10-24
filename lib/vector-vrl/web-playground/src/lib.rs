@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::collections::BTreeMap;
 
 use gloo_utils::format::JsValueSerdeExt;
@@ -40,6 +38,8 @@ impl Input {
 pub struct VrlCompileResult {
     // Pre-serialized target_value to avoid f64 precision loss in JS JSON.parse.
     pub output: String,
+    // Pre-serialized last expression for the same full-precision display.
+    pub runtime_output: String,
     pub runtime_result: Value,
     pub target_value: Value,
     pub elapsed_time: Option<f64>,
@@ -145,16 +145,19 @@ fn compile(
     match result {
         Ok(runtime_result) => {
             // Full-precision JSON for display.
-            let output = to_pretty_json(&target_value.value).map_err(|err| {
-                let msg = format!("failed to serialize result: {err}");
-                VrlDiagnosticResult {
-                    msg_colorized: msg.clone(),
-                    msg,
-                    ..Default::default()
-                }
-            })?;
+            let serialize = |value: &Value| {
+                to_pretty_json(value).map_err(|err| {
+                    let msg = format!("failed to serialize result: {err}");
+                    VrlDiagnosticResult {
+                        msg_colorized: msg.clone(),
+                        msg,
+                        ..Default::default()
+                    }
+                })
+            };
             Ok(VrlCompileResult {
-                output,
+                output: serialize(&target_value.value)?,
+                runtime_output: serialize(&runtime_result)?,
                 runtime_result, // This is the value of the last expression.
                 target_value: target_value.value, // The value of the final event
                 elapsed_time,

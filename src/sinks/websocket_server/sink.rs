@@ -49,7 +49,7 @@ use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
     },
-    sink::StreamSink,
+    sink::{SinkError, StreamSink},
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
@@ -360,8 +360,8 @@ impl WebSocketListenerSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for WebSocketListenerSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+impl StreamSink<Event, SinkError> for WebSocketListenerSink {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), SinkError> {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
@@ -369,7 +369,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
         let events_sent = register!(EventsSent::from(Output(None)));
         let encode_as_binary = self.encoder.serializer().is_binary();
 
-        let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
+        let listener = self.tls.bind(&self.address).await.map_err(SinkError::new)?;
 
         let peers = Arc::new(Mutex::new(HashMap::default()));
         let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
@@ -685,7 +685,7 @@ mod tests {
         .unwrap();
 
         run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             stream::once(ready(event)),
             &SINK_TAGS,
         )
@@ -839,7 +839,7 @@ mod tests {
         let sink = WebSocketListenerSink::new(config, &SinkContext::default()).unwrap();
 
         let compliance_assertion = tokio::spawn(run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             events,
             &SINK_TAGS,
         ));

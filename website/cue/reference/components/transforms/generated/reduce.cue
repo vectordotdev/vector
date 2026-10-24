@@ -4,7 +4,7 @@ generated: components: transforms: reduce: configuration: {
 	end_every_period_ms: {
 		description: """
 			If supplied, every time this interval elapses for a given grouping, the reduced value
-			for that grouping is flushed. Checked every flush_period_ms.
+			for that grouping is flushed. Checked every `flush_period_ms`.
 			"""
 		required: false
 		type: uint: {}

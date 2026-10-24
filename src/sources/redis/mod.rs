@@ -298,7 +298,7 @@ impl InputHandler {
                                 path!("key"),
                                 self.key.as_str(),
                             );
-                        };
+                        }
 
                         event
                     });
@@ -373,6 +373,7 @@ mod integration_test {
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
+        sync::Notify,
         time::Instant,
     };
     use vrl::value;
@@ -571,63 +572,66 @@ mod integration_test {
         assert_list_batches_in_order(Method::Rpop, expected).await;
     }
 
-    /// Stops the source while it is reading a long list and checks that every entry is either
-    /// emitted or still in the list.
+    /// Holds a pop reply after Redis removes the entry, then shuts down before delivering it.
     async fn assert_no_entries_lost_on_shutdown(method: Method, batch_size: usize) {
-        const ENTRIES: usize = 4_000;
-        const ROUNDS: usize = 5;
-
         let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
+        let key = format!("test-key-{}", random_string(10));
+        let _: i64 = conn.rpush(&key, "held entry").await.unwrap();
 
-        for _ in 0..ROUNDS {
-            let key = format!("test-key-{}", random_string(10));
-            let values: Vec<String> = (1..=ENTRIES).map(|i| i.to_string()).collect();
-            for chunk in values.chunks(1000) {
-                let _: i64 = conn.rpush(&key, chunk).await.unwrap();
+        let proxy = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method,
+                batch_size: NonZeroUsize::new(batch_size).unwrap(),
+            }),
+            url: proxy.url.clone(),
+            key: key.clone(),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let mut source = config.build(cx).await.unwrap();
+
+        // Connection setup has completed, so the next reply belongs to the blocking pop.
+        proxy.frozen.store(true, Ordering::SeqCst);
+        tokio::time::timeout(Duration::from_secs(10), async {
+            tokio::select! {
+                () = proxy.reply_held.notified() => {}
+                result = &mut source => panic!("source stopped before its reply was held: {result:?}"),
             }
+        })
+        .await
+        .expect("proxy did not capture the pop reply");
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(remaining, 0, "Redis must have removed the entry");
 
-            let config = RedisSourceConfig {
-                data_type: DataTypeConfig::List,
-                list: Some(ListOption {
-                    method,
-                    batch_size: NonZeroUsize::new(batch_size).unwrap(),
-                }),
-                url: redis_url(),
-                key: key.clone(),
-                redis_key: None,
-                framing: default_framing_message_based(),
-                decoding: default_decoding(),
-                log_namespace: Some(false),
-            };
+        // shutdown_all signals synchronously. Poll the source before releasing the reply so it
+        // must observe shutdown with a pop in flight, regardless of executor scheduling.
+        let shutdown = shutdown.shutdown_all(Some(Instant::now() + Duration::from_secs(10)));
+        assert!(
+            futures::poll!(&mut source).is_pending(),
+            "source abandoned the in-flight pop during shutdown"
+        );
+        proxy.frozen.store(false, Ordering::SeqCst);
+        proxy.release_reply.notify_one();
 
-            let (tx, rx) = SourceSender::new_test();
-            let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
-            let source = tokio::spawn(config.build(cx).await.unwrap());
-            // Consume concurrently so the source is busy popping, not waiting on a full channel.
-            let received = tokio::spawn(rx.count());
-
-            // Stop the source part-way through the list, while it is still popping entries.
-            loop {
-                let remaining: usize = conn.llen(&key).await.unwrap();
-                if remaining < ENTRIES / 2 {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-            shutdown
-                .shutdown_all(Some(Instant::now() + Duration::from_secs(10)))
-                .await;
-            source.await.unwrap().unwrap();
-
-            let received = received.await.unwrap();
-            let remaining: usize = conn.llen(&key).await.unwrap();
-            assert_eq!(
-                received + remaining,
-                ENTRIES,
-                "received {received} + remaining {remaining} != pushed {ENTRIES}"
-            );
-        }
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let (result, ()) = tokio::join!(source, shutdown);
+            result.unwrap();
+        })
+        .await
+        .expect("source did not finish after its reply was released");
+        let events = rx.collect::<Vec<_>>().await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "held entry".into()
+        );
     }
 
     #[tokio::test]
@@ -645,9 +649,15 @@ mod integration_test {
         assert_no_entries_lost_on_shutdown(Method::Lpop, 10).await;
     }
 
-    /// Starts a TCP proxy to the test Redis server whose replies can be frozen, which makes the
-    /// connection look half-open to the client. Returns the proxy URL and the freeze switch.
-    async fn freezable_redis_proxy() -> (String, Arc<AtomicBool>) {
+    struct RedisProxy {
+        url: String,
+        frozen: Arc<AtomicBool>,
+        reply_held: Arc<Notify>,
+        release_reply: Arc<Notify>,
+    }
+
+    /// Starts a TCP proxy whose replies can be held until explicitly released.
+    async fn freezable_redis_proxy() -> RedisProxy {
         let client = redis::Client::open(redis_url()).unwrap();
         let redis::ConnectionAddr::Tcp(host, port) = client.get_connection_info().addr.clone()
         else {
@@ -657,8 +667,12 @@ mod integration_test {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let proxy_url = format!("redis://{}/{db}", listener.local_addr().unwrap());
         let frozen = Arc::new(AtomicBool::new(false));
+        let reply_held = Arc::new(Notify::new());
+        let release_reply = Arc::new(Notify::new());
 
         let frozen_replies = Arc::clone(&frozen);
+        let held = Arc::clone(&reply_held);
+        let release = Arc::clone(&release_reply);
         tokio::spawn(async move {
             loop {
                 let (inbound, _) = listener.accept().await.unwrap();
@@ -669,6 +683,8 @@ mod integration_test {
                     _ = tokio::io::copy(&mut client_read, &mut server_write).await;
                 });
                 let frozen = Arc::clone(&frozen_replies);
+                let held = Arc::clone(&held);
+                let release = Arc::clone(&release);
                 tokio::spawn(async move {
                     let mut buf = vec![0; 16 * 1024];
                     loop {
@@ -676,8 +692,8 @@ mod integration_test {
                             return;
                         };
                         if frozen.load(Ordering::SeqCst) {
-                            // Swallow this and every later reply.
-                            std::future::pending::<()>().await;
+                            held.notify_one();
+                            release.notified().await;
                         }
                         if client_write.write_all(&buf[..n]).await.is_err() {
                             return;
@@ -687,7 +703,12 @@ mod integration_test {
             }
         });
 
-        (proxy_url, frozen)
+        RedisProxy {
+            url: proxy_url,
+            frozen,
+            reply_held,
+            release_reply,
+        }
     }
 
     /// Stops the source after its Redis replies stop arriving, with `entries` queued in the list
@@ -701,14 +722,14 @@ mod integration_test {
             let _: i64 = conn.rpush(&key, chunk).await.unwrap();
         }
 
-        let (proxy_url, frozen) = freezable_redis_proxy().await;
+        let proxy = freezable_redis_proxy().await;
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
                 method: Method::Lpop,
                 batch_size: NonZeroUsize::new(batch_size).unwrap(),
             }),
-            url: proxy_url,
+            url: proxy.url,
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -734,7 +755,7 @@ mod integration_test {
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
         }
-        frozen.store(true, Ordering::SeqCst);
+        proxy.frozen.store(true, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(1500)).await;
 
         let stopped = tokio::time::timeout(Duration::from_secs(10), async {

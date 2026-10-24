@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! Networking-related helper functions.
 
 use std::{io, time::Duration};

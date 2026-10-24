@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{
     fs,
     path::{Path, PathBuf},

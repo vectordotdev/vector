@@ -798,7 +798,9 @@ pub fn generate_bool_or_struct_schema(
             .definitions_mut()
             .insert(name.clone(), Schema::Bool(false));
         let object = get_or_generate_schema(config, generator, None)?;
-        let mut schema = generate_one_of_schema(&[generate_bool_schema(), object]);
+        let mut boolean = generate_bool_schema();
+        boolean.metadata().deprecated = true;
+        let mut schema = generate_one_of_schema(&[boolean, object]);
         let mut metadata = config.make_metadata();
         metadata.add_custom_attribute(CustomAttribute::kv(
             constants::DOCS_META_ENUM_TAGGING,

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 #[cfg(feature = "aws-core")]
 use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
@@ -637,7 +635,8 @@ impl RetryStrategy {
     ///
     /// For the `All` strategy, all non-success status codes will be retried.
     #[must_use]
-    pub fn retry_action<Req>(&self, status: http::StatusCode) -> RetryAction<Req> {
+    pub fn retry_action<Req>(&self, status: impl IntoStatusCode) -> RetryAction<Req> {
+        let status = status.into_status_code();
         if status.is_success() {
             return RetryAction::Successful;
         }
@@ -673,6 +672,28 @@ impl RetryStrategy {
                 }
             }
         }
+    }
+}
+
+/// A response status code from either `http` crate version.
+///
+/// Retry logic and healthcheck errors accept both versions through this trait, so callers never
+/// convert between them. This is the only place that converts.
+// TODO: Use `http_1::StatusCode` natively and remove the `http` 0.2 impl once the HTTP v1
+// migration is complete: https://github.com/vectordotdev/vector/issues/19179
+pub trait IntoStatusCode {
+    fn into_status_code(self) -> StatusCode;
+}
+
+impl IntoStatusCode for StatusCode {
+    fn into_status_code(self) -> StatusCode {
+        self
+    }
+}
+
+impl IntoStatusCode for http_1::StatusCode {
+    fn into_status_code(self) -> StatusCode {
+        StatusCode::from_u16(self.as_u16()).expect("HTTP status codes are valid u16 values")
     }
 }
 
@@ -745,9 +766,16 @@ impl HttpErrorClassify for HttpError {
     }
 }
 
-impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
+impl HttpErrorClassify for vector_http::HttpError {
+    fn is_retriable(&self) -> bool {
+        vector_http::HttpError::is_retriable(self)
+    }
+}
+
+impl<F, S, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
@@ -762,9 +790,10 @@ where
     }
 }
 
-impl<F, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
+impl<F, S, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
     E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
@@ -780,9 +809,10 @@ where
     }
 }
 
-impl<F, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
+impl<F, S, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
     E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
