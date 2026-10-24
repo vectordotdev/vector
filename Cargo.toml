@@ -199,6 +199,7 @@ indexmap = { version = "2.11.0", default-features = false, features = ["serde", 
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
+jsonschema = { version = "0.38.1", default-features = false }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.18.1", default-features = false }
@@ -550,6 +551,7 @@ criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["server-auto"] }
 itertools.workspace = true
+jsonschema.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true

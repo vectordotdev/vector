@@ -65,7 +65,14 @@ generated: components: sources: static_metrics: configuration: {
 										upper_limit: {
 											description: "The upper limit of values in the bucket."
 											required:    true
-											type: float: {}
+											type: {
+												float: {}
+												string: enum: {
+													"-inf": "Negative infinity."
+													NaN:    "Not a number."
+													inf:    "Positive infinity."
+												}
+											}
 										}
 									}
 								}
