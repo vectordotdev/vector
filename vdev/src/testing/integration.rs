@@ -73,6 +73,31 @@ pub(crate) fn collect_compose_logs(
     ComposeTest::generate(local_config, test_name, environment, 0, false)?.logs()
 }
 
+/// RAII guard that triggers test cleanup on drop unless disabled
+/// by `AUTODESPAWN` or `AUTOSPAWN` environment variables.
+struct AutoDespawnGuard<'a> {
+    test: &'a ComposeTest,
+    auto_despawn: bool,
+}
+
+impl<'a> AutoDespawnGuard<'a> {
+    pub fn new(test: &'a ComposeTest) -> Self {
+        let auto_despawn = std::env::var("AUTODESPAWN")
+            .or_else(|_| std::env::var("AUTOSPAWN"))
+            .map_or(true, |v| v.eq_ignore_ascii_case("true"));
+
+        Self { test, auto_despawn }
+    }
+}
+
+impl Drop for AutoDespawnGuard<'_> {
+    fn drop(&mut self) {
+        if self.auto_despawn {
+            let _ = self.test.stop();
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ComposeTest {
     local_config: ComposeTestLocalConfig,
@@ -239,6 +264,8 @@ impl ComposeTest {
             args.push("--retries".to_string());
             args.push(self.retries.to_string());
         }
+
+        let _auto_despawn_guard = AutoDespawnGuard::new(self);
 
         self.runner.test(
             &env_vars,
