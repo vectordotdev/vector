@@ -102,6 +102,11 @@ pub mod secrets;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
+#[cfg(any(
+    windows,
+    all(test, feature = "sources-demo_logs", feature = "sinks-blackhole")
+))]
+mod service_arguments;
 pub mod signal;
 pub(crate) mod sink_ext;
 #[allow(unreachable_pub)]
