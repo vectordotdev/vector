@@ -7,6 +7,7 @@ use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_common::sensitive_string::SensitiveString;
 use vector_lib::{
     TimeZone,
     codecs::encoding::Framer,
@@ -23,7 +24,7 @@ use crate::{
         ValidatedSink,
     },
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
+    gcp::{GcpAuthenticator, GcpCredentialsConfig, Scope},
     http::{client_v1::HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
@@ -46,6 +47,7 @@ use crate::{
     template::{ConfinedTemplate, ConfinementConfig, Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
+use tracing::warn;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
@@ -194,7 +196,15 @@ pub struct GcsSinkConfig {
     request: TowerRequestConfig<GcsTowerRequestConfigDefaults>,
 
     #[serde(flatten)]
-    auth: GcpAuthConfig,
+    auth: GcpCredentialsConfig,
+
+    /// An [API key][gcp_api_key].
+    ///
+    /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
+    #[configurable(
+        deprecated = "API keys are not supported by Google Cloud Storage, use `credentials_path` or default GCE credentials instead."
+    )]
+    api_key: Option<SensitiveString>,
 
     tls: Option<TlsConfig>,
 
@@ -235,7 +245,8 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         batch: BatchConfig::default(),
         endpoint: default_endpoint(),
         request: TowerRequestConfig::default(),
-        auth: GcpAuthConfig::default(),
+        auth: GcpCredentialsConfig::default(),
+        api_key: Option::default(),
         tls: Option::default(),
         acknowledgements: AcknowledgementsConfig::default(),
         timezone: Option::default(),
@@ -298,6 +309,12 @@ impl ValidatedSink for GcsSinkConfig {
         let ValidatedGcsSink { base_url, .. } = validated;
 
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+
+        if self.api_key.is_some() {
+            warn!(
+                "DEPRECATED: The `api_key` option is deprecated and not supported by Google Cloud Storage. See https://vector.dev/deprecations/#gcp_cloud_storage_api_key for migration instructions."
+            );
+        }
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls.into(), cx.proxy())?;
         let healthcheck = build_healthcheck(
