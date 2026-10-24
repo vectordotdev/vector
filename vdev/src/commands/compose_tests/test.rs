@@ -22,7 +22,11 @@ struct DespawnGuard<'a> {
 }
 
 impl<'a> DespawnGuard<'a> {
-    pub fn new(local_config: ComposeTestLocalConfig, test_name: &'a str, was_running: bool) -> Self {
+    pub fn new(
+        local_config: ComposeTestLocalConfig,
+        test_name: &'a str,
+        was_running: bool,
+    ) -> Self {
         let auto_despawn = std::env::var("AUTODESPAWN")
             .or_else(|_| std::env::var("AUTOSPAWN"))
             .map_or(true, |v| v.eq_ignore_ascii_case("true"));
@@ -83,7 +87,7 @@ pub fn exec(
     let mut ran_environments = Vec::new();
     let is_running = active.is_some();
     for environment in environments {
-        let despawn_guard = DespawnGuard::new(local_config.clone(), integration, is_running);
+        let despawn_guard = DespawnGuard::new(local_config, integration, is_running);
 
         run_environment(
             local_config,
