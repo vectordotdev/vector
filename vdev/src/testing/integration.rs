@@ -73,26 +73,33 @@ pub(crate) fn collect_compose_logs(
     ComposeTest::generate(local_config, test_name, environment, 0, false)?.logs()
 }
 
-/// RAII guard that triggers test cleanup on drop unless disabled
-/// by `AUTODESPAWN` or `AUTOSPAWN` environment variables.
+/// RAII guard that triggers test environment cleanup on drop.
+///
+/// Cleanup is skipped if disabled via `AUTODESPAWN` or `AUTOSPAWN` environment
+/// variables, or if the environment was already running prior to the test execution
+/// (preserving caller-owned environments and fast repeated runs).
 struct AutoDespawnGuard<'a> {
     test: &'a ComposeTest,
-    auto_despawn: bool,
+    should_despawn: bool,
 }
 
 impl<'a> AutoDespawnGuard<'a> {
-    pub fn new(test: &'a ComposeTest) -> Self {
+    pub fn new(test: &'a ComposeTest, was_running: bool) -> Self {
         let auto_despawn = std::env::var("AUTODESPAWN")
             .or_else(|_| std::env::var("AUTOSPAWN"))
             .map_or(true, |v| v.eq_ignore_ascii_case("true"));
 
-        Self { test, auto_despawn }
+        let should_despawn = auto_despawn && !was_running;
+        Self {
+            test,
+            should_despawn,
+        }
     }
 }
 
 impl Drop for AutoDespawnGuard<'_> {
     fn drop(&mut self) {
-        if self.auto_despawn {
+        if self.should_despawn {
             let _ = self.test.stop();
         }
     }
@@ -209,6 +216,7 @@ impl ComposeTest {
 
     pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
         let was_running = self.is_running()?;
+        let _auto_despawn_guard = AutoDespawnGuard::new(self, was_running);
         self.config.check_required()?;
 
         if !was_running {
@@ -264,8 +272,6 @@ impl ComposeTest {
             args.push("--retries".to_string());
             args.push(self.retries.to_string());
         }
-
-        let _auto_despawn_guard = AutoDespawnGuard::new(self);
 
         self.runner.test(
             &env_vars,
