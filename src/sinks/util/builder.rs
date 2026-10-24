@@ -141,8 +141,16 @@ pub trait SinkBuilderExt: Stream {
                 // Split the input into metadata and events.
                 let (metadata, request_metadata_builder, events) = builder.split_input(input);
 
-                // Encode the events.
-                let payload = builder.encode_events(events)?;
+                // Encode the events. The metadata is already split off at this point, so hand it
+                // back to the builder on failure instead of dropping it, which would resolve any
+                // event finalizers it owns as a successful delivery.
+                let payload = match builder.encode_events(events) {
+                    Ok(payload) => payload,
+                    Err(error) => {
+                        builder.on_encode_error(metadata);
+                        return Err(error);
+                    }
+                };
 
                 // Note: it would be nice for the RequestMetadataBuilder to build be created from the
                 // events here, and not need to be required by split_input(). But this then requires

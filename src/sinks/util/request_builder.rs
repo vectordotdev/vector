@@ -109,6 +109,21 @@ pub trait RequestBuilder<Input> {
         Ok(result)
     }
 
+    /// Handles the metadata of a batch that failed to encode.
+    ///
+    /// `split_input` hands ownership of the metadata to the caller before the events are encoded,
+    /// so a failing `encode_events` leaves the metadata with nowhere to go and it is dropped.
+    /// Builders whose metadata owns the event finalizers must override this to reject them,
+    /// because dropping finalizers reports the batch as delivered to upstream components.
+    ///
+    /// The metadata is taken by value, so finalizers can only be resolved once.
+    ///
+    /// The default implementation drops the metadata, which is correct for builders that do not
+    /// carry finalizers in it.
+    fn on_encode_error(&self, metadata: Self::Metadata) {
+        drop(metadata);
+    }
+
     /// Builds a request for the given metadata and payload.
     fn build_request(
         &self,
