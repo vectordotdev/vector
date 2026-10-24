@@ -10,6 +10,48 @@ use crate::testing::{
 
 use super::active_projects::find_active_environment_for_integration;
 
+/// RAII guard that triggers test environment cleanup on drop.
+///
+/// Cleanup is skipped if disabled via `AUTODESPAWN` or `AUTOSPAWN` environment
+/// variables, or if the environment was already running prior to the test execution
+/// (preserving caller-owned environments and fast repeated runs).
+struct DespawnGuard<'a> {
+    local_config: ComposeTestLocalConfig,
+    test_name: &'a str,
+    should_despawn: bool,
+}
+
+impl<'a> DespawnGuard<'a> {
+    pub fn new(local_config: ComposeTestLocalConfig, test_name: &'a str, was_running: bool) -> Self {
+        let auto_despawn = std::env::var("AUTODESPAWN")
+            .or_else(|_| std::env::var("AUTOSPAWN"))
+            .map_or(true, |v| v.eq_ignore_ascii_case("true"));
+
+        let should_despawn = auto_despawn && !was_running;
+        Self {
+            local_config,
+            test_name,
+            should_despawn,
+        }
+    }
+
+    pub fn disarm_and_stop(mut self) -> Result<()> {
+        if self.should_despawn {
+            self.should_despawn = false;
+            let _ = super::stop::exec(self.local_config, self.test_name);
+        }
+        Ok(())
+    }
+}
+
+impl Drop for DespawnGuard<'_> {
+    fn drop(&mut self) {
+        if self.should_despawn {
+            let _ = super::stop::exec(self.local_config, self.test_name);
+        }
+    }
+}
+
 pub fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
@@ -39,7 +81,10 @@ pub fn exec(
     }
 
     let mut ran_environments = Vec::new();
+    let is_running = active.is_some();
     for environment in environments {
+        let despawn_guard = DespawnGuard::new(local_config.clone(), integration, is_running);
+
         run_environment(
             local_config,
             integration,
@@ -51,6 +96,7 @@ pub fn exec(
         if coverage {
             ran_environments.push(environment.clone());
         }
+        despawn_guard.disarm_and_stop()?;
     }
 
     if coverage {
