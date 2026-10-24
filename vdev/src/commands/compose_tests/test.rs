@@ -10,7 +10,7 @@ use crate::testing::{
 
 use super::active_projects::find_active_environment_for_integration;
 
-/// RAII guard that triggers test environment cleanup on drop.
+/// RAII guard that triggers test environment cleanup.
 ///
 /// Cleanup is skipped if disabled via `AUTODESPAWN` or `AUTOSPAWN` environment
 /// variables, or if the environment was already running prior to the test execution
@@ -42,7 +42,7 @@ impl<'a> DespawnGuard<'a> {
     pub fn disarm_and_stop(mut self) -> Result<()> {
         if self.should_despawn {
             self.should_despawn = false;
-            let _ = super::stop::exec(self.local_config, self.test_name);
+            super::stop::exec(self.local_config, self.test_name)?;
         }
         Ok(())
     }
