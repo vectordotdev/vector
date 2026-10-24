@@ -43,6 +43,15 @@ test("documentation TOC navigates to a visible section", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Configure Vector", exact: true })).toBeInViewport();
 });
 
+test("documentation headings are keyboard-focusable", async ({ page }) => {
+  await page.goto(quickstart);
+  const headingLink = page.getByRole("heading", { name: "Configure Vector", exact: true }).getByRole("link");
+  await expect(headingLink).toHaveAttribute("href", "#configure-vector");
+  await headingLink.focus();
+  await expect(headingLink).toBeFocused();
+  await expect(headingLink).toHaveCSS("outline-style", "solid");
+});
+
 test("configuration format and level tabs change the displayed example", async ({ page }) => {
   await page.goto(remap);
   const examples = page.locator("div[x-data]").filter({
