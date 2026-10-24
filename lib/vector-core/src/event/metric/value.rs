@@ -6,7 +6,7 @@ use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
 use super::{samples_to_buckets, write_list, write_word};
-use crate::{float_eq, metrics::AgentDDSketch};
+use crate::{float_eq, metrics::AgentDDSketch, opt_float_eq};
 
 const INFINITY: &str = "inf";
 const NEG_INFINITY: &str = "-inf";
@@ -47,7 +47,8 @@ pub enum MetricValue {
 
     /// A set of observations which are counted into buckets.
     ///
-    /// It also contains the total count of all observations and their sum to allow calculating the mean.
+    /// It also contains the total count of all observations, and their sum where the source reported
+    /// one, to allow calculating the mean.
     AggregatedHistogram {
         /// The buckets within this histogram.
         buckets: Vec<Bucket>,
@@ -56,9 +57,13 @@ pub enum MetricValue {
         count: u64,
 
         /// The sum of all observations contained within this histogram.
-        // Tolerate payloads that omit an unreported sum, reading it as zero.
-        #[serde(default)]
-        sum: f64,
+        ///
+        /// Optional, because not every source reports one: OTLP makes the histogram sum optional,
+        /// and `OpenMetrics` only recommends the `_sum` series -- forbidding it outright for
+        /// histograms with negative bucket thresholds. A histogram without a sum is a legitimate
+        /// input rather than an error, and consumers must not substitute zero for it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sum: Option<f64>,
     },
 
     /// A set of observations which are represented by quantiles.
@@ -132,7 +137,7 @@ impl MetricValue {
                 Some(MetricValue::AggregatedHistogram {
                     buckets,
                     count,
-                    sum,
+                    sum: Some(sum),
                 })
             }
             _ => None,
@@ -180,7 +185,9 @@ impl MetricValue {
                     bucket.count = 0;
                 }
                 *count = 0;
-                *sum = 0.0;
+                // Zeroing the observations says nothing about whether the source reports a sum, so a
+                // histogram that never had one must not acquire one here.
+                *sum = sum.map(|_| 0.0);
             }
             Self::AggregatedSummary {
                 quantiles,
@@ -251,8 +258,16 @@ impl MetricValue {
                 for (b1, b2) in buckets.iter_mut().zip(buckets2) {
                     b1.count += b2.count;
                 }
+                // A histogram with no observations sums to zero whether or not it reports a sum, so
+                // only a non-empty side without one makes the total unknown. Treating that one as
+                // zero would silently under-report the total.
+                *sum = match (*sum, *sum2) {
+                    (Some(s1), Some(s2)) => Some(s1 + s2),
+                    (None, s2) if *count == 0 => s2,
+                    (s1, None) if *count2 == 0 => s1,
+                    _ => None,
+                };
                 *count += count2;
-                *sum += sum2;
                 true
             }
             (Self::Sketch { sketch }, Self::Sketch { sketch: sketch2 }) => {
@@ -352,8 +367,16 @@ impl MetricValue {
                 for (b1, b2) in buckets.iter_mut().zip(buckets2) {
                     b1.count -= b2.count;
                 }
+                // As in `add`, a delta against an unknown quantity is unknown, unless that quantity is
+                // an empty baseline and so sums to zero. This matters for the absolute-to-incremental
+                // conversion feeding sketch-based sinks: the sketch conversion needs to see an absent
+                // sum to know it must estimate one.
+                *sum = match (*sum, *sum2) {
+                    (Some(s1), Some(s2)) => Some(s1 - s2),
+                    (s1, None) if *count2 == 0 => s1,
+                    _ => None,
+                };
                 *count -= count2;
-                *sum -= sum2;
                 true
             }
             _ => false,
@@ -405,7 +428,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_buckets == r_buckets && l_count == r_count && float_eq(*l_sum, *r_sum),
+            ) => l_buckets == r_buckets && l_count == r_count && opt_float_eq(*l_sum, *r_sum),
             (
                 Self::AggregatedSummary {
                     quantiles: l_quantiles,
@@ -453,7 +476,11 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                write!(fmt, "count={count} sum={sum} ")?;
+                write!(fmt, "count={count} ")?;
+                // A histogram that reports no sum has no `sum=` to show, rather than a sum of zero.
+                if let Some(sum) = sum {
+                    write!(fmt, "sum={sum} ")?;
+                }
                 write_list(fmt, " ", buckets, |fmt, bucket| {
                     write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
                 })

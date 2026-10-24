@@ -220,10 +220,6 @@ mod tests {
         test_util::test_generate_config::<InternalMetricsConfig>();
     }
 
-    #[expect(
-        clippy::float_cmp,
-        reason = "These deterministic fixture values are compared exactly."
-    )]
     #[test]
     fn captures_internal_metrics() {
         test_util::trace_init();
@@ -278,7 +274,7 @@ mod tests {
                 // users to set their own bucket widths.
                 assert_eq!(buckets[15].count, 2);
                 assert_eq!(*count, 2);
-                assert_eq!(*sum, 11.0);
+                assert_eq!(*sum, Some(11.0));
             }
             _ => panic!("wrong type"),
         }
@@ -296,7 +292,7 @@ mod tests {
                 assert_eq!(buckets[15].count, 1);
                 assert_eq!(buckets[16].count, 1);
                 assert_eq!(*count, 2);
-                assert_eq!(*sum, 16.1);
+                assert_eq!(*sum, Some(16.1));
             }
             _ => panic!("wrong type"),
         }

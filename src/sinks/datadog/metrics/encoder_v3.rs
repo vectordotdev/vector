@@ -589,7 +589,7 @@ mod tests {
                     count: 1,
                 }],
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
             },
         );
         assert!(enc.try_encode(histogram).is_err());
