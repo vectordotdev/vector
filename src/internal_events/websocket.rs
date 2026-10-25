@@ -110,15 +110,10 @@ mod source {
 
     use super::PROTOCOL;
 
-    #[allow(dead_code)]
     #[derive(Debug, Copy, Clone)]
     pub enum WebSocketKind {
-        Ping,
-        Pong,
         Text,
         Binary,
-        Close,
-        Frame,
     }
 
     impl Display for WebSocketKind {
