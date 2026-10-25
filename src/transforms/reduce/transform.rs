@@ -16,7 +16,7 @@ use vrl::{
 use crate::{
     conditions::Condition,
     event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
-    internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
+    internal_events::ReduceStaleEventFlushed,
     transforms::{
         TaskTransform,
         reduce::{
@@ -41,7 +41,9 @@ fn is_covered_by_strategy(
 ) -> bool {
     let mut current = OwnedTargetPath::event_root();
     for component in &path.path.segments {
-        current = current.with_field_appended(&component.to_string());
+        // Append the segment itself. Rendering it with `to_string()` would quote names such as
+        // `a-b` or `a"b`, and the quoted name never matches the strategy key.
+        current.path.push_segment(component.clone());
         if strategies.contains_key(&current) {
             return true;
         }
@@ -85,20 +87,12 @@ impl ReduceState {
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
-                // This should not return an error, unless there is a bug in the event fields iterator.
-                let parsed_path = match parse_target_path(&path) {
-                    Ok(path) => path,
-                    Err(error) => {
-                        emit!(ReduceAddEventError { error, path });
-                        continue;
-                    }
-                };
-                if is_covered_by_strategy(&parsed_path, strategies) {
+                if is_covered_by_strategy(&path, strategies) {
                     continue;
                 }
 
-                let maybe_strategy = strategies.get(&parsed_path);
-                match self.fields.entry(parsed_path) {
+                let maybe_strategy = strategies.get(&path);
+                match self.fields.entry(path) {
                     Entry::Vacant(entry) => {
                         if let Some(strategy) = maybe_strategy {
                             match get_value_merger(value.clone(), strategy) {
@@ -1032,6 +1026,64 @@ mod test {
             let expected_value = Value::from(btreemap! {
                 "a b" => 3,
                 "test_end" => "done"
+            });
+            assert_eq!(*output.value(), expected_value);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        }))
+        .await;
+    }
+
+    #[tokio::test]
+    async fn field_names_with_quotes_and_backslashes() {
+        let config = serde_yaml::from_str::<ReduceConfig>(indoc! {r#"
+            group_by:
+              - id
+            merge_strategies:
+              '"i\"j"': sum
+            ends_when:
+              type: vrl
+              source: exists(.test_end)
+        "#})
+        .unwrap();
+
+        Box::pin(assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let e_1 = LogEvent::from(Value::from(btreemap! {
+                "id" => "x",
+                "a\"b" => 1,
+                "c\\d" => 1,
+                "e\\\\f" => 1,
+                "parent" => btreemap! { "g\"h" => "first" },
+                "i\"j" => 2,
+            }));
+            tx.send(e_1.into()).await.unwrap();
+
+            let e_2 = LogEvent::from(Value::from(btreemap! {
+                "id" => "x",
+                "a\"b" => 2,
+                "c\\d" => 2,
+                "e\\\\f" => 2,
+                "parent" => btreemap! { "g\"h" => "second" },
+                "i\"j" => 3,
+                "test_end" => "done",
+            }));
+            tx.send(e_2.into()).await.unwrap();
+
+            let output = out.recv().await.unwrap().into_log();
+            let expected_value = Value::from(btreemap! {
+                "id" => "x",
+                "a\"b" => 3,
+                "c\\d" => 3,
+                "e\\\\f" => 3,
+                "parent" => btreemap! { "g\"h" => "first" },
+                "i\"j" => 5,
+                "test_end" => "done",
             });
             assert_eq!(*output.value(), expected_value);
 

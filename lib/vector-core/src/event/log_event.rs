@@ -450,10 +450,11 @@ impl LogEvent {
         self.as_map().map(all_fields)
     }
 
-    /// Similar to [`LogEvent::all_event_fields`], but doesn't traverse individual array elements.
+    /// Similar to [`LogEvent::all_event_fields`], but doesn't traverse individual array elements
+    /// and returns each path as an [`OwnedTargetPath`].
     pub fn all_event_fields_skip_array_elements(
         &self,
-    ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
+    ) -> Option<impl Iterator<Item = (OwnedTargetPath, &Value)>> {
         self.as_map().map(all_fields_skip_array_elements)
     }
 
@@ -845,7 +846,7 @@ impl tracing::field::Visit for LogEvent {
 mod test {
     use lookup::event_path;
     use uuid::Version;
-    use vrl::{btreemap, value};
+    use vrl::{btreemap, owned_event_path, value};
 
     use super::*;
     use crate::test_util::open_fixture;
@@ -1192,16 +1193,16 @@ mod test {
             },
         }));
 
-        let actual: Vec<(KeyString, Value)> = log
+        let actual: Vec<(OwnedTargetPath, Value)> = log
             .all_event_fields_skip_array_elements()
             .unwrap()
-            .map(|(s, v)| (s, v.clone()))
+            .map(|(p, v)| (p, v.clone()))
             .collect();
         assert_eq!(
             actual,
             vec![
-                ("arr".into(), [1].into()),
-                ("obj.arr".into(), [1, 2, 3].into())
+                (owned_event_path!("arr"), [1].into()),
+                (owned_event_path!("obj", "arr"), [1, 2, 3].into())
             ]
         );
     }
