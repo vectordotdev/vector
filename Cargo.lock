@@ -13802,6 +13802,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "tracing 0.1.44",
+ "tracing-test",
  "url",
  "uuid",
  "vector-api-client",
