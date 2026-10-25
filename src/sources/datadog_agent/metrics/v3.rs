@@ -189,14 +189,14 @@ impl V3ReferenceDecoder {
         })
     }
 
-    fn decode_unit(
+    fn decode_unit<'a>(
         &mut self,
         data: &MetricDataV3,
-        units: &[String],
+        units: &'a [String],
         packed_type: u64,
-    ) -> crate::Result<String> {
+    ) -> crate::Result<&'a str> {
         if packed_type & V3_FLAG_HAS_UNIT == 0 {
-            return Ok(String::new());
+            return Ok("");
         }
         let delta = *data
             .unit_refs
@@ -209,7 +209,7 @@ impl V3ReferenceDecoder {
             units.len(),
             "Datadog v3 unit reference overflow",
         )?;
-        Ok(units[index].clone())
+        Ok(&units[index])
     }
 }
 
@@ -569,7 +569,7 @@ pub(crate) fn decode_v3_metric_data(
         allocation_budget.check_before_allocating(
             point_count,
             name,
-            &unit,
+            unit,
             source_type,
             V3TagResourceSize {
                 tag_bytes: tagset_bytes[refs.tagset],
@@ -628,7 +628,7 @@ pub(crate) fn decode_v3_metric_data(
             tags: tagsets[refs.tagset].clone(),
             points,
             r#type: metric_type as i32,
-            unit,
+            unit: unit.to_owned(),
             source_type_name: source_type.clone(),
             interval: i64::from(interval),
             metadata: series_metadata,
@@ -1021,4 +1021,25 @@ fn checked_v3_string_bytes(total: usize, value: &str) -> crate::Result<usize> {
         .checked_add(std::mem::size_of::<String>())
         .and_then(|total| total.checked_add(value.len()))
         .ok_or_else(|| "Datadog v3 expanded string size overflow".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_v3_unit_reference_borrows_dictionary_entry() {
+        let data = MetricDataV3 {
+            unit_refs: vec![1],
+            ..Default::default()
+        };
+        let units = vec![String::new(), "byte".to_owned()];
+        let mut references = V3ReferenceDecoder::default();
+
+        let unit = references
+            .decode_unit(&data, &units, V3_FLAG_HAS_UNIT)
+            .unwrap();
+
+        assert!(std::ptr::eq(unit.as_ptr(), units[1].as_ptr()));
+    }
 }

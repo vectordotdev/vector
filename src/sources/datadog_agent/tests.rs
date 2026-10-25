@@ -2891,6 +2891,16 @@ fn decode_v3_rejects_excessive_source_type_event_expansion() {
 }
 
 #[test]
+fn decode_v3_rejects_unit_clone_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_unit_str = v3_string_dictionary(&[&"x".repeat(7 * 1024 * 1024)]);
+    data.types[0] |= 0x200;
+    data.unit_refs = vec![1];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
 fn decode_v3_rejects_excessive_dictionary_string_cloning() {
     let mut data = minimal_v3_metric_data();
     data.dict_name_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
