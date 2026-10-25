@@ -21,6 +21,12 @@ pub struct Metadata {
     pub api_key: Option<Arc<str>>,
 }
 
+impl Finalizable for Metadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 pub struct DatadogEventsRequestBuilder {
     encoder: (Transformer, Encoder<()>),
 }

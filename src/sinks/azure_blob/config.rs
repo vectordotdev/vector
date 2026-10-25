@@ -984,6 +984,12 @@ pub struct AzureBlobMetadata {
     pub finalizers: EventFinalizers,
 }
 
+impl Finalizable for AzureBlobMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AzureBlobRetryLogic;
 

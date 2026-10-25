@@ -31,6 +31,12 @@ pub struct KinesisMetadata {
     pub partition_key: String,
 }
 
+impl Finalizable for KinesisMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 #[derive(Clone)]
 pub struct KinesisRequest<R>
 where

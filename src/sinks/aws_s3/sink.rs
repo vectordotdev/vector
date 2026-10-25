@@ -3,11 +3,7 @@ use std::io;
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
 use uuid::Uuid;
-use vector_lib::{
-    codecs::EncoderKind,
-    event::{EventStatus, Finalizable},
-    request_metadata::RequestMetadata,
-};
+use vector_lib::{codecs::EncoderKind, event::Finalizable, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::Transformer,
@@ -72,13 +68,6 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         (metadata, builder, events)
     }
 
-    fn on_encode_error(&self, metadata: Self::Metadata) {
-        // `split_input` took the finalizers off the events, so this is the only owner left. Reject
-        // them, otherwise dropping them would report the batch as delivered and the events would be
-        // lost without the upstream source ever knowing.
-        metadata.finalizers.update_status(EventStatus::Rejected);
-    }
-
     fn build_request(
         &self,
         mut s3metadata: Self::Metadata,
@@ -139,8 +128,9 @@ mod tests {
     use futures::{StreamExt, stream};
     use vector_lib::{
         codecs::encoding::{AvroSerializerConfig, Framer, NewlineDelimitedEncoder},
-        event::{BatchNotifier, BatchStatus, LogEvent},
+        event::{BatchNotifier, BatchStatus, EventStatus, LogEvent},
     };
+    use vrl::event_path;
 
     use super::*;
     use crate::sinks::util::builder::SinkBuilderExt;
@@ -246,5 +236,50 @@ mod tests {
         drop(finalizers);
 
         assert_eq!(receiver.await, BatchStatus::Delivered);
+    }
+
+    #[tokio::test]
+    async fn encode_failure_does_not_affect_another_batch() {
+        let (failed_batch, failed_receiver) = BatchNotifier::new_with_receiver();
+        let failed_events = vec![Event::Log(
+            LogEvent::from("missing required field").with_batch_notifier(&failed_batch),
+        )];
+        drop(failed_batch);
+
+        let (successful_batch, successful_receiver) = BatchNotifier::new_with_receiver();
+        let mut successful_log = LogEvent::from("valid event");
+        successful_log.insert(event_path!("required_field"), "present");
+        let successful_events = vec![Event::Log(
+            successful_log.with_batch_notifier(&successful_batch),
+        )];
+        drop(successful_batch);
+
+        let mut requests = stream::iter(vec![
+            (partition_key(), failed_events),
+            (partition_key(), successful_events),
+        ])
+        .request_builder(
+            NonZeroUsize::new(2).expect("nonzero"),
+            request_options(failing_encoder()),
+        );
+
+        let mut encoded = 0;
+        let mut rejected = 0;
+        while let Some(result) = requests.next().await {
+            match result {
+                Ok(mut request) => {
+                    encoded += 1;
+                    request
+                        .take_finalizers()
+                        .update_status(EventStatus::Delivered);
+                }
+                Err(_) => rejected += 1,
+            }
+        }
+
+        assert_eq!(encoded, 1);
+        assert_eq!(rejected, 1);
+        assert_eq!(failed_receiver.await, BatchStatus::Rejected);
+        assert_eq!(successful_receiver.await, BatchStatus::Delivered);
     }
 }

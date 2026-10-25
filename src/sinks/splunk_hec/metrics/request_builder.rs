@@ -32,7 +32,7 @@ impl HecMetricsRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
-    type Metadata = (EventFinalizers, Option<Arc<str>>);
+    type Metadata = (Option<Arc<str>>, EventFinalizers);
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecMetricsEncoder;
     type Payload = Bytes;
@@ -56,7 +56,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
 
-        ((finalizers, passthrough_token), metadata_builder, events)
+        ((passthrough_token, finalizers), metadata_builder, events)
     }
 
     fn build_request(
@@ -65,7 +65,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (finalizers, passthrough_token) = hec_metadata;
+        let (passthrough_token, finalizers) = hec_metadata;
         HecRequest {
             body: payload.into_payload(),
             finalizers,

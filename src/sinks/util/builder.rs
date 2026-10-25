@@ -16,7 +16,7 @@ use tower::Service;
 use tracing::Span;
 use vector_lib::{
     ByteSizeOf,
-    event::{Finalizable, Metric},
+    event::{EventStatus, Finalizable, Metric},
     partition::Partitioner,
     stream::{
         ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
@@ -139,15 +139,17 @@ pub trait SinkBuilderExt: Stream {
                 let _entered = span.enter();
 
                 // Split the input into metadata and events.
-                let (metadata, request_metadata_builder, events) = builder.split_input(input);
+                let (mut metadata, request_metadata_builder, events) = builder.split_input(input);
 
-                // Encode the events. The metadata is already split off at this point, so hand it
-                // back to the builder on failure instead of dropping it, which would resolve any
-                // event finalizers it owns as a successful delivery.
+                // Encode the events.
                 let payload = match builder.encode_events(events) {
                     Ok(payload) => payload,
                     Err(error) => {
-                        builder.on_encode_error(metadata);
+                        // Encoding is deterministic for this batch. Reject its finalizers before
+                        // returning the error; dropping them would acknowledge delivery.
+                        metadata
+                            .take_finalizers()
+                            .update_status(EventStatus::Rejected);
                         return Err(error);
                     }
                 };

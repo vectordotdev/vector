@@ -1,3 +1,3 @@
-The `aws_s3` sink now rejects a batch when encoding it fails, so sources with end-to-end acknowledgements enabled are told the data was not delivered. Previously an encoding failure was only logged and the batch was acknowledged as delivered, which hid the data loss from the upstream source.
+Sinks now reject batches that fail encoding instead of acknowledging them as delivered. This prevents upstream sources with end-to-end acknowledgements enabled from losing events silently.
 
 authors: pedramsafaei
