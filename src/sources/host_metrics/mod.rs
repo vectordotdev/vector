@@ -40,6 +40,8 @@ mod memory;
 mod network;
 mod process;
 #[cfg(target_os = "linux")]
+mod psi;
+#[cfg(target_os = "linux")]
 mod tcp;
 mod temperature;
 
@@ -77,6 +79,11 @@ pub enum Collector {
 
     /// Metrics related to network utilization.
     Network,
+
+    /// Metrics related to Linux Pressure Stall Information (PSI).
+    ///
+    /// Only available on Linux.
+    PSI,
 
     /// Metrics related to TCP connections.
     TCP,
@@ -197,6 +204,7 @@ const fn example_collectors() -> [&'static str; 10] {
         "host",
         "memory",
         "network",
+        "psi",
         "tcp",
         "temperature",
     ]
@@ -221,11 +229,13 @@ fn default_collectors() -> Option<Vec<Collector>> {
     #[cfg(target_os = "linux")]
     {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::PSI);
         collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
     if is_generating_root_schema() {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::PSI);
         collectors.push(Collector::TCP);
     }
 
@@ -304,6 +314,9 @@ impl SourceConfig for HostMetricsConfig {
         {
             if self.cgroups.is_some() || self.has_collector(Collector::CGroups) {
                 return Err("CGroups collector is only available on Linux systems".into());
+            }
+            if self.has_collector(Collector::PSI) {
+                return Err("PSI collector is only available on Linux systems".into());
             }
             if self.has_collector(Collector::TCP) {
                 return Err("TCP collector is only available on Linux systems".into());
@@ -442,6 +455,10 @@ impl HostMetrics {
         }
         if self.config.has_collector(Collector::Network) {
             self.network_metrics(&mut buffer).await;
+        }
+        #[cfg(target_os = "linux")]
+        if self.config.has_collector(Collector::PSI) {
+            self.psi_metrics(&mut buffer).await;
         }
         #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::TCP) {
@@ -817,6 +834,8 @@ mod tests {
             Collector::Host,
             Collector::Memory,
             Collector::Network,
+            #[cfg(target_os = "linux")]
+            Collector::PSI,
         ] {
             let some_metrics = HostMetrics::new(HostMetricsConfig {
                 collectors: Some(vec![*collector]),
