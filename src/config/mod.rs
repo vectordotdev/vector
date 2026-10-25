@@ -2,10 +2,9 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
-    fs,
     hash::Hash,
     net::SocketAddr,
-    path::PathBuf,
+    path::{self, PathBuf},
     time::Duration,
 };
 
@@ -95,13 +94,13 @@ impl ComponentConfig {
         component_key: ComponentKey,
         component_type: ComponentKind,
     ) -> Self {
-        let canonicalized_paths = config_paths
+        let absolute_paths = config_paths
             .into_iter()
-            .filter_map(|p| fs::canonicalize(p).ok())
+            .filter_map(|p| path::absolute(p).ok())
             .collect();
 
         Self {
-            config_paths: canonicalized_paths,
+            config_paths: absolute_paths,
             component_key,
             component_type,
         }
