@@ -2939,6 +2939,22 @@ fn decode_v3_rejects_excessive_empty_tagsets() {
 }
 
 #[test]
+fn decode_v3_rejects_tagset_bookkeeping_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tagsets = vec![0; 450_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_resource_bookkeeping_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_len = vec![0; 450_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
 fn decode_v3_rejects_excessive_resource_expansion() {
     let mut data = minimal_v3_metric_data();
     data.dict_resource_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);

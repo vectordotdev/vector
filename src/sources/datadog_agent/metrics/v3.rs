@@ -6,7 +6,6 @@ use prost::Message;
 
 use super::decode_ddseries;
 use crate::{
-    common::datadog::DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX,
     event::{Event, metric::TagValueSet},
     sources::datadog_agent::{
         ddmetric_proto::{
@@ -29,7 +28,7 @@ const V3_METRIC_TAG_ENTRY_BYTES: usize =
 // `metricType`, `valueType`, and `metricFlags` in Datadog's `intake_v3.proto`.
 const V3_METRIC_TYPE_MASK: u64 = 0x0f;
 const V3_VALUE_TYPE_MASK: u64 = 0xf0;
-const V3_FLAG_NO_INDEX: u64 = 0x100;
+pub(super) const V3_FLAG_NO_INDEX: u64 = 0x100;
 const V3_FLAG_HAS_UNIT: u64 = 0x200;
 const V3_METRIC_TYPE_SKETCH: u64 = 4;
 const V3_VALUE_TYPE_ZERO: u64 = 0;
@@ -48,27 +47,19 @@ pub(crate) fn decode_ddseries_v3(
 ) -> crate::Result<Vec<Event>> {
     validate_v3_predecode_allocations(&frame)?;
     let payload = MetricPayloadV3::decode(frame)?;
-    // `types` combines the metric kind, point value encoding, and flags. `flagNoIndex` is not
-    // represented by the v2 `MetricSeries` used during translation, so carry its Datadog origin
-    // value alongside each translated series until `decode_ddseries` builds the Vector events.
-    let metric_types = payload.metric_data.as_ref().map(|metric_data| {
-        metric_data
-            .types
-            .iter()
-            .map(|packed_type| {
-                (packed_type & V3_FLAG_NO_INDEX != 0).then_some(DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX)
-            })
-            .collect::<Vec<_>>()
-    });
-    let series = payload.metric_data.map_or(Ok(Vec::new()), |metric_data| {
-        decode_v3_metric_data(&metric_data, payload.metadata.as_ref())
-    })?;
-    decode_ddseries(
-        series,
-        api_key,
-        split_metric_namespace,
-        metric_types.as_deref(),
-    )
+    // `types` combines the metric kind, point value encoding, and flags. Pass the decoded column
+    // through directly so preserving `flagNoIndex` does not require another attacker-sized vector.
+    let packed_types = payload
+        .metric_data
+        .as_ref()
+        .map(|metric_data| metric_data.types.as_slice());
+    let series = payload
+        .metric_data
+        .as_ref()
+        .map_or(Ok(Vec::new()), |metric_data| {
+            decode_v3_metric_data(metric_data, payload.metadata.as_ref())
+        })?;
+    decode_ddseries(series, api_key, split_metric_namespace, packed_types)
 }
 
 fn validate_v3_metric_columns(
@@ -443,12 +434,6 @@ fn charge_v3_decoded_allocations(
     ] {
         budget.charge(bytes?)?;
     }
-    budget.charge(
-        data.types
-            .len()
-            .checked_mul(std::mem::size_of::<Option<i32>>())
-            .ok_or("Datadog v3 metric type allocation size overflow")?,
-    )?;
     Ok(())
 }
 
@@ -485,28 +470,42 @@ pub(crate) fn decode_v3_metric_data(
     let origin_count = data.dict_origin_info.len() / 3 + 1;
 
     // The size of a dictionary entry is stable, so calculate it once rather than rescanning the
-    // same tags and resources for every series that references it.
+    // same tags and resources for every series that references it. Charge both bookkeeping
+    // vectors before collecting either one so rejection cannot temporarily exceed the budget.
+    allocation_budget.charge(
+        tagsets
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
+    allocation_budget.charge(
+        tagsets
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
     let tagset_bytes = tagsets
         .iter()
         .map(|tags| v3_string_list_bytes(tags))
         .collect::<crate::Result<Vec<_>>>()?;
-    allocation_budget.charge(
-        tagset_bytes
-            .len()
-            .checked_mul(std::mem::size_of::<usize>())
-            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
-    )?;
     let tagset_counts = tagsets.iter().map(Vec::len).collect::<Vec<_>>();
-    allocation_budget.charge(
-        tagset_counts
-            .len()
-            .checked_mul(std::mem::size_of::<usize>())
-            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
-    )?;
     let metadata_resource_bytes = metadata
         .map(|metadata| v3_string_list_bytes(&metadata.resources))
         .transpose()?
         .unwrap_or(0);
+    // As above, reserve the full bookkeeping cost before either resource vector is allocated.
+    allocation_budget.charge(
+        resources
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
+    allocation_budget.charge(
+        resources
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
     let resource_bytes = resources
         .iter()
         .map(|entry| {
@@ -515,23 +514,11 @@ pub(crate) fn decode_v3_metric_data(
                 .ok_or_else(|| "Datadog v3 expanded resource size overflow".into())
         })
         .collect::<crate::Result<Vec<_>>>()?;
-    allocation_budget.charge(
-        resource_bytes
-            .len()
-            .checked_mul(std::mem::size_of::<usize>())
-            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
-    )?;
     let metadata_resource_count = metadata.map_or(0, |metadata| metadata.resources.len() / 2);
     let resource_counts = resources
         .iter()
         .map(|entry| entry.len() + metadata_resource_count)
         .collect::<Vec<_>>();
-    allocation_budget.charge(
-        resource_counts
-            .len()
-            .checked_mul(std::mem::size_of::<usize>())
-            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
-    )?;
 
     let dictionary_lengths = [
         names.len(),
