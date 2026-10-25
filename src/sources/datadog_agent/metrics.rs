@@ -17,10 +17,7 @@ use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_paylo
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
-        datadog::{
-            DATADOG_METRIC_RESOURCE_TAG_PREFIX, DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX,
-            DatadogMetricType, DatadogSeriesMetric,
-        },
+        datadog::{DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogSeriesMetric},
         http::ErrorMessage,
     },
     config::log_schema,
@@ -376,7 +373,7 @@ fn decode_ddseries(
     series: Vec<metric_payload::MetricSeries>,
     api_key: &Option<Arc<str>>,
     split_metric_namespace: bool,
-    packed_types: Option<&[u64]>,
+    metric_types: Option<&[Option<i32>]>,
 ) -> crate::Result<Vec<Event>> {
     validate_unit_event_expansion(
         series
@@ -402,10 +399,10 @@ fn decode_ddseries(
             };
             let mut tags = into_metric_tags(serie.tags);
 
-            let metric_type = packed_types
-                .and_then(|packed_types| packed_types.get(index))
-                .filter(|packed_type| **packed_type & v3::V3_FLAG_NO_INDEX != 0)
-                .map(|_| DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX);
+            let metric_type = metric_types
+                .and_then(|metric_types| metric_types.get(index))
+                .copied()
+                .flatten();
             let mut event_metadata = get_event_metadata(serie.metadata.as_ref(), metric_type);
             if !serie.unit.is_empty() {
                 event_metadata.set_datadog_metric_unit(serie.unit.clone());

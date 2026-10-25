@@ -2990,6 +2990,20 @@ fn decode_v3_accepts_many_distinct_metadata_tags() {
 }
 
 #[test]
+fn decode_v3_accounts_for_metadata_tag_deduplication() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 0;
+    data.timestamps.clear();
+    data.vals_float64.clear();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: (0..250_000).map(|index| format!("tag:{index}")).collect(),
+        resources: Vec::new(),
+    };
+
+    assert!(super::metrics::decode_v3_metric_data(&data, Some(&metadata)).is_err());
+}
+
+#[test]
 fn decode_v3_shares_budget_across_expansion_categories() {
     let mut data = minimal_v3_metric_data();
     data.num_points[0] = 0;

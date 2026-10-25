@@ -6,6 +6,7 @@ use prost::Message;
 
 use super::decode_ddseries;
 use crate::{
+    common::datadog::DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX,
     event::{Event, metric::TagValueSet},
     sources::datadog_agent::{
         ddmetric_proto::{
@@ -23,12 +24,16 @@ const MAX_V3_DECODED_EXPANDED_BYTES: usize = 16 * 1024 * 1024;
 // key/value containers plus a conservative three-pointer share of the tree node allocation.
 const V3_METRIC_TAG_ENTRY_BYTES: usize =
     std::mem::size_of::<(String, TagValueSet)>() + 3 * std::mem::size_of::<usize>();
+// Conservatively cover a borrowed string key, hash-table control/capacity overhead, and a
+// pointer in the companion list used while deduplicating metadata tags.
+const V3_METADATA_TAG_DEDUP_BYTES: usize = 4 * std::mem::size_of::<usize>();
+const V3_TAGSET_MEMBER_BYTES: usize = 3 * std::mem::size_of::<usize>();
 
 // `MetricData.types` packs three independent values into each integer. These masks mirror
 // `metricType`, `valueType`, and `metricFlags` in Datadog's `intake_v3.proto`.
 const V3_METRIC_TYPE_MASK: u64 = 0x0f;
 const V3_VALUE_TYPE_MASK: u64 = 0xf0;
-pub(super) const V3_FLAG_NO_INDEX: u64 = 0x100;
+const V3_FLAG_NO_INDEX: u64 = 0x100;
 const V3_FLAG_HAS_UNIT: u64 = 0x200;
 const V3_METRIC_TYPE_SKETCH: u64 = 4;
 const V3_VALUE_TYPE_ZERO: u64 = 0;
@@ -47,19 +52,30 @@ pub(crate) fn decode_ddseries_v3(
 ) -> crate::Result<Vec<Event>> {
     validate_v3_predecode_allocations(&frame)?;
     let payload = MetricPayloadV3::decode(frame)?;
-    // `types` combines the metric kind, point value encoding, and flags. Pass the decoded column
-    // through directly so preserving `flagNoIndex` does not require another attacker-sized vector.
-    let packed_types = payload
-        .metric_data
-        .as_ref()
-        .map(|metric_data| metric_data.types.as_slice());
-    let series = payload
-        .metric_data
-        .as_ref()
-        .map_or(Ok(Vec::new()), |metric_data| {
-            decode_v3_metric_data(metric_data, payload.metadata.as_ref())
-        })?;
-    decode_ddseries(series, api_key, split_metric_namespace, packed_types)
+    // Validate and budget the decoded payload before allocating the no-index side column. Keeping
+    // that column separate preserves v2 metadata semantics while allowing `metric_data` to be
+    // dropped before event expansion begins.
+    let (series, metric_types) =
+        payload
+            .metric_data
+            .map_or(Ok((Vec::new(), None)), |metric_data| -> crate::Result<_> {
+                let series = decode_v3_metric_data(&metric_data, payload.metadata.as_ref())?;
+                let metric_types = metric_data
+                    .types
+                    .iter()
+                    .map(|packed_type| {
+                        (packed_type & V3_FLAG_NO_INDEX != 0)
+                            .then_some(DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX)
+                    })
+                    .collect::<Vec<_>>();
+                Ok((series, Some(metric_types)))
+            })?;
+    decode_ddseries(
+        series,
+        api_key,
+        split_metric_namespace,
+        metric_types.as_deref(),
+    )
 }
 
 fn validate_v3_metric_columns(
@@ -434,6 +450,12 @@ fn charge_v3_decoded_allocations(
     ] {
         budget.charge(bytes?)?;
     }
+    budget.charge(
+        data.types
+            .len()
+            .checked_mul(std::mem::size_of::<Option<i32>>())
+            .ok_or("Datadog v3 metric type allocation size overflow")?,
+    )?;
     Ok(())
 }
 
@@ -913,17 +935,28 @@ fn decode_v3_tagsets(
     }
     if let Some(metadata) = metadata {
         let mut seen = HashSet::new();
-        let metadata_tags = metadata
-            .tags
-            .iter()
-            .filter(|tag| seen.insert(tag.as_str()))
-            .collect::<Vec<_>>();
+        let mut metadata_tags = Vec::new();
+        for tag in &metadata.tags {
+            if !seen.contains(tag.as_str()) {
+                allocation_budget.charge(V3_METADATA_TAG_DEDUP_BYTES)?;
+                seen.insert(tag.as_str());
+                metadata_tags.push(tag);
+            }
+        }
         for tagset in &mut tagsets {
+            allocation_budget.charge(
+                tagset
+                    .len()
+                    .checked_mul(V3_TAGSET_MEMBER_BYTES)
+                    .ok_or("Datadog v3 tagset deduplication size overflow")?,
+            )?;
             let mut tagset_members = tagset.iter().map(String::as_str).collect::<HashSet<_>>();
             let mut additional_tags = Vec::new();
             for &tag in &metadata_tags {
-                if tagset_members.insert(tag) {
+                if !tagset_members.contains(tag.as_str()) {
+                    allocation_budget.charge(V3_TAGSET_MEMBER_BYTES)?;
                     allocation_budget.charge(checked_v3_string_bytes(0, tag)?)?;
+                    tagset_members.insert(tag.as_str());
                     additional_tags.push(tag.clone());
                 }
             }
