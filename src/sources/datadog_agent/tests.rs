@@ -2965,12 +2965,28 @@ fn decode_v3_deduplicates_metadata_tags() {
 fn decode_v3_accepts_many_distinct_metadata_tags() {
     let data = minimal_v3_metric_data();
     let metadata = ddmetric_v3_proto::Metadata {
-        tags: (0..100_000).map(|index| format!("tag:{index}")).collect(),
+        tags: (0..10_000).map(|index| format!("tag:{index}")).collect(),
         resources: Vec::new(),
     };
 
     let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
-    assert_eq!(series[0].tags.len(), 100_000);
+    assert_eq!(series[0].tags.len(), 10_000);
+}
+
+#[test]
+fn decode_v3_shares_budget_across_expansion_categories() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 0;
+    data.timestamps.clear();
+    data.vals_float64.clear();
+    data.dict_tagsets = vec![0; 200_000];
+    data.dict_resource_len = vec![0; 200_000];
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: vec![String::new(); 200_000],
+        resources: Vec::new(),
+    };
+
+    assert!(super::metrics::decode_v3_metric_data(&data, Some(&metadata)).is_err());
 }
 
 #[test]

@@ -19,11 +19,7 @@ use crate::{
     },
 };
 
-const MAX_V3_EXPANDED_TAGSET_BYTES: usize = 16 * 1024 * 1024;
-const MAX_V3_EXPANDED_RESOURCE_BYTES: usize = 16 * 1024 * 1024;
-const MAX_V3_EXPANDED_SERIES_BYTES: usize = 16 * 1024 * 1024;
-const MAX_V3_EXPANDED_EVENT_BYTES: usize = 16 * 1024 * 1024;
-const MAX_V3_DECODED_REPEATED_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_DECODED_EXPANDED_BYTES: usize = 16 * 1024 * 1024;
 // `decode_ddseries` converts every wire tag/resource into a BTreeMap entry. Account for the
 // key/value containers plus a conservative three-pointer share of the tree node allocation.
 const V3_METRIC_TAG_ENTRY_BYTES: usize =
@@ -312,8 +308,7 @@ impl<'a> V3PointDecoder<'a> {
 
 #[derive(Default)]
 struct V3AllocationBudget {
-    series_bytes: usize,
-    event_bytes: usize,
+    bytes: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -325,10 +320,21 @@ struct V3TagResourceSize {
 }
 
 impl V3AllocationBudget {
+    fn charge(&mut self, bytes: usize) -> crate::Result<()> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or("Datadog v3 decoded allocation size overflow")?;
+        if self.bytes > MAX_V3_DECODED_EXPANDED_BYTES {
+            return Err("Datadog v3 decoded allocations exceed size limit".into());
+        }
+        Ok(())
+    }
+
     /// Accounts for every clone and vector expansion performed for one series.
     ///
     /// Callers must invoke this before allocating points, tags, resources, or events for the
-    /// series. Successful return means both cumulative expansion limits still hold.
+    /// series. Successful return means the shared decoded/expanded allocation limit still holds.
     fn check_before_allocating(
         &mut self,
         point_count: usize,
@@ -361,13 +367,7 @@ impl V3AllocationBudget {
             .and_then(|total| total.checked_add(expanded_tag_resource_bytes))
             .and_then(|total| total.checked_add(dictionary_string_bytes))
             .ok_or("Datadog v3 expanded series size overflow")?;
-        self.series_bytes = self
-            .series_bytes
-            .checked_add(series_bytes)
-            .ok_or("Datadog v3 expanded series size overflow")?;
-        if self.series_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
-            return Err("Datadog v3 expanded series exceed size limit".into());
-        }
+        self.charge(series_bytes)?;
 
         let event_tag_count = tag_resources
             .tag_count
@@ -385,19 +385,78 @@ impl V3AllocationBudget {
             .and_then(|total| total.checked_add(unit.len()))
             .and_then(|total| total.checked_add(event_tag_entry_bytes))
             .ok_or("Datadog v3 expanded event size overflow")?;
-        self.event_bytes = self
-            .event_bytes
-            .checked_add(
-                event_bytes
-                    .checked_mul(point_count)
-                    .ok_or("Datadog v3 expanded event size overflow")?,
-            )
-            .ok_or("Datadog v3 expanded event size overflow")?;
-        if self.event_bytes > MAX_V3_EXPANDED_EVENT_BYTES {
-            return Err("Datadog v3 expanded events exceed size limit".into());
-        }
-        Ok(())
+        self.charge(
+            event_bytes
+                .checked_mul(point_count)
+                .ok_or("Datadog v3 expanded event size overflow")?,
+        )
     }
+}
+
+fn charge_v3_decoded_allocations(
+    budget: &mut V3AllocationBudget,
+    data: &MetricDataV3,
+    metadata: Option<&MetricMetadataV3>,
+) -> crate::Result<()> {
+    if let Some(metadata) = metadata {
+        for value in metadata.tags.iter().chain(&metadata.resources) {
+            budget.charge(
+                std::mem::size_of::<String>()
+                    .checked_add(value.len())
+                    .ok_or("Datadog v3 metadata allocation size overflow")?,
+            )?;
+        }
+    }
+
+    for bytes in [
+        &data.dict_name_str,
+        &data.dict_tag_str,
+        &data.dict_resource_str,
+        &data.dict_source_type_name,
+        &data.dict_unit_str,
+    ] {
+        budget.charge(bytes.len())?;
+    }
+
+    for bytes in [
+        v3_slice_bytes(&data.dict_tagsets),
+        v3_slice_bytes(&data.dict_resource_len),
+        v3_slice_bytes(&data.dict_resource_type),
+        v3_slice_bytes(&data.dict_resource_name),
+        v3_slice_bytes(&data.dict_origin_info),
+        v3_slice_bytes(&data.types),
+        v3_slice_bytes(&data.name_refs),
+        v3_slice_bytes(&data.tagset_refs),
+        v3_slice_bytes(&data.resources_refs),
+        v3_slice_bytes(&data.intervals),
+        v3_slice_bytes(&data.num_points),
+        v3_slice_bytes(&data.source_type_name_refs),
+        v3_slice_bytes(&data.origin_info_refs),
+        v3_slice_bytes(&data.unit_refs),
+        v3_slice_bytes(&data.timestamps),
+        v3_slice_bytes(&data.vals_sint64),
+        v3_slice_bytes(&data.vals_float32),
+        v3_slice_bytes(&data.vals_float64),
+        v3_slice_bytes(&data.sketch_num_bins),
+        v3_slice_bytes(&data.sketch_bin_keys),
+        v3_slice_bytes(&data.sketch_bin_cnts),
+    ] {
+        budget.charge(bytes?)?;
+    }
+    budget.charge(
+        data.types
+            .len()
+            .checked_mul(std::mem::size_of::<Option<i32>>())
+            .ok_or("Datadog v3 metric type allocation size overflow")?,
+    )?;
+    Ok(())
+}
+
+fn v3_slice_bytes<T>(values: &[T]) -> crate::Result<usize> {
+    values
+        .len()
+        .checked_mul(std::mem::size_of::<T>())
+        .ok_or_else(|| "Datadog v3 decoded column allocation size overflow".into())
 }
 
 #[allow(
@@ -409,17 +468,20 @@ pub(crate) fn decode_v3_metric_data(
     metadata: Option<&MetricMetadataV3>,
 ) -> crate::Result<Vec<MetricSeries>> {
     validate_v3_metric_columns(data, metadata)?;
-    let mut string_dictionary_bytes = 0;
-    let names = decode_v3_strings(&data.dict_name_str, false, &mut string_dictionary_bytes)?;
-    let tag_strings = decode_v3_strings(&data.dict_tag_str, true, &mut string_dictionary_bytes)?;
-    let units = decode_v3_strings(&data.dict_unit_str, false, &mut string_dictionary_bytes)?;
-    let tagsets = decode_v3_tagsets(&data.dict_tagsets, &tag_strings, metadata)?;
-    let resources = decode_v3_resources(data, &mut string_dictionary_bytes)?;
-    let source_types = decode_v3_strings(
-        &data.dict_source_type_name,
-        false,
-        &mut string_dictionary_bytes,
+    let mut allocation_budget = V3AllocationBudget::default();
+    charge_v3_decoded_allocations(&mut allocation_budget, data, metadata)?;
+    let names = decode_v3_strings(&data.dict_name_str, false, &mut allocation_budget)?;
+    let tag_strings = decode_v3_strings(&data.dict_tag_str, true, &mut allocation_budget)?;
+    let units = decode_v3_strings(&data.dict_unit_str, false, &mut allocation_budget)?;
+    let tagsets = decode_v3_tagsets(
+        &data.dict_tagsets,
+        &tag_strings,
+        metadata,
+        &mut allocation_budget,
     )?;
+    let resources = decode_v3_resources(data, &mut allocation_budget)?;
+    let source_types =
+        decode_v3_strings(&data.dict_source_type_name, false, &mut allocation_budget)?;
     let origin_count = data.dict_origin_info.len() / 3 + 1;
 
     // The size of a dictionary entry is stable, so calculate it once rather than rescanning the
@@ -428,7 +490,19 @@ pub(crate) fn decode_v3_metric_data(
         .iter()
         .map(|tags| v3_string_list_bytes(tags))
         .collect::<crate::Result<Vec<_>>>()?;
+    allocation_budget.charge(
+        tagset_bytes
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
     let tagset_counts = tagsets.iter().map(Vec::len).collect::<Vec<_>>();
+    allocation_budget.charge(
+        tagset_counts
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
     let metadata_resource_bytes = metadata
         .map(|metadata| v3_string_list_bytes(&metadata.resources))
         .transpose()?
@@ -441,11 +515,23 @@ pub(crate) fn decode_v3_metric_data(
                 .ok_or_else(|| "Datadog v3 expanded resource size overflow".into())
         })
         .collect::<crate::Result<Vec<_>>>()?;
+    allocation_budget.charge(
+        resource_bytes
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
     let metadata_resource_count = metadata.map_or(0, |metadata| metadata.resources.len() / 2);
     let resource_counts = resources
         .iter()
         .map(|entry| entry.len() + metadata_resource_count)
         .collect::<Vec<_>>();
+    allocation_budget.charge(
+        resource_counts
+            .len()
+            .checked_mul(std::mem::size_of::<usize>())
+            .ok_or("Datadog v3 bookkeeping allocation size overflow")?,
+    )?;
 
     let dictionary_lengths = [
         names.len(),
@@ -456,7 +542,6 @@ pub(crate) fn decode_v3_metric_data(
     ];
     let mut references = V3ReferenceDecoder::default();
     let mut point_decoder = V3PointDecoder::new(data);
-    let mut allocation_budget = V3AllocationBudget::default();
     let mut series = Vec::new();
 
     for index in 0..data.types.len() {
@@ -546,12 +631,9 @@ pub(crate) fn decode_v3_metric_data(
 fn decode_v3_strings(
     raw: &[u8],
     sanitize: bool,
-    expanded_bytes: &mut usize,
+    allocation_budget: &mut V3AllocationBudget,
 ) -> crate::Result<Vec<String>> {
-    *expanded_bytes = checked_v3_string_bytes(*expanded_bytes, "")?;
-    if *expanded_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
-        return Err("Datadog v3 expanded string dictionaries exceed size limit".into());
-    }
+    allocation_budget.charge(std::mem::size_of::<String>())?;
     let mut values = vec![String::new()];
     let mut offset = 0;
     while offset < raw.len() {
@@ -565,32 +647,23 @@ fn decode_v3_strings(
             return Err("truncated Datadog v3 string dictionary".into());
         }
         let bytes = &raw[offset..end];
-        let valid_string_bytes = (*expanded_bytes)
-            .checked_add(std::mem::size_of::<String>())
-            .and_then(|total| total.checked_add(length))
+        let valid_string_bytes = std::mem::size_of::<String>()
+            .checked_add(length)
             .ok_or("Datadog v3 expanded string dictionary size overflow")?;
-        if valid_string_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
-            return Err("Datadog v3 expanded string dictionaries exceed size limit".into());
-        }
         let value = match std::str::from_utf8(bytes) {
             Ok(value) => {
-                *expanded_bytes = valid_string_bytes;
+                allocation_budget.charge(valid_string_bytes)?;
                 value.to_owned()
             }
             Err(_) if sanitize => {
                 let worst_case_length = length
                     .checked_mul(3)
                     .ok_or("Datadog v3 expanded string dictionary size overflow")?;
-                let worst_case_bytes = (*expanded_bytes)
-                    .checked_add(std::mem::size_of::<String>())
-                    .and_then(|total| total.checked_add(worst_case_length))
+                let worst_case_bytes = std::mem::size_of::<String>()
+                    .checked_add(worst_case_length)
                     .ok_or("Datadog v3 expanded string dictionary size overflow")?;
-                if worst_case_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
-                    return Err("Datadog v3 expanded string dictionaries exceed size limit".into());
-                }
-                let value = String::from_utf8_lossy(bytes).into_owned();
-                *expanded_bytes = checked_v3_string_bytes(*expanded_bytes, &value)?;
-                value
+                allocation_budget.charge(worst_case_bytes)?;
+                String::from_utf8_lossy(bytes).into_owned()
             }
             Err(error) => return Err(error.into()),
         };
@@ -619,8 +692,7 @@ fn decode_v3_varint(raw: &[u8]) -> crate::Result<(u64, usize)> {
 
 fn validate_v3_predecode_allocations(raw: &[u8]) -> crate::Result<()> {
     let mut offset = 0;
-    let mut metadata_bytes = 0usize;
-    let mut repeated_numeric_bytes = 0usize;
+    let mut allocation_budget = V3AllocationBudget::default();
     while offset < raw.len() {
         let (key, consumed) = decode_v3_varint(&raw[offset..])?;
         offset += consumed;
@@ -629,9 +701,9 @@ fn validate_v3_predecode_allocations(raw: &[u8]) -> crate::Result<()> {
         if matches!(field, 2 | 3) && wire_type == 2 {
             let (message, end) = decode_v3_length_delimited(raw, offset)?;
             if field == 2 {
-                validate_v3_metadata_allocations(message, &mut metadata_bytes)?;
+                validate_v3_metadata_allocations(message, &mut allocation_budget)?;
             } else {
-                validate_v3_metric_data_allocations(message, &mut repeated_numeric_bytes)?;
+                validate_v3_metric_data_allocations(message, &mut allocation_budget)?;
             }
             offset = end;
         } else {
@@ -641,7 +713,10 @@ fn validate_v3_predecode_allocations(raw: &[u8]) -> crate::Result<()> {
     Ok(())
 }
 
-fn validate_v3_metadata_allocations(raw: &[u8], decoded_bytes: &mut usize) -> crate::Result<()> {
+fn validate_v3_metadata_allocations(
+    raw: &[u8],
+    allocation_budget: &mut V3AllocationBudget,
+) -> crate::Result<()> {
     let mut offset = 0;
     while offset < raw.len() {
         let (key, consumed) = decode_v3_varint(&raw[offset..])?;
@@ -650,13 +725,10 @@ fn validate_v3_metadata_allocations(raw: &[u8], decoded_bytes: &mut usize) -> cr
         let wire_type = key & 0x07;
         if matches!(field, 1 | 2) && wire_type == 2 {
             let (value, end) = decode_v3_length_delimited(raw, offset)?;
-            *decoded_bytes = decoded_bytes
-                .checked_add(std::mem::size_of::<String>())
-                .and_then(|total| total.checked_add(value.len()))
+            let decoded_bytes = std::mem::size_of::<String>()
+                .checked_add(value.len())
                 .ok_or("Datadog v3 metadata string allocation overflow")?;
-            if *decoded_bytes > MAX_V3_DECODED_REPEATED_BYTES {
-                return Err("Datadog v3 metadata strings exceed size limit".into());
-            }
+            allocation_budget.charge(decoded_bytes)?;
             offset = end;
         } else {
             offset = skip_v3_field(raw, offset, wire_type)?;
@@ -665,13 +737,22 @@ fn validate_v3_metadata_allocations(raw: &[u8], decoded_bytes: &mut usize) -> cr
     Ok(())
 }
 
-fn validate_v3_metric_data_allocations(raw: &[u8], decoded_bytes: &mut usize) -> crate::Result<()> {
+fn validate_v3_metric_data_allocations(
+    raw: &[u8],
+    allocation_budget: &mut V3AllocationBudget,
+) -> crate::Result<()> {
     let mut offset = 0;
     while offset < raw.len() {
         let (key, consumed) = decode_v3_varint(&raw[offset..])?;
         offset += consumed;
         let field = key >> 3;
         let wire_type = key & 0x07;
+        if matches!(field, 1 | 2 | 4 | 8 | 25) && wire_type == 2 {
+            let (bytes, end) = decode_v3_length_delimited(raw, offset)?;
+            allocation_budget.charge(bytes.len())?;
+            offset = end;
+            continue;
+        }
         let element_size = match field {
             3 | 5..=7 | 10..=17 | 19 | 20 | 23 | 24 | 26 => 8,
             9 | 18 | 21 | 22 => 4,
@@ -709,12 +790,7 @@ fn validate_v3_metric_data_allocations(raw: &[u8], decoded_bytes: &mut usize) ->
         let allocation = count
             .checked_mul(element_size)
             .ok_or("Datadog v3 numeric column allocation overflow")?;
-        *decoded_bytes = decoded_bytes
-            .checked_add(allocation)
-            .ok_or("Datadog v3 numeric column allocation overflow")?;
-        if *decoded_bytes > MAX_V3_DECODED_REPEATED_BYTES {
-            return Err("Datadog v3 numeric columns exceed size limit".into());
-        }
+        allocation_budget.charge(allocation)?;
     }
     Ok(())
 }
@@ -793,17 +869,13 @@ fn decode_v3_tagsets(
     packed: &[i64],
     dictionary: &[String],
     metadata: Option<&MetricMetadataV3>,
+    allocation_budget: &mut V3AllocationBudget,
 ) -> crate::Result<Vec<Vec<String>>> {
     let mut tagsets: Vec<Vec<String>> = vec![Vec::new()];
-    let mut expanded_bytes = std::mem::size_of::<Vec<String>>();
+    allocation_budget.charge(std::mem::size_of::<Vec<String>>())?;
     let mut offset = 0;
     while offset < packed.len() {
-        expanded_bytes = expanded_bytes
-            .checked_add(std::mem::size_of::<Vec<String>>())
-            .ok_or("Datadog v3 expanded tagset size overflow")?;
-        if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
-            return Err("Datadog v3 expanded tagsets exceed size limit".into());
-        }
+        allocation_budget.charge(std::mem::size_of::<Vec<String>>())?;
         let size = usize::try_from(packed[offset]).map_err(|_| "invalid Datadog v3 tagset size")?;
         offset += 1;
         let end = offset
@@ -834,12 +906,7 @@ fn decode_v3_tagsets(
                         .and_then(|total| total.checked_add(tag.len()))
                         .ok_or("Datadog v3 expanded tagset size overflow")
                 })?;
-                expanded_bytes = expanded_bytes
-                    .checked_add(referenced_bytes)
-                    .ok_or("Datadog v3 expanded tagset size overflow")?;
-                if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
-                    return Err("Datadog v3 expanded tagsets exceed size limit".into());
-                }
+                allocation_budget.charge(referenced_bytes)?;
                 tags.extend(referenced.iter().cloned());
             } else {
                 let index =
@@ -847,13 +914,10 @@ fn decode_v3_tagsets(
                 let tag = dictionary
                     .get(index)
                     .ok_or("invalid Datadog v3 tag reference")?;
-                expanded_bytes = expanded_bytes
-                    .checked_add(std::mem::size_of::<String>())
-                    .and_then(|total| total.checked_add(tag.len()))
+                let tag_bytes = std::mem::size_of::<String>()
+                    .checked_add(tag.len())
                     .ok_or("Datadog v3 expanded tagset size overflow")?;
-                if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
-                    return Err("Datadog v3 expanded tagsets exceed size limit".into());
-                }
+                allocation_budget.charge(tag_bytes)?;
                 tags.push(tag.clone());
             }
         }
@@ -872,10 +936,7 @@ fn decode_v3_tagsets(
             let mut additional_tags = Vec::new();
             for &tag in &metadata_tags {
                 if tagset_members.insert(tag) {
-                    expanded_bytes = checked_v3_string_bytes(expanded_bytes, tag)?;
-                    if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
-                        return Err("Datadog v3 expanded tagsets exceed size limit".into());
-                    }
+                    allocation_budget.charge(checked_v3_string_bytes(0, tag)?)?;
                     additional_tags.push(tag.clone());
                 }
             }
@@ -887,19 +948,14 @@ fn decode_v3_tagsets(
 
 fn decode_v3_resources(
     data: &MetricDataV3,
-    string_dictionary_bytes: &mut usize,
+    allocation_budget: &mut V3AllocationBudget,
 ) -> crate::Result<Vec<Vec<(String, String)>>> {
-    let dictionary = decode_v3_strings(&data.dict_resource_str, false, string_dictionary_bytes)?;
+    let dictionary = decode_v3_strings(&data.dict_resource_str, false, allocation_budget)?;
     let mut resources = vec![Vec::new()];
-    let mut expanded_bytes = std::mem::size_of::<Vec<(String, String)>>();
+    allocation_budget.charge(std::mem::size_of::<Vec<(String, String)>>())?;
     let mut entry_offset: usize = 0;
     for &resource_len in &data.dict_resource_len {
-        expanded_bytes = expanded_bytes
-            .checked_add(std::mem::size_of::<Vec<(String, String)>>())
-            .ok_or("Datadog v3 expanded resource size overflow")?;
-        if expanded_bytes > MAX_V3_EXPANDED_RESOURCE_BYTES {
-            return Err("Datadog v3 expanded resources exceed size limit".into());
-        }
+        allocation_budget.charge(std::mem::size_of::<Vec<(String, String)>>())?;
         let size = usize::try_from(resource_len).map_err(|_| "invalid Datadog v3 resource size")?;
         let end = entry_offset
             .checked_add(size)
@@ -930,11 +986,8 @@ fn decode_v3_resources(
             let resource_name = dictionary
                 .get(name_index)
                 .ok_or("invalid Datadog v3 resource reference")?;
-            expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_type)?;
-            expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_name)?;
-            if expanded_bytes > MAX_V3_EXPANDED_RESOURCE_BYTES {
-                return Err("Datadog v3 expanded resources exceed size limit".into());
-            }
+            allocation_budget.charge(checked_v3_string_bytes(0, resource_type)?)?;
+            allocation_budget.charge(checked_v3_string_bytes(0, resource_name)?)?;
             set.push((resource_type.clone(), resource_name.clone()));
         }
         resources.push(set);
