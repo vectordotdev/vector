@@ -1,19 +1,27 @@
 {{/* Returns the deprecation notices under content/deprecations as a dict:
-       active:  pages without `removed_in` (mounted from deprecation.d/)
-       enacted: pages with `removed_in` (content/en/deprecations/enacted/)
+       active:  notices without `removed_in` (mounted from deprecation.d/)
+       enacted: notices with `removed_in` (content/en/deprecations/enacted/)
+     Each notice is a map with `what`, `deprecated_since`, `removed_in` (enacted
+     only) and the rendered body as `content`. Versions are normalized to
+     X.Y.Z: fragments may use the "0.56" shorthand, which means "0.56.0".
      Both lists are sorted by `deprecated_since`, newest first. */}}
 {{- $active := slice -}}
 {{- $enacted := slice -}}
 {{- with site.GetPage "/deprecations" -}}
   {{- range .RegularPagesRecursive -}}
-    {{- if .Params.removed_in -}}
-      {{- $enacted = $enacted | append . -}}
+    {{- $since := string .Params.deprecated_since -}}
+    {{- if eq (len (split $since ".")) 2 }}{{ $since = printf "%s.0" $since }}{{ end -}}
+    {{- $entry := dict "what" .Params.what "deprecated_since" $since "content" .Content -}}
+    {{- with .Params.removed_in -}}
+      {{- $removed := string . -}}
+      {{- if eq (len (split $removed ".")) 2 }}{{ $removed = printf "%s.0" $removed }}{{ end -}}
+      {{- $enacted = $enacted | append (merge $entry (dict "removed_in" $removed)) -}}
     {{- else -}}
-      {{- $active = $active | append . -}}
+      {{- $active = $active | append $entry -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
 {{- return (dict
-  "active" (sort $active "Params.deprecated_since" "desc")
-  "enacted" (sort $enacted "Params.deprecated_since" "desc")
+  "active" (sort $active "deprecated_since" "desc")
+  "enacted" (sort $enacted "deprecated_since" "desc")
 ) -}}

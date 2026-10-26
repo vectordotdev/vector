@@ -30,12 +30,12 @@
           {{ range $pending }}
           <div class="py-6 first:pt-0">
             <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .Params.what | markdownify }}
+              {{ .what | markdownify }}
             </span>
             <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Deprecated since {{ .Params.deprecated_since }}
+              Deprecated since {{ .deprecated_since }}
             </div>
-            {{ with .Content }}
+            {{ with .content }}
             <div class="mt-2.5 prose dark:prose-invert max-w-none">
               {{ . }}
             </div>
@@ -57,12 +57,12 @@
           {{ range $enacted }}
           <div class="py-6 first:pt-0 opacity-75">
             <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .Params.what | markdownify }}
+              {{ .what | markdownify }}
             </span>
             <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Deprecated since {{ .Params.deprecated_since }} &middot; Removed in {{ .Params.removed_in }}
+              Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
             </div>
-            {{ with .Content }}
+            {{ with .content }}
             <div class="mt-2.5 prose dark:prose-invert max-w-none">
               {{ . }}
             </div>
