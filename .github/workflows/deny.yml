@@ -3,10 +3,15 @@
 # Checks for security vulnerabilities or license incompatibilities
 #
 # Runs on:
-#  - scheduled UTC midnight
-#  - on PR review (see comment-trigger.yml)
+#  - scheduled daily at 05:00 UTC
+#  - on PR review (see ci-review-trigger.yml)
 #  - on demand from github actions UI
 #  - on pull requests when Cargo.toml or Cargo.lock files change
+#  - in the merge queue
+#
+# Pull requests and merge queue runs only fail on advisories that the base revision does not also
+# have, so a new advisory for an existing dependency does not fail every PR. The scheduled run
+# reports those.
 
 name: Deny - Linux
 
@@ -29,8 +34,7 @@ on:
   merge_group:
     types: [checks_requested]
   schedule:
-    # Same schedule as nightly.yml
-    - cron: "0 5 * * 2-6" # Runs at 5:00 AM UTC, Tuesday through Saturday
+    - cron: "0 5 * * *" # Runs daily at 5:00 AM UTC
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
@@ -48,6 +52,9 @@ jobs:
   test-deny:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # Only set for pull requests and merge queue runs.
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
     if: &deny_gate >-
       always() &&
       (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') &&
@@ -59,13 +66,80 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Checkout base
+        if: env.BASE_SHA != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: base
+          persist-credentials: false
+
       - uses: ./.github/actions/setup
         with:
           mold: false
           cargo-deny: true
 
       - name: Check cargo deny (all)
+        if: env.BASE_SHA == ''
         run: make check-deny
+
+      - name: Check cargo deny bans and sources
+        if: env.BASE_SHA != ''
+        run: cargo deny --log-level error --all-features check bans sources
+
+      - name: Check cargo deny advisories (new compared to base)
+        if: env.BASE_SHA != ''
+        run: |
+          set -euo pipefail
+
+          # Print one "<key>\t<crates>: <message>" line for each advisory error of the workspace in $1.
+          advisory_errors() {
+            local root="$1"
+            shift
+            local output="$RUNNER_TEMP/deny-$root.json"
+            # Advisory errors make cargo deny fail, so look for the summary to see if it completed.
+            cargo deny --format json --log-level error --all-features \
+              --manifest-path "$root/Cargo.toml" --config "$root/deny.toml" "$@" \
+              check advisories 2> "$output" || true
+            if ! jq -R -e 'fromjson? | select(.type == "summary")' "$output" > /dev/null; then
+              cat "$output" >&2
+              echo "::error::cargo deny did not complete for $root"
+              return 1
+            fi
+            # Key on the advisory ID, so that a version change of an affected crate is not new.
+            jq -R -r 'fromjson? | select(.type == "diagnostic" and .fields.severity == "error") | .fields
+              | ((.graphs // []) | map(.Krate | "\(.name) \(.version)") | join(", ")) as $crates
+              | [.advisory.id // "\(.code) \(.graphs[0].Krate.name)", "\($crates): \(.message)"]
+              | @tsv' "$output" | sort -u
+          }
+
+          head="$RUNNER_TEMP/head.tsv"
+          base="$RUNNER_TEMP/base.tsv"
+          advisory_errors . > "$head"
+          if [[ ! -s "$head" ]]; then
+            echo "No advisories found."
+            exit 0
+          fi
+
+          # The base run is offline, so it uses the advisory database that the run above fetched.
+          # Offline also prevents crate downloads, so fetch the crates of the base first.
+          cargo fetch --manifest-path base/Cargo.toml
+          advisory_errors base --offline > "$base"
+
+          existing="$(awk -F '\t' 'NR == FNR { known[$1]; next } $1 in known' "$base" "$head")"
+          new="$(awk -F '\t' 'NR == FNR { known[$1]; next } !($1 in known)' "$base" "$head")"
+          if [[ -n "$existing" ]]; then
+            echo "Advisories that the base also has (ignored):"
+            echo "$existing"
+          fi
+          if [[ -z "$new" ]]; then
+            echo "No new advisories compared to $BASE_SHA."
+            exit 0
+          fi
+          echo "New advisories compared to $BASE_SHA:"
+          echo "$new"
+          echo "::error::This change adds advisories. Run 'cargo deny --all-features check advisories' for details."
+          exit 1
 
   test-deny-licenses:
     runs-on: ubuntu-24.04
