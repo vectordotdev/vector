@@ -358,6 +358,8 @@ jobs:
             website_tests:
               - "website/**"
               - "!website/cue/**"
+              # Mounted into the website as content; see website/config.toml.
+              - "deprecation.d/**"
               - ".github/workflows/website-tests.yml"
               - ".github/actions/install-vrl-doc-builder/**"
               - ".github/workflows/changes.yml"
