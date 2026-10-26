@@ -27,7 +27,10 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         Source,
-        util::{change_socket_permissions, unix::UNNAMED_SOCKET_HOST},
+        util::{
+            change_socket_permissions,
+            unix::{UNNAMED_SOCKET_HOST, remove_stale_socket},
+        },
     },
 };
 
@@ -57,6 +60,9 @@ where
     F: Into<SmallVec<[Event; 1]>> + Send,
 {
     Ok(Box::pin(async move {
+        remove_stale_socket(&listen_path, |path| {
+            std::os::unix::net::UnixStream::connect(path).map(drop)
+        });
         let listener = UnixListener::bind(&listen_path).unwrap_or_else(|e| {
             panic!(
                 "Failed to bind to listener socket at path: {}. Err: {e}",
