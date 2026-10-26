@@ -2,7 +2,7 @@
 name: Vector minor release
 about: Use this template for a new minor release.
 title: "Vector [version] release"
-labels: "domain: releasing"
+labels: "domain:releasing"
 ---
 
 # Prepare the release

@@ -2,7 +2,7 @@
 name: Vector patch release
 about: Use this template for a new patch release.
 title: "Vector [version] release"
-labels: "domain: releasing"
+labels: "domain:releasing"
 ---
 
 # Setup environment
