@@ -343,11 +343,12 @@ impl WebSocketSource {
 
                     if let Err(error) = out.send_batch(events_with_meta).await {
                         error!(message = "Error sending events.", %error);
-                    }
-
-                    // We only care about the latest message ID, because it is used to replay
-                    if let Some(last_message_id) = message_ids.last() {
-                        _ = ack_tx.send(last_message_id.clone()).await;
+                    } else {
+                        // Only ACK on successful send
+                        // We only care about the latest message ID, because it is used to replay
+                        if let Some(last_message_id) = message_ids.last() {
+                            _ = ack_tx.send(last_message_id.clone()).await;
+                        }
                     }
                 }
                 Err(error) => {
