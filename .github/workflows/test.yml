@@ -69,6 +69,23 @@ jobs:
           cargo-cache: true
       - run: make check-clippy
 
+  check-package-repositories:
+    name: Check package repository tooling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    if: ${{ needs.changes.outputs.package_repositories == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # CLI and image checks require neither signing material nor AWS access.
+      - run: |
+          cargo test --locked --package vdev commands::release::repositories::
+          cargo build --locked --package vdev
+          target/debug/vdev release repositories build-image
+          docker run --rm vector-package-publisher:local --help
+
   test:
     needs: changes
     permissions:
@@ -214,6 +231,7 @@ jobs:
       - check-fmt
       - check-actionlint
       - check-clippy
+      - check-package-repositories
       - test
       - check-scripts
       - check-events

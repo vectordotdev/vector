@@ -1417,6 +1417,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-iam"
+version = "1.123.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fabfa8ac26d6684cd0a021cf775bafb972dfa0dcc8ab151354de5e806d4f7d8a"
+dependencies = [
+ "arc-swap",
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-observability",
+ "aws-smithy-query",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-schema",
+ "aws-smithy-types",
+ "aws-smithy-xml",
+ "aws-types",
+ "fastrand",
+ "http 0.2.12",
+ "http 1.5.0",
+ "regex-lite",
+ "tracing 0.1.44",
+]
+
+[[package]]
 name = "aws-sdk-kinesis"
 version = "1.119.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1795,10 +1822,19 @@ dependencies = [
  "h2 0.3.26",
  "h2 0.4.19",
  "http 0.2.12",
+ "http 1.5.0",
  "http-body 0.4.6",
  "hyper 0.14.32",
+ "hyper 1.11.1",
+ "hyper-rustls",
+ "hyper-util",
  "pin-project-lite",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
+ "tower 0.5.3",
  "tracing 0.1.44",
 ]
 
@@ -4589,6 +4625,16 @@ dependencies = [
  "vector-common",
  "vector-config",
  "winapi",
+]
+
+[[package]]
+name = "filetime"
+version = "0.2.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759"
+dependencies = [
+ "cfg-if",
+ "libc",
 ]
 
 [[package]]
@@ -11916,6 +11962,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
+name = "tar"
+version = "0.4.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
+
+[[package]]
 name = "tcp-stream"
 version = "0.34.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13213,9 +13270,17 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.35"
+version = "0.3.36"
 dependencies = [
  "anyhow",
+ "aws-config",
+ "aws-sdk-iam",
+ "aws-sdk-s3",
+ "aws-sdk-sts",
+ "aws-smithy-http-client",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "base64 0.23.1",
  "cfg-if",
  "chrono",
  "clap",
@@ -13223,6 +13288,7 @@ dependencies = [
  "clap_complete",
  "convert_case 0.12.0",
  "directories",
+ "flate2",
  "git2",
  "glob",
  "handlebars",
@@ -13237,6 +13303,8 @@ dependencies = [
  "proc-macro2 1.0.107",
  "quote 1.0.47",
  "regex",
+ "reqwest 0.11.26",
+ "roxmltree",
  "semver",
  "serde",
  "serde_json",
@@ -13244,9 +13312,12 @@ dependencies = [
  "sha2 0.11.0",
  "strum 0.28.0",
  "syn 3.0.5",
+ "tar",
  "tempfile",
+ "tokio",
  "toml",
  "toml_edit 0.23.9",
+ "uuid",
 ]
 
 [[package]]
@@ -15030,6 +15101,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
 dependencies = [
  "tap",
+]
+
+[[package]]
+name = "xattr"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
+dependencies = [
+ "libc",
+ "rustix 1.1.4",
 ]
 
 [[package]]
