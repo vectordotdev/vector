@@ -38,7 +38,7 @@ pub fn exec(
     }
 
     if coverage {
-        super::test::clear_coverage();
+        super::test::clear_coverage()?;
     }
 
     let mut covered_environments = Vec::new();
@@ -93,7 +93,7 @@ pub fn exec(
     }
 
     if coverage {
-        super::test::merge_coverage(&covered_environments)?;
+        super::test::validate_coverage(&covered_environments)?;
     }
 
     Ok(())

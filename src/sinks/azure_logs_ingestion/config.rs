@@ -3,15 +3,13 @@ use std::sync::Arc;
 use azure_core::credentials::TokenCredential;
 use http_1::uri::PathAndQuery;
 
+use vector_http::HttpError;
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
     config::ValidatedSink,
-    http::{
-        client_v1::{HttpClient, HttpError},
-        get_http_scheme_from_uri,
-    },
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
         prelude::*,

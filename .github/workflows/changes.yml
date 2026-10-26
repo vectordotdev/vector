@@ -266,6 +266,7 @@ jobs:
               - ".github/workflows/changes.yml"
             markdown:
               - '**/**.md'
+              - "scripts/environment/npm-tools/**"
               - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             scripts:
@@ -301,7 +302,7 @@ jobs:
               - ".github/actions/**"
               - ".github/actionlint.yaml"
               - "scripts/environment/prepare.sh"
-              - "scripts/environment/npm-tools/*"
+              - "scripts/environment/npm-tools/**"
               - "Makefile"
             prettier:
               - "**/*.yml"
@@ -312,6 +313,7 @@ jobs:
               - "**/*.json"
               - ".prettierrc.json"
               - ".prettierignore"
+              - "scripts/environment/npm-tools/**"
               - ".github/workflows/changes.yml"
             test-yml:
               - ".github/workflows/test.yml"
