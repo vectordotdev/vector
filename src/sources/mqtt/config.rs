@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use rand::RngExt;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
@@ -125,14 +123,15 @@ impl MqttSourceConfig {
 
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(client_id, &self.common.host, self.common.port);
-        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
+        let mut options =
+            MqttOptions::new(client_id, (self.common.host.as_str(), self.common.port));
+        options.set_keep_alive(self.common.keep_alive);
         options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
 
         options.set_clean_session(false);
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
-                options.set_credentials(user, password);
+                options.set_credentials(user, password.clone());
             }
             (None, None) => {
                 // Credentials were not provided

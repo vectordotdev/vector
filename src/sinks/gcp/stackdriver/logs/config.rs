@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use http_1::Request;
 use snafu::Snafu;
+use vector_http::full_body;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
@@ -19,7 +20,7 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::client_v1::{HttpClient, full_body},
+    http::client_v1::HttpClient,
     schema,
     sinks::{
         gcs_common::config::healthcheck_status,

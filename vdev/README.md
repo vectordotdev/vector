@@ -13,6 +13,7 @@ Table of Contents:
 - [Installation](#installation)
 - [Running Tests](#running-tests)
   - [Running Integration tests](#running-integration-tests)
+- [Coverage publishing](#coverage-publishing)
 - [Developing vdev](#developing-vdev)
 - [Releasing vdev](#releasing-vdev)
 
@@ -70,6 +71,35 @@ Integration tests are not run by default when running `make test`. Instead, they
 
 For most development needs, use `cargo vdev integration run <test-name>`, which handles the full lifecycle (start, test, stop) automatically. You can find the list of available integration tests using `cargo vdev int show`.
 
+
+## Coverage publishing
+
+The Coverage workflow runs the workspace unit/component/CLI/API suites and all integration
+and E2E tests on one resolved commit. Unit reports include workspace libraries. Integration
+coverage measures the test process; E2E runner coverage is excluded because it does not
+instrument the separately launched Vector service.
+
+Coverage uses three `cargo vdev build coverage` operations:
+
+- `plan` records the tested commit, workflow run, service matrix, and expected environment reports.
+- `seal` normalizes source paths and records each producer's report checksums and provenance.
+- `publish` validates the entire collection before uploading original reports with `unit` and
+  `integration` flags. `--validate-only` writes the same line-union summary without uploading.
+
+CI builds the workflow revision's vdev once and shares it with coverage jobs, so these commands
+also work when testing an older review commit. Both Datadog commit overrides use the resolved
+tested SHA, even if the pull request advances while CI runs. Missing, unexpected, corrupt, or
+mismatched reports fail publication. A unit report with no library coverage is also rejected.
+
+Locally, `cargo vdev integration run --coverage <service>` retains individual
+`target/coverage/lcov-<environment>.info` files. A new run removes previous coverage reports in
+that directory to prevent stale results from satisfying a retry.
+
+The final job archives the originals, manifests, plan, and validation summary for 90 days.
+Datadog aggregates the uploaded reports. Ingestion is incremental: prevalidation prevents a
+known incomplete collection from being submitted, but a network failure during upload can
+still leave a partial result. A successful publisher job is the completion signal; the
+Datadog percentage alone is not. Re-running only the publisher reuses the validated artifacts.
 
 ## Developing vdev
 

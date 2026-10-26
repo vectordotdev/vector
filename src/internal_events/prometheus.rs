@@ -1,5 +1,3 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 #[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
@@ -44,11 +42,13 @@ impl InternalEvent for PrometheusParseError<'_> {
     }
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 impl InternalEvent for PrometheusRemoteWriteParseError {
     fn emit(self) {
         error!(
