@@ -7,6 +7,10 @@ use aws_sdk_s3::{
     primitives::ByteStream,
     types::{ChecksumMode, ServerSideEncryption},
 };
+use aws_smithy_http_client::{
+    Builder,
+    tls::{Provider, rustls_provider::CryptoMode},
+};
 use aws_smithy_runtime_api::client::{
     interceptors::{Intercept, context::BeforeDeserializationInterceptorContextRef},
     runtime_components::RuntimeComponents,
@@ -117,8 +121,12 @@ impl S3Store {
             "fixed-publisher-session",
         );
         let runtime = tokio::runtime::Runtime::new()?;
+        let http_client = Builder::new()
+            .tls_provider(Provider::Rustls(CryptoMode::Ring))
+            .build_https();
         let sdk = runtime.block_on(
             aws_config::defaults(aws_config::BehaviorVersion::latest())
+                .http_client(http_client)
                 .region(Region::new(config.region.clone()))
                 .credentials_provider(credentials)
                 .retry_config(RetryConfig::disabled())
