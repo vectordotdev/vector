@@ -14,11 +14,11 @@ jobs:
     permissions:
       contents: read # Required for repository context
       actions: write # Required to upload artifacts that trigger the preview build workflow
-    # Only run when at least one "preview: <app>" label is present
+    # Only run when at least one "preview:<app>" label is present
     if: >-
       ${{
-        contains(github.event.pull_request.labels.*.name, 'preview: website') ||
-        contains(github.event.pull_request.labels.*.name, 'preview: playground')
+        contains(github.event.pull_request.labels.*.name, 'preview:website') ||
+        contains(github.event.pull_request.labels.*.name, 'preview:playground')
       }}
     steps:
       # Save PR information. The raw branch name is only ever written as file data, hashed for
@@ -35,8 +35,8 @@ jobs:
             const branchName = context.payload.pull_request.head.ref;
             const labelNames = context.payload.pull_request.labels.map(l => l.name);
             const apps = {
-              website: labelNames.includes('preview: website'),
-              playground: labelNames.includes('preview: playground'),
+              website: labelNames.includes('preview:website'),
+              playground: labelNames.includes('preview:playground'),
             };
 
             await fs.mkdir('./pr', { recursive: true });

@@ -121,12 +121,12 @@ this, or any other aspect of Vector and VRL.
 [standard library]: https://vrl.dev/functions/
 [performance]: https://vector.dev/highlights/2022-03-15-vrl-vm-beta/
 [event enrichment features]: https://vector.dev/highlights/2021-11-18-csv-enrichment/
-[squashing many bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+sort%3Aupdated-desc+is%3Aclosed+label%3A%22domain%3A+vrl%22+label%3A%22type%3A+bug%22
+[squashing many bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+sort%3Aupdated-desc+is%3Aclosed+label%3A%22domain%3Avrl%22+type%3ABug
 [LUA runtime transform]: https://vector.dev/docs/reference/configuration/transforms/lua
 [join us on Discord]: https://discord.gg/n3CuBAwNCn
 [@vectordotdev]: https://twitter.com/vectordotdev
 [existing iteration functions]: https://vrl.dev/functions/#enumerate-functions
-[file a request]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+feature&template=feature.yml
+[file a request]: https://github.com/vectordotdev/vector/issues/new?template=feature.yml
 [RFC]: https://github.com/vectordotdev/vector/blob/50dd7a7c655cbc3c7903b58213adb34a70cf7ba6/rfcs/2021-08-29-8381-vrl-iteration-support.md
 [rfc examples]: https://github.com/vectordotdev/vector/blob/50dd7a7c655cbc3c7903b58213adb34a70cf7ba6/rfcs/2021-08-29-8381-vrl-iteration-support.md#use-cases
 [test harness]: https://github.com/vectordotdev/vector/tree/cf0864873c03edd937c1e7796468809e0d52e764/lib/vrl/tests/tests/rfcs/8381

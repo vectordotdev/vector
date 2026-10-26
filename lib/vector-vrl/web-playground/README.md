@@ -192,4 +192,4 @@ init().then(() => {
 [mozilla-wasm-rust-docs]: https://developer.mozilla.org/en-US/docs/WebAssembly/Rust_to_wasm
 [rust-book-wasm]: https://rustwasm.github.io/docs/book/
 [vrl-repl]: https://github.com/vectordotdev/vector/tree/master/lib/vector-vrl/cli
-[vrl-wasm-unsupported-filter]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3A+playground%22+wasm+compatible
+[vrl-wasm-unsupported-filter]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22vrl%3Aplayground%22+wasm+compatible
