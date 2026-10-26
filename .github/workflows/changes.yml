@@ -238,7 +238,7 @@ jobs:
               - ".github/workflows/deny.yml"
             deprecations:
               - 'deprecation.d/**'
-              - 'website/data/deprecations.json'
+              - 'website/content/en/deprecations/enacted/**'
               - "vdev/Cargo.toml"
               - ".github/workflows/deprecation.yaml"
               - ".github/workflows/changes.yml"

@@ -3,8 +3,9 @@
 {{ end }}
 
 {{ define "main" }}
-{{ $pending := sort site.Data.deprecations.deprecations_pending "deprecated_since" "desc" }}
-{{ $enacted := sort site.Data.deprecations.deprecations_enacted "deprecated_since" "desc" }}
+{{ $entries := partialCached "deprecations/entries.html" . }}
+{{ $pending := $entries.active }}
+{{ $enacted := $entries.enacted }}
 {{ $latest := index site.Data.docs.versions 0 }}
 
 <div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
@@ -29,14 +30,14 @@
           {{ range $pending }}
           <div class="py-6 first:pt-0">
             <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .what | markdownify }}
+              {{ .Params.what | markdownify }}
             </span>
             <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Deprecated since {{ .deprecated_since }}
+              Deprecated since {{ .Params.deprecated_since }}
             </div>
-            {{ with .description }}
+            {{ with .Content }}
             <div class="mt-2.5 prose dark:prose-invert max-w-none">
-              {{ . | markdownify }}
+              {{ . }}
             </div>
             {{ end }}
           </div>
@@ -56,14 +57,14 @@
           {{ range $enacted }}
           <div class="py-6 first:pt-0 opacity-75">
             <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .what | markdownify }}
+              {{ .Params.what | markdownify }}
             </span>
             <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
+              Deprecated since {{ .Params.deprecated_since }} &middot; Removed in {{ .Params.removed_in }}
             </div>
-            {{ with .description }}
+            {{ with .Content }}
             <div class="mt-2.5 prose dark:prose-invert max-w-none">
-              {{ . | markdownify }}
+              {{ . }}
             </div>
             {{ end }}
           </div>

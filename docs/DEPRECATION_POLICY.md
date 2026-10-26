@@ -84,8 +84,7 @@ When introducing a deprecation into Vector, the pull request introducing the dep
 
 - **Add a deprecation fragment** to [`deprecation.d/`](../deprecation.d/) following the format in
   [`deprecation.d/README.md`](../deprecation.d/README.md). Set `deprecated_since` to the current release version.
-  Use the fragment body for the full migration guide (rationale, before/after examples, links). Then run
-  `cargo vdev deprecation generate` to regenerate `website/data/deprecations.json` and commit both files.
+  Use the fragment body for the full migration guide (rationale, before/after examples, links).
   Run `cargo vdev deprecation show` to preview, and `cargo vdev deprecation check` to validate.
   The fragment itself is the announcement; no separate changelog fragment is required (an announcement is not a
   change, so it does not belong in `changelog.d/`). The fragment is rendered on the release page in the
@@ -118,5 +117,6 @@ When removing a deprecation in a subsequent release, the pull request should:
   change (the feature stops working), so it belongs in the release notes' Breaking changes section alongside other
   breaking changes. The Past Deprecations section is the lifecycle view, answering a different question for a
   different reader.
-- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result. This records the
-  removal in `website/data/deprecations.json` and deletes the original fragment in one step.
+- Run `cargo vdev deprecation enact <slug> --version <removed-in-version>` and commit the result. This moves the
+  fragment to [`website/content/en/deprecations/enacted/`](../website/content/en/deprecations/enacted/) and records
+  `removed_in` in its frontmatter.

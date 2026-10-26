@@ -1,0 +1,19 @@
+{{/* Returns the deprecation notices under content/deprecations as a dict:
+       active:  pages without `removed_in` (mounted from deprecation.d/)
+       enacted: pages with `removed_in` (content/en/deprecations/enacted/)
+     Both lists are sorted by `deprecated_since`, newest first. */}}
+{{- $active := slice -}}
+{{- $enacted := slice -}}
+{{- with site.GetPage "/deprecations" -}}
+  {{- range .RegularPagesRecursive -}}
+    {{- if .Params.removed_in -}}
+      {{- $enacted = $enacted | append . -}}
+    {{- else -}}
+      {{- $active = $active | append . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return (dict
+  "active" (sort $active "Params.deprecated_since" "desc")
+  "enacted" (sort $enacted "Params.deprecated_since" "desc")
+) -}}

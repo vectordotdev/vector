@@ -5,8 +5,10 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
+/// Active deprecation notices.
 pub const DEPRECATION_DIR: &str = "deprecation.d";
-pub const DEPRECATIONS_JSON: &str = "website/data/deprecations.json";
+/// Enacted (removed) deprecation notices; same format plus `removed_in`.
+pub const ENACTED_DIR: &str = "website/content/en/deprecations/enacted";
 
 /// A concrete semver version identifying when a deprecation was announced.
 /// Accepted forms: `"0.56"` (major.minor) or `"0.56.0"` (major.minor.patch).
@@ -55,15 +57,19 @@ use serde::Deserialize;
 struct Frontmatter {
     what: String,
     deprecated_since: DeprecationVersion,
+    #[serde(default)]
+    removed_in: Option<DeprecationVersion>,
 }
 
-/// A parsed and validated deprecation entry from `deprecation.d/`.
+/// A parsed and validated deprecation entry from `deprecation.d/` or `ENACTED_DIR`.
 #[derive(Debug, Clone)]
 pub struct DeprecationEntry {
     pub filename: String,
     pub what: String,
     /// The release in which this deprecation was first announced.
     pub deprecated_since: DeprecationVersion,
+    /// The release in which the deprecated feature was removed. Set only for enacted entries.
+    pub removed_in: Option<DeprecationVersion>,
     /// Optional body text (everything after the closing `---` of the frontmatter).
     pub description: String,
 }
@@ -188,6 +194,7 @@ fn parse_deprecation_fragment(path: &Path) -> Result<DeprecationEntry> {
         filename,
         what: fm.what.trim().to_string(),
         deprecated_since: fm.deprecated_since,
+        removed_in: fm.removed_in,
         description: body.trim().to_string(),
     })
 }
@@ -220,218 +227,119 @@ fn split_frontmatter<'a>(content: &'a str, path: &Path) -> Result<(&'a str, &'a 
     Ok((frontmatter, body))
 }
 
-/// A deprecation that has been enacted (feature removed).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct EnactedEntry {
-    pub what: String,
-    pub deprecated_since: String,
-    pub removed_in: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub description: String,
+/// All deprecation notices in the repository.
+pub struct Deprecations {
+    /// Fragments in `DEPRECATION_DIR`.
+    pub active: Vec<DeprecationEntry>,
+    /// Fragments in `ENACTED_DIR`.
+    pub enacted: Vec<DeprecationEntry>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct DeprecationsJson {
-    deprecations_pending: Vec<PendingJsonEntry>,
-    deprecations_enacted: Vec<EnactedEntry>,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct PendingJsonEntry {
-    what: String,
-    deprecated_since: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    description: String,
-}
-
-/// Read only the enacted entries from `DEPRECATIONS_JSON`.
-pub fn read_enacted(repo_root: &Path) -> Result<Vec<EnactedEntry>> {
-    Ok(read_json(repo_root)?.deprecations_enacted)
-}
-
-fn read_json(repo_root: &Path) -> Result<DeprecationsJson> {
-    let path = repo_root.join(DEPRECATIONS_JSON);
-    if !path.exists() {
-        return Ok(DeprecationsJson {
-            deprecations_pending: Vec::new(),
-            deprecations_enacted: Vec::new(),
-        });
-    }
-    let raw =
-        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-    serde_json::from_str(&raw).with_context(|| format!("Failed to parse {}", path.display()))
-}
-
-fn write_json(repo_root: &Path, data: &DeprecationsJson) -> Result<()> {
-    let path = repo_root.join(DEPRECATIONS_JSON);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let out = serde_json::to_string_pretty(data)? + "\n";
-    fs::write(&path, out).with_context(|| format!("Failed to write {}", path.display()))
-}
-
-/// Append an enacted entry and regenerate the pending section from deprecation.d/.
+/// Read and validate the active and enacted deprecation notices.
 ///
-/// Idempotent only on a byte-for-byte duplicate: silently skips the append
-/// so that re-running `enact` after a partial failure (e.g. the fragment
-/// delete failed) can complete cleanly. Any mismatch in `removed_in`,
-/// `deprecated_since`, or `description` is rejected — those signal a stale
-/// or edited fragment versus the recorded entry, and silently keeping the
-/// older record would lose the new data.
-pub fn append_enacted(repo_root: &Path, entry: EnactedEntry) -> Result<()> {
-    let dir = repo_root.join(DEPRECATION_DIR);
-    let pending = read_deprecation_fragments(&dir)?;
-    let mut data = read_json(repo_root)?;
-    if let Some(existing) = data
-        .deprecations_enacted
-        .iter()
-        .find(|e| e.what == entry.what)
-    {
-        if existing.removed_in != entry.removed_in {
+/// Rejects, in addition to the per-directory checks of `read_deprecation_fragments`:
+///   * active fragments that set `removed_in`
+///   * enacted fragments without `removed_in`, or whose `removed_in` is not in a
+///     later minor release than `deprecated_since` (the deprecation policy rule)
+///   * the same `what` in both directories (e.g. an interrupted `enact`)
+pub fn read_all(repo_root: &Path) -> Result<Deprecations> {
+    let active = read_deprecation_fragments(&repo_root.join(DEPRECATION_DIR))?;
+    let enacted = read_deprecation_fragments(&repo_root.join(ENACTED_DIR))?;
+
+    for e in &active {
+        if let Some(removed_in) = &e.removed_in {
             bail!(
-                "Conflicting enacted entry for '{}': already recorded as removed in {}, refusing to record as removed in {}",
-                entry.what,
-                existing.removed_in,
-                entry.removed_in
+                "{DEPRECATION_DIR}/{} sets removed_in ({removed_in}); \
+                 run `cargo vdev deprecation enact` instead of setting it by hand.",
+                e.filename
             );
         }
-        if existing.deprecated_since != entry.deprecated_since
-            || existing.description != entry.description
-        {
-            bail!(
-                "Mismatched enacted entry for '{}': the existing record in {} differs from the fragment data \
-                 (deprecated_since or description). \
-                 Either revert the fragment edit or update the enacted JSON by hand.",
-                entry.what,
-                existing.removed_in,
-            );
-        }
-        // Byte-for-byte duplicate; rewrite pending so a partial failure can
-        // recover, but don't push the entry again.
-    } else {
-        data.deprecations_enacted.push(entry);
     }
-    sort_enacted(&mut data.deprecations_enacted);
-    data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
-    write_json(repo_root, &data)
-}
-
-/// Sort enacted deprecations so generated output has a stable order.
-///
-/// Entries are grouped by the release that removed them, then by the release
-/// that announced them. `what` makes the order deterministic for entries
-/// announced and removed in the same releases.
-fn sort_enacted(entries: &mut [EnactedEntry]) {
-    entries.sort_by_cached_key(|entry| {
-        (
-            parse_strict_release(&entry.removed_in).ok(),
-            parse_strict_release(&entry.deprecated_since).ok(),
-            entry.what.clone(),
-        )
-    });
-}
-
-/// Filter pending fragments so they exclude any `what` already in `enacted`.
-/// Keeps the JSON consistent if `enact` was interrupted between the JSON
-/// write and the fragment delete: the next `generate` / `check` will still
-/// produce a JSON without the enacted-and-still-on-disk fragment in
-/// `deprecations_pending`.
-fn pending_excluding_enacted(
-    pending: &[DeprecationEntry],
-    enacted: &[EnactedEntry],
-) -> Vec<PendingJsonEntry> {
-    let enacted_what: std::collections::HashSet<&str> =
-        enacted.iter().map(|e| e.what.as_str()).collect();
-    pending
-        .iter()
-        .filter(|e| !enacted_what.contains(e.what.as_str()))
-        .map(|e| PendingJsonEntry {
-            what: e.what.clone(),
-            deprecated_since: e.deprecated_since.to_string(),
-            description: e.description.clone(),
-        })
-        .collect()
-}
-
-/// Validate the enacted entries in `DEPRECATIONS_JSON`:
-///   * both versions must be valid semver
-///   * `removed_in` must be in a later major.minor than `deprecated_since`
-///     (matching the deprecation policy and the `enact` command's rule)
-///   * no duplicate `what` values (a feature can't be removed twice, even
-///     in different releases)
-pub fn validate_enacted(repo_root: &Path) -> Result<usize> {
-    let enacted = read_enacted(repo_root)?;
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for e in &enacted {
-        let dep = parse_strict_release(&e.deprecated_since).with_context(|| {
-            format!(
-                "Enacted entry '{}' has invalid deprecated_since '{}'",
-                e.what, e.deprecated_since
-            )
-        })?;
-        let rem = parse_strict_release(&e.removed_in).with_context(|| {
-            format!(
-                "Enacted entry '{}' has invalid removed_in '{}'",
-                e.what, e.removed_in
-            )
-        })?;
-        if !later_minor(&rem, &dep) {
+        let Some(removed_in) = &e.removed_in else {
+            bail!("{ENACTED_DIR}/{} is missing removed_in.", e.filename);
+        };
+        if !later_minor(&removed_in.0, &e.deprecated_since.0) {
             bail!(
-                "Enacted entry '{}' has removed_in ({}) that is not in a later minor release than deprecated_since ({}); the deprecation policy requires at least one minor release between announcement and removal.",
-                e.what,
-                e.removed_in,
+                "{ENACTED_DIR}/{} has removed_in ({removed_in}) that is not in a later minor release than deprecated_since ({}); the deprecation policy requires at least one minor release between announcement and removal.",
+                e.filename,
                 e.deprecated_since
             );
         }
-        if !seen.insert(e.what.clone()) {
+    }
+
+    let enacted_what: std::collections::HashMap<&str, &str> = enacted
+        .iter()
+        .map(|e| (e.what.as_str(), e.filename.as_str()))
+        .collect();
+    for e in &active {
+        if let Some(prev) = enacted_what.get(e.what.as_str()) {
             bail!(
-                "Duplicate enacted entry for '{}'; the same feature cannot be recorded as removed more than once.",
-                e.what
+                "Deprecation '{}' is both active ({DEPRECATION_DIR}/{}) and enacted ({ENACTED_DIR}/{prev}); delete the active fragment.",
+                e.what,
+                e.filename
             );
         }
     }
-    Ok(enacted.len())
+
+    Ok(Deprecations { active, enacted })
+}
+
+/// Enact the active fragment `filename`: move it to `ENACTED_DIR` with
+/// `removed_in` added to its frontmatter. The body is kept verbatim.
+/// Returns the path of the new file.
+pub fn enact(repo_root: &Path, filename: &str, removed_in: &Version) -> Result<PathBuf> {
+    if !removed_in.pre.is_empty() || !removed_in.build.is_empty() {
+        bail!(
+            "removed_in {removed_in} has prerelease or build metadata; only plain X.Y.Z is allowed"
+        );
+    }
+    let deprecations = read_all(repo_root)?;
+    let src = repo_root.join(DEPRECATION_DIR).join(filename);
+    let entry = deprecations
+        .active
+        .iter()
+        .find(|e| e.filename == filename)
+        .ok_or_else(|| anyhow!("No deprecation fragment found at {}", src.display()))?;
+
+    if !later_minor(removed_in, &entry.deprecated_since.0) {
+        bail!(
+            "removed_in ({removed_in}) must be in a later minor release than deprecated_since ({}); \
+             the deprecation policy requires at least one minor release between \
+             the announcement and removal.",
+            entry.deprecated_since
+        );
+    }
+
+    let dest = repo_root.join(ENACTED_DIR).join(filename);
+    if dest.exists() {
+        bail!("{} already exists", dest.display());
+    }
+
+    let raw =
+        fs::read_to_string(&src).with_context(|| format!("Failed to read {}", src.display()))?;
+    let (frontmatter, body) = split_frontmatter(&raw, &src)?;
+    let mut out = format!(
+        "---\n{}\nremoved_in: \"{removed_in}\"\n---\n",
+        frontmatter.trim_end()
+    );
+    let body = body.trim_end();
+    if !body.is_empty() {
+        out.push('\n');
+        out.push_str(body);
+        out.push('\n');
+    }
+
+    fs::create_dir_all(repo_root.join(ENACTED_DIR))?;
+    fs::write(&dest, out).with_context(|| format!("Failed to write {}", dest.display()))?;
+    fs::remove_file(&src).with_context(|| format!("Failed to delete {}", src.display()))?;
+    Ok(dest)
 }
 
 /// True when `a` is in a later major.minor release than `b`. Equal or smaller
 /// major.minor (regardless of patch) returns false.
 pub fn later_minor(a: &Version, b: &Version) -> bool {
     (a.major, a.minor) > (b.major, b.minor)
-}
-
-/// Parse a release version string strictly: only plain `X.Y.Z` is allowed
-/// (no prerelease or build metadata). Mirrors the rule that release tags
-/// follow `vX.Y.Z`.
-pub fn parse_strict_release(s: &str) -> Result<Version> {
-    let v = Version::parse(s)?;
-    if !v.pre.is_empty() || !v.build.is_empty() {
-        bail!("version '{s}' has prerelease or build metadata; only plain X.Y.Z is allowed");
-    }
-    Ok(v)
-}
-
-/// Render the JSON that `sync_deprecations_cue` would write, without
-/// touching disk. Returns the serialized string (with trailing newline) so
-/// callers can compare against the on-disk file.
-pub fn rendered_json(repo_root: &Path) -> Result<String> {
-    let dir = repo_root.join(DEPRECATION_DIR);
-    let pending = read_deprecation_fragments(&dir)?;
-    let mut data = read_json(repo_root)?;
-    sort_enacted(&mut data.deprecations_enacted);
-    data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
-    Ok(serde_json::to_string_pretty(&data)? + "\n")
-}
-
-/// Regenerate `DEPRECATIONS_JSON` from `deprecation.d/` (pending) plus the
-/// existing enacted entries already in the file.
-pub fn sync_deprecations_cue(repo_root: &Path) -> Result<()> {
-    let dir = repo_root.join(DEPRECATION_DIR);
-    let pending = read_deprecation_fragments(&dir)?;
-    let mut data = read_json(repo_root)?;
-    sort_enacted(&mut data.deprecations_enacted);
-    data.deprecations_pending = pending_excluding_enacted(&pending, &data.deprecations_enacted);
-    write_json(repo_root, &data)
 }
 
 #[cfg(test)]
@@ -576,147 +484,110 @@ mod tests {
         assert_eq!(filenames, vec!["real.md"]);
     }
 
-    #[test]
-    fn append_enacted_is_idempotent_on_exact_duplicate() {
-        // Re-running `enact` after a partial failure should succeed without
-        // duplicating the enacted entry.
-        let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-        let entry = EnactedEntry {
-            what: "foo".into(),
-            deprecated_since: "0.55.0".into(),
-            removed_in: "0.56.0".into(),
-            description: String::new(),
-        };
-        append_enacted(tmp.path(), entry.clone()).unwrap();
-        append_enacted(tmp.path(), entry).unwrap();
-        let enacted = read_enacted(tmp.path()).unwrap();
-        assert_eq!(enacted.len(), 1);
-    }
-
-    #[test]
-    fn append_enacted_rejects_conflicting_removed_in() {
-        let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-        let entry = EnactedEntry {
-            what: "foo".into(),
-            deprecated_since: "0.55.0".into(),
-            removed_in: "0.56.0".into(),
-            description: String::new(),
-        };
-        append_enacted(tmp.path(), entry.clone()).unwrap();
-        let conflict = EnactedEntry {
-            removed_in: "0.57.0".into(),
-            ..entry
-        };
-        let err = append_enacted(tmp.path(), conflict).unwrap_err();
-        assert!(format!("{err}").contains("Conflicting"));
-    }
-
-    #[test]
-    fn append_enacted_rejects_mismatched_deprecated_since_or_description() {
-        let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join("deprecation.d")).unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-        let entry = EnactedEntry {
-            what: "foo".into(),
-            deprecated_since: "0.55.0".into(),
-            removed_in: "0.56.0".into(),
-            description: "old".into(),
-        };
-        append_enacted(tmp.path(), entry.clone()).unwrap();
-
-        // Same `what` + `removed_in` but updated description must not silently
-        // keep the older record.
-        let edited = EnactedEntry {
-            description: "new".into(),
-            ..entry.clone()
-        };
-        let err = append_enacted(tmp.path(), edited).unwrap_err();
-        assert!(format!("{err}").contains("Mismatched"));
-
-        // Same with a different deprecated_since.
-        let edited = EnactedEntry {
-            deprecated_since: "0.54.0".into(),
-            ..entry
-        };
-        let err = append_enacted(tmp.path(), edited).unwrap_err();
-        assert!(format!("{err}").contains("Mismatched"));
-    }
-
-    #[test]
-    fn validate_enacted_catches_bad_versions_and_duplicates() {
-        let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-        // Invalid removed_in.
-        fs::write(
-            tmp.path().join("website/data/deprecations.json"),
-            r#"{"deprecations_pending":[],"deprecations_enacted":[
-                {"what":"x","deprecated_since":"0.55.0","removed_in":"not-a-version"}
-            ]}"#,
-        )
-        .unwrap();
-        assert!(validate_enacted(tmp.path()).is_err());
-
-        // Duplicate `what` (different removed_in) — still rejected.
-        fs::write(
-            tmp.path().join("website/data/deprecations.json"),
-            r#"{"deprecations_pending":[],"deprecations_enacted":[
-                {"what":"x","deprecated_since":"0.55.0","removed_in":"0.56.0"},
-                {"what":"x","deprecated_since":"0.55.0","removed_in":"0.57.0"}
-            ]}"#,
-        )
-        .unwrap();
-        let err = validate_enacted(tmp.path()).unwrap_err();
-        assert!(format!("{err}").contains("Duplicate"));
-    }
-
-    #[test]
-    fn validate_enacted_rejects_same_minor() {
-        let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-        // removed_in is later semver (patch bump) but same minor as
-        // deprecated_since — policy violation that `enact` rejects, so a
-        // hand-edited JSON should also fail validation.
-        fs::write(
-            tmp.path().join("website/data/deprecations.json"),
-            r#"{"deprecations_pending":[],"deprecations_enacted":[
-                {"what":"x","deprecated_since":"0.57.0","removed_in":"0.57.1"}
-            ]}"#,
-        )
-        .unwrap();
-        let err = validate_enacted(tmp.path()).unwrap_err();
-        assert!(format!("{err}").contains("later minor release"));
-    }
-
-    #[test]
-    fn rendered_json_drops_pending_already_enacted() {
-        // Simulate an interrupted enact: the fragment file is still on disk
-        // (delete failed) but the JSON already has the matching enacted entry.
-        // rendered_json must keep deprecations_pending consistent with
-        // deprecations_enacted so `check` doesn't accept the inconsistent
-        // intermediate state.
-        let tmp = tempdir().unwrap();
-        let dir = tmp.path().join("deprecation.d");
+    fn write_fragment(root: &Path, dir: &str, name: &str, content: &str) {
+        let dir = root.join(dir);
         fs::create_dir_all(&dir).unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-        fs::write(
-            dir.join("foo.md"),
+        fs::write(dir.join(name), content).unwrap();
+    }
+
+    #[test]
+    fn read_all_rejects_removed_in_on_active_fragment() {
+        let tmp = tempdir().unwrap();
+        write_fragment(
+            tmp.path(),
+            DEPRECATION_DIR,
+            "foo.md",
+            "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\nremoved_in: \"0.56.0\"\n---\n",
+        );
+        let err = read_all(tmp.path()).err().unwrap();
+        assert!(format!("{err:#}").contains("sets removed_in"));
+    }
+
+    #[test]
+    fn read_all_validates_removed_in_on_enacted_fragment() {
+        for (removed_in, expected) in [
+            ("", "missing removed_in"),
+            // Patch bump of deprecated_since: same minor, policy violation.
+            ("removed_in: \"0.55.1\"\n", "later minor release"),
+            (
+                "removed_in: \"0.56.0-alpha\"\n",
+                "prerelease and build metadata",
+            ),
+        ] {
+            let tmp = tempdir().unwrap();
+            write_fragment(
+                tmp.path(),
+                ENACTED_DIR,
+                "foo.md",
+                &format!("---\nwhat: foo\ndeprecated_since: \"0.55.0\"\n{removed_in}---\n"),
+            );
+            let err = read_all(tmp.path()).err().unwrap();
+            assert!(
+                format!("{err:#}").contains(expected),
+                "{removed_in:?}: {err:#}"
+            );
+        }
+    }
+
+    #[test]
+    fn read_all_rejects_same_what_active_and_enacted() {
+        // State left behind by an `enact` that wrote the enacted file but
+        // failed to delete the active fragment.
+        let tmp = tempdir().unwrap();
+        write_fragment(
+            tmp.path(),
+            DEPRECATION_DIR,
+            "foo.md",
             "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\n---\n",
-        )
-        .unwrap();
-        fs::write(
-            tmp.path().join("website/data/deprecations.json"),
-            r#"{"deprecations_pending":[],"deprecations_enacted":[
-                {"what":"foo","deprecated_since":"0.55.0","removed_in":"0.57.0"}
-            ]}"#,
-        )
-        .unwrap();
-        let out = rendered_json(tmp.path()).unwrap();
-        assert!(out.contains("\"deprecations_pending\": []"));
-        assert!(out.contains("\"what\": \"foo\""));
+        );
+        write_fragment(
+            tmp.path(),
+            ENACTED_DIR,
+            "foo-renamed.md",
+            "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\nremoved_in: \"0.57.0\"\n---\n",
+        );
+        let err = read_all(tmp.path()).err().unwrap();
+        assert!(format!("{err:#}").contains("both active"));
+    }
+
+    #[test]
+    fn enact_moves_fragment_and_records_removed_in() {
+        let tmp = tempdir().unwrap();
+        write_fragment(
+            tmp.path(),
+            DEPRECATION_DIR,
+            "foo.md",
+            "---\nwhat: \"`foo` option\"\n# kept\ndeprecated_since: \"0.55\"\n---\n\nUse `bar`.\n\n```yaml\nbar: true\n```\n",
+        );
+        let dest = enact(tmp.path(), "foo.md", &Version::new(0, 57, 0)).unwrap();
+
+        assert!(!tmp.path().join(DEPRECATION_DIR).join("foo.md").exists());
+        assert_eq!(dest, tmp.path().join(ENACTED_DIR).join("foo.md"));
+        assert_eq!(
+            fs::read_to_string(&dest).unwrap(),
+            "---\nwhat: \"`foo` option\"\n# kept\ndeprecated_since: \"0.55\"\nremoved_in: \"0.57.0\"\n---\n\nUse `bar`.\n\n```yaml\nbar: true\n```\n",
+        );
+        let all = read_all(tmp.path()).unwrap();
+        assert!(all.active.is_empty());
+        assert_eq!(
+            all.enacted[0].removed_in,
+            Some(DeprecationVersion(Version::new(0, 57, 0)))
+        );
+    }
+
+    #[test]
+    fn enact_rejects_same_minor_and_keeps_fragment() {
+        let tmp = tempdir().unwrap();
+        write_fragment(
+            tmp.path(),
+            DEPRECATION_DIR,
+            "foo.md",
+            "---\nwhat: foo\ndeprecated_since: \"0.55.0\"\n---\n",
+        );
+        let err = enact(tmp.path(), "foo.md", &Version::new(0, 55, 1)).unwrap_err();
+        assert!(format!("{err}").contains("later minor release"));
+        assert!(tmp.path().join(DEPRECATION_DIR).join("foo.md").exists());
+        assert!(!tmp.path().join(ENACTED_DIR).exists());
     }
 
     #[test]
@@ -756,21 +627,6 @@ mod tests {
         // The symlinked dir must be treated as missing, not read through.
         let entries = read_deprecation_fragments(&link).unwrap();
         assert!(entries.is_empty());
-    }
-
-    #[test]
-    fn validate_enacted_rejects_prerelease_versions() {
-        let tmp = tempdir().unwrap();
-        fs::create_dir_all(tmp.path().join("website/data")).unwrap();
-        fs::write(
-            tmp.path().join("website/data/deprecations.json"),
-            r#"{"deprecations_pending":[],"deprecations_enacted":[
-                {"what":"x","deprecated_since":"0.55.0","removed_in":"0.56.0-alpha"}
-            ]}"#,
-        )
-        .unwrap();
-        let err = validate_enacted(tmp.path()).unwrap_err();
-        assert!(format!("{err:?}").contains("prerelease or build metadata"));
     }
 
     #[test]
