@@ -295,6 +295,7 @@ jobs:
               - "rust-toolchain.toml"
               - ".github/actions/package-repository-tools/**"
               - ".github/workflows/package-repositories*.yml"
+              - ".github/workflows/vdev_publish.yml"
               - ".github/workflows/changes.yml"
             k8s:
               - "src/sources/kubernetes_logs/**"

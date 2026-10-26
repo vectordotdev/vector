@@ -217,13 +217,24 @@ fn fingerprints(data: &[u8], primary: &str, subkey: &str) -> Result<Vec<(Vec<Str
 pub(super) struct PublicKey<'a> {
     pub config: &'a Config,
     pub home: PathBuf,
+    _directory: tempfile::TempDir,
 }
 impl<'a> PublicKey<'a> {
     pub fn new(config: &'a Config, name: &str) -> Result<Self> {
-        use std::os::unix::fs::DirBuilderExt as _;
-        let home = Path::new("/run/keys").join(name);
-        fs::DirBuilder::new().mode(0o700).create(&home)?;
-        let public = Self { config, home };
+        use std::os::unix::fs::PermissionsExt as _;
+
+        // Linux tmpfs keeps key files outside the checkout and artifact directories.
+        // TempDir creates a unique 0700 directory and removes it on success or error.
+        let directory = tempfile::Builder::new()
+            .prefix(&format!("vector-package-{name}-"))
+            .permissions(fs::Permissions::from_mode(0o700))
+            .tempdir_in("/dev/shm")
+            .context("Package repository signing requires writable Linux tmpfs at /dev/shm")?;
+        let public = Self {
+            config,
+            home: directory.path().to_owned(),
+            _directory: directory,
+        };
         let keys = fingerprints(
             &public.gpg(
                 [
@@ -317,7 +328,6 @@ impl Drop for PublicKey<'_> {
                 .stderr(Stdio::null())
                 .status(),
         );
-        drop(fs::remove_dir_all(&self.home));
     }
 }
 pub(super) struct Signer<'a> {
