@@ -165,14 +165,7 @@ impl WebSocketSource {
                 res = ping_manager.tick(&mut ws_sink) => res,
 
                 Some(ack) = ack_rx.recv() => {
-                    self.last_received_message_id = Some(ack.clone());
-
-                    if stateful {
-                        self.store_last_message_id().await;
-                    }
-
-                    // Ignore failed acks
-                    Ok(self.send_ack(&mut ws_sink, ack).await)
+                    Ok(self.handle_ack(&mut ws_sink, ack, stateful).await)
                 }
 
                 Some(msg_result) = ws_source.next() => {
@@ -237,6 +230,10 @@ impl WebSocketSource {
                     break;
                 }
             }
+        }
+
+        while let Some(ack) = ack_rx.recv().await {
+            self.handle_ack(&mut ws_sink, ack, stateful).await;
         }
 
         Ok(())
@@ -382,6 +379,17 @@ impl WebSocketSource {
                 }));
         }
         message_ids
+    }
+
+    async fn handle_ack(&mut self, ws_sink: &mut WebSocketSink, ack: String, stateful: bool) {
+        self.last_received_message_id = Some(ack.clone());
+
+        if stateful {
+            self.store_last_message_id().await;
+        }
+
+        // Ignore failed acks
+        self.send_ack(ws_sink, ack).await;
     }
 
     fn add_metadata(&self, event: &mut LogEvent, now: DateTime<Utc>) {
