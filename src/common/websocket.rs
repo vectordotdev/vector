@@ -80,7 +80,6 @@ impl WebSocketConnector {
     pub(crate) fn parse_headers(
         headers: &HashMap<String, Vec<String>>,
     ) -> Result<HeaderMap<HeaderValue>, WebSocketError> {
-        std::println!("parse_headers: {headers:?}");
         let mut result = HeaderMap::with_capacity(headers.iter().map(|(_, v)| v.len()).sum());
 
         for (key, values) in headers {
@@ -105,7 +104,6 @@ impl WebSocketConnector {
         auth: Option<Auth>,
         extra_headers: HeaderMap<HeaderValue>,
     ) -> Self {
-        std::println!("headers: {extra_headers:?}");
         Self {
             uri,
             tls,

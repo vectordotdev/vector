@@ -214,7 +214,6 @@ impl_generate_config_from_default!(WebSocketConfig);
 #[typetag::serde(name = "websocket")]
 impl SourceConfig for WebSocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        std::println!("build headers: {:?}", self.common.headers);
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
