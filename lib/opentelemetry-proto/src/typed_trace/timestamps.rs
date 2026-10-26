@@ -18,12 +18,24 @@ pub fn datetime_to_otlp_nanos(
     ts: DateTime<Utc>,
     reporter: &mut impl TraceConversionReporter,
 ) -> u64 {
-    let nanos = i128::from(ts.timestamp()) * i128::from(NANOS_PER_SECOND)
-        + i128::from(ts.timestamp_subsec_nanos());
+    clamp_signed_nanos(signed_nanos(ts), reporter)
+}
+
+fn signed_nanos(ts: DateTime<Utc>) -> i128 {
+    i128::from(ts.timestamp()) * i128::from(NANOS_PER_SECOND)
+        + i128::from(ts.timestamp_subsec_nanos())
+}
+
+fn clamp_signed_nanos(nanos: i128, reporter: &mut impl TraceConversionReporter) -> u64 {
     u64::try_from(nanos).unwrap_or_else(|_| {
         reporter.report(TraceConversionIssue::ClampedTimestamp);
         if nanos < 0 { 0 } else { u64::MAX }
     })
+}
+
+/// `Duration::MAX` is about 2^94 nanoseconds, which fits in `i128`.
+fn duration_nanos(duration: Duration) -> i128 {
+    i128::try_from(duration.as_nanos()).unwrap_or(i128::MAX)
 }
 
 pub fn duration_from_otlp(
@@ -41,13 +53,10 @@ pub fn duration_from_otlp(
 }
 
 pub fn reconstruct_end_time(
-    start_nanos: u64,
+    start: DateTime<Utc>,
     duration: Duration,
     reporter: &mut impl TraceConversionReporter,
 ) -> u64 {
-    let end = u128::from(start_nanos) + duration.as_nanos();
-    u64::try_from(end).unwrap_or_else(|_| {
-        reporter.report(TraceConversionIssue::ClampedTimestamp);
-        u64::MAX
-    })
+    let end = signed_nanos(start).saturating_add(duration_nanos(duration));
+    clamp_signed_nanos(end, reporter)
 }

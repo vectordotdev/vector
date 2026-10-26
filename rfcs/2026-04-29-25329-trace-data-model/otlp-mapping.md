@@ -70,9 +70,10 @@ input shapes. Each is justified by a paragraph in the Implementation or Rational
 below.
 
 - **Promoted deprecated `deployment.environment` key** is rewritten to
-  `deployment.environment.name` on OTLP egress. If both keys are present on ingress, the
-  deprecated value is dropped (the stable key wins). See the deprecated-environment
-  paragraph under Implementation.
+  `deployment.environment.name` on OTLP egress. If both keys are present on ingress and
+  the stable value is a non-empty string, the deprecated value is dropped. An empty or
+  non-string stable value stays in the attribute map, and a usable deprecated value is
+  still promoted. See the deprecated-environment paragraph under Implementation.
 - **Reserved cross-format OTLP attributes** under the `datadog.` prefix are lifted into
   the typed `TraceEvent.datadog` / `Span.datadog` slots on OTLP ingress and stripped,
   then synthesized from those slots on OTLP egress, removing or replacing any existing
@@ -262,12 +263,13 @@ the attribute as `deployment.environment.name` in semantic conventions
 ([PR #3584](https://github.com/open-telemetry/semantic-conventions/pull/3584)), with
 `deployment.environment` listed as "Replaced by `deployment.environment.name`."
 
-The stable key wins when both are present; dropping the deprecated value
-saturating-increments `Resource.dropped_attributes_count`. The selected
-key is then subject to the promotion rule above: a non-empty string promotes, while an
-empty or non-string value remains under its original key. On OTLP egress, a promoted
-`Resource.environment` uses
-`deployment.environment.name`; an unpromoted attribute retains its original key and
+A non-empty string at `deployment.environment.name` wins when both keys are present.
+Dropping the deprecated value saturating-increments `Resource.dropped_attributes_count`.
+An empty or non-string stable value does not win: it stays in the attribute map, and
+`deployment.environment` is the selected key instead. The selected key is then subject
+to the promotion rule above: a non-empty string promotes, while an empty or non-string
+value remains under its original key. On OTLP egress, a promoted `Resource.environment`
+uses `deployment.environment.name`; an unpromoted attribute retains its original key and
 value.
 
 The Rationale for accepting both keys is in the Rationale section.
@@ -276,10 +278,12 @@ The Rationale for accepting both keys is in the Rationale section.
 
 OTLP carries timing as two independent `fixed64` nanosecond values, `start_time_unix_nano`
 and `end_time_unix_nano`. On ingress, `Span.duration` is computed as
-`end_time_unix_nano − start_time_unix_nano`; on egress, `end_time_unix_nano` is
-reconstructed as `start_time_unix_nano + duration.as_nanos()`. Both quantities are integer
-nanoseconds in memory and on the wire; the round trip is bit-exact for any span where
-`end_time_unix_nano >= start_time_unix_nano`.
+`end_time_unix_nano − start_time_unix_nano`. On egress, `end_time_unix_nano` is
+reconstructed by adding `duration.as_nanos()` to the original typed `start_time` in a
+widened signed domain, then clamping the start and that derived end independently to the
+`fixed64` domain. A start of -1s with a duration of 2s encodes as start `0` and end `1s`.
+Both quantities are integer nanoseconds in memory and on the wire; the round trip is
+bit-exact for any span where `end_time_unix_nano >= start_time_unix_nano`.
 
 A span with reversed timestamps (`end_time_unix_nano < start_time_unix_nano`) is clamped to zero
 duration on ingress; this is one of the OTLP-side zero-loss exclusions listed above.
@@ -384,10 +388,12 @@ partition of a `ScopeSpans` use wire-order first; the conflict is reported.
   `Resource.environment` populates Datadog's `TracerPayload.env` on cross-format egress
   (see the Datadog sub-RFC): a route that fails to recognize the producer's chosen key
   emits an empty `TracerPayload.env` and loses environment attribution at the Datadog
-  backend. The collision rule (current key wins) and egress emission (current key only)
-  are documented under Implementation. A bit-exact relay alternative would require either
-  adding provenance state to `Resource` or moving the typed slot to a derived view over
-  `Resource.attributes`; both pay substantive cost for one transitional attribute.
+  backend. The collision rule (a non-empty string at the current key wins; an empty or
+  non-string current value leaves the deprecated key eligible) and egress emission
+  (current key only) are documented under Implementation. A bit-exact relay alternative
+  would require either adding provenance state to `Resource` or moving the typed slot
+  to a derived view over `Resource.attributes`; both pay substantive cost for one
+  transitional attribute.
 - The OTLP `AnyValue.string_value` / `AnyValue.bytes_value` discriminator is preserved
   structurally because the parent RFC's `AttrValue` carries `String` and `Bytes` as
   distinct variants. OTLP egress is a 1:1 variant routing with no payload inspection,

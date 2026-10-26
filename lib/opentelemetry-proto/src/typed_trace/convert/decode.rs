@@ -150,7 +150,10 @@ fn promote_resource_slots(resource: &mut Resource, reporter: &mut impl TraceConv
         &mut resource.service,
     );
 
-    let has_stable = resource.attributes.get(ENVIRONMENT_NAME).is_some();
+    let has_stable = matches!(
+        resource.attributes.get(ENVIRONMENT_NAME),
+        Some(AttrValue::String(value)) if !value.is_empty()
+    );
     if has_stable && resource.attributes.remove(ENVIRONMENT_LEGACY).is_some() {
         resource.dropped_attributes_count.increment(1);
         reporter.report(TraceConversionIssue::AttributeCollision {

@@ -153,7 +153,7 @@ impl PbSpan {
             name: span.name,
             kind: span.kind.to_i32(),
             start_time_unix_nano,
-            end_time_unix_nano: reconstruct_end_time(start_time_unix_nano, span.duration, reporter),
+            end_time_unix_nano: reconstruct_end_time(span.start_time, span.duration, reporter),
             attributes: attr_map_to_key_values(map),
             dropped_attributes_count: dropped.get(),
             events: span

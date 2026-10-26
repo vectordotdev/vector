@@ -32,24 +32,29 @@ impl ExportTraceServiceRequest {
     ) -> (Self, EventFinalizers) {
         let mut finalizers = EventFinalizers::default();
         let mut groups: Vec<ResourceGroup> = Vec::new();
+        let mut last_group = None;
         for event in events {
             let (trace_id, resource, scope, mut datadog, spans, mut metadata) = event.into_parts();
             finalizers.merge(metadata.take_finalizers());
             let agent = datadog.take_agent();
             let chunk = datadog.take_chunk();
             let tracer = datadog.tracer;
-            let index = groups
-                .iter()
-                .position(|group| group.matches(&resource, agent.as_ref(), &tracer))
-                .unwrap_or_else(|| {
-                    groups.push(ResourceGroup {
-                        resource,
-                        agent,
-                        tracer,
-                        scope_groups: Vec::new(),
-                    });
-                    groups.len() - 1
+            let found = recent_match(last_group, &groups, |group| {
+                group.matches(&resource, agent.as_ref(), &tracer)
+            });
+            let index = if let Some(index) = found {
+                index
+            } else {
+                groups.push(ResourceGroup {
+                    resource,
+                    agent,
+                    tracer,
+                    scope_groups: Vec::new(),
+                    last_scope: None,
                 });
+                groups.len() - 1
+            };
+            last_group = Some(index);
             groups[index].push(trace_id, scope, chunk, spans, reporter);
         }
         (
@@ -69,6 +74,20 @@ struct ResourceGroup {
     agent: Option<DatadogAgentEnvelope>,
     tracer: DatadogTracerContext,
     scope_groups: Vec<ScopeGroup>,
+    last_scope: Option<usize>,
+}
+
+/// Index of the matching item, checking `last` before scanning.
+///
+/// Events from one request tend to share a resource and scope with their predecessor, so
+/// the repeated full equality scan is the uncommon path.
+fn recent_match<T>(
+    last: Option<usize>,
+    items: &[T],
+    matches: impl Fn(&T) -> bool,
+) -> Option<usize> {
+    last.filter(|&index| matches(&items[index]))
+        .or_else(|| items.iter().position(&matches))
 }
 
 enum ScopeGroup {
@@ -83,21 +102,12 @@ enum ScopeGroup {
 }
 
 impl ScopeGroup {
-    /// Returns this group's spans when an event with `event_scope` and `event_chunk`
-    /// coalesces into it.
-    fn coalesced_spans(
-        &mut self,
-        event_scope: &Scope,
-        event_chunk: Option<&DatadogChunkContext>,
-    ) -> Option<&mut Vec<(TraceId, Span)>> {
-        match self {
-            Self::Coalesced {
-                scope,
-                chunk,
-                spans,
-            } if scope == event_scope && chunk.as_ref() == event_chunk => Some(spans),
-            _ => None,
-        }
+    fn coalesces(&self, event_scope: &Scope, event_chunk: Option<&DatadogChunkContext>) -> bool {
+        matches!(
+            self,
+            Self::Coalesced { scope, chunk, .. }
+                if scope == event_scope && chunk.as_ref() == event_chunk
+        )
     }
 }
 
@@ -148,17 +158,24 @@ impl ResourceGroup {
             chunk => chunk,
         };
         let spans = spans.into_iter().map(|span| (trace_id, span));
-        match self
-            .scope_groups
-            .iter_mut()
-            .find_map(|group| group.coalesced_spans(&scope, chunk.as_ref()))
-        {
-            Some(group_spans) => group_spans.extend(spans),
-            None => self.scope_groups.push(ScopeGroup::Coalesced {
+        if let Some(index) = recent_match(self.last_scope, &self.scope_groups, |group| {
+            group.coalesces(&scope, chunk.as_ref())
+        }) {
+            let ScopeGroup::Coalesced {
+                spans: group_spans, ..
+            } = &mut self.scope_groups[index]
+            else {
+                unreachable!("coalesces is false for an empty scope group");
+            };
+            group_spans.extend(spans);
+            self.last_scope = Some(index);
+        } else {
+            self.scope_groups.push(ScopeGroup::Coalesced {
                 scope,
                 chunk,
                 spans: spans.collect(),
-            }),
+            });
+            self.last_scope = Some(self.scope_groups.len() - 1);
         }
     }
 }

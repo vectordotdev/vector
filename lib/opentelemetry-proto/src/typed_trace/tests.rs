@@ -311,6 +311,76 @@ fn stable_environment_wins_over_deprecated() {
 }
 
 #[test]
+fn unusable_stable_environment_keeps_legacy() {
+    let empty_stable = ResourceSpans::from_parts(
+        vec![PbSpan::from_parts(1, 1, "s")],
+        vec![
+            KeyValue::from_string("deployment.environment.name", ""),
+            KeyValue::from_string("deployment.environment", "legacy-env"),
+        ],
+    );
+    let non_string_stable = ResourceSpans::from_parts(
+        vec![PbSpan::from_parts(1, 1, "s")],
+        vec![
+            KeyValue::from_int("deployment.environment.name", 7),
+            KeyValue::from_string("deployment.environment", "legacy-env"),
+        ],
+    );
+    assert_eq!(
+        empty_stable.decode(),
+        (
+            vec![resource_event(Resource {
+                environment: Some("legacy-env".into()),
+                attributes: attrs([(
+                    "deployment.environment.name",
+                    AttrValue::String(String::new()),
+                )]),
+                ..Resource::default()
+            })],
+            TraceConversionCounts::default(),
+        )
+    );
+    assert_eq!(
+        non_string_stable.decode(),
+        (
+            vec![resource_event(Resource {
+                environment: Some("legacy-env".into()),
+                attributes: attrs([("deployment.environment.name", AttrValue::Integer(7))]),
+                ..Resource::default()
+            })],
+            TraceConversionCounts::default(),
+        )
+    );
+}
+
+#[test]
+fn unusable_environment_keys_both_remain() {
+    let rs = ResourceSpans::from_parts(
+        vec![PbSpan::from_parts(1, 1, "s")],
+        vec![
+            KeyValue::from_string("deployment.environment.name", ""),
+            KeyValue::from_parts("deployment.environment", None),
+        ],
+    );
+    assert_eq!(
+        rs.decode(),
+        (
+            vec![resource_event(Resource {
+                attributes: attrs([
+                    (
+                        "deployment.environment.name",
+                        AttrValue::String(String::new()),
+                    ),
+                    ("deployment.environment", AttrValue::Null),
+                ]),
+                ..Resource::default()
+            })],
+            TraceConversionCounts::default(),
+        )
+    );
+}
+
+#[test]
 fn duplicate_keys_last_wins_and_increment_dropped() {
     let rs = ResourceSpans::from_parts(
         vec![PbSpan::from_parts(1, 1, "s")],
@@ -649,6 +719,54 @@ fn coalesces_compatible_partitions_and_keeps_one_scope_dropped_count() {
 }
 
 #[test]
+fn nonadjacent_resources_and_scopes_still_coalesce() {
+    let event = |trace, span, name: &str, service: &str, scope_name: &str| {
+        let mut event = typed_event(trace, vec![typed_span(span, name)]);
+        event.resource_mut().service = Some(service.into());
+        event.scope_mut().name = Some(scope_name.into());
+        event
+    };
+    let encoded = encode(&[
+        event(1, 1, "a1", "svc-a", "lib-a"),
+        event(2, 2, "b1", "svc-b", "lib-a"),
+        event(1, 3, "a2", "svc-a", "lib-b"),
+        event(1, 4, "a3", "svc-a", "lib-a"),
+    ]);
+
+    assert_eq!(encoded.len(), 2);
+    let service_a = &encoded[0];
+    let service_b = &encoded[1];
+    assert_eq!(
+        service_a.resource.as_ref().unwrap().attributes,
+        vec![KeyValue::from_string(SERVICE_NAME, "svc-a")]
+    );
+    assert_eq!(service_a.scope_spans.len(), 2);
+    assert_eq!(
+        service_a.scope_spans[0].scope.as_ref().unwrap().name,
+        "lib-a"
+    );
+    assert_eq!(
+        service_a.scope_spans[0]
+            .spans
+            .iter()
+            .map(|span| span.name.as_str())
+            .collect::<Vec<_>>(),
+        ["a1", "a3"]
+    );
+    assert_eq!(
+        service_a.scope_spans[1].scope.as_ref().unwrap().name,
+        "lib-b"
+    );
+    assert_eq!(service_a.scope_spans[1].spans[0].name, "a2");
+    assert_eq!(
+        service_b.resource.as_ref().unwrap().attributes,
+        vec![KeyValue::from_string(SERVICE_NAME, "svc-b")]
+    );
+    assert_eq!(service_b.scope_spans.len(), 1);
+    assert_eq!(service_b.scope_spans[0].spans[0].name, "b1");
+}
+
+#[test]
 fn incompatible_chunk_contexts_do_not_share_scope_spans() {
     let mut keep = typed_event(1, vec![typed_span(1, "a")]);
     keep.datadog_mut().set_chunk(Some(DatadogChunkContext {
@@ -934,6 +1052,54 @@ fn egress_clamps_timestamps_to_otlp_domain() {
             u64::MAX,
             TraceConversionCounts {
                 clamped_timestamps: 3,
+                ..TraceConversionCounts::default()
+            },
+        )
+    );
+}
+
+#[test]
+fn egress_derives_end_before_clamping_pre_epoch_start() {
+    let crossing = Span {
+        start_time: DateTime::from_timestamp(-1, 0).unwrap(),
+        duration: Duration::from_secs(2),
+        ..typed_span(1, "s")
+    };
+    let still_before = Span {
+        start_time: DateTime::from_timestamp(-5, 0).unwrap(),
+        duration: Duration::from_secs(2),
+        ..typed_span(1, "s")
+    };
+    let (crossing_encoded, crossing_counts) = encode_counted(&[typed_event(1, vec![crossing])]);
+    let crossing_wire = &crossing_encoded[0].scope_spans[0].spans[0];
+    assert_eq!(
+        (
+            crossing_wire.start_time_unix_nano,
+            crossing_wire.end_time_unix_nano,
+            crossing_counts,
+        ),
+        (
+            0,
+            1_000_000_000,
+            TraceConversionCounts {
+                clamped_timestamps: 1,
+                ..TraceConversionCounts::default()
+            },
+        )
+    );
+    let (before_encoded, before_counts) = encode_counted(&[typed_event(1, vec![still_before])]);
+    let before_wire = &before_encoded[0].scope_spans[0].spans[0];
+    assert_eq!(
+        (
+            before_wire.start_time_unix_nano,
+            before_wire.end_time_unix_nano,
+            before_counts,
+        ),
+        (
+            0,
+            0,
+            TraceConversionCounts {
+                clamped_timestamps: 2,
                 ..TraceConversionCounts::default()
             },
         )
@@ -1299,10 +1465,8 @@ proptest! {
             for key in PROMOTED_KEYS {
                 prop_assert!(!is_promotable(attributes.get(key)), "{key} was not promoted");
             }
-            prop_assert!(
-                attributes.get(ENVIRONMENT_NAME).is_none()
-                    || attributes.get(ENVIRONMENT_LEGACY).is_none()
-            );
+            // An empty or non-string stable environment does not drop the legacy key,
+            // so both may remain. A promotable string under either key fails above.
             for span in event.spans() {
                 prop_assert!(span.attributes.iter().all(|(key, _)| !is_reserved_datadog_key(key)));
             }
