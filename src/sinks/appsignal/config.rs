@@ -1,7 +1,8 @@
 use futures::FutureExt;
-use http::{HeaderValue, Request, header::AUTHORIZATION};
-use hyper::Body;
+use http::StatusCode;
+use http_1::{HeaderValue, Request, header::AUTHORIZATION};
 use tower::ServiceBuilder;
+use vector_http::empty_body;
 use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input},
     configurable::configurable_component,
@@ -11,20 +12,21 @@ use vector_lib::{
 };
 
 use super::{
-    service::{AppsignalResponse, AppsignalService},
-    sink::AppsignalSink,
+    encoder::AppsignalEncoder, request_builder::AppsignalRequestBuilder,
+    service::AppsignalSvcRequestBuilder, sink::AppsignalSink,
 };
 use crate::{
     codecs::Transformer,
     config::ValidatedSink,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},
         util::{
             BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
-            http::{HttpStatusRetryLogic, RetryStrategy},
+            http::RetryStrategy,
+            http_v1::{HttpService, http_response_retry_logic},
         },
     },
 };
@@ -93,29 +95,37 @@ impl AppsignalConfig {
         batch_settings: BatcherSettings,
         endpoint: HttpEndpoint,
     ) -> VectorSink {
-        let push_api_key = self.push_api_key.clone();
-        let compression = self.compression;
-        let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
+        let service_request_builder = AppsignalSvcRequestBuilder {
+            endpoint,
+            push_api_key: self.push_api_key.clone(),
+            compression: self.compression,
+        };
+
+        let service =
+            HttpService::new(http_client, service_request_builder).with_response_decompression();
 
         let request_opts = self.request;
         let request_settings = request_opts.into_settings();
-        let retry_logic = HttpStatusRetryLogic::new(
-            |req: &AppsignalResponse| req.http_status,
-            self.retry_strategy.clone(),
-        );
 
         let service = ServiceBuilder::new()
-            .settings(request_settings, retry_logic)
+            .settings(
+                request_settings,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
             .service(service);
 
-        let transformer = self.encoding.clone();
-        let sink = AppsignalSink {
-            service,
-            compression,
-            transformer,
-            batch_settings,
+        let request_builder = AppsignalRequestBuilder {
+            encoder: AppsignalEncoder {
+                transformer: self.encoding.clone(),
+            },
+            compression: self.compression,
         };
 
+        let sink = AppsignalSink {
+            service,
+            batch_settings,
+            request_builder,
+        };
         VectorSink::from_event_streamsink(sink)
     }
 }
@@ -191,10 +201,13 @@ async fn healthcheck(
     authorization: HeaderValue,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::get(uri.as_uri()).header(AUTHORIZATION, authorization);
-    let response = client.send(request.body(Body::empty()).unwrap()).await?;
+    let request = Request::get(uri.into_v1()).header(AUTHORIZATION, authorization);
+    let response = client.send(request.body(empty_body())?).await?;
 
-    match response.status() {
+    let status = StatusCode::from_u16(response.status().as_u16())
+        .expect("HTTP status codes are valid u16 values");
+
+    match status {
         status if status.is_success() => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }

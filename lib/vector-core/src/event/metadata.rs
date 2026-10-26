@@ -104,10 +104,13 @@ pub(super) struct Inner {
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
     /// This definition is only currently valid for logs, and shouldn't be used for other event types.
+    /// `None` stands for the shared default definition, so creating an event allocates nothing
+    /// for it.
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
-    #[serde(default = "default_schema_definition", skip)]
-    pub(crate) schema_definition: Arc<schema::Definition>,
+    #[derivative(PartialEq(compare_with = "schema_definition_eq"))]
+    #[serde(default, skip)]
+    pub(crate) schema_definition: Option<Arc<schema::Definition>>,
 
     /// A store of values that may be dropped during the encoding process but may be needed
     /// later on. The map is indexed by meaning.
@@ -333,7 +336,7 @@ impl Default for Inner {
             value: Value::Object(ObjectMap::new()),
             secrets: Secrets::new(),
             finalizers: Default::default(),
-            schema_definition: default_schema_definition(),
+            schema_definition: None,
             source_id: None,
             source_type: None,
             upstream_id: None,
@@ -361,8 +364,22 @@ static DEFAULT_SCHEMA_DEFINITION: LazyLock<Arc<schema::Definition>> = LazyLock::
     ))
 });
 
-pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
-    Arc::clone(&*DEFAULT_SCHEMA_DEFINITION)
+fn default_schema_definition() -> &'static Arc<schema::Definition> {
+    &DEFAULT_SCHEMA_DEFINITION
+}
+
+fn resolve_schema_definition(
+    definition: Option<&Arc<schema::Definition>>,
+) -> &Arc<schema::Definition> {
+    definition.unwrap_or_else(|| default_schema_definition())
+}
+
+#[expect(clippy::ref_option, reason = "signature required by `derivative`")]
+fn schema_definition_eq(
+    left: &Option<Arc<schema::Definition>>,
+    right: &Option<Arc<schema::Definition>>,
+) -> bool {
+    resolve_schema_definition(left.as_ref()) == resolve_schema_definition(right.as_ref())
 }
 
 impl ByteSizeOf for EventMetadata {
@@ -407,7 +424,7 @@ impl EventMetadata {
     /// Replace the schema definition with the given one.
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
-        self.get_mut().schema_definition = Arc::clone(schema_definition);
+        self.get_mut().schema_definition = Some(Arc::clone(schema_definition));
         self
     }
 
@@ -491,12 +508,12 @@ impl EventMetadata {
 
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
-        &self.inner.schema_definition
+        resolve_schema_definition(self.inner.schema_definition.as_ref())
     }
 
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
-        self.get_mut().schema_definition = Arc::clone(definition);
+        self.get_mut().schema_definition = Some(Arc::clone(definition));
     }
 
     /// Helper function to add a semantic meaning to the schema definition.
@@ -515,7 +532,11 @@ impl EventMetadata {
     ///     .set_schema_definition(new_schema);
     /// ````
     pub fn add_schema_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
-        let schema = Arc::make_mut(&mut self.get_mut().schema_definition);
+        let schema = Arc::make_mut(
+            self.get_mut()
+                .schema_definition
+                .get_or_insert_with(|| Arc::clone(default_schema_definition())),
+        );
         schema.add_meaning(target_path, meaning);
     }
 }

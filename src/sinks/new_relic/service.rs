@@ -1,22 +1,18 @@
 use std::{
-    fmt::Debug,
     sync::Arc,
     task::{Context, Poll},
 };
 
 use bytes::Bytes;
-use http::{
+use http_1::{
     Request,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
-use hyper::Body;
 use tracing::Instrument;
+use vector_http::full_body;
 
 use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::{
-    http::HttpClient,
-    sinks::{prelude::*, util::Compression},
-};
+use crate::{http::client_v1::HttpClient, sinks::prelude::*};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {
@@ -73,12 +69,12 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
     type Error = NewRelicSinkError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: NewRelicApiRequest) -> Self::Future {
-        let mut client = self.client.clone();
+        let client = self.client.clone();
 
         let uri = request.credentials.get_uri();
 
@@ -96,11 +92,15 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
         let metadata = request.get_metadata().clone();
         let http_request = http_request
             .header(CONTENT_LENGTH, payload_len)
-            .body(Body::from(request.payload))
+            .body(request.payload)
             .expect("building HTTP request failed unexpectedly");
 
         Box::pin(async move {
-            match client.call(http_request).in_current_span().await {
+            match client
+                .send(http_request.map(full_body))
+                .in_current_span()
+                .await
+            {
                 Ok(_) => Ok(NewRelicApiResponse {
                     event_status: EventStatus::Delivered,
                     metadata,
