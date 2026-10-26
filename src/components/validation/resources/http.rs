@@ -8,14 +8,17 @@ use std::{
 
 use axum::{
     Router,
+    extract::Request,
+    http::StatusCode,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
 };
 use bytes::{BufMut as _, BytesMut};
-use http::{Method, Request, StatusCode, Uri};
-use http_body::{Body as _, Collected};
-use hyper::{Body, Client, Server};
+use http::{Method, Uri};
+use http_body_util::{BodyExt as _, Collected};
+use hyper::Client;
 use tokio::{
+    net::TcpListener,
     select,
     sync::{Mutex, Notify, mpsc, oneshot},
 };
@@ -237,7 +240,7 @@ fn spawn_input_http_client(
         started.mark_as_done();
         info!("HTTP client external input resource started.");
 
-        let client = Client::builder().build_http::<Body>();
+        let client = Client::builder().build_http::<hyper::Body>();
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
         let headers = config.headers.unwrap_or_default();
@@ -272,7 +275,7 @@ fn spawn_input_http_client(
                 runner_metrics.sent_bytes_total += 1;
             }
 
-            let mut request_builder = Request::builder()
+            let mut request_builder = http::Request::builder()
                 .uri(request_uri.clone())
                 .method(request_method.clone());
 
@@ -475,7 +478,7 @@ fn spawn_http_server<H, F, R>(
     handler: H,
 ) -> (Arc<Notify>, oneshot::Sender<()>)
 where
-    H: Fn(Request<Body>, Arc<Mutex<RunnerMetrics>>) -> F + Clone + Send + 'static,
+    H: Fn(Request, Arc<Mutex<RunnerMetrics>>) -> F + Clone + Send + 'static,
     F: Future<Output = R> + Send,
     R: IntoResponse,
 {
@@ -504,8 +507,9 @@ where
     tokio::spawn(async move {
         // Create our HTTP server by binding as early as possible to return an error if we can't
         // actually bind.
-        let server_builder =
-            Server::try_bind(&listen_addr).expect("Failed to bind to listen address.");
+        let listener = TcpListener::bind(listen_addr)
+            .await
+            .expect("Failed to bind to listen address.");
 
         // Create our router, which is a bit boilerplate-y because we take the HTTP method
         // parametrically. We generate a handler that calls the given `handler` and then triggers
@@ -514,10 +518,13 @@ where
         // Every time a request is processed, we notify the core logic loop so it can continue
         // checking to see if it's time to fully close once all input events have been consumed and
         // the input receiver is closed.
-        let method_filter = MethodFilter::try_from(request_method)
-            .expect("should not fail to convert method to method filter");
+        let method_filter = MethodFilter::try_from(
+            axum::http::Method::from_bytes(request_method.as_str().as_bytes())
+                .expect("configured HTTP method should be a valid method token"),
+        )
+        .expect("should not fail to convert method to method filter");
         let method_router = MethodRouter::new()
-            .fallback(|req: Request<Body>| async move {
+            .fallback(|req: Request| async move {
                 error!(
                     path = req.uri().path(),
                     method = req.method().as_str(),
@@ -526,7 +533,7 @@ where
 
                 StatusCode::METHOD_NOT_ALLOWED
             })
-            .on(method_filter, move |request: Request<Body>| {
+            .on(method_filter, move |request: Request| {
                 let request_handler = handler(request, output_runner_metrics);
                 let notifier = Arc::clone(&server_notifier);
 
@@ -537,21 +544,20 @@ where
                 }
             });
 
-        let router = Router::new().route(&request_path, method_router).fallback(
-            |req: Request<Body>| async move {
-                error!(?req, "Component sent request the server could not route.");
-                StatusCode::NOT_FOUND
-            },
-        );
+        let router =
+            Router::new()
+                .route(&request_path, method_router)
+                .fallback(|req: Request| async move {
+                    error!(?req, "Component sent request the server could not route.");
+                    StatusCode::NOT_FOUND
+                });
 
         // Now actually run/drive the HTTP server and process requests until we're told to shutdown.
         http_server_started.mark_as_done();
 
-        let server = server_builder
-            .serve(router.into_make_service())
-            .with_graceful_shutdown(async {
-                http_server_shutdown_rx.await.ok();
-            });
+        let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+            http_server_shutdown_rx.await.ok();
+        });
 
         if let Err(e) = server.await {
             error!(error = ?e, "HTTP server encountered an error.");

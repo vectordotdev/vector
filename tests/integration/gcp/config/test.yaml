@@ -1,5 +1,6 @@
 features:
   - gcp-integration-tests
+  - gcp-pubsub-integration-tests
 
 test_filter: "::gcp"
 

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 
 use chrono::Utc;
 use futures::TryFutureExt;
-use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
+use tonic::{Request, Response, Status, service::RoutesBuilder};
 use tonic_health::server::health_reporter;
 use tower::layer::util::Identity;
 use vector_lib::{
@@ -614,5 +614,47 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
+    }
+
+    #[tokio::test]
+    async fn sink_reconnects_after_source_max_connection_age() {
+        use futures::StreamExt;
+        use tokio::time::{Duration, sleep};
+
+        let (_guard, addr) = test_util::addr::next_addr();
+        let source: VectorConfig = toml::from_str(&format!(
+            "address = \"{addr}\"\n[keepalive]\nmax_connection_age_secs = 1"
+        ))
+        .unwrap();
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Retries are disabled, so the second batch must succeed on a new connection.
+        let sink: SinkConfig = toml::from_str(&format!(
+            "address = \"http://{addr}\"\nbatch.timeout_secs = 0.1\nrequest.retry_attempts = 0"
+        ))
+        .unwrap();
+        let (sink, _) = sink.build(SinkContext::default()).await.unwrap();
+
+        let (first_batch, first_receiver) = BatchNotifier::new_with_receiver();
+        let (_, first_stream) = test_util::random_events_with_stream(16, 5, Some(first_batch));
+        let (second_batch, second_receiver) = BatchNotifier::new_with_receiver();
+        let (_, second_stream) = test_util::random_events_with_stream(16, 5, Some(second_batch));
+        let wait_for_max_age = futures::stream::once(async move {
+            assert_eq!(first_receiver.await, BatchStatus::Delivered);
+            sleep(Duration::from_millis(1500)).await;
+        })
+        .filter_map(|()| std::future::ready(None));
+
+        sink.run(first_stream.chain(wait_for_max_age).chain(second_stream))
+            .await
+            .unwrap();
+
+        assert_eq!(second_receiver.await, BatchStatus::Delivered);
     }
 }

@@ -10,9 +10,7 @@ use std::{
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
+use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tokio::sync::Semaphore;
 use tonic::Code::{
     AlreadyExists, DataLoss, InvalidArgument, NotFound, OutOfRange, PermissionDenied,
@@ -20,6 +18,7 @@ use tonic::Code::{
 };
 use tonic::body::BoxBody;
 use tower::{Service, ServiceBuilder};
+use vector_http::Http2Client;
 use vector_lib::configurable::configurable_component;
 use vector_lib::stream::BatcherSettings;
 
@@ -34,7 +33,6 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions, ValidatedSink,
     },
-    http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
@@ -194,7 +192,7 @@ struct RoutingConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
-    pub fn from_address(addr: &Uri) -> Self {
+    pub fn from_address(addr: &http_1::Uri) -> Self {
         let addr = addr.to_string();
         default_config(addr.as_str())
     }
@@ -288,10 +286,10 @@ impl ValidatedSink for VectorConfig {
             .into_iter()
             .map(|uri| {
                 let endpoint = uri.to_string();
-                let service = VectorService::new(client.clone(), uri, self.compression);
-                (endpoint, service)
+                VectorService::new(client.clone(), uri, self.compression)
+                    .map(|service| (endpoint, service))
             })
-            .collect::<Vec<_>>();
+            .collect::<crate::Result<Vec<_>>>()?;
 
         let sink = match endpoint_strategy {
             _ if services.len() == 1 => {
@@ -757,7 +755,7 @@ async fn healthcheck(
 }
 
 fn healthchecks(
-    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    client: Http2Client<BoxBody>,
     uris: &[Uri],
     options: &SinkHealthcheckOptions,
     endpoint_strategy: EndpointStrategy,
@@ -770,15 +768,19 @@ fn healthchecks(
 
     let timeout = options.timeout;
     let healthchecks = healthcheck_uris.into_iter().map(move |uri| {
-        let service = VectorService::new(client.clone(), uri, VectorCompression::None);
-        healthcheck(
-            service,
-            SinkHealthcheckOptions {
-                enabled: true,
-                uri: None,
-                timeout,
-            },
-        )
+        let client = client.clone();
+        async move {
+            let service = VectorService::new(client, uri, VectorCompression::None)?;
+            healthcheck(
+                service,
+                SinkHealthcheckOptions {
+                    enabled: true,
+                    uri: None,
+                    timeout,
+                },
+            )
+            .await
+        }
         .boxed()
     });
 
@@ -824,11 +826,9 @@ fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
     keepalive: Option<VectorKeepaliveConfig>,
-) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
-    let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
-
-    let mut builder = hyper::Client::builder();
-    builder.http2_only(true);
+) -> crate::Result<Http2Client<BoxBody>> {
+    let mut builder = Builder::new(TokioExecutor::new());
+    builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
 
     // Keepalive is opt-in. When enabled, PINGs are sent on idle connections so dead connections
     // are detected and evicted before they are reused, not during a request.
@@ -841,7 +841,7 @@ fn new_client(
             .http2_keep_alive_while_idle(true);
     }
 
-    Ok(builder.build(proxy))
+    Http2Client::new(tls_settings.clone(), proxy_config, builder)
 }
 
 #[derive(Debug, Clone)]

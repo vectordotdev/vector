@@ -25,7 +25,7 @@
 #
 # The following triggers are available but do NOT run as part of /ci-run-all:
 # /ci-run-cross               : runs Cross (covered by /ci-run-packaging)
-# /ci-run-coverage            : runs full coverage suite (unit + int + e2e)
+# /ci-run-coverage            : collects unit + integration coverage; also runs e2e tests
 # /ci-run-regression          : runs Regression Detection Suite. The comparison ref is
 #                               the review's commit. An optional baseline ref can be
 #                               passed as an argument, otherwise the baseline defaults
@@ -253,6 +253,7 @@ jobs:
     uses: ./.github/workflows/coverage.yml
     with:
       ref: ${{ github.event.review.commit_id }}
+      branch: ${{ github.event.pull_request.head.ref }}
     secrets: inherit
 
   packaging:
