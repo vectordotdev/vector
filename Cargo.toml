@@ -120,6 +120,7 @@ members = [
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
+  "lib/vector-http",
   "lib/vector-lib",
   "lib/vector-lookup",
   "lib/vector-stream",
@@ -237,7 +238,7 @@ proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "visit", "extra-traits"] }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.12.3", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-native-roots", "gzip", "zstd"] }
+tonic = { version = "0.12.3", default-features = false, features = ["transport", "codegen", "prost", "tls", "gzip", "zstd"] }
 tonic-build = { version = "0.12.3", default-features = false, features = ["transport", "prost"] }
 tonic-health = { version = "0.12.3", default-features = false }
 tonic-reflection = { version = "0.12.3", default-features = false, features = ["server"] }
@@ -279,6 +280,7 @@ vrl.workspace = true
 fakedata = { path = "lib/fakedata", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-common = { path = "lib/vector-common", default-features = false }
+vector-http = { path = "lib/vector-http" }
 vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
@@ -449,7 +451,6 @@ http-body-util = { version = "0.1", default-features = false }
 hyper = { version = "0.14.32", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream", "backports", "deprecated"] }
 hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["client", "http1", "http2"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
-hyper-openssl-1 = { package = "hyper-openssl", version = "0.10", default-features = false, features = ["client-legacy"] }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 hyper-util = { version = "0.1", default-features = false, features = ["client", "client-legacy", "http1", "http2", "tokio"] }
 indexmap.workspace = true
@@ -484,7 +485,6 @@ roaring = { version = "0.11.2", default-features = false, features = ["std"], op
 rumqttc = { package = "rumqttc-next", version = "0.26.1", default-features = false, features = ["use-rustls-no-provider"], optional = true }
 # Keep MQTT on Ring alongside Vector's other Rustls users, including in minimal builds.
 rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
-rustls-native-certs = { version = "0.8", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -784,7 +784,7 @@ sources-exec = []
 sources-file = ["vector-lib/file-source"]
 sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "sources-utils-net-unix", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
-sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "dep:rustls", "dep:rustls-native-certs", "protobuf-build", "dep:tonic"]
+sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics = ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]

@@ -11,6 +11,7 @@ use http_body_util::BodyExt;
 use tower::{Service, service_fn};
 use tower_http_1::decompression::Decompression;
 use tracing::debug;
+use vector_http::{HttpError, full_body};
 use vector_lib::{
     event::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
@@ -18,7 +19,7 @@ use vector_lib::{
 };
 
 use crate::{
-    http::client_v1::{HttpClient, HttpError, full_body},
+    http::client_v1::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::util::{http::HttpRequest, sink},
 };
