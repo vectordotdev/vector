@@ -119,8 +119,9 @@ fn is_io_error_after_reporting(error: RedisError) -> bool {
 enum DrainMode {
     /// `LPOP key count` / `RPOP key count`: one command per batch (Redis 6.2+).
     Count,
-    /// Single `LPOP key` / `RPOP key` commands sent in one pipeline, for older servers.
-    Pipelined,
+    /// The server rejected the `count` argument (older than Redis 6.2), so each batch is just
+    /// the blocking pop.
+    Unsupported,
 }
 
 /// Reads batches of entries from a Redis list, preserving list order.
@@ -157,22 +158,21 @@ impl ListPopper {
             return Ok(Vec::new());
         }
 
-        match self.drain_mode {
-            DrainMode::Count => match pop_count(conn, &self.key, self.method, count).await {
-                Err(error) if is_pop_count_unsupported(&error) => {
-                    warn!(
-                        message = "Redis server does not support popping multiple list entries in one command (requires Redis 6.2 or newer); falling back to pipelined single pops.",
-                        key = %self.key,
-                    );
-                    self.drain_mode = DrainMode::Pipelined;
-                    // The rejected command removed nothing. Pipelining starts with the next drain
-                    // rather than here, so this drain, which may be finishing during shutdown,
-                    // never sends a second read.
-                    Ok(Vec::new())
-                }
-                result => result,
-            },
-            DrainMode::Pipelined => pop_pipelined(conn, &self.key, self.method, count).await,
+        if self.drain_mode == DrainMode::Unsupported {
+            return Ok(Vec::new());
+        }
+
+        match pop_count(conn, &self.key, self.method, count).await {
+            Err(error) if is_pop_count_unsupported(&error) => {
+                warn!(
+                    message = "Redis server does not support popping multiple list entries in one command (requires Redis 6.2 or newer); reading one entry at a time.",
+                    key = %self.key,
+                );
+                // The rejected command removed nothing.
+                self.drain_mode = DrainMode::Unsupported;
+                Ok(Vec::new())
+            }
+            result => result,
         }
     }
 }
@@ -197,20 +197,6 @@ async fn pop_count(
         .query_async(conn)
         .await?;
     Ok(popped.unwrap_or_default())
-}
-
-async fn pop_pipelined(
-    conn: &mut ConnectionManager,
-    key: &str,
-    method: Method,
-    count: usize,
-) -> RedisResult<Vec<String>> {
-    let mut pipe = redis::pipe();
-    for _ in 0..count {
-        pipe.cmd(pop_command(method)).arg(key);
-    }
-    let popped: Vec<Option<String>> = pipe.query_async(conn).await?;
-    Ok(popped.into_iter().flatten().collect())
 }
 
 /// Servers older than Redis 6.2 reject the `count` argument of `LPOP`/`RPOP` without popping.
@@ -351,30 +337,15 @@ pub(super) mod integration_test {
     }
 
     #[tokio::test]
-    async fn pipelined_drain_returns_batch_size_entries_in_order() {
-        let mut conn = connection().await;
-        let key = list_with_entries(&mut conn, 10).await;
-        let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(4));
-        popper.drain_mode = DrainMode::Pipelined;
-
-        assert_eq!(
-            pop_one_batch(&mut popper, &mut conn).await,
-            ["1", "2", "3", "4"]
-        );
-        let remaining: usize = conn.llen(&key).await.unwrap();
-        assert_eq!(remaining, 6);
-    }
-
-    #[tokio::test]
     async fn batch_larger_than_list_returns_all_entries() {
         let mut conn = connection().await;
-        let key = list_with_entries(&mut conn, 3).await;
-        let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(100));
-        // Start in the mode the server needs; detecting it is covered by
+        // Batches beyond the blocking pop need Redis 6.2+; older servers are covered by
         // `drain_mode_follows_server_support_for_pop_count`.
         if !server_supports_pop_count(&mut conn).await {
-            popper.drain_mode = DrainMode::Pipelined;
+            return;
         }
+        let key = list_with_entries(&mut conn, 3).await;
+        let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(100));
 
         assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["1", "2", "3"]);
         let remaining: usize = conn.llen(&key).await.unwrap();
@@ -383,14 +354,11 @@ pub(super) mod integration_test {
 
     #[tokio::test]
     async fn drain_of_empty_list_returns_no_entries() {
-        for mode in [DrainMode::Count, DrainMode::Pipelined] {
-            let mut conn = connection().await;
-            let key = list_with_entries(&mut conn, 1).await;
-            let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(10));
-            popper.drain_mode = mode;
+        let mut conn = connection().await;
+        let key = list_with_entries(&mut conn, 1).await;
+        let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(10));
 
-            assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["1"]);
-        }
+        assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["1"]);
     }
 
     #[tokio::test]
@@ -406,16 +374,13 @@ pub(super) mod integration_test {
             );
             assert_eq!(popper.drain_mode, DrainMode::Count);
         } else {
-            // The rejected probe removes nothing and no second command is sent in the same
-            // drain, so the first batch is just the blocking pop; pipelining starts next batch.
+            // The rejected probe removes nothing, and later batches are just the blocking pop:
+            // no further pops are sent for entries that may not be queued.
             assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["1"]);
-            assert_eq!(popper.drain_mode, DrainMode::Pipelined);
+            assert_eq!(popper.drain_mode, DrainMode::Unsupported);
+            assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["2"]);
             let remaining: usize = conn.llen(&key).await.unwrap();
-            assert_eq!(remaining, 9);
-            assert_eq!(
-                pop_one_batch(&mut popper, &mut conn).await,
-                ["2", "3", "4", "5", "6"]
-            );
+            assert_eq!(remaining, 8);
         }
     }
 
