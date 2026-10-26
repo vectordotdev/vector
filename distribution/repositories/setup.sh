@@ -215,7 +215,7 @@ elif "$existing"; then
         { keys=0 }
         /^[[:space:]]*(gpgcheck|repo_gpgcheck)[[:space:]]*=/ { next }
         /^[[:space:]]*baseurl[[:space:]]*=/ && arch=="armv7hl" {
-            gsub(/\/vector-0\/\$(basearch|\{basearch\})\//, "/vector-0/armv7hl/")
+            gsub(/\/vector-0\/\$(basearch|\{basearch\})(\/|$)/, "/vector-0/armv7hl/")
         }
         { print }
         END {
