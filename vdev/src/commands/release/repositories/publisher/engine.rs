@@ -8,7 +8,7 @@ use super::{
 };
 use anyhow::{Context, Result, ensure};
 use serde_json::Value;
-use std::{collections::BTreeSet, fs, io::Read, path::Path};
+use std::{collections::BTreeSet, fs, io::Read, path::Path, time::Duration};
 
 fn bundle_key(config: &Config, input: &str, base: Option<&str>) -> String {
     format!(
@@ -256,6 +256,13 @@ pub(super) fn publish(config: &Config, work: &Path) -> Result<()> {
     Ok(())
 }
 pub(super) fn verify_snapshot(config: &Config, snapshot: &Snapshot) -> Result<()> {
+    verify_endpoints(config, snapshot, &client(true)?)
+}
+pub(super) fn verify_endpoints(
+    config: &Config,
+    snapshot: &Snapshot,
+    client: &reqwest::blocking::Client,
+) -> Result<()> {
     let mut names: BTreeSet<_> = snapshot
         .entries
         .keys()
@@ -263,7 +270,6 @@ pub(super) fn verify_snapshot(config: &Config, snapshot: &Snapshot) -> Result<()
         .cloned()
         .collect();
     names.extend(files(&snapshot.source)?.into_keys());
-    let client = client(true)?;
     for name in &names {
         let (repository, relative) = name.split_once('/').context("Invalid repository path")?;
         let root = if repository == "apt" {
@@ -276,18 +282,38 @@ pub(super) fn verify_snapshot(config: &Config, snapshot: &Snapshot) -> Result<()
             "Verification requires HTTPS repository roots"
         );
         let expected = &snapshot.entries[name];
-        let response = client
-            .get(format!("{root}{relative}"))
-            .send()?
-            .error_for_status()?;
-        ensure!(
-            response.url().scheme() == "https",
-            "Repository redirected away from HTTPS"
-        );
-        ensure!(
-            Entry::read(response.take(expected.size + 1))? == *expected,
-            "Endpoint differs from snapshot: {name}"
-        );
+        // Newly published objects can still be stale or missing at a CDN edge.
+        // Retry the complete download/check; success still requires exact bytes.
+        for attempt in 0..7 {
+            let result = (|| -> Result<()> {
+                let response = client
+                    .get(format!("{root}{relative}"))
+                    .send()?
+                    .error_for_status()?;
+                ensure!(
+                    response.url().scheme() == "https",
+                    "Repository redirected away from HTTPS"
+                );
+                ensure!(
+                    Entry::read(response.take(expected.size + 1))? == *expected,
+                    "Endpoint differs from snapshot: {name}"
+                );
+                Ok(())
+            })();
+            match result {
+                Ok(()) => break,
+                Err(error) if attempt < 6 => {
+                    let delay = 1 << attempt;
+                    println!("Verification of {name} failed: {error:#}; retrying in {delay}s");
+                    std::thread::sleep(Duration::from_secs(delay));
+                }
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        format!("Verification of {name} failed after 7 attempts")
+                    });
+                }
+            }
+        }
     }
     println!(
         "Verified {} endpoint objects for {}",
