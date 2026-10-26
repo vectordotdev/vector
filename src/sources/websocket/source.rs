@@ -550,7 +550,11 @@ impl WebSocketSource {
                 debug!(message = "Encoding ACK message failed.", %err);
                 return;
             }
-            let message = Message::binary(message_bytes);
+            let message = if ack_serializer.is_binary() {
+                Message::binary(message_bytes)
+            } else {
+                Message::text(String::from_utf8_lossy(&message_bytes))
+            };
 
             _ = ws_sink
                 .send(message)
