@@ -140,14 +140,17 @@ pub async fn assert_component_received_events_total(expected_count: usize) {
             .parse()
             .expect("Vector API endpoint should be a valid URI"),
     );
-    client.connect().await.unwrap_or_else(|e| {
-        panic!("Failed to connect to the Vector API at {VECTOR_API_ENDPOINT}: {e}")
-    });
+    // This only sets up the transport: an unreachable API fails on the first RPC below.
+    client
+        .connect()
+        .unwrap_or_else(|e| panic!("Failed to set up the Vector API client: {e}"));
 
     let components = client
         .get_components(0)
         .await
-        .unwrap_or_else(|e| panic!("Failed to get components from the Vector API: {e}"))
+        .unwrap_or_else(|e| {
+            panic!("Failed to get components from the Vector API at {VECTOR_API_ENDPOINT}: {e}")
+        })
         .components;
     let total_events = components
         .iter()
