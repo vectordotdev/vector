@@ -53,7 +53,10 @@ impl<'de> serde::Deserialize<'de> for DeprecationVersion {
 
 use serde::Deserialize;
 
+/// Hugo renders these files as pages, so any other field (e.g. `draft` or
+/// `build`) could change how Hugo lists them; unknown fields are rejected.
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Frontmatter {
     what: String,
     deprecated_since: DeprecationVersion,
@@ -383,6 +386,22 @@ mod tests {
         )
         .unwrap();
         assert!(read_deprecation_fragments(tmp.path()).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_frontmatter_fields() {
+        // `draft: true` would make Hugo silently drop the notice from the site.
+        let tmp = tempdir().unwrap();
+        fs::write(
+            tmp.path().join("draft.md"),
+            "---\nwhat: foo\ndeprecated_since: \"0.60.0\"\ndraft: true\n---\n",
+        )
+        .unwrap();
+        let err = read_deprecation_fragments(tmp.path()).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("unknown field `draft`"),
+            "{err:#}"
+        );
     }
 
     #[test]
