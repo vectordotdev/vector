@@ -232,6 +232,7 @@ impl WebSocketSource {
             }
         }
 
+        drop(ack_tx);
         while let Some(ack) = ack_rx.recv().await {
             self.handle_ack(&mut ws_sink, ack, stateful).await;
         }
