@@ -151,6 +151,8 @@ jobs:
 
   # Upload immutable packages/indexes before switching signed repository roots.
   # Serialize writes with the S3 control lock; this job has no signing key.
+  # If an upload fails with the lock held, follow the recovery procedure above
+  # the maintain job in package-repositories-maintenance.yml before retrying.
   publish:
     needs: [inputs, sign]
     runs-on: ubuntu-24.04

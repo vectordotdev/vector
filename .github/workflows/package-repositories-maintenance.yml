@@ -12,7 +12,7 @@ on:
         description: Exact archived snapshot SHA-256 for rollback
         type: string
       expected_version:
-        description: Exact control-object S3 version reported by status, for lock recovery
+        description: Top-level version from the status summary (S3 VersionId, not snapshot SHA-256)
         type: string
       confirm_owner_stopped:
         description: The previous workflow/process and its in-flight writes have stopped
@@ -28,8 +28,27 @@ concurrency:
 jobs:
   # Inspect S3 state, prepare a rollback, or recover a lock with the publishing role.
   # Every job uses the vdev version pinned by the reviewed workflow checkout.
-  # Available even when automated publication is disabled. Recovery requires the exact
-  # control version, a stopped owner and an expired 65-minute recovery window.
+  # Available even when automated publication is disabled.
+  #
+  # Recover after a workflow dies during upload (GitHub Actions -> this workflow):
+  # 1. Stop/cancel the old workflow and confirm its runner/process and in-flight
+  #    writes have stopped. A failed workflow alone is not that confirmation.
+  # 2. Run on master with operation=status and obtain Vector team approval. In
+  #    the maintain job summary, inspect state.held, state.owner, state.pending,
+  #    state.recover_after and the top-level version. If held=false, skip unlocking.
+  # 3. Wait until state.recover_after (UTC, 65 minutes after lock acquisition).
+  #    The lock never expires automatically; do not edit/delete the S3 control object.
+  # 4. Run on master with operation=recover-lock, expected_version set to that
+  #    version, and confirm_owner_stopped=true; obtain team approval again.
+  #    If the version changed, repeat status and reassess the owner before retrying.
+  # 5. Confirm state.held=false in the recovery summary. Unlocking preserves
+  #    active/pending and does not repair partially uploaded repository metadata.
+  # 6. Resume by dispatching Package Repositories with the same Release Suite
+  #    run_id, tag and channel; it restores the saved signed S3 bundle. For an
+  #    interrupted rollback, dispatch operation=rollback with the same snapshot.
+  #    To abandon an unfinished release, use operation=rollback with state.active
+  #    as snapshot. Finish the resumed publication/rollback and its verification
+  #    before publishing a different release.
   maintain:
     if: github.repository_id == '146327667' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
