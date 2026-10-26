@@ -75,13 +75,15 @@ impl InputHandler {
                 let mut drain_error = None;
                 // No more entries are read once shutdown has been signalled.
                 if !stopping {
+                    // The counted pop's reply grows with `batch_size`, so it is not cut off by the
+                    // blocking pop's grace period.
                     let (res, drain_stopping) =
-                        read_or_shutdown(popper.drain(&mut conn), &mut shutdown).await;
+                        read_or_shutdown_within(popper.drain(&mut conn), &mut shutdown, None).await;
                     stopping = drain_stopping;
                     match res {
                         Some(Ok(rest)) => lines.extend(rest),
                         Some(Err(error)) => drain_error = Some(error),
-                        // Shutdown was signalled and the drain did not return in time.
+                        // Shutdown had already been signalled, so the drain was not started.
                         None => {}
                     }
                 }
@@ -213,7 +215,7 @@ fn is_pop_count_unsupported(error: &RedisError) -> bool {
 /// waits for an in-flight pop on a healthy connection.
 const BLOCKING_POP_TIMEOUT_SECS: f64 = 1.0;
 
-/// How long shutdown waits for an in-flight read to finish. A healthy server replies within
+/// How long shutdown waits for an in-flight blocking pop to finish. A healthy server replies within
 /// `BLOCKING_POP_TIMEOUT_SECS` plus a round trip; this only bounds shutdown when the reply never
 /// arrives, so an unresponsive Redis connection cannot stall shutdown.
 const SHUTDOWN_READ_GRACE: Duration = Duration::from_secs(5);
@@ -229,6 +231,17 @@ async fn read_or_shutdown<T>(
     read: impl Future<Output = RedisResult<T>>,
     shutdown: &mut ShutdownSignal,
 ) -> (Option<RedisResult<T>>, bool) {
+    read_or_shutdown_within(read, shutdown, Some(SHUTDOWN_READ_GRACE)).await
+}
+
+/// Like `read_or_shutdown`, but with the grace period as a parameter. `None` lets an in-flight read
+/// finish however long its reply takes, for replies that grow with `batch_size`; the topology's
+/// shutdown deadline still stops the source if the connection never replies.
+async fn read_or_shutdown_within<T>(
+    read: impl Future<Output = RedisResult<T>>,
+    shutdown: &mut ShutdownSignal,
+    grace: Option<Duration>,
+) -> (Option<RedisResult<T>>, bool) {
     // Do not send a new read once shutdown has been signalled.
     if (&mut *shutdown).now_or_never().is_some() {
         return (None, true);
@@ -240,7 +253,13 @@ async fn read_or_shutdown<T>(
         // ever applies to a read that is already in flight.
         biased;
         res = &mut read => (Some(res), false),
-        _ = shutdown => (tokio::time::timeout(SHUTDOWN_READ_GRACE, read).await.ok(), true),
+        _ = shutdown => {
+            let res = match grace {
+                Some(grace) => tokio::time::timeout(grace, read).await.ok(),
+                None => Some(read.await),
+            };
+            (res, true)
+        }
     }
 }
 

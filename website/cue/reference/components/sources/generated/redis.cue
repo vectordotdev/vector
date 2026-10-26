@@ -48,10 +48,11 @@ generated: components: sources: redis: configuration: {
 		type: object: options: {
 			batch_size: {
 				description: """
-					The maximum number of entries to read from the list per round trip.
+					The maximum number of entries to read from the list per batch.
 
 					The source blocks until at least one entry is available, then reads up to `batch_size - 1`
-					more without waiting, so batches only fill up when entries are queued. Values greater than
+					more without waiting, so each batch costs two Redis commands (a blocking pop and a counted
+					pop) and batches only fill up when entries are queued. Values greater than
 					`1` use the `count` argument of `LPOP`/`RPOP`, which requires Redis 6.2 or newer. Older
 					servers reject it; the source then logs a warning and reads one entry at a time.
 
