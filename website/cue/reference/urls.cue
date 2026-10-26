@@ -388,7 +388,7 @@ urls: {
 	new_security_report:                        "\(vector_repo)/issues/new?labels=domain%3Asecurity"
 	new_sink:                                   "\(vector_repo)/issues/new?template=feature.yml"
 	new_source:                                 "\(vector_repo)/issues/new?template=feature.yml"
-	new_target:                                 "\(vector_repo)/issues/new?template=feature.yml&labels=domain%3Aplatforms"
+	new_target:                                 "\(vector_repo)/issues/new?labels=type%3A+task&labels=domain%3A+operations"
 	new_transform:                              "\(vector_repo)/issues/new?template=feature.yml"
 	nginx:                                      "https://www.nginx.com/"
 	nginx_combined:                             "https://nginx.org/en/docs/http/ngx_http_log_module.html"
