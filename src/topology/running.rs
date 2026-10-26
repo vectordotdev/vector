@@ -326,14 +326,6 @@ impl RunningTopology {
         let diff = ConfigDiff::new(&self.config, &new_config, components_to_reload);
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
-        // Gives windows some time to make available any port
-        // released by shutdown components.
-        // Issue: https://github.com/vectordotdev/vector/issues/3035
-        if cfg!(windows) {
-            // This value is guess work.
-            tokio::time::sleep(Duration::from_millis(200)).await;
-        }
-
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
