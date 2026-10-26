@@ -25,11 +25,15 @@ request:
   retry_attempts: 3
 ```
 
-For HTTP authentication, keep only the fields used by the selected strategy:
+For options that select an enum variant, keep only the fields used by that variant. For example,
+HTTP authentication with `strategy: bearer` uses `token`. Remove `username` and `password`, which
+belong to the `basic` variant:
 
-- `basic` (also the default when `strategy` is omitted): `username` and `password`.
-- `bearer`: `token`.
-- `custom`: `source`.
+```yaml
+auth:
+  strategy: bearer
+  token: example-token
+```
 
 Warnings identify field paths without including their values. Maps that accept arbitrary keys,
 such as HTTP headers, remain supported.
