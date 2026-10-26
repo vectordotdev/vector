@@ -1,4 +1,4 @@
-//! Container-side implementation of `vdev release repositories`.
+//! Native implementation of `vdev release repositories`.
 // Repository object names are case-sensitive protocol identifiers.
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
 mod bundles;
@@ -9,7 +9,7 @@ mod repository;
 mod rollback;
 mod storage;
 use super::{Channel, Commands, Rollback};
-use anyhow::{Result, bail};
+use anyhow::Result;
 use model::Config;
 use std::path::Path;
 
@@ -71,6 +71,5 @@ pub(super) fn exec(config: &Path, work: &Path, command: Commands) -> Result<()> 
             }
             Ok(())
         }
-        Commands::BuildImage => bail!("Build the image outside the container"),
     }
 }

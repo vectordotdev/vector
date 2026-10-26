@@ -115,7 +115,11 @@ Package repository commands are disabled in ordinary vdev builds. To enable them
 cargo run --package vdev --features package-repositories -- release repositories --help
 ```
 
-The dedicated publisher image enables this feature explicitly; normal vdev releases omit it.
+The separate `vdev-package-repositories-x86_64-unknown-linux-gnu` release archive enables
+this feature; ordinary vdev binaries omit it. Repository commands run natively on Linux
+and need `apt-utils`, `dpkg-dev`, `createrepo-c`, `rpm`, and `gnupg`. Key files use private,
+automatically cleaned directories in `/dev/shm`. Until the production integration is
+installed, pass `--config` with the repository configuration and its public key.
 
 ## Releasing vdev
 
