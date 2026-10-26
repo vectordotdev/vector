@@ -1,50 +1,23 @@
-name: Load package repository tools
-description: Pull the immutable publisher image and use its opt-in vdev binary.
-inputs:
-  image:
-    description: Publisher image pinned by its full GHCR SHA-256 digest
-    required: true
-  token:
-    description: GitHub token with read access to the container package
-    required: true
-outputs:
-  image:
-    description: Exact image reference used by this job
-    value: ${{ steps.pull.outputs.image }}
+name: Install package repository tools
+description: Install native packaging tools and the versioned opt-in vdev binary.
 runs:
   using: composite
   steps:
-    - id: pull
-      shell: bash
-      env:
-        PUBLISHER_IMAGE: ${{ inputs.image }}
-        GHCR_TOKEN: ${{ inputs.token }}
+    # Install tools before the job acquires signing or AWS credentials.
+    - shell: bash
       run: |
-        [[ "$PUBLISHER_IMAGE" =~ ^ghcr\.io/vectordotdev/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || {
-          echo 'Set PACKAGE_REPOSITORIES_IMAGE to the digest reported by Package Repository Image.' >&2
-          exit 1
-        }
-        # Keep registry credentials in memory and remove them before any signing/AWS step.
-        export DOCKER_CONFIG
-        DOCKER_CONFIG=$(mktemp -d /dev/shm/package-registry.XXXXXX)
-        publisher_container=
-        cleanup() {
-          if [[ -n "$publisher_container" ]]; then
-            docker rm "$publisher_container" >/dev/null || true
-          fi
-          rm -rf "$DOCKER_CONFIG"
-        }
-        trap cleanup EXIT
-        printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-        docker pull "$PUBLISHER_IMAGE"
-        docker tag "$PUBLISHER_IMAGE" vector-package-publisher:local
-        # Ordinary vdev releases omit this command. Reuse the feature-enabled binary
-        # from the same reviewed image, without compiling on publishing runners.
-        publisher_tools="$RUNNER_TEMP/package-repository-tools"
-        mkdir -p "$publisher_tools"
-        publisher_container=$(docker create "$PUBLISHER_IMAGE")
-        docker cp "$publisher_container:/usr/local/bin/vdev" "$publisher_tools/vdev"
-        chmod +x "$publisher_tools/vdev"
-        "$publisher_tools/vdev" release repositories --help >/dev/null
-        echo "VDEV=$publisher_tools/vdev" >> "$GITHUB_ENV"
-        echo "image=$PUBLISHER_IMAGE" >> "$GITHUB_OUTPUT"
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          apt-utils ca-certificates createrepo-c dpkg-dev gnupg rpm libssl3t64
+        version=$(sed -n 's/^version = "\(.*\)"/\1/p' vdev/Cargo.toml)
+        [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+        archive="vdev-package-repositories-x86_64-unknown-linux-gnu-v${version}"
+        tools="$RUNNER_TEMP/package-repository-tools"
+        mkdir -p "$tools"
+        curl --fail --silent --show-error --location --retry 3 \
+          "https://install.datadoghq.com/vector/vdev/${version}/${archive}.tgz" \
+          --output "$tools/$archive.tgz"
+        tar -xzf "$tools/$archive.tgz" -C "$tools" --strip-components=1 "$archive/vdev"
+        test "$("$tools/vdev" --version)" = "vdev $version"
+        "$tools/vdev" release repositories --help >/dev/null
+        echo "VDEV=$tools/vdev" >> "$GITHUB_ENV"

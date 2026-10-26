@@ -28,8 +28,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Freeze verified release assets and the manually selected publisher image digest.
-  # Rebuild via Package Repository Image; select its digest with PACKAGE_REPOSITORIES_IMAGE.
+  # Freeze verified release assets and the reviewed tooling checkout.
+  # Jobs install the opt-in binary published with the vdev version in that checkout.
   # Trust authorized GitHub release publishers: run/tag and checksum checks do not
   # prove build provenance. Stronger provenance verification is deferred.
   # Enable only after historical backfill and the repository/key migration are ready.
@@ -47,11 +47,9 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      packages: read
       actions: read
     outputs:
       tooling_commit: ${{ steps.source.outputs.commit }}
-      publisher_image: ${{ steps.image.outputs.image }}
     steps:
       # workflow_run executes reviewed default-branch code, never release/tag code.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -61,10 +59,6 @@ jobs:
       - id: source
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/package-repository-tools
-        id: image
-        with:
-          image: ${{ vars.PACKAGE_REPOSITORIES_IMAGE }}
-          token: ${{ github.token }}
       - name: Freeze and verify release inputs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -89,7 +83,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      packages: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,9 +90,6 @@ jobs:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
       - uses: ./.github/actions/package-repository-tools
-        with:
-          image: ${{ needs.inputs.outputs.publisher_image }}
-          token: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-inputs
@@ -130,16 +120,12 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
       - uses: ./.github/actions/package-repository-tools
-        with:
-          image: ${{ needs.inputs.outputs.publisher_image }}
-          token: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-base
@@ -155,7 +141,7 @@ jobs:
           PACKAGE_SIGNING_SUBKEY: ${{ secrets.PACKAGE_SIGNING_SUBKEY }}
           PACKAGE_SIGNING_PASSPHRASE: ${{ secrets.PACKAGE_SIGNING_PASSPHRASE }}
         run: '"$VDEV" release repositories prepare'
-      # Private material only exists in the container's tmpfs, outside this path.
+      # GPG homes use private /dev/shm directories and are removed before this upload.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-repository-signed
@@ -172,7 +158,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      packages: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -180,9 +165,6 @@ jobs:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
       - uses: ./.github/actions/package-repository-tools
-        with:
-          image: ${{ needs.inputs.outputs.publisher_image }}
-          token: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-signed
@@ -205,16 +187,12 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
       - uses: ./.github/actions/package-repository-tools
-        with:
-          image: ${{ needs.inputs.outputs.publisher_image }}
-          token: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package-repository-signed
