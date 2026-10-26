@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::Read};
 use indexmap::IndexMap;
 
 use super::{
-    ComponentHint, Process, deserialize_config_map, loader, prepare_input,
+    ComponentHint, Process, deserialize_config_map, ignored_fields, loader, prepare_input,
     representation::ConfigMap, secret,
 };
 use crate::config::{
@@ -94,6 +94,7 @@ impl Process for ConfigBuilderLoader {
 
     /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
     fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        let ignored = ignored_fields::find(&map, hint);
         match hint {
             Some(ComponentHint::Source) => {
                 self.builder
@@ -131,6 +132,7 @@ impl Process for ConfigBuilderLoader {
             }
         }
 
+        ignored_fields::warn(&ignored);
         Ok(())
     }
 }

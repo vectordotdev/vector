@@ -262,6 +262,7 @@ similar-asserts = "2.0.0"
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
+jsonschema.workspace = true
 cfg-if.workspace = true
 reqwest.workspace = true
 reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "native-tls", "rustls-no-provider"] }
@@ -550,7 +551,6 @@ criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["server-auto"] }
 itertools.workspace = true
-jsonschema.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true

@@ -31,6 +31,13 @@ files, including:
 1. That all of the [sources], [transforms], and [sinks] include all required fields.
 2. All fields are of the proper type.
 
+### Ignored fields
+
+Vector warns about configuration fields that it accepts but ignores, including misspelled settings
+and options that do not apply to the selected strategy. These warnings include field paths without
+printing their values. Correct the settings before a future release rejects them; see the
+[migration notice](/deprecations/#ignored-configuration-fields).
+
 ### Topology checks
 
 These checks verify that the configuration file contains a valid topology:
