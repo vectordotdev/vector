@@ -322,6 +322,59 @@ mod tests {
             panic!("Test timed out");
         }
     }
+
+    #[tokio::test]
+    async fn components_sharing_file_through_symlink() {
+        trace_init();
+
+        let delay = Duration::from_secs(3);
+        let dir = temp_dir();
+        std::fs::create_dir(&dir).unwrap();
+        let file_path = dir.join("tls.cert");
+        let link_path = dir.join("tls-link.cert");
+        let mut file = File::create(&file_path).unwrap();
+        std::os::unix::fs::symlink(&file_path, &link_path).unwrap();
+
+        let direct_component = ComponentKey::from("direct");
+        let linked_component = ComponentKey::from("linked");
+        let component_configs = vec![
+            ComponentConfig::new(
+                vec![file_path],
+                direct_component.clone(),
+                ComponentKind::Sink,
+            ),
+            ComponentConfig::new(
+                vec![link_path],
+                linked_component.clone(),
+                ComponentKind::Sink,
+            ),
+        ];
+
+        let (signal_tx, signal_rx) = broadcast::channel(128);
+        spawn_thread(
+            WatcherConfig::RecommendedWatcher,
+            signal_tx,
+            &Vec::<PathBuf>::new(),
+            component_configs,
+            delay,
+        )
+        .unwrap();
+
+        if !test_signal(
+            &mut file,
+            crate::signal::SignalTo::ReloadComponents(HashSet::from([
+                direct_component,
+                linked_component,
+            ])),
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
+            panic!("Test timed out");
+        }
+    }
+
     #[tokio::test]
     async fn file_directory_update() {
         trace_init();

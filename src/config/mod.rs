@@ -2,6 +2,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
+    fs,
     hash::Hash,
     net::SocketAddr,
     path::{self, PathBuf},
@@ -111,7 +112,18 @@ impl ComponentConfig {
         &self,
         config_paths: &HashSet<PathBuf>,
     ) -> Option<(ComponentKey, ComponentKind)> {
-        if config_paths.iter().any(|p| self.config_paths.contains(p)) {
+        let changed_files: HashSet<PathBuf> = config_paths
+            .iter()
+            .filter_map(|p| fs::canonicalize(p).ok())
+            .collect();
+
+        if config_paths.iter().any(|p| self.config_paths.contains(p))
+            || self
+                .config_paths
+                .iter()
+                .filter_map(|p| fs::canonicalize(p).ok())
+                .any(|p| changed_files.contains(&p))
+        {
             return Some((self.component_key.clone(), self.component_type));
         }
         None
