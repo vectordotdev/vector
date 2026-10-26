@@ -124,6 +124,10 @@ pub fn is_historical_otlp_layout(legacy: &LegacyTraceEvent) -> bool {
 /// record. Zero typed outputs is success (empty `ScopeSpans`, or every span rejected); drops
 /// and normalizations go to `reporter`.
 ///
+/// Success drops [`TraceLayout`] from the metadata copied onto each typed event. The hint
+/// names the legacy layout, which that event no longer has. A failed conversion returns the
+/// original event with its hint.
+///
 /// # Errors
 ///
 /// Returns [`ConversionError::UnrecognizedLayout`] for an unrecognized hint, and
@@ -154,7 +158,7 @@ fn convert_by_shape(
     if looks_like_otlp_envelope(map) {
         convert_envelope(legacy, reporter)
     } else if looks_like_flattened_otlp(map) {
-        legacy_map(legacy).map(|(map, metadata)| convert_flattened(map, &metadata, reporter))
+        legacy_map(legacy).map(|(map, metadata)| convert_flattened(map, metadata, reporter))
     } else {
         Err(FailedConversion(legacy, ConversionError::NotOtlpLayout))
     }
@@ -165,7 +169,9 @@ fn convert_by_shape(
 ///
 /// Returns [`HintedLegacy::Skipped`] when the hint is absent or names another producer. An
 /// unrecognized hint returns [`ConversionError::UnrecognizedLayout`] with the original event,
-/// so callers never fall through to shape detection for it.
+/// so callers never fall through to shape detection for it. A successful result drops
+/// [`TraceLayout`] from each typed event's metadata; a skipped or failed result keeps the
+/// original event and its hint.
 #[must_use]
 pub fn hinted_legacy_to_typed(
     legacy: LegacyTraceEvent,
@@ -173,7 +179,7 @@ pub fn hinted_legacy_to_typed(
 ) -> HintedLegacy {
     match legacy.metadata().trace_layout() {
         Some(TraceLayout::OtelFlattened) => HintedLegacy::Done(
-            legacy_map(legacy).map(|(map, metadata)| convert_flattened(map, &metadata, reporter)),
+            legacy_map(legacy).map(|(map, metadata)| convert_flattened(map, metadata, reporter)),
         ),
         Some(TraceLayout::OtlpResourceSpans) => {
             HintedLegacy::Done(convert_envelope(legacy, reporter))
@@ -236,13 +242,16 @@ fn convert_envelope(
     legacy: LegacyTraceEvent,
     reporter: &mut impl TraceConversionReporter,
 ) -> Result<Vec<TraceEvent>, FailedConversion> {
-    let (mut map, metadata) = legacy_map(legacy)?;
+    let (mut map, mut metadata) = legacy_map(legacy)?;
     let Some(array) = take_resource_spans(&mut map) else {
         return Err(FailedConversion(
             LegacyTraceEvent::from_parts(map, metadata),
             ConversionError::NotOtlpLayout,
         ));
     };
+    // The failure path above returns this metadata. Typed events no longer have the
+    // legacy layout the hint names.
+    metadata.clear_trace_layout();
     ConsumeFields::wrap(map, reporter).finish();
     let (resource_spans, _) = parse_entries(
         array,
@@ -258,8 +267,9 @@ fn convert_envelope(
 
 fn convert_flattened(
     map: ObjectMap,
-    metadata: &EventMetadata,
+    mut metadata: EventMetadata,
     reporter: &mut impl TraceConversionReporter,
 ) -> Vec<TraceEvent> {
-    ResourceSpans::from_flattened_map(map, reporter).into_typed_events(metadata, reporter)
+    metadata.clear_trace_layout();
+    ResourceSpans::from_flattened_map(map, reporter).into_typed_events(&metadata, reporter)
 }

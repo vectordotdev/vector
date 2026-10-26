@@ -50,9 +50,12 @@ fn traces(events: Vec<TraceEvent>) -> (Vec<TraceEvent>, TraceConversionCounts) {
     (events, TraceConversionCounts::default())
 }
 
-/// The single event a one-span legacy record converts to, carrying the record's metadata.
+/// The single event a one-span legacy record converts to, carrying the record's metadata
+/// without the legacy layout hint.
 fn legacy_span(legacy: &LegacyTraceEvent, span: Span) -> Vec<TraceEvent> {
-    vec![typed_event_with_metadata(1, vec![span], legacy.metadata())]
+    let mut metadata = legacy.metadata().clone();
+    metadata.clear_trace_layout();
+    vec![typed_event_with_metadata(1, vec![span], &metadata)]
 }
 
 /// A flattened per-span record with its layout hint, as the `opentelemetry` source writes it.
@@ -130,6 +133,24 @@ fn raw_span_id(span: u64) -> Value {
 }
 
 #[test]
+fn successful_conversion_drops_trace_layout() {
+    let (flattened, _) = convert_hinted(flattened_legacy());
+    assert_eq!(flattened[0].metadata().trace_layout(), None);
+
+    let envelope = envelope_with_spans(vec![
+        Value::Object(valid_envelope_span(1, 1)),
+        Value::Object(valid_envelope_span(2, 2)),
+    ]);
+    let (events, _) = convert_hinted(envelope);
+    assert_eq!(events.len(), 2);
+    assert!(
+        events
+            .iter()
+            .all(|event| event.metadata().trace_layout().is_none())
+    );
+}
+
+#[test]
 fn detection_matches_hinted_conversion_and_rejects_datadog() {
     for legacy in [
         flattened_legacy(),
@@ -138,11 +159,7 @@ fn detection_matches_hinted_conversion_and_rejects_datadog() {
         assert!(is_historical_otlp_layout(&legacy));
         let mut hintless = legacy.clone();
         hintless.metadata_mut().clear_trace_layout();
-        let (mut detected, counts) = convert_legacy(hintless.clone());
-        for event in &mut detected {
-            *event.metadata_mut() = legacy.metadata().clone();
-        }
-        assert_eq!((detected, counts), convert_hinted(legacy.clone()));
+        assert_eq!(convert_legacy(hintless), convert_hinted(legacy.clone()));
     }
 
     let mut datadog = LegacyTraceEvent::default();
@@ -297,8 +314,7 @@ fn producer_batch() -> ResourceSpans {
 fn flattened_producer_and_converter_agree() {
     let rs = producer_batch();
 
-    let mut metadata = EventMetadata::default();
-    metadata.set_trace_layout(TraceLayout::OtelFlattened);
+    let metadata = EventMetadata::default();
     let expected: Vec<TraceEvent> = rs
         .clone()
         .into_typed_events(&metadata, &mut PanicOnIssue)
@@ -505,12 +521,14 @@ fn envelope_accepts_string_backed_raw_ids() {
     let expected_trace_id = TraceId::from_bytes(*b"0123456789abcdef").unwrap();
     let expected_span_id = SpanId::from_bytes(*b"01234567").unwrap();
 
+    let mut metadata = envelope.metadata().clone();
+    metadata.clear_trace_layout();
     assert_eq!(
-        convert_hinted(envelope.clone()),
+        convert_hinted(envelope),
         traces(vec![typed_event_with_metadata(
             expected_trace_id.get(),
             vec![Span::new(expected_span_id, "s")],
-            envelope.metadata(),
+            &metadata,
         )])
     );
 }
