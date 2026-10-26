@@ -153,10 +153,9 @@ impl ListPopper {
 
     /// Pops up to `batch_size - 1` more entries without waiting.
     async fn drain(&mut self, conn: &mut ConnectionManager) -> RedisResult<Vec<String>> {
-        let count = self.batch_size.get() - 1;
-        if count == 0 {
+        let Some(count) = NonZeroUsize::new(self.batch_size.get() - 1) else {
             return Ok(Vec::new());
-        }
+        };
 
         if self.drain_mode == DrainMode::Unsupported {
             return Ok(Vec::new());
@@ -177,25 +176,17 @@ impl ListPopper {
     }
 }
 
-const fn pop_command(method: Method) -> &'static str {
-    match method {
-        Method::Lpop => "LPOP",
-        Method::Rpop => "RPOP",
-    }
-}
-
 async fn pop_count(
     conn: &mut ConnectionManager,
     key: &str,
     method: Method,
-    count: usize,
+    count: NonZeroUsize,
 ) -> RedisResult<Vec<String>> {
     // A nil reply means the list is empty.
-    let popped: Option<Vec<String>> = redis::cmd(pop_command(method))
-        .arg(key)
-        .arg(count)
-        .query_async(conn)
-        .await?;
+    let popped: Option<Vec<String>> = match method {
+        Method::Lpop => conn.lpop(key, Some(count)).await?,
+        Method::Rpop => conn.rpop(key, Some(count)).await?,
+    };
     Ok(popped.unwrap_or_default())
 }
 
