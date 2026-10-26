@@ -5,24 +5,33 @@
 //! Datadog Agent, and sends out `StatsPayload` packets formatted and Aggregated by the same
 //! algorithm, at ten second intervals, independently of the sink's trace payloads.
 
+#[cfg(not(feature = "typed-trace"))]
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "typed-trace"))]
 use vector_lib::event::TraceEvent;
 
 pub(crate) use self::{aggregation::Aggregator, flusher::flush_apm_stats_thread};
+#[cfg(not(feature = "typed-trace"))]
+pub(crate) use super::sink::PartitionKey;
 pub(crate) use super::{
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     request_builder::{DDTracesMetadata, RequestBuilderError, build_request},
-    sink::PartitionKey,
 };
 
 mod aggregation;
 mod bucket;
 mod flusher;
+#[cfg(feature = "typed-trace")]
+mod typed;
 mod weight;
 
-#[cfg(all(test, feature = "datadog-traces-integration-tests"))]
+#[cfg(all(
+    test,
+    feature = "datadog-traces-integration-tests",
+    not(feature = "typed-trace")
+))]
 mod integration_tests;
 
 /// The duration of time in nanoseconds that a bucket covers.
@@ -104,7 +113,11 @@ pub(crate) struct ClientGroupedStats {
     pub(crate) top_level_hits: u64,
 }
 
+#[cfg(feature = "typed-trace")]
+pub(crate) use typed::compute_typed_apm_stats;
+
 /// Computes APM stats from the incoming trace events.
+#[cfg(not(feature = "typed-trace"))]
 ///
 /// # arguments
 ///

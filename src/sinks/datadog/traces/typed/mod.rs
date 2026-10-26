@@ -4,9 +4,21 @@
 //! `AgentPayload`s. The `datadog_traces` sink consumes this after intake conversion;
 //! generic HTTP sinks do not.
 
-// The sink migration (the next change) is the production caller. Tests cover the
-// encoder until that call exists.
-#![allow(dead_code)]
+use vector_lib::internal_event::emit;
+
+use crate::{
+    event::typed_trace::{TraceConversionIssue, TraceConversionReporter},
+    internal_events::DatadogTracesConversionError,
+};
+
+/// Reports conversion and grouping issues. Encoding continues.
+pub(super) struct IssueLog;
+
+impl TraceConversionReporter for IssueLog {
+    fn report(&mut self, issue: TraceConversionIssue<'_>) {
+        emit(DatadogTracesConversionError { issue });
+    }
+}
 
 mod derive;
 mod grouping;
@@ -17,8 +29,7 @@ mod string;
 #[cfg(test)]
 mod testutil;
 
-// The sink migration is the production caller. These names are unused until then.
-#[allow(unused_imports)]
+#[allow(unused_imports)] // `ChunkGroup` and `TracerGroup` are named by grouping tests.
 pub(crate) use grouping::{AgentGroup, ChunkGroup, TracerGroup, group_typed_traces};
 #[cfg_attr(not(test), allow(unused_imports))]
 pub(crate) use string::dd_value_to_string;

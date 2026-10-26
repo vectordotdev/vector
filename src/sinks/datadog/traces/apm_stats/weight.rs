@@ -1,7 +1,10 @@
+#[cfg(not(feature = "typed-trace"))]
 use std::collections::BTreeMap;
 
+#[cfg(not(feature = "typed-trace"))]
 use crate::event::{ObjectMap, Value};
 
+#[cfg(not(feature = "typed-trace"))]
 const SAMPLING_RATE_KEY: &str = "_sample_rate";
 
 /// This extracts the relative weights from the top level span (i.e. the span that does not have a parent).
@@ -11,6 +14,7 @@ const SAMPLING_RATE_KEY: &str = "_sample_rate";
     clippy::cast_sign_loss,
     reason = "Preserve diagnostic trace ID conversion."
 )]
+#[cfg(not(feature = "typed-trace"))]
 pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
     // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
 

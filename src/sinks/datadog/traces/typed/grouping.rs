@@ -68,6 +68,7 @@ pub(crate) struct ChunkGroup {
     key: Option<ChunkKey>,
     services: HashSet<String>,
     /// Trace ID shared by the spans. Also recorded for an empty event, which has no span to carry it.
+    #[allow(dead_code)] // Read by grouping tests; the sink uses the encoded spans.
     pub trace_id: TraceId,
     /// Wire sampling priority. Absent priority is `1` (`AutoKeep`).
     pub priority: i32,
