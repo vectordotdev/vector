@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use http_1::Uri;
 use indoc::indoc;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
@@ -16,7 +17,7 @@ use super::{
 use crate::{
     common::datadog,
     config::{GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{
@@ -87,15 +88,17 @@ pub enum DatadogTracesEndpoint {
     APMStats,
 }
 
-/// Store traces & APM stats endpoints actual URIs.
+/// Stores the native HTTP URIs for traces and APM stats.
 #[derive(Clone)]
 pub struct DatadogTracesEndpointConfiguration {
-    traces_endpoint: HttpEndpoint,
-    stats_endpoint: HttpEndpoint,
+    traces_endpoint: Uri,
+    stats_endpoint: Uri,
 }
 
 impl DatadogTracesEndpointConfiguration {
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> HttpEndpoint {
+    /// Returns the cached native HTTP URI for the specified intake endpoint.
+    #[must_use]
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogTracesEndpoint) -> Uri {
         match endpoint {
             DatadogTracesEndpoint::Traces => self.traces_endpoint.clone(),
             DatadogTracesEndpoint::APMStats => self.stats_endpoint.clone(),
@@ -119,8 +122,8 @@ impl DatadogTracesConfig {
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
         Ok(DatadogTracesEndpointConfiguration {
-            traces_endpoint,
-            stats_endpoint,
+            traces_endpoint: traces_endpoint.into_v1(),
+            stats_endpoint: stats_endpoint.into_v1(),
         })
     }
 
@@ -166,7 +169,11 @@ impl DatadogTracesConfig {
             request_builder,
             batcher_settings,
             shutdown,
-            endpoints.traces_endpoint.protocol().to_string(),
+            endpoints
+                .traces_endpoint
+                .scheme_str()
+                .unwrap_or("https")
+                .to_string(),
         );
 
         // Send the APM stats payloads independently of the sink framework.
@@ -200,7 +207,7 @@ impl DatadogTracesConfig {
             }),
             false,
         )?;
-        Ok(HttpClient::new(tls_settings, proxy)?)
+        HttpClient::new(tls_settings, proxy)
     }
 }
 

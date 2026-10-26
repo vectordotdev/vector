@@ -8,12 +8,10 @@ use http_1::{Request, StatusCode};
 use http_body_util::BodyExt;
 use serde::Deserialize;
 use url::form_urlencoded;
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
-use crate::http::{
-    Auth,
-    client_v1::{HttpClient, empty_body},
-};
+use crate::http::{Auth, client_v1::HttpClient};
 
 use super::parser::ClickHouseType;
 

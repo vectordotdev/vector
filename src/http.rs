@@ -9,13 +9,11 @@ use std::{
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
-#[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
 use http::{
     HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
     uri::InvalidUri,
 };
-#[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
 use http_1::Request as RequestV1;
 use hyper::{
     body::{Body, HttpBody},
@@ -24,7 +22,6 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use rand::RngExt;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
@@ -485,8 +482,7 @@ impl Auth {
         builder
     }
 
-    #[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
-    pub(crate) fn apply_v1<B>(&self, request: &mut RequestV1<B>) {
+    pub fn apply_v1<B>(&self, request: &mut RequestV1<B>) {
         self.apply_headers_map_v1(request.headers_mut());
     }
 
@@ -517,7 +513,6 @@ impl Auth {
         }
     }
 
-    #[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
     fn apply_headers_map_v1(&self, map: &mut http_1::HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
@@ -680,18 +675,9 @@ impl MaxConnectionAgeLayer {
     pub fn new(max_connection_age: Duration, jitter_factor: f64, peer_addr: SocketAddr) -> Self {
         Self {
             start_reference: Instant::now(),
-            max_connection_age: Self::jittered_duration(max_connection_age, jitter_factor),
+            max_connection_age: vector_http::jittered_duration(max_connection_age, jitter_factor),
             peer_addr,
         }
-    }
-
-    fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
-        // Ensure the jitter_factor is between 0.0 and 1.0
-        let jitter_factor = jitter_factor.clamp(0.0, 1.0);
-        // Generate a random jitter factor between `1 - jitter_factor`` and `1 + jitter_factor`.
-        let mut rng = rand::rng();
-        let random_jitter_factor = rng.random_range(-jitter_factor..=jitter_factor) + 1.;
-        duration.mul_f64(random_jitter_factor)
     }
 }
 
@@ -894,7 +880,7 @@ impl IntoIterator for QueryParameterValue {
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
-pub(crate) mod client_v1;
+pub mod client_v1;
 
 #[cfg(test)]
 mod transport_tests;
@@ -1011,7 +997,7 @@ mod tests {
         #[test]
         fn test_jittered_duration(duration_in_secs in 0u64..120, jitter_factor in 0.0..1.0) {
             let duration = Duration::from_secs(duration_in_secs);
-            let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
+            let jittered_duration = vector_http::jittered_duration(duration, jitter_factor);
 
             // Check properties based on the range of inputs
             if jitter_factor == 0.0 {

@@ -1,25 +1,23 @@
-use http::Uri;
+use http_1::Uri;
 use indoc::indoc;
 use tower::ServiceBuilder;
 use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, schema};
 use vrl::value::Kind;
 
-use super::{
-    service::{DatadogEventsResponse, DatadogEventsService},
-    sink::DatadogEventsSink,
-};
+use super::{service::DatadogEventsServiceRequestBuilder, sink::DatadogEventsSink};
 use crate::{
     common::datadog,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{
             HttpEndpoint, ServiceBuilderExt, TowerRequestConfig, TowerRequestSettings,
-            http::{HttpStatusRetryLogic, RetryStrategy},
+            http::RetryStrategy,
+            http_v1::{HttpService, http_response_retry_logic},
         },
     },
     tls::MaybeTlsSettings,
@@ -58,7 +56,7 @@ impl DatadogEventsConfig {
         let base = datadog::get_api_base_endpoint(endpoint, site);
         Ok(HttpEndpoint::parse(&base)?
             .append_path("/api/v1/events")?
-            .into_uri())
+            .into_v1())
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
@@ -74,14 +72,14 @@ impl DatadogEventsConfig {
         validated: &ValidatedEvents,
         endpoint: Uri,
     ) -> VectorSink {
-        let service =
-            DatadogEventsService::new(endpoint, dd_common.default_api_key.clone(), client);
+        let request_builder = DatadogEventsServiceRequestBuilder {
+            endpoint,
+            default_api_key: dd_common.default_api_key.clone(),
+        };
+        let service = HttpService::new(client, request_builder).with_response_decompression();
 
         let request_settings = validated.request_settings.clone();
-        let retry_logic = HttpStatusRetryLogic::new(
-            |req: &DatadogEventsResponse| req.http_status,
-            self.retry_strategy.clone(),
-        );
+        let retry_logic = http_response_retry_logic(self.retry_strategy.clone());
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)

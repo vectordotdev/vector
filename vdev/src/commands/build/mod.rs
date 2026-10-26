@@ -1,5 +1,6 @@
 mod component_docs;
 pub(crate) mod component_examples;
+mod coverage;
 mod debian_maintainer_scripts;
 pub(crate) mod docs_json;
 mod licenses;
@@ -13,6 +14,7 @@ crate::cli_subcommands! {
     "Build, generate or regenerate components..."
     component_docs,
     component_examples,
+    coverage,
     debian_maintainer_scripts,
     docs_json,
     licenses,
