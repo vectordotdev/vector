@@ -122,8 +122,9 @@ jobs:
           # above, so an advisory published in between can not show up on this branch only.
           deny_errors "$base" -C base -f "$GITHUB_WORKSPACE/Makefile" VDEV="$GITHUB_WORKSPACE/target/debug/vdev"
 
-          existing="$(awk -F '\t' 'NR == FNR { known[$1]; next } $1 in known' "$base" "$head")"
-          new="$(awk -F '\t' 'NR == FNR { known[$1]; next } !($1 in known)' "$base" "$head")"
+          # Compare FILENAME, not NR == FNR, which stays true for the head file if the base file is empty.
+          existing="$(awk -F '\t' 'FILENAME == ARGV[1] { known[$1]; next } $1 in known' "$base" "$head")"
+          new="$(awk -F '\t' 'FILENAME == ARGV[1] { known[$1]; next } !($1 in known)' "$base" "$head")"
           if [[ -n "$existing" ]]; then
             echo "Errors that the base also has (ignored):"
             echo "$existing"
