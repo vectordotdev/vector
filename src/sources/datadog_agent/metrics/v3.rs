@@ -7,7 +7,7 @@ use prost::Message;
 use super::decode_ddseries;
 use crate::{
     common::datadog::DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX,
-    event::{Event, metric::TagValueSet},
+    event::{Event, EventMetadata, metric::TagValueSet},
     sources::datadog_agent::{
         ddmetric_proto::{
             Metadata, Origin,
@@ -381,20 +381,30 @@ impl V3AllocationBudget {
             .checked_add(tag_resources.resource_count)
             .and_then(|total| total.checked_add(usize::from(!source_type.is_empty())))
             .ok_or("Datadog v3 expanded event size overflow")?;
-        let event_tag_entry_bytes = event_tag_count
+        let tag_entry_bytes = event_tag_count
             .checked_mul(V3_METRIC_TAG_ENTRY_BYTES)
             .ok_or("Datadog v3 expanded event size overflow")?;
         let event_bytes = std::mem::size_of::<Event>()
-            .checked_add(name.len())
+            .checked_add(EventMetadata::allocated_inner_size())
+            .and_then(|total| total.checked_add(name.len()))
             .and_then(|total| total.checked_add(tag_resources.tag_bytes))
             .and_then(|total| total.checked_add(tag_resources.resource_bytes))
             .and_then(|total| total.checked_add(source_type.len()))
             .and_then(|total| total.checked_add(unit.len()))
-            .and_then(|total| total.checked_add(event_tag_entry_bytes))
+            .and_then(|total| total.checked_add(tag_entry_bytes))
+            .ok_or("Datadog v3 expanded event size overflow")?;
+        let expanded_event_bytes = event_bytes
+            .checked_mul(point_count)
+            .ok_or("Datadog v3 expanded event size overflow")?;
+        // `decode_ddseries` first materializes one base MetricTags map, then deep-clones it for
+        // each point. Strings above already include the base copy, but its BTreeMap nodes need a
+        // separate charge for every nonempty series.
+        let base_tag_entry_bytes = usize::from(point_count != 0)
+            .checked_mul(tag_entry_bytes)
             .ok_or("Datadog v3 expanded event size overflow")?;
         self.charge(
-            event_bytes
-                .checked_mul(point_count)
+            expanded_event_bytes
+                .checked_add(base_tag_entry_bytes)
                 .ok_or("Datadog v3 expanded event size overflow")?,
         )
     }
@@ -1026,6 +1036,86 @@ fn checked_v3_string_bytes(total: usize, value: &str) -> crate::Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn allocation_budget_includes_event_metadata_inner() {
+        let mut empty_series_budget = V3AllocationBudget::default();
+        empty_series_budget
+            .check_before_allocating(
+                0,
+                "",
+                "",
+                "",
+                V3TagResourceSize {
+                    tag_bytes: 0,
+                    tag_count: 0,
+                    resource_bytes: 0,
+                    resource_count: 0,
+                },
+            )
+            .unwrap();
+        let mut one_point_budget = V3AllocationBudget::default();
+        one_point_budget
+            .check_before_allocating(
+                1,
+                "",
+                "",
+                "",
+                V3TagResourceSize {
+                    tag_bytes: 0,
+                    tag_count: 0,
+                    resource_bytes: 0,
+                    resource_count: 0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            one_point_budget.bytes - empty_series_budget.bytes,
+            std::mem::size_of::<MetricPoint>()
+                + std::mem::size_of::<Event>()
+                + EventMetadata::allocated_inner_size()
+        );
+    }
+
+    #[test]
+    fn allocation_budget_includes_base_metric_tag_map() {
+        let mut untagged_budget = V3AllocationBudget::default();
+        untagged_budget
+            .check_before_allocating(
+                1,
+                "",
+                "",
+                "",
+                V3TagResourceSize {
+                    tag_bytes: 0,
+                    tag_count: 0,
+                    resource_bytes: 0,
+                    resource_count: 0,
+                },
+            )
+            .unwrap();
+        let mut tagged_budget = V3AllocationBudget::default();
+        tagged_budget
+            .check_before_allocating(
+                1,
+                "",
+                "",
+                "",
+                V3TagResourceSize {
+                    tag_bytes: 0,
+                    tag_count: 1,
+                    resource_bytes: 0,
+                    resource_count: 0,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            tagged_budget.bytes - untagged_budget.bytes,
+            2 * V3_METRIC_TAG_ENTRY_BYTES
+        );
+    }
 
     #[test]
     fn decode_v3_unit_reference_borrows_dictionary_entry() {

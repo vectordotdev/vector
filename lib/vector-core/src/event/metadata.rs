@@ -435,6 +435,16 @@ impl ByteSizeOf for EventMetadata {
 }
 
 impl EventMetadata {
+    /// Returns the size of the out-of-line allocation shared by cloned event metadata.
+    ///
+    /// This excludes allocations referenced by the metadata fields themselves. It is intended for
+    /// ingestion paths that must budget for a later copy-on-write operation on every event.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn allocated_inner_size() -> usize {
+        std::mem::size_of::<Inner>()
+    }
+
     /// Replaces the existing event finalizers with the given one.
     #[must_use]
     pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
