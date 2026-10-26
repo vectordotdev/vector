@@ -9,8 +9,8 @@
 #  - on pull requests when Cargo.toml or Cargo.lock files change
 #  - in the merge queue
 #
-# Pull requests and merge queue runs only fail on advisories that the base revision does not also
-# have, so a new advisory for an existing dependency does not fail every PR. The scheduled run
+# Pull requests and merge queue runs only fail on cargo deny errors that the base revision does not
+# also have, so a new advisory for an existing dependency does not fail every PR. The scheduled run
 # reports those.
 
 name: Deny - Linux
@@ -83,62 +83,58 @@ jobs:
         if: env.BASE_SHA == ''
         run: make check-deny
 
-      - name: Check cargo deny bans and sources
-        if: env.BASE_SHA != ''
-        run: cargo deny --log-level error --all-features check bans sources
-
-      - name: Check cargo deny advisories (new compared to base)
+      - name: Check cargo deny (new errors compared to base)
         if: env.BASE_SHA != ''
         run: |
           set -euo pipefail
 
-          # Print one "<key>\t<crates>: <message>" line for each advisory error of the workspace in $1.
-          advisory_errors() {
-            local root="$1"
+          # Run `make check-deny` with the make arguments after $1 and write one
+          # "<key>\t<crates>: <message>" line for each error to $1.
+          deny_errors() {
+            local result="$1"
             shift
-            local output="$RUNNER_TEMP/deny-$root.json"
-            # Advisory errors make cargo deny fail, so look for the summary to see if it completed.
-            cargo deny --format json --log-level error --all-features \
-              --manifest-path "$root/Cargo.toml" --config "$root/deny.toml" "$@" \
-              check advisories 2> "$output" || true
+            local output
+            output="$(mktemp)"
+            # Errors make the target fail, so look for the summary to see if cargo deny completed.
+            make "$@" check-deny DENY_FORMAT=json &> "$output" || true
             if ! jq -R -e 'fromjson? | select(.type == "summary")' "$output" > /dev/null; then
-              cat "$output" >&2
-              echo "::error::cargo deny did not complete for $root"
+              cat "$output"
+              echo "::error::cargo deny did not complete (make $*)"
               return 1
             fi
             # Key on the advisory ID, so that a version change of an affected crate is not new.
             jq -R -r 'fromjson? | select(.type == "diagnostic" and .fields.severity == "error") | .fields
               | ((.graphs // []) | map(.Krate | "\(.name) \(.version)") | join(", ")) as $crates
               | [.advisory.id // "\(.code) \(.graphs[0].Krate.name)", "\($crates): \(.message)"]
-              | @tsv' "$output" | sort -u
+              | @tsv' "$output" | sort -u > "$result"
           }
 
           head="$RUNNER_TEMP/head.tsv"
           base="$RUNNER_TEMP/base.tsv"
-          advisory_errors . > "$head"
+          deny_errors "$head"
           if [[ ! -s "$head" ]]; then
-            echo "No advisories found."
+            echo "No errors found."
             exit 0
           fi
 
-          # The base run is offline, so it uses the advisory database that the run above fetched.
-          # Offline also prevents crate downloads, so fetch the crates of the base first.
-          cargo fetch --manifest-path base/Cargo.toml
-          advisory_errors base --offline > "$base"
+          # vdev checks the repository of the working directory, so this runs the Makefile and vdev
+          # of this branch on the base. The base run fetches the advisory database after the run
+          # above, so an advisory published in between can not show up on this branch only.
+          deny_errors "$base" -C base -f "$GITHUB_WORKSPACE/Makefile" VDEV="$GITHUB_WORKSPACE/target/debug/vdev"
 
           existing="$(awk -F '\t' 'NR == FNR { known[$1]; next } $1 in known' "$base" "$head")"
           new="$(awk -F '\t' 'NR == FNR { known[$1]; next } !($1 in known)' "$base" "$head")"
           if [[ -n "$existing" ]]; then
-            echo "Advisories that the base also has (ignored):"
+            echo "Errors that the base also has (ignored):"
             echo "$existing"
           fi
           if [[ -z "$new" ]]; then
-            echo "No new advisories compared to $BASE_SHA."
+            echo "No new errors compared to $BASE_SHA."
             exit 0
           fi
-          echo "New advisories compared to $BASE_SHA:"
+          echo "New errors compared to $BASE_SHA:"
           echo "$new"
-          echo "::error::This change adds advisories. Run 'cargo deny --all-features check advisories' for details."
+          echo "::error::This change adds cargo deny errors. Run 'make check-deny' for details."
           exit 1
 
   test-deny-licenses:

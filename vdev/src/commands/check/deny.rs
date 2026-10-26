@@ -9,6 +9,10 @@ pub struct Cli {
     /// Only check licenses
     #[arg(long)]
     licenses_only: bool,
+
+    /// Output format of `cargo deny`
+    #[arg(long, default_value = "human", value_parser = ["human", "json", "sarif"])]
+    format: String,
 }
 
 impl Cli {
@@ -24,6 +28,8 @@ impl Cli {
                 "deny",
                 "--log-level",
                 "error",
+                "--format",
+                &self.format,
                 "--all-features",
                 "check",
                 check,
