@@ -766,6 +766,12 @@ impl HttpErrorClassify for HttpError {
     }
 }
 
+impl HttpErrorClassify for vector_http::HttpError {
+    fn is_retriable(&self) -> bool {
+        vector_http::HttpError::is_retriable(self)
+    }
+}
+
 impl<F, S, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
 where
     F: Fn(&Res) -> S + Clone + Send + Sync + 'static,

@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, sync::Arc};
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::RequestPayer;
@@ -33,7 +33,12 @@ use crate::{
     tls::TlsConfig,
 };
 
+mod notification;
 pub mod sqs;
+
+pub use notification::{
+    NotificationBatch, NotificationBatches, NotificationParser, S3ObjectReference,
+};
 
 pub(super) const BUCKET: &str = "bucket";
 pub(super) const OBJECT: &str = "object";
@@ -190,18 +195,7 @@ impl_generate_config_from_default!(AwsS3Config);
 #[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let log_namespace = cx.log_namespace(self.log_namespace);
-
-        let multiline_config: Option<line_agg::Config> =
-            self.multiline.as_ref().map(TryInto::try_into).transpose()?;
-
-        match self.strategy {
-            Strategy::Sqs => Ok(crate::sources::opaque_source(
-                self.create_sqs_ingestor(multiline_config, &cx.proxy, log_namespace)
-                    .await?
-                    .run(cx, self.acknowledgements, log_namespace),
-            )),
-        }
+        Box::pin(self.build_source(cx, None)).await
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -264,6 +258,46 @@ impl SourceConfig for AwsS3Config {
 }
 
 impl AwsS3Config {
+    /// Build the S3 source with a custom notification parser.
+    ///
+    /// Only notification parsing changes. Downloads, SQS handling, output schemas,
+    /// and `aws_s3` metadata stay the same.
+    ///
+    /// # Errors
+    /// Returns an error if configuration is invalid or AWS client setup fails.
+    pub async fn build_with_notification_parser(
+        &self,
+        cx: SourceContext,
+        parser: Arc<dyn NotificationParser>,
+    ) -> crate::Result<super::Source> {
+        Box::pin(self.build_source(cx, Some(parser))).await
+    }
+
+    async fn build_source(
+        &self,
+        cx: SourceContext,
+        parser: Option<Arc<dyn NotificationParser>>,
+    ) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let multiline_config = self.multiline.as_ref().map(TryInto::try_into).transpose()?;
+        match self.strategy {
+            Strategy::Sqs => {
+                let ingestor = self
+                    .create_sqs_ingestor(multiline_config, &cx.proxy, log_namespace)
+                    .await?;
+                let ingestor = match parser {
+                    Some(parser) => ingestor.with_notification_parser(parser),
+                    None => ingestor,
+                };
+                Ok(crate::sources::opaque_source(ingestor.run(
+                    cx,
+                    self.acknowledgements,
+                    log_namespace,
+                )))
+            }
+        }
+    }
+
     async fn create_sqs_ingestor(
         &self,
         multiline: Option<line_agg::Config>,

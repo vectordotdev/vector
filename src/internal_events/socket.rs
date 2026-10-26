@@ -10,7 +10,6 @@ use vector_lib::{
 };
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-#[allow(dead_code)] // some features only use some variants
 pub enum SocketMode {
     Tcp,
     Udp,

@@ -10,10 +10,11 @@ use http_1::{
 };
 use snafu::ResultExt;
 use tracing::debug;
+use vector_http::HttpError;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, client_v1::HttpError},
+    http::Auth,
     sinks::{
         UriParseSnafu,
         clickhouse::config::Format,
