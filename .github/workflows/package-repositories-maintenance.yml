@@ -93,6 +93,7 @@ jobs:
                 --expected-version "$EXPECTED_VERSION" --confirm-owner-stopped
               ;;
           esac
+          mkdir -p target
           "$VDEV" release repositories status > target/package-repository-status.json
           cat target/package-repository-status.json
           {
