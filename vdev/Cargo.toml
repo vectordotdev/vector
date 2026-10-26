@@ -20,8 +20,9 @@ include = [
 workspace = true
 
 [features]
-# The ordinary developer CLI only launches the tools container. Compile the AWS
-# clients and publisher implementation inside that container.
+default = []
+# Opt in to the entire package-repository command and its publisher dependencies.
+# Ordinary developer binaries omit it; the dedicated tools image enables it.
 package-repositories = [
   "dep:aws-config", "dep:aws-sdk-s3", "dep:aws-sdk-sts", "dep:aws-sdk-iam",
   "dep:aws-smithy-http-client", "dep:aws-smithy-runtime-api", "dep:aws-smithy-types", "dep:base64", "dep:flate2", "dep:reqwest", "dep:roxmltree", "dep:tar",

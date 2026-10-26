@@ -109,6 +109,14 @@ If you are actively developing vdev itself, install from your working tree so th
 cargo install -f --path vdev
 ```
 
+Package repository commands are disabled in ordinary vdev builds. To enable them locally:
+
+```sh
+cargo run --package vdev --features package-repositories -- release repositories --help
+```
+
+The dedicated publisher image enables this feature explicitly; normal vdev releases omit it.
+
 ## Releasing vdev
 
 To release vdev, open a PR that bumps the `version` field in `vdev/Cargo.toml`.
