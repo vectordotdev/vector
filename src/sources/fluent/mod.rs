@@ -65,6 +65,7 @@ pub enum FluentMode {
 ///
 /// See [serde-rs/serde#2231](https://github.com/serde-rs/serde/issues/2231)
 mod deser {
+    use serde::{Deserialize, Deserializer, de::Error as _};
     use vector_config::configurable_component;
 
     use super::{FluentMode, FluentTcpConfig, FluentUnixConfig, UnixOnly};
@@ -86,14 +87,44 @@ mod deser {
 
     /// Fluent accepts an explicit mode or a TCP configuration without a mode tag.
     #[configurable_component]
-    #[serde(untagged)]
+    #[serde(untagged, deny_unknown_fields)]
     pub(super) enum FluentModeDe {
         /// Explicit TCP or Unix listening mode.
         Tagged(FluentModeTagged),
 
         // Note: this must be last as serde attempts variants in order.
         /// TCP is the default when mode is omitted.
-        Untagged(FluentTcpConfig),
+        Untagged {
+            /// Prevent the TCP fallback from also matching an explicit Unix mode.
+            #[configurable(metadata(docs::hidden))]
+            #[serde(default)]
+            mode: DefaultTcpMode,
+            #[serde(flatten)]
+            config: FluentTcpConfig,
+        },
+    }
+
+    /// The default TCP mode, which excludes Unix mode from the fallback schema.
+    #[configurable_component(no_deser)]
+    #[derive(Default)]
+    #[serde(rename_all = "snake_case")]
+    pub(super) enum DefaultTcpMode {
+        /// Listen on TCP port.
+        #[default]
+        Tcp,
+    }
+
+    impl<'de> Deserialize<'de> for DefaultTcpMode {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            // Mode tags must be strings, not Serde's externally tagged object form.
+            match String::deserialize(deserializer)?.as_str() {
+                "tcp" => Ok(Self::Tcp),
+                value => Err(D::Error::unknown_variant(value, &["tcp"])),
+            }
+        }
     }
 
     impl From<FluentModeDe> for FluentMode {
@@ -101,7 +132,7 @@ mod deser {
             match input {
                 FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => Self::Unix(config),
                 FluentModeDe::Tagged(FluentModeTagged::Tcp(config))
-                | FluentModeDe::Untagged(config) => Self::Tcp(config),
+                | FluentModeDe::Untagged { config, .. } => Self::Tcp(config),
             }
         }
     }
@@ -162,6 +193,10 @@ mod deser {
                 serde_json::json!({"mode": "udp", "address": "0.0.0.0:2020"}),
                 serde_json::json!({"mode": "tcp"}),
                 serde_json::json!({"mode": "unix"}),
+                serde_json::json!({"mode": "unix", "path": "/foo", "address": "0.0.0.0:24224"}),
+                serde_json::json!({"mode": "tcp", "address": "0.0.0.0:24224", "path": "/foo"}),
+                serde_json::json!({"mode": {"tcp": null}, "address": "0.0.0.0:24224"}),
+                serde_json::json!({"mode": null, "address": "0.0.0.0:24224"}),
                 serde_json::json!({"address": "0.0.0.0:2020", "connection_limit": "invalid"}),
             ] {
                 assert!(!validator.is_valid(&input), "schema accepted {input}");

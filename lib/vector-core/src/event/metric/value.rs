@@ -1,6 +1,7 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
+use serde::{Deserialize, Deserializer, de::Error as _};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
@@ -632,7 +633,7 @@ enum BucketBound {
 }
 
 /// String representations of non-finite bucket boundaries.
-#[configurable_component]
+#[configurable_component(no_deser)]
 enum SpecialBucketBound {
     /// Positive infinity.
     #[serde(rename = "inf")]
@@ -643,6 +644,21 @@ enum SpecialBucketBound {
     /// Not a number.
     #[serde(rename = "NaN")]
     Nan,
+}
+
+// Unit enums also accept single-key objects by default, but bucket bounds only accept strings.
+impl<'de> Deserialize<'de> for SpecialBucketBound {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match String::deserialize(deserializer)?.as_str() {
+            "inf" => Ok(Self::Infinity),
+            "-inf" => Ok(Self::NegativeInfinity),
+            "NaN" => Ok(Self::Nan),
+            value => Err(D::Error::unknown_variant(value, &["inf", "-inf", "NaN"])),
+        }
+    }
 }
 
 impl From<BucketRepr> for Bucket {
@@ -792,6 +808,9 @@ mod tests {
             json!("1.5"),
             json!(true),
             json!(null),
+            json!({"inf": null}),
+            json!({"-inf": null}),
+            json!({"NaN": null}),
         ] {
             let input = json!({"upper_limit": bound, "count": 5});
             assert!(!validator.is_valid(&input), "schema accepted {input}");
