@@ -1,6 +1,7 @@
 pub mod logs;
 pub mod metrics;
 pub mod metrics_native;
+pub mod multiservice_traces;
 pub mod traces;
 
 use std::{
@@ -10,11 +11,15 @@ use std::{
     time::{Duration, Instant},
 };
 
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use prost::Message as ProstMessage;
-use prost_reflect::{DescriptorPool, prost::Message as ProstReflectMessage};
+use prost_reflect::{
+    DescriptorPool, Kind, MessageDescriptor, prost::Message as ProstReflectMessage,
+};
 use serde_json::Value;
 use vector_lib::opentelemetry::proto::{
-    DESCRIPTOR_BYTES, common::v1::any_value::Value as AnyValueEnum, resource::v1::Resource,
+    DESCRIPTOR_BYTES, TRACES_REQUEST_MESSAGE_TYPE, collector::trace::v1::ExportTraceServiceRequest,
+    common::v1::any_value::Value as AnyValueEnum, resource::v1::Resource,
 };
 use vrl::value::Value as VrlValue;
 
@@ -196,4 +201,129 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
         "component_received_events_total should count individual items ({expected_count}), \
          not batch requests. Found: {total_events}"
     );
+}
+
+fn parse_export_traces_request(content: &str) -> Result<ExportTraceServiceRequest, String> {
+    // The file may contain multiple lines, each with a JSON object containing an array of resourceSpans
+    let mut merged_request = ExportTraceServiceRequest {
+        resource_spans: Vec::new(),
+    };
+
+    for (line_num, line) in content.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        merged_request.resource_spans.extend(
+            parse_collector_trace_line(line)
+                .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+                .resource_spans,
+        );
+    }
+
+    if merged_request.resource_spans.is_empty() {
+        return Err("No resource spans found in file".to_string());
+    }
+
+    Ok(merged_request)
+}
+
+fn parse_collector_trace_line(line: &str) -> Result<ExportTraceServiceRequest, String> {
+    let mut value: VrlValue = serde_json::from_str::<serde_json::Value>(line)
+        .map_err(|e| format!("Failed to parse JSON: {e}"))?
+        .into();
+
+    let pool = DescriptorPool::decode(DESCRIPTOR_BYTES).map_err(|error| error.to_string())?;
+    let descriptor = pool
+        .get_message_by_name(TRACES_REQUEST_MESSAGE_TYPE)
+        .ok_or("Trace request descriptor missing")?;
+    reject_unknown_fields(&value, &descriptor)?;
+    decode_collector_bytes(&mut value)?;
+    parse_value_to_export_type_request(TRACES_REQUEST_MESSAGE_TYPE, value)
+}
+
+// VRL's protobuf encoder otherwise discards unknown JSON fields from both captures.
+fn reject_unknown_fields(value: &VrlValue, descriptor: &MessageDescriptor) -> Result<(), String> {
+    let fields = value
+        .as_object()
+        .ok_or_else(|| format!("{} should be an object", descriptor.full_name()))?;
+    for (name, value) in fields {
+        let field = descriptor.get_field_by_json_name(name).ok_or_else(|| {
+            format!(
+                "Unsupported captured field {}.{name}",
+                descriptor.full_name()
+            )
+        })?;
+        if let Kind::Message(child) = field.kind() {
+            if field.is_list() {
+                for value in value
+                    .as_array()
+                    .ok_or_else(|| format!("{name} should be an array"))?
+                {
+                    reject_unknown_fields(value, &child)?;
+                }
+            } else if !matches!(value, VrlValue::Null) {
+                reject_unknown_fields(value, &child)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn decode_collector_bytes(value: &mut VrlValue) -> Result<(), String> {
+    match value {
+        VrlValue::Object(fields) => {
+            for (name, value) in fields {
+                match name.as_str() {
+                    "bytesValue" => {
+                        let encoded = value
+                            .as_bytes()
+                            .ok_or("bytesValue should be a base64 string")?;
+                        *value = VrlValue::Bytes(
+                            BASE64_STANDARD
+                                .decode(encoded)
+                                .map_err(|error| format!("Failed to decode bytesValue: {error}"))?
+                                .into(),
+                        );
+                    }
+                    "traceId" => decode_collector_hex(value, name, &[32])?,
+                    "spanId" => decode_collector_hex(value, name, &[16])?,
+                    "parentSpanId" => decode_collector_hex(value, name, &[0, 16])?,
+                    _ => decode_collector_bytes(value)?,
+                }
+            }
+        }
+        VrlValue::Array(values) => {
+            for value in values {
+                decode_collector_bytes(value)?;
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn decode_collector_hex(
+    value: &mut VrlValue,
+    name: &str,
+    valid_hex_lengths: &[usize],
+) -> Result<(), String> {
+    let encoded = value
+        .as_bytes()
+        .ok_or_else(|| format!("{name} should be a hexadecimal string"))?;
+    if !valid_hex_lengths.contains(&encoded.len()) {
+        return Err(format!(
+            "{name} has invalid hexadecimal length {}",
+            encoded.len()
+        ));
+    }
+
+    *value = VrlValue::Bytes(
+        hex::decode(encoded.as_ref())
+            .map_err(|e| format!("Failed to decode {name}: {e}"))?
+            .into(),
+    );
+    Ok(())
 }
