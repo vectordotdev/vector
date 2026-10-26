@@ -442,16 +442,13 @@ check-examples: ## Check that the config/examples files are valid
 check-scripts: ## Check that scripts do not have common mistakes
 	$(VDEV) check scripts
 
-# Override with `json` or `sarif` for machine readable `check-deny*` output. The diagnostics go to stderr.
-DENY_FORMAT ?= human
-
 .PHONY: check-deny
 check-deny: ## Check advisories licenses and sources for crate dependencies
-	$(VDEV) check deny --format $(DENY_FORMAT)
+	$(VDEV) check deny
 
 .PHONY: check-deny-licenses
 check-deny-licenses: ## Check licenses for crate dependencies
-	$(VDEV) check deny --licenses-only --format $(DENY_FORMAT)
+	$(VDEV) check deny --licenses-only
 
 .PHONY: check-events
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
