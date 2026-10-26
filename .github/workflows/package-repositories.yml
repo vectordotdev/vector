@@ -60,10 +60,6 @@ jobs:
           persist-credentials: false
       - id: source
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         id: image
         with:
@@ -100,10 +96,6 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         with:
           image: ${{ needs.inputs.outputs.publisher_image }}
@@ -144,10 +136,6 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         with:
           image: ${{ needs.inputs.outputs.publisher_image }}
@@ -191,10 +179,6 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         with:
           image: ${{ needs.inputs.outputs.publisher_image }}
@@ -227,10 +211,6 @@ jobs:
         with:
           ref: ${{ needs.inputs.outputs.tooling_commit }}
           persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         with:
           image: ${{ needs.inputs.outputs.publisher_image }}

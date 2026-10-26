@@ -82,6 +82,7 @@ jobs:
           PUBLISHER_IMAGE: ${{ needs.build.outputs.image }}
         run: |
           docker run --rm vector-package-publisher:local --help
+          "$VDEV" release repositories --help
           {
             echo 'Set the repository variable below to select this image for future publishing and maintenance runs.'
             echo '```sh'

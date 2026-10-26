@@ -1,5 +1,5 @@
-name: Pull package repository image
-description: Pull the selected immutable publisher image from private GHCR storage.
+name: Load package repository tools
+description: Pull the immutable publisher image and use its opt-in vdev binary.
 inputs:
   image:
     description: Publisher image pinned by its full GHCR SHA-256 digest
@@ -27,8 +27,24 @@ runs:
         # Keep registry credentials in memory and remove them before any signing/AWS step.
         export DOCKER_CONFIG
         DOCKER_CONFIG=$(mktemp -d /dev/shm/package-registry.XXXXXX)
-        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+        publisher_container=
+        cleanup() {
+          if [[ -n "$publisher_container" ]]; then
+            docker rm "$publisher_container" >/dev/null || true
+          fi
+          rm -rf "$DOCKER_CONFIG"
+        }
+        trap cleanup EXIT
         printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
         docker pull "$PUBLISHER_IMAGE"
         docker tag "$PUBLISHER_IMAGE" vector-package-publisher:local
+        # Ordinary vdev releases omit this command. Reuse the feature-enabled binary
+        # from the same reviewed image, without compiling on publishing runners.
+        publisher_tools="$RUNNER_TEMP/package-repository-tools"
+        mkdir -p "$publisher_tools"
+        publisher_container=$(docker create "$PUBLISHER_IMAGE")
+        docker cp "$publisher_container:/usr/local/bin/vdev" "$publisher_tools/vdev"
+        chmod +x "$publisher_tools/vdev"
+        "$publisher_tools/vdev" release repositories --help >/dev/null
+        echo "VDEV=$publisher_tools/vdev" >> "$GITHUB_ENV"
         echo "image=$PUBLISHER_IMAGE" >> "$GITHUB_OUTPUT"

@@ -59,10 +59,6 @@ jobs:
             recover-lock) test -n "$EXPECTED_VERSION" && test "$OWNER_STOPPED" = true ;;
             *) exit 1 ;;
           esac
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         id: image
         with:
@@ -125,10 +121,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         with:
           image: ${{ needs.maintain.outputs.publisher_image }}
@@ -172,10 +164,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         with:
           image: ${{ needs.maintain.outputs.publisher_image }}
@@ -217,10 +205,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/setup
-        with:
-          vdev: true
-          mold: false
       - uses: ./.github/actions/package-repository-tools
         with:
           image: ${{ needs.maintain.outputs.publisher_image }}
