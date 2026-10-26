@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, pin::Pin};
+use std::{borrow::Cow, fs, path::PathBuf, pin::Pin};
 
 use bytes::BytesMut;
 use chrono::{DateTime, Utc};
@@ -13,7 +13,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, encoding::Serializer},
     config::LogNamespace,
-    event::{Event, LogEvent},
+    event::{Event, EventMetadata, LogEvent},
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
 };
 use vrl::{core::Value, prelude::VrlValueConvert};
@@ -151,12 +151,7 @@ impl WebSocketSource {
 
         pin_mut!(ws_sink, ws_source);
 
-        let stateful = self
-            .config
-            .replay
-            .as_ref()
-            .map(|r| r.stateful)
-            .unwrap_or(false);
+        let stateful = self.config.replay.as_ref().is_some_and(|r| r.stateful);
 
         loop {
             let result = tokio::select! {
@@ -350,8 +345,9 @@ impl WebSocketSource {
                         error!(message = "Error sending events.", %error);
                     }
 
-                    for message_id in message_ids {
-                        _ = ack_tx.send(message_id).await;
+                    // We only care about the latest message ID, because it is used to replay
+                    if let Some(last_message_id) = message_ids.last() {
+                        _ = ack_tx.send(last_message_id.clone()).await;
                     }
                 }
                 Err(error) => {
@@ -378,7 +374,7 @@ impl WebSocketSource {
                                     .inspect_err(|err| debug!(message = "Message ID is not a valid string.", %err))
                                     .ok()
                             })
-                            .map(|val| val.into_owned())
+                            .map(Cow::into_owned)
                     } else {
                         None
                     }
@@ -443,7 +439,7 @@ impl WebSocketSource {
                     );
                     let new_uri = WebSocketConnector::parse_uri(new_uri.as_str())
                         .inspect_err(|err| {
-                            warn!(message = "Sending last_received message ID to the server failed.", %err)
+                            warn!(message = "Sending last_received message ID to the server failed.", %err);
                         })
                         .ok()?;
                     Some(self.params.connector.clone().with_new_uri(new_uri))
@@ -547,12 +543,12 @@ impl WebSocketSource {
 
             let mut message_bytes = BytesMut::new();
             if let Err(err) = ack_serializer.encode(
-                LogEvent::from_parts(value, Default::default()).into(),
+                LogEvent::from_parts(value, EventMetadata::default()).into(),
                 &mut message_bytes,
             ) {
                 debug!(message = "Encoding ACK message failed.", %err);
                 return;
-            };
+            }
             let message = Message::binary(message_bytes);
 
             _ = ws_sink
@@ -1058,6 +1054,6 @@ mod tests {
             )
             .unwrap(),
             "message2"
-        )
+        );
     }
 }
