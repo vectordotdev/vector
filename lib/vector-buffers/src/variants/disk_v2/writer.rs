@@ -1980,6 +1980,12 @@ where
             self.ledger.notify_writer_waiters();
         }
     }
+
+    /// The largest encoded record this writer accepts. A record over it can never be written and
+    /// is dropped whole, which is why the sender splits oversized items before handing them over.
+    pub(crate) fn max_record_size(&self) -> usize {
+        self.config.max_record_size
+    }
 }
 
 impl<T, FS> Drop for BufferWriter<T, FS>

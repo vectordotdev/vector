@@ -183,6 +183,37 @@ pub trait Bufferable: InMemoryBufferable + Encodable + GroupedFinalizable {
     fn is_fully_encodable(&self) -> bool {
         true
     }
+
+    /// Splits this item into a front and a back half, each holding at least one sub-item, with
+    /// the sub-items in their original order.
+    ///
+    /// The disk-v2 sender uses this to persist an item whose encoded form would exceed the
+    /// maximum record size: rather than dropping every sub-item along with the record, it writes
+    /// the halves as separate records, splitting again until each fits or holds a single
+    /// sub-item. Each sub-item keeps its own finalizers, so splitting does not change how
+    /// acknowledgements resolve.
+    ///
+    /// Returns the item unchanged in `Err` when it cannot be split, either because it holds fewer
+    /// than two sub-items or because the type does not support splitting, which is the default.
+    /// An unsplittable oversized item is dropped by the writer exactly as before.
+    ///
+    /// # Errors
+    ///
+    /// Returns the unchanged item when it cannot be split.
+    fn split_in_half(self) -> std::result::Result<(Self, Self), Self> {
+        Err(self)
+    }
+
+    /// Joins the two halves returned by [`Bufferable::split_in_half`], `self` being the front.
+    ///
+    /// The sender calls this to hand back, as one item, the part of a split item that did not fit
+    /// in the buffer. It is only ever called on halves produced by `split_in_half`, so a type
+    /// that does not override `split_in_half` never reaches it. Implementors overriding one must
+    /// override both.
+    #[must_use]
+    fn rejoin(self, _back: Self) -> Self {
+        unreachable!("`rejoin` is only called on halves produced by `split_in_half`")
+    }
 }
 
 /// Hook for observing items as they are sent into a `BufferSender`.
