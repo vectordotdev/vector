@@ -1,7 +1,10 @@
 use std::{num::NonZeroUsize, time::Duration};
 
 use futures::FutureExt;
-use redis::{AsyncCommands, ErrorKind, RedisError, RedisResult, aio::ConnectionManager};
+use redis::{
+    AsyncCommands, ErrorKind, FromRedisValue, RedisError, RedisResult, Value,
+    aio::ConnectionManager,
+};
 use snafu::{ResultExt, Snafu};
 
 use super::{InputHandler, ListOption, Method};
@@ -183,11 +186,21 @@ async fn pop_count(
     count: NonZeroUsize,
 ) -> RedisResult<Vec<String>> {
     // A nil reply means the list is empty.
-    let popped: Option<Vec<String>> = match method {
+    let popped: Option<Vec<Value>> = match method {
         Method::Lpop => conn.lpop(key, Some(count)).await?,
         Method::Rpop => conn.rpop(key, Some(count)).await?,
     };
-    Ok(popped.unwrap_or_default())
+    // Convert entries one by one: Redis has already removed all of them, so an entry that is not
+    // valid UTF-8 is reported and dropped on its own, as it would be without batching.
+    Ok(popped
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|value| {
+            String::from_owned_redis_value(value)
+                .map_err(|error| emit!(RedisReceiveEventError::from(error)))
+                .ok()
+        })
+        .collect())
 }
 
 /// Servers older than Redis 6.2 reject the `count` argument of `LPOP`/`RPOP` without popping.
@@ -339,6 +352,28 @@ pub(super) mod integration_test {
         let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(100));
 
         assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["1", "2", "3"]);
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(remaining, 0);
+    }
+
+    #[tokio::test]
+    async fn drain_keeps_valid_entries_next_to_invalid_utf8() {
+        let mut conn = connection().await;
+        if !server_supports_pop_count(&mut conn).await {
+            return;
+        }
+        let key = format!("test-key-{}", random_string(10));
+        let _: i64 = conn.rpush(&key, "1").await.unwrap();
+        let _: i64 = conn.rpush(&key, &[0xff_u8, 0xfe][..]).await.unwrap();
+        let _: i64 = conn.rpush(&key, "3").await.unwrap();
+        let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(3));
+
+        let first = popper.pop_first(&mut conn).await.unwrap();
+        assert_eq!(first, Some("1".to_owned()));
+        // Only the entry that is not valid UTF-8 is dropped, as it would be without batching.
+        let rest = popper.drain(&mut conn).await;
+        assert!(rest.is_ok(), "drain failed for the whole batch: {rest:?}");
+        assert_eq!(rest.unwrap(), ["3"]);
         let remaining: usize = conn.llen(&key).await.unwrap();
         assert_eq!(remaining, 0);
     }
