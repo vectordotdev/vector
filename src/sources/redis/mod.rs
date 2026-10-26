@@ -649,6 +649,77 @@ mod integration_test {
         assert_no_entries_lost_on_shutdown(Method::Lpop, 10).await;
     }
 
+    /// On servers without `LPOP key count` (older than Redis 6.2), holds the rejected count
+    /// probe's reply, shuts down, then releases it: the source must not start the pipelined
+    /// fallback after shutdown, so the entries behind the first one stay in the list.
+    #[tokio::test]
+    async fn redis_source_list_fallback_does_not_read_after_shutdown() {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
+        if list::integration_test::server_supports_pop_count(&mut conn).await {
+            return;
+        }
+        let key = format!("test-key-{}", random_string(10));
+        for value in ["1", "2", "3"] {
+            let _: i64 = conn.rpush(&key, value).await.unwrap();
+        }
+
+        let proxy = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method: Method::Lpop,
+                batch_size: NonZeroUsize::new(10).unwrap(),
+            }),
+            url: proxy.url.clone(),
+            key: key.clone(),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let mut source = config.build(cx).await.unwrap();
+
+        // Hold the blocking pop's reply, let it through, then hold the count probe's reply.
+        proxy.frozen.store(true, Ordering::SeqCst);
+        for reply in ["blocking pop", "count probe"] {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                tokio::select! {
+                    () = proxy.reply_held.notified() => {}
+                    result = &mut source => panic!("source stopped before the {reply} reply: {result:?}"),
+                }
+            })
+            .await
+            .unwrap_or_else(|_| panic!("proxy did not capture the {reply} reply"));
+            if reply == "blocking pop" {
+                proxy.release_reply.notify_one();
+            }
+        }
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(
+            remaining, 2,
+            "only the blocking pop may have removed an entry"
+        );
+
+        let shutdown = shutdown.shutdown_all(Some(Instant::now() + Duration::from_secs(10)));
+        assert!(futures::poll!(&mut source).is_pending());
+        proxy.frozen.store(false, Ordering::SeqCst);
+        proxy.release_reply.notify_one();
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let (result, ()) = tokio::join!(source, shutdown);
+            result.unwrap();
+        })
+        .await
+        .expect("source did not finish after the probe reply was released");
+        let events = rx.collect::<Vec<_>>().await;
+        assert_eq!(events.len(), 1, "no entries may be read after shutdown");
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(remaining, 2, "no pipelined pops may be sent after shutdown");
+    }
+
     struct RedisProxy {
         url: String,
         frozen: Arc<AtomicBool>,

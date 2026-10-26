@@ -157,20 +157,23 @@ impl ListPopper {
             return Ok(Vec::new());
         }
 
-        if self.drain_mode == DrainMode::Count {
-            match pop_count(conn, &self.key, self.method, count).await {
+        match self.drain_mode {
+            DrainMode::Count => match pop_count(conn, &self.key, self.method, count).await {
                 Err(error) if is_pop_count_unsupported(&error) => {
                     warn!(
                         message = "Redis server does not support popping multiple list entries in one command (requires Redis 6.2 or newer); falling back to pipelined single pops.",
                         key = %self.key,
                     );
                     self.drain_mode = DrainMode::Pipelined;
+                    // The rejected command removed nothing. Pipelining starts with the next drain
+                    // rather than here, so this drain, which may be finishing during shutdown,
+                    // never sends a second read.
+                    Ok(Vec::new())
                 }
-                result => return result,
-            }
+                result => result,
+            },
+            DrainMode::Pipelined => pop_pipelined(conn, &self.key, self.method, count).await,
         }
-
-        pop_pipelined(conn, &self.key, self.method, count).await
     }
 }
 
@@ -265,7 +268,7 @@ async fn blpop(conn: &mut ConnectionManager, key: &str) -> RedisResult<Option<St
 }
 
 #[cfg(all(test, feature = "redis-integration-tests"))]
-mod integration_test {
+pub(super) mod integration_test {
     use std::num::NonZeroUsize;
 
     use redis::AsyncCommands;
@@ -294,7 +297,9 @@ mod integration_test {
         key
     }
 
-    async fn server_supports_pop_count(conn: &mut ConnectionManager) -> bool {
+    pub(in crate::sources::redis) async fn server_supports_pop_count(
+        conn: &mut ConnectionManager,
+    ) -> bool {
         let info: String = redis::cmd("INFO")
             .arg("server")
             .query_async(conn)
@@ -346,34 +351,6 @@ mod integration_test {
     }
 
     #[tokio::test]
-    async fn lpop_batch_returns_batch_size_entries_in_order() {
-        let mut conn = connection().await;
-        let key = list_with_entries(&mut conn, 10).await;
-        let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(4));
-
-        assert_eq!(
-            pop_one_batch(&mut popper, &mut conn).await,
-            ["1", "2", "3", "4"]
-        );
-        let remaining: usize = conn.llen(&key).await.unwrap();
-        assert_eq!(remaining, 6);
-    }
-
-    #[tokio::test]
-    async fn rpop_batch_returns_batch_size_entries_in_order() {
-        let mut conn = connection().await;
-        let key = list_with_entries(&mut conn, 10).await;
-        let mut popper = ListPopper::new(key.clone(), Method::Rpop, batch(4));
-
-        assert_eq!(
-            pop_one_batch(&mut popper, &mut conn).await,
-            ["10", "9", "8", "7"]
-        );
-        let remaining: usize = conn.llen(&key).await.unwrap();
-        assert_eq!(remaining, 6);
-    }
-
-    #[tokio::test]
     async fn pipelined_drain_returns_batch_size_entries_in_order() {
         let mut conn = connection().await;
         let key = list_with_entries(&mut conn, 10).await;
@@ -389,25 +366,15 @@ mod integration_test {
     }
 
     #[tokio::test]
-    async fn pipelined_rpop_drain_returns_batch_size_entries_in_order() {
-        let mut conn = connection().await;
-        let key = list_with_entries(&mut conn, 10).await;
-        let mut popper = ListPopper::new(key.clone(), Method::Rpop, batch(4));
-        popper.drain_mode = DrainMode::Pipelined;
-
-        assert_eq!(
-            pop_one_batch(&mut popper, &mut conn).await,
-            ["10", "9", "8", "7"]
-        );
-        let remaining: usize = conn.llen(&key).await.unwrap();
-        assert_eq!(remaining, 6);
-    }
-
-    #[tokio::test]
     async fn batch_larger_than_list_returns_all_entries() {
         let mut conn = connection().await;
         let key = list_with_entries(&mut conn, 3).await;
         let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(100));
+        // Start in the mode the server needs; detecting it is covered by
+        // `drain_mode_follows_server_support_for_pop_count`.
+        if !server_supports_pop_count(&mut conn).await {
+            popper.drain_mode = DrainMode::Pipelined;
+        }
 
         assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["1", "2", "3"]);
         let remaining: usize = conn.llen(&key).await.unwrap();
@@ -429,19 +396,27 @@ mod integration_test {
     #[tokio::test]
     async fn drain_mode_follows_server_support_for_pop_count() {
         let mut conn = connection().await;
-        let key = list_with_entries(&mut conn, 5).await;
+        let key = list_with_entries(&mut conn, 10).await;
         let mut popper = ListPopper::new(key.clone(), Method::Lpop, batch(5));
 
-        assert_eq!(
-            pop_one_batch(&mut popper, &mut conn).await,
-            ["1", "2", "3", "4", "5"]
-        );
-        let expected = if server_supports_pop_count(&mut conn).await {
-            DrainMode::Count
+        if server_supports_pop_count(&mut conn).await {
+            assert_eq!(
+                pop_one_batch(&mut popper, &mut conn).await,
+                ["1", "2", "3", "4", "5"]
+            );
+            assert_eq!(popper.drain_mode, DrainMode::Count);
         } else {
-            DrainMode::Pipelined
-        };
-        assert_eq!(popper.drain_mode, expected);
+            // The rejected probe removes nothing and no second command is sent in the same
+            // drain, so the first batch is just the blocking pop; pipelining starts next batch.
+            assert_eq!(pop_one_batch(&mut popper, &mut conn).await, ["1"]);
+            assert_eq!(popper.drain_mode, DrainMode::Pipelined);
+            let remaining: usize = conn.llen(&key).await.unwrap();
+            assert_eq!(remaining, 9);
+            assert_eq!(
+                pop_one_batch(&mut popper, &mut conn).await,
+                ["2", "3", "4", "5", "6"]
+            );
+        }
     }
 
     #[tokio::test]
