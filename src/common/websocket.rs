@@ -3,10 +3,15 @@ use std::{
     fmt::Debug,
     net::SocketAddr,
     num::NonZeroU64,
+    str::FromStr,
     task::{Context, Poll},
     time::Duration,
 };
 
+use http::{
+    HeaderMap, HeaderName, HeaderValue,
+    header::{InvalidHeaderName, InvalidHeaderValue},
+};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
 use tokio_tungstenite::{
@@ -43,6 +48,10 @@ pub enum WebSocketError {
     NoAddresses,
     #[snafu(display("Connection attempt timed out"))]
     ConnectionTimedOut,
+    #[snafu(display("Invalid extra header value: {}", source))]
+    InvalidHeaderValue { source: InvalidHeaderValue },
+    #[snafu(display("Invalid extra header name: {}", source))]
+    InvalidHeaderName { source: InvalidHeaderName },
 }
 
 #[derive(Clone)]
@@ -50,6 +59,7 @@ pub(crate) struct WebSocketConnector {
     uri: Uri,
     tls: MaybeTlsSettings,
     auth: Option<Auth>,
+    extra_headers: HeaderMap<HeaderValue>,
 }
 
 impl WebSocketConnector {
@@ -66,17 +76,50 @@ impl WebSocketConnector {
         Ok(uri)
     }
 
+    /// Parse the headers.
+    pub(crate) fn parse_headers(
+        headers: &HashMap<String, Vec<String>>,
+    ) -> Result<HeaderMap<HeaderValue>, WebSocketError> {
+        std::println!("parse_headers: {headers:?}");
+        let mut result = HeaderMap::with_capacity(headers.iter().map(|(_, v)| v.len()).sum());
+
+        for (key, values) in headers {
+            for v in values {
+                result.append(
+                    HeaderName::from_str(&key).context(InvalidHeaderNameSnafu)?,
+                    v.parse().context(InvalidHeaderValueSnafu)?,
+                );
+            }
+        }
+        Ok(result)
+    }
+
     /// Construct a connector from an already-parsed URI.
     ///
     /// Used by callers whose `validate` already parsed the URI, so the parsed
     /// value is plumbed through the validated state rather than re-parsed
     /// here. TLS resolution still happens in this method.
-    pub(crate) const fn from_validated(
+    pub(crate) fn from_validated(
         uri: Uri,
         tls: MaybeTlsSettings,
         auth: Option<Auth>,
+        extra_headers: HeaderMap<HeaderValue>,
     ) -> Self {
-        Self { uri, tls, auth }
+        std::println!("headers: {extra_headers:?}");
+        Self {
+            uri,
+            tls,
+            auth,
+            extra_headers,
+        }
+    }
+
+    /// Construct a connector from an existing connector, with a new URI.
+    pub(crate) fn with_new_uri(self, new_uri: Uri) -> Self {
+        Self {
+            uri: new_uri,
+            ..self
+        }
     }
 
     fn extract_host_and_port(uri: &Uri) -> Result<(String, u16), TungsteniteError> {
@@ -110,6 +153,8 @@ impl WebSocketConnector {
         let mut request = (&self.uri)
             .into_client_request()
             .context(CreateFailedSnafu)?;
+
+        request.headers_mut().extend(self.extra_headers.clone());
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);

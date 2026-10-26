@@ -88,7 +88,6 @@ impl PongValidation {
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 pub struct ReplayAckConfig {
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
     /// Name of the field that should contain the ACKed message ID.
@@ -127,7 +126,6 @@ pub struct MessageReplayConfig {
     /// replay can be requested at reconnection and ACK messages can be sent.
     pub message_id_path: ConfigValuePath,
 
-    #[configurable(derived)]
     pub ack: Option<ReplayAckConfig>,
 }
 
@@ -176,7 +174,6 @@ pub struct WebSocketConfig {
     #[serde(default)]
     pub pong_message: Option<PongMessage>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub replay: Option<MessageReplayConfig>,
 
@@ -217,10 +214,13 @@ impl_generate_config_from_default!(WebSocketConfig);
 #[typetag::serde(name = "websocket")]
 impl SourceConfig for WebSocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        std::println!("build headers: {:?}", self.common.headers);
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
-        let connector = WebSocketConnector::from_validated(uri, tls, self.common.auth.clone());
+        let headers = WebSocketConnector::parse_headers(&self.common.headers)?;
+        let connector =
+            WebSocketConnector::from_validated(uri, tls, self.common.auth.clone(), headers);
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
@@ -239,7 +239,6 @@ impl SourceConfig for WebSocketConfig {
 
         let params = WebSocketSourceParams {
             connector,
-            tls,
             decoder,
             log_namespace,
             data_dir,

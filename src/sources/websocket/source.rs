@@ -15,7 +15,6 @@ use vector_lib::{
     config::LogNamespace,
     event::{Event, LogEvent},
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
-    tls::MaybeTlsSettings,
 };
 use vrl::{core::Value, prelude::VrlValueConvert};
 
@@ -50,7 +49,6 @@ const LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME: &str = "last_received";
 
 pub(crate) struct WebSocketSourceParams {
     pub connector: WebSocketConnector,
-    pub tls: MaybeTlsSettings,
     pub decoder: Decoder,
     pub log_namespace: LogNamespace,
     pub data_dir: Option<PathBuf>,
@@ -443,15 +441,12 @@ impl WebSocketSource {
                         LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME,
                         last_received_message_id,
                     );
-                    WebSocketConnector::new(
-                        String::from(new_uri),
-                        self.params.tls.clone(),
-                        self.config.common.auth.clone(),
-                    )
-                    .inspect_err(|err| {
-                        warn!(message = "Sending last_received message ID to the server failed.", %err)
-                    })
-                    .ok()
+                    let new_uri = WebSocketConnector::parse_uri(new_uri.as_str())
+                        .inspect_err(|err| {
+                            warn!(message = "Sending last_received message ID to the server failed.", %err)
+                        })
+                        .ok()?;
+                    Some(self.params.connector.clone().with_new_uri(new_uri))
                 });
         let connector = if self.config.replay.is_some() {
             last_received_message_connector
