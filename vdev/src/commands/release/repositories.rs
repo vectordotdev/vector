@@ -1,4 +1,3 @@
-#[cfg(feature = "package-repositories")]
 mod publisher;
 
 use std::{path::PathBuf, process::Command};
@@ -89,10 +88,7 @@ enum Channel {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         if self.in_container {
-            #[cfg(feature = "package-repositories")]
             return publisher::exec(&self.config, &self.work, self.command);
-            #[cfg(not(feature = "package-repositories"))]
-            anyhow::bail!("The publisher requires the package-repositories Cargo feature");
         }
         app::set_repo_dir()?;
         if matches!(self.command, Commands::BuildImage) {

@@ -81,8 +81,14 @@ jobs:
           persist-credentials: false
       # CLI and image checks require neither signing material nor AWS access.
       - run: |
-          cargo test --locked --package vdev commands::release::repositories::
           cargo build --locked --package vdev
+          target/debug/vdev release --help
+          if target/debug/vdev release repositories --help; then
+            echo 'Package repository commands must be disabled by default.' >&2
+            exit 1
+          fi
+          cargo test --locked --package vdev --features package-repositories commands::release::repositories::
+          cargo build --locked --package vdev --features package-repositories
           target/debug/vdev release repositories build-image
           docker run --rm vector-package-publisher:local --help
 
