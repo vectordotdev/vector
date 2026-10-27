@@ -600,7 +600,7 @@ pub fn build_runtime(
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
 
-    let threads = threads.unwrap_or_else(crate::num_threads);
+    let threads = threads.unwrap_or_else(vector_lib::num_threads);
     if threads == 0 {
         error!("The `threads` argument must be greater or equal to 1.");
         return Err(exitcode::CONFIG);

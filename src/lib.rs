@@ -243,37 +243,3 @@ pub fn get_hostname() -> std::io::Result<String> {
 }
 
 pub(crate) use vector_lib::spawn_in_current_span;
-
-/// Spawn a task with the given name. The name is only used if
-/// built with [`tokio_unstable`][tokio_unstable].
-///
-/// [tokio_unstable]: https://docs.rs/tokio/latest/tokio/#unstable-features
-#[track_caller]
-pub(crate) fn spawn_named<T>(
-    task: impl std::future::Future<Output = T> + Send + 'static,
-    _name: &str,
-) -> tokio::task::JoinHandle<T>
-where
-    T: Send + 'static,
-{
-    #[cfg(tokio_unstable)]
-    return tokio::task::Builder::new()
-        .name(_name)
-        .spawn(task)
-        .expect("tokio task should spawn");
-
-    #[cfg(not(tokio_unstable))]
-    tokio::spawn(task)
-}
-
-/// Returns an estimate of the number of recommended threads that Vector should spawn.
-pub fn num_threads() -> usize {
-    let count = match std::thread::available_parallelism() {
-        Ok(count) => count,
-        Err(error) => {
-            warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
-            std::num::NonZeroUsize::MIN
-        }
-    };
-    usize::from(count)
-}

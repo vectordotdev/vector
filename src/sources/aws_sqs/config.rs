@@ -119,7 +119,7 @@ impl SourceConfig for AwsSqsConfig {
                 poll_secs: self.poll_secs,
                 concurrency: self
                     .client_concurrency
-                    .map_or_else(crate::num_threads, NonZeroUsize::get),
+                    .map_or_else(vector_lib::num_threads, NonZeroUsize::get),
                 visibility_timeout_secs: self.visibility_timeout_secs,
                 delete_message: self.delete_message,
                 acknowledgements,
