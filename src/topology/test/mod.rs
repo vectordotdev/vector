@@ -27,6 +27,7 @@ use crate::{
             basic_sink, basic_sink_failing_healthcheck, basic_sink_with_data, basic_source,
             basic_source_with_data, basic_source_with_event_counter, basic_transform,
             error_definition_transform,
+            transforms::{NoopTransformConfig, TransformType},
         },
         start_topology, trace_init,
     },
@@ -368,6 +369,63 @@ async fn topology_remove_one_sink() {
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
+}
+
+/// Removing a sink behind a transform that never received an event must still let the old
+/// sink finish: the idle transform has to apply the fanout `Remove` so the sink's input closes.
+async fn removed_sink_behind_idle_transform_finishes(transform: NoopTransformConfig) {
+    trace_init();
+
+    // Keep the source's sender alive, so the source does not finish and close everything
+    // downstream on its own.
+    let (_in1, source1) = basic_source();
+    let (out1, sink1) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_transform("t1", &["in1"], transform.clone());
+    config.add_sink("out1", &["t1"], sink1);
+    config.add_sink("out2", &["t1"], basic_sink(10).1);
+
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
+
+    let mut config = Config::builder();
+    config.add_source("in1", basic_source().1);
+    config.add_transform("t1", &["in1"], transform);
+    config.add_sink("out2", &["t1"], basic_sink(10).1);
+
+    topology
+        .reload_config_and_respawn(config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
+
+    let drained = tokio::time::timeout(
+        Duration::from_secs(5),
+        out1.flat_map(into_event_stream).collect::<Vec<_>>(),
+    )
+    .await
+    .expect("removed sink should finish once the idle transform drops its input sender");
+    assert_eq!(Vec::<Event>::new(), drained);
+
+    topology.stop().await;
+}
+
+#[tokio::test]
+async fn topology_removed_sink_behind_idle_inline_transform_finishes() {
+    removed_sink_behind_idle_transform_finishes(TransformType::Function.into()).await;
+}
+
+#[tokio::test]
+async fn topology_removed_sink_behind_idle_concurrent_transform_finishes() {
+    removed_sink_behind_idle_transform_finishes(
+        NoopTransformConfig::from(TransformType::Function).with_concurrency(),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn topology_removed_sink_behind_idle_task_transform_finishes() {
+    removed_sink_behind_idle_transform_finishes(TransformType::Task.into()).await;
 }
 
 #[tokio::test]

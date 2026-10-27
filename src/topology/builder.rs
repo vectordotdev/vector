@@ -1335,12 +1335,24 @@ impl Runner {
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         self.timer_tx.try_send_start_wait();
-        while let Some(events) = input_rx.next().await {
-            self.on_events_received(&events);
-            self.transform.transform_all(events, &mut outputs_buf);
-            self.send_outputs(&mut outputs_buf)
-                .await
-                .map_err(TaskError::wrapped)?;
+        let mut control_channel_open = true;
+        loop {
+            tokio::select! {
+                biased;
+                // Apply reload control messages while no events arrive; see
+                // `TransformOutputs::recv_control_message`.
+                alive = self.outputs.recv_control_message(), if control_channel_open => {
+                    control_channel_open = alive;
+                }
+                events = input_rx.next() => {
+                    let Some(events) = events else { break };
+                    self.on_events_received(&events);
+                    self.transform.transform_all(events, &mut outputs_buf);
+                    self.send_outputs(&mut outputs_buf)
+                        .await
+                        .map_err(TaskError::wrapped)?;
+                }
+            }
         }
 
         Ok(TaskOutput::Transform)
@@ -1359,11 +1371,20 @@ impl Runner {
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
+        let mut control_channel_open = true;
 
         self.timer_tx.try_send_start_wait();
         loop {
             tokio::select! {
                 biased;
+
+                // Apply reload control messages between batches, so outputs that receive no
+                // events still release removed or changed downstream components; see
+                // `TransformOutputs::recv_control_message`. No `SendGroup` is live here, as
+                // `send_outputs` completes within the `in_flight` branch.
+                alive = self.outputs.recv_control_message(), if control_channel_open && !shutting_down => {
+                    control_channel_open = alive;
+                }
 
                 result = in_flight.next(), if !in_flight.is_empty() => {
                     match result {
