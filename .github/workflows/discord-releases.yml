@@ -1,0 +1,44 @@
+name: Announce Releases on Discord
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  announce:
+    # Disable the native GitHub release webhook before enabling this repository variable.
+    if: github.repository == 'vectordotdev/vector' && vars.DISCORD_RELEASES_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Post release to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::error::DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is not configured"
+            exit 1
+          fi
+
+          # Bound the payload size even when every character uses four UTF-8 bytes.
+          jq '{
+            username: "Vector Releases",
+            allowed_mentions: {parse: []},
+            embeds: [{
+              title: (("Vector " + .release.tag_name)[:128]),
+              url: .release.html_url,
+              description: ((.release.body // "") |
+                if length > 1000 then .[:1000] + "…" else . end),
+              footer: {text: (if .release.prerelease then "Pre-release" else "Release" end)}
+            }]
+          }' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/discord-release.json"
+
+          curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 30 \
+            --header 'Content-Type: application/json' \
+            --data-binary "@$RUNNER_TEMP/discord-release.json" \
+            --output /dev/null \
+            "${DISCORD_WEBHOOK_URL}?wait=true"
+
