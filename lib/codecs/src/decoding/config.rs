@@ -43,11 +43,12 @@ impl DecodingConfig {
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Avro schema cannot be parsed, the protobuf descriptor set file
+    /// cannot be read or decoded or does not contain the message type, or the VRL program fails
+    /// to compile.
     pub fn build(&self) -> vector_common::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();
