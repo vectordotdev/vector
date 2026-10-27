@@ -9,8 +9,8 @@ use super::representation::ConfigMap;
 ///
 /// # Errors
 ///
-/// Returns an error message for each referenced variable in a string leaf that contains a
-/// newline, or that is required (`?` or `:?`) but is missing or empty.
+/// Returns an error message for each referenced variable in a string leaf that contains LF or
+/// CR, is unset without a default, or is empty when referenced with `:?`.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
@@ -86,8 +86,8 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: LazyLock<Regex> = LazyLock:
 ///
 /// # Errors
 ///
-/// Returns an error message for each referenced variable that contains a newline, or that is
-/// required (`?` or `:?`) but is missing or empty.
+/// Returns an error message for each referenced variable that contains LF or CR, is unset
+/// without a default, or is empty when referenced with `:?`.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,

@@ -374,8 +374,8 @@ fn load_from_inputs(
 /// # Errors
 ///
 /// Returns error messages if `input` cannot be read as UTF-8, or, when `interpolate_env` is
-/// set, if a referenced environment variable contains a newline or a required (`?` or `:?`)
-/// variable is missing or empty.
+/// set, if a referenced environment variable contains LF or CR, is unset without a default, or
+/// is empty when referenced with `:?`.
 pub fn prepare_input<R: std::io::Read>(
     mut input: R,
     interpolate_env: bool,
