@@ -215,6 +215,15 @@ components: sources: datadog_agent: {
 				You can find the agent configuration template [here](\(urls.datadog_agent_vector_config_template)).
 				"""
 		}
+		metrics_compatibility: {
+			title: "Metrics intake compatibility"
+			body: """
+				The `datadog_agent` source accepts the Datadog Agent series v1 (`/api/v1/series`),
+				v2 (`/api/v2/series`), and v3 (`/api/intake/metrics/v3/series`) intake formats.
+				Datadog Agent 7.81.0 and newer use v3 by default, so they can send metrics to Vector
+				without being configured to use a legacy series intake format.
+				"""
+		}
 		trace_support: {
 			title: "Trace support caveats"
 			body: """
