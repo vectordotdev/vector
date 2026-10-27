@@ -278,10 +278,10 @@ impl ValidatedSink for DorisConfig {
             .collect::<Vec<_>>();
 
         let service = request_settings.distributed_service(
-            DorisRetryLogic {},
+            &DorisRetryLogic {},
             services,
-            health_config,
-            DorisHealthLogic,
+            &health_config,
+            &DorisHealthLogic,
             1, // Buffer bound is hardcoded to 1 for sinks
         );
 

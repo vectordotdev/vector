@@ -776,6 +776,51 @@ pub fn get_or_generate_schema(
     Ok(schema)
 }
 
+/// Generates a shared boolean-or-object input schema for Vector's `bool_or_struct` helper.
+///
+/// Keep a separate definition so ordinary and flattened uses of the same type remain object-only.
+/// The definition inherits type metadata, while defaults and descriptions stay specific to each field.
+///
+/// # Errors
+///
+/// Returns an error if generating the object schema or validating field metadata fails.
+pub fn generate_bool_or_struct_schema(
+    config: &ConfigurableRef,
+    generator: &RefCell<SchemaGenerator>,
+    overrides: Option<Metadata>,
+) -> Result<SchemaObject, GenerateError> {
+    // Avoid a generic wrapper's `<...>` in the name: `$ref` fragments must be valid URIs.
+    let name = format!("bool_or_struct::{}", config.type_name());
+    if !generator.borrow().definitions().contains_key(&name) {
+        // Match get_or_generate_schema's recursion guard.
+        generator
+            .borrow_mut()
+            .definitions_mut()
+            .insert(name.clone(), Schema::Bool(false));
+        let object = get_or_generate_schema(config, generator, None)?;
+        let mut boolean = generate_bool_schema();
+        boolean.metadata().deprecated = true;
+        let mut schema = generate_one_of_schema(&[boolean, object]);
+        let mut metadata = config.make_metadata();
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_ENUM_TAGGING,
+            "untagged",
+        ));
+        apply_configurable_metadata(config, &mut schema, metadata);
+        generator
+            .borrow_mut()
+            .definitions_mut()
+            .insert(name.clone(), Schema::Object(schema));
+    }
+
+    let mut schema = get_schema_ref(generator, &name);
+    if let Some(metadata) = overrides {
+        config.validate_metadata(&metadata)?;
+        apply_configurable_metadata(config, &mut schema, metadata);
+    }
+    Ok(schema)
+}
+
 fn get_schema_ref<S: AsRef<str>>(generator: &RefCell<SchemaGenerator>, name: S) -> SchemaObject {
     let ref_path = format!(
         "{}{}",

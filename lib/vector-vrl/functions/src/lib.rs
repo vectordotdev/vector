@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Central location for all VRL functions used in Vector.
 //!
 //! This crate provides a single source of truth for the complete set of VRL functions

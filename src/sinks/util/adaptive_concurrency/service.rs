@@ -70,11 +70,8 @@ where
 
     fn call(&mut self, request: Request) -> Self::Future {
         // Make sure a permit has been acquired
-        let permit = match mem::replace(&mut self.state, State::Empty) {
-            // Take the permit.
-            State::Ready(permit) => permit,
-            // whoopsie!
-            _ => panic!("Maximum requests in-flight; poll_ready must be called first"),
+        let State::Ready(permit) = mem::replace(&mut self.state, State::Empty) else {
+            panic!("Maximum requests in-flight; poll_ready must be called first");
         };
 
         self.controller.start_request();
@@ -266,6 +263,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[expect(clippy::float_cmp, reason = "These constant samples have exact means.")]
     async fn increases_limit() {
         let stats = TestService::run(|mut svc| async move {
             // Concurrency starts at 1

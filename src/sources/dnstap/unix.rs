@@ -42,6 +42,7 @@ pub struct UnixConfig {
 }
 
 impl UnixConfig {
+    #[must_use]
     pub fn new(socket_path: PathBuf) -> Self {
         Self {
             socket_path,
@@ -71,7 +72,7 @@ pub struct DnstapFrameHandler<T: FrameHandler + Clone> {
 }
 
 impl<T: FrameHandler + Clone> DnstapFrameHandler<T> {
-    pub fn new(config: UnixConfig, frame_handler: T) -> Self {
+    pub fn new(config: &UnixConfig, frame_handler: T) -> Self {
         Self {
             frame_handler,
             socket_path: config.socket_path.clone(),
@@ -92,10 +93,10 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
     }
 
     /**
-     * Function to pass into util::framestream::build_framestream_unix_source
+     * Function to pass into `util::framestream::build_framestream_unix_source`
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
-    fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+    fn handle_event(&self, received_from: Option<String>, frame: Bytes) -> Option<Event> {
         self.frame_handler
             .handle_event(received_from, frame)
             .map(|event| {
@@ -104,7 +105,7 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
                         mode: SocketMode::Unix,
                         byte_size: log_event.estimated_json_encoded_size_of(),
                         count: 1
-                    })
+                    });
                 }
                 event
             })

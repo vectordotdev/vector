@@ -361,6 +361,7 @@ impl Encoder<Event> for CefSerializer {
 fn get_log_event_value(log: &LogEvent, field: &ConfigTargetPath) -> String {
     match log.get(field) {
         Some(Value::Bytes(bytes)) => String::from_utf8_lossy(bytes).to_string(),
+        Some(Value::String(string)) => string.to_string(),
         Some(Value::Integer(int)) => int.to_string(),
         Some(Value::Float(float)) => float.to_string(),
         Some(Value::Boolean(bool)) => bool.to_string(),

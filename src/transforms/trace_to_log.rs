@@ -89,7 +89,7 @@ mod tests {
     }
 
     async fn do_transform(trace: TraceEvent) -> Option<LogEvent> {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = TraceToLogConfig {
                 log_namespace: Some(false),
             };
@@ -105,9 +105,9 @@ mod tests {
             assert_eq!(out.recv().await, None);
 
             result
-        })
+        }))
         .await
-        .map(|e| e.into_log())
+        .map(Event::into_log)
     }
 
     #[tokio::test]
@@ -123,7 +123,7 @@ mod tests {
 
         let (expected_map, _) = trace.clone().into_parts();
 
-        let log = do_transform(trace).await.unwrap();
+        let log = Box::pin(do_transform(trace)).await.unwrap();
         let (actual_value, _) = log.into_parts();
         let actual_map = actual_value
             .into_object()
@@ -145,7 +145,7 @@ mod tests {
         });
         trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
 
-        let log = do_transform(trace).await.unwrap();
+        let log = Box::pin(do_transform(trace)).await.unwrap();
         assert_eq!(log.namespace(), LogNamespace::Legacy);
         assert_eq!(log.metadata().trace_layout(), None);
         assert_eq!(

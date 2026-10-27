@@ -56,7 +56,7 @@ impl InternalEvent for WindowsServiceRestart<'_> {
             name = ?self.name,
             "Restarted Windows Service."
         );
-        counter!(CounterName::WindowsServiceRestartTotal).increment(1)
+        counter!(CounterName::WindowsServiceRestartTotal).increment(1);
     }
 }
 

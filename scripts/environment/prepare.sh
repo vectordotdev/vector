@@ -4,10 +4,10 @@ set -euo pipefail
 SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
 # Tool versions. Keep pins here so CI and local setup use the same versions.
-CARGO_DEB_VERSION="2.9.3"
+CARGO_DEB_VERSION="3.6.2"
 CROSS_VERSION="0.2.5"
 CARGO_NEXTEST_VERSION="0.9.95"
-CARGO_DENY_VERSION="0.19.0"
+CARGO_DENY_VERSION="0.20.2"
 CARGO_MSRV_VERSION="0.18.4"
 CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"

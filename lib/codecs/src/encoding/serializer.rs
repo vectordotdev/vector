@@ -2,7 +2,7 @@
 
 use bytes::BytesMut;
 use vector_config::configurable_component;
-use vector_core::{config::DataType, event::Event, schema};
+use vector_core::{config::DataType, event::Event, schema, serde::AsciiChar};
 
 #[cfg(feature = "arrow")]
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
@@ -358,9 +358,9 @@ impl SerializerConfig {
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
             #[cfg(feature = "syslog")]
             SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
-            SerializerConfig::Gelf(_) => {
-                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
-            }
+            SerializerConfig::Gelf(_) => FramingConfig::CharacterDelimited(
+                CharacterDelimitedEncoderConfig::new(AsciiChar::new('\0')),
+            ),
         }
     }
 

@@ -15,7 +15,7 @@ use vector_lib::{
 use vector_lib::codecs::Encoder;
 
 /// A test case event for deserialization from yaml file.
-/// This is an intermediary step to TestEvent.
+/// This is an intermediary step to `TestEvent`.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum RawTestEvent {
@@ -92,6 +92,9 @@ pub enum TestEvent {
 }
 
 impl TestEvent {
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn into_event(self) -> Event {
         match self {
             Self::Passthrough(event) => event,
@@ -100,6 +103,8 @@ impl TestEvent {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub const fn get_event(&mut self) -> &mut Event {
         match self {
             Self::Passthrough(event) => event,
@@ -108,7 +113,10 @@ impl TestEvent {
         }
     }
 
-    /// (should_fail, event)
+    /// (`should_fail`, event)
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn get(self) -> (bool, Event) {
         match self {
             Self::Passthrough(event) => (false, event),
@@ -118,6 +126,7 @@ impl TestEvent {
     }
 
     /// True if the event should fail, false otherwise.
+    #[must_use]
     pub const fn should_fail(&self) -> bool {
         match self {
             Self::Passthrough(_) => false,
@@ -127,6 +136,7 @@ impl TestEvent {
 
     /// True if the event should be rejected by the external resource in order to
     /// trigger a failure path.
+    #[must_use]
     pub const fn should_reject(&self) -> bool {
         match self {
             Self::Passthrough(_) | Self::FailWithAlternateEncoder(_) => false,
@@ -151,6 +161,8 @@ impl From<RawTestEvent> for TestEvent {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn encode_test_event(
     encoder: &mut Encoder<encoding::Framer>,
     buf: &mut BytesMut,

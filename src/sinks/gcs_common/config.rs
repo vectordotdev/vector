@@ -14,11 +14,17 @@ use crate::{
         gcs_common::service::GcsResponse,
         util::{
             HttpEndpoint,
+            http::IntoStatusCode,
             retries::{RetryAction, RetryLogic},
         },
     },
 };
 
+/// Returns the default Google Cloud Storage endpoint.
+///
+/// # Panics
+/// Panics if the static endpoint is not a valid HTTP URL.
+#[must_use]
 pub fn default_endpoint() -> HttpEndpoint {
     HttpEndpoint::parse("https://storage.googleapis.com")
         .expect("static default endpoint should be a valid http(s) URL")
@@ -109,12 +115,15 @@ pub enum GcsError {
     BucketNotFound { bucket: String },
 }
 
+/// Builds a bucket healthcheck.
+///
+/// The returned future reports request failures and non-successful health statuses.
 pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
     base_url: HttpEndpoint,
     auth: GcpAuthenticator,
-) -> crate::Result<Healthcheck> {
+) -> Healthcheck {
     let healthcheck = async move {
         let uri = base_url.into_uri();
         let mut request = http::Request::head(uri).body(Body::empty())?;
@@ -124,14 +133,18 @@ pub fn build_healthcheck(
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
         let response = client.send(request).await?;
-        healthcheck_response(response, not_found_error)
+        healthcheck_response(&response, not_found_error)
     };
 
-    Ok(healthcheck.boxed())
+    healthcheck.boxed()
 }
 
+/// Classifies a GCP healthcheck response.
+///
+/// # Errors
+/// Returns an error for forbidden, missing, or unexpected response statuses.
 pub fn healthcheck_response(
-    response: http::Response<hyper::Body>,
+    response: &http::Response<hyper::Body>,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
     healthcheck_status(response.status(), not_found_error)
@@ -139,15 +152,18 @@ pub fn healthcheck_response(
 
 /// Classifies a GCP healthcheck response by status alone, shared by the legacy and native
 /// HTTP clients.
+///
+/// # Errors
+/// Returns an error for forbidden, missing, or unexpected response statuses.
 pub fn healthcheck_status(
-    status: http::StatusCode,
+    status: impl IntoStatusCode,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
-    match status {
+    match status.into_status_code() {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 

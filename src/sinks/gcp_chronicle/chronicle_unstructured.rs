@@ -82,7 +82,7 @@ pub enum Region {
     /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)
     Asia,
 
-    /// SãoPaulo Region
+    /// São Paulo Region
     SãoPaulo,
 
     /// Canada Region
@@ -112,7 +112,7 @@ pub enum Region {
     /// Sydney Region
     Sydney,
 
-    /// TelAviv Region
+    /// Tel Aviv Region
     TelAviv,
 
     /// Tokyo Region
@@ -131,7 +131,9 @@ impl Region {
         match self {
             Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
             Region::Us => "https://malachiteingestion-pa.googleapis.com",
-            Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Asia | Region::Singapore => {
+                "https://asia-southeast1-malachiteingestion-pa.googleapis.com"
+            }
             Region::SãoPaulo => "https://southamerica-east1-malachiteingestion-pa.googleapis.com",
             Region::Canada => {
                 "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
@@ -142,7 +144,6 @@ impl Region {
             Region::London => "https://europe-west2-malachiteingestion-pa.googleapis.com",
             Region::Mumbai => "https://asia-south1-malachiteingestion-pa.googleapis.com",
             Region::Paris => "https://europe-west9-malachiteingestion-pa.googleapis.com",
-            Region::Singapore => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
             Region::Sydney => "https://australia-southeast1-malachiteingestion-pa.googleapis.com",
             Region::TelAviv => "https://me-west1-malachiteingestion-pa.googleapis.com",
             Region::Tokyo => "https://asia-northeast1-malachiteingestion-pa.googleapis.com",
@@ -256,7 +257,7 @@ fn chronicle_labels_examples() -> HashMap<String, String> {
 
 impl GenerateConfig for ChronicleUnstructuredConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             credentials_path: /path/to/credentials.json
             customer_id: customer_id
             namespace: namespace
@@ -266,11 +267,15 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             fallback_log_type: VECTOR_DEV
             encoding:
               codec: text
-        "#})
+        "})
         .unwrap()
     }
 }
 
+/// Builds a Chronicle endpoint healthcheck.
+///
+/// # Errors
+/// Returns an error if the endpoint is not a valid HTTP URI.
 pub fn build_healthcheck(
     client: HttpClient,
     base_url: &str,
@@ -283,7 +288,7 @@ pub fn build_healthcheck(
         auth.apply(&mut request);
 
         let response = client.send(request).await?;
-        healthcheck_response(response, GcsHealthcheckError::NotFound.into())
+        healthcheck_response(&response, GcsHealthcheckError::NotFound.into())
     };
 
     Ok(Box::pin(healthcheck))
@@ -377,7 +382,7 @@ impl ChronicleUnstructuredConfig {
 
         let request = self.request.into_settings();
 
-        let partitioner = self.partitioner()?;
+        let partitioner = self.partitioner();
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic::default())
@@ -395,12 +400,12 @@ impl ChronicleUnstructuredConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
-        Ok(ChroniclePartitioner::new(
+    fn partitioner(&self) -> ChroniclePartitioner {
+        ChroniclePartitioner::new(
             self.log_type.clone(),
             self.fallback_log_type.clone(),
             self.namespace.clone(),
-        ))
+        )
     }
 
     fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
@@ -475,7 +480,7 @@ impl Encoder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleEncoder {
                     .as_log()
                     .get_timestamp()
                     .and_then(|ts| ts.as_timestamp())
-                    .cloned();
+                    .copied();
                 let mut bytes = BytesMut::new();
                 self.transformer.transform(&mut event);
 
@@ -625,8 +630,8 @@ impl ChronicleRequestBuilder {
             labels: config.labels.as_ref().map(|labs| {
                 labs.iter()
                     .map(|(k, v)| Label {
-                        key: k.to_string(),
-                        value: v.to_string(),
+                        key: k.clone(),
+                        value: v.clone(),
                     })
                     .collect::<Vec<_>>()
             }),

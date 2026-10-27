@@ -13,7 +13,7 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
-        opendal_common::*,
+        opendal_common::{OpenDalRequestBuilder, OpenDalService, OpenDalSink},
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint,
             partitioner::KeyPartitioner,
@@ -98,7 +98,7 @@ impl GenerateConfig for WebHdfsConfig {
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
 
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         })
         .unwrap()
@@ -158,6 +158,10 @@ impl ValidatedSink for WebHdfsConfig {
 }
 
 impl WebHdfsConfig {
+    /// Builds the WebHDFS operator.
+    ///
+    /// # Errors
+    /// Returns an error if OpenDAL cannot initialize the operator from this configuration.
     pub fn build_operator(&self) -> crate::Result<Operator> {
         install_opendal_defaults();
 
@@ -171,6 +175,10 @@ impl WebHdfsConfig {
         Ok(op)
     }
 
+    /// Builds the sink from the operator and validated settings.
+    ///
+    /// # Errors
+    /// Returns an error if the event encoder cannot be built.
     pub fn build_processor(
         &self,
         op: Operator,
@@ -207,6 +215,10 @@ impl WebHdfsConfig {
         prefix.confine(&self.confinement, Self::NAME, "prefix")
     }
 
+    /// Builds the partitioner from the configured prefix.
+    ///
+    /// # Errors
+    /// Returns an error if the prefix template is invalid or violates confinement rules.
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         let prefix = self.confined_prefix()?;
         Ok(KeyPartitioner::new(prefix, None))
@@ -244,8 +256,8 @@ mod tests {
             )
                 .into(),
             compression: crate::sinks::util::Compression::None,
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }
     }
@@ -308,7 +320,7 @@ mod tests {
         // Bulk size-based defaults: 10 MB batches, 300s timeout.
         assert_eq!(
             validated.batcher_settings.timeout,
-            std::time::Duration::from_secs(300)
+            std::time::Duration::from_mins(5)
         );
         assert_eq!(validated.batcher_settings.size_limit, 10_000_000);
         // The confined prefix retains the validated value.

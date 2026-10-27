@@ -326,7 +326,8 @@ test-component-validation: ## Runs component validation tests
 
 .PHONY: coverage-report
 coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
-	cargo llvm-cov report --lcov --output-path lcov.info
+	# Report every workspace package, not only Vector's non-virtual root package.
+	cargo llvm-cov report --package '*' --lcov --output-path lcov.info
 
 ##@ Benching
 
@@ -542,10 +543,6 @@ generate-example-configs: generate-component-docs ## Generate committed componen
 
 .PHONY: generate-docs
 generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs generate-example-configs
-
-.PHONY: signoff
-signoff: ## Signsoff all previous commits since branch creation
-	scripts/signoff.sh
 
 .PHONY: version
 version: ## Get the current Vector version

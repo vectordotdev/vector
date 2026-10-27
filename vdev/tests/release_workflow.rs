@@ -774,7 +774,7 @@ mod autotag {
         })
     }
 
-    fn check_autotag(repo: &Path, base: &str, sha: &str, prs: Value) -> Output {
+    fn check_autotag(repo: &Path, base: &str, sha: &str, prs: &Value) -> Output {
         write(repo, ".git/associated-prs.json", &prs.to_string());
         write(
             repo,
@@ -815,7 +815,7 @@ mod autotag {
         let (temp, base) = preparation();
         let repo = temp.path();
         let sha = git(repo, &["rev-parse", "HEAD"]);
-        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        let result = check_autotag(repo, &base, &sha, &json!([[approved_pr(&sha)]]));
         assert!(
             result.status.success(),
             "{}",
@@ -830,7 +830,7 @@ mod autotag {
             "Another commit\n",
         );
         let sha = commit(repo);
-        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        let result = check_autotag(repo, &base, &sha, &json!([[approved_pr(&sha)]]));
         assert!(!result.status.success());
         assert!(String::from_utf8_lossy(&result.stderr).contains("single squash-merge commit"));
     }
@@ -851,7 +851,7 @@ mod autotag {
         ] {
             let mut pr = approved_pr(&sha);
             *pr.pointer_mut(pointer).unwrap() = value;
-            let result = check_autotag(repo, &base, &sha, json!([[pr]]));
+            let result = check_autotag(repo, &base, &sha, &json!([[pr]]));
             assert!(!result.status.success(), "accepted invalid {pointer}");
             assert!(
                 String::from_utf8_lossy(&result.stderr)
@@ -862,7 +862,7 @@ mod autotag {
             json!([[]]),
             json!([[approved_pr(&sha)], [approved_pr(&sha)]]),
         ] {
-            let result = check_autotag(repo, &base, &sha, prs);
+            let result = check_autotag(repo, &base, &sha, &prs);
             assert!(!result.status.success());
         }
     }
@@ -876,7 +876,7 @@ mod autotag {
             version(repo, new_version);
             write(repo, "README.md", "Ordinary change\n");
             let sha = commit(repo);
-            let result = check_autotag(repo, &before, &sha, json!("API must not be needed"));
+            let result = check_autotag(repo, &before, &sha, &json!("API must not be needed"));
             assert!(
                 result.status.success(),
                 "{}",
@@ -897,7 +897,7 @@ mod autotag {
         git(repo, &["add", "."]);
         git(repo, &["commit", "--amend", "--no-edit"]);
         let sha = git(repo, &["rev-parse", "HEAD"]);
-        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        let result = check_autotag(repo, &base, &sha, &json!([[approved_pr(&sha)]]));
         assert!(!result.status.success());
         assert!(
             String::from_utf8_lossy(&result.stderr).contains("unexpected release preparation file")
@@ -907,7 +907,7 @@ mod autotag {
     #[test]
     fn rejects_a_mismatched_checkout() {
         let (temp, base) = preparation();
-        let result = check_autotag(temp.path(), &base, &base, json!([[]]));
+        let result = check_autotag(temp.path(), &base, &base, &json!([[]]));
         assert!(!result.status.success());
         assert!(
             String::from_utf8_lossy(&result.stderr).contains("checkout must match the release SHA")
