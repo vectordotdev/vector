@@ -45,11 +45,14 @@ impl EncodingConfig {
     }
 
     /// Build the `Serializer` for this config.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured serializer cannot be built: the Avro schema cannot be
+    /// parsed or resolved, a CEF device field exceeds its maximum length or an extension key
+    /// contains characters other than ASCII letters, no CSV fields are configured, the protobuf
+    /// `desc_file` cannot be loaded or does not contain `message_type`, or the bundled OTLP
+    /// descriptor set cannot be decoded.
     pub fn build(&self) -> vector_common::Result<Serializer> {
         self.encoding.build()
     }
@@ -64,11 +67,13 @@ impl EncodingConfig {
     /// filesystem-free (it runs under `vector validate --no-environment`).
     /// A protobuf descriptor that can't be loaded is caught by the
     /// environment-dependent `build()` phase instead.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured serializer cannot be built: the Avro schema cannot be
+    /// parsed or resolved, a CEF device field exceeds its maximum length or an extension key
+    /// contains characters other than ASCII letters, no CSV fields are configured, or the bundled
+    /// OTLP descriptor set cannot be decoded. Protobuf configurations are not checked.
     pub fn validate(&self) -> vector_common::Result<()> {
         match self.config() {
             SerializerConfig::Protobuf(_) => Ok(()),
@@ -133,11 +138,15 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build the `Framer` and `Serializer` for this config.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured serializer cannot be built: the Avro schema cannot be
+    /// parsed or resolved, a CEF device field exceeds its maximum length or an extension key
+    /// contains characters other than ASCII letters, no CSV fields are configured, the protobuf
+    /// `desc_file` cannot be loaded or does not contain `message_type`, or the bundled OTLP
+    /// descriptor set cannot be decoded.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
     #[allow(
         clippy::needless_pass_by_value,
         reason = "Keep the existing owned-argument API during the lint rollout."
@@ -184,11 +193,14 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build the `Transformer` and `EncoderKind` for this config.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured serializer cannot be built: the Avro schema cannot be
+    /// parsed or resolved, a CEF device field exceeds its maximum length or an extension key
+    /// contains characters other than ASCII letters, no CSV fields are configured, the protobuf
+    /// `desc_file` cannot be loaded or does not contain `message_type`, or the bundled OTLP
+    /// descriptor set cannot be decoded.
     pub fn build_encoder(
         &self,
         sink_type: SinkType,
@@ -206,11 +218,13 @@ impl EncodingConfigWithFraming {
     /// filesystem-free (it runs under `vector validate --no-environment`).
     /// Building the framer is infallible, so there is nothing to validate on
     /// the framing side.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured serializer cannot be built: the Avro schema cannot be
+    /// parsed or resolved, a CEF device field exceeds its maximum length or an extension key
+    /// contains characters other than ASCII letters, no CSV fields are configured, or the bundled
+    /// OTLP descriptor set cannot be decoded. Protobuf configurations are not checked.
     pub fn validate(&self) -> vector_common::Result<()> {
         self.encoding.validate()
     }
