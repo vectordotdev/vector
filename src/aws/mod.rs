@@ -295,6 +295,11 @@ enum SigningError {
 ///
 /// Returns an error if a header value is not valid UTF-8, the credentials cannot be
 /// provided, or the request cannot be signed.
+///
+/// # Panics
+///
+/// Panics if the access key ID, session token, region, or service name contains characters that
+/// are not valid in an HTTP header value, such as a newline.
 pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
@@ -336,6 +341,11 @@ pub async fn sign_request(
 ///
 /// Returns an error if a header value is not valid UTF-8, the credentials cannot be
 /// provided, or the request cannot be signed.
+///
+/// # Panics
+///
+/// Panics if the access key ID, session token, region, or service name contains characters that
+/// are not valid in an HTTP header value, such as a newline.
 pub async fn sign_request_v1(
     service_name: &str,
     request: &mut http_1::Request<Bytes>,
