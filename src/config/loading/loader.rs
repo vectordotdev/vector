@@ -226,8 +226,12 @@ where
     /// Consumes Self, and returns the final, deserialized `T`.
     fn take(self) -> T;
 
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Deserializes `input` with the provided format, and makes the result available via `take`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if `input` cannot be prepared (for example, read or interpolated),
+    /// parsed, or deserialized, or if the result cannot be merged.
     fn load_from_str<R: std::io::Read>(
         &mut self,
         input: R,
@@ -240,9 +244,12 @@ where
     }
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
-    /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if the file contents cannot be prepared (for example, read or
+    /// interpolated), parsed, or deserialized, or if the result cannot be merged. A file that
+    /// cannot be opened is skipped rather than reported as an error.
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<(), Vec<String>> {
         if let Some((_, map)) = self.load_file(path, format)? {
             self.merge(map, None)?;
@@ -253,9 +260,12 @@ where
     }
 
     /// Deserializes a dir with the provided format, and makes the result available via `take`.
-    /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if the directory or one of its entries cannot be read, a config
+    /// file in it cannot be prepared, parsed, or deserialized, values from different files have
+    /// incompatible types, or a result cannot be merged.
     fn load_from_dir(&mut self, path: &Path) -> Result<(), Vec<String>> {
         // Iterator containing component-specific sub-folders to attempt traversing into.
         let hints = [
