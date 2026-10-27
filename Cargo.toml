@@ -1164,9 +1164,10 @@ e2e-tests-datadog = [
 ]
 
 e2e-tests-opentelemetry = [
+  "api",
+  "api-client-minimal",
   "sources-opentelemetry",
   "sinks-opentelemetry",
-  "sources-internal_metrics",
   "transforms-remap",
   "sinks-console",
   "sinks-file",
