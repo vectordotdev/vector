@@ -46,9 +46,8 @@ impl DecodingConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if the Avro schema cannot be parsed, the protobuf descriptor set file
-    /// cannot be read or decoded or does not contain the message type, or the VRL program fails
-    /// to compile.
+    /// Returns an error if the configured deserializer cannot be built. See
+    /// [`DeserializerConfig::build`] for codec-specific errors.
     pub fn build(&self) -> vector_common::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();
