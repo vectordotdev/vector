@@ -103,7 +103,13 @@ where
     ///
     /// # Errors
     ///
-    /// Returns an error if the connector cannot be built; see [`build_proxy_connector`].
+    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
+    /// connector cannot be created, or a configured proxy URL is not a valid URI.
+    ///
+    /// # Panics
+    ///
+    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
+    /// build-time application name and version do not form a valid `User-Agent` header value.
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -116,7 +122,13 @@ where
     ///
     /// # Errors
     ///
-    /// Returns an error if the connector cannot be built; see [`build_proxy_connector`].
+    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
+    /// connector cannot be created, or a configured proxy URL is not a valid URI.
+    ///
+    /// # Panics
+    ///
+    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
+    /// build-time application name and version do not form a valid `User-Agent` header value.
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -146,6 +158,11 @@ where
     /// It only matters for the case of a plaintext-`http` request sent through an HTTP proxy, where
     /// `Proxy-Authorization` must ride on the request itself. HTTPS-through-proxy is unaffected:
     /// proxy auth happens during the CONNECT handshake inside the connector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the build-time application name and version do not form a valid `User-Agent`
+    /// header value.
     pub fn new_with_connector(connector: C, client_builder: &mut client::Builder) -> Self {
         let client = client_builder.build(connector);
 
