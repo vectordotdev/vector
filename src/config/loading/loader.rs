@@ -244,7 +244,6 @@ where
     }
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
-    /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     ///
     /// # Errors
     ///
@@ -261,7 +260,6 @@ where
     }
 
     /// Deserializes a dir with the provided format, and makes the result available via `take`.
-    /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     ///
     /// # Errors
     ///
