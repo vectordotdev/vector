@@ -37,7 +37,7 @@ impl DatadogSearchConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if a field referenced in the query cannot be parsed as a path.
+    /// Currently never returns an error.
     pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<LogEvent>>> {
         Ok(build_matcher(&self.source, &EventFilter)?)
     }

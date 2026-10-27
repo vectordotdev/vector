@@ -161,7 +161,7 @@ impl From<RawTestEvent> for TestEvent {
     }
 }
 
-/// Encodes a test event into `buf`, using an alternate encoder for events meant to fail encoding.
+/// Encodes a test event into `buf`, using an alternate encoder for events meant to fail decoding.
 ///
 /// # Panics
 ///

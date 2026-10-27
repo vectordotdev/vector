@@ -124,8 +124,7 @@ impl ConditionConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if a VRL condition fails to compile or does not return a boolean, or if
-    /// a Datadog Search query contains a field that cannot be parsed as a path.
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean.
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -212,8 +211,7 @@ impl AnyCondition {
     ///
     /// # Errors
     ///
-    /// Returns an error if a VRL condition fails to compile or does not return a boolean, or if
-    /// a Datadog Search query contains a field that cannot be parsed as a path.
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean.
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
@@ -240,8 +238,7 @@ impl AnyCondition {
     ///
     /// # Errors
     ///
-    /// Returns an error if a VRL condition fails to compile or does not return a boolean, or if
-    /// a Datadog Search query contains a field that cannot be parsed as a path.
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean.
     pub fn validate(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
