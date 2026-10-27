@@ -8,7 +8,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
-    http::HttpClient,
+    http::{HttpClient, HttpError},
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
@@ -189,7 +189,7 @@ impl<Request> Clone for GcsRetryLogic<Request> {
 
 // This is a clone of HttpRetryLogic for the Body type, should get merged
 impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Request = Request;
     type Response = GcsResponse;
 
