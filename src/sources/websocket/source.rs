@@ -443,10 +443,19 @@ impl WebSocketSource {
                 .as_ref()
                 .and_then(|last_received_message_id| {
                     let mut new_uri = url::Url::parse(&self.config.common.uri).ok()?;
-                    new_uri.query_pairs_mut().append_pair(
-                        LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME,
-                        last_received_message_id,
-                    );
+                    let query_pairs: Vec<_> = new_uri
+                        .query_pairs()
+                        .filter(|(name, _)| name != LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME)
+                        .map(|(name, value)| (name.into_owned(), value.into_owned()))
+                        .collect();
+                    new_uri
+                        .query_pairs_mut()
+                        .clear()
+                        .extend_pairs(query_pairs)
+                        .append_pair(
+                            LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME,
+                            last_received_message_id,
+                        );
                     let new_uri = WebSocketConnector::parse_uri(new_uri.as_str())
                         .inspect_err(|err| {
                             warn!(message = "Sending last_received message ID to the server failed.", %err);
