@@ -2,7 +2,7 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use rumqttc::{AsyncClient, ClientError};
+use rumqttc::{AsyncClient, ClientError, PublishOptions};
 use snafu::Snafu;
 
 use super::config::MqttQoS;
@@ -80,7 +80,11 @@ impl Service<MqttRequest> for MqttService {
             let byte_size = req.body.len();
 
             let res = client
-                .publish(&req.topic, quality_of_service.into(), retain, req.body)
+                .publish(
+                    req.topic,
+                    req.body,
+                    PublishOptions::new(quality_of_service.into()).retain(retain),
+                )
                 .await;
             match res {
                 Ok(()) => Ok(MqttResponse {
