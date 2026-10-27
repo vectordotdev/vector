@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::collections::BTreeMap;
 
 use gloo_utils::format::JsValueSerdeExt;
@@ -10,6 +8,7 @@ use vrl::{
         runtime::{Runtime, Terminate},
     },
     diagnostic::{DiagnosticList, Formatter},
+    docs::{FunctionDoc, build_functions_doc},
     value::{Secrets, Value},
 };
 use wasm_bindgen::prelude::*;
@@ -39,6 +38,8 @@ impl Input {
 pub struct VrlCompileResult {
     // Pre-serialized target_value to avoid f64 precision loss in JS JSON.parse.
     pub output: String,
+    // Pre-serialized last expression for the same full-precision display.
+    pub runtime_output: String,
     pub runtime_result: Value,
     pub target_value: Value,
     pub elapsed_time: Option<f64>,
@@ -144,16 +145,19 @@ fn compile(
     match result {
         Ok(runtime_result) => {
             // Full-precision JSON for display.
-            let output = to_pretty_json(&target_value.value).map_err(|err| {
-                let msg = format!("failed to serialize result: {err}");
-                VrlDiagnosticResult {
-                    msg_colorized: msg.clone(),
-                    msg,
-                    ..Default::default()
-                }
-            })?;
+            let serialize = |value: &Value| {
+                to_pretty_json(value).map_err(|err| {
+                    let msg = format!("failed to serialize result: {err}");
+                    VrlDiagnosticResult {
+                        msg_colorized: msg.clone(),
+                        msg,
+                        ..Default::default()
+                    }
+                })
+            };
             Ok(VrlCompileResult {
-                output,
+                output: serialize(&target_value.value)?,
+                runtime_output: serialize(&runtime_result)?,
                 runtime_result, // This is the value of the last expression.
                 target_value: target_value.value, // The value of the final event
                 elapsed_time,
@@ -176,6 +180,22 @@ pub fn run_vrl(incoming: &JsValue, tz_str: &str) -> JsValue {
         Ok(res) => JsValue::from_serde(&res).unwrap(),
         Err(err) => JsValue::from_serde(&err).unwrap(),
     }
+}
+
+fn function_docs() -> Vec<FunctionDoc> {
+    build_functions_doc(&vector_vrl_functions::all())
+}
+
+/// Describes every function the playground can compile, in the shape of VRL's
+/// `docs/generated` files. The editor builds its completion, signature help and
+/// hover from it.
+///
+/// # Panics
+/// Panics if the documentation cannot be serialized.
+#[wasm_bindgen]
+#[must_use]
+pub fn vrl_functions() -> JsValue {
+    JsValue::from_serde(&function_docs()).unwrap()
 }
 
 #[wasm_bindgen]
@@ -223,6 +243,20 @@ mod tests {
         assert_eq!(
             to_pretty_json(&Value::from(-2_796_170_501_982_571_315_i64)).unwrap(),
             "-2796170501982571315"
+        );
+    }
+
+    #[test]
+    fn function_docs_describe_vector_and_stdlib_functions() {
+        let docs = function_docs();
+        let parse_json = docs.iter().find(|doc| doc.name == "parse_json").unwrap();
+        assert_eq!(parse_json.arguments[0].name, "value");
+        assert!(parse_json.arguments[0].required);
+        assert!(!parse_json.internal_failure_reasons.is_empty());
+        // Vector's own functions are documented too, not only the stdlib's.
+        assert!(
+            docs.iter()
+                .any(|doc| doc.name == "get_enrichment_table_record")
         );
     }
 

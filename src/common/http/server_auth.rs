@@ -34,8 +34,14 @@ use super::ErrorMessage;
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+// Keep the existing visitor; derive the schema and serialization from the accepted input forms.
+#[serde(
+    from = "HttpServerAuthRepr",
+    into = "HttpServerAuthRepr",
+    tag = "strategy",
+    rename_all = "snake_case"
+)]
 #[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
-#[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum HttpServerAuthConfig {
     /// Basic authentication.
     ///
@@ -44,13 +50,9 @@ pub enum HttpServerAuthConfig {
     /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
         /// The basic authentication username.
-        #[configurable(metadata(docs::examples = "${USERNAME}"))]
-        #[configurable(metadata(docs::examples = "username"))]
         username: String,
 
         /// The basic authentication password.
-        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
-        #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
     },
 
@@ -59,8 +61,6 @@ pub enum HttpServerAuthConfig {
     /// The token is matched against the `Authorization` header using the `Bearer` scheme.
     Bearer {
         /// The bearer token to match against incoming requests.
-        #[configurable(metadata(docs::examples = "SECRET[backend.token]"))]
-        #[configurable(metadata(docs::examples = "my-secret-token"))]
         token: SensitiveString,
     },
 
@@ -71,6 +71,121 @@ pub enum HttpServerAuthConfig {
         /// The VRL boolean expression.
         source: String,
     },
+}
+
+/// HTTP authentication input with a default basic strategy.
+#[configurable_component]
+#[serde(tag = "strategy", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+enum HttpServerAuthRepr {
+    /// Bearer authentication.
+    ///
+    /// The token is matched against the `Authorization` header using the `Bearer` scheme.
+    Bearer {
+        /// The bearer token to match against incoming requests.
+        #[configurable(metadata(docs::examples = "SECRET[backend.token]"))]
+        #[configurable(metadata(docs::examples = "my-secret-token"))]
+        token: SensitiveString,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        username: String,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        password: String,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        source: String,
+    },
+    /// Custom authentication using VRL code.
+    ///
+    /// Takes in request and validates it using VRL code. The VRL program must return a boolean.
+    Custom {
+        /// The VRL boolean expression.
+        source: String,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        username: String,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        password: String,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        token: String,
+    },
+    /// Basic authentication.
+    ///
+    /// Used when strategy is omitted. The username and password are concatenated and encoded
+    /// using [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    #[serde(untagged)]
+    Basic {
+        /// The authentication strategy to use.
+        #[serde(default)]
+        strategy: BasicStrategy,
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
+        username: String,
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
+        password: SensitiveString,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        token: String,
+        /// Accepted but ignored for this strategy.
+        #[configurable(metadata(docs::hidden))]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        source: String,
+    },
+}
+
+/// Basic authentication is the default when no strategy is specified.
+#[configurable_component]
+#[derive(Default)]
+#[serde(rename_all = "snake_case")]
+enum BasicStrategy {
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded using [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    #[default]
+    Basic,
+}
+
+impl From<HttpServerAuthConfig> for HttpServerAuthRepr {
+    fn from(config: HttpServerAuthConfig) -> Self {
+        match config {
+            HttpServerAuthConfig::Basic { username, password } => Self::Basic {
+                strategy: BasicStrategy::Basic,
+                username,
+                password,
+                token: String::new(),
+                source: String::new(),
+            },
+            HttpServerAuthConfig::Bearer { token } => Self::Bearer {
+                token,
+                username: String::new(),
+                password: String::new(),
+                source: String::new(),
+            },
+            HttpServerAuthConfig::Custom { source } => Self::Custom {
+                source,
+                username: String::new(),
+                password: String::new(),
+                token: String::new(),
+            },
+        }
+    }
 }
 
 // Custom deserializer implementation to default `strategy` to `basic`
@@ -110,8 +225,7 @@ impl<'de> Deserialize<'de> for HttpServerAuthConfig {
                 // Default to "basic" if strategy is missing
                 let strategy = fields
                     .get("strategy")
-                    .map(String::as_str)
-                    .unwrap_or_else(|| "basic");
+                    .map_or_else(|| "basic", String::as_str);
 
                 match strategy {
                     "basic" => {
@@ -156,6 +270,11 @@ impl HttpServerAuthConfig {
     /// Builds an auth matcher based on provided configuration.
     /// Used to validate configuration if needed, before passing it to the
     /// actual component for usage.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -210,6 +329,11 @@ impl HttpServerAuthConfig {
     /// Validates the auth configuration against the given enrichment tables,
     /// compiling any custom VRL program so `vector validate --no-environment`
     /// catches syntax/type errors while resolving enrichment table names.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn validate(&self, enrichment_tables: &TableRegistry) -> crate::Result<()> {
         self.build(enrichment_tables, &MetricsStorage::default())
             .map(|_| ())
@@ -235,6 +359,11 @@ pub enum HttpServerAuthMatcher {
 impl HttpServerAuthMatcher {
     /// Validates the request. Returns `Ok(Some(enrichment))` when auth passes and the VRL program
     /// wrote `%field` values; returns `Ok(None)` when auth passes with no metadata enrichment.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
     pub fn handle_auth(
         &self,
         address: Option<&SocketAddr>,
@@ -265,6 +394,15 @@ impl HttpServerAuthMatcher {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
+    #[allow(
+        clippy::unused_self,
+        reason = "Preserve the existing method receiver and call sites during the lint rollout."
+    )]
     fn handle_vrl_auth(
         &self,
         address: Option<&SocketAddr>,
@@ -334,6 +472,8 @@ impl HttpServerAuthMatcher {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use serde_json::json;
+    use vector_config::schema::generate_root_schema;
 
     use super::*;
     use crate::test_util::{addr::next_addr, random_string};
@@ -353,10 +493,10 @@ mod tests {
 
     #[test]
     fn config_should_default_to_basic() {
-        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r"
             username: foo
             password: bar
-            "#
+            "
         })
         .unwrap();
 
@@ -370,11 +510,11 @@ mod tests {
 
     #[test]
     fn config_should_support_explicit_basic_strategy() {
-        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r"
             strategy: basic
             username: foo
             password: bar
-            "#
+            "
         })
         .unwrap();
 
@@ -404,13 +544,107 @@ mod tests {
     }
 
     #[test]
+    fn config_schema_accepts_default_and_explicit_strategies() {
+        let schema =
+            serde_json::to_value(generate_root_schema::<HttpServerAuthConfig>().unwrap()).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        for (input, expected) in [
+            (
+                json!({"username": "user", "password": "pass", "token": "ignored", "source": "ignored"}),
+                json!({"strategy": "basic", "username": "user", "password": "pass"}),
+            ),
+            (
+                json!({"strategy": "basic", "username": "user", "password": "pass"}),
+                json!({"strategy": "basic", "username": "user", "password": "pass"}),
+            ),
+            (
+                json!({"strategy": "bearer", "token": "secret"}),
+                json!({"strategy": "bearer", "token": "secret"}),
+            ),
+            (
+                json!({"strategy": "custom", "source": "true", "username": "ignored", "password": "ignored", "token": "ignored"}),
+                json!({"strategy": "custom", "source": "true"}),
+            ),
+            (
+                json!({"strategy": "bearer", "token": "secret", "username": "ignored", "password": "ignored", "source": "ignored"}),
+                json!({"strategy": "bearer", "token": "secret"}),
+            ),
+        ] {
+            validator.validate(&input).unwrap();
+            let parsed: HttpServerAuthConfig = serde_json::from_value(input).unwrap();
+            let encoded = serde_json::to_value(parsed).unwrap();
+            assert_eq!(encoded, expected);
+            validator.validate(&encoded).unwrap();
+        }
+    }
+
+    #[test]
+    fn config_schema_requires_credentials_for_the_selected_strategy() {
+        let schema =
+            serde_json::to_value(generate_root_schema::<HttpServerAuthConfig>().unwrap()).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        for input in [
+            json!({}),
+            json!({"username": "user"}),
+            json!({"password": "pass"}),
+            json!({"strategy": "basic"}),
+            json!({"strategy": "bearer"}),
+            json!({"strategy": "custom"}),
+            json!({"strategy": "bearer", "username": "user", "password": "pass"}),
+            json!({"strategy": "custom", "username": "user", "password": "pass"}),
+            json!({"strategy": "unknown", "username": "user", "password": "pass"}),
+            json!({"strategy": null, "username": "user", "password": "pass"}),
+            json!({"username": "user", "password": null}),
+            json!({"strategy": "bearer", "token": 42}),
+            json!({"strategy": "bearer", "token": "secret", "password": null}),
+            json!({"username": "user", "password": "pass", "token": 42}),
+        ] {
+            assert!(!validator.is_valid(&input), "schema accepted {input}");
+            assert!(
+                serde_json::from_value::<HttpServerAuthConfig>(input.clone()).is_err(),
+                "deserializer accepted {input}"
+            );
+        }
+    }
+
+    #[test]
+    fn config_rejects_unknown_duplicate_and_invalid_unused_fields() {
+        const INVALID_CONFIGS: [&str; 3] = [
+            indoc! {"
+                username: user
+                password: pass
+                extra: field
+            "},
+            indoc! {"
+                username: user
+                username: other
+                password: pass
+            "},
+            indoc! {"
+                strategy: basic
+                strategy: bearer
+                token: secret
+            "},
+        ];
+        for config in INVALID_CONFIGS {
+            assert!(serde_yaml::from_str::<HttpServerAuthConfig>(config).is_err());
+        }
+        for field in ["token", "source"] {
+            for value in [serde_json::Value::Null, json!(42)] {
+                let input = json!({"username": "user", "password": "pass", field: value});
+                assert!(serde_json::from_value::<HttpServerAuthConfig>(input).is_err());
+            }
+        }
+    }
+
+    #[test]
     fn build_basic_auth_should_always_work() {
         let basic_auth = HttpServerAuthConfig::Basic {
             username: random_string(16),
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default(), &Default::default());
+        let matcher = basic_auth.build(&TableRegistry::default(), &MetricsStorage::default());
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -427,7 +661,7 @@ mod tests {
         };
 
         let (_, error_message) = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap()
             .auth_header();
         assert_eq!("Invalid username/password", error_message);
@@ -443,7 +677,7 @@ mod tests {
         };
 
         let (header, _) = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap()
             .auth_header();
         assert_eq!(
@@ -454,10 +688,10 @@ mod tests {
 
     #[test]
     fn config_should_support_bearer_strategy() {
-        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r"
             strategy: bearer
             token: my-secret-token
-            "#
+            "
         })
         .unwrap();
 
@@ -474,7 +708,7 @@ mod tests {
             token: random_string(16).into(),
         };
 
-        let matcher = bearer_auth.build(&Default::default(), &Default::default());
+        let matcher = bearer_auth.build(&TableRegistry::default(), &MetricsStorage::default());
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -490,7 +724,7 @@ mod tests {
         };
 
         let (_, error_message) = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap()
             .auth_header();
         assert_eq!("Invalid token", error_message);
@@ -503,7 +737,7 @@ mod tests {
         };
 
         let matcher = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let (_guard, addr) = next_addr();
@@ -522,7 +756,7 @@ mod tests {
         };
 
         let matcher = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -547,7 +781,7 @@ mod tests {
         };
 
         let matcher = bearer_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -569,7 +803,7 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_err()
         );
     }
@@ -577,16 +811,16 @@ mod tests {
     #[test]
     fn build_custom_should_fail_on_non_boolean_return_type() {
         let custom_auth = HttpServerAuthConfig::Custom {
-            source: indoc! {r#"
+            source: indoc! {r"
                 .success = true
                 .
-                "#}
+                "}
             .to_string(),
         };
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_err()
         );
     }
@@ -602,7 +836,7 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_ok()
         );
     }
@@ -615,7 +849,7 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let (_guard, addr) = next_addr();
@@ -635,7 +869,7 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -659,7 +893,7 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -680,7 +914,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -700,7 +934,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -718,7 +952,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -734,7 +968,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -751,7 +985,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -768,7 +1002,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -789,7 +1023,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -812,7 +1046,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -840,7 +1074,7 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(&TableRegistry::default(), &MetricsStorage::default())
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -868,7 +1102,7 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(&TableRegistry::default(), &MetricsStorage::default())
                 .is_err(),
             "writing to event body (.field) must be rejected at compile time"
         );

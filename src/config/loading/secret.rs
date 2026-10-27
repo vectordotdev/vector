@@ -51,13 +51,14 @@ pub struct SecretBackendLoader {
 
 impl SecretBackendLoader {
     /// Sets whether to interpolate environment variables in the config.
+    #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
     }
 
     /// Retrieve secrets from backends.
-    /// Returns an empty HashMap if there are no secrets to retrieve.
+    /// Returns an empty `HashMap` if there are no secrets to retrieve.
     pub(crate) async fn retrieve_secrets(
         mut self,
         signal_handler: &mut signal::SignalHandler,
@@ -134,6 +135,11 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
 
 /// Collects secret references from string leaves in a parsed configuration.
 /// Keys are excluded, matching tree-based interpolation.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
 pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, HashSet<String>>) {
     fn visit(value: &serde_json::Value, keys: &mut HashMap<String, HashSet<String>>) {
         match value {
@@ -153,6 +159,12 @@ pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, 
 }
 
 /// Replaces secret references in string leaves, preserving keys and value types.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate_config_map_with_secrets(
     map: &ConfigMap,
     secrets: &HashMap<String, String>,
@@ -168,13 +180,20 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
             } else {
                 keys.insert(
                     backend.as_str().to_string(),
-                    HashSet::from_iter(std::iter::once(key.as_str().to_string())),
+                    HashSet::from([key.as_str().to_string()]),
                 );
             }
         }
     });
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
     let output = COLLECTOR
@@ -188,7 +207,7 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
                         "Unable to find secret replacement for {}.",
                         caps.get(0).unwrap().as_str()
                     ));
-                    "".to_string()
+                    String::new()
                 })
         })
         .into_owned();

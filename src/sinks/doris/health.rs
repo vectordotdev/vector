@@ -35,23 +35,22 @@ impl HealthLogic for DorisHealthLogic {
                     None
                 }
             }
-            Err(error) => match error.downcast_ref::<HttpError>() {
-                Some(http_error) => {
+            Err(error) => {
+                if let Some(http_error) = error.downcast_ref::<HttpError>() {
                     error!(
                         message = "Health check failed with HTTP error.",
                         error_type = "HttpError::CallRequest",
                         %http_error
                     );
                     Some(false)
-                }
-                _ => {
+                } else {
                     debug!(
                         message = "Health check failed with non-HTTP error, not determining health state.",
                         %error
                     );
                     None
                 }
-            },
+            }
         }
     }
 }

@@ -102,15 +102,17 @@ pub struct AwsEcsMetricsSourceConfig {
     namespace: String,
 }
 
-const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI";
-const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI_V4";
+const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI_V4";
+const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI";
 
+#[must_use]
 pub fn default_endpoint() -> String {
     env::var(METADATA_URI_V4)
         .or_else(|_| env::var(METADATA_URI_V3))
         .unwrap_or_else(|_| "http://169.254.170.2/v2".into())
 }
 
+#[must_use]
 pub fn default_version() -> Version {
     if env::var(METADATA_URI_V4).is_ok() {
         Version::V4
@@ -121,10 +123,12 @@ pub fn default_version() -> Version {
     }
 }
 
+#[must_use]
 pub const fn default_scrape_interval_secs() -> Duration {
     Duration::from_secs(15)
 }
 
+#[must_use]
 pub fn default_namespace() -> String {
     "awsecs".to_string()
 }
@@ -157,7 +161,7 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let http_client = HttpClient::new(None, &cx.proxy)?;
 
-        Ok(Box::pin(aws_ecs_metrics(
+        Ok(crate::sources::source_with_error(aws_ecs_metrics(
             http_client,
             self.stats_endpoint(),
             self.scrape_interval_secs,
@@ -183,7 +187,7 @@ async fn aws_ecs_metrics(
     namespace: Option<String>,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
@@ -201,7 +205,7 @@ async fn aws_ecs_metrics(
                     Ok(body) => {
                         bytes_received.emit(ByteSize(body.len()));
 
-                        match parser::parse(body.as_ref(), namespace.clone()) {
+                        match parser::parse(body.as_ref(), namespace.as_deref()) {
                             Ok(metrics) => {
                                 let count = metrics.len();
                                 emit!(AwsEcsMetricsEventsReceived {
@@ -210,9 +214,9 @@ async fn aws_ecs_metrics(
                                     endpoint: uri.path(),
                                 });
 
-                                if (out.send_batch(metrics).await).is_err() {
+                                if let Err(error) = out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count });
-                                    return Err(());
+                                    return Err(error);
                                 }
                             }
                             Err(error) => {
@@ -227,7 +231,7 @@ async fn aws_ecs_metrics(
                     Err(error) => {
                         emit!(HttpClientHttpError {
                             error: crate::Error::from(error),
-                            url: url.to_owned(),
+                            url: url.clone(),
                         });
                     }
                 }
@@ -235,13 +239,13 @@ async fn aws_ecs_metrics(
             Ok(response) => {
                 emit!(HttpClientHttpResponseError {
                     code: response.status(),
-                    url: url.to_owned(),
+                    url: url.clone(),
                 });
             }
             Err(error) => {
                 emit!(HttpClientHttpError {
                     error: crate::Error::from(error),
-                    url: url.to_owned(),
+                    url: url.clone(),
                 });
             }
         }
@@ -252,6 +256,7 @@ async fn aws_ecs_metrics(
 
 #[cfg(test)]
 mod test {
+    use crate::event::Event;
     use hyper::{
         Body, Response, Server,
         service::{make_service_fn, service_fn},
@@ -269,6 +274,10 @@ mod test {
         },
     };
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
         let (_guard, in_addr) = next_addr();
@@ -592,7 +601,7 @@ mod test {
 
         let metrics = events
             .into_iter()
-            .map(|e| e.into_metric())
+            .map(Event::into_metric)
             .collect::<Vec<_>>();
 
         match metrics
@@ -600,7 +609,12 @@ mod test {
             .find(|m| m.name() == "network_receive_bytes_total")
         {
             Some(m) => {
-                assert_eq!(m.value(), &MetricValue::Counter { value: 329932716.0 });
+                assert_eq!(
+                    m.value(),
+                    &MetricValue::Counter {
+                        value: 329_932_716.0
+                    }
+                );
                 assert_eq!(m.namespace(), Some("awsecs"));
 
                 match m.tags() {

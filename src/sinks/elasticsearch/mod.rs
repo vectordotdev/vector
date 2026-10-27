@@ -94,6 +94,7 @@ pub enum BulkAction {
 }
 
 impl BulkAction {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             BulkAction::Index => "index",
@@ -102,6 +103,7 @@ impl BulkAction {
         }
     }
 
+    #[must_use]
     pub const fn as_json_pointer(self) -> &'static str {
         match self {
             BulkAction::Index => "/index",
@@ -140,6 +142,7 @@ pub enum VersionType {
 }
 
 impl VersionType {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Internal => "internal",
@@ -183,7 +186,7 @@ struct VersionValueParseError<'a> {
 
 impl InternalEvent for VersionValueParseError<'_> {
     fn emit(self) {
-        warn!("{self}")
+        warn!("{self}");
     }
 }
 
@@ -284,17 +287,17 @@ impl ElasticsearchCommonMode {
         }
     }
 
-    const fn version_type(&self) -> Option<VersionType> {
+    const fn version_type(&self) -> VersionType {
         match self {
-            ElasticsearchCommonMode::Bulk { version_type, .. } => Some(*version_type),
-            _ => Some(VersionType::Internal),
+            Self::Bulk { version_type, .. } => *version_type,
+            Self::DataStream(_) => VersionType::Internal,
         }
     }
 
     const fn as_data_stream_config(&self) -> Option<&DataStreamMode> {
         match self {
             Self::DataStream(value) => Some(value),
-            _ => None,
+            Self::Bulk { .. } => None,
         }
     }
 }
@@ -306,7 +309,10 @@ impl ElasticsearchCommonMode {
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 #[derive(Default)]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the API version.
+    /// Automatically select the API version.
+    ///
+    /// The `opensearch` sink selects an OpenSearch-compatible API version without querying the server.
+    /// The `elasticsearch` sink detects the version from the server.
     ///
     /// If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
     /// stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to

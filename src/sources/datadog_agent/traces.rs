@@ -108,6 +108,14 @@ fn handle_dd_trace_payload(
     handle_dd_trace_payload_v1(decoded_payload, api_key, source)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn handle_dd_trace_payload_v1(
     decoded_payload: ddtrace_proto::AgentPayload,
     api_key: Option<Arc<str>>,
@@ -141,7 +149,7 @@ fn handle_dd_trace_payload_v1(
             }
             trace_event.insert(
                 &source.log_schema_source_type_key,
-                Bytes::from("datadog_agent"),
+                Value::from_static_str("datadog_agent"),
             );
             trace_event.insert(event_path!("payload_version"), "v2".to_string());
             trace_event.insert(&source.log_schema_host_key, hostname.clone());
@@ -181,7 +189,7 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
         .into_iter()
         .map(|trace| {
             let mut trace_event = new_trace_event();
-            trace_event.insert(event_path!("priority"), trace.priority as i64);
+            trace_event.insert(event_path!("priority"), i64::from(trace.priority));
             trace_event.insert(event_path!("origin"), trace.origin);
             trace_event.insert(event_path!("dropped"), trace.dropped_trace);
             let mut trace_tags = convert_tags(trace.tags);
@@ -214,6 +222,10 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
         .collect()
 }
 
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
     let mut span = ObjectMap::new();
     span.insert("service".into(), Value::from(dd_span.service));
@@ -232,7 +244,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
         Value::from(Utc.timestamp_nanos(dd_span.start)),
     );
     span.insert("duration".into(), Value::from(dd_span.duration));
-    span.insert("error".into(), Value::from(dd_span.error as i64));
+    span.insert("error".into(), Value::from(i64::from(dd_span.error)));
     span.insert("meta".into(), Value::from(convert_tags(dd_span.meta)));
     span.insert(
         "metrics".into(),
@@ -240,12 +252,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| {
-                    (
-                        k.into(),
-                        NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
-                    )
-                })
+                .map(|(k, v)| (k.into(), NotNan::new(v).map_or(Value::Null, Value::Float)))
                 .collect::<ObjectMap>(),
         ),
     );
@@ -307,6 +314,10 @@ fn convert_span_link(link: ddtrace_proto::SpanLink) -> ObjectMap {
     ])
 }
 
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn convert_span_event(event: ddtrace_proto::SpanEvent) -> ObjectMap {
     ObjectMap::from([
         (
@@ -336,9 +347,9 @@ fn convert_attribute_any_value(value: ddtrace_proto::AttributeAnyValue) -> Value
         AttributeAnyValueType::StringValue => Value::from(value.string_value),
         AttributeAnyValueType::BoolValue => Value::from(value.bool_value),
         AttributeAnyValueType::IntValue => Value::from(value.int_value),
-        AttributeAnyValueType::DoubleValue => NotNan::new(value.double_value)
-            .map(Value::Float)
-            .unwrap_or(Value::Null),
+        AttributeAnyValueType::DoubleValue => {
+            NotNan::new(value.double_value).map_or(Value::Null, Value::Float)
+        }
         AttributeAnyValueType::ArrayValue => Value::Array(
             value
                 .array_value
@@ -363,9 +374,9 @@ fn convert_attribute_array_value(value: ddtrace_proto::AttributeArrayValue) -> V
         AttributeArrayValueType::StringValue => Value::from(value.string_value),
         AttributeArrayValueType::BoolValue => Value::from(value.bool_value),
         AttributeArrayValueType::IntValue => Value::from(value.int_value),
-        AttributeArrayValueType::DoubleValue => NotNan::new(value.double_value)
-            .map(Value::Float)
-            .unwrap_or(Value::Null),
+        AttributeArrayValueType::DoubleValue => {
+            NotNan::new(value.double_value).map_or(Value::Null, Value::Float)
+        }
     }
 }
 
