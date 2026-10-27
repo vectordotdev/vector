@@ -267,8 +267,8 @@ fn vector_sink_otel_sink_traces_match() {
     );
 }
 
-#[test]
-fn vector_component_received_events_total_counts_individual_spans() {
+#[tokio::test]
+async fn vector_component_received_events_total_counts_individual_spans() {
     // This test verifies that when OTLP preservation is enabled, the
     // component_received_events_total metric counts individual spans
     // within OTLP batches, not the number of OTLP requests.
@@ -276,7 +276,7 @@ fn vector_component_received_events_total_counts_individual_spans() {
     // OpenTelemetry source when native conversion is enabled.
     use crate::opentelemetry::assert_component_received_events_total;
 
-    assert_component_received_events_total("traces", FORWARDED_SPAN_COUNT);
+    assert_component_received_events_total(FORWARDED_SPAN_COUNT).await;
 }
 
 #[test]
