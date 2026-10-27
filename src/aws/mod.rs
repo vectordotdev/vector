@@ -180,9 +180,8 @@ async fn resolve_region(
 ///
 /// # Errors
 ///
-/// Returns an error if no region is configured and none can be resolved from the environment,
-/// profile files, or IMDS; if the TLS settings are invalid or the proxy or TLS connector cannot
-/// be built; or if the credentials provider for `auth` cannot be created.
+/// Returns an error if the client cannot be created. See [`create_client_and_region`] for the
+/// specific errors.
 pub async fn create_client<T>(
     builder: &T,
     auth: &AwsAuthentication,
