@@ -120,6 +120,7 @@ base64-simd,https://github.com/Nugine/simd,MIT,The base64-simd Authors
 base64ct,https://github.com/RustCrypto/formats/tree/master/base64ct,Apache-2.0 OR MIT,RustCrypto Developers
 bigdecimal,https://github.com/akubera/bigdecimal-rs,MIT OR Apache-2.0,Andrew Kubera
 bit-set,https://github.com/contain-rs/bit-set,Apache-2.0 OR MIT,Alexis Beingessner <a.beingessner@gmail.com>
+bit-set,https://github.com/contain-rs/bit-vec,Apache-2.0 OR MIT,Alexis Beingessner <a.beingessner@gmail.com>
 bit-vec,https://github.com/contain-rs/bit-vec,Apache-2.0 OR MIT,Alexis Beingessner <a.beingessner@gmail.com>
 bitflags,https://github.com/bitflags/bitflags,MIT OR Apache-2.0,The Rust Project Developers
 bitmask-enum,https://github.com/Lukas3674/rust-bitmask-enum,MIT OR Apache-2.0,Lukas3674 <lukashassler@web.de>
@@ -133,6 +134,8 @@ bollard-stubs,https://github.com/fussybeaver/bollard,Apache-2.0,Bollard contribu
 bon,https://github.com/elastio/bon,MIT OR Apache-2.0,The bon Authors
 bon-macros,https://github.com/elastio/bon,MIT OR Apache-2.0,The bon-macros Authors
 borrow-or-share,https://github.com/yescallop/borrow-or-share,MIT-0,Scallop Ye <yescallop@gmail.com>
+borsh,https://github.com/near/borsh-rs,MIT OR Apache-2.0,Near Inc <hello@near.org>
+borsh-derive,https://github.com/near/borsh-rs,Apache-2.0,Near Inc <hello@nearprotocol.com>
 brotli,https://github.com/dropbox/rust-brotli,BSD-3-Clause AND MIT,"Daniel Reiter Horn <danielrh@dropbox.com>, The Brotli Authors"
 brotli-decompressor,https://github.com/dropbox/rust-brotli-decompressor,BSD-3-Clause OR MIT,"Daniel Reiter Horn <danielrh@dropbox.com>, The Brotli Authors"
 bs58,https://github.com/Nullus157/bs58-rs,MIT OR Apache-2.0,The bs58 Authors
