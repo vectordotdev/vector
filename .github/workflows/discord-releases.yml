@@ -20,6 +20,7 @@ jobs:
     if: github.repository == 'vectordotdev/vector' && vars.DISCORD_RELEASES_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    continue-on-error: true
     steps:
       - name: Read published release
         env:
@@ -60,3 +61,7 @@ jobs:
             --data-binary "@$RUNNER_TEMP/discord-release.json" \
             --output /dev/null \
             "${DISCORD_WEBHOOK_URL}?wait=true"
+
+      - name: Report notification failure
+        if: failure()
+        run: echo "::warning::Discord release notification failed; release publishing can continue."
