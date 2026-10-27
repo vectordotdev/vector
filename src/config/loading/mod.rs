@@ -162,8 +162,9 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
 ///
 /// # Errors
 ///
-/// Returns error messages if a config file or directory cannot be read, interpolated, parsed,
-/// merged, or deserialized, or if the resulting configuration fails to build.
+/// Returns error messages if a directory cannot be read, an opened config file cannot be read,
+/// interpolated, parsed, merged, or deserialized, or if the resulting configuration fails to
+/// build. Config files that cannot be opened are logged and skipped.
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
     let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
@@ -322,8 +323,9 @@ where
 ///
 /// # Errors
 ///
-/// Returns error messages if a config file or directory cannot be read or parsed, or if values
-/// from different files have incompatible types and cannot be merged.
+/// Returns error messages if a directory cannot be read, an opened config file cannot be read or
+/// parsed, or values from different files have incompatible types and cannot be merged. Config
+/// files that cannot be opened are logged and skipped.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
