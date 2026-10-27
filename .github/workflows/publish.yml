@@ -578,6 +578,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: make release-github
 
+  announce-discord:
+    name: Announce release on Discord
+    needs: [generate-publish-metadata, publish-github]
+    if: ${{ !inputs.skip_publish && inputs.channel == 'release' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/discord-releases.yml
+    with:
+      tag: v${{ needs.generate-publish-metadata.outputs.vector_version }}
+    secrets:
+      DISCORD_ANNOUNCEMENTS_WEBHOOK_URL: ${{ secrets.DISCORD_ANNOUNCEMENTS_WEBHOOK_URL }}
+
   generate-sha256sum:
     name: Generate SHA256 checksums
     runs-on: ubuntu-24.04
