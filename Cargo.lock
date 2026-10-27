@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "antithesis-harness"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "antithesis-instrumentation",
  "antithesis_sdk",
@@ -2874,7 +2874,7 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
 name = "codecs"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "apache-avro",
  "arrow 59.2.0",
@@ -3737,7 +3737,7 @@ dependencies = [
 
 [[package]]
 name = "datadog-proto"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "prost 0.13.5",
  "prost-build 0.13.5",
@@ -4045,7 +4045,7 @@ dependencies = [
 
 [[package]]
 name = "dnsmsg-parser"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "criterion",
  "data-encoding",
@@ -4055,7 +4055,7 @@ dependencies = [
 
 [[package]]
 name = "dnstap-parser"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -4083,7 +4083,7 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "docs-renderer"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "anyhow",
  "serde",
@@ -4297,7 +4297,7 @@ checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
 
 [[package]]
 name = "enrichment"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "arc-swap",
  "chrono",
@@ -4497,7 +4497,7 @@ checksum = "de853764b47027c2e862a995c34978ffa63c1501f2e15f987ba11bd4f9bba193"
 
 [[package]]
 name = "fakedata"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "chrono",
  "rand 0.10.2",
@@ -4555,7 +4555,7 @@ checksum = "a481586acf778f1b1455424c343f71124b048ffa5f4fc3f8f6ae9dc432dcb3c7"
 
 [[package]]
 name = "file-source"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "async-compression",
  "bytes",
@@ -4575,7 +4575,7 @@ dependencies = [
 
 [[package]]
 name = "file-source-common"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "async-compression",
  "bstr",
@@ -6531,7 +6531,7 @@ dependencies = [
 
 [[package]]
 name = "k8s-e2e-tests"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "env_logger",
  "futures",
@@ -6560,7 +6560,7 @@ dependencies = [
 
 [[package]]
 name = "k8s-test-framework"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "k8s-openapi",
  "log",
@@ -7009,7 +7009,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "loki-logproto"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "chrono",
  "prost 0.13.5",
@@ -8326,7 +8326,7 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-proto"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "bytes",
  "chrono",
@@ -9112,7 +9112,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parser"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "indexmap 2.14.2",
  "nom 8.0.0",
@@ -12825,7 +12825,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-limit"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "criterion",
  "dashmap",
@@ -13310,7 +13310,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.37"
+version = "0.3.38"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -13586,7 +13586,7 @@ dependencies = [
 
 [[package]]
 name = "vector-api-client"
-version = "0.2.0"
+version = "0.61.0-dev"
 dependencies = [
  "http 1.5.0",
  "hyper-util",
@@ -13606,7 +13606,7 @@ dependencies = [
 
 [[package]]
 name = "vector-buffers"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "antithesis_sdk",
  "async-recursion",
@@ -13649,7 +13649,7 @@ dependencies = [
 
 [[package]]
 name = "vector-common"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "async-compression",
  "async-stream",
@@ -13679,7 +13679,7 @@ dependencies = [
 
 [[package]]
 name = "vector-common-macros"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "proc-macro2 1.0.107",
  "quote 1.0.47",
@@ -13688,7 +13688,7 @@ dependencies = [
 
 [[package]]
 name = "vector-config"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "assert-json-diff",
  "chrono",
@@ -13715,7 +13715,7 @@ dependencies = [
 
 [[package]]
 name = "vector-config-common"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "convert_case 0.12.0",
  "darling 0.24.1",
@@ -13729,7 +13729,7 @@ dependencies = [
 
 [[package]]
 name = "vector-config-macros"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "darling 0.24.1",
  "proc-macro2 1.0.107",
@@ -13743,7 +13743,7 @@ dependencies = [
 
 [[package]]
 name = "vector-core"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -13824,7 +13824,7 @@ dependencies = [
 
 [[package]]
 name = "vector-http"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "arc-swap",
  "bytes",
@@ -13846,7 +13846,7 @@ dependencies = [
 
 [[package]]
 name = "vector-lib"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "codecs",
  "enrichment",
@@ -13868,7 +13868,7 @@ dependencies = [
 
 [[package]]
 name = "vector-lookup"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "proptest",
  "proptest-derive",
@@ -13880,7 +13880,7 @@ dependencies = [
 
 [[package]]
 name = "vector-stream"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "async-stream",
  "futures",
@@ -13900,7 +13900,7 @@ dependencies = [
 
 [[package]]
 name = "vector-tap"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "bytes",
  "clap",
@@ -13925,7 +13925,7 @@ dependencies = [
 
 [[package]]
 name = "vector-top"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "chrono",
  "crossterm",
@@ -13944,14 +13944,14 @@ dependencies = [
 
 [[package]]
 name = "vector-vrl-category"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "strum 0.28.0",
 ]
 
 [[package]]
 name = "vector-vrl-cli"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "clap",
  "vector-vrl-functions",
@@ -13960,7 +13960,7 @@ dependencies = [
 
 [[package]]
 name = "vector-vrl-doc-builder"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "anyhow",
  "clap",
@@ -13971,7 +13971,7 @@ dependencies = [
 
 [[package]]
 name = "vector-vrl-functions"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "dnstap-parser",
  "enrichment",
@@ -13983,7 +13983,7 @@ dependencies = [
 
 [[package]]
 name = "vector-vrl-metrics"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "arc-swap",
  "const-str",
@@ -13997,7 +13997,7 @@ dependencies = [
 
 [[package]]
 name = "vector-vrl-tests"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "chrono-tz",
  "clap",
@@ -14015,7 +14015,7 @@ dependencies = [
 
 [[package]]
 name = "vector-vrl-web-playground"
-version = "0.1.0"
+version = "0.61.0-dev"
 dependencies = [
  "cargo-lock",
  "getrandom 0.2.15",

@@ -228,6 +228,9 @@ pub fn get_version() -> String {
 #[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
+
+    /// The full version of this package.
+    pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 }
 
 /// Returns the host name of the current system.

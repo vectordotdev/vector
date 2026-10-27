@@ -183,9 +183,6 @@ fn main() {
     let pkg_name = tracker
         .get_env_var("CARGO_PKG_NAME")
         .expect("Cargo-provided environment variables should always exist!");
-    let pkg_version = tracker
-        .get_env_var("CARGO_PKG_VERSION")
-        .expect("Cargo-provided environment variables should always exist!");
     let pkg_description = tracker
         .get_env_var("CARGO_PKG_DESCRIPTION")
         .expect("Cargo-provided environment variables should always exist!");
@@ -232,11 +229,6 @@ fn main() {
         rust_version,
     );
     constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
-    constants.add_required_constant(
-        "PKG_VERSION",
-        "The full version of this package.",
-        pkg_version,
-    );
     constants.add_required_constant(
         "PKG_DESCRIPTION",
         "The description of this package.",

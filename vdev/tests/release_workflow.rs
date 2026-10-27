@@ -32,7 +32,7 @@ fn version(repo: &Path, version: &str) {
         repo,
         "Cargo.toml",
         &format!(
-            "[package]\nname = \"vector\"\nversion = \"{version}\"\nedition = \"2021\"\n[dependencies]\nvrl = {{ workspace = true }}\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
+            "[package]\nname = \"vector\"\nversion.workspace = true\nedition = \"2021\"\n[workspace.package]\nversion = \"{version}\"\n[dependencies]\nvrl = {{ workspace = true }}\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
         ),
     );
     write(
@@ -656,7 +656,7 @@ mod housekeeping {
             ("Cargo.lock", "version = 4\n", "lock file"),
             (
                 "Cargo.toml",
-                "[package]\nname = \"vector\"\nversion = \"0.60.0-dev\"\nedition = \"2024\"\n",
+                "[package]\nname = \"vector\"\nversion.workspace = true\nedition = \"2024\"\n[workspace.package]\nversion = \"0.60.0-dev\"\n",
                 "housekeeping may only bump",
             ),
         ] {

@@ -289,15 +289,15 @@ pub(super) fn update_vector_package_version(
     let mut doc = cargo_toml_contents
         .parse::<DocumentMut>()
         .context("Failed to parse Cargo.toml")?;
-    let current_version = doc["package"]["version"]
+    let current_version = doc["workspace"]["package"]["version"]
         .as_str()
-        .context("package.version should be a string")?;
+        .context("workspace.package.version should be a string")?;
 
     if current_version != expected_version {
-        bail!("expected package version {expected_version}, found {current_version}");
+        bail!("expected workspace package version {expected_version}, found {current_version}");
     }
 
-    doc["package"]["version"] = toml_edit::value(release_version);
+    doc["workspace"]["package"]["version"] = toml_edit::value(release_version);
     Ok(doc.to_string())
 }
 
@@ -421,10 +421,13 @@ mod tests {
         let input = indoc! {r#"
             [package]
             name = "vector"
-            version = "0.59.0-dev"
+            version.workspace = true
 
             [workspace]
             resolver = "2"
+
+            [workspace.package]
+            version = "0.59.0-dev"
         "#};
 
         let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
@@ -436,7 +439,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("expected package version 0.58.0-dev")
+                .contains("expected workspace package version 0.58.0-dev")
         );
     }
 
