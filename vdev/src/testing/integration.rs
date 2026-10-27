@@ -11,7 +11,9 @@ use super::{
     config::{
         ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
     },
-    runner::{ContainerTestRunner as _, IntegrationTestRunner, TARGET_PATH, TestRunner as _},
+    runner::{
+        ContainerTestRunner as _, IntegrationTestRunner, RunnerState, TARGET_PATH, TestRunner as _,
+    },
 };
 use crate::{
     app::CommandExt as _,
@@ -34,9 +36,12 @@ fn docker_image_exists(image_name: &str) -> Result<bool> {
     Ok(output.lines().any(|line| line == image_name))
 }
 
-/// Image that the compose `vector` services of E2E tests run.
-fn e2e_vector_image_name(rust_version: &str) -> String {
-    format!("vector-e2e-vector-{rust_version}:latest")
+/// Image that the compose `vector` services of E2E tests run, committed from `runner_container`.
+///
+/// Naming it after the runner keeps suites with their own runners (and feature sets) from
+/// overwriting each other's image when they run concurrently.
+fn e2e_vector_image_name(runner_container: &str) -> String {
+    format!("{runner_container}-e2e-vector:latest")
 }
 
 /// Extract the digest from `sha256sum` output (`<digest>  <path>`).
@@ -216,7 +221,7 @@ impl ComposeTest {
         )?;
 
         let vector_image = match local_config.kind {
-            ComposeTestKind::E2E => e2e_vector_image_name(&RustToolchainConfig::rust_version()),
+            ComposeTestKind::E2E => e2e_vector_image_name(&runner.container_name()),
             ComposeTestKind::Integration => runner.image_name(),
         };
         env_config.insert("VECTOR_IMAGE".to_string(), Some(vector_image));
@@ -356,6 +361,15 @@ impl ComposeTest {
     /// instead of compiling Vector a second time. The image is only re-committed when the
     /// runner image or the binary changed, so later environments of a run reuse it.
     fn build_e2e_vector_image(&self) -> Result<()> {
+        // Only test targets build the `vector` binary. Without one, a stale binary left in the
+        // shared target volume by another suite would end up in the image.
+        if self.config.test.is_none() {
+            bail!(
+                "E2E test {} must set `test` in test.yaml: its compose services run the Vector \
+                 binary built for that test target",
+                self.test_name
+            );
+        }
         self.runner.ensure_network()?;
         self.runner.ensure_external_volumes()?;
         self.runner.ensure_running(&self.env_config)?;
@@ -373,7 +387,7 @@ impl ComposeTest {
             docker_command(["inspect", "--format", "{{.Image}}", &container]).check_output()?;
         let runner_image = inspect_image(runner_image.trim())?;
 
-        let image = e2e_vector_image_name(&RustToolchainConfig::rust_version());
+        let image = e2e_vector_image_name(&container);
         // A missing or unreadable image is simply rebuilt.
         let previous = inspect_image(&image).ok();
         if previous
@@ -407,6 +421,21 @@ impl ComposeTest {
     }
 
     pub(crate) fn start(&self) -> Result<()> {
+        let runner_was_missing = matches!(self.runner.state()?, RunnerState::Missing);
+        let result = self.start_environment();
+        // E2E start creates the runner before compose is up. If it fails, `stop` finds no active
+        // environment and would leave the runner behind, attached to this test's network, for
+        // the next test to reuse.
+        if result.is_err()
+            && runner_was_missing
+            && let Err(error) = self.runner.remove()
+        {
+            warn!("Failed to remove runner after start failed: {error}");
+        }
+        result
+    }
+
+    fn start_environment(&self) -> Result<()> {
         // For end-to-end tests, we want to run vector as a service. Build it in the runner so
         // the compile is shared with the test binary. Coverage only instruments the test binary,
         // so the same uninstrumented service binary works for coverage runs.
@@ -584,10 +613,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn e2e_vector_image_name_includes_rust_version() {
+    fn e2e_vector_image_name_is_per_runner() {
         assert_eq!(
-            e2e_vector_image_name("1.96.1"),
-            "vector-e2e-vector-1.96.1:latest"
+            e2e_vector_image_name("vector-test-runner-1.96.1"),
+            "vector-test-runner-1.96.1-e2e-vector:latest"
+        );
+        assert_ne!(
+            e2e_vector_image_name("vector-test-runner-datadog-logs-1.96.1"),
+            e2e_vector_image_name("vector-test-runner-opentelemetry-logs-1.96.1")
         );
     }
 
