@@ -47,6 +47,23 @@ fn parse_sha256sum(output: &str) -> Option<&str> {
         .filter(|digest| digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
+/// The `--features` value for a suite: `shared_feature` (if any), then the suite's own features,
+/// then `vendored`.
+///
+/// E2E suites keep their own features alongside `all-e2e-tests` because the same build produces
+/// the Vector binary their compose services run, and some suites enable extra features (e.g.
+/// `typed-trace`) that the aggregate feature does not include.
+fn cargo_features(shared_feature: Option<&str>, suite_features: &[String]) -> String {
+    let mut features: Vec<&str> = shared_feature.into_iter().collect();
+    for feature in suite_features {
+        if !features.contains(&feature.as_str()) {
+            features.push(feature);
+        }
+    }
+    features.push("vendored");
+    features.join(",")
+}
+
 /// The parts of `docker image inspect` output needed to decide whether an image can be reused.
 #[derive(Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -317,13 +334,10 @@ impl ComposeTest {
         // Integration tests always compile only the suite's own `test.yaml` features: each CI
         // job runs a single suite, so compiling `all-integration-tests` there only adds build
         // time. E2E tests on the shared runner still use `all-e2e-tests`.
-        let use_all_features =
-            self.runner.is_shared_runner() && self.local_config.kind == ComposeTestKind::E2E;
-        let features = if use_all_features {
-            format!("{},vendored", self.local_config.feature_flag)
-        } else {
-            format!("{},vendored", self.config.features.join(","))
-        };
+        let shared_feature = (self.runner.is_shared_runner()
+            && self.local_config.kind == ComposeTestKind::E2E)
+            .then_some(self.local_config.feature_flag);
+        let features = cargo_features(shared_feature, &self.config.features);
         let mut args = vec!["--features".to_string(), features];
 
         // If the test field is not present then use the --lib flag
@@ -574,6 +588,26 @@ mod tests {
         assert_eq!(
             e2e_vector_image_name("1.96.1"),
             "vector-e2e-vector-1.96.1:latest"
+        );
+    }
+
+    #[test]
+    fn cargo_features_keep_suite_features_alongside_shared_feature() {
+        let suite = [
+            "e2e-tests-opentelemetry".to_string(),
+            "typed-trace".to_string(),
+        ];
+        assert_eq!(
+            cargo_features(Some("all-e2e-tests"), &suite),
+            "all-e2e-tests,e2e-tests-opentelemetry,typed-trace,vendored"
+        );
+        assert_eq!(
+            cargo_features(None, &suite),
+            "e2e-tests-opentelemetry,typed-trace,vendored"
+        );
+        assert_eq!(
+            cargo_features(Some("all-e2e-tests"), &["all-e2e-tests".to_string()]),
+            "all-e2e-tests,vendored"
         );
     }
 
