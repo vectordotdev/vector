@@ -2,12 +2,13 @@ use std::task::Poll;
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{
+use http_1::{
     Request,
     header::{HeaderName, HeaderValue},
 };
-use hyper::Body;
+use hyper_1::body::Incoming;
 use tower::Service;
+use vector_http::{HttpError, full_body};
 use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
@@ -16,7 +17,7 @@ use vector_lib::{
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
-    http::{HttpClient, HttpError},
+    http::client_v1::HttpClient,
     sinks::util::HttpEndpoint,
 };
 
@@ -79,9 +80,13 @@ pub struct GcsRequestSettings {
     pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
+/// Response of a GCS-family request, shared by the `gcp_cloud_storage` and `gcp_chronicle`
+/// services so both use [`GcsRetryLogic`](super::config::GcsRetryLogic).
 #[derive(Debug)]
 pub struct GcsResponse {
-    pub inner: http::Response<Body>,
+    /// The native client's response; delivery and retries use only its status, so the body
+    /// stays unread.
+    pub inner: http_1::Response<Incoming>,
     pub metadata: RequestMetadata,
 }
 
@@ -124,7 +129,7 @@ impl Service<GcsRequest> for GcsService {
             .base_url
             .append_path(&request.key)
             .expect("partition key must be a valid URI path segment")
-            .into_uri();
+            .into_v1();
 
         let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
@@ -145,12 +150,12 @@ impl Service<GcsRequest> for GcsService {
             headers.insert(p, v);
         }
 
-        let mut http_request = builder.body(Body::from(request.body)).unwrap();
-        self.auth.apply(&mut http_request);
+        let mut http_request = builder.body(request.body).unwrap();
+        self.auth.apply_v1(&mut http_request);
 
-        let mut client = self.client.clone();
+        let client = self.client.clone();
         Box::pin(async move {
-            let result = client.call(http_request).await;
+            let result = client.send(http_request.map(full_body)).await;
             result.map(|inner| GcsResponse { inner, metadata })
         })
     }
