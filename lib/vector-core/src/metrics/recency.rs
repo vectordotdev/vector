@@ -432,10 +432,66 @@ where
 
             if deleted {
                 entries.remove(key);
+                drop(guard);
+                self.per_set_timeouts.lock().per_key_timeouts.remove(key);
                 return false;
             }
         }
 
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use metrics::{Key, Label};
+    use metrics_util::registry::Registry;
+
+    use super::*;
+    use crate::metrics::{metric_matcher::MetricKeyMatcher, storage::VectorStorage};
+
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
+    fn pod_key(pod: usize) -> Key {
+        Key::from_parts(
+            "component_received_events_total",
+            vec![Label::new("pod_name", format!("pod-{pod}"))],
+        )
+    }
+
+    fn visit_counters(
+        recency: &Recency<Key, MetricKeyMatcher>,
+        registry: &Registry<Key, GenerationalStorage<VectorStorage>>,
+    ) {
+        for (key, counter) in registry.get_counter_handles() {
+            recency.should_store_counter(&key, &counter, registry);
+        }
+    }
+
+    #[test]
+    fn expired_keys_do_not_accumulate_in_per_key_timeouts() {
+        let (clock, mock) = Clock::mock();
+        let recency = Recency::new(clock, MetricKindMask::ALL, Some(TIMEOUT), Vec::new());
+        let registry = Registry::new(GenerationalStorage::new(VectorStorage));
+        let pods_per_round = 100;
+        let rounds = 10;
+        let mut cached_keys_per_round = Vec::new();
+
+        for round in 0..rounds {
+            for pod in 0..pods_per_round {
+                registry.get_or_create_counter(&pod_key(round * pods_per_round + pod), |c| {
+                    CounterFn::increment(c, 1);
+                });
+            }
+            visit_counters(&recency, &registry);
+            mock.increment(TIMEOUT * 2);
+            visit_counters(&recency, &registry);
+
+            assert!(registry.get_counter_handles().is_empty());
+            assert!(recency.inner.lock().1.is_empty());
+            cached_keys_per_round.push(recency.per_set_timeouts.lock().per_key_timeouts.len());
+        }
+
+        assert_eq!(cached_keys_per_round, vec![0; rounds]);
     }
 }
