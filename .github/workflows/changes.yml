@@ -52,6 +52,8 @@ on:
         value: ${{ jobs.source.outputs.website_tests }}
       install:
         value: ${{ jobs.source.outputs.install }}
+      package_repositories:
+        value: ${{ jobs.source.outputs.package_repositories }}
       actionlint:
         value: ${{ jobs.source.outputs.actionlint }}
       prettier:
@@ -187,6 +189,7 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       scripts: ${{ steps.filter.outputs.scripts }}
       install: ${{ steps.filter.outputs.install }}
+      package_repositories: ${{ steps.filter.outputs.package_repositories }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
       website_tests: ${{ steps.website_filter.outputs.website_tests }}
@@ -266,6 +269,7 @@ jobs:
               - ".github/workflows/changes.yml"
             markdown:
               - '**/**.md'
+              - "scripts/environment/npm-tools/**"
               - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             scripts:
@@ -282,6 +286,16 @@ jobs:
             install:
               - ".github/workflows/install-sh.yml"
               - "distribution/install.sh"
+              - ".github/workflows/changes.yml"
+            package_repositories:
+              - "distribution/repositories/**"
+              - "vdev/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
+              - ".github/actions/package-repository-tools/**"
+              - ".github/workflows/package-repositories*.yml"
+              - ".github/workflows/vdev_publish.yml"
               - ".github/workflows/changes.yml"
             k8s:
               - "src/sources/kubernetes_logs/**"
@@ -301,7 +315,7 @@ jobs:
               - ".github/actions/**"
               - ".github/actionlint.yaml"
               - "scripts/environment/prepare.sh"
-              - "scripts/environment/npm-tools/*"
+              - "scripts/environment/npm-tools/**"
               - "Makefile"
             prettier:
               - "**/*.yml"
@@ -312,6 +326,7 @@ jobs:
               - "**/*.json"
               - ".prettierrc.json"
               - ".prettierignore"
+              - "scripts/environment/npm-tools/**"
               - ".github/workflows/changes.yml"
             test-yml:
               - ".github/workflows/test.yml"
@@ -482,7 +497,7 @@ jobs:
           echo "any=$any_changed" >> "$GITHUB_OUTPUT"
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: int_tests_changes
           path: int_tests_changes.json
@@ -547,7 +562,7 @@ jobs:
           echo "any=$any_changed" >> "$GITHUB_OUTPUT"
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e_tests_changes
           path: e2e_tests_changes.json

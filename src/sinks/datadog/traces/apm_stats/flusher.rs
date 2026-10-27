@@ -6,6 +6,7 @@ use std::{
 use bytes::Bytes;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Receiver, Sender};
+use vector_http::full_body;
 use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
 use super::{
@@ -14,9 +15,12 @@ use super::{
     build_request,
 };
 use crate::{
-    http::{BuildRequestSnafu, HttpClient},
+    http::client_v1::HttpClient,
     internal_events::DatadogTracesAPMStatsError,
-    sinks::util::{Compression, Compressor},
+    sinks::{
+        HTTPV1RequestBuilderSnafu,
+        util::{Compression, Compressor},
+    },
 };
 
 /// Flushes cached APM stats buckets to Datadog on a 10 second interval.
@@ -127,9 +131,9 @@ impl ApmStatsSender {
 
         let http_request = trace_api_request
             .into_http_request()
-            .context(BuildRequestSnafu)?;
+            .context(HTTPV1RequestBuilderSnafu)?;
 
-        self.client.send(http_request).await?;
+        self.client.send(http_request.map(full_body)).await?;
 
         Ok(())
     }

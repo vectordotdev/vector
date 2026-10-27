@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod config_builder;
 pub(crate) mod interpolation;
 mod loader;

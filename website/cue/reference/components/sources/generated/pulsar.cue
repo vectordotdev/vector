@@ -37,7 +37,7 @@ generated: components: sources: pulsar: configuration: {
 				required:    true
 				type: object: options: {
 					audience: {
-						description: "The OAuth2 audience."
+						description: "The `OAuth2` audience."
 						required:    false
 						type: string: examples: ["${OAUTH2_AUDIENCE}", "pulsar"]
 					}
@@ -56,7 +56,7 @@ generated: components: sources: pulsar: configuration: {
 						type: string: examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
 					}
 					scope: {
-						description: "The OAuth2 scope."
+						description: "The `OAuth2` scope."
 						required:    false
 						type: string: examples: ["${OAUTH2_SCOPE}", "admin"]
 					}
@@ -160,7 +160,7 @@ generated: components: sources: pulsar: configuration: {
 			}
 			verify_hostname: {
 				description: """
-					Whether hostname verification is enabled when verify_certificate is false
+					Whether hostname verification is enabled when `verify_certificate` is false
 
 					Set to true if not specified.
 					"""

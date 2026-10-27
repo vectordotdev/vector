@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},

@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::{MetricTags, WithMetadata};
 use crate::{event, metrics::AgentDDSketch};
 
-#[allow(warnings, clippy::all, clippy::pedantic)]
+#[allow(warnings, clippy::all)]
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
@@ -17,7 +17,7 @@ pub use proto_event::*;
 use vrl::value::{ObjectMap, Value as VrlValue};
 
 use super::EventFinalizers;
-use super::metadata::{Inner, default_schema_definition};
+use super::metadata::Inner;
 use super::ser::DecodeError;
 use super::{EventMetadata, array, metric::MetricSketch};
 
@@ -597,6 +597,7 @@ impl From<Secrets> for super::metadata::Secrets {
 impl From<super::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
     fn from(value: super::DatadogMetricOriginMetadata) -> Self {
         Self {
+            metric_type: value.metric_type(),
             origin_product: value.product(),
             origin_category: value.category(),
             origin_service: value.service(),
@@ -611,6 +612,7 @@ impl From<DatadogOriginMetadata> for super::DatadogMetricOriginMetadata {
             value.origin_category,
             value.origin_service,
         )
+        .with_metric_type(value.metric_type)
     }
 }
 
@@ -638,6 +640,7 @@ impl From<EventMetadata> for Metadata {
             source_type,
             upstream_id,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
             trace_layout,
             ..
@@ -653,6 +656,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
+            datadog_metric_unit: datadog_metric_unit.map(|unit| unit.to_string()),
             trace_layout: encode_trace_layout(trace_layout),
         }
     }
@@ -669,6 +673,7 @@ impl TryFrom<Metadata> for EventMetadata {
             upstream_id,
             secrets,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
             trace_layout,
         } = value;
@@ -706,9 +711,10 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
-                schema_definition: default_schema_definition(),
+                schema_definition: None,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
+                datadog_metric_unit: datadog_metric_unit.map(Arc::from),
                 trace_layout: decode_trace_layout(trace_layout),
                 source_event_id,
             }),

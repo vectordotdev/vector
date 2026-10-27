@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use bytes::BytesMut;
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::stream::Peekable;

@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use http::StatusCode;
 use http_1::Request;
 use snafu::Snafu;
+use vector_http::full_body;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
@@ -20,7 +20,7 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::client_v1::{HttpClient, full_body},
+    http::client_v1::HttpClient,
     schema,
     sinks::{
         gcs_common::config::healthcheck_status,
@@ -380,9 +380,7 @@ async fn healthcheck(
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    healthcheck_status(status, HealthcheckError::NotFound.into())
+    healthcheck_status(response.status(), HealthcheckError::NotFound.into())
 }
 
 #[cfg(test)]

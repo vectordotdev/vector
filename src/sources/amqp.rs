@@ -1,5 +1,5 @@
 //! `AMQP` source.
-//! Handles version AMQP 0.9.1 which is used by RabbitMQ.
+//! Handles version AMQP 0.9.1 which is used by `RabbitMQ`.
 use std::{io::Cursor, pin::Pin};
 
 use async_stream::stream;
@@ -299,7 +299,7 @@ fn populate_log_event(
                     metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
                     timestamp,
                 );
-            };
+            }
 
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
@@ -308,9 +308,13 @@ fn populate_log_event(
                 log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
-    };
+    }
 }
 
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// Receives an event from `AMQP` and pushes it along the pipeline.
 async fn receive_event(
     config: &AmqpSourceConfig,
@@ -401,22 +405,21 @@ async fn finalize_event_stream(
                 Err(_) => {
                     emit!(StreamClosedError { count: 1 });
                 }
-                Ok(_) => {
+                Ok(()) => {
                     finalizer.add(msg.into(), receiver);
                 }
             }
         }
-        None => match out.send_event_stream(&mut stream).await {
-            Err(_) => {
+        None => {
+            if out.send_event_stream(&mut stream).await.is_err() {
                 emit!(StreamClosedError { count: 1 });
-            }
-            Ok(_) => {
+            } else {
                 let ack_options = lapin::options::BasicAckOptions::default();
                 if let Err(error) = msg.acker.ack(ack_options).await {
                     emit!(AmqpAckError { error });
                 }
             }
-        },
+        }
     }
 }
 
@@ -475,7 +478,7 @@ async fn run_amqp_source(
                             return Err(crate::sources::SourceError::from(error));
                         }
                         Ok(msg) => {
-                            receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?
+                            receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?;
                         }
                     }
                 } else {
@@ -496,13 +499,7 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
                 emit!(AmqpAckError { error });
             }
         }
-        BatchStatus::Errored => {
-            let ack_options = lapin::options::BasicRejectOptions::default();
-            if let Err(error) = entry.acker.reject(ack_options).await {
-                emit!(AmqpRejectError { error });
-            }
-        }
-        BatchStatus::Rejected => {
+        BatchStatus::Errored | BatchStatus::Rejected => {
             let ack_options = lapin::options::BasicRejectOptions::default();
             if let Err(error) = entry.acker.reject(ack_options).await {
                 emit!(AmqpRejectError { error });
@@ -523,6 +520,7 @@ pub mod test {
         crate::test_util::test_generate_config::<AmqpSourceConfig>();
     }
 
+    #[must_use]
     pub fn make_config() -> AmqpSourceConfig {
         let mut config = AmqpSourceConfig {
             queue: "it".to_string(),
@@ -537,6 +535,7 @@ pub mod test {
         config
     }
 
+    #[must_use]
     pub fn make_tls_config() -> AmqpSourceConfig {
         let mut config = AmqpSourceConfig {
             queue: "it".to_string(),

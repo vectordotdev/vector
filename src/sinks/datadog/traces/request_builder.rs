@@ -200,9 +200,7 @@ pub fn build_request(
         body: payload,
         headers,
         finalizers: ddtraces_metadata.finalizers,
-        uri: endpoint_configuration
-            .get_uri_for_endpoint(ddtraces_metadata.endpoint)
-            .into_uri(),
+        uri: endpoint_configuration.get_uri_for_endpoint(ddtraces_metadata.endpoint),
         uncompressed_size: ddtraces_metadata.uncompressed_size,
         metadata: request_metadata,
     }

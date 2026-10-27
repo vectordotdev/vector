@@ -25,6 +25,10 @@ pub struct MqttSource {
 }
 
 impl MqttSource {
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn new(
         connector: MqttConnector,
         decoder: Decoder,
@@ -71,16 +75,9 @@ impl MqttSource {
                     // delivery guarantees.
                     // We need this issue resolved first:
                     // https://github.com/bytebeamio/rumqtt/issues/349
-                    match mqtt_event {
-                        Ok(MqttEvent::Incoming(Incoming::Publish(publish))) => {
-                            self.process_message(publish, &mut out).await;
-                        }
-                        Ok(MqttEvent::Incoming(
-                            Incoming::PubAck(_) | Incoming::PubRec(_) | Incoming::PubComp(_),
-                        )) => {
-                            // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
-                        }
-                        _ => {}
+                    // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
+                    if let Ok(MqttEvent::Incoming(Incoming::Publish(publish))) = mqtt_event {
+                        self.process_message(publish, &mut out).await;
                     }
                 }
             }
@@ -91,7 +88,7 @@ impl MqttSource {
         emit!(EndpointBytesReceived {
             byte_size: publish.payload.len(),
             protocol: "mqtt",
-            endpoint: &self.connector.options.broker_address().0,
+            endpoint: &self.config.common.host,
         });
         let events_received = register!(EventsReceived);
 

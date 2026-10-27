@@ -27,7 +27,7 @@ use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
 use serde::{Deserialize, Deserializer, Serialize, de};
 use tokio::sync::Semaphore;
-use tonic::transport::server::RoutesBuilder;
+use tonic::service::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType},
@@ -84,7 +84,7 @@ pub struct OtlpDecodingConfig {
 }
 
 impl From<bool> for OtlpDecodingConfig {
-    /// Converts a boolean value to an OtlpDecodingConfig.
+    /// Converts a boolean value to an `OtlpDecodingConfig`.
     ///
     /// This provides backward compatibility with the previous boolean configuration.
     /// - `true` enables OTLP decoding for all signals
@@ -100,16 +100,19 @@ impl From<bool> for OtlpDecodingConfig {
 
 impl OtlpDecodingConfig {
     /// Returns true if any signal is configured to use OTLP decoding.
+    #[must_use]
     pub const fn any_enabled(&self) -> bool {
         self.logs || self.metrics || self.traces
     }
 
     /// Returns true if all signals are configured to use OTLP decoding.
+    #[must_use]
     pub const fn all_enabled(&self) -> bool {
         self.logs && self.metrics && self.traces
     }
 
     /// Returns true if signals have mixed configuration (some enabled, some disabled).
+    #[must_use]
     pub const fn is_mixed(&self) -> bool {
         self.any_enabled() && !self.all_enabled()
     }
@@ -321,7 +324,7 @@ impl GenerateConfig for OpentelemetryConfig {
         serde_json::to_value(Self {
             grpc: example_grpc_config(),
             http: example_http_config(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             max_concurrent_requests: None,
             request_timeout_secs: None,
             log_namespace: None,
@@ -348,6 +351,10 @@ impl OpentelemetryConfig {
         }
     }
 
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub(crate) fn get_signal_deserializer(
         &self,
         signal_type: OtlpSignalType,
@@ -370,6 +377,10 @@ impl OpentelemetryConfig {
 }
 
 impl OpentelemetryConfig {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS, decoding, request limits, or header matching cannot be configured.
     /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
     pub fn build_with_tls_reloaders(
         &self,
@@ -503,6 +514,10 @@ impl SourceConfig for OpentelemetryConfig {
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
     // as both are optional and can be converted to/from.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = Definition::new_with_default_metadata(Kind::any(), [log_namespace])

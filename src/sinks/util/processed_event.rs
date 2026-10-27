@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use serde::Serialize;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,

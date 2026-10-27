@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use serde::Serialize;
 use strum::EnumDiscriminants;
 use vector_lib::configurable::{Configurable, ToValue};

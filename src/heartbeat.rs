@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Emits a heartbeat internal metric.
 use std::time::{Duration, Instant};
 

@@ -51,10 +51,12 @@ pub enum Mode {
 }
 
 impl SocketConfig {
+    #[must_use]
     pub fn new_tcp(tcp_config: tcp::TcpConfig) -> Self {
         tcp_config.into()
     }
 
+    #[must_use]
     pub fn make_basic_tcp_config(addr: std::net::SocketAddr) -> Self {
         tcp::TcpConfig::from_address(addr.into()).into()
     }
@@ -63,8 +65,9 @@ impl SocketConfig {
         match &self.mode {
             Mode::Tcp(config) => config.decoding().clone(),
             Mode::Udp(config) => config.decoding().clone(),
-            Mode::UnixDatagram(config) => config.platform_independent().decoding().clone(),
-            Mode::UnixStream(config) => config.platform_independent().decoding().clone(),
+            Mode::UnixDatagram(config) | Mode::UnixStream(config) => {
+                config.platform_independent().decoding().clone()
+            }
         }
     }
 
@@ -72,10 +75,7 @@ impl SocketConfig {
         match &self.mode {
             Mode::Tcp(config) => global_log_namespace.merge(config.log_namespace),
             Mode::Udp(config) => global_log_namespace.merge(config.log_namespace),
-            Mode::UnixDatagram(config) => {
-                global_log_namespace.merge(config.platform_independent().log_namespace)
-            }
-            Mode::UnixStream(config) => {
+            Mode::UnixDatagram(config) | Mode::UnixStream(config) => {
                 global_log_namespace.merge(config.platform_independent().log_namespace)
             }
         }
@@ -158,7 +158,7 @@ impl SourceConfig for SocketConfig {
                 let decoding = config.decoding().clone();
                 let framing = config
                     .framing()
-                    .clone()
+                    .cloned()
                     .unwrap_or_else(|| decoding.default_message_based_framing());
                 let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
                 Ok(udp::udp(
@@ -273,23 +273,7 @@ impl SourceConfig for SocketConfig {
                         None,
                     )
             }
-            Mode::UnixDatagram(config) => {
-                let legacy_host_key = config
-                    .platform_independent()
-                    .host_key()
-                    .clone()
-                    .path
-                    .map(LegacyKey::InsertIfEmpty);
-
-                schema_definition.with_source_metadata(
-                    Self::NAME,
-                    legacy_host_key,
-                    &owned_value_path!("host"),
-                    Kind::bytes(),
-                    None,
-                )
-            }
-            Mode::UnixStream(config) => {
+            Mode::UnixDatagram(config) | Mode::UnixStream(config) => {
                 let legacy_host_key = config
                     .platform_independent()
                     .host_key()
@@ -317,8 +301,7 @@ impl SourceConfig for SocketConfig {
         match self.mode.clone() {
             Mode::Tcp(tcp) => vec![tcp.address().as_tcp_resource()],
             Mode::Udp(udp) => vec![udp.address().as_udp_resource()],
-            Mode::UnixDatagram(_) => vec![],
-            Mode::UnixStream(_) => vec![],
+            Mode::UnixDatagram(_) | Mode::UnixStream(_) => vec![],
         }
     }
 
@@ -333,6 +316,9 @@ pub(crate) fn default_host_key() -> OptionalValuePath {
 
 #[cfg(test)]
 mod test {
+    use crate::config::ProxyConfig;
+    use crate::config::schema::Options;
+    use crate::extra_context::ExtraContext;
     use std::{
         collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
@@ -343,6 +329,8 @@ mod test {
         },
         thread,
     };
+    use vector_lib::{codecs::Transformer, enrichment::TableRegistry};
+    use vector_vrl_metrics::MetricsStorage;
 
     use approx::assert_relative_eq;
     use bytes::{BufMut, Bytes, BytesMut};
@@ -404,7 +392,7 @@ mod test {
 
     async fn wait_for_tcp_and_release(guard: PortGuard, addr: SocketAddr) {
         wait_for_tcp(addr).await;
-        drop(guard) // Now we're sure the socket was bound by the server and we can release the guard
+        drop(guard); // Now we're sure the socket was bound by the server and we can release the guard
     }
 
     pub fn bind_unused_udp() -> UdpSocket {
@@ -430,7 +418,7 @@ mod test {
             "version": "1.1",
             "host": "example.org",
             "short_message": message,
-            "timestamp": 1234567890.123,
+            "timestamp": 1_234_567_890.123,
             "level": 6,
             "_foo": "bar",
         }))
@@ -453,6 +441,10 @@ mod test {
         chunk.freeze()
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn get_gelf_chunks(short_message: &str, max_size: usize, rng: &mut SmallRng) -> Vec<Bytes> {
         let message_id = rand::random();
         let payload = get_gelf_payload(short_message);
@@ -480,14 +472,14 @@ mod test {
     #[test]
     fn unix_modes_deserialize_on_all_platforms() {
         for input in [
-            indoc::indoc! {r#"
+            indoc::indoc! {r"
                 mode: unix_datagram
                 path: /tmp/vector-socket.sock
-            "#},
-            indoc::indoc! {r#"
+            "},
+            indoc::indoc! {r"
                 mode: unix_stream
                 path: /tmp/vector-socket.sock
-            "#},
+            "},
         ] {
             let config: SocketConfig = serde_yaml::from_str(input).unwrap();
 
@@ -848,33 +840,6 @@ mod test {
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn tcp_shutdown_infinite_stream() {
-        // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
-        // the source doesn't block on sending the events downstream, otherwise if it was blocked on
-        // doing so, it wouldn't be able to wake up and loop to see that it had been signalled to
-        // shutdown.
-        let (guard, addr) = next_addr();
-
-        let (source_tx, source_rx) = SourceSender::new_test_sender_with_options(10_000, None);
-        let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
-        let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
-
-        let mut source_config = TcpConfig::from_address(addr.into());
-        source_config.set_shutdown_timeout_secs(1);
-        let source_task = SocketConfig::from(source_config)
-            .build(source_cx)
-            .await
-            .unwrap();
-
-        // Spawn the source task and wait until we're sure it's listening:
-        let source_handle = tokio::spawn(source_task);
-        wait_for_tcp_and_release(guard, addr).await;
-
-        // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
-        // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
-        // it down, exercising the logic we have to ensure timely shutdown even under load:
-        let message = random_string(512);
-        let message_bytes = Bytes::from(message.clone());
-
         #[derive(Clone, Debug)]
         struct Serializer {
             bytes: Bytes,
@@ -888,11 +853,39 @@ mod test {
                 Ok(())
             }
         }
+
+        // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
+        // the source doesn't block on sending the events downstream, otherwise if it was blocked on
+        // doing so, it wouldn't be able to wake up and loop to see that it had been signalled to
+        // shutdown.
+        let (guard, addr) = next_addr();
+
+        let (source_tx, source_rx) = SourceSender::new_test_sender_with_options(10_000, None);
+        let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
+        let (source_context, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_shutdown_timeout_secs(1);
+        let source_task = SocketConfig::from(source_config)
+            .build(source_context)
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        let source_handle = tokio::spawn(source_task);
+        wait_for_tcp_and_release(guard, addr).await;
+
+        // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
+        // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
+        // it down, exercising the logic we have to ensure timely shutdown even under load:
+        let message = random_string(512);
+        let message_bytes = Bytes::from(message.clone());
+
         let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
         let encoder = Serializer {
             bytes: message_bytes,
         };
-        let (sink, _healthcheck) = sink_config.build(Default::default(), encoder).unwrap();
+        let (sink, _healthcheck) = sink_config.build(Transformer::default(), encoder).unwrap();
 
         tokio::spawn(async move {
             let input = stream::repeat_with(|| LogEvent::default().into()).boxed();
@@ -952,7 +945,7 @@ mod test {
         let mut buffer = [0u8; 10];
 
         tokio::select! {
-             _ = timeout => {
+             () = timeout => {
                  panic!("timed out waiting for stream to close")
              },
              read_result = stream.read(&mut buffer) => {
@@ -1013,7 +1006,7 @@ mod test {
         to: SocketAddr,
         lines: impl IntoIterator<Item = String>,
     ) -> UdpSocket {
-        send_packets_udp_from(from, to, lines.into_iter().map(|line| line.into()))
+        send_packets_udp_from(from, to, lines.into_iter().map(Into::into))
     }
 
     fn send_packets_udp(to: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> UdpSocket {
@@ -1090,19 +1083,20 @@ mod test {
         SocketAddr,
         JoinHandle<Result<(), crate::sources::SourceError>>,
     ) {
-        let (guard, address, mut config) = match config {
-            Some(config) => match config.address() {
+        let (guard, address, mut config) = if let Some(config) = config {
+            match config.address() {
                 SocketListenAddr::SocketAddr(addr) => (None, addr, config),
-                _ => panic!("listen address should not be systemd FD offset in tests"),
-            },
-            None => {
-                let (guard, address) = next_addr();
-                (
-                    Some(guard),
-                    address,
-                    UdpConfig::from_address(address.into()),
-                )
+                SocketListenAddr::SystemdFd(_) => {
+                    panic!("listen address should not be systemd FD offset in tests")
+                }
             }
+        } else {
+            let (guard, address) = next_addr();
+            (
+                Some(guard),
+                address,
+                UdpConfig::from_address(address.into()),
+            )
         };
 
         let config = if use_vector_namespace {
@@ -1116,15 +1110,15 @@ mod test {
             .build(SourceContext {
                 key: source_key.clone(),
                 globals: GlobalOptions::default(),
-                enrichment_tables: Default::default(),
+                enrichment_tables: TableRegistry::default(),
                 shutdown: shutdown_signal,
                 out: sender,
-                proxy: Default::default(),
+                proxy: ProxyConfig::default(),
                 acknowledgements: false,
-                schema: Default::default(),
+                schema: Options::default(),
                 schema_definitions: HashMap::default(),
-                extra_context: Default::default(),
-                metrics_storage: Default::default(),
+                extra_context: ExtraContext::default(),
+                metrics_storage: MetricsStorage::default(),
             })
             .await
             .unwrap();
@@ -1134,7 +1128,7 @@ mod test {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         if let Some(guard) = guard {
-            drop(guard)
+            drop(guard);
         }
 
         (address, source_handle)
@@ -1229,8 +1223,8 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     /// This test only works on Unix.
-    /// Unix truncates at max_length giving us the bytes to get the first n delimited messages.
-    /// Windows will drop the entire packet if we exceed the max_length so we are unable to
+    /// Unix truncates at `max_length` giving us the bytes to get the first n delimited messages.
+    /// Windows will drop the entire packet if we exceed the `max_length` so we are unable to
     /// extract anything.
     async fn udp_max_length_delimited() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
@@ -1628,9 +1622,10 @@ mod test {
 
     #[cfg(unix)]
     async fn unix_send_lines(stream: bool, path: PathBuf, lines: &[&str]) {
-        match stream {
-            false => send_lines_unix_datagram(path, lines).await,
-            true => send_lines_unix_stream(path, lines).await,
+        if stream {
+            send_lines_unix_stream(path, lines).await;
+        } else {
+            send_lines_unix_datagram(path, lines).await;
         }
     }
 
@@ -1723,7 +1718,7 @@ mod test {
         .await;
     }
 
-    #[ignore]
+    #[ignore = "Manual fixture for comparing bound and unbound Unix datagram sockets"]
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_socket_test() {
@@ -1853,7 +1848,7 @@ mod test {
     #[tokio::test]
     async fn unix_datagram_multiple_packets() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            unix_multiple_packets(false).await
+            unix_multiple_packets(false).await;
         })
         .await;
     }
@@ -1892,7 +1887,7 @@ mod test {
                 Ok(meta) => {
                     match meta.permissions().mode() {
                         // S_IFSOCK   0140000   socket
-                        0o140555 => ready(true),
+                        0o140_555 => ready(true),
                         _ => ready(false),
                     }
                 }
@@ -1991,7 +1986,7 @@ mod test {
     #[tokio::test]
     async fn unix_stream_multiple_packets() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            unix_multiple_packets(true).await
+            unix_multiple_packets(true).await;
         })
         .await;
     }
@@ -2037,7 +2032,7 @@ mod test {
                 Ok(meta) => {
                     match meta.permissions().mode() {
                         // S_IFSOCK   0140000   socket
-                        0o140421 => ready(true),
+                        0o140_421 => ready(true),
                         _ => ready(false),
                     }
                 }

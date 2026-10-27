@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.60.0-dev"
+version = "0.61.0-dev"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -60,7 +60,6 @@ assets = [
   ["distribution/debian/vector.yaml", "/etc/vector/vector.yaml", "644"],
   ["config/vector.yaml", "/usr/share/vector/examples/vector.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
-  ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"],
   ["licenses/*", "/usr/share/vector/licenses/", "644"],
   ["NOTICE", "/usr/share/vector/NOTICE", "644"],
@@ -120,6 +119,7 @@ members = [
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
+  "lib/vector-http",
   "lib/vector-lib",
   "lib/vector-lookup",
   "lib/vector-stream",
@@ -143,6 +143,7 @@ members = [
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(ddsketch_extended)'] }
 
 [workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
 string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"
@@ -167,7 +168,7 @@ arc-swap = { version = "1.8.2", default-features = false }
 async-compression = { version = "0.4.42", default-features = false, features = ["tokio", "gzip"] }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
-axum = { version = "0.6.20", default-features = false }
+axum = { version = "0.7.9", default-features = false }
 base64 = { version = "0.23.0", default-features = false, features = ["std"] }
 bitflags = { version = "2.13.2", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
@@ -197,6 +198,7 @@ indexmap = { version = "2.11.0", default-features = false, features = ["serde", 
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
+jsonschema = { version = "0.38.1", default-features = false }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.18.1", default-features = false }
@@ -208,10 +210,10 @@ pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.11" }
 proptest-derive = { version = "0.8.0" }
-prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-build = { version = "0.12", default-features = false }
+prost = { version = "0.13", default-features = false, features = ["std"] }
+prost-build = { version = "0.13", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
-prost-types = { version = "0.12", default-features = false }
+prost-types = { version = "0.13", default-features = false }
 quickcheck = { version = "1.1.0" }
 rand = { version = "0.10.1", default-features = false, features = ["thread_rng"] }
 rand_distr = { version = "0.6.0", default-features = false }
@@ -236,10 +238,10 @@ proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 syn = { version = "3", default-features = false, features = ["full", "visit", "extra-traits"] }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
-tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-tonic-health = { version = "0.11", default-features = false }
-tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
+tonic = { version = "0.12.3", default-features = false, features = ["transport", "codegen", "prost", "tls", "gzip", "zstd"] }
+tonic-build = { version = "0.12.3", default-features = false, features = ["transport", "prost"] }
+tonic-health = { version = "0.12.3", default-features = false }
+tonic-reflection = { version = "0.12.3", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -278,6 +280,7 @@ vrl.workspace = true
 fakedata = { path = "lib/fakedata", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-common = { path = "lib/vector-common", default-features = false }
+vector-http = { path = "lib/vector-http" }
 vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
@@ -330,7 +333,7 @@ aws-sdk-sts = { version = "1.114.0", default-features = false, features = ["beha
 
 # The `aws-sdk-sts` crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication is configured.
-aws-sigv4 = { version = "1.5.1", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "1.5.1", default-features = false, features = ["sign-http", "http0-compat", "http1"], optional = true }
 
 aws-smithy-async = { version = "1.3.0", default-features = false, features = ["rt-tokio"], optional = true }
 aws-smithy-http = { version = "0.64", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
@@ -356,6 +359,7 @@ opendal-http-transport-reqwest = { version = "0.58.2", default-features = false,
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
+tower-http-1 = { package = "tower-http", version = "0.6.8", default-features = false, features = ["decompression-full"] }
 # Serde
 serde.workspace = true
 serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
@@ -397,7 +401,7 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 greptimedb-ingester = { version = "0.17.0", default-features = false, optional = true }
 
 # External libs
-arc-swap = { workspace = true, default-features = false, optional = true }
+arc-swap = { workspace = true, default-features = false }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
 arrow = { version = "59.2.0", default-features = false, features = ["ipc"], optional = true }
 parquet = { version = "59.2.0", default-features = false, features = [
@@ -407,7 +411,7 @@ parquet = { version = "59.2.0", default-features = false, features = [
   "lz4",
   "flate2-rust_backened",
 ], optional = true }
-axum = { version = "0.6.20", default-features = false }
+axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio"] }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.20", default-features = false, features = ["pipe", "ssl", "chrono"], optional = true }
@@ -447,7 +451,6 @@ http-body-util = { version = "0.1", default-features = false }
 hyper = { version = "0.14.32", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream", "backports", "deprecated"] }
 hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["client", "http1", "http2"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
-hyper-openssl-1 = { package = "hyper-openssl", version = "0.10", default-features = false, features = ["client-legacy"] }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 hyper-util = { version = "0.1", default-features = false, features = ["client", "client-legacy", "http1", "http2", "tokio"] }
 indexmap.workspace = true
@@ -479,7 +482,9 @@ rdkafka = { workspace = true, features = ["curl-static", "tokio", "libz", "ssl",
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
-rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
+rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-no-provider"], optional = true }
+# Keep MQTT on Ring alongside Vector's other Rustls users, including in minimal builds.
+rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -541,7 +546,11 @@ approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 base64.workspace = true
 criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
+# The HTTP transport tests serve HTTP/1.1 and HTTP/2 with native Hyper 1 servers.
+hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["server"] }
+hyper-util = { version = "0.1", default-features = false, features = ["server-auto"] }
 itertools.workspace = true
+jsonschema.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true
@@ -789,7 +798,7 @@ sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
-sources-mqtt = ["dep:rumqttc"]
+sources-mqtt = ["dep:rumqttc", "dep:rustls"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-okta = ["sources-utils-http-client"]
@@ -832,7 +841,7 @@ sources-websocket = ["dep:tokio-tungstenite"]
 sources-windows_event_log = ["dep:windows", "dep:quick-xml", "dep:governor"]
 sources-windows_event_log-integration-tests = ["sources-windows_event_log"]
 
-sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-health", "protobuf-build"]
+sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-health", "http-body-util/channel", "protobuf-build", "tower-http-1/trace"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -867,7 +876,7 @@ transforms-metrics = [
 ]
 
 transforms-aggregate = []
-transforms-aws_ec2_metadata = ["dep:arc-swap"]
+transforms-aws_ec2_metadata = []
 transforms-dedupe = ["transforms-impl-dedupe"]
 transforms-delay = []
 transforms-filter = []
@@ -930,6 +939,7 @@ sinks-logs = [
   "sinks-nats",
   "sinks-new_relic",
   "sinks-new_relic_logs",
+  "sinks-opensearch",
   "sinks-opentelemetry",
   "sinks-papertrail",
   "sinks-postgres",
@@ -997,10 +1007,11 @@ sinks-kafka = ["dep:rdkafka"]
 sinks-keep = []
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
-sinks-mqtt = ["dep:rumqttc"]
+sinks-mqtt = ["dep:rumqttc", "dep:rustls"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
+sinks-opensearch = ["sinks-elasticsearch"]
 sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
@@ -1053,6 +1064,7 @@ all-integration-tests = [
   "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "opensearch-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
   "postgres_sink-integration-tests",
@@ -1102,10 +1114,11 @@ databend-integration-tests = ["sinks-databend"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics", "dep:prost"]
-datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
+datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces"]
 docker-logs-integration-tests = ["sources-docker_logs"]
 doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
+opensearch-integration-tests = ["es-integration-tests", "sinks-opensearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
@@ -1151,9 +1164,10 @@ e2e-tests-datadog = [
 ]
 
 e2e-tests-opentelemetry = [
+  "api",
+  "api-client-minimal",
   "sources-opentelemetry",
   "sinks-opentelemetry",
-  "sources-internal_metrics",
   "transforms-remap",
   "sinks-console",
   "sinks-file",

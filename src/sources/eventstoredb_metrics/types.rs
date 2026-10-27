@@ -16,6 +16,15 @@ pub struct Stats {
 }
 
 impl Stats {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing conversion of source counters to floating-point metrics. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[must_use]
     pub fn metrics(&self, namespace: Option<String>) -> Vec<Metric> {
         let mut result = Vec::new();
         let mut tags = MetricTags::default();

@@ -1,22 +1,17 @@
 use futures_util::future::ready;
 
-use super::{
-    encoder::AppsignalEncoder,
-    normalizer::AppsignalMetricsNormalizer,
-    request_builder::{AppsignalRequest, AppsignalRequestBuilder},
-};
-use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalizer};
+use super::{normalizer::AppsignalMetricsNormalizer, request_builder::AppsignalRequestBuilder};
+use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalizer, util::http::HttpRequest};
 
 pub(super) struct AppsignalSink<S> {
     pub(super) service: S,
-    pub(super) compression: Compression,
-    pub(super) transformer: Transformer,
     pub(super) batch_settings: BatcherSettings,
+    pub(super) request_builder: AppsignalRequestBuilder,
 }
 
 impl<S> AppsignalSink<S>
 where
-    S: Service<AppsignalRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
@@ -36,12 +31,7 @@ where
             .batched(self.batch_settings.as_byte_size_config())
             .request_builder(
                 default_request_builder_concurrency_limit(),
-                AppsignalRequestBuilder {
-                    compression: self.compression,
-                    encoder: AppsignalEncoder {
-                        transformer: self.transformer.clone(),
-                    },
-                },
+                self.request_builder,
             )
             .filter_map(|request| async move {
                 match request {
@@ -61,7 +51,7 @@ where
 #[async_trait::async_trait]
 impl<S> StreamSink<Event> for AppsignalSink<S>
 where
-    S: Service<AppsignalRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,

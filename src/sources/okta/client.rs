@@ -85,8 +85,8 @@ pub struct OktaConfig {
 impl Default for OktaConfig {
     fn default() -> Self {
         Self {
-            domain: "".to_string(),
-            token: "".to_string(),
+            domain: String::new(),
+            token: String::new(),
             interval: default_interval(),
             timeout: default_timeout(),
             since: None,
@@ -209,12 +209,11 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
                 .get_all("link")
                 .iter()
                 .filter_map(|v| v.to_str().ok())
-                .filter_map(find_rel_next_link)
-                .next()
+                .find_map(find_rel_next_link)
                 .and_then(|next| Uri::try_from(next).ok())
             {
                 next = Some(next_url);
-            };
+            }
 
             let body = http_body::Body::collect(body).await?.to_bytes();
 
@@ -323,7 +322,7 @@ async fn run(
             let decoder = decoder.clone();
 
             async move {
-                stream::unfold((), move |_| {
+                stream::unfold((), move |()| {
                     let url_mutex = Arc::clone(&url_mutex);
                     let token = token.clone();
                     let decoder = decoder.clone();

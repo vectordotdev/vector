@@ -214,7 +214,7 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
             ));
         }
 
-        return Ok((stripped_key.to_owned(), "".to_owned()));
+        return Ok((stripped_key.to_owned(), String::new()));
     }
 
     // The Prometheus Pushgateway has a fairly permissive base64 implementation
@@ -366,6 +366,10 @@ mod test {
     async fn test_whole_request_happy_path_https() {
         whole_request_happy_path(Some(TlsEnableableConfig::test_config())).await;
     }
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn whole_request_happy_path(tls: Option<TlsEnableableConfig>) {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (_guard, address) = test_util::addr::next_addr();

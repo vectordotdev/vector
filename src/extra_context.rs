@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! `ExtraContext` is used for passing extra data to Vector's components when Vector is used as a library.
 use std::{
     any::{Any, TypeId},

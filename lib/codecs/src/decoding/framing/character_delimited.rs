@@ -2,10 +2,12 @@ use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
+use vector_common::internal_event::emit;
 use vector_config::configurable_component;
 use vector_core::serde::AsciiChar;
 
 use super::BoxedFramingError;
+use crate::internal_events::DecoderFrameTooLongError;
 
 /// The behavior to apply when a frame exceeds the maximum allowed byte size.
 #[configurable_component]
@@ -164,11 +166,10 @@ impl Decoder for CharacterDelimitedDecoder {
                     if next_delimiter_idx > self.max_length {
                         match self.oversized_action {
                             OversizedAction::Drop => {
-                                warn!(
-                                    message = "Discarding frame larger than max_length.",
-                                    buf_len = buf.len(),
-                                    max_length = self.max_length,
-                                );
+                                emit(DecoderFrameTooLongError {
+                                    length: next_delimiter_idx,
+                                    max_length: self.max_length,
+                                });
                                 buf.advance(next_delimiter_idx + 1);
                             }
                             OversizedAction::Truncate => {
@@ -206,11 +207,10 @@ impl Decoder for CharacterDelimitedDecoder {
                 } else if buf.len() > self.max_length {
                     match self.oversized_action {
                         OversizedAction::Drop => {
-                            warn!(
-                                message = "Discarding frame larger than max_length.",
-                                buf_len = buf.len(),
-                                max_length = self.max_length,
-                            );
+                            emit(DecoderFrameTooLongError {
+                                length: buf.len(),
+                                max_length: self.max_length,
+                            });
                             buf.clear();
                             Ok(None)
                         }
@@ -244,6 +244,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn delimiter_schema_matches_its_ascii_string_representation() {
+        let schema = serde_json::to_value(
+            vector_config::schema::generate_root_schema::<CharacterDelimitedDecoderOptions>()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(schema["properties"]["delimiter"]["type"], "string");
+
+        let input = serde_json::json!({"delimiter": "1"});
+        let options: CharacterDelimitedDecoderOptions =
+            serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(options.delimiter.as_byte(), b'1');
+        assert_eq!(serde_json::to_value(options).unwrap(), input);
+        assert!(
+            serde_json::from_value::<CharacterDelimitedDecoderOptions>(
+                serde_json::json!({"delimiter": 1})
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn decode() {
         let mut codec = CharacterDelimitedDecoder::new(b'\n');
         let buf = &mut BytesMut::new();
@@ -272,6 +294,48 @@ mod tests {
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123456")));
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123")));
         assert_eq!(codec.decode_eof(buf).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_drop_emits_frame_too_long_error() {
+        use vector_core::{
+            event::MetricValue,
+            metrics::{Controller, init_test},
+        };
+
+        init_test();
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', 3);
+        let buf = &mut BytesMut::new();
+
+        // One oversized frame dropped by `decode`, one by `decode_eof`.
+        buf.put_slice(b"toolong\nok\nalsotoolong");
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("ok")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), None);
+
+        let metrics = Controller::get()
+            .expect("There must be a controller")
+            .capture_metrics();
+
+        let errors = metrics
+            .iter()
+            .filter(|metric| metric.name() == "component_errors_total")
+            .collect::<Vec<_>>();
+        assert_eq!(errors.len(), 1);
+        let tags = errors[0].tags().expect("component_errors_total has tags");
+        assert_eq!(tags.get("error_code"), Some("decoder_frame_too_long"));
+        assert_eq!(tags.get("error_type"), Some("parser_failed"));
+        assert_eq!(tags.get("stage"), Some("processing"));
+        let MetricValue::Counter { value } = errors[0].value() else {
+            panic!("component_errors_total has invalid type")
+        };
+        assert!((*value - 2.0).abs() < f64::EPSILON);
+
+        // Frames are dropped before any event exists, so no events are counted as discarded.
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| metric.name() == "component_discarded_events_total")
+        );
     }
 
     // Regression test for [infinite loop bug](https://github.com/vectordotdev/vector/issues/2564)
