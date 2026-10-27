@@ -15,8 +15,14 @@ LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
 LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 
 # we want the latest versions of these
+# Remove the revoked emSign roots C1, C3, and G3 (CVE-2026-111943).
 # hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd libsasl2-2 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd libsasl2-2 && rm -rf /var/lib/apt/lists/* \
+    && sed -i '\|^mozilla/emSign_Root_CA_-_C1\.crt$|d; \|^mozilla/emSign_ECC_Root_CA_-_C3\.crt$|d; \|^mozilla/emSign_ECC_Root_CA_-_G3\.crt$|d' /etc/ca-certificates.conf \
+    && update-ca-certificates --fresh \
+    && openssl storeutl -noout -text -certs /etc/ssl/certs/ca-certificates.crt > /tmp/ca.txt \
+    && ! grep -E 'Subject:.*CN=emSign (Root CA - C1|ECC Root CA - C3|ECC Root CA - G3)$' /tmp/ca.txt \
+    && rm /tmp/ca.txt
 
 COPY --from=builder /usr/bin/vector /usr/bin/vector
 COPY --from=builder /usr/share/vector /usr/share/vector

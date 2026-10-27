@@ -20,8 +20,9 @@ LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
 LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 
 # we want the latest versions of these
+# Use a CA bundle that has the CVE-2026-111943 fix.
 # hadolint ignore=DL3018
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add "ca-certificates-bundle>=20261020-r0" ca-certificates tzdata
 
 COPY --from=builder /vector/bin/* /usr/local/bin/
 COPY --from=builder /vector/config/vector.yaml /usr/share/vector/examples/vector.yaml
