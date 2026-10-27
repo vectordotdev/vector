@@ -2,11 +2,13 @@ use super::{AggregateConfig, AggregationMode};
 
 use std::{
     collections::{BTreeMap, HashMap, hash_map::Entry},
+    num::NonZeroU32,
     pin::Pin,
     time::Duration,
 };
 
 use async_stream::stream;
+use chrono::{DateTime, TimeDelta, Utc};
 use futures::{Stream, StreamExt};
 use vector_lib::event::{
     MetricValue,
@@ -95,6 +97,10 @@ pub struct Aggregate {
         BTreeMap<BucketKey, HashMap<MetricSeries, Vec<MetricEntry>>>,
     pub(crate) watermark: Option<BucketKey>,
     pub(crate) config: AggregateConfig,
+    /// Interval to set on flushed incremental metrics; `Some` only when `set_interval_ms` is enabled.
+    output_interval_ms: Option<NonZeroU32>,
+    /// Start of the next flush window, given to flushed metrics that have no timestamp.
+    next_window_start: Option<DateTime<Utc>>,
 }
 
 /// Upper bound for any millisecond-valued duration field that is later cast
@@ -133,6 +139,27 @@ impl Aggregate {
                 .into());
             }
         }
+        let output_interval_ms = if config.set_interval_ms {
+            // Sinks such as `datadog_metrics` send the interval as whole seconds.
+            if !config.interval_ms.is_multiple_of(1000) {
+                return Err(format!(
+                    "`interval_ms` ({}) must be a whole number of seconds (a multiple of 1000) when `set_interval_ms` is enabled",
+                    config.interval_ms
+                )
+                .into());
+            }
+            let interval_ms = u32::try_from(config.interval_ms).map_err(|_| {
+                format!(
+                    "`interval_ms` ({}) exceeds the maximum supported value of {} ms when `set_interval_ms` is enabled",
+                    config.interval_ms,
+                    u32::MAX
+                )
+            })?;
+            // Non-zero was validated above.
+            NonZeroU32::new(interval_ms)
+        } else {
+            None
+        };
 
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
@@ -143,6 +170,8 @@ impl Aggregate {
             event_time_multi_buckets: BTreeMap::default(),
             watermark: None,
             config: *config,
+            output_interval_ms,
+            next_window_start: None,
         })
     }
 
@@ -339,11 +368,13 @@ impl Aggregate {
         }
     }
     pub fn flush_into(&mut self, output: &mut Vec<Event>) {
+        let start = output.len();
         if self.config.is_event_time() {
             self.flush_event_time_buckets(output, false);
         } else {
             self.flush_system_time(output);
         }
+        self.set_output_interval(&mut output[start..]);
     }
 
     /// Final flush invoked when the input stream closes. In event-time mode
@@ -352,10 +383,46 @@ impl Aggregate {
     /// shutdown or topology reload, matching system-time semantics where
     /// `flush_system_time` always empties `self.map`.
     pub fn flush_final(&mut self, output: &mut Vec<Event>) {
+        let start = output.len();
         if self.config.is_event_time() {
             self.flush_event_time_buckets(output, true);
         } else {
             self.flush_system_time(output);
+        }
+        self.set_output_interval(&mut output[start..]);
+    }
+
+    /// Overwrites `interval_ms` on flushed incremental metrics with the flush interval, so a
+    /// counter aggregated over the window can be read as a rate over that window.
+    ///
+    /// Metrics without a timestamp get the window start. Otherwise a sink that stamps them with
+    /// its send time can give two windows the same timestamp and combine them, so the rate is
+    /// overstated. Windows advance by exactly the interval, so their starts never share a second.
+    fn set_output_interval(&mut self, flushed: &mut [Event]) {
+        let Some(interval_ms) = self.output_interval_ms else {
+            return;
+        };
+        let interval = TimeDelta::milliseconds(i64::from(interval_ms.get()));
+        let window_start = *self
+            .next_window_start
+            .get_or_insert_with(|| Utc::now() - interval);
+        self.next_window_start = Some(window_start + interval);
+        for event in flushed {
+            let metric = event.as_mut_metric();
+            if metric.kind() == MetricKind::Incremental {
+                let time = &mut metric.data_mut().time;
+                time.interval_ms = Some(interval_ms);
+                time.timestamp.get_or_insert(window_start);
+            }
+        }
+    }
+
+    /// Tick `k` of the flush timer fires at `timer_start + k * interval`, so its window starts one
+    /// interval earlier. Anchoring here keeps that true when missed ticks arrive in a burst.
+    fn start_window_timeline(&mut self, timer_start: DateTime<Utc>) {
+        if let Some(interval_ms) = self.output_interval_ms {
+            self.next_window_start =
+                Some(timer_start - TimeDelta::milliseconds(i64::from(interval_ms.get())));
         }
     }
 
@@ -452,9 +519,10 @@ impl TaskTransform<Event> for Aggregate {
     where
         Self: 'static,
     {
-        let mut flush_stream = tokio::time::interval(self.interval);
-
         Box::pin(stream! {
+            // Created on the first poll, so that no ticks are missed before the task runs.
+            let mut flush_stream = tokio::time::interval(self.interval);
+            self.start_window_timeline(Utc::now());
             let mut output = Vec::new();
             let mut done = false;
             while !done {
