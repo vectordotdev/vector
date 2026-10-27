@@ -21,6 +21,7 @@ use vector_lib::{
     spawn_named,
     tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
     trigger::DisabledTrigger,
+    utilization::UtilizationRegistry,
 };
 
 use super::{
@@ -38,7 +39,6 @@ use crate::{
     event::EventArray,
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
-    utilization::UtilizationRegistry,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;

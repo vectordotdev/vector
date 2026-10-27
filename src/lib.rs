@@ -76,7 +76,6 @@ pub mod aws;
 pub mod common;
 pub mod completion;
 mod convert_config;
-pub mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 #[cfg(feature = "gcp")]
@@ -121,7 +120,6 @@ pub mod trace;
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
-pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;

@@ -26,6 +26,8 @@ pub mod config;
 
 pub mod constants;
 
+pub mod cpu_time;
+
 pub mod decompression;
 
 #[cfg(feature = "conversion")]

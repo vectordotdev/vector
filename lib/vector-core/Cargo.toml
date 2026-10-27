@@ -50,9 +50,9 @@ serde_with.workspace = true
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu.workspace = true
 socket2.workspace = true
-tokio = { workspace = true, features = ["net"] }
+tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "time"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
-tokio-stream = { workspace = true, features = ["time"], optional = true }
+tokio-stream = { workspace = true, features = ["time"] }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml.workspace = true
 tonic.workspace = true
@@ -95,11 +95,13 @@ noisy_float = "0.2.1"
 rand.workspace = true
 rand_distr.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
+serial_test.workspace = true
+mock_instant.workspace = true
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]
 default = []
-lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
+lua = ["dep:mlua", "vrl/lua"]
 test = ["vector-common/test", "proptest"]
 # Internal typed trace event (RFC 25329). Off by default until a source, transform, or sink consumes it.
 typed-trace = []
