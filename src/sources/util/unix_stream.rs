@@ -1,4 +1,8 @@
-use std::{fs::remove_file, path::PathBuf, time::Duration};
+use std::{
+    fs::remove_file,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use futures::{FutureExt, StreamExt};
 use smallvec::SmallVec;
@@ -60,9 +64,10 @@ where
     F: Into<SmallVec<[Event; 1]>> + Send,
 {
     Ok(Box::pin(async move {
-        remove_stale_socket(&listen_path, |path| {
-            std::os::unix::net::UnixStream::connect(path).map(drop)
-        });
+        remove_stale_socket(&listen_path, async |path: &Path| {
+            tokio::net::UnixStream::connect(path).await.map(drop)
+        })
+        .await;
         let listener = UnixListener::bind(&listen_path).unwrap_or_else(|e| {
             panic!(
                 "Failed to bind to listener socket at path: {}. Err: {e}",
