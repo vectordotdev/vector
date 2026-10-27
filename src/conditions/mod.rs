@@ -120,8 +120,12 @@ pub enum ConditionConfig {
 }
 
 impl ConditionConfig {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Builds the configured condition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean, or if
+    /// a Datadog Search query contains a field that cannot be parsed as a path.
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -158,8 +162,12 @@ pub trait Conditional: std::fmt::Debug {
 }
 
 pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Builds the condition described by this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Implementations return an error if the configuration cannot be turned into a usable
+    /// condition, such as a source that fails to compile or parse.
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -200,12 +208,17 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
+    /// Builds the condition, treating a plain string as a VRL boolean expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean, or if
+    /// a Datadog Search query contains a field that cannot be parsed as a path.
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(
         clippy::default_trait_access,
         reason = "Preserve inferred default types"
     )]
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -223,8 +236,12 @@ impl AnyCondition {
         }
     }
 
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Checks that the condition can be built, discarding the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a VRL condition fails to compile or does not return a boolean, or if
+    /// a Datadog Search query contains a field that cannot be parsed as a path.
     pub fn validate(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,

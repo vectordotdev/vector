@@ -161,8 +161,11 @@ impl From<RawTestEvent> for TestEvent {
     }
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+/// Encodes a test event into `buf`, using an alternate encoder for events meant to fail encoding.
+///
+/// # Panics
+///
+/// Panics if the event cannot be encoded with the selected encoder.
 pub fn encode_test_event(
     encoder: &mut Encoder<encoding::Framer>,
     buf: &mut BytesMut,

@@ -33,8 +33,11 @@ impl Default for DatadogSearchConfig {
 }
 
 impl DatadogSearchConfig {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Builds a log event matcher from the configured query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a field referenced in the query cannot be parsed as a path.
     pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<LogEvent>>> {
         Ok(build_matcher(&self.source, &EventFilter)?)
     }
