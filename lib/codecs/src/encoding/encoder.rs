@@ -73,9 +73,10 @@ impl BatchEncoder {
     ///
     /// Returns an error if the serializer is Parquet, which only supports the
     /// `tokio_util::codec::Encoder` interface. For Arrow, returns
-    /// `Error::SchemaConstraintViolation` if a non-nullable schema field is missing or null in any
-    /// event, and `Error::SerializingError` if `events` contains no log events, a log event cannot
-    /// be serialized to JSON, or the values cannot be decoded into the schema.
+    /// `Error::SchemaConstraintViolation` if a non-nullable top-level schema field is missing or
+    /// null in a log event, and `Error::SerializingError` if `events` contains no log events, a log
+    /// event cannot be serialized to JSON, or the values cannot be decoded into the schema
+    /// (including null values in non-nullable nested fields).
     pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
         match &self.serializer {
             BatchSerializer::Arrow(serializer) => {
