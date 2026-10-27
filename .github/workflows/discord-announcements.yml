@@ -21,14 +21,15 @@ jobs:
             exit 1
           fi
 
+          # Bound the payload size even when every character uses four UTF-8 bytes.
           jq '{
             username: "Vector Announcements",
             allowed_mentions: {parse: []},
             embeds: [{
-              title: .discussion.title[:256],
+              title: .discussion.title[:128],
               url: .discussion.html_url,
               description: ((.discussion.body // "") |
-                if length > 3500 then .[:3500] + "…" else . end)
+                if length > 1000 then .[:1000] + "…" else . end)
             }]
           }' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/discord-announcement.json"
 
