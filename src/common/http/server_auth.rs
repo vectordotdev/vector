@@ -362,9 +362,9 @@ impl HttpServerAuthMatcher {
     ///
     /// # Errors
     ///
-    /// Returns an [`ErrorMessage`] with status `401 Unauthorized` if the `Authorization` header
-    /// is missing or does not match, or if the VRL program fails at runtime, returns `false`, or
-    /// returns a non-boolean value.
+    /// Returns an [`ErrorMessage`] with status `401 Unauthorized` if an `AuthHeader` matcher finds
+    /// the `Authorization` header missing or not matching, or if a `Vrl` matcher's program fails at
+    /// runtime, returns `false`, or returns a non-boolean value.
     pub fn handle_auth(
         &self,
         address: Option<&SocketAddr>,
