@@ -1659,8 +1659,218 @@ async fn decode_traces_empty_tracer_payloads_emits_error() {
     .await;
 }
 
+fn idx_strings(values: &[&str]) -> Vec<String> {
+    std::iter::once(String::new())
+        .chain(values.iter().map(|value| (*value).to_owned()))
+        .collect()
+}
+
+fn idx_ref(values: &[&str], value: &str) -> u32 {
+    u32::try_from(
+        values
+            .iter()
+            .position(|candidate| *candidate == value)
+            .unwrap()
+            + 1,
+    )
+    .unwrap()
+}
+
+fn idx_only_agent_payload() -> ddtrace_proto::AgentPayload {
+    let names = [
+        "an_id",
+        "plop",
+        "a_service",
+        "a_name",
+        "a_resource",
+        "a_type",
+    ];
+    ddtrace_proto::AgentPayload {
+        host_name: "a_hostname".to_owned(),
+        env: "env".to_owned(),
+        agent_version: "v1.23456".to_owned(),
+        target_tps: 10.0,
+        error_tps: 10.0,
+        idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload {
+            strings: idx_strings(&names),
+            container_id_ref: idx_ref(&names, "an_id"),
+            language_name_ref: idx_ref(&names, "plop"),
+            chunks: vec![ddtrace_proto::idx::TraceChunk {
+                priority: 42,
+                trace_id: ddtrace_proto::idx::join_trace_id(0, 123).to_vec(),
+                spans: vec![ddtrace_proto::idx::Span {
+                    service_ref: idx_ref(&names, "a_service"),
+                    name_ref: idx_ref(&names, "a_name"),
+                    resource_ref: idx_ref(&names, "a_resource"),
+                    type_ref: idx_ref(&names, "a_type"),
+                    span_id: 456,
+                    parent_id: 789,
+                    start: 1_431_648_000_000_001,
+                    duration: 1_000_000_000,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+}
+
 #[tokio::test]
-async fn decode_traces_idx_only_payload_emits_error() {
+async fn decode_traces_idx_only_payload() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let mut buf = Vec::new();
+        idx_only_agent_payload().encode(&mut buf).unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH)
+                        .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        let start = Value::from(Utc.timestamp_nanos(1_431_648_000_000_001));
+        assert_eq!(
+            events[0].metadata().trace_layout(),
+            Some(TraceLayout::Datadog)
+        );
+        assert_eq!(
+            events[0].metadata().datadog_api_key().as_deref().unwrap(),
+            DD_API_KEY
+        );
+        assert_eq!(
+            Value::Object(events[0].as_trace().as_map().clone()),
+            value!({
+                "host": "a_hostname",
+                "env": "env",
+                "source_type": "datadog_agent",
+                "payload_version": "v2",
+                "agent_version": "v1.23456",
+                "target_tps": 10.0,
+                "error_tps": 10.0,
+                "priority": 42,
+                "origin": "",
+                "dropped": false,
+                "tags": {},
+                "container_id": "an_id",
+                "language_name": "plop",
+                "language_version": "",
+                "tracer_version": "",
+                "runtime_id": "",
+                "app_version": "",
+                "spans": [{
+                    "service": "a_service",
+                    "name": "a_name",
+                    "resource": "a_resource",
+                    "trace_id": 123,
+                    "span_id": 456,
+                    "parent_id": 789,
+                    "start": start,
+                    "duration": 1_000_000_000,
+                    "error": 0,
+                    "meta": {},
+                    "metrics": {},
+                    "type": "a_type",
+                    "meta_struct": {},
+                    "span_links": [],
+                    "span_events": []
+                }]
+            })
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_legacy_and_idx_payloads() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let names = ["idx-service"];
+        let mut buf = Vec::new();
+        ddtrace_proto::AgentPayload {
+            tracer_payloads: vec![ddtrace_proto::TracerPayload {
+                chunks: vec![ddtrace_proto::TraceChunk {
+                    spans: vec![ddtrace_proto::Span {
+                        service: "legacy-service".to_owned(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload {
+                strings: idx_strings(&names),
+                chunks: vec![ddtrace_proto::idx::TraceChunk {
+                    spans: vec![ddtrace_proto::idx::Span {
+                        service_ref: idx_ref(&names, "idx-service"),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode(&mut buf)
+        .unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH)
+                        .await
+                );
+            },
+            rx,
+            2,
+        )
+        .await;
+
+        let service = |event: &crate::event::Event| {
+            event.as_trace().as_map()["spans"].as_array().unwrap()[0]
+                .as_object()
+                .unwrap()
+                .get("service")
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(service(&events[0]), Value::from("legacy-service"));
+        assert_eq!(service(&events[1]), Value::from("idx-service"));
+        assert_eq!(
+            events[0]
+                .as_trace()
+                .as_map()
+                .get("payload_version")
+                .unwrap(),
+            &Value::from("v2")
+        );
+        assert_eq!(
+            events[1]
+                .as_trace()
+                .as_map()
+                .get("payload_version")
+                .unwrap(),
+            &Value::from("v2")
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_idx_bad_string_ref_is_rejected() {
     crate::test_util::components::init_test();
     assert_source_error(&COMPONENT_ERROR_TAGS, async {
         let (rx, _, _, addr, _guard) =
@@ -1668,14 +1878,24 @@ async fn decode_traces_idx_only_payload_emits_error() {
 
         let mut buf = Vec::new();
         ddtrace_proto::AgentPayload {
-            idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload::default()],
+            idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload {
+                strings: vec![String::new()],
+                chunks: vec![ddtrace_proto::idx::TraceChunk {
+                    spans: vec![ddtrace_proto::idx::Span {
+                        service_ref: 1,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
             ..Default::default()
         }
         .encode(&mut buf)
         .unwrap();
 
         assert_eq!(
-            200,
+            422,
             send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH).await
         );
 
@@ -1684,11 +1904,11 @@ async fn decode_traces_idx_only_payload_emits_error() {
 
         let metrics = Controller::get().unwrap().capture_metrics();
         assert!(
-            metrics.iter().any(|m| {
-                m.name() == "component_errors_total"
-                    && m.tag_matches("error_code", "idx_tracer_payloads")
+            metrics.iter().any(|metric| {
+                metric.name() == "component_errors_total"
+                    && metric.tag_matches("error_code", "idx_invalid_string_ref")
             }),
-            "expected component_errors_total with error_code=idx_tracer_payloads"
+            "expected component_errors_total with error_code=idx_invalid_string_ref"
         );
     })
     .await;

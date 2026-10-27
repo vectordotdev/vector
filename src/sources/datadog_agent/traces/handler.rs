@@ -14,15 +14,20 @@ use vector_lib::{
 use vrl::event_path;
 use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto};
+use super::{
+    super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, TRACES, ddtrace_proto},
+    idx::convert_idx_tracer_payload,
+};
 use crate::{
     common::{datadog::encode_u64_id_hex, http::ErrorMessage},
     event::{Event, ObjectMap, TraceEvent, Value},
-    internal_events::DatadogAgentUnsupportedTracePayloadError,
+    internal_events::{
+        DatadogAgentInvalidIdxStringRefError, DatadogAgentUnsupportedTracePayloadError,
+    },
     sources::util::http::capped_body,
 };
 
-pub(super) fn build_warp_filter(
+pub(in crate::sources::datadog_agent) fn build_warp_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
@@ -54,11 +59,10 @@ fn build_trace_filter(
                     .and_then(|body| {
                         handle_dd_trace_payload(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            source
+                                .api_key_extractor
+                                .extract(path.as_str(), api_token, query_params.dd_api_key)
+                                .as_ref(),
                             &source,
                         )
                         .map_err(|error| {
@@ -68,7 +72,7 @@ fn build_trace_filter(
                             )
                         })
                     });
-                handler.clone().handle_request(events, super::TRACES)
+                handler.clone().handle_request(events, TRACES)
             }
         })
         .boxed()
@@ -86,95 +90,103 @@ fn build_stats_filter() -> BoxedFilter<(Response,)> {
         .boxed()
 }
 
+struct AgentTraceFields<'a> {
+    env: &'a str,
+    hostname: &'a str,
+    agent_version: &'a str,
+    target_tps: f64,
+    error_tps: f64,
+    tags: &'a ObjectMap,
+}
+
 fn handle_dd_trace_payload(
     frame: Bytes,
-    api_key: Option<Arc<str>>,
+    api_key: Option<&Arc<str>>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
     let decoded_payload = ddtrace_proto::AgentPayload::decode(frame)?;
-    if !decoded_payload.idx_tracer_payloads.is_empty() {
+    if decoded_payload.tracer_payloads.is_empty() && decoded_payload.idx_tracer_payloads.is_empty()
+    {
         emit!(DatadogAgentUnsupportedTracePayloadError {
-            error_code: "idx_tracer_payloads",
+            error_code: "empty_tracer_payloads",
         });
-    }
-    if decoded_payload.tracer_payloads.is_empty() {
-        if decoded_payload.idx_tracer_payloads.is_empty() {
-            emit!(DatadogAgentUnsupportedTracePayloadError {
-                error_code: "empty_tracer_payloads",
-            });
-        }
         return Ok(Vec::new());
     }
-    handle_dd_trace_payload_v1(decoded_payload, api_key, source)
-}
 
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Request handlers own payload and token values at this boundary."
-)]
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
-)]
-fn handle_dd_trace_payload_v1(
-    decoded_payload: ddtrace_proto::AgentPayload,
-    api_key: Option<Arc<str>>,
-    source: &DatadogAgentSource,
-) -> crate::Result<Vec<Event>> {
-    let env = decoded_payload.env;
-    let hostname = decoded_payload.host_name;
-    let agent_version = decoded_payload.agent_version;
-    let target_tps = decoded_payload.target_tps;
-    let error_tps = decoded_payload.error_tps;
-    let tags = convert_tags(decoded_payload.tags);
-
-    let trace_events: Vec<TraceEvent> = decoded_payload
+    let mut trace_events: Vec<TraceEvent> = decoded_payload
         .tracer_payloads
         .into_iter()
         .flat_map(convert_dd_tracer_payload)
         .collect();
+    for payload in decoded_payload.idx_tracer_payloads {
+        match convert_idx_tracer_payload(payload) {
+            Ok(events) => trace_events.extend(events),
+            Err(error) => {
+                emit!(DatadogAgentInvalidIdxStringRefError { index: error.index });
+                return Err(error.into());
+            }
+        }
+    }
 
     source.events_received.emit(CountByteSize(
         trace_events.len(),
         trace_events.estimated_json_encoded_size_of(),
     ));
 
-    let enriched_events = trace_events
+    let tags = convert_tags(decoded_payload.tags);
+    let fields = AgentTraceFields {
+        env: &decoded_payload.env,
+        hostname: &decoded_payload.host_name,
+        agent_version: &decoded_payload.agent_version,
+        target_tps: decoded_payload.target_tps,
+        error_tps: decoded_payload.error_tps,
+        tags: &tags,
+    };
+    Ok(trace_events
         .into_iter()
-        .map(|mut trace_event| {
-            if let Some(k) = &api_key {
-                trace_event
-                    .metadata_mut()
-                    .set_datadog_api_key(Arc::clone(k));
-            }
-            trace_event.insert(
-                &source.log_schema_source_type_key,
-                Value::from_static_str("datadog_agent"),
-            );
-            trace_event.insert(event_path!("payload_version"), "v2".to_string());
-            trace_event.insert(&source.log_schema_host_key, hostname.clone());
-            trace_event.insert(event_path!("env"), env.clone());
-            trace_event.insert(event_path!("agent_version"), agent_version.clone());
-            trace_event.insert(
-                event_path!("target_tps"),
-                Value::Float(NotNan::new(target_tps).expect("target_tps cannot be Nan")),
-            );
-            trace_event.insert(
-                event_path!("error_tps"),
-                Value::Float(NotNan::new(error_tps).expect("error_tps cannot be Nan")),
-            );
-            if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
-                span_tags.extend(tags.clone());
-            } else {
-                trace_event.insert(event_path!("tags"), Value::from(tags.clone()));
-            }
-            Event::Trace(trace_event)
-        })
-        .collect();
-    Ok(enriched_events)
+        .map(|trace_event| enrich_trace_event(trace_event, api_key, source, &fields))
+        .collect())
 }
 
-fn new_trace_event() -> TraceEvent {
+fn enrich_trace_event(
+    mut trace_event: TraceEvent,
+    api_key: Option<&Arc<str>>,
+    source: &DatadogAgentSource,
+    fields: &AgentTraceFields<'_>,
+) -> Event {
+    if let Some(key) = api_key {
+        trace_event
+            .metadata_mut()
+            .set_datadog_api_key(Arc::clone(key));
+    }
+    trace_event.insert(
+        &source.log_schema_source_type_key,
+        Value::from_static_str("datadog_agent"),
+    );
+    trace_event.insert(event_path!("payload_version"), "v2".to_string());
+    trace_event.insert(&source.log_schema_host_key, fields.hostname.to_owned());
+    trace_event.insert(event_path!("env"), fields.env.to_owned());
+    trace_event.insert(
+        event_path!("agent_version"),
+        fields.agent_version.to_owned(),
+    );
+    trace_event.insert(
+        event_path!("target_tps"),
+        Value::Float(NotNan::new(fields.target_tps).expect("target_tps cannot be Nan")),
+    );
+    trace_event.insert(
+        event_path!("error_tps"),
+        Value::Float(NotNan::new(fields.error_tps).expect("error_tps cannot be Nan")),
+    );
+    if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
+        span_tags.extend(fields.tags.clone());
+    } else {
+        trace_event.insert(event_path!("tags"), Value::from(fields.tags.clone()));
+    }
+    Event::Trace(trace_event)
+}
+
+pub(super) fn new_trace_event() -> TraceEvent {
     let mut trace_event = TraceEvent::default();
     trace_event
         .metadata_mut()
@@ -182,7 +194,7 @@ fn new_trace_event() -> TraceEvent {
     trace_event
 }
 
-fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<TraceEvent> {
+pub(super) fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<TraceEvent> {
     let tags = convert_tags(payload.tags);
     payload
         .chunks
@@ -201,7 +213,7 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
                 trace
                     .spans
                     .into_iter()
-                    .map(|s| Value::from(convert_span(s)))
+                    .map(|span| Value::from(convert_span(span)))
                     .collect::<Vec<Value>>(),
             );
 
@@ -252,7 +264,12 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| (k.into(), NotNan::new(v).map_or(Value::Null, Value::Float)))
+                .map(|(key, value)| {
+                    (
+                        key.into(),
+                        NotNan::new(value).map_or(Value::Null, Value::Float),
+                    )
+                })
                 .collect::<ObjectMap>(),
         ),
     );
@@ -263,7 +280,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
             dd_span
                 .meta_struct
                 .into_iter()
-                .map(|(k, v)| (k.into(), Value::from(bytes::Bytes::from(v))))
+                .map(|(key, value)| (key.into(), Value::from(bytes::Bytes::from(value))))
                 .collect::<ObjectMap>(),
         ),
     );
@@ -331,7 +348,7 @@ fn convert_span_event(event: ddtrace_proto::SpanEvent) -> ObjectMap {
                 event
                     .attributes
                     .into_iter()
-                    .map(|(k, v)| (k.into(), convert_attribute_any_value(v)))
+                    .map(|(key, value)| (key.into(), convert_attribute_any_value(value)))
                     .collect::<ObjectMap>(),
             ),
         ),
@@ -383,6 +400,6 @@ fn convert_attribute_array_value(value: ddtrace_proto::AttributeArrayValue) -> V
 fn convert_tags(original_map: BTreeMap<String, String>) -> ObjectMap {
     original_map
         .into_iter()
-        .map(|(k, v)| (k.into(), Value::from(v)))
+        .map(|(key, value)| (key.into(), Value::from(value)))
         .collect::<ObjectMap>()
 }
