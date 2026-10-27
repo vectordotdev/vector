@@ -37,6 +37,7 @@ use vector_lib::{
     latency::LatencyRecorder,
     schema::Definition,
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
+    spawn_named,
     transform::update_runtime_schema_definition,
 };
 use vector_lib::{gauge, internal_event::GaugeName};
@@ -59,7 +60,6 @@ use crate::{
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     utilization::{
@@ -121,7 +121,7 @@ pub(crate) fn set_ready_array_capacity(size: usize) {
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads().map_or_else(crate::num_threads, NonZeroUsize::get)
+    crate::app::worker_threads().map_or_else(vector_lib::num_threads, NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
