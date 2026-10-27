@@ -115,7 +115,7 @@ where
     /// # Panics
     ///
     /// Panics if the validated state is missing because the sink was not validated during
-    /// config compilation, or if the validated state was produced by a different sink type.
+    /// config compilation, or if its type does not match the sink's expected validated state type.
     pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let validated = self
             .validated
