@@ -523,9 +523,6 @@ jobs:
           path: target/artifacts
           merge-multiple: true
       - name: Publish artifacts to S3
-        env:
-          LEGACY_AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
-          LEGACY_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
         run: make release-s3
 
   publish-github:
