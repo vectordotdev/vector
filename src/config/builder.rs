@@ -136,10 +136,8 @@ impl ConfigBuilder {
     ///
     /// # Errors
     ///
-    /// Returns the compilation error messages if component names are invalid, a component's
-    /// shape, resources, outputs, or values fail validation, the component graph has
-    /// ambiguous output names, unresolved inputs, type mismatches, or cycles, a test
-    /// references outputs that do not exist, or a sink fails validation.
+    /// Returns the compilation error messages if the configuration fails to compile. See
+    /// [`Self::build_with_warnings`] for the specific errors.
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
