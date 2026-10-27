@@ -3,10 +3,15 @@
 # Checks for security vulnerabilities or license incompatibilities
 #
 # Runs on:
-#  - scheduled UTC midnight
-#  - on PR review (see comment-trigger.yml)
+#  - scheduled daily at 05:00 UTC
+#  - on PR review (see ci-review-trigger.yml)
 #  - on demand from github actions UI
 #  - on pull requests when Cargo.toml or Cargo.lock files change
+#  - in the merge queue
+#
+# Pull requests and merge queue runs only fail on cargo deny errors that the base revision does not
+# also have, so a new advisory for an existing dependency does not fail every PR. The scheduled run
+# reports those.
 
 name: Deny - Linux
 
@@ -29,8 +34,7 @@ on:
   merge_group:
     types: [checks_requested]
   schedule:
-    # Same schedule as nightly.yml
-    - cron: "0 5 * * 2-6" # Runs at 5:00 AM UTC, Tuesday through Saturday
+    - cron: "0 5 * * *" # Runs daily at 5:00 AM UTC
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
@@ -48,7 +52,13 @@ jobs:
   test-deny:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
+    env:
+      # Only set for pull requests and merge queue runs.
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+    if: &deny_gate >-
+      always() &&
+      (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') &&
+      (github.event_name != 'schedule' || github.repository == 'vectordotdev/vector')
     needs: [changes]
     steps:
       - name: Checkout branch
@@ -56,18 +66,32 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Checkout base
+        if: env.BASE_SHA != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: base
+          persist-credentials: false
+
       - uses: ./.github/actions/setup
         with:
           mold: false
           cargo-deny: true
 
       - name: Check cargo deny (all)
+        if: env.BASE_SHA == ''
         run: make check-deny
+
+      - name: Check cargo deny (new errors compared to base)
+        if: env.BASE_SHA != ''
+        # Runs `cargo deny` of this branch on the base.
+        run: vdev check deny --base-dir base
 
   test-deny-licenses:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: ${{ always() && (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') }}
+    if: *deny_gate
     needs: [changes]
     steps:
       - name: Checkout branch

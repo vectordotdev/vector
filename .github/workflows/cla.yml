@@ -12,7 +12,9 @@ permissions:
 
 jobs:
   CLAAssistant:
-    runs-on: ubuntu-latest
+    # Signatures are stored in DataDog/cla-signatures via an STS token only upstream can obtain.
+    if: ${{ github.repository == 'vectordotdev/vector' }}
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: write # Required to comment on PRs
       id-token: write # Required to federate tokens with dd-octo-sts-action
@@ -41,7 +43,7 @@ jobs:
           branch: "vector"
           remote-repository-name: cla-signatures
           remote-organization-name: DataDog
-          allowlist: step-security-bot
+          allowlist: step-security-bot,datadog-bits
 
           custom-notsigned-prcomment: |
             Thank you for your contribution! Before we can merge this PR, please sign our [Contributor License Agreement](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618).

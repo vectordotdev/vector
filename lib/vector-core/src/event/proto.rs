@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::{MetricTags, WithMetadata};
 use crate::{event, metrics::AgentDDSketch};
 
-#[allow(warnings, clippy::all, clippy::pedantic)]
+#[allow(warnings, clippy::all)]
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
@@ -17,7 +17,7 @@ pub use proto_event::*;
 use vrl::value::{ObjectMap, Value as VrlValue};
 
 use super::EventFinalizers;
-use super::metadata::{Inner, default_schema_definition};
+use super::metadata::Inner;
 use super::ser::DecodeError;
 use super::{EventMetadata, array, metric::MetricSketch};
 
@@ -189,7 +189,8 @@ impl TryFrom<MetricValue> for super::MetricValue {
             MetricValue::AggregatedHistogram3(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
-                sum: hist.sum,
+                // `f64` cannot express an unreported sum, so it reads as zero.
+                sum: if hist.sum_missing { 0.0 } else { hist.sum },
             },
             MetricValue::AggregatedSummary1(summary) => Self::AggregatedSummary {
                 quantiles: super::metric::zip_quantiles(summary.quantiles, summary.values),
@@ -389,6 +390,7 @@ impl From<super::MetricValue> for MetricValue {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
                 sum,
+                sum_missing: false,
             }),
             super::MetricValue::AggregatedSummary {
                 quantiles,
@@ -595,6 +597,7 @@ impl From<Secrets> for super::metadata::Secrets {
 impl From<super::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
     fn from(value: super::DatadogMetricOriginMetadata) -> Self {
         Self {
+            metric_type: value.metric_type(),
             origin_product: value.product(),
             origin_category: value.category(),
             origin_service: value.service(),
@@ -609,6 +612,7 @@ impl From<DatadogOriginMetadata> for super::DatadogMetricOriginMetadata {
             value.origin_category,
             value.origin_service,
         )
+        .with_metric_type(value.metric_type)
     }
 }
 
@@ -636,6 +640,7 @@ impl From<EventMetadata> for Metadata {
             source_type,
             upstream_id,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
             trace_layout,
             ..
@@ -651,6 +656,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
+            datadog_metric_unit: datadog_metric_unit.map(|unit| unit.to_string()),
             trace_layout: encode_trace_layout(trace_layout),
         }
     }
@@ -667,6 +673,7 @@ impl TryFrom<Metadata> for EventMetadata {
             upstream_id,
             secrets,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
             trace_layout,
         } = value;
@@ -704,9 +711,10 @@ impl TryFrom<Metadata> for EventMetadata {
                 source_id,
                 source_type: source_type.map(Into::into),
                 upstream_id,
-                schema_definition: default_schema_definition(),
+                schema_definition: None,
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
+                datadog_metric_unit: datadog_metric_unit.map(Arc::from),
                 trace_layout: decode_trace_layout(trace_layout),
                 source_event_id,
             }),
@@ -807,6 +815,7 @@ fn encode_value(value: super::Value) -> Value {
     Value {
         kind: match value {
             super::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
+            super::Value::String(s) => Some(value::Kind::RawBytes(s.into_bytes())),
             super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
             super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
@@ -947,6 +956,51 @@ mod tests {
         assert_eq!(decoded, expected);
     }
 
+    /// Newer encoders set `sum_missing` on a histogram that reported no sum. `f64` cannot hold an
+    /// absent sum, so it must decode as zero whatever `sum` carries.
+    #[test]
+    fn decodes_histogram_marked_sum_missing_as_zero() {
+        let value = MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
+            buckets: vec![HistogramBucket3 {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum: 7.0,
+            sum_missing: true,
+        });
+
+        assert_eq!(
+            EventMetricValue::try_from(value).expect("marked histogram should decode"),
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
+                    count: 2,
+                }],
+                count: 2,
+                sum: 0.0,
+            }
+        );
+    }
+
+    /// A reported sum of zero must not be mistaken for a missing one.
+    #[test]
+    fn encodes_reported_zero_sum_without_marker() {
+        let value = MetricValue::from(EventMetricValue::AggregatedHistogram {
+            buckets: vec![metric::Bucket {
+                upper_limit: 1.5,
+                count: 2,
+            }],
+            count: 2,
+            sum: 0.0,
+        });
+
+        let MetricValue::AggregatedHistogram3(hist) = value else {
+            panic!("expected AggregatedHistogram3, got {value:?}");
+        };
+        assert!(!hist.sum_missing);
+    }
+
     #[test]
     fn decodes_pre_v27_single_valued_metric_tags() {
         let encoded = Metric::decode(PRE_V27_TAGS).unwrap();
@@ -1080,6 +1134,17 @@ mod tests {
             crate::event::Metric::try_from(proto),
             Err(DecodeError::MismatchedSketchBins)
         );
+    }
+
+    #[test]
+    fn strings_preserve_bytes_wire_encoding() {
+        let string = VrlValue::from("café\n");
+        let bytes = VrlValue::Bytes("café\n".into());
+        let encoded = encode_value(string.clone());
+        assert_eq!(encoded.encode_to_vec(), encode_value(bytes).encode_to_vec());
+        let decoded = decode_value(encoded).unwrap().unwrap();
+        assert!(matches!(decoded, VrlValue::Bytes(_)));
+        assert_eq!(decoded, string);
     }
 
     #[test]

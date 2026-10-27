@@ -180,7 +180,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
                     error,
                     field: Some("process"),
                     drop_event: false,
-                })
+                });
             })
             .ok()
             .unwrap_or_else(|| String::from("vector"));

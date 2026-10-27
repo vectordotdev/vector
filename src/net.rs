@@ -56,13 +56,14 @@ pub fn set_keepalive(socket: &TcpStream, ttl: Duration) -> io::Result<()> {
 const SSL_R_PROTOCOL_IS_SHUTDOWN: std::ffi::c_int = 207;
 
 /// Returns true when an `io::Error` represents a peer-initiated, graceful TLS
-/// shutdown (close_notify), rather than a real I/O failure.
+/// shutdown (`close_notify`), rather than a real I/O failure.
 ///
 /// Two cases are recognized:
 /// - `SSL_ERROR_ZERO_RETURN`: the peer sent `close_notify` and we observed it
 ///   during this I/O call.
 /// - `SSL_R_PROTOCOL_IS_SHUTDOWN`: a subsequent write after the session was
 ///   already shut down ("ssl session has been shut down").
+#[must_use]
 pub fn is_graceful_tls_shutdown(err: &io::Error) -> bool {
     let Some(ssl) = err
         .get_ref()

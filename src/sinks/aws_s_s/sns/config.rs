@@ -4,7 +4,7 @@ use aws_sdk_sns::Client as SnsClient;
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SnsMessagePublisher,
+    BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SnsMessagePublisher, is_fifo,
     message_deduplication_id, message_group_id,
 };
 use crate::{
@@ -42,10 +42,10 @@ pub(super) struct SnsSinkConfig {
 impl GenerateConfig for SnsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic
+            r"topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic
             region: us-east-2
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -96,8 +96,8 @@ impl ValidatedSink for SnsSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedSnsSink> {
         let message_group_id = message_group_id(
-            self.base_config.message_group_id.clone(),
-            self.topic_arn.ends_with(".fifo"),
+            self.base_config.message_group_id.as_deref(),
+            is_fifo(&self.topic_arn),
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
@@ -121,9 +121,9 @@ impl ValidatedSink for SnsSinkConfig {
         let request_builder = SSRequestBuilder::new(
             validated.message_group_id.clone(),
             validated.message_deduplication_id.clone(),
-            self.base_config.encoding.clone(),
+            &self.base_config.encoding,
         )?;
-        let sink = SSSink::new(request_builder, self.base_config.request, publisher)?;
+        let sink = SSSink::new(request_builder, self.base_config.request, publisher);
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
             healthcheck,
@@ -154,6 +154,7 @@ pub(super) async fn healthcheck(client: SnsClient, topic_arn: String) -> crate::
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
     use vector_lib::codecs::TextSerializerConfig;
 
     fn test_config(topic_arn: &str) -> SnsSinkConfig {
@@ -164,11 +165,11 @@ mod tests {
                 encoding: TextSerializerConfig::default().into(),
                 message_group_id: None,
                 message_deduplication_id: None,
-                request: Default::default(),
-                tls: Default::default(),
+                request: TowerRequestConfig::default(),
+                tls: None,
                 assume_role: None,
-                auth: Default::default(),
-                acknowledgements: Default::default(),
+                auth: AwsAuthentication::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
             },
         }
     }

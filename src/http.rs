@@ -9,13 +9,11 @@ use std::{
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
-#[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
 use http::{
     HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
     uri::InvalidUri,
 };
-#[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
 use http_1::Request as RequestV1;
 use hyper::{
     body::{Body, HttpBody},
@@ -24,7 +22,6 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use rand::RngExt;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
@@ -69,6 +66,7 @@ pub enum HttpError {
 }
 
 impl HttpError {
+    #[must_use]
     pub const fn is_retriable(&self) -> bool {
         match self {
             HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
@@ -101,6 +99,8 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -108,6 +108,8 @@ where
         HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -215,6 +217,9 @@ fn default_user_agent() -> HeaderValue {
         .expect("Invalid header value for user-agent!")
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
@@ -264,6 +269,8 @@ pub fn build_proxy_connector(
     Ok(proxy)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn build_tls_connector(
     tls_settings: MaybeTlsSettings,
 ) -> Result<HttpsConnector<HttpConnector>, HttpError> {
@@ -310,6 +317,11 @@ fn tls_proxy_authority(url: Option<&str>) -> Option<(String, Option<u16>)> {
 /// Build an HTTPS connector, skipping the `tls.server_name` override for connections to one of
 /// `proxy_authorities`. The override must only apply to the upstream destination; applying it to a
 /// proxy connection would verify the proxy certificate against the destination name.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn build_https_connector(
     tls_settings: MaybeTlsSettings,
     proxy_authorities: TlsProxyAuthorities,
@@ -378,6 +390,8 @@ impl<B, C: Clone> Clone for HttpClient<B, C> {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_fields_in_debug, reason = "Preserve diagnostic fields")]
 impl<B, C> fmt::Debug for HttpClient<B, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HttpClient")
@@ -415,7 +429,7 @@ pub enum Auth {
 
     /// Bearer authentication.
     ///
-    /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
+    /// The bearer token value (OAuth 2.0, JWT, etc.) is passed as-is.
     Bearer {
         /// The bearer authentication token.
         token: SensitiveString,
@@ -441,6 +455,8 @@ pub enum Auth {
 }
 
 pub trait MaybeAuth: Sized {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn choose_one(&self, other: &Self) -> crate::Result<Self>;
 }
 
@@ -456,19 +472,18 @@ impl MaybeAuth for Option<Auth> {
 
 impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
-        self.apply_headers_map(req.headers_mut())
+        self.apply_headers_map(req.headers_mut());
     }
 
     pub fn apply_builder(&self, mut builder: Builder) -> Builder {
         if let Some(map) = builder.headers_mut() {
-            self.apply_headers_map(map)
+            self.apply_headers_map(map);
         }
         builder
     }
 
-    #[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
-    pub(crate) fn apply_v1<B>(&self, request: &mut RequestV1<B>) {
-        self.apply_headers_map_v1(request.headers_mut())
+    pub fn apply_v1<B>(&self, request: &mut RequestV1<B>) {
+        self.apply_headers_map_v1(request.headers_mut());
     }
 
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
@@ -489,7 +504,7 @@ impl Auth {
                         map.insert(http::header::AUTHORIZATION, header_val);
                     }
                     Err(error) => {
-                        error!(message = "Invalid custom auth header value.", value = %value, %error)
+                        error!(message = "Invalid custom auth header value.", value = %value, %error);
                     }
                 }
             }
@@ -498,7 +513,6 @@ impl Auth {
         }
     }
 
-    #[cfg(any(feature = "sinks-clickhouse", feature = "sinks-greptimedb_logs", test))]
     fn apply_headers_map_v1(&self, map: &mut http_1::HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
@@ -517,7 +531,7 @@ impl Auth {
                         map.insert(http_1::header::AUTHORIZATION, header_val);
                     }
                     Err(error) => {
-                        error!(message = "Invalid custom auth header value.", value = %value, %error)
+                        error!(message = "Invalid custom auth header value.", value = %value, %error);
                     }
                 }
             }
@@ -527,6 +541,8 @@ impl Auth {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
     // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
     // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
@@ -541,9 +557,10 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
     })
 }
 
-/// Builds a [TraceLayer] configured for a HTTP server.
+/// Builds a [`TraceLayer`] configured for a HTTP server.
 ///
 /// This layer emits HTTP specific telemetry for requests received, responses sent, and handler duration.
+#[must_use]
 pub fn build_http_trace_layer<T, U>(
     span: Span,
 ) -> TraceLayer<
@@ -615,6 +632,11 @@ pub struct KeepaliveConfig {
     pub tcp_keepalive: Option<TcpKeepaliveConfig>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve return type and caller contracts"
+)]
 const fn default_max_connection_age() -> Option<u64> {
     Some(300) // 5 minutes
 }
@@ -649,21 +671,13 @@ pub struct MaxConnectionAgeLayer {
 }
 
 impl MaxConnectionAgeLayer {
+    #[must_use]
     pub fn new(max_connection_age: Duration, jitter_factor: f64, peer_addr: SocketAddr) -> Self {
         Self {
             start_reference: Instant::now(),
-            max_connection_age: Self::jittered_duration(max_connection_age, jitter_factor),
+            max_connection_age: vector_http::jittered_duration(max_connection_age, jitter_factor),
             peer_addr,
         }
-    }
-
-    fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
-        // Ensure the jitter_factor is between 0.0 and 1.0
-        let jitter_factor = jitter_factor.clamp(0.0, 1.0);
-        // Generate a random jitter factor between `1 - jitter_factor`` and `1 + jitter_factor`.
-        let mut rng = rand::rng();
-        let random_jitter_factor = rng.random_range(-jitter_factor..=jitter_factor) + 1.;
-        duration.mul_f64(random_jitter_factor)
     }
 }
 
@@ -717,6 +731,8 @@ where
         self.service.poll_ready(cx)
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let start_reference = self.start_reference;
         let max_connection_age = self.max_connection_age;
@@ -796,6 +812,7 @@ pub enum ParameterValue {
 
 impl ParameterValue {
     /// Returns true if the parameter is a VRL expression.
+    #[must_use]
     pub const fn is_vrl(&self) -> bool {
         match self {
             ParameterValue::String(_) => false,
@@ -804,6 +821,7 @@ impl ParameterValue {
     }
 
     /// Returns the raw string value of the parameter.
+    #[must_use]
     pub const fn value(&self) -> &str {
         match self {
             ParameterValue::String(value) | ParameterValue::Typed { value, .. } => value.as_str(),
@@ -811,6 +829,7 @@ impl ParameterValue {
     }
 
     /// Consumes the `ParameterValue` and returns the owned raw string value.
+    #[must_use]
     pub fn into_value(self) -> String {
         match self {
             ParameterValue::String(s) => s,
@@ -861,7 +880,7 @@ impl IntoIterator for QueryParameterValue {
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
-pub(crate) mod client_v1;
+pub mod client_v1;
 
 #[cfg(test)]
 mod transport_tests;
@@ -978,7 +997,7 @@ mod tests {
         #[test]
         fn test_jittered_duration(duration_in_secs in 0u64..120, jitter_factor in 0.0..1.0) {
             let duration = Duration::from_secs(duration_in_secs);
-            let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
+            let jittered_duration = vector_http::jittered_duration(duration, jitter_factor);
 
             // Check properties based on the range of inputs
             if jitter_factor == 0.0 {

@@ -216,14 +216,6 @@ various channels.
 
 #### Testing
 
-##### Skipping tests
-
-Tests are run for all changes except those that have the label:
-
-```text
-ci-condition: skip
-```
-
 ##### Daily tests
 
 Some long-running tests are only run daily, rather than on every pull request.

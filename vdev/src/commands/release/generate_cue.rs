@@ -14,9 +14,9 @@ use serde_json::json;
 use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
 
-const RELEASES_DIR: &str = "website/cue/reference/releases";
+pub(super) const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
-const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
+pub(super) const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum PullRequestMetadata {
@@ -705,7 +705,7 @@ fn run_cue_fmt(path: &Path) -> Result<()> {
 
 /// Return the first file in `highlights_dir` whose name ends in the version-suffix used
 /// by upgrade guides (e.g. `-0-58-0-upgrade-guide.md`), regardless of the date prefix.
-fn find_existing_upgrade_guide(
+pub(super) fn find_existing_upgrade_guide(
     highlights_dir: &Path,
     version: &Version,
 ) -> Result<Option<PathBuf>> {

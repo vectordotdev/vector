@@ -1,7 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
-use futures_util::FutureExt;
 use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
@@ -172,7 +171,12 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
+        Ok(crate::sources::source_with_error(call(
+            inputs,
+            builder,
+            cx.out,
+            HttpMethod::Get,
+        )))
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -228,13 +232,13 @@ impl HttpClientBuilder for PrometheusScrapeBuilder {
                 })
             );
             InstanceInfo {
-                tag: tag.to_string(),
+                tag: tag.clone(),
                 instance,
                 honor_label: self.honor_labels,
             }
         });
         let endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
-            tag: tag.to_string(),
+            tag: tag.clone(),
             endpoint: url.to_string(),
             honor_label: self.honor_labels,
         });
@@ -329,6 +333,7 @@ impl HttpClientContext for PrometheusScrapeContext {
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
+    use crate::config::AcknowledgementsConfig;
     use http_body::Body as _;
     use hyper::{
         Body, Client, Response, Server,
@@ -336,6 +341,7 @@ mod test {
     };
     use similar_asserts::assert_eq;
     use tokio::time::{Duration, sleep};
+    use vector_lib::event::Metric;
     use warp::Filter;
 
     use super::*;
@@ -433,10 +439,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         for metric in metrics {
             assert_eq!(
@@ -486,10 +489,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         for metric in metrics {
             assert_eq!(
@@ -553,10 +553,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<vector_lib::event::Metric> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<Metric> = events.into_iter().map(Event::into_metric).collect();
         let metric = &metrics[0];
 
         assert_eq!(metric.name(), "metric_label");
@@ -623,10 +620,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         let expected = HashMap::from([
             (
@@ -654,6 +648,10 @@ mod test {
 
     // Intentionally not using assert_source_compliance here because this is a round-trip test which
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn test_prometheus_routing() {
         trace_init();
@@ -731,7 +729,7 @@ mod test {
                 distributions_as_summaries: false,
                 flush_period_secs: Duration::from_secs(3),
                 suppress_timestamp: false,
-                acknowledgements: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
             },
         );
 
@@ -819,10 +817,7 @@ mod integration_tests {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<_> = events
-            .into_iter()
-            .map(|event| event.into_metric())
-            .collect();
+        let metrics: Vec<_> = events.into_iter().map(Event::into_metric).collect();
 
         let find_metric = |name: &str| {
             metrics

@@ -1,8 +1,7 @@
-#![warn(clippy::pedantic)]
-
 //! Vector gRPC API client library
 //!
-//! This library provides a Rust client for the Vector gRPC observability API.
+//! This library provides a Rust client for the Vector gRPC observability API. It sends RPCs over
+//! Vector's shared HTTP/2 client, which uses OpenSSL for `https` URIs.
 //!
 //! # Example
 //!
@@ -11,7 +10,8 @@
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut client = Client::new("http://localhost:9999".parse().unwrap());
-//! client.connect().await?;
+//! // Sets up the transport; the first RPC opens the connection.
+//! client.connect()?;
 //!
 //! // Check health (standard gRPC health check)
 //! client.health().await?;

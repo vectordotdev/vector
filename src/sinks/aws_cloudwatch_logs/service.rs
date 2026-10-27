@@ -242,7 +242,7 @@ impl CloudwatchLogsSvc {
         }
     }
 
-    pub fn process_events(&self, mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
+    pub fn process_events(mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
         // Sort by timestamp
         events.sort_by_key(|e| e.timestamp);
 
@@ -298,7 +298,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
     fn call(&mut self, req: Vec<InputLogEvent>) -> Self::Future {
         if self.token_rx.is_none() {
-            let event_batches = self.process_events(req);
+            let event_batches = Self::process_events(req);
 
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
@@ -310,7 +310,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.group_name.clone(),
                 self.create_missing_group,
                 self.create_missing_stream,
-                self.retention.clone(),
+                &self.retention,
                 self.kms_key.clone(),
                 self.tags.clone(),
                 event_batches,

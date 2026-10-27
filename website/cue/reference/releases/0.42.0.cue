@@ -19,16 +19,16 @@ releases: "0.42.0": {
 			description: """
 				VRL was updated to v0.19.0. This includes the following changes:
 
-				### Breaking Changes & Upgrade Guide
+				### Breaking Changes & Upgrade Guide {#vrl-breaking-changes--upgrade-guide}
 
 				- The multi-line mode of the `parse_groks` VRL function is now enabled by default.
 				Use the `(?-m)` modifier to disable this behavior. (https://github.com/vectordotdev/vrl/pull/1022)
 
-				### Enhancements
+				### Enhancements {#vrl-enhancements}
 
 				- The `keyvalue` grok filter is extended to match the Datadog implementation. (https://github.com/vectordotdev/vrl/pull/1015)
 
-				### Fixes
+				### Fixes {#vrl-fixes}
 
 				- The `parse_xml` function no longer adds an unnecessary `text` key when processing single nodes. (https://github.com/vectordotdev/vrl/pull/849)
 				- `parse_grok` and `parse_groks` no longer require field names containing a hyphen (for example, `@a-b`) to be quoted.

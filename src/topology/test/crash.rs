@@ -1,18 +1,184 @@
+use std::net::{TcpListener, UdpSocket};
+
 use futures_util::StreamExt;
-use tokio::time::{Duration, sleep};
+use tokio::time::{Duration, sleep, timeout};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
+    config::AcknowledgementsConfig,
     config::Config,
+    signal::ShutdownError,
     sinks::socket::SocketSinkConfig,
-    sources::socket::SocketConfig,
+    sources::socket::{SocketConfig, udp::UdpConfig},
     test_util::{
         CountReceiver,
         addr::next_addr,
-        mock::{error_sink, error_source, panic_sink, panic_source},
+        mock::{basic_sink, error_sink, error_source, panic_sink, panic_source},
         random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
     },
 };
+
+#[cfg(feature = "sinks-prometheus")]
+use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
+#[cfg(feature = "sinks-websocket_server")]
+use crate::sinks::websocket_server::WebSocketListenerSinkConfig;
+#[cfg(feature = "sources-statsd")]
+use crate::sources::statsd::{StatsdConfig, UdpConfig as StatsdUdpConfig};
+#[cfg(feature = "sources-syslog")]
+use crate::sources::syslog::{Mode as SyslogMode, SyslogConfig};
+#[cfg(any(feature = "sinks-prometheus", feature = "sinks-websocket_server"))]
+use crate::test_util::mock::basic_source;
+
+async fn first_shutdown_error(config: Config) -> ShutdownError {
+    let (topology, mut errors) = start_topology(config, false).await;
+    let error = timeout(Duration::from_secs(5), errors.recv())
+        .await
+        .expect("component error timed out")
+        .expect("component error missing");
+    topology.stop().await;
+    error
+}
+
+#[cfg(feature = "sinks-websocket_server")]
+#[tokio::test]
+async fn test_websocket_sink_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _listener = TcpListener::bind(address).unwrap();
+    let expected_error = TcpListener::bind(address).unwrap_err().to_string();
+    let (_input, source) = basic_source();
+
+    let sink = WebSocketListenerSinkConfig {
+        address,
+        ..Default::default()
+    };
+    let mut config = Config::builder();
+    config.add_source("in", source);
+    config.add_sink("out", &["in"], sink);
+
+    let error = first_shutdown_error(config.build().unwrap()).await;
+    assert!(matches!(
+        error,
+        ShutdownError::SinkAborted { error, .. } if error.contains(&expected_error)
+    ));
+}
+
+#[cfg(feature = "sinks-prometheus")]
+#[tokio::test]
+async fn test_prometheus_exporter_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _listener = TcpListener::bind(address).unwrap();
+    let expected_error = TcpListener::bind(address).unwrap_err().to_string();
+    let (_input, source) = basic_source();
+
+    let sink = PrometheusExporterConfig {
+        address,
+        ..Default::default()
+    };
+    let mut config = Config::builder();
+    config.add_source("in", source);
+    config.add_sink("out", &["in"], sink);
+
+    let error = first_shutdown_error(config.build().unwrap()).await;
+    assert!(matches!(
+        error,
+        ShutdownError::SinkAborted { error, .. } if error.contains(&expected_error)
+    ));
+}
+
+#[tokio::test]
+async fn test_tcp_socket_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _listener = TcpListener::bind(address).unwrap();
+    let expected_error = TcpListener::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source("in", SocketConfig::make_basic_tcp_config(address));
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let error = first_shutdown_error(config.build().unwrap()).await;
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. }
+            if error.contains("TCP bind failed") && error.contains(&expected_error)
+    ));
+}
+
+#[tokio::test]
+async fn test_udp_socket_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _socket = UdpSocket::bind(address).unwrap();
+    let expected_error = UdpSocket::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source(
+        "in",
+        SocketConfig::from(UdpConfig::from_address(address.into())),
+    );
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let error = first_shutdown_error(config.build().unwrap()).await;
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. } if error == expected_error
+    ));
+}
+
+#[cfg(feature = "sources-syslog")]
+#[tokio::test]
+async fn test_udp_syslog_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _socket = UdpSocket::bind(address).unwrap();
+    let expected_error = UdpSocket::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source(
+        "in",
+        SyslogConfig::from_mode(SyslogMode::Udp {
+            address: address.into(),
+            receive_buffer_bytes: None,
+        }),
+    );
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let error = first_shutdown_error(config.build().unwrap()).await;
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. } if error == expected_error
+    ));
+}
+
+#[cfg(feature = "sources-statsd")]
+#[tokio::test]
+async fn test_udp_statsd_bind_error_is_reported() {
+    trace_init();
+
+    let (_guard, address) = next_addr();
+    let _socket = UdpSocket::bind(address).unwrap();
+    let expected_error = UdpSocket::bind(address).unwrap_err().to_string();
+
+    let mut config = Config::builder();
+    config.add_source(
+        "in",
+        StatsdConfig::Udp(StatsdUdpConfig::from_address(address.into())),
+    );
+    config.add_sink("out", &["in"], basic_sink(1).1);
+
+    let error = first_shutdown_error(config.build().unwrap()).await;
+    assert!(matches!(
+        error,
+        ShutdownError::SourceAborted { error, .. } if error == expected_error
+    ));
+}
 
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]
@@ -30,7 +196,10 @@ async fn test_source_error() {
     config.add_sink(
         "out",
         &["in", "error"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
+        SocketSinkConfig::make_basic_tcp_config(
+            out_addr.to_string(),
+            AcknowledgementsConfig::default(),
+        ),
     );
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
@@ -74,7 +243,10 @@ async fn test_source_panic() {
     config.add_sink(
         "out",
         &["in", "panic"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
+        SocketSinkConfig::make_basic_tcp_config(
+            out_addr.to_string(),
+            AcknowledgementsConfig::default(),
+        ),
     );
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
@@ -121,7 +293,10 @@ async fn test_sink_error() {
     config.add_sink(
         "out",
         &["in1"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
+        SocketSinkConfig::make_basic_tcp_config(
+            out_addr.to_string(),
+            AcknowledgementsConfig::default(),
+        ),
     );
     config.add_sink("error", &["in2"], error_sink());
 
@@ -169,7 +344,10 @@ async fn test_sink_panic() {
     config.add_sink(
         "out",
         &["in1"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
+        SocketSinkConfig::make_basic_tcp_config(
+            out_addr.to_string(),
+            AcknowledgementsConfig::default(),
+        ),
     );
     config.add_sink("panic", &["in2"], panic_sink());
 

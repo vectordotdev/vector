@@ -6,6 +6,12 @@ use std::process::ExitCode;
 use vector::{app::Application, extra_context::ExtraContext};
 
 #[cfg(unix)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve low-byte exit status"
+)]
 fn main() -> ExitCode {
     #[cfg(all(unix, feature = "tikv-jemallocator"))]
     {
@@ -45,7 +51,13 @@ fn main() -> ExitCode {
 }
 
 #[cfg(windows)]
-pub fn main() -> ExitCode {
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve low-byte exit status"
+)]
+fn main() -> ExitCode {
     // We need to be able to run vector in User Interactive mode. We first try
     // to run vector as a service. If we fail, we consider that we are in
     // interactive mode and then fallback to console mode.  See
