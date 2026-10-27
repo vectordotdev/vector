@@ -54,14 +54,15 @@ pub(super) fn find(map: &Map<String, Value>, hint: Option<ComponentHint>) -> Vec
     ignored_paths(validator, &value)
 }
 
-pub(super) fn warn(paths: &[String]) {
-    for path in paths {
-        warn!(
-            field = %path,
-            internal_log_rate_limit = false,
-            "DEPRECATED: This configuration field is ignored. Remove it; a future release will reject ignored fields. See https://vector.dev/deprecations/#ignored-configuration-fields."
-        );
-    }
+pub(super) fn warnings(paths: &[String]) -> Vec<String> {
+    paths
+        .iter()
+        .map(|path| {
+            format!(
+                "DEPRECATED: Configuration field `{path}` is ignored. Remove it; a future release will reject ignored fields. See https://vector.dev/deprecations/#ignored-configuration-fields."
+            )
+        })
+        .collect()
 }
 
 #[derive(Default)]
@@ -172,7 +173,11 @@ fn prepare_schema(schema: &mut Value) {
     }
     // Input forms can overlap (for example an enum's named string and general string forms).
     // Recognize fields from every matching form rather than diagnosing an ambiguous value.
-    if let Some(variants) = object.remove("oneOf") {
+    if let Some(mut variants) = object.remove("oneOf") {
+        // Feature-restricted builds can have no registered components of a given kind.
+        if variants.as_array().is_some_and(Vec::is_empty) {
+            variants = serde_json::json!([false]);
+        }
         if object.contains_key("anyOf") {
             object
                 .entry("allOf")
@@ -306,6 +311,23 @@ mod tests {
         prepare_schema(&mut schema);
         let validator = jsonschema::validator_for(&schema).unwrap();
         ignored_paths(&validator, value)
+    }
+
+    #[test]
+    fn empty_component_unions_do_not_disable_diagnostics() {
+        let mut schema = json!({
+            "type": "object", "additionalProperties": false,
+            "properties": {
+                "transforms": {"type": "object", "additionalProperties": {"oneOf": []}}
+            }
+        });
+        prepare_schema(&mut schema);
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        assert_eq!(
+            ignored_paths(&validator, &json!({"transforms": {}, "typo": true})),
+            ["/typo"]
+        );
+        assert!(!validator.is_valid(&json!({"transforms": {"unavailable": {}}})));
     }
 
     #[test]

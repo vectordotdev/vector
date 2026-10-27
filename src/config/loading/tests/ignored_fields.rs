@@ -17,7 +17,9 @@ use tracing_subscriber::{Layer as _, layer::SubscriberExt as _};
 
 use crate::config::{
     ConfigBuilder, Format,
-    loading::{ComponentHint, ConfigBuilderLoader, ignored_fields},
+    loading::{
+        ComponentHint, ConfigBuilderLoader, Loader as _, Process as _, ignored_fields, load_builder,
+    },
 };
 
 const CONFIG: &str = indoc! {r#"
@@ -128,7 +130,7 @@ impl Write for Capture {
     }
 }
 
-fn load_with_logs(config: &str) -> (Result<ConfigBuilder, Vec<String>>, String) {
+fn with_logs<T>(f: impl FnOnce() -> T) -> (T, String) {
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let writer = Capture(Arc::clone(&buffer));
     let formatter = tracing_subscriber::fmt::layer()
@@ -139,23 +141,23 @@ fn load_with_logs(config: &str) -> (Result<ConfigBuilder, Vec<String>>, String) 
         tracing_limit::RateLimitedLayer::new(formatter)
             .with_filter(tracing_subscriber::filter::LevelFilter::WARN),
     );
-    let result = tracing::subscriber::with_default(subscriber, || {
-        ConfigBuilderLoader::default()
-            .interpolate_env(false)
-            .load_from_input(config.as_bytes(), Format::Yaml)
-    });
+    let result = tracing::subscriber::with_default(subscriber, f);
     let logs = String::from_utf8(buffer.lock().unwrap().clone()).unwrap();
     (result, logs)
 }
 
 #[test]
 fn loading_warns_and_preserves_configuration_without_logging_values() {
-    let (builder, logs) = load_with_logs(CONFIG);
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(false)
+        .load_from_input(CONFIG.as_bytes(), Format::Yaml)
+        .unwrap();
     let expected: ConfigBuilder = serde_yaml::from_str(CONFIG).unwrap();
     assert_eq!(
-        serde_json::to_value(builder.unwrap()).unwrap(),
+        serde_json::to_value(&builder).unwrap(),
         serde_json::to_value(expected).unwrap()
     );
+    let (_, logs) = with_logs(|| builder.build().unwrap());
     assert_eq!(logs.matches("DEPRECATED:").count(), 5, "{logs}");
     assert!(logs.contains("/sources/http/auth/password"), "{logs}");
     assert!(logs.contains("/sinks/out/request/retry_atempts"), "{logs}");
@@ -183,7 +185,11 @@ fn invalid_configurations_keep_their_error_without_deprecation_warnings() {
               strategy: bearer
               username: alice
     "#};
-    let (result, logs) = load_with_logs(CONFIG);
+    let (result, logs) = with_logs(|| {
+        ConfigBuilderLoader::default()
+            .interpolate_env(false)
+            .load_from_input(CONFIG.as_bytes(), Format::Yaml)
+    });
     assert!(
         result
             .unwrap_err()
@@ -191,4 +197,72 @@ fn invalid_configurations_keep_their_error_without_deprecation_warnings() {
             .contains("missing field `token`")
     );
     assert!(!logs.contains("DEPRECATED:"), "{logs}");
+}
+
+#[test]
+fn component_and_appended_warnings_reach_build_with_warnings() {
+    let value: Value = serde_yaml::from_str(CONFIG).unwrap();
+    let mut loader = ConfigBuilderLoader::default();
+    for (name, hint) in [
+        ("sources", ComponentHint::Source),
+        ("sinks", ComponentHint::Sink),
+    ] {
+        loader
+            .merge(value[name].as_object().unwrap().clone(), Some(hint))
+            .unwrap();
+    }
+    let mut builder = ConfigBuilder::default();
+    builder.append(loader.take()).unwrap();
+    let expected =
+        ignored_fields::warnings(&ignored_fields::find(value.as_object().unwrap(), None));
+    let (_, mut warnings) = builder.build_with_warnings().unwrap();
+    warnings.sort();
+    assert_eq!(warnings, expected);
+}
+
+#[test]
+fn raw_input_loading_preserves_values_and_collects_warnings_in_all_formats() {
+    let value: Value = serde_yaml::from_str(CONFIG).unwrap();
+    let expected = serde_json::to_value(
+        crate::config::load::<_, ConfigBuilder>(CONFIG.as_bytes(), Format::Yaml).unwrap(),
+    )
+    .unwrap();
+    for (format, input) in [
+        (Format::Yaml, CONFIG.to_owned()),
+        (Format::Json, serde_json::to_string(&value).unwrap()),
+        (Format::Toml, toml::to_string(&value).unwrap()),
+    ] {
+        let builder = load_builder(input.as_bytes(), format).unwrap();
+        assert_eq!(serde_json::to_value(&builder).unwrap(), expected);
+        let (_, warnings) = builder.build_with_warnings().unwrap();
+        assert_eq!(warnings.len(), 5);
+    }
+}
+
+#[test]
+fn raw_input_loading_preserves_deserialization_errors() {
+    const CONFIGS: &[&str] = &[
+        "null",
+        "[]",
+        "42",
+        "data_dir: []",
+        "sources: {bad: {type: does_not_exist}}",
+    ];
+    for config in CONFIGS {
+        let expected =
+            crate::config::load::<_, ConfigBuilder>(config.as_bytes(), Format::Yaml).unwrap_err();
+        assert_eq!(
+            load_builder(config.as_bytes(), Format::Yaml).unwrap_err(),
+            expected
+        );
+    }
+}
+
+#[cfg(feature = "api")]
+#[test]
+fn raw_input_loading_preserves_explicit_null_instead_of_merging_defaults() {
+    const CONFIG: &str = "api: {address: null}";
+    let builder = load_builder(CONFIG.as_bytes(), Format::Yaml).unwrap();
+    assert_eq!(builder.api.address, None);
+    assert!(builder.loading_warnings.is_empty());
 }

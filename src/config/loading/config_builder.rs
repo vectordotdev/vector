@@ -132,7 +132,9 @@ impl Process for ConfigBuilderLoader {
             }
         }
 
-        ignored_fields::warn(&ignored);
+        self.builder
+            .loading_warnings
+            .extend(ignored_fields::warnings(&ignored));
         Ok(())
     }
 }

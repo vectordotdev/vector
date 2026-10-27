@@ -171,7 +171,7 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
-        warn!("{warning}");
+        warn!(internal_log_rate_limit = false, "{warning}");
     }
 
     Ok(config)
@@ -200,7 +200,9 @@ pub async fn load_from_paths_with_provider_and_secrets(
 
     // If there's a provider, overwrite the existing config builder with the remote variant.
     if let Some(mut provider) = builder.provider {
+        let bootstrap_warnings = builder.loading_warnings;
         builder = provider.build(signal_handler).await?;
+        builder.loading_warnings.extend(bootstrap_warnings);
         debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
 
@@ -263,7 +265,7 @@ async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> 
     validation::check_buffer_preconditions(&new_config).await?;
 
     for warning in build_warnings {
-        warn!("{warning}");
+        warn!(internal_log_rate_limit = false, "{warning}");
     }
 
     Ok(new_config)
@@ -346,7 +348,7 @@ pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>>
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
-        warn!("{warning}");
+        warn!(internal_log_rate_limit = false, "{warning}");
     }
 
     Ok(config)
@@ -359,7 +361,7 @@ fn load_from_inputs(
     let mut errors = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|n| config.append(n)) {
+        if let Err(errs) = load_builder(input, format).and_then(|n| config.append(n)) {
             // TODO: add back paths
             errors.extend(errs.iter().cloned());
         }
@@ -405,6 +407,22 @@ pub fn prepare_input<R: std::io::Read>(
     } else {
         Ok(source_string)
     }
+}
+
+/// Loads a complete configuration, retaining diagnostics before deserialization discards fields.
+pub(crate) fn load_builder(
+    input: impl std::io::Read,
+    format: Format,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let content = prepare_input(input, false)?;
+    let value = representation::parse_config_value(&content, format)?;
+    let ignored = value
+        .as_object()
+        .map(|map| ignored_fields::find(map, None))
+        .unwrap_or_default();
+    let mut builder: ConfigBuilder = representation::deserialize_config_value(value)?;
+    builder.loading_warnings = ignored_fields::warnings(&ignored);
+    Ok(builder)
 }
 
 /// Reads `input` and deserializes it as `T` in the given format, without interpolating

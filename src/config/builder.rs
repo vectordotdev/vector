@@ -76,6 +76,10 @@ pub struct ConfigBuilder {
     #[serde(default, skip)]
     #[doc(hidden)]
     pub allow_empty: bool,
+
+    /// Diagnostics collected while loading, before unused fields are discarded.
+    #[serde(skip)]
+    pub(crate) loading_warnings: Vec<String>,
 }
 
 impl From<Config> for ConfigBuilder {
@@ -127,6 +131,7 @@ impl From<Config> for ConfigBuilder {
             secret,
             graceful_shutdown_duration,
             allow_empty: false,
+            loading_warnings: Vec::new(),
         }
     }
 }
@@ -142,7 +147,7 @@ impl ConfigBuilder {
         let (config, warnings) = self.build_with_warnings()?;
 
         for warning in warnings {
-            warn!("{warning}");
+            warn!(internal_log_rate_limit = false, "{warning}");
         }
 
         Ok(config)
@@ -290,6 +295,7 @@ impl ConfigBuilder {
         self.transforms.extend(with.transforms);
         self.tests.extend(with.tests);
         self.secret.extend(with.secret);
+        self.loading_warnings.extend(with.loading_warnings);
 
         Ok(())
     }
