@@ -96,12 +96,12 @@ pub trait RequestBuilder<Input> {
         // of clash-y with `Self::Metadata`.
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
-        let (_, json_size) = self.encoder().encode_input(events, &mut compressor)?;
+        let (uncompressed_byte_size, json_size) =
+            self.encoder().encode_input(events, &mut compressor)?;
 
         let payload = compressor.into_inner().freeze();
         let result = if is_compressed {
-            let compressed_byte_size = payload.len();
-            EncodeResult::compressed(payload.into(), compressed_byte_size, json_size)
+            EncodeResult::compressed(payload.into(), uncompressed_byte_size, json_size)
         } else {
             EncodeResult::uncompressed(payload.into(), json_size)
         };
@@ -142,4 +142,90 @@ pub trait IncrementalRequestBuilder<Input> {
 
     /// Builds a request for the given metadata and payload.
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sinks::util::encoding::write_all;
+
+    struct BytesEncoder;
+
+    impl Encoder<Vec<u8>> for BytesEncoder {
+        fn encode_input(
+            &self,
+            input: Vec<u8>,
+            writer: &mut dyn io::Write,
+        ) -> io::Result<(usize, GroupedCountByteSize)> {
+            write_all(writer, 1, &input)?;
+            Ok((input.len(), GroupedCountByteSize::new_untagged()))
+        }
+    }
+
+    struct TestRequestBuilder {
+        compression: Compression,
+    }
+
+    impl RequestBuilder<Vec<u8>> for TestRequestBuilder {
+        type Metadata = ();
+        type Events = Vec<u8>;
+        type Encoder = BytesEncoder;
+        type Payload = Bytes;
+        type Request = ();
+        type Error = io::Error;
+
+        fn compression(&self) -> Compression {
+            self.compression
+        }
+
+        fn encoder(&self) -> &Self::Encoder {
+            &BytesEncoder
+        }
+
+        fn split_input(
+            &self,
+            input: Vec<u8>,
+        ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+            ((), RequestMetadataBuilder::default(), input)
+        }
+
+        fn build_request(
+            &self,
+            _metadata: Self::Metadata,
+            _request_metadata: RequestMetadata,
+            _payload: EncodeResult<Self::Payload>,
+        ) -> Self::Request {
+        }
+    }
+
+    #[test]
+    fn encode_events_reports_size_before_compression() {
+        let input = b"hello world ".repeat(100);
+        let builder = TestRequestBuilder {
+            compression: Compression::gzip_default(),
+        };
+
+        let result = builder.encode_events(input.clone()).unwrap();
+        let compressed_len = result.payload.len();
+        assert!(compressed_len < input.len());
+        assert_eq!(result.uncompressed_byte_size, input.len());
+        assert_eq!(result.compressed_byte_size, Some(compressed_len));
+
+        let metadata = RequestMetadataBuilder::default().build(&result);
+        assert_eq!(metadata.request_encoded_size(), input.len());
+        assert_eq!(metadata.request_wire_size(), compressed_len);
+    }
+
+    #[test]
+    fn encode_events_without_compression() {
+        let input = b"hello world ".repeat(100);
+        let builder = TestRequestBuilder {
+            compression: Compression::None,
+        };
+
+        let result = builder.encode_events(input.clone()).unwrap();
+        assert_eq!(result.payload.len(), input.len());
+        assert_eq!(result.uncompressed_byte_size, input.len());
+        assert_eq!(result.compressed_byte_size, None);
+    }
 }
