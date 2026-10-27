@@ -198,6 +198,7 @@ indexmap = { version = "2.11.0", default-features = false, features = ["serde", 
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
+jsonschema = { version = "0.38.1", default-features = false }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.18.1", default-features = false }
@@ -481,7 +482,7 @@ rdkafka = { workspace = true, features = ["curl-static", "tokio", "libz", "ssl",
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
-rumqttc = { package = "rumqttc-next", version = "0.26.1", default-features = false, features = ["use-rustls-no-provider"], optional = true }
+rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-no-provider"], optional = true }
 # Keep MQTT on Ring alongside Vector's other Rustls users, including in minimal builds.
 rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
@@ -549,6 +550,7 @@ criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["server-auto"] }
 itertools.workspace = true
+jsonschema.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true

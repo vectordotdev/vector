@@ -1,93 +1,16 @@
-use vector_lib::opentelemetry::proto::TRACES_REQUEST_MESSAGE_TYPE;
-use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
+use vector_lib::opentelemetry::proto::{
+    collector::trace::v1::ExportTraceServiceRequest, common::v1::any_value::Value as AnyValueEnum,
+};
 
 use crate::opentelemetry::{
-    assert_service_name_with, parse_value_to_export_type_request, read_file_helper,
+    assert_service_name_with, parse_export_traces_request, read_file_helper,
 };
-use vrl::value::Value as VrlValue;
 
 // The source collector records telemetrygen's input once, then forwards it to Vector over both
 // OTLP protocols.
 const EXPECTED_TRACE_COUNT: usize = 100;
 const SOURCE_SPAN_COUNT: usize = 200; // 100 traces * 2 spans (parent + child).
 const FORWARDED_SPAN_COUNT: usize = 400; // 200 spans * 2 Vector exports (gRPC + HTTP).
-
-fn parse_export_traces_request(content: &str) -> Result<ExportTraceServiceRequest, String> {
-    // The file may contain multiple lines, each with a JSON object containing an array of resourceSpans
-    let mut merged_request = ExportTraceServiceRequest {
-        resource_spans: Vec::new(),
-    };
-
-    for (line_num, line) in content.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-
-        merged_request.resource_spans.extend(
-            parse_collector_trace_line(line)
-                .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
-                .resource_spans,
-        );
-    }
-
-    if merged_request.resource_spans.is_empty() {
-        return Err("No resource spans found in file".to_string());
-    }
-
-    Ok(merged_request)
-}
-
-fn parse_collector_trace_line(line: &str) -> Result<ExportTraceServiceRequest, String> {
-    let mut value: VrlValue = serde_json::from_str::<serde_json::Value>(line)
-        .map_err(|e| format!("Failed to parse JSON: {e}"))?
-        .into();
-
-    decode_collector_ids(&mut value)?;
-    parse_value_to_export_type_request(TRACES_REQUEST_MESSAGE_TYPE, value)
-}
-
-fn decode_collector_ids(value: &mut VrlValue) -> Result<(), String> {
-    match value {
-        VrlValue::Object(fields) => {
-            for (name, value) in fields {
-                let valid_hex_lengths: &[usize] = match name.as_str() {
-                    "traceId" => &[32],
-                    "spanId" => &[16],
-                    "parentSpanId" => &[0, 16],
-                    _ => {
-                        decode_collector_ids(value)?;
-                        continue;
-                    }
-                };
-
-                let encoded = value
-                    .as_bytes()
-                    .ok_or_else(|| format!("{name} should be a hexadecimal string"))?;
-                if !valid_hex_lengths.contains(&encoded.len()) {
-                    return Err(format!(
-                        "{name} has invalid hexadecimal length {}",
-                        encoded.len()
-                    ));
-                }
-
-                *value = VrlValue::Bytes(
-                    hex::decode(encoded.as_ref())
-                        .map_err(|e| format!("Failed to decode {name}: {e}"))?
-                        .into(),
-                );
-            }
-        }
-        VrlValue::Array(values) => {
-            for value in values {
-                decode_collector_ids(value)?;
-            }
-        }
-        _ => {}
-    }
-
-    Ok(())
-}
 
 /// Asserts that all spans have expected static fields set:
 /// - `name`: Should be non-empty
@@ -354,4 +277,26 @@ async fn vector_component_received_events_total_counts_individual_spans() {
     use crate::opentelemetry::assert_component_received_events_total;
 
     assert_component_received_events_total(FORWARDED_SPAN_COUNT).await;
+}
+
+#[test]
+fn collector_trace_parser_rejects_unknown_fields() {
+    let capture = r#"{"resourceSpans":[{"resource":{"entityRefs":[]},"scopeSpans":[]}]}"#;
+    assert!(
+        parse_export_traces_request(capture)
+            .unwrap_err()
+            .contains("entityRefs")
+    );
+}
+
+#[test]
+fn collector_trace_parser_decodes_byte_attributes() {
+    let capture = r#"{"resourceSpans":[{"scopeSpans":[{"spans":[{"attributes":[{"key":"payload","value":{"bytesValue":"AAEC/w=="}}]}]}]}]}"#;
+    let request = parse_export_traces_request(capture).unwrap();
+    assert_eq!(
+        request.resource_spans[0].scope_spans[0].spans[0].attributes[0].value,
+        Some(vector_lib::opentelemetry::proto::common::v1::AnyValue {
+            value: Some(AnyValueEnum::BytesValue(vec![0, 1, 2, 255]))
+        })
+    );
 }
