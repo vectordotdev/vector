@@ -12,6 +12,7 @@ use vector_lib::{
     buffers::{BufferConfig, BufferType, MemoryBufferSize, WhenFull},
     config::ComponentKey,
     event::{Event, EventContainer, LogEvent},
+    extra_context::ExtraContext,
 };
 
 use crate::{
@@ -20,7 +21,6 @@ use crate::{
         EnrichmentTables,
         memory::{MemoryConfig, MemorySourceConfig, ReloadBehavior},
     },
-    extra_context::ExtraContext,
     sinks::prometheus::exporter::PrometheusExporterConfig,
     sources::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,

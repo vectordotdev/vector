@@ -10,13 +10,13 @@ use indoc::indoc;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    extra_context::ExtraContext,
 };
 
 use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
-    extra_context::ExtraContext,
     sinks::{
         VectorSink,
         datadog::test_utils::{ApiStatus, test_server},

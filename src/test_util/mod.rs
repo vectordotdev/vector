@@ -41,11 +41,11 @@ use vector_lib::{
         BatchNotifier, BatchStatusReceiver, Event, EventArray, LogEvent, Metric, MetricKind,
         MetricTags, MetricValue,
     },
+    extra_context::ExtraContext,
 };
 
 use crate::{
     config::{Config, GenerateConfig},
-    extra_context::ExtraContext,
     topology::{RunningTopology, ShutdownErrorReceiver},
     trace,
 };

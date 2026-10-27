@@ -1,8 +1,9 @@
 use std::path::Path;
 
+use vector_lib::extra_context::ExtraContext;
+
 use crate::{
     config::Config,
-    extra_context::ExtraContext,
     test_util::{
         mock::{basic_sink, basic_source},
         start_topology, trace_init,

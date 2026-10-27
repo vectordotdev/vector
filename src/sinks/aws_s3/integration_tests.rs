@@ -28,7 +28,6 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     common::s3::S3ClientBuilder,
     config::{AcknowledgementsConfig, Config, SinkContext, ValidatedSink},
-    extra_context::ExtraContext,
     sinks::{
         aws_s3::config::default_filename_time_format,
         s3_common::config::{RetryStrategy, S3Options, S3ServerSideEncryption},
@@ -60,6 +59,7 @@ use similar_asserts::assert_eq;
 use tempfile::TempDir;
 use tokio_stream::StreamExt;
 use vector_common::decompression::CappedDecoder;
+use vector_lib::extra_context::ExtraContext;
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     codecs::{TextSerializerConfig, encoding::FramingConfig},
