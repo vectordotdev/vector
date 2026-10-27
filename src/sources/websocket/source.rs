@@ -553,7 +553,12 @@ impl WebSocketSource {
 
             let mut message_bytes = BytesMut::new();
             if let Err(err) = ack_serializer.encode(
-                LogEvent::from_parts(value, EventMetadata::default()).into(),
+                match (&*ack_serializer, value) {
+                    (Serializer::Text(_), Value::Bytes(bytes)) => {
+                        LogEvent::from_bytes_legacy(&bytes).into()
+                    }
+                    (_, value) => LogEvent::from_parts(value, EventMetadata::default()).into(),
+                },
                 &mut message_bytes,
             ) {
                 debug!(message = "Encoding ACK message failed.", %err);
