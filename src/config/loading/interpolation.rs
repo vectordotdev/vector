@@ -6,12 +6,16 @@ use serde_json::Value;
 use super::representation::ConfigMap;
 
 /// Interpolates environment variables in string leaves without changing keys or value types.
+///
+/// # Errors
+///
+/// Returns an error message for each referenced variable in a string leaf that contains a
+/// newline, or that is required (`?` or `:?`) but is missing or empty.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Preserve collection type and API bounds"
 )]
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate_config_map_with_env_vars(
     map: &ConfigMap,
     vars: &HashMap<String, String>,
@@ -79,12 +83,16 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: LazyLock<Regex> = LazyLock:
 });
 
 /// Result<interpolated config, errors>
+///
+/// # Errors
+///
+/// Returns an error message for each referenced variable that contains a newline, or that is
+/// required (`?` or `:?`) but is missing or empty.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Preserve collection type and API bounds"
 )]
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
 
