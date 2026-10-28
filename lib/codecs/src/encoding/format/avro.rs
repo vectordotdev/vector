@@ -261,10 +261,6 @@ pub type AvroOcfCompression = BatchSerializerCompression;
 /// Convert a VRL LogEvent to an Avro value with logical type coercion and resolution.
 /// This is the single shared path used by both datum and OCF encoders to ensure
 /// they handle dates, times, named schemas, and unions identically.
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "Union indexes are checked by apache_avro and use u32."
-)]
 fn log_to_avro_value(
     log: vector_core::event::LogEvent,
     schema: &apache_avro::Schema,
