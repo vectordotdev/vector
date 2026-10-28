@@ -7,8 +7,7 @@ deprecated_since: "0.61.0"
 
 Configuration fields that Vector accepts but discards during deserialization are deprecated.
 Vector now warns about these fields when loading configuration, including during `vector validate`.
-Existing configurations continue to work. We will give users sufficient time to migrate, including
-at least one minor release after this announcement, before rejecting ignored fields.
+Existing configurations continue to work.
 
 Correct misspelled fields or remove fields that do not belong to the selected enum variant.
 For example, replace this HTTP sink request setting:
