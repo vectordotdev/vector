@@ -365,9 +365,14 @@ impl WebSocketSource {
                 .filter_map(|event| {
                     if let Event::Log(event) = event {
                         event
-                            .get_message()
-                            .unwrap_or(event.value())
+                            .value()
                             .get(&replay_config.message_id_path)
+                            .filter(|value| matches!(value, Value::Bytes(_)))
+                            .or_else(|| {
+                                event
+                                    .get_message()
+                                    .and_then(|message| message.get(&replay_config.message_id_path))
+                            })
                             .and_then(|v| {
                                 v.try_bytes_utf8_lossy()
                                     .inspect_err(|err| debug!(message = "Message ID is not a valid string.", %err))
