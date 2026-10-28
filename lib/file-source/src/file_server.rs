@@ -349,11 +349,12 @@ where
                         && watcher.last_read_success().elapsed() >= grace_period
                     {
                         // Try to remove
-                        match remove_file(&watcher.path).await {
-                            Ok(()) => {
+                        match watcher.remove_file().await {
+                            Ok(true) => {
                                 self.emitter.emit_file_deleted(&watcher.path);
                                 watcher.set_dead();
                             }
+                            Ok(false) => {}
                             Err(error) => {
                                 // We will try again after some time.
                                 self.emitter.emit_file_delete_error(&watcher.path, error);
@@ -636,21 +637,36 @@ pub struct Line {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs as std_fs, io, path::Path};
+    use std::{
+        fs as std_fs, io,
+        path::Path,
+        sync::atomic::{AtomicBool, Ordering},
+    };
 
     use async_compression::tokio::bufread::GzipEncoder;
     use file_source_common::FingerprintStrategy;
+    use futures::{
+        FutureExt as _, StreamExt as _,
+        channel::{mpsc, oneshot},
+    };
     use tokio::{fs::File, io::AsyncReadExt as _};
 
     use crate::file_watcher::RawLine;
 
     use super::*;
 
-    #[derive(Clone)]
-    struct NoErrors;
+    #[derive(Clone, Default)]
+    struct NoErrors {
+        rotate_on_add: Option<(PathBuf, &'static [u8])>,
+    }
 
     impl FileSourceInternalEvents for NoErrors {
-        fn emit_file_added(&self, _: &Path) {}
+        fn emit_file_added(&self, path: &Path) {
+            if let Some((rotated, replacement)) = &self.rotate_on_add {
+                std_fs::rename(path, rotated).unwrap();
+                std_fs::write(path, replacement).unwrap();
+            }
+        }
         fn emit_file_resumed(&self, _: &Path, _: u64) {}
         fn emit_file_watch_error(&self, path: &Path, error: io::Error) {
             panic!("watch {path:?}: {error}");
@@ -689,6 +705,23 @@ mod tests {
         }
     }
 
+    struct DiscoverAfterStartup {
+        path: PathBuf,
+        startup: AtomicBool,
+    }
+
+    impl PathsProvider for DiscoverAfterStartup {
+        type IntoIter = Vec<PathBuf>;
+
+        fn paths(&self) -> Self::IntoIter {
+            if self.startup.swap(false, Ordering::Relaxed) {
+                Vec::new()
+            } else {
+                vec![self.path.clone()]
+            }
+        }
+    }
+
     fn checksum_strategy() -> FingerprintStrategy {
         FingerprintStrategy::FirstLinesChecksum {
             ignored_header_bytes: 0,
@@ -700,8 +733,16 @@ mod tests {
         data_dir: &Path,
         strategy: FingerprintStrategy,
     ) -> FileServer<NoPaths, NoErrors> {
+        test_server_with_paths(data_dir, strategy, NoPaths)
+    }
+
+    fn test_server_with_paths<PP: PathsProvider>(
+        data_dir: &Path,
+        strategy: FingerprintStrategy,
+        paths_provider: PP,
+    ) -> FileServer<PP, NoErrors> {
         FileServer {
-            paths_provider: NoPaths,
+            paths_provider,
             max_read_bytes: 2048,
             ignore_checkpoints: false,
             read_from: ReadFrom::Beginning,
@@ -713,7 +754,7 @@ mod tests {
             fingerprinter: Fingerprinter::new(strategy, 1024, false),
             oldest_first: false,
             remove_after: None,
-            emitter: NoErrors,
+            emitter: NoErrors::default(),
             rotate_wait: Duration::from_mins(1),
         }
     }
@@ -731,6 +772,61 @@ mod tests {
 
     async fn next_line(watcher: &mut FileWatcher) -> RawLine {
         watcher.read_line().await.unwrap().raw_line.unwrap()
+    }
+
+    #[tokio::test]
+    async fn remove_after_preserves_replacement_file() {
+        const ORIGINAL: &[u8] = b"original event\n";
+        const REPLACEMENT: &[u8] = b"unread replacement event\n";
+
+        for rotate in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("0.log");
+            let rotated = dir.path().join("0.log.rotated");
+            std_fs::write(&path, ORIGINAL).unwrap();
+            let paths = DiscoverAfterStartup {
+                path: path.clone(),
+                startup: AtomicBool::new(true),
+            };
+            let mut server = test_server_with_paths(dir.path(), checksum_strategy(), paths);
+            server.glob_minimum_cooldown = Duration::from_mins(1);
+            server.remove_after = Some(Duration::ZERO);
+            if rotate {
+                server.emitter.rotate_on_add = Some((rotated.clone(), REPLACEMENT));
+            }
+            let (tx, mut rx) = mpsc::channel(1);
+            let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+            let shutdown = shutdown_rx.shared();
+            let run = server.run(
+                tx,
+                shutdown.clone(),
+                shutdown,
+                Checkpointer::new(dir.path()),
+            );
+            let consume = async {
+                let batch = rx.next().await.unwrap();
+                assert_eq!(batch.len(), 1);
+                assert_eq!(batch[0].text.as_ref(), &ORIGINAL[..ORIGINAL.len() - 1]);
+                // Two idle batches allow the EOF read backoff to expire before cleanup.
+                for _ in 0..2 {
+                    assert!(rx.next().await.unwrap().is_empty());
+                }
+                if rotate {
+                    assert_eq!(std_fs::read(&path).unwrap(), REPLACEMENT);
+                    assert_eq!(std_fs::read(&rotated).unwrap(), ORIGINAL);
+                } else {
+                    assert!(!path.exists());
+                }
+                shutdown_tx.send(()).unwrap();
+                while rx.next().await.is_some() {}
+            };
+            tokio::time::timeout(Duration::from_secs(5), async {
+                let (result, ()) = futures::future::join(run, consume).await;
+                result.unwrap();
+            })
+            .await
+            .unwrap();
+        }
     }
 
     #[tokio::test]

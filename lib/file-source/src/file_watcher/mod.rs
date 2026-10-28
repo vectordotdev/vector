@@ -317,6 +317,21 @@ impl FileWatcher {
         Ok(unwatch_info)
     }
 
+    /// Skip deletion when rotation has rebound the path to another file.
+    ///
+    /// # Errors
+    /// Returns an error if opening the path, reading metadata, or removing the file fails.
+    pub(super) async fn remove_file(&self) -> io::Result<bool> {
+        let file = File::open(&self.path).await?;
+        let file_info = file.file_info().await?;
+        if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
+            return Ok(false);
+        }
+
+        tokio::fs::remove_file(&self.path).await?;
+        Ok(true)
+    }
+
     pub fn set_file_findable(&mut self, f: bool) {
         self.findable = f;
         if f {
