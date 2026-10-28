@@ -138,6 +138,14 @@ pub enum AggregationMode {
 
     /// Stdev value of absolute metric; incremental metrics pass through unchanged.
     Stdev,
+
+    /// Collects the values of absolute metrics into a single sorted distribution; incremental
+    /// metrics pass through unchanged.
+    ///
+    /// Gauges and sets (numeric members only) contribute one sample per value, distributions
+    /// contribute their existing samples, and aggregated histograms contribute one sample at each
+    /// bucket's upper limit per count in that bucket. Other absolute metric types are ignored.
+    Distribution,
 }
 
 const fn default_mode() -> AggregationMode {

@@ -10,7 +10,7 @@ use async_stream::stream;
 use futures::{Stream, StreamExt};
 use vector_lib::event::{
     MetricValue,
-    metric::{Metric, MetricData, MetricKind, MetricSeries},
+    metric::{Metric, MetricData, MetricKind, MetricSeries, Sample, StatisticKind},
 };
 
 use crate::{
@@ -54,6 +54,11 @@ enum InnerMode {
     Stdev {
         multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     },
+
+    /// Collects absolute metrics into a distribution; incremental metrics pass through unchanged.
+    Distribution {
+        multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
+    },
 }
 
 impl From<AggregationMode> for InnerMode {
@@ -72,6 +77,9 @@ impl From<AggregationMode> for InnerMode {
                 multi_map: HashMap::default(),
             },
             AggregationMode::Stdev => InnerMode::Stdev {
+                multi_map: HashMap::default(),
+            },
+            AggregationMode::Distribution => InnerMode::Distribution {
                 multi_map: HashMap::default(),
             },
         }
@@ -163,7 +171,8 @@ impl Aggregate {
                 | InnerMode::Max
                 | InnerMode::Min
                 | InnerMode::Mean { .. }
-                | InnerMode::Stdev { .. },
+                | InnerMode::Stdev { .. }
+                | InnerMode::Distribution { .. },
                 MetricKind::Incremental,
             ) => {
                 return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
@@ -196,6 +205,11 @@ impl Aggregate {
                     }
                 }
             }
+            (InnerMode::Distribution { multi_map }, MetricKind::Absolute) => {
+                if Self::distribution_accepts(&data.value) {
+                    multi_map.entry(series).or_default().push((data, metadata));
+                }
+            }
         }
 
         emit!(AggregateEventRecorded);
@@ -214,18 +228,38 @@ impl Aggregate {
                         | AggregationMode::Max
                         | AggregationMode::Min
                         | AggregationMode::Mean
-                        | AggregationMode::Stdev,
+                        | AggregationMode::Stdev
+                        | AggregationMode::Distribution,
                     MetricKind::Incremental
                 )
         )
     }
 
     /// Returns `true` for metrics that system-time accepts but does not store or
-    /// pass through — currently absolute non-gauge values in `Mean`/`Stdev`.
+    /// pass through — absolute non-gauge values in `Mean`/`Stdev`, and absolute values that
+    /// cannot contribute samples in `Distribution`.
     pub(crate) const fn is_silently_ignored(mode: AggregationMode, data: &MetricData) -> bool {
-        matches!(mode, AggregationMode::Mean | AggregationMode::Stdev)
-            && matches!(data.kind, MetricKind::Absolute)
-            && !matches!(data.value, MetricValue::Gauge { value: _ })
+        if !matches!(data.kind, MetricKind::Absolute) {
+            return false;
+        }
+        match mode {
+            AggregationMode::Mean | AggregationMode::Stdev => {
+                !matches!(data.value, MetricValue::Gauge { value: _ })
+            }
+            AggregationMode::Distribution => !Self::distribution_accepts(&data.value),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if `Distribution` mode can turn this value into samples.
+    pub(crate) const fn distribution_accepts(value: &MetricValue) -> bool {
+        matches!(
+            value,
+            MetricValue::Gauge { .. }
+                | MetricValue::Set { .. }
+                | MetricValue::Distribution { .. }
+                | MetricValue::AggregatedHistogram { .. }
+        )
     }
 
     /// Returns `true` iff a record with the given `kind`/`value` would be
@@ -260,6 +294,10 @@ impl Aggregate {
             AggregationMode::Mean | AggregationMode::Stdev => {
                 matches!(data.kind, MetricKind::Absolute)
                     && matches!(data.value, MetricValue::Gauge { value: _ })
+            }
+            // `Distribution` only records absolute values it can convert to samples.
+            AggregationMode::Distribution => {
+                matches!(data.kind, MetricKind::Absolute) && Self::distribution_accepts(&data.value)
             }
         }
     }
@@ -378,14 +416,23 @@ impl Aggregate {
         }
 
         let multi_map = match &mut self.mode {
-            InnerMode::Mean { multi_map } | InnerMode::Stdev { multi_map } => {
-                std::mem::take(multi_map)
-            }
+            InnerMode::Mean { multi_map }
+            | InnerMode::Stdev { multi_map }
+            | InnerMode::Distribution { multi_map } => std::mem::take(multi_map),
             _ => HashMap::default(),
         };
 
         'outer: for (series, entries) in multi_map {
             if entries.is_empty() {
+                continue;
+            }
+
+            // Distribution builds its output from the raw entries; `update()` only
+            // works for same-typed metrics and would reject mixed gauge/set/histogram input.
+            if matches!(self.mode, InnerMode::Distribution { .. }) {
+                if let Some((data, metadata)) = Self::distribution_from_entries(&entries) {
+                    output.push(Event::Metric(Metric::from_parts(series, data, metadata)));
+                }
                 continue;
             }
 
@@ -441,6 +488,78 @@ impl Aggregate {
             *prev_map = map;
         }
         emit!(AggregateFlushed);
+    }
+}
+
+impl Aggregate {
+    /// Builds a single sorted `Distribution` from absolute entries of mixed types, merging
+    /// their metadata.
+    ///
+    /// - `Gauge`: one sample.
+    /// - `Set`: one sample per member that parses as `f64`; others are skipped.
+    /// - `Distribution`: existing samples are merged.
+    /// - `AggregatedHistogram`: one sample at each bucket's upper limit per count in the bucket.
+    ///
+    /// Returns `None` when no entry yields a sample, so no empty distribution is emitted.
+    pub(crate) fn distribution_from_entries(
+        entries: &[MetricEntry],
+    ) -> Option<(MetricData, EventMetadata)> {
+        let mut samples = Vec::new();
+
+        for (data, _) in entries {
+            match data.value() {
+                MetricValue::Gauge { value } => samples.push(Sample {
+                    value: *value,
+                    rate: 1,
+                }),
+                MetricValue::Set { values } => {
+                    samples.extend(values.iter().filter_map(|value| {
+                        value
+                            .parse::<f64>()
+                            .ok()
+                            .map(|value| Sample { value, rate: 1 })
+                    }));
+                }
+                MetricValue::Distribution {
+                    samples: existing, ..
+                } => samples.extend(existing.iter().copied()),
+                MetricValue::AggregatedHistogram { buckets, .. } => {
+                    for bucket in buckets {
+                        for _ in 0..bucket.count {
+                            samples.push(Sample {
+                                value: bucket.upper_limit,
+                                rate: 1,
+                            });
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if samples.is_empty() {
+            return None;
+        }
+        samples.sort_by(|a, b| a.value.total_cmp(&b.value));
+
+        let (first_data, first_metadata) = entries.first()?;
+        let metadata =
+            entries
+                .iter()
+                .skip(1)
+                .fold(first_metadata.clone(), |mut acc, (_, metadata)| {
+                    acc.merge(metadata.clone());
+                    acc
+                });
+        let data = MetricData {
+            time: first_data.time,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Distribution {
+                samples,
+                statistic: StatisticKind::Histogram,
+            },
+        };
+        Some((data, metadata))
     }
 }
 
