@@ -266,11 +266,7 @@ impl Application {
                 opts.root.dangerously_allow_env_var_interpolation
                     || sub_command.dangerously_allow_env_var_interpolation(),
             );
-            return Err(runtime.block_on(sub_command.execute(
-                signals,
-                color,
-                opts.root.verbose > 0,
-            )));
+            return Err(runtime.block_on(sub_command.execute(signals, color)));
         }
 
         config::set_env_var_interpolation(opts.root.dangerously_allow_env_var_interpolation);

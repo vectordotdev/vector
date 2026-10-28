@@ -509,7 +509,6 @@ impl SubCommand {
         &self,
         mut signals: signal::SignalPair,
         color: bool,
-        verbose: bool,
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
@@ -525,7 +524,7 @@ impl SubCommand {
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, &mut signals.handler, color, verbose).await,
+            Self::Validate(v) => validate::validate(v, &mut signals.handler, color).await,
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }

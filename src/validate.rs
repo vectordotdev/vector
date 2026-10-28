@@ -181,13 +181,12 @@ pub async fn validate(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
     color: bool,
-    verbose: bool,
 ) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
 
-    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt, verbose).await else {
+    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt).await else {
         return exitcode::CONFIG;
     };
 
@@ -215,7 +214,6 @@ pub async fn validate_config(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
     fmt: &mut Formatter,
-    verbose: bool,
 ) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
@@ -226,12 +224,10 @@ pub async fn validate_config(
 
     // Load
     let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
-
-    let paths_count = paths_list.len();
+    let paths_summary = summarize_paths(&paths_list);
 
     let mut report_error = |errors| {
-        fmt.title(format!("Failed to load {paths_count} config path(s)"));
-        fmt.paths(&paths_list, verbose);
+        fmt.title(format!("Failed to load {paths_summary}"));
         fmt.sub_error(errors);
     };
 
@@ -257,20 +253,43 @@ pub async fn validate_config(
 
     // Warnings
     if warnings.is_empty() {
-        fmt.success(format!("Loaded {paths_count} config path(s)"));
-        fmt.paths(&paths_list, verbose);
+        fmt.success(format!("Loaded {paths_summary}"));
     } else {
         if opts.deny_warnings {
             report_error(warnings);
             return None;
         }
 
-        fmt.title(format!("Loaded {paths_count} config path(s) with warnings"));
-        fmt.paths(&paths_list, verbose);
+        fmt.title(format!("Loaded with warnings {paths_summary}"));
         fmt.sub_warning(warnings);
     }
 
     Some(config)
+}
+
+/// Maximum length of the config paths summary, excluding the trailing
+/// `… and N more` marker. Resolved paths can be numerous (e.g. `**` globs), and
+/// printing all of them would produce an unreadable line of unbounded length.
+const MAX_PATHS_SUMMARY_LEN: usize = 1024;
+
+/// Formats config paths like a `Debug` list, but stops once the summary would
+/// exceed `MAX_PATHS_SUMMARY_LEN` and reports the number of omitted paths.
+fn summarize_paths(paths: &[&PathBuf]) -> String {
+    let mut summary = String::from("[");
+    for (index, path) in paths.iter().enumerate() {
+        // `Debug` escapes control characters and invalid UTF-8 bytes, so a path
+        // can't break the output and distinct paths stay distinguishable.
+        #[allow(clippy::unnecessary_debug_formatting)]
+        let item = format!("{path:?}");
+        let separator = if index == 0 { "" } else { ", " };
+        if summary.len() + separator.len() + item.len() > MAX_PATHS_SUMMARY_LEN {
+            return format!("{summary}{separator}… and {} more]", paths.len() - index);
+        }
+        summary.push_str(separator);
+        summary.push_str(&item);
+    }
+    summary.push(']');
+    summary
 }
 
 /// Builds a `TableRegistry` with stub tables for the configured enrichment tables,
@@ -475,8 +494,9 @@ fn remove_tmp_directory(path: &Path) {
     }
 }
 
-/// Number of config paths listed by default; `-v` lists all of them.
-const MAX_PATHS_SHOWN: usize = 20;
+/// Rust panics with "Formatting argument out of range" for a format width
+/// above `u16::MAX`, so widths derived from line lengths are capped to it.
+const MAX_FORMAT_WIDTH: usize = u16::MAX as usize;
 
 pub struct Formatter {
     /// Width of largest printed line
@@ -515,18 +535,12 @@ impl Formatter {
         }
     }
 
-    /// Width usable as a format width. Rust panics with
-    /// "Formatting argument out of range" for widths above `u16::MAX`.
-    fn clamped_width(&self) -> usize {
-        self.max_line_width.min(usize::from(u16::MAX))
-    }
-
     /// Final confirmation that validation process was successful.
     fn validated(&self) {
-        let max_line_width = self.clamped_width();
+        let width = self.max_line_width.min(MAX_FORMAT_WIDTH);
         #[allow(clippy::print_stdout)]
         {
-            println!("{:-^width$}", "", width = max_line_width);
+            println!("{:-^width$}", "");
         }
         if self.color {
             // Coloring needs to be used directly so that print
@@ -535,12 +549,12 @@ impl Formatter {
             // calculated into the length.
             #[allow(clippy::print_stdout)]
             {
-                println!("{:>width$}", "Validated".green(), width = max_line_width);
+                println!("{:>width$}", "Validated".green(), width = width);
             }
         } else {
             #[allow(clippy::print_stdout)]
             {
-                println!("{:>width$}", "Validated", width = max_line_width);
+                println!("{:>width$}", "Validated", width = width);
             }
         }
     }
@@ -563,30 +577,12 @@ impl Formatter {
     /// Marks sub
     fn title(&mut self, title: impl AsRef<str>) {
         self.space();
-        let width = title.as_ref().chars().count();
-        self.print(format!("{}\n{}\n", title.as_ref(), "-".repeat(width)));
-    }
-
-    /// Lists config paths, one per line. Without `verbose` only the first
-    /// `MAX_PATHS_SHOWN` paths are listed.
-    fn paths(&mut self, paths: &[&PathBuf], verbose: bool) {
-        let shown = if verbose {
-            paths.len()
-        } else {
-            paths.len().min(MAX_PATHS_SHOWN)
-        };
-        for path in &paths[..shown] {
-            // `Debug` escapes control characters and invalid UTF-8 bytes, so every
-            // path stays on its own line and distinct paths stay distinguishable.
-            #[allow(clippy::unnecessary_debug_formatting)]
-            self.print(format!("  {path:?}\n"));
-        }
-        if shown < paths.len() {
-            self.print(format!(
-                "  ... and {} more (use -v to list all)\n",
-                paths.len() - shown
-            ));
-        }
+        self.print(format!(
+            "{}\n{:-<width$}\n",
+            title.as_ref(),
+            "",
+            width = title.as_ref().len().min(MAX_FORMAT_WIDTH)
+        ));
     }
 
     /// A list of warnings that go with a title.
@@ -650,14 +646,51 @@ impl Formatter {
 mod tests {
     use super::*;
 
-    /// Rust panics with "Formatting argument out of range" for format widths
-    /// above `u16::MAX`, so lines longer than that must not be used as widths.
+    #[test]
+    fn summarize_paths_lists_short_input_in_full() {
+        let paths = [PathBuf::from("/a"), PathBuf::from("/b")];
+        let paths: Vec<_> = paths.iter().collect();
+
+        assert_eq!(summarize_paths(&paths), r#"["/a", "/b"]"#);
+        assert_eq!(summarize_paths(&[]), "[]");
+    }
+
+    #[test]
+    fn summarize_paths_truncates_long_input() {
+        let paths: Vec<_> = (0..3000)
+            .map(|i| PathBuf::from(format!("/configs/pipeline_{i:04}/transforms")))
+            .collect();
+        let paths: Vec<_> = paths.iter().collect();
+
+        let summary = summarize_paths(&paths);
+
+        assert!(summary.starts_with(r#"["/configs/pipeline_0000/transforms", "#));
+        assert!(summary.ends_with(" more]"));
+        assert!(summary.contains("… and "));
+        assert!(summary.len() < MAX_PATHS_SUMMARY_LEN + 32);
+    }
+
+    #[test]
+    fn summarize_paths_truncates_single_oversized_path() {
+        let path = PathBuf::from("x".repeat(MAX_PATHS_SUMMARY_LEN * 2));
+
+        assert_eq!(summarize_paths(&[&path]), "[… and 1 more]");
+    }
+
+    #[test]
+    fn summarize_paths_escapes_control_characters() {
+        let path = PathBuf::from("/a\nb");
+
+        assert_eq!(summarize_paths(&[&path]), r#"["/a\nb"]"#);
+    }
+
+    /// Lines longer than `u16::MAX` must not be used as format widths.
     #[test]
     fn formatter_handles_lines_longer_than_u16_max() {
         let mut fmt = Formatter::new(false);
 
-        fmt.title("x".repeat(usize::from(u16::MAX) + 1));
-        fmt.success("y".repeat(usize::from(u16::MAX) + 1));
+        fmt.title("x".repeat(MAX_FORMAT_WIDTH + 1));
+        fmt.success("y".repeat(MAX_FORMAT_WIDTH + 1));
         fmt.validated();
     }
 }
