@@ -125,8 +125,13 @@ impl<'a> ValueCoercer<'a> {
     }
 
     /// Coerces a value in place. On error, some fields may already be coerced.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if `value` does not match the schema, for example when a value has
+    /// the wrong type, an object has a disallowed property, an array has extra elements, or a
+    /// value is not an allowed enum option or constant. Also returns an error if the schema
+    /// contains a missing or unsupported `$ref`.
     pub fn coerce(&mut self, value: &mut Value) -> Result<(), Error> {
         self.path.clear();
         self.coerce_value(value, self.schema)
