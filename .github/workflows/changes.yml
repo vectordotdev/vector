@@ -241,7 +241,7 @@ jobs:
               - ".github/workflows/deny.yml"
             deprecations:
               - 'deprecation.d/**'
-              - 'website/data/deprecations.json'
+              - 'website/content/en/deprecations/enacted/**'
               - "vdev/Cargo.toml"
               - ".github/workflows/deprecation.yaml"
               - ".github/workflows/changes.yml"
@@ -371,6 +371,8 @@ jobs:
             website_tests:
               - "website/**"
               - "!website/cue/**"
+              # Mounted into the website as content; see website/config.toml.
+              - "deprecation.d/**"
               - ".github/workflows/website-tests.yml"
               - ".github/actions/install-vrl-doc-builder/**"
               - ".github/workflows/changes.yml"
