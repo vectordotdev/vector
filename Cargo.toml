@@ -220,6 +220,7 @@ rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
+rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
@@ -484,8 +485,6 @@ regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 # Select MQTT's provider explicitly because VRL also enables Rustls's AWS-LC provider.
 rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-ring"], optional = true }
-# Initialize a shared TLS provider at startup when both Ring and AWS-LC are enabled.
-rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -558,6 +557,7 @@ proptest.workspace = true
 quickcheck.workspace = true
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
+rustls.workspace = true
 serial_test.workspace = true
 similar-asserts.workspace = true
 tempfile.workspace = true

@@ -335,9 +335,7 @@ impl RootOpts {
     /// # Panics
     /// Panics if global metrics initialization fails.
     pub fn init_global(&self) {
-        // VRL enables AWS-LC alongside Ring. Select a default before any clients
-        // are built; installation leaves an existing provider unchanged.
-        _ = rustls::crypto::ring::default_provider().install_default();
+        vector_lib::tls::install_default_crypto_provider();
 
         if !self.openssl_no_probe {
             // SAFETY: Initialization runs before worker threads start.
