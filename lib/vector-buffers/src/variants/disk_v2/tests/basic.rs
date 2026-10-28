@@ -236,9 +236,10 @@ async fn initial_size_correct_with_multievents() {
             drop(ledger);
 
             // Reopen the buffer with a full reader to verify the persisted data.
-            let (writer, mut reader, ledger, usage) =
+            let (mut writer, mut reader, ledger, usage) =
                 create_default_buffer_v2_with_usage::<_, MultiEventRecord>(&data_dir).await;
-            drop(writer);
+            let disk_usage = writer.usage_snapshot();
+            writer.close();
 
             // Make sure our usage data agrees with our expected event count and byte size:
             let snapshot = usage.snapshot();
@@ -246,6 +247,8 @@ async fn initial_size_correct_with_multievents() {
             assert_eq!(expected_bytes as u64, snapshot.received_byte_size);
             assert_eq!(expected_events as u64, ledger.get_total_records());
             assert_eq!(expected_bytes, total_bytes_written);
+            assert_eq!(expected_events as u64, disk_usage.event_count);
+            assert_eq!(expected_bytes as u64, disk_usage.byte_size);
 
             // Make sure we can read all of the records we wrote, and recalculate some of these
             // values from the source:
@@ -260,6 +263,9 @@ async fn initial_size_correct_with_multievents() {
 
             assert_eq!(expected_events, total_record_events);
             assert_eq!(expected_records, total_records_read);
+            let disk_usage = writer.usage_snapshot();
+            assert_eq!(0, disk_usage.event_count);
+            assert_eq!(0, disk_usage.byte_size);
         }
     })
     .await;

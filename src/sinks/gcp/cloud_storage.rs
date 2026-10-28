@@ -580,7 +580,7 @@ mod tests {
 
         let context = SinkContext::default();
 
-        let tls = TlsSettings::default();
+        let tls = TlsSettings::from_options(None).expect("should not fail to create TLS settings");
         let client = HttpClient::new(tls.into(), context.proxy())
             .expect("should not fail to create HTTP client");
 
