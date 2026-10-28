@@ -167,17 +167,22 @@ impl WebSocketSource {
                     Ok(self.handle_ack(&mut ws_sink, ack, stateful).await)
                 }
 
-                Some(msg_result) = ws_source.next() => {
-                    match msg_result {
-                        Ok(msg) => self.handle_message(msg, &mut ping_manager, ack_tx.clone(), &mut out).await,
-                        Err(error) => {
-                            emit!(WebSocketReceiveError { error: &error });
-                            Err(WebSocketSourceError::Tungstenite { source: error })
+                // Split "fairly" between pings and incoming messages
+                () = async {} => {
+                    tokio::select! {
+                        Some(msg_result) = ws_source.next() => {
+                            match msg_result {
+                                Ok(msg) => self.handle_message(msg, &mut ping_manager, ack_tx.clone(), &mut out).await,
+                                Err(error) => {
+                                    emit!(WebSocketReceiveError { error: &error });
+                                    Err(WebSocketSourceError::Tungstenite { source: error })
+                                }
+                            }
                         }
+
+                        res = ping_manager.tick(&mut ws_sink) => res,
                     }
                 }
-
-                res = ping_manager.tick(&mut ws_sink) => res,
             };
 
             if let Err(error) = result {
