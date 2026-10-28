@@ -486,6 +486,7 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_batch_encoding_correct_toml_shape() {
+        use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSchemaMode};
         let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
@@ -505,7 +506,6 @@ mod tests {
         let super::S3BatchEncoding::Parquet(ref p) = batch_enc else {
             panic!("expected Parquet batch encoding");
         };
-        use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSchemaMode};
         assert_eq!(p.schema_mode, ParquetSchemaMode::AutoInfer);
         assert_eq!(p.compression, ParquetCompression::Snappy);
     }
@@ -716,14 +716,14 @@ mod tests {
     #[cfg(feature = "codecs-arrow")]
     #[test]
     fn s3_batch_encoding_rejects_arrow_stream() {
-        let error = serde_yaml::from_str::<S3SinkConfig>(indoc::indoc! {r#"
+        let error = serde_yaml::from_str::<S3SinkConfig>(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
               codec: text
             batch_encoding:
               codec: arrow_stream
-            "#})
+            "})
         .expect_err("S3 must reject unsupported Arrow Stream batch encoding");
 
         assert!(
