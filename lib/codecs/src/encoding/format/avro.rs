@@ -258,7 +258,7 @@ impl Encoder<Event> for AvroSerializer {
 /// Compatibility alias for the shared batch-file compression configuration.
 pub type AvroOcfCompression = BatchSerializerCompression;
 
-/// Convert a VRL LogEvent to an Avro value with logical type coercion and resolution.
+/// Convert a VRL `LogEvent` to an Avro value with logical type coercion and resolution.
 /// This is the single shared path used by both datum and OCF encoders to ensure
 /// they handle dates, times, named schemas, and unions identically.
 fn log_to_avro_value(
@@ -305,6 +305,7 @@ pub struct AvroOcfSerializerConfig {
 
 impl AvroOcfSerializerConfig {
     /// Creates a new `AvroOcfSerializerConfig`.
+    #[must_use]
     pub const fn new(options: AvroSerializerOptions) -> Self {
         Self {
             avro: options,
@@ -312,23 +313,27 @@ impl AvroOcfSerializerConfig {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     /// Build the `AvroOcfSerializer` from this configuration.
     pub fn build(&self) -> Result<AvroOcfSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro OCF serializer: {error}"))?;
-        AvroOcfSerializer::new(
-            schema,
-            resolve_ocf_compression(self.compression)?,
-        )
-        .map_err(|error| format!("Failed resolving Avro schema: {error}").into())
+        AvroOcfSerializer::new(schema, resolve_ocf_compression(self.compression)?)
+            .map_err(|error| format!("Failed resolving Avro schema: {error}").into())
     }
 
     /// The data type of events that are accepted by `AvroOcfSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         schema::Requirement::empty()
     }
@@ -352,7 +357,13 @@ pub struct AvroOcfSerializer {
 
 impl AvroOcfSerializer {
     /// Creates a new `AvroOcfSerializer`.
-    pub fn new(schema: apache_avro::Schema, compression: apache_avro::Codec) -> Result<Self, apache_avro::Error> {
+    /// # Errors
+    ///
+    /// Returns an error if the schema cannot be parsed or resolved.
+    pub fn new(
+        schema: apache_avro::Schema,
+        compression: apache_avro::Codec,
+    ) -> Result<Self, apache_avro::Error> {
         let named_schemas = resolve_named_schemas(&schema)?;
         Ok(Self {
             schema,
@@ -456,7 +467,7 @@ mod tests {
         ];
 
         let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
-            schema: schema_json.clone(),
+            schema: schema_json,
         });
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
@@ -510,7 +521,7 @@ mod tests {
         ))];
 
         let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
-            schema: schema_json.clone(),
+            schema: schema_json,
         });
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
@@ -594,9 +605,9 @@ mod tests {
         ))];
 
         let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
-            schema: schema_json.clone(),
+            schema: schema_json,
         });
-        let mut s1 = config.clone().build().unwrap();
+        let mut s1 = config.build().unwrap();
         let mut s2 = config.build().unwrap();
 
         let mut buf1 = BytesMut::new();
@@ -973,7 +984,9 @@ mod tests {
 
     fn ocf_records(bytes: &[u8]) -> Vec<apache_avro::types::Value> {
         let reader = apache_avro::Reader::new(bytes).expect("Failed to create OCF reader");
-        reader.collect::<Result<Vec<_>, _>>().expect("Failed to read OCF records")
+        reader
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to read OCF records")
     }
 
     #[test]
@@ -1008,13 +1021,14 @@ mod tests {
 
         let record = &records[0];
         let AvroValue::Record(fields) = record else {
-            panic!("Expected Record, got: {:?}", record);
+            panic!("Expected Record, got: {record:?}");
         };
         assert_eq!(fields.len(), 1);
-        assert!(matches!(
-            fields[0].1,
-            AvroValue::Date(19_646)
-        ), "Expected day field to be Date(19646), got: {:?}", fields[0].1);
+        assert!(
+            matches!(fields[0].1, AvroValue::Date(19_646)),
+            "Expected day field to be Date(19646), got: {:?}",
+            fields[0].1
+        );
     }
 
     #[test]
@@ -1049,13 +1063,14 @@ mod tests {
 
         let record = &records[0];
         let AvroValue::Record(fields) = record else {
-            panic!("Expected Record, got: {:?}", record);
+            panic!("Expected Record, got: {record:?}");
         };
         assert_eq!(fields.len(), 1);
-        assert!(matches!(
-            fields[0].1,
-            AvroValue::TimeMillis(59_820_123)
-        ), "Expected millis field to be TimeMillis(59820123), got: {:?}", fields[0].1);
+        assert!(
+            matches!(fields[0].1, AvroValue::TimeMillis(59_820_123)),
+            "Expected millis field to be TimeMillis(59820123), got: {:?}",
+            fields[0].1
+        );
     }
 
     #[test]
@@ -1109,29 +1124,31 @@ mod tests {
 
         let record = &records[0];
         let AvroValue::Record(fields) = record else {
-            panic!("Expected Record, got: {:?}", record);
+            panic!("Expected Record, got: {record:?}");
         };
         assert_eq!(fields.len(), 2);
 
         // Check first field (direct Inner record)
         let first_inner = &fields[0].1;
         let AvroValue::Record(first_fields) = first_inner else {
-            panic!("Expected Record for first field, got: {:?}", first_inner);
+            panic!("Expected Record for first field, got: {first_inner:?}");
         };
-        assert!(matches!(
-            first_fields[0].1,
-            AvroValue::Date(20_000)
-        ), "Expected first.date to be Date(20000), got: {:?}", first_fields[0].1);
+        assert!(
+            matches!(first_fields[0].1, AvroValue::Date(20_000)),
+            "Expected first.date to be Date(20000), got: {:?}",
+            first_fields[0].1
+        );
 
         // Check second field (named reference to Inner)
         let second_inner = &fields[1].1;
         let AvroValue::Record(second_fields) = second_inner else {
-            panic!("Expected Record for second field, got: {:?}", second_inner);
+            panic!("Expected Record for second field, got: {second_inner:?}");
         };
-        assert!(matches!(
-            second_fields[0].1,
-            AvroValue::Date(20_001)
-        ), "Expected second.date to be Date(20001), got: {:?}", second_fields[0].1);
+        assert!(
+            matches!(second_fields[0].1, AvroValue::Date(20_001)),
+            "Expected second.date to be Date(20001), got: {:?}",
+            second_fields[0].1
+        );
     }
 
     #[test]
@@ -1160,11 +1177,21 @@ mod tests {
         let mut bytes = BytesMut::new();
 
         let result = serializer.encode(vec![event], &mut bytes);
-        
-        assert!(result.is_err(), "Expected encode to fail for out-of-range time-millis");
+
+        assert!(
+            result.is_err(),
+            "Expected encode to fail for out-of-range time-millis"
+        );
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("time-millis"), "Error message should mention time-millis, got: {}", err_msg);
-        assert!(bytes.is_empty(), "Buffer should be empty after error, but has {} bytes", bytes.len());
+        assert!(
+            err_msg.contains("time-millis"),
+            "Error message should mention time-millis, got: {err_msg}"
+        );
+        assert!(
+            bytes.is_empty(),
+            "Buffer should be empty after error, but has {} bytes",
+            bytes.len()
+        );
     }
 
     #[test]
@@ -1240,8 +1267,15 @@ mod tests {
         serializer.encode(vec![], &mut bytes).unwrap();
 
         let result = bytes.freeze();
-        assert!(!result.is_empty(), "Empty batch should still produce OCF header");
-        assert_eq!(&result[0..4], b"Obj\x01", "OCF should start with magic bytes");
+        assert!(
+            !result.is_empty(),
+            "Empty batch should still produce OCF header"
+        );
+        assert_eq!(
+            &result[0..4],
+            b"Obj\x01",
+            "OCF should start with magic bytes"
+        );
 
         let records = ocf_records(&result);
         assert_eq!(records.len(), 0, "Empty batch should produce no records");

@@ -414,7 +414,9 @@ impl SerializerConfig {
     #[must_use]
     pub fn input_type(&self) -> DataType {
         match self {
-            SerializerConfig::Avro { avro } => AvroSerializerConfig::new(avro.schema.clone()).input_type(),
+            SerializerConfig::Avro { avro } => {
+                AvroSerializerConfig::new(avro.schema.clone()).input_type()
+            }
             SerializerConfig::Cef(config) => config.input_type(),
             SerializerConfig::Csv(config) => config.input_type(),
             SerializerConfig::Gelf(config) => config.input_type(),
