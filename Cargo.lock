@@ -13555,6 +13555,7 @@ dependencies = [
  "roaring",
  "rstest",
  "rumqttc-v4-next",
+ "rustls",
  "seahash",
  "semver",
  "serde",
