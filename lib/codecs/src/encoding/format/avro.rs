@@ -157,10 +157,12 @@ pub struct AvroSerializerConfig {
 }
 
 impl AvroSerializerConfig {
-    /// Creates a new `AvroSerializerConfig` with optional encoding format.
+    /// Creates a new `AvroSerializerConfig`.
     #[must_use]
-    pub const fn new(options: AvroSerializerOptions) -> Self {
-        Self { avro: options }
+    pub const fn new(schema: String) -> Self {
+        Self {
+            avro: AvroSerializerOptions { schema },
+        }
     }
 
     /// Build the `AvroSerializer` from this configuration.
@@ -420,9 +422,7 @@ mod tests {
         let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
         }));
-        let config = AvroSerializerConfig::new(AvroSerializerOptions {
-            schema: schema_str(),
-        });
+        let config = AvroSerializerConfig::new(schema_str());
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
 
@@ -633,7 +633,7 @@ mod tests {
             ]
         "#}
         .to_owned();
-        let config = AvroSerializerConfig::new(AvroSerializerOptions { schema });
+        let config = AvroSerializerConfig::new(schema);
         let mut serializer = config.build().unwrap();
         let mut bytes = BytesMut::new();
 
