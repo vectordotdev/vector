@@ -142,7 +142,7 @@ pub enum EncoderKind {
     /// Uses framing to encode individual events
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
-    Batch(Box<BatchEncoder>),
+    Batch(BatchEncoder),
 }
 
 #[derive(Debug, Clone)]

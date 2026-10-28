@@ -362,7 +362,7 @@ impl S3SinkConfig {
                 api_options.content_type = batch_encoder.content_type().map(str::to_string);
             }
 
-            let encoder = EncoderKind::Batch(Box::new(batch_encoder));
+            let encoder = EncoderKind::Batch(batch_encoder);
 
             // Auto-detect file extension from the explicitly supported S3 batch format.
             let filename_extension = self
