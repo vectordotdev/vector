@@ -130,7 +130,8 @@ fn prepare_schema(schema: &mut Value) {
         .get(METADATA)
         .and_then(|metadata| metadata.get(SERDE_IGNORED))
         == Some(&Value::Bool(true));
-    // Descriptions/defaults are irrelevant to field recognition and can be large annotations.
+    // Keep field shapes and variant selection; Serde handles value constraints.
+    // Documentation annotations are irrelevant to field recognition and can be large.
     for key in [
         METADATA,
         "title",
@@ -425,12 +426,12 @@ mod tests {
                 "limit": {"type": "integer", "maximum": 9_007_199_254_740_991_u64}
             }
         });
-        assert!(
+        assert_eq!(
             ignored(
                 schema,
-                &json!({"payload": {"any": {"key": true}}, "timezone": "local", "limit": u64::MAX})
-            )
-            .is_empty()
+                &json!({"payload": {"any": {"key": true}}, "timezone": "local", "limit": u64::MAX, "typo": true})
+            ),
+            ["/typo"]
         );
     }
 }

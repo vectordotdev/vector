@@ -146,9 +146,7 @@ impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Vec<String>> {
         let (config, warnings) = self.build_with_warnings()?;
 
-        for warning in warnings {
-            warn!(internal_log_rate_limit = false, "{warning}");
-        }
+        super::loading::log_warnings(&warnings);
 
         Ok(config)
     }

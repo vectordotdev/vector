@@ -167,14 +167,9 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
 /// interpolated, parsed, merged, or deserialized, or if the resulting configuration fails to
 /// build. Config files that cannot be opened are logged and skipped.
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
-    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
-    let (config, build_warnings) = builder.build_with_warnings()?;
-
-    for warning in build_warnings {
-        warn!(internal_log_rate_limit = false, "{warning}");
-    }
-
-    Ok(config)
+    ConfigBuilderLoader::default()
+        .load_from_paths(config_paths)?
+        .build()
 }
 
 /// Loads a configuration from paths. Handle secret replacement and if a provider is present
@@ -264,9 +259,7 @@ async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> 
 
     validation::check_buffer_preconditions(&new_config).await?;
 
-    for warning in build_warnings {
-        warn!(internal_log_rate_limit = false, "{warning}");
-    }
+    log_warnings(&build_warnings);
 
     Ok(new_config)
 }
@@ -344,14 +337,14 @@ pub fn load_source_from_paths(
 /// Returns error messages if the input cannot be parsed or deserialized, cannot be appended to
 /// the config builder, or if the resulting configuration fails to build.
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
-    let builder = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
-    let (config, build_warnings) = builder.build_with_warnings()?;
+    load_from_inputs(std::iter::once((input.as_bytes(), format)))?.build()
+}
 
-    for warning in build_warnings {
-        warn!(internal_log_rate_limit = false, "{warning}");
+pub(super) fn log_warnings(warnings: &[String]) {
+    if !warnings.is_empty() {
+        // Keep every warning visible on the first load while rate limiting repeated loads.
+        warn!(warnings = ?warnings, "Configuration warnings.");
     }
-
-    Ok(config)
 }
 
 fn load_from_inputs(

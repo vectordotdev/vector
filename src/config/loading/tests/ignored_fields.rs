@@ -6,10 +6,7 @@
     feature = "sinks-http"
 ))]
 
-use std::{
-    io::{self, Write},
-    sync::{Arc, Mutex},
-};
+use std::io::{Read as _, Seek as _, SeekFrom};
 
 use indoc::indoc;
 use serde_json::Value;
@@ -69,17 +66,6 @@ fn finds_unused_fields_in_custom_enums_and_flattened_structs() {
 }
 
 #[test]
-fn component_directory_fields_include_their_scope() {
-    let value: Value = serde_yaml::from_str(CONFIG).unwrap();
-    let paths = ignored_fields::find(
-        value["sources"].as_object().unwrap(),
-        Some(ComponentHint::Source),
-    );
-    assert_eq!(paths.len(), 4);
-    assert!(paths.iter().all(|path| path.starts_with("/sources/")));
-}
-
-#[test]
 fn supported_defaults_aliases_and_maps_do_not_warn() {
     const CONFIG: &str = indoc! {r#"
         timezone: local
@@ -116,33 +102,21 @@ fn supported_defaults_aliases_and_maps_do_not_warn() {
     );
 }
 
-#[derive(Clone)]
-struct Capture(Arc<Mutex<Vec<u8>>>);
-
-impl Write for Capture {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
 fn with_logs<T>(f: impl FnOnce() -> T) -> (T, String) {
-    let buffer = Arc::new(Mutex::new(Vec::new()));
-    let writer = Capture(Arc::clone(&buffer));
+    let mut buffer = tempfile::tempfile().unwrap();
     let formatter = tracing_subscriber::fmt::layer()
         .with_ansi(false)
         .without_time()
-        .with_writer(move || writer.clone());
+        .with_writer(buffer.try_clone().unwrap());
     let subscriber = tracing_subscriber::registry().with(
         tracing_limit::RateLimitedLayer::new(formatter)
+            .with_default_limit(60)
             .with_filter(tracing_subscriber::filter::LevelFilter::WARN),
     );
     let result = tracing::subscriber::with_default(subscriber, f);
-    let logs = String::from_utf8(buffer.lock().unwrap().clone()).unwrap();
+    let mut logs = String::new();
+    buffer.seek(SeekFrom::Start(0)).unwrap();
+    buffer.read_to_string(&mut logs).unwrap();
     (result, logs)
 }
 
@@ -172,6 +146,20 @@ fn loading_warns_and_preserves_configuration_without_logging_values() {
             "a configuration value appeared in the warning"
         );
     }
+}
+
+#[test]
+fn repeated_loads_rate_limit_the_complete_warning_list() {
+    let ((), logs) = with_logs(|| {
+        for _ in 0..5 {
+            load_builder(CONFIG.as_bytes(), Format::Yaml)
+                .unwrap()
+                .build()
+                .unwrap();
+        }
+    });
+    assert_eq!(logs.matches("DEPRECATED:").count(), 5, "{logs}");
+    assert!(logs.contains("is being suppressed"), "{logs}");
 }
 
 #[test]

@@ -33,8 +33,8 @@ files, including:
 
 ### Ignored fields
 
-Vector warns about configuration fields that it accepts but ignores, including misspelled settings
-and options that do not apply to the selected strategy. These warnings include field paths without
+Vector warns about fields discarded during deserialization, including misspelled settings
+and fields belonging to a different enum variant. These warnings include field paths without
 printing their values. Correct the settings before a future release rejects them; see the
 [migration notice](/deprecations/#ignored-configuration-fields).
 
