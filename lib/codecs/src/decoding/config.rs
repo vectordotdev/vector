@@ -43,11 +43,11 @@ impl DecodingConfig {
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured deserializer cannot be built. See
+    /// [`DeserializerConfig::build`] for codec-specific errors.
     pub fn build(&self) -> vector_common::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();
