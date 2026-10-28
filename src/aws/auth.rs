@@ -4,7 +4,7 @@ use std::time::Duration;
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, identity::IdentityCache, imds,
     profile::ProfileFileCredentialsProvider, provider_config::ProviderConfig,
-    sts::AssumeRoleProviderBuilder,
+    sts::AssumeRoleProviderBuilder, timeout::TimeoutConfig,
 };
 use aws_credential_types::{Credentials, provider::SharedCredentialsProvider};
 use aws_runtime::env_config::file::{EnvConfigFileKind, EnvConfigFiles};
@@ -247,18 +247,20 @@ impl AwsAuthentication {
         assume_role: &str,
         external_id: Option<&str>,
         session_name: Option<&str>,
+        load_timeout_secs: Option<u64>,
     ) -> crate::Result<AssumeRoleProviderBuilder> {
         let connector = super::AwsHttpClient {
             http: super::connector(proxy, tls_options)?,
             region: region.clone(),
             emit_bytes_sent: false,
         };
-        let config = SdkConfig::builder()
+        let mut config_builder = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
             .time_source(SystemTimeSource::new())
-            .use_fips(resolve_use_fips().await.unwrap_or(false))
-            .build();
+            .use_fips(resolve_use_fips().await.unwrap_or(false));
+        config_builder.set_timeout_config(load_timeout_config(load_timeout_secs));
+        let config = config_builder.build();
 
         let mut builder = AssumeRoleProviderBuilder::new(assume_role)
             .region(region.clone())
@@ -280,6 +282,10 @@ impl AwsAuthentication {
     #[allow(
         clippy::missing_errors_doc,
         reason = "Audit and document the existing error contracts separately from lint enforcement."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep one match arm per authentication strategy"
     )]
     pub async fn credentials_provider(
         &self,
@@ -311,6 +317,7 @@ impl AwsAuthentication {
                         assume_role,
                         external_id.as_deref(),
                         session_name.as_deref(),
+                        None,
                     )
                     .await?;
 
@@ -351,10 +358,10 @@ impl AwsAuthentication {
             AwsAuthentication::Role {
                 assume_role,
                 external_id,
+                load_timeout_secs,
                 imds,
                 region,
                 session_name,
-                ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let builder = Self::assume_role_provider_builder(
@@ -364,24 +371,36 @@ impl AwsAuthentication {
                     assume_role,
                     external_id.as_deref(),
                     session_name.as_deref(),
+                    *load_timeout_secs,
                 )
                 .await?;
 
                 let provider = builder
                     .build_from_provider(
-                        default_credentials_provider(auth_region, proxy, tls_options, *imds)
-                            .await?,
+                        default_credentials_provider(
+                            auth_region,
+                            proxy,
+                            tls_options,
+                            *imds,
+                            *load_timeout_secs,
+                        )
+                        .await?,
                     )
                     .await;
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
-            AwsAuthentication::Default { imds, region, .. } => Ok(SharedCredentialsProvider::new(
+            AwsAuthentication::Default {
+                load_timeout_secs,
+                imds,
+                region,
+            } => Ok(SharedCredentialsProvider::new(
                 default_credentials_provider(
                     region.clone().map(Region::new).unwrap_or(service_region),
                     proxy,
                     tls_options,
                     *imds,
+                    *load_timeout_secs,
                 )
                 .await?,
             )),
@@ -404,6 +423,22 @@ impl AwsAuthentication {
     }
 }
 
+/// Builds the timeout configuration for the STS/SSO clients used to load credentials.
+///
+/// Credential providers that are not wrapped in an `IdentityCache` (such as those used for request
+/// signing) never see the cache's load timeout, so these clients would otherwise fall back to the
+/// SDK's default connect timeout. Returns `None` when no timeout is configured, preserving the SDK
+/// defaults.
+fn load_timeout_config(load_timeout_secs: Option<u64>) -> Option<TimeoutConfig> {
+    load_timeout_secs.map(|secs| {
+        let timeout = Duration::from_secs(secs);
+        TimeoutConfig::builder()
+            .connect_timeout(timeout)
+            .operation_timeout(timeout)
+            .build()
+    })
+}
+
 /// Resolves the FIPS endpoint setting from the environment variable
 /// `AWS_USE_FIPS_ENDPOINT`.
 ///
@@ -418,6 +453,7 @@ async fn default_credentials_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     imds: ImdsAuthentication,
+    load_timeout_secs: Option<u64>,
 ) -> crate::Result<SharedCredentialsProvider> {
     let connector = super::AwsHttpClient {
         http: super::connector(proxy, tls_options)?,
@@ -425,10 +461,15 @@ async fn default_credentials_provider(
         emit_bytes_sent: false,
     };
 
-    let provider_config = ProviderConfig::empty()
+    let mut provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))
         .with_http_client(connector)
         .with_use_fips(resolve_use_fips().await);
+    // Applies to the STS/SSO clients created by the chain (web identity, profile). IMDS uses its
+    // own timeouts below, and the ECS provider's timeouts are not configurable through the chain.
+    if let Some(timeout_config) = load_timeout_config(load_timeout_secs) {
+        provider_config = provider_config.with_timeout_config(timeout_config);
+    }
 
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)
@@ -765,5 +806,24 @@ mod tests {
             }
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn load_timeout_config_uses_load_timeout() {
+        let timeout_config = load_timeout_config(Some(15)).unwrap();
+
+        assert_eq!(
+            timeout_config.connect_timeout(),
+            Some(Duration::from_secs(15))
+        );
+        assert_eq!(
+            timeout_config.operation_timeout(),
+            Some(Duration::from_secs(15))
+        );
+    }
+
+    #[test]
+    fn load_timeout_config_defaults_to_sdk() {
+        assert!(load_timeout_config(None).is_none());
     }
 }
