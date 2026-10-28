@@ -4,7 +4,10 @@
      Each notice is a map with `what`, `deprecated_since`, `removed_in` (enacted
      only) and the rendered body as `content`. Versions are normalized to
      X.Y.Z: fragments may use the "0.56" shorthand, which means "0.56.0".
-     Both lists are sorted by `deprecated_since`, newest first. */}}
+     Active notices are sorted by `deprecated_since`, newest first. Enacted
+     notices are sorted by `removed_in`, newest first, then by
+     `deprecated_since`, newest first (`sort` is stable, so the secondary key
+     is applied first). */}}
 {{- $active := slice -}}
 {{- $enacted := slice -}}
 {{- with site.GetPage "/deprecations" -}}
@@ -23,5 +26,5 @@
 {{- end -}}
 {{- return (dict
   "active" (sort $active "deprecated_since" "desc")
-  "enacted" (sort $enacted "deprecated_since" "desc")
+  "enacted" (sort (sort $enacted "deprecated_since" "desc") "removed_in" "desc")
 ) -}}
