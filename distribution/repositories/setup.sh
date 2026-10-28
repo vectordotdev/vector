@@ -259,7 +259,9 @@ if ! command -v curl >/dev/null || ! command -v gpg >/dev/null || [[ ! -s /etc/s
         "${sudo_cmd[@]}" apt-get update || printf 'Some indexes could not refresh; attempting prerequisite installation.\n' >&2
         "${sudo_cmd[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl gnupg
     else
-        "${sudo_cmd[@]}" "$package_manager" -y --disablerepo=vector install ca-certificates curl gnupg2
+        prerequisites=(ca-certificates gnupg2)
+        if ! command -v curl >/dev/null; then prerequisites+=(curl); fi
+        "${sudo_cmd[@]}" "$package_manager" -y --disablerepo=vector install "${prerequisites[@]}"
     fi
 fi
 

@@ -25,11 +25,12 @@ permissions: {}
 # All channels share the apt pool and one S3 publication control object.
 concurrency:
   group: package-repositories
+  queue: max
   cancel-in-progress: false
 
 jobs:
   # Freeze verified release assets and the reviewed tooling checkout.
-  # Jobs install the opt-in binary published with the vdev version in that checkout.
+  # Jobs install the publisher version and SHA-256 pinned by that checkout.
   # Trust authorized GitHub release publishers: run/tag and checksum checks do not
   # prove build provenance. Stronger provenance verification is deferred.
   # Enable only after historical backfill and the repository/key migration are ready.

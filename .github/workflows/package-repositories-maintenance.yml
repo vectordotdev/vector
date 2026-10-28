@@ -23,11 +23,12 @@ permissions: {}
 
 concurrency:
   group: package-repositories
+  queue: max
   cancel-in-progress: false
 
 jobs:
   # Inspect S3 state, prepare a rollback, or recover a lock with the publishing role.
-  # Every job uses the vdev version pinned by the reviewed workflow checkout.
+  # Every job uses the publisher version and SHA-256 pinned by the reviewed checkout.
   # Available even when automated publication is disabled.
   #
   # Recover after a workflow dies during upload (GitHub Actions -> this workflow):
