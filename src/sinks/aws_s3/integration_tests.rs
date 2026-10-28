@@ -530,7 +530,8 @@ async fn s3_avro_ocf_insert_message() {
 
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, &cx, &validated).unwrap();
 
     let (batch_notifier, receiver) = BatchNotifier::new_with_receiver();
     let events: Vec<Event> = (0..10)
