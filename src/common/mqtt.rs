@@ -135,10 +135,9 @@ impl MqttConnector {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn tls_crypto_provider_is_unambiguous() {
-        // Rustls panics here if no provider, or both Ring and AWS-LC, are enabled.
-        let _config = rustls::ClientConfig::builder()
-            .with_root_certificates(rustls::RootCertStore::empty())
-            .with_no_client_auth();
+    fn tls_config_uses_explicit_crypto_provider() {
+        // Exercise MQTT's provider selection, including when VRL enables AWS-LC.
+        rumqttc::TlsConfiguration::try_default_rustls()
+            .expect("MQTT TLS should select Ring without a process-wide default provider");
     }
 }
