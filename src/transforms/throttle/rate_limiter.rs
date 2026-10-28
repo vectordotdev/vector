@@ -4,7 +4,7 @@ use governor::{RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::Das
 use tokio;
 
 use super::transform::Throttle;
-use crate::cpu_time::spawn_timed;
+use vector_lib::cpu_time::spawn_timed;
 
 /// Re-usable wrapper around the structs/type from the governor crate.
 /// Spawns a background task that periodically flushes keys that haven't been accessed recently.

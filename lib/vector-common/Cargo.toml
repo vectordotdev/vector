@@ -56,11 +56,21 @@ serde_json.workspace = true
 smallvec = { version = "1", default-features = false }
 strum.workspace = true
 stream-cancel = { version = "0.8.2", default-features = false }
+# `tracing` exposes `tokio::task::Builder::name` under `cfg(tokio_unstable)`.
 tokio = { workspace = true, features = ["macros", "rt", "time", "tracing"] }
 tracing.workspace = true
 vrl.workspace = true
 vector-config.workspace = true
 vector-common-macros.workspace = true
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+] }
 
 [dev-dependencies]
 futures = { version = "0.3.31", default-features = false, features = ["async-await"] }

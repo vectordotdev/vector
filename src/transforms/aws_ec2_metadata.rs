@@ -18,6 +18,7 @@ use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
 use vector_lib::{
     configurable::configurable_component,
+    cpu_time::spawn_timed,
     lookup::{
         OwnedTargetPath,
         lookup_v2::{OptionalTargetPath, OwnedSegment},
@@ -30,7 +31,6 @@ use crate::{
     config::{
         DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
     },
-    cpu_time::spawn_timed,
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},

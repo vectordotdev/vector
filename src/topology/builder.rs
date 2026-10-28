@@ -31,6 +31,7 @@ use vector_lib::{
             },
         },
     },
+    cpu_time::{self, CpuTimedExt, spawn_timed},
     enrichment::Table,
     extra_context::ExtraContext,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
@@ -39,6 +40,10 @@ use vector_lib::{
     source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
     spawn_named,
     transform::update_runtime_schema_definition,
+    utilization::{
+        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
+        UtilizationRegistry,
+    },
 };
 use vector_lib::{gauge, internal_event::GaugeName};
 use vector_vrl_metrics::MetricsStorage;
@@ -56,16 +61,11 @@ use crate::{
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
         TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
-    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{
-        OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
-        UtilizationRegistry,
-    },
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -578,7 +578,7 @@ impl<'a> Builder<'a> {
             // `None` when `measure_cpu_usage` is false (the default): no counter
             // is registered and no per-poll `ThreadTime` measurement takes place.
             cpu_ns: if transform.measure_cpu_usage {
-                Some(crate::cpu_time::register_counter())
+                Some(cpu_time::register_counter())
             } else {
                 None
             },

@@ -42,6 +42,7 @@ mod test_util;
 pub mod time;
 pub mod tls;
 pub mod transform;
+pub mod utilization;
 pub mod vrl;
 
 use std::path::PathBuf;
