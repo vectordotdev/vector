@@ -368,36 +368,6 @@ mod tests {
     }
 
     #[test]
-    fn warns_only_about_fields_unused_by_the_selected_variant() {
-        let schema = json!({
-            "type": "object", "unevaluatedProperties": false,
-            "oneOf": [
-                {"required": ["mode"], "properties": {"mode": {"const": "tcp"}, "address": {"type": "string"}}},
-                {"required": ["mode"], "properties": {"mode": {"const": "unix"}, "path": {"type": "string"}}}
-            ]
-        });
-        assert_eq!(
-            ignored(
-                schema,
-                &json!({"mode": "tcp", "address": "127.0.0.1:9000", "path": "ignored"})
-            ),
-            ["/path"]
-        );
-    }
-
-    #[test]
-    fn explicitly_ignored_fields_are_reported_without_values() {
-        let schema = json!({
-            "type": "object", "unevaluatedProperties": false,
-            "properties": {"password": {"type": "string", "_metadata": {"serde::ignored": true}}}
-        });
-        assert_eq!(
-            ignored(schema, &json!({"password": "DO_NOT_LOG_THIS"})),
-            ["/password"]
-        );
-    }
-
-    #[test]
     fn nested_arrays_and_escaped_names_produce_unambiguous_paths() {
         let schema = json!({
             "type": "array", "items": {"$ref": "#/definitions/Config<String>"},

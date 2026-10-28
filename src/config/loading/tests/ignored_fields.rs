@@ -50,22 +50,6 @@ const CONFIG: &str = indoc! {r#"
 "#};
 
 #[test]
-fn finds_unused_fields_in_custom_enums_and_flattened_structs() {
-    let value: Value = serde_yaml::from_str(CONFIG).unwrap();
-    let paths = ignored_fields::find(value.as_object().unwrap(), None);
-    assert_eq!(
-        paths,
-        [
-            "/sinks/out/request/retry_atempts",
-            "/sources/files/fingerprinting/ignored_header_bytes",
-            "/sources/files/fingerprinting/unknown_option",
-            "/sources/http/auth/password",
-            "/sources/http/auth/username",
-        ]
-    );
-}
-
-#[test]
 fn supported_defaults_aliases_and_maps_do_not_warn() {
     const CONFIG: &str = indoc! {r#"
         timezone: local
@@ -121,20 +105,30 @@ fn with_logs<T>(f: impl FnOnce() -> T) -> (T, String) {
 }
 
 #[test]
-fn loading_warns_and_preserves_configuration_without_logging_values() {
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(false)
-        .load_from_input(CONFIG.as_bytes(), Format::Yaml)
-        .unwrap();
+fn loading_warns_without_changing_values_or_flooding_logs() {
     let expected: ConfigBuilder = serde_yaml::from_str(CONFIG).unwrap();
-    assert_eq!(
-        serde_json::to_value(&builder).unwrap(),
-        serde_json::to_value(expected).unwrap()
-    );
-    let (_, logs) = with_logs(|| builder.build().unwrap());
+    let expected = serde_json::to_value(expected).unwrap();
+    let ((), logs) = with_logs(|| {
+        for _ in 0..5 {
+            let builder = ConfigBuilderLoader::default()
+                .interpolate_env(false)
+                .load_from_input(CONFIG.as_bytes(), Format::Yaml)
+                .unwrap();
+            assert_eq!(serde_json::to_value(&builder).unwrap(), expected);
+            builder.build().unwrap();
+        }
+    });
     assert_eq!(logs.matches("DEPRECATED:").count(), 5, "{logs}");
-    assert!(logs.contains("/sources/http/auth/password"), "{logs}");
-    assert!(logs.contains("/sinks/out/request/retry_atempts"), "{logs}");
+    assert!(logs.contains("is being suppressed"), "{logs}");
+    for path in [
+        "/sinks/out/request/retry_atempts",
+        "/sources/files/fingerprinting/ignored_header_bytes",
+        "/sources/files/fingerprinting/unknown_option",
+        "/sources/http/auth/password",
+        "/sources/http/auth/username",
+    ] {
+        assert_eq!(logs.matches(path).count(), 1, "{logs}");
+    }
     for secret in [
         "BEARER_SECRET",
         "UNUSED_USERNAME",
@@ -146,20 +140,6 @@ fn loading_warns_and_preserves_configuration_without_logging_values() {
             "a configuration value appeared in the warning"
         );
     }
-}
-
-#[test]
-fn repeated_loads_rate_limit_the_complete_warning_list() {
-    let ((), logs) = with_logs(|| {
-        for _ in 0..5 {
-            load_builder(CONFIG.as_bytes(), Format::Yaml)
-                .unwrap()
-                .build()
-                .unwrap();
-        }
-    });
-    assert_eq!(logs.matches("DEPRECATED:").count(), 5, "{logs}");
-    assert!(logs.contains("is being suppressed"), "{logs}");
 }
 
 #[test]
