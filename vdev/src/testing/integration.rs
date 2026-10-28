@@ -85,6 +85,21 @@ struct ImageInspect {
 struct ImageConfig {
     #[serde(default)]
     labels: Option<BTreeMap<String, String>>,
+    // Runtime config that `docker commit` copies from the runner container. vdev creates that
+    // container without overriding these, so they match the runner image's unless the runner
+    // changed. `Cmd` and `WorkingDir` are left out because vdev sets them on the container.
+    #[serde(default)]
+    env: Option<Vec<String>>,
+    #[serde(default)]
+    entrypoint: Option<Vec<String>>,
+    #[serde(default)]
+    user: Option<String>,
+}
+
+impl ImageConfig {
+    fn same_runtime_config(&self, other: &Self) -> bool {
+        self.env == other.env && self.entrypoint == other.entrypoint && self.user == other.user
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Deserialize)]
@@ -112,12 +127,14 @@ impl ImageInspect {
     /// Whether this image was committed from a container of `runner` holding a Vector binary
     /// with sha256 `binary_digest`.
     ///
-    /// This compares filesystem layers, not image IDs: rebuilding the runner image from cache
-    /// yields the same layers but can yield a new ID (e.g. with the containerd image store).
+    /// This compares filesystem layers and runtime config, not image IDs: rebuilding the runner
+    /// image from cache yields the same layers but can yield a new ID (e.g. with the containerd
+    /// image store). Config-only changes such as `ENV` keep the layers, hence the config check.
     fn is_committed_from(&self, runner: &ImageInspect, binary_digest: &str) -> bool {
         self.label(E2E_VECTOR_BINARY_LABEL) == Some(binary_digest)
             && self.root_fs.layers.len() == runner.root_fs.layers.len() + 1
             && self.root_fs.layers.starts_with(&runner.root_fs.layers)
+            && self.config.same_runtime_config(&runner.config)
     }
 }
 
@@ -665,6 +682,7 @@ mod tests {
                 labels: binary.map(|digest| {
                     BTreeMap::from([(E2E_VECTOR_BINARY_LABEL.to_string(), digest.to_string())])
                 }),
+                ..ImageConfig::default()
             },
             root_fs: ImageRootFs {
                 layers: layers.iter().map(ToString::to_string).collect(),
@@ -676,10 +694,11 @@ mod tests {
     fn parses_image_inspect_output() {
         let output = r#"[{
             "Id": "sha256:committed",
-            "Config": {"Cmd": ["/bin/sleep", "infinity"], "Labels": {
-                "vector-test-runner": "true",
-                "vector.e2e.binary-sha256": "abc"
-            }},
+            "Config": {
+                "Cmd": ["/bin/sleep", "infinity"], "Env": ["PATH=/usr/bin"],
+                "Entrypoint": null, "User": "",
+                "Labels": {"vector-test-runner": "true", "vector.e2e.binary-sha256": "abc"}
+            },
             "RootFS": {"Type": "layers", "Layers": ["sha256:a", "sha256:b"]}
         }]"#;
         assert_eq!(
@@ -690,6 +709,9 @@ mod tests {
                         ("vector-test-runner".to_string(), "true".to_string()),
                         (E2E_VECTOR_BINARY_LABEL.to_string(), "abc".to_string()),
                     ])),
+                    env: Some(vec!["PATH=/usr/bin".to_string()]),
+                    entrypoint: None,
+                    user: Some(String::new()),
                 },
                 ..image("sha256:committed", None, &["sha256:a", "sha256:b"])
             }
@@ -728,6 +750,66 @@ mod tests {
         // The runner image itself is never mistaken for a committed image.
         let labeled_runner = image("sha256:runner", Some("abc"), &["sha256:a", "sha256:b"]);
         assert!(!labeled_runner.is_committed_from(&runner, "abc"));
+    }
+
+    /// `docker image inspect` output for a runner image with the given runtime config.
+    fn runner_inspect(env: &str, entrypoint: &str, user: &str) -> ImageInspect {
+        ImageInspect::parse(&format!(
+            r#"[{{
+                "Id": "sha256:runner",
+                "Config": {{
+                    "Env": {env}, "Entrypoint": {entrypoint}, "User": {user},
+                    "Cmd": ["bash"], "WorkingDir": "/vector",
+                    "Labels": {{"vector-test-runner": "true"}}
+                }},
+                "RootFS": {{"Layers": ["sha256:a", "sha256:b"]}}
+            }}]"#
+        ))
+        .unwrap()
+    }
+
+    /// An image committed from a runner container: vdev creates the container with its own
+    /// command and working directory, and commits it with the binary label.
+    fn committed_inspect() -> ImageInspect {
+        ImageInspect::parse(
+            r#"[{
+                "Id": "sha256:e2e",
+                "Config": {
+                    "Env": ["PATH=/usr/local/cargo/bin:/usr/bin"], "Entrypoint": null, "User": "",
+                    "Cmd": ["/bin/sleep", "infinity"], "WorkingDir": "/home/vector",
+                    "Labels": {"vector-test-runner": "true", "vector.e2e.binary-sha256": "abc"}
+                },
+                "RootFS": {"Layers": ["sha256:a", "sha256:b", "sha256:c"]}
+            }]"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn reuses_image_despite_container_command_and_working_dir() {
+        let runner = runner_inspect(r#"["PATH=/usr/local/cargo/bin:/usr/bin"]"#, "null", r#""""#);
+        assert!(committed_inspect().is_committed_from(&runner, "abc"));
+    }
+
+    #[test]
+    fn does_not_reuse_image_after_runner_runtime_config_changes() {
+        let path = r#"["PATH=/usr/local/cargo/bin:/usr/bin"]"#;
+        // Config-only Dockerfile changes keep the same layers.
+        for runner in [
+            runner_inspect(
+                r#"["PATH=/usr/local/cargo/bin:/usr/bin", "FOO=bar"]"#,
+                "null",
+                r#""""#,
+            ),
+            runner_inspect(path, r#"["/bin/sh", "-c"]"#, r#""""#),
+            runner_inspect(path, "null", r#""vector""#),
+        ] {
+            assert!(
+                !committed_inspect().is_committed_from(&runner, "abc"),
+                "{:?}",
+                runner.config
+            );
+        }
     }
 }
 
