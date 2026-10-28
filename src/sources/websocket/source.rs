@@ -4,6 +4,7 @@ use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
+use tempfile::NamedTempFile;
 use tokio::{sync::mpsc::Sender, time};
 use tokio_tungstenite::tungstenite::{
     Message, error::Error as TungsteniteError, protocol::CloseFrame,
@@ -246,9 +247,28 @@ impl WebSocketSource {
             .as_ref()
             .map(|p| p.join(LAST_RECEIVED_MESSAGE_ID_FILE_NAME))
             && let Some(last_message_id) = &self.last_received_message_id
-            && let Err(err) = tokio::fs::write(path, last_message_id).await
         {
-            error!(message = "Persisting last received message id failed.", %err);
+            let mut parent = path.clone();
+
+            if parent.pop() {
+                if parent == *"" {
+                    parent = ".".into();
+                }
+
+                match NamedTempFile::new_in(parent) {
+                    Ok(temp) => {
+                        if let Err(err) = tokio::fs::write(temp.path(), last_message_id).await {
+                            error!(message = "Persisting last received message id failed.", %err);
+                        }
+                        if let Err(err) = temp.persist(path) {
+                            error!(message = "Persisting last received message id failed.", %err);
+                        }
+                    }
+                    Err(err) => warn!(
+                        message = "Persisting last received message id failed. Couldn't open temporary file.", %err
+                    ),
+                }
+            }
         }
     }
 
