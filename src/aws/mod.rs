@@ -137,11 +137,10 @@ pub trait ClientBuilder {
 }
 
 /// Provides the configured AWS region.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+///
+/// # Errors
+///
+/// Returns an error if the TLS settings are invalid or the proxy or TLS connector cannot be built.
 pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
@@ -178,11 +177,11 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+///
+/// # Errors
+///
+/// Returns an error if the client cannot be created. See [`create_client_and_region`] for the
+/// specific errors.
 pub async fn create_client<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -201,11 +200,12 @@ where
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+///
+/// # Errors
+///
+/// Returns an error if no region is configured and none can be resolved from the environment,
+/// profile files, or IMDS; if the TLS settings are invalid or the proxy or TLS connector cannot
+/// be built; or if the credentials provider for `auth` cannot be created.
 pub async fn create_client_and_region<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -290,15 +290,16 @@ enum SigningError {
 
 /// Sign the request prior to sending to AWS.
 /// The signature is added to the provided `request`.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Audit and document the existing panic conditions separately from lint enforcement."
-)]
+///
+/// # Errors
+///
+/// Returns an error if a header value is not valid UTF-8, the credentials cannot be
+/// provided, or the request cannot be signed.
+///
+/// # Panics
+///
+/// Panics if the access key ID, region, or service name contains characters that are not valid
+/// in an HTTP header value, such as a newline.
 pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
@@ -340,6 +341,11 @@ pub async fn sign_request(
 ///
 /// Returns an error if a header value is not valid UTF-8, the credentials cannot be
 /// provided, or the request cannot be signed.
+///
+/// # Panics
+///
+/// Panics if the access key ID, region, or service name contains characters that are not valid
+/// in an HTTP header value, such as a newline.
 pub async fn sign_request_v1(
     service_name: &str,
     request: &mut http_1::Request<Bytes>,
