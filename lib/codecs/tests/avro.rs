@@ -9,8 +9,9 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use codecs::{
+    avro::{AvroEncoding, AvroSchemaSource},
     decoding::format::{AvroDeserializerConfig, Deserializer},
-    encoding::format::AvroSerializerConfig,
+    encoding::format::{AvroOcfSerializerConfig, AvroSerializerConfig, AvroSerializerOptions},
 };
 use rstest::*;
 use similar_asserts::assert_eq;
@@ -22,14 +23,14 @@ use vector_core::{config::LogNamespace, event::Event};
 #[case(false)]
 fn roundtrip_avro_fixtures(
     #[files("tests/data/avro/generated/*.avro")]
-    #[exclude(".*fixed.avro")]
+    #[exclude(".*(fixed|ocf).avro")]
     path: PathBuf,
     #[case] reserialize: bool,
 ) {
     let schema_path = path.as_path().with_extension("avsc");
     assert!(schema_path.exists());
 
-    roundtrip_avro(path, schema_path, reserialize);
+    roundtrip_avro(&path, &schema_path, reserialize);
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
@@ -37,15 +38,15 @@ fn roundtrip_avro_fixtures(
     clippy::needless_pass_by_value,
     reason = "Keep the existing owned-argument API during the lint rollout."
 )]
-fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
-    let schema = load_file(&schema_path);
+fn roundtrip_avro(data_path: &Path, schema_path: &Path, reserialize: bool) {
+    let schema = load_file(schema_path);
     let schema = from_utf8(&schema).unwrap().to_string();
     let deserializer = AvroDeserializerConfig::new(schema.clone(), false)
         .build()
         .unwrap();
     let mut serializer = AvroSerializerConfig::new(schema).build().unwrap();
 
-    let (buf, event) = load_deserialize(&data_path, &deserializer);
+    let (buf, event) = load_deserialize(data_path, &deserializer);
 
     if reserialize {
         // Serialize the parsed event
@@ -65,6 +66,62 @@ fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
         serializer.encode(event, &mut new_buf).unwrap();
         assert_eq!(buf, new_buf);
     }
+}
+
+#[rstest]
+#[case(true)]
+fn roundtrip_avro_ocf_fixtures(
+    #[files("tests/data/avro/generated/*.ocf.avro")]
+    #[exclude(".*fixed.ocf.avro")]
+    path: PathBuf,
+    #[case] reserialize: bool,
+) {
+    // OCF files share the same .avsc schema as their datum counterparts
+    let schema_path = path.as_path().with_file_name(
+        path.file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace(".ocf.avro", ".avsc"),
+    );
+    assert!(schema_path.exists());
+
+    roundtrip_avro_ocf(&path, &schema_path, reserialize);
+}
+
+fn roundtrip_avro_ocf(data_path: &Path, schema_path: &Path, _reserialize: bool) {
+    let schema = load_file(schema_path);
+    let schema = from_utf8(&schema).unwrap().to_string();
+    // Use Embedded schema source: the OCF file contains its own schema in the header, and
+    // apache_avro::Writer may normalize logical-type schemas differently from the PCF stored in
+    // the .avsc file (e.g. it preserves "logicalType":"uuid" which PCF strips). Using Embedded
+    // avoids a Rabin fingerprint mismatch between the .avsc PCF and the writer-embedded form.
+    let deserializer = AvroDeserializerConfig::new_with_options(
+        schema.clone(),
+        false,
+        AvroEncoding::ObjectContainerFile,
+        AvroSchemaSource::Embedded,
+    )
+    .build()
+    .unwrap();
+    let options = AvroSerializerOptions { schema };
+    let mut serializer = AvroOcfSerializerConfig::new(options).build().unwrap();
+
+    let (_, event) = load_deserialize(data_path, &deserializer);
+
+    // Serialize the parsed event in OCF format using the batch serializer
+    let mut buf = BytesMut::new();
+    serializer.encode(vec![event.clone()], &mut buf).unwrap();
+
+    // Deserialize the event from the re-encoded OCF bytes and verify round-trip
+    let new_events = deserializer
+        .parse(buf.into(), LogNamespace::Vector)
+        .unwrap();
+    assert_eq!(new_events.len(), 1);
+    assert_eq!(new_events[0], event);
+
+    // Note: byte-for-byte comparison is intentionally not done here because OCF files contain
+    // a randomly-generated sync marker (per the Avro spec), making each encode unique.
 }
 
 fn load_file(path: &Path) -> Bytes {

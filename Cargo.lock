@@ -315,6 +315,7 @@ checksum = "312c1ea69e5fe9966e0029fb95aca8790100b85aff4f0d3b00a9337c74069a9c"
 dependencies = [
  "bigdecimal",
  "bon",
+ "crc32fast",
  "digest 0.11.3",
  "log",
  "miniz_oxide",
@@ -326,6 +327,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "snap",
  "strum 0.28.0",
  "thiserror 2.0.18",
  "uuid",
@@ -13365,6 +13367,7 @@ name = "vector"
 version = "0.61.0-dev"
 dependencies = [
  "antithesis-instrumentation",
+ "apache-avro",
  "approx",
  "arc-swap",
  "arr_macro",
