@@ -50,10 +50,10 @@ impl<'a> DespawnGuard<'a> {
 
 impl Drop for DespawnGuard<'_> {
     fn drop(&mut self) {
-        if self.should_despawn {
-            if let Err(e) = super::stop::exec(self.local_config, self.test_name) {
-                warn!("Failed to stop environment (cleanup): {e}");
-            }
+        if self.should_despawn
+            && let Err(e) = super::stop::exec(self.local_config, self.test_name)
+        {
+            warn!("Failed to stop environment (cleanup): {e}");
         }
     }
 }
