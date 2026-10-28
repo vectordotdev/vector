@@ -642,3 +642,19 @@ impl Formatter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Rust panics with "Formatting argument out of range" for format widths
+    /// above `u16::MAX`, so lines longer than that must not be used as widths.
+    #[test]
+    fn formatter_handles_lines_longer_than_u16_max() {
+        let mut fmt = Formatter::new(false);
+
+        fmt.title("x".repeat(usize::from(u16::MAX) + 1));
+        fmt.success("y".repeat(usize::from(u16::MAX) + 1));
+        fmt.validated();
+    }
+}
