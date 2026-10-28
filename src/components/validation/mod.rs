@@ -309,7 +309,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
         let mut runner = Runner::from_configuration(
             configuration,
             test_case_data_path,
-            crate::extra_context::ExtraContext::default(),
+            vector_lib::extra_context::ExtraContext::default(),
         );
         runner.add_validator(StandardValidators::ComponentSpec);
 

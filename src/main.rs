@@ -3,7 +3,8 @@
 extern crate vector;
 use std::process::ExitCode;
 
-use vector::{app::Application, extra_context::ExtraContext};
+use vector::app::Application;
+use vector_lib::extra_context::ExtraContext;
 
 #[cfg(unix)]
 // https://github.com/vectordotdev/vector/issues/23659

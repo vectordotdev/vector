@@ -158,13 +158,13 @@ mod tests {
         net::{TcpListener, TcpStream},
     };
     use tokio_util::sync::CancellationToken;
+    use vector_lib::extra_context::ExtraContext;
 
     use super::drive_event_loop;
     use crate::{
         common::mqtt::MqttCommonConfig,
         config::{ComponentKey, Config, SinkConfig, SinkContext},
         event::{Event, LogEvent},
-        extra_context::ExtraContext,
         sinks::{
             VectorSink,
             mqtt::{MqttSinkConfig, config::MqttQoS},

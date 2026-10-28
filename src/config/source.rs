@@ -18,7 +18,9 @@ use vector_lib::{
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
-use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
+use vector_lib::extra_context::ExtraContext;
+
+use crate::{SourceSender, shutdown::ShutdownSignal};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 

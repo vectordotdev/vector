@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use futures_util::FutureExt as _;
 use tokio::sync::{Mutex, MutexGuard};
+use vector_lib::extra_context::ExtraContext;
 
 #[cfg(feature = "api")]
 use crate::api;
 use crate::{
     config,
-    extra_context::ExtraContext,
     internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded},
     signal::ShutdownError,
     topology::{ReloadError, RunningTopology},
