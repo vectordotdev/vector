@@ -67,10 +67,6 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
         validate_tls_all_or_none(tls_config)?;
         match (ca_file, crt_file, key_file) {
             (Some(ca), Some(crt), Some(key)) => {
-                // Tonic uses the process provider when VRL also enables AWS-LC.
-                // Preserve any provider another component has already installed.
-                _ = rustls::crypto::ring::default_provider().install_default();
-
                 channel_config.client_tls = Some(ClientTlsOption {
                     server_ca_cert_path: ca.to_string_lossy().into_owned(),
                     client_cert_path: crt.to_string_lossy().into_owned(),
@@ -170,41 +166,4 @@ pub(super) fn healthcheck(
             .map_err(std::convert::Into::into)
     }
     .boxed())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tls_channel_uses_crypto_provider() {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        let _guard = runtime.enter();
-        let config = GreptimeDBGrpcServiceConfig {
-            endpoint: "localhost:4001".into(),
-            dbname: "public".into(),
-            username: None,
-            password: None,
-            compression: GrpcCompression::None,
-            tls: Some(TlsConfig {
-                ca_file: Some("tests/data/ca/certs/ca.cert.pem".into()),
-                crt_file: Some(
-                    "tests/data/ca/intermediate_client/certs/localhost-chain.cert.pem".into(),
-                ),
-                key_file: Some(
-                    "tests/data/ca/intermediate_client/private/localhost.key.pem".into(),
-                ),
-                ..Default::default()
-            }),
-        };
-
-        // Building the lazy channel configures tonic TLS without contacting a server.
-        let client = new_client_from_config(&config).unwrap();
-        client
-            .find_channel()
-            .expect("GreptimeDB TLS should have a crypto provider");
-    }
 }

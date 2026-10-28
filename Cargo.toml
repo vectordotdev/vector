@@ -484,8 +484,8 @@ regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 # Select MQTT's provider explicitly because VRL also enables Rustls's AWS-LC provider.
 rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-ring"], optional = true }
-# GreptimeDB uses tonic TLS, which needs a default provider when VRL enables AWS-LC.
-rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
+# Initialize a shared TLS provider at startup when both Ring and AWS-LC are enabled.
+rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -998,7 +998,7 @@ sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
 sinks-gcp-chronicle = ["gcp"]
-sinks-greptimedb_metrics = ["dep:greptimedb-ingester", "dep:rustls"]
+sinks-greptimedb_metrics = ["dep:greptimedb-ingester"]
 sinks-greptimedb_logs = ["dep:greptimedb-ingester"]
 sinks-honeycomb = []
 sinks-http = []

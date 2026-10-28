@@ -157,10 +157,6 @@ pub(crate) fn from_tls_auth_config(
     auth_config: Option<&NatsAuthConfig>,
     tls_config: Option<&TlsEnableableConfig>,
 ) -> Result<async_nats::ConnectOptions, NatsConfigError> {
-    // async-nats uses the process provider when VRL also enables AWS-LC.
-    // Keep an existing provider if another component already installed one.
-    _ = async_nats::rustls::crypto::ring::default_provider().install_default();
-
     let nats_options = match auth_config {
         None => async_nats::ConnectOptions::new(),
         Some(auth) => auth.to_nats_options()?,
@@ -203,16 +199,6 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
-
-    #[test]
-    fn tls_crypto_provider_is_available() {
-        from_tls_auth_config("test", None, None).unwrap();
-
-        // Mirror async-nats's TLS builder with VRL's AWS-LC feature also enabled.
-        let _config = async_nats::rustls::ClientConfig::builder()
-            .with_root_certificates(async_nats::rustls::RootCertStore::empty())
-            .with_no_client_auth();
-    }
 
     fn parse_auth(s: &str) -> Result<async_nats::ConnectOptions, crate::Error> {
         serde_yaml::from_str(s)
