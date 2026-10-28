@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.61.0-dev"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -13,6 +13,9 @@ autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
 rust-version = "1.95"
+
+[workspace.package]
+version = "0.61.0-dev"
 
 [[bin]]
 name = "vector"

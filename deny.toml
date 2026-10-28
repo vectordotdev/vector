@@ -24,9 +24,9 @@ exceptions = [
     # compliance we cannot be modifying the source files.
     { allow = ["MPL-2.0"], name = "colored", version = "*" },
     { allow = ["MPL-2.0"], name = "webpki-roots", version = "*" },
-    { allow = ["MPL-2.0"], name = "vector-common-macros", version = "*" },
-    { allow = ["MPL-2.0"], name = "vector-config-common", version = "*" },
-    { allow = ["MPL-2.0"], name = "vector-config-macros", version = "*" },
+    { allow = ["MPL-2.0"], name = "vector-common-macros" },
+    { allow = ["MPL-2.0"], name = "vector-config-common" },
+    { allow = ["MPL-2.0"], name = "vector-config-macros" },
     { allow = ["MPL-2.0"], name = "vrl", version = "*" },
 ]
 

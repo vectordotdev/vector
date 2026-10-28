@@ -677,7 +677,7 @@ fn validate_release_manifest(
     let expected: toml::Value = toml::from_str(&expected)?;
     ensure!(
         actual == expected,
-        "Cargo.toml may only change package.version to {version} and pin VRL to {vrl_version}"
+        "Cargo.toml may only change workspace.package.version to {version} and pin VRL to {vrl_version}"
     );
 
     let lock: toml::Value =
@@ -745,8 +745,11 @@ fn parse_cargo_version(contents: &str) -> Result<Version> {
         .context("failed to parse Cargo.toml")?;
     let version = doc["package"]["version"]
         .as_str()
-        .context("Cargo.toml package.version must be a string")?;
-    Version::parse(version).context("Cargo.toml package.version is not a semantic version")
+        .or_else(|| doc["workspace"]["package"]["version"].as_str())
+        .context("Cargo.toml package.version or workspace.package.version must be a string")?;
+    Version::parse(version).context(
+        "Cargo.toml package.version or workspace.package.version is not a semantic version",
+    )
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -977,7 +980,23 @@ mod tests {
     }
 
     #[test]
-    fn parses_package_version() {
+    fn parses_workspace_package_version() {
+        let cargo_toml = indoc! {r#"
+            [package]
+            name = "vector"
+            version.workspace = true
+
+            [workspace.package]
+            version = "0.59.0-dev"
+        "#};
+        assert_eq!(
+            parse_cargo_version(cargo_toml).expect("valid Cargo.toml"),
+            "0.59.0-dev".parse().expect("valid version")
+        );
+    }
+
+    #[test]
+    fn parses_legacy_package_version() {
         let cargo_toml = indoc! {r#"
             [package]
             name = "vector"
