@@ -33,11 +33,11 @@ pub struct NativeJsonSerializer;
 
 impl NativeJsonSerializer {
     /// Encode event and represent it as native JSON value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event cannot be serialized to JSON.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
     #[allow(
         clippy::needless_pass_by_value,
         reason = "Keep the existing owned-argument API during the lint rollout."

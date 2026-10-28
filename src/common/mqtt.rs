@@ -121,12 +121,13 @@ impl MqttConnector {
             .build()
     }
 
+    /// Checks the health of the MQTT connection. Currently a no-op.
+    ///
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error.
     pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
     }
