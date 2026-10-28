@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use crate::encoding::BuildError;
 use bytes::BytesMut;
-use prost_reflect::{MessageDescriptor, prost::Message as _};
+use prost::Message as _;
+use prost_reflect::MessageDescriptor;
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -25,6 +26,11 @@ pub struct ProtobufSerializerConfig {
 
 impl ProtobufSerializerConfig {
     /// Build the `ProtobufSerializer` from this configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
         let message_descriptor =
             get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
@@ -38,11 +44,13 @@ impl ProtobufSerializerConfig {
     }
 
     /// The data type of events that are accepted by `ProtobufSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log | DataType::Trace
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // Protobuf, we don't want to enforce that limitation to users yet.
@@ -74,6 +82,11 @@ pub struct ProtobufSerializerOptions {
     /// This is useful when working with data that has already been converted from JSON or
     /// when interfacing with systems that use JSON naming conventions.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::doc_markdown,
+        reason = "Preserve generated configuration documentation during the lint rollout."
+    )]
     pub use_json_names: bool,
 }
 
@@ -87,6 +100,7 @@ pub struct ProtobufSerializer {
 
 impl ProtobufSerializer {
     /// Creates a new `ProtobufSerializer`.
+    #[must_use]
     pub fn new(message_descriptor: MessageDescriptor) -> Self {
         Self {
             message_descriptor,
@@ -95,6 +109,11 @@ impl ProtobufSerializer {
     }
 
     /// Creates a new serializer instance using the descriptor bytes directly.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn new_from_bytes(
         desc_bytes: &[u8],
         message_type: &str,
@@ -108,6 +127,7 @@ impl ProtobufSerializer {
     }
 
     /// Get a description of the message type used in serialization.
+    #[must_use]
     pub fn descriptor_proto(&self) -> &prost_reflect::prost_types::DescriptorProto {
         self.message_descriptor.descriptor_proto()
     }

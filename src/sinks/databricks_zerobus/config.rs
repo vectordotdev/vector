@@ -255,7 +255,7 @@ impl ValidatedSink for ZerobusSinkConfig {
         validated: &ValidatedZerobus,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = ZerobusService::new(self.clone(), cx.proxy()).await?;
+        let service = ZerobusService::new(self.clone(), cx.proxy())?;
         let healthcheck_service = service.clone();
 
         let sink = ZerobusSink::new(
@@ -268,7 +268,7 @@ impl ValidatedSink for ZerobusSinkConfig {
             healthcheck_service
                 .ensure_stream()
                 .await
-                .map_err(|e| e.into())
+                .map_err(std::convert::Into::into)
         };
 
         Ok((
@@ -279,6 +279,13 @@ impl ValidatedSink for ZerobusSinkConfig {
 }
 
 impl ZerobusSinkConfig {
+    /// Validates the table name, OAuth credentials, and batch size.
+    ///
+    /// # Errors
+    ///
+    /// Returns a configuration error if the table name does not contain exactly
+    /// three nonempty parts, either OAuth credential is empty, or the configured
+    /// batch size exceeds 10 MB.
     pub fn validate(&self) -> Result<(), ZerobusSinkError> {
         // `ingestion_endpoint` is an `HttpEndpoint`: deserialization already
         // guarantees it is an absolute http(s) URL with a host and valid port,
@@ -379,9 +386,9 @@ mod tests {
             },
             user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 
@@ -466,7 +473,7 @@ auth:
     #[test]
     fn test_config_validation_empty_table_name() {
         let mut config = create_test_config();
-        config.table_name = "".to_string();
+        config.table_name = String::new();
 
         let result = config.validate();
         assert!(result.is_err());
@@ -561,7 +568,7 @@ auth:
     fn test_config_validation_empty_oauth_credentials() {
         let mut config = create_test_config();
         config.auth = DatabricksAuthentication::OAuth {
-            client_id: SensitiveString::from("".to_string()),
+            client_id: SensitiveString::from(String::new()),
             client_secret: SensitiveString::from("test-secret".to_string()),
         };
 

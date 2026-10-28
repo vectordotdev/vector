@@ -25,6 +25,11 @@ pub struct GelfChunker {
 }
 
 impl Chunking for GelfChunker {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
     fn chunk(&self, bytes: Bytes) -> Result<Vec<Bytes>, vector_common::Error> {
         if bytes.len() <= self.max_chunk_size {
             return Ok(vec![bytes]);
@@ -43,8 +48,7 @@ impl Chunking for GelfChunker {
 
         if chunk_count > GELF_MAX_TOTAL_CHUNKS {
             return Err(vector_common::Error::from(format!(
-                "Too many chunks to generate for GELF: {}, max: {}",
-                chunk_count, GELF_MAX_TOTAL_CHUNKS
+                "Too many chunks to generate for GELF: {chunk_count}, max: {GELF_MAX_TOTAL_CHUNKS}"
             )));
         }
 
@@ -90,6 +94,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
     fn test_gelf_chunker_chunk() {
         let chunker = Chunker::Gelf(GelfChunker {
             max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 4,
@@ -122,12 +131,19 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
     fn test_gelf_chunker_max() {
+        static INPUT: [u8; 65_500 * 128] = [0; 65_500 * 128];
+
         let chunker = Chunker::Gelf(GelfChunker {
             max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 65500,
         });
         // Input for 128 chunks of 65500 bytes of data
-        let input = Bytes::from_static(&[0; 65500 * 128]);
+        let input = Bytes::from_static(&INPUT);
         let chunks = chunker.chunk(input).unwrap();
         assert_eq!(chunks.len(), 128);
 
@@ -141,7 +157,7 @@ mod tests {
             // Byte 11: Sequence count
             assert_eq!(chunks[i][11], chunks.len() as u8);
             // Payload bytes
-            assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], &[0; 65500]);
+            assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], &INPUT[..65_500]);
         }
     }
 }

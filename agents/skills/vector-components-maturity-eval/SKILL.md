@@ -202,7 +202,9 @@ Read each component's CUE file in batches of 10–15 (parallel Read calls in a s
 
 ## Phase 4: Match Bugs to Components
 
-For each issue from Phase 2a, check its labels. For each label matching `^(source|sink|transform): (.+)$`, count the issue toward `{kind}s/{name}`. Labels are controlled vocabulary — no normalization needed. `source: kafka` maps to `sources/kafka` only, not `sinks/kafka`.
+For each issue from Phase 2a, check its labels. For each label matching `^(source|sink|transform):\s*(.+)$`, trim the captured component name and count the issue toward `{kind}s/{name}`. Current labels have no space after the colon; accept optional whitespace for older spellings. For example, `source:kafka` and `source: kafka` both map to `sources/kafka` only, not `sinks/kafka`.
+
+Validate mapped names against the canonical inventory from Phase 1. Report unknown component labels separately rather than silently discarding them. If component-prefixed labels are present but none match known components, report the mapping failure and stop before assigning recommendations; this must not be interpreted as zero component bugs.
 
 If an issue has component labels for multiple components, count it for each. If an issue has no component label, do not count it toward any component — do not attempt title or body matching. Collect these in the report's **Unlabeled Bug Issues** section so label hygiene gaps are visible.
 

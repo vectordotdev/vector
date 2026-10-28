@@ -103,11 +103,11 @@ impl EventCollection {
     /// or store all the metrics, depending on the value of the `aggregate` parameter.
     fn new(aggregate: bool) -> Self {
         Self {
-            finalizers: Default::default(),
+            finalizers: EventFinalizers::default(),
             events: if aggregate {
-                BatchedMetrics::Aggregated(Default::default())
+                BatchedMetrics::Aggregated(MetricSet::default())
             } else {
-                BatchedMetrics::Unaggregated(Default::default())
+                BatchedMetrics::Unaggregated(Vec::default())
             },
             events_byte_size: Default::default(),
             events_json_byte_size: telemetry().create_request_count_byte_size(),
@@ -194,7 +194,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build Remote Write request: {:?}.", e);
+                        error!("Failed to build Remote Write request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),

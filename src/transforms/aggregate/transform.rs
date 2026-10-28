@@ -104,41 +104,43 @@ pub struct Aggregate {
 const MAX_DURATION_MS: u64 = i64::MAX as u64;
 
 impl Aggregate {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the aggregation configuration is invalid.
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         if config.interval_ms == 0 {
             return Err("`interval_ms` must be greater than 0".into());
         }
         if config.interval_ms > MAX_DURATION_MS {
             return Err(format!(
-                "`interval_ms` ({}) exceeds the maximum supported value of {} ms",
-                config.interval_ms, MAX_DURATION_MS
+                "`interval_ms` ({}) exceeds the maximum supported value of {MAX_DURATION_MS} ms",
+                config.interval_ms
             )
             .into());
         }
         if let Some(event_time) = &config.event_time {
             if event_time.max_future_ms > MAX_DURATION_MS {
                 return Err(format!(
-                    "`event_time.max_future_ms` ({}) exceeds the maximum supported value of {} ms",
-                    event_time.max_future_ms, MAX_DURATION_MS
-                )
+                    "`event_time.max_future_ms` ({}) exceeds the maximum supported value of {MAX_DURATION_MS} ms",
+                    event_time.max_future_ms)
                 .into());
             }
             if event_time.allowed_lateness_ms > MAX_DURATION_MS {
                 return Err(format!(
-                    "`event_time.allowed_lateness_ms` ({}) exceeds the maximum supported value of {} ms",
-                    event_time.allowed_lateness_ms, MAX_DURATION_MS
-                )
+                    "`event_time.allowed_lateness_ms` ({}) exceeds the maximum supported value of {MAX_DURATION_MS} ms",
+                    event_time.allowed_lateness_ms)
                 .into());
             }
         }
 
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
-            map: Default::default(),
+            map: HashMap::default(),
             mode: config.mode.into(),
-            event_time_buckets: Default::default(),
-            event_time_prev_buckets: Default::default(),
-            event_time_multi_buckets: Default::default(),
+            event_time_buckets: BTreeMap::default(),
+            event_time_prev_buckets: BTreeMap::default(),
+            event_time_multi_buckets: BTreeMap::default(),
             watermark: None,
             config: *config,
         })
@@ -155,16 +157,24 @@ impl Aggregate {
 
         match (&mut self.mode, data.kind) {
             (InnerMode::Sum, MetricKind::Absolute)
-            | (InnerMode::Latest | InnerMode::Diff { .. }, MetricKind::Incremental)
-            | (InnerMode::Max | InnerMode::Min, MetricKind::Incremental)
-            | (InnerMode::Mean { .. } | InnerMode::Stdev { .. }, MetricKind::Incremental) => {
+            | (
+                InnerMode::Latest
+                | InnerMode::Diff { .. }
+                | InnerMode::Max
+                | InnerMode::Min
+                | InnerMode::Mean { .. }
+                | InnerMode::Stdev { .. },
+                MetricKind::Incremental,
+            ) => {
                 return Some(Event::Metric(Metric::from_parts(series, data, metadata)));
             }
             (InnerMode::Auto | InnerMode::Sum, MetricKind::Incremental) => {
                 self.record_sum(series, data, metadata);
             }
-            (InnerMode::Auto, MetricKind::Absolute)
-            | (InnerMode::Latest | InnerMode::Diff { .. }, MetricKind::Absolute) => {
+            (
+                InnerMode::Auto | InnerMode::Latest | InnerMode::Diff { .. },
+                MetricKind::Absolute,
+            ) => {
                 self.map.insert(series, (data, metadata));
             }
             (InnerMode::Count, _) => {
@@ -198,12 +208,15 @@ impl Aggregate {
         matches!(
             (mode, data.kind),
             (AggregationMode::Sum, MetricKind::Absolute)
-                | (AggregationMode::Latest, MetricKind::Incremental)
-                | (AggregationMode::Diff, MetricKind::Incremental)
-                | (AggregationMode::Max, MetricKind::Incremental)
-                | (AggregationMode::Min, MetricKind::Incremental)
-                | (AggregationMode::Mean, MetricKind::Incremental)
-                | (AggregationMode::Stdev, MetricKind::Incremental)
+                | (
+                    AggregationMode::Latest
+                        | AggregationMode::Diff
+                        | AggregationMode::Max
+                        | AggregationMode::Min
+                        | AggregationMode::Mean
+                        | AggregationMode::Stdev,
+                    MetricKind::Incremental
+                )
         )
     }
 
@@ -338,7 +351,7 @@ impl Aggregate {
     /// predicate so that metrics in still-open windows are emitted on
     /// shutdown or topology reload, matching system-time semantics where
     /// `flush_system_time` always empties `self.map`.
-    pub(crate) fn flush_final(&mut self, output: &mut Vec<Event>) {
+    pub fn flush_final(&mut self, output: &mut Vec<Event>) {
         if self.config.is_event_time() {
             self.flush_event_time_buckets(output, true);
         } else {
@@ -346,9 +359,13 @@ impl Aggregate {
         }
     }
 
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn flush_system_time(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
-        for (series, entry) in map.clone().into_iter() {
+        for (series, entry) in map.clone() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
             if let InnerMode::Diff { prev_map } = &self.mode
                 && let Some(prev_entry) = prev_map.get(metric.series())
@@ -367,7 +384,7 @@ impl Aggregate {
             _ => HashMap::default(),
         };
 
-        'outer: for (series, entries) in multi_map.into_iter() {
+        'outer: for (series, entries) in multi_map {
             if entries.is_empty() {
                 continue;
             }
@@ -411,7 +428,7 @@ impl Aggregate {
                         / entries.len() as f64;
                     let mut final_stdev = final_mean;
                     if let MetricValue::Gauge { value } = final_stdev.value_mut() {
-                        *value = variance.sqrt()
+                        *value = variance.sqrt();
                     }
                     let metric = Metric::from_parts(series, final_stdev, final_metadata);
                     output.push(Event::Metric(metric));

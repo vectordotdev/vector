@@ -1,4 +1,4 @@
-use metrics::Counter;
+use metrics::{Counter, Label};
 
 use crate::counter;
 
@@ -16,8 +16,34 @@ pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
 
 impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'_, INTENTIONAL> {
     fn emit(self) {
+        self.emit_with_group(None);
+    }
+}
+
+impl<'a, const INTENTIONAL: bool> ComponentEventsDropped<'a, INTENTIONAL> {
+    /// Emits the discarded events metric with an optional `group` label.
+    pub fn emit_with_group(self, group: Option<String>) {
+        #[cfg(any(test, feature = "test"))]
+        crate::event_test_util::record_internal_event(<Self as super::NamedInternalEvent>::name(
+            &self,
+        ));
+
         let count = self.count;
-        self.register().emit(Count(count));
+        self.register_with_group(group).emit(Count(count));
+    }
+
+    fn register_with_group(self, group: Option<String>) -> DroppedHandle<'a, INTENTIONAL> {
+        let tags = std::iter::once(Label::new(
+            "intentional",
+            if INTENTIONAL { "true" } else { "false" },
+        ))
+        .chain(group.map(|value| Label::new("group", value)))
+        .collect::<Vec<_>>();
+
+        DroppedHandle {
+            discarded_events: counter!(CounterName::ComponentDiscardedEventsTotal, tags),
+            reason: self.reason,
+        }
     }
 }
 
@@ -35,13 +61,7 @@ impl<'a, const INTENTIONAL: bool> RegisterInternalEvent
     // ## skip check-validity-events ##
     type Handle = DroppedHandle<'a, INTENTIONAL>;
     fn register(self) -> Self::Handle {
-        Self::Handle {
-            discarded_events: counter!(
-                CounterName::ComponentDiscardedEventsTotal,
-                "intentional" => if INTENTIONAL { "true" } else { "false" },
-            ),
-            reason: self.reason,
-        }
+        self.register_with_group(None)
     }
 }
 

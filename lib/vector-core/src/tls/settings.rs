@@ -175,6 +175,7 @@ pub struct TlsSettings {
     verify_certificate: bool,
     pub(super) verify_hostname: bool,
     authorities: Vec<X509>,
+    include_system_roots: bool,
     pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
@@ -194,6 +195,16 @@ impl TlsSettings {
     /// `None`, the result is set to defaults (ie empty).
     pub fn from_options(options: Option<&TlsConfig>) -> Result<Self> {
         Self::from_options_base(options, false)
+    }
+
+    /// Trust system roots in addition to configured CA certificates.
+    ///
+    /// By default, a nonempty `ca_file` replaces system roots. Use this policy for clients
+    /// whose configured CA certificates must supplement, rather than replace, system trust.
+    #[must_use]
+    pub fn with_system_roots(mut self) -> Self {
+        self.include_system_roots = true;
+        self
     }
 
     pub(super) fn from_options_base(options: Option<&TlsConfig>, for_server: bool) -> Result<Self> {
@@ -217,6 +228,7 @@ impl TlsSettings {
             verify_certificate: options.verify_certificate.unwrap_or(!for_server),
             verify_hostname: options.verify_hostname.unwrap_or(!for_server),
             authorities: options.load_authorities()?,
+            include_system_roots: false,
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
             server_name: options.server_name.clone(),
@@ -302,26 +314,42 @@ impl TlsSettings {
                 }
             }
         }
-        if self.authorities.is_empty() {
+        let system_store = if self.authorities.is_empty() || self.include_system_roots {
             debug!("Fetching system root certs.");
 
             cfg_if! {
                 if #[cfg(windows)] {
-                    load_windows_certs(context).unwrap();
+                    Some(load_windows_certs().unwrap())
                 } else if #[cfg(target_os = "macos")] {
                     cfg_if! { // Panic in release builds, warn in debug builds.
                         if #[cfg(debug_assertions)] {
-                            if let Err(error) = load_mac_certs(context) {
-                                warn!("Failed to load macOS certs: {error}");
-                            }
+                            load_mac_certs()
+                                .inspect_err(|error| warn!("Failed to load macOS certs: {error}"))
+                                .ok()
                         } else {
-                            load_mac_certs(context).unwrap();
+                            Some(load_mac_certs().unwrap())
                         }
+                    }
+                } else {
+                    // Without configured CAs, retain the connector's default verification paths.
+                    if self.authorities.is_empty() {
+                        None
+                    } else {
+                        let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
+                        store.set_default_paths().context(SetVerifyCertSnafu)?;
+                        Some(store)
                     }
                 }
             }
         } else {
-            let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
+            None
+        };
+
+        if system_store.is_some() || !self.authorities.is_empty() {
+            let mut store = match system_store {
+                Some(store) => store,
+                None => X509StoreBuilder::new().context(NewStoreBuilderSnafu)?,
+            };
             for authority in &self.authorities {
                 store
                     .add_cert(authority.clone())
@@ -525,7 +553,7 @@ impl TlsConfig {
 /// Load the system default certs from `schannel` this should be in place
 /// of openssl-probe on linux.
 #[cfg(windows)]
-fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
+fn load_windows_certs() -> Result<X509StoreBuilder> {
     use super::SchannelSnafu;
 
     let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
@@ -539,15 +567,11 @@ fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
         store.add_cert(cert).context(AddCertToStoreSnafu)?;
     }
 
-    builder
-        .set_verify_cert_store(store.build())
-        .context(SetVerifyCertSnafu)?;
-
-    Ok(())
+    Ok(store)
 }
 
 #[cfg(target_os = "macos")]
-fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
+fn load_mac_certs() -> Result<X509StoreBuilder> {
     use std::collections::HashMap;
 
     use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
@@ -597,11 +621,7 @@ fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
         }
     }
 
-    builder
-        .set_verify_cert_store(store.build())
-        .context(SetVerifyCertSnafu)?;
-
-    Ok(())
+    Ok(store)
 }
 
 impl fmt::Debug for TlsSettings {
@@ -790,6 +810,66 @@ mod test {
             .expect("Failed to load authority certificate");
         assert!(settings.identity.is_none());
         assert_eq!(settings.authorities.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn system_roots_preserve_custom_ca_verification() {
+        use std::time::Duration;
+
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        let server = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .unwrap();
+        let mut listener = server.bind(&"127.0.0.1:0".parse().unwrap()).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        for trust_private_ca in [false, true] {
+            let options = TlsConfig {
+                ca_file: trust_private_ca.then(|| TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            };
+            let client: MaybeTlsSettings = TlsSettings::from_options(Some(&options))
+                .unwrap()
+                .with_system_roots()
+                .into();
+
+            let receive = async {
+                let connection = client.connect("localhost", &addr).await;
+                if trust_private_ca {
+                    let mut connection = connection.unwrap();
+                    let mut payload = [0; 7];
+                    connection.read_exact(&mut payload).await.unwrap();
+                    assert_eq!(&payload, b"trusted");
+                } else {
+                    assert!(matches!(connection, Err(TlsError::Handshake { .. })));
+                }
+            };
+            let serve = async {
+                let mut connection = listener.accept().await.unwrap();
+                let handshake = connection.handshake().await;
+                if trust_private_ca {
+                    handshake.unwrap();
+                    connection.write_all(b"trusted").await.unwrap();
+                } else {
+                    assert!(handshake.is_err());
+                }
+            };
+            tokio::time::timeout(Duration::from_secs(10), async {
+                tokio::join!(receive, serve);
+            })
+            .await
+            .unwrap();
+        }
     }
 
     #[test]

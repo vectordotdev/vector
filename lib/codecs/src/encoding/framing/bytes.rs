@@ -10,11 +10,13 @@ pub struct BytesEncoderConfig;
 
 impl BytesEncoderConfig {
     /// Creates a `BytesEncoderConfig`.
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }
 
     /// Build the `BytesEncoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> BytesEncoder {
         BytesEncoder
     }
@@ -40,7 +42,7 @@ impl Default for BytesEncoderConfig {
 impl Encoder<()> for BytesEncoder {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), _: &mut BytesMut) -> Result<(), BoxedFramingError> {
+    fn encode(&mut self, (): (), _: &mut BytesMut) -> Result<(), BoxedFramingError> {
         Ok(())
     }
 }

@@ -144,6 +144,9 @@ make check-fmt
 make check-clippy
 make check-generated-docs
 
+# Lint GitHub Actions workflows.
+make check-actionlint
+
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
 make check-docs
@@ -213,14 +216,6 @@ various channels.
 
 #### Testing
 
-##### Skipping tests
-
-Tests are run for all changes except those that have the label:
-
-```text
-ci-condition: skip
-```
-
 ##### Daily tests
 
 Some long-running tests are only run daily, rather than on every pull request.
@@ -277,9 +272,6 @@ cargo vdev check licenses
 # Vector's documentation for each component is generated from the comments attached to the Component structs and members.
 # Running this ensures that the generated docs are up to date.
 make check-generated-docs
-# Generate the code documentation for the Vector project.
-# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
-cd rust-doc && make docs
 ```
 
 ### Updating licences

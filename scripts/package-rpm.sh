@@ -36,10 +36,9 @@ echo "TARGET: $TARGET"
 # release is 1.
 export RELEASE=1
 
-# The RPM spec does not like a leading `v` or `-` in the version name.
-# Therefore we clean the version so that the `rpmbuild` command does
-# not fail.
-export CLEANED_VERSION="${PACKAGE_VERSION//-/.}"
+# RPM uses `~` to order prereleases before the corresponding stable version.
+CLEANED_VERSION="${PACKAGE_VERSION/-/\~}"
+export CLEANED_VERSION="${CLEANED_VERSION//-/.}"
 
 # The arch is the first part of the target
 # For some architectures, like armv7hl it doesn't match the arch

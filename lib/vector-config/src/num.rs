@@ -31,6 +31,7 @@ impl NumberClass {
     ///
     /// The "instance type" is the JSON Schema term for value type i.e. string, number, integer,
     /// array, and so on.
+    #[must_use]
     pub fn as_instance_type(self) -> InstanceType {
         match self {
             Self::Signed | Self::Unsigned => InstanceType::Integer,
@@ -52,6 +53,7 @@ pub trait ConfigurableNumber {
     fn class() -> NumberClass;
 
     /// Whether or not this numeric type disallows nonzero values.
+    #[must_use]
     fn is_nonzero() -> bool {
         false
     }
@@ -62,6 +64,7 @@ pub trait ConfigurableNumber {
     /// of correctness and/or optimization. In some cases, we can simply adjust the normal minimum/maximum bounds in the
     /// schema to encode this. In other cases, such as signed versions like `NonZeroI64`, zero is a discrete value
     /// within the minimum and maximum bounds and must be excluded explicitly.
+    #[must_use]
     fn requires_nonzero_exclusion() -> bool {
         false
     }
@@ -76,6 +79,7 @@ pub trait ConfigurableNumber {
     }
 
     /// Gets the minimum bound for this numeric type, limited by the representable range in JSON Schema.
+    #[must_use]
     fn get_enforced_min_bound() -> f64 {
         let mechanical_minimum = match (Self::is_nonzero(), Self::requires_nonzero_exclusion()) {
             // If the number is not a nonzero type, or it is a nonzero type, but needs an exclusion, we simply return
@@ -99,6 +103,7 @@ pub trait ConfigurableNumber {
     }
 
     /// Gets the maximum bound for this numeric type, limited by the representable range in JSON Schema.
+    #[must_use]
     fn get_enforced_max_bound() -> f64 {
         let enforced_maximum = NUMERIC_ENFORCED_UPPER_BOUND;
         let mechanical_maximum = Self::Numeric::max_value()

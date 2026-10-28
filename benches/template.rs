@@ -24,7 +24,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
             || event.clone(),
             |event| index.render(&event),
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.bench_function("static", |b| {
@@ -39,7 +39,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
             || event.clone(),
             |event| index.render(&event),
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.finish();

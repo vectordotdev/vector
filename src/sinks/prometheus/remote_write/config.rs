@@ -181,11 +181,13 @@ fn validate_headers(
 /// Mirrors the check in `build`.
 #[cfg(feature = "aws-core")]
 fn validate_aws_region(
-    auth: &Option<PrometheusRemoteWriteAuth>,
-    aws: &Option<crate::aws::RegionOrEndpoint>,
+    auth: Option<&PrometheusRemoteWriteAuth>,
+    aws: Option<&crate::aws::RegionOrEndpoint>,
 ) -> crate::Result<()> {
     if matches!(auth, Some(PrometheusRemoteWriteAuth::Aws(_)))
-        && aws.as_ref().and_then(|config| config.region()).is_none()
+        && aws
+            .and_then(crate::aws::region::RegionOrEndpoint::region)
+            .is_none()
     {
         return Err(Errors::AwsRegionRequired.into());
     }
@@ -239,7 +241,7 @@ impl ValidatedSink for RemoteWriteConfig {
             .into_batcher_settings()?;
 
         #[cfg(feature = "aws-core")]
-        validate_aws_region(&self.auth, &self.aws)?;
+        validate_aws_region(self.auth.as_ref(), self.aws.as_ref())?;
 
         Ok(ValidatedRemoteWrite {
             tenant_id,
@@ -281,11 +283,12 @@ impl ValidatedSink for RemoteWriteConfig {
             }
             #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
-                let region = match self.aws.as_ref().and_then(|config| config.region()) {
-                    Some(region) => region,
-                    None => {
-                        unreachable!("aws.region validated by validate() when AWS auth is selected")
-                    }
+                let Some(region) = self
+                    .aws
+                    .as_ref()
+                    .and_then(crate::aws::region::RegionOrEndpoint::region)
+                else {
+                    unreachable!("aws.region validated by validate() when AWS auth is selected")
                 };
                 Some(Auth::Aws {
                     credentials_provider: aws_auth

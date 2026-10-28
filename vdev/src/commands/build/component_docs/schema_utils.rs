@@ -68,7 +68,7 @@ impl SchemaContext {
         schema_name: &str,
         friendly_name: &str,
     ) -> Result<Map<String, Value>> {
-        debug!("[*] Resolving schema definition for {}...", friendly_name);
+        debug!("[*] Resolving schema definition for {friendly_name}...");
 
         let resolved_schema = self.resolve_schema_by_name(schema_name)?;
 
@@ -445,13 +445,6 @@ impl SchemaContext {
                 "required_when".to_string(),
                 Value::String(condition.clone()),
             );
-        }
-
-        if let Some(minimal) = get_schema_metadata(source_schema, "docs::minimal") {
-            resolved_schema
-                .as_object_mut()
-                .unwrap()
-                .insert("minimal".to_string(), minimal.clone());
         }
     }
 

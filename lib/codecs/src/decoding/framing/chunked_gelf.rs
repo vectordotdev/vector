@@ -36,6 +36,10 @@ const fn default_pending_messages_limit() -> usize {
     MAX_PENDING_MESSAGES
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Serde requires a default function returning the optional field type."
+)]
 const fn default_max_length() -> Option<usize> {
     Some(DEFAULT_MAX_BUFFERED_PAYLOAD)
 }
@@ -51,6 +55,7 @@ pub struct ChunkedGelfDecoderConfig {
 
 impl ChunkedGelfDecoderConfig {
     /// Build the `ChunkedGelfDecoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> ChunkedGelfDecoder {
         ChunkedGelfDecoder::new(
             self.chunked_gelf.timeout_secs,
@@ -111,6 +116,11 @@ pub struct ChunkedGelfDecoderOptions {
 /// Decompression options for ChunkedGelfDecoder.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::doc_markdown,
+    reason = "Preserve generated configuration documentation during the lint rollout."
+)]
 pub enum ChunkedGelfDecompressionConfig {
     /// Automatically detect the decompression method based on the magic bytes of the message.
     #[default]
@@ -124,6 +134,11 @@ pub enum ChunkedGelfDecompressionConfig {
 }
 
 impl ChunkedGelfDecompressionConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "Keep the existing borrowed receiver API during the lint rollout."
+    )]
     pub fn get_decompression(&self, data: &Bytes) -> ChunkedGelfDecompression {
         match self {
             Self::Auto => ChunkedGelfDecompression::from_magic(data),
@@ -159,6 +174,11 @@ impl MessageState {
         self.chunks_bitmap & chunk_bitmap_id != 0
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     fn add_chunk(&mut self, sequence_number: u8, chunk: Bytes) {
         let chunk_bitmap_id = 1 << sequence_number;
         self.chunks_bitmap |= chunk_bitmap_id;
@@ -168,13 +188,18 @@ impl MessageState {
 
     /// Callers must have ruled out a duplicate, which would not raise the count.
     fn is_final_missing_chunk(&self) -> bool {
-        self.chunks_bitmap.count_ones() + 1 == self.total_chunks as u32
+        self.chunks_bitmap.count_ones() + 1 == u32::from(self.total_chunks)
     }
 
     fn current_length(&self) -> usize {
         self.current_length
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     fn finish(mut self: Box<Self>, sequence_number: u8, final_chunk: Bytes) -> Bytes {
         let mut message = BytesMut::with_capacity(self.current_length + final_chunk.len());
         for (index, chunk) in self.chunks[0..self.total_chunks as usize]
@@ -236,17 +261,17 @@ impl ChunkedGelfDecompression {
         if data.starts_with(ZLIB_MAGIC) {
             // Based on https://datatracker.ietf.org/doc/html/rfc1950#section-2.2
             if let Some([first_byte, second_byte]) = data.get(0..2)
-                && (*first_byte as u16 * 256 + *second_byte as u16).is_multiple_of(31)
+                && (u16::from(*first_byte) * 256 + u16::from(*second_byte)).is_multiple_of(31)
             {
                 trace!("Detected Zlib compression");
                 return Self::Zlib;
-            };
+            }
 
             warn!(
                 "Detected Zlib magic bytes but the header is invalid: {:?}",
                 data.get(0..2)
             );
-        };
+        }
 
         trace!("No compression detected",);
         Self::None
@@ -388,6 +413,19 @@ impl ChunkedGelfDecoder {
     }
 
     /// Decode a GELF chunk
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
+    #[allow(
+        clippy::missing_panics_doc,
+        reason = "The codec API panic documentation needs a separate audit."
+    )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep this codec mapping together during the lint rollout."
+    )]
     pub fn decode_chunk(
         &mut self,
         mut chunk: Bytes,
@@ -586,6 +624,11 @@ impl ChunkedGelfDecoder {
     /// Decode a GELF message that may be chunked or not. The source bytes are expected to be
     /// datagram-based (or message-based), so it must not contain multiple GELF messages
     /// delimited by '\0', such as it would be in a stream-based protocol.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn decode_message(
         &mut self,
         mut src: Bytes,
@@ -916,17 +959,15 @@ mod tests {
             assert!(count < 2 * total_chunks as usize);
             if let Some(message) = decoder.decode_eof(&mut merged_chunks[count]).unwrap() {
                 break message;
-            } else {
-                count += 1;
             }
+            count += 1;
         };
         let second_retrieved_message = loop {
             assert!(count < 2 * total_chunks as usize);
             if let Some(message) = decoder.decode_eof(&mut merged_chunks[count]).unwrap() {
                 break message;
-            } else {
-                count += 1
             }
+            count += 1;
         };
 
         assert_eq!(second_retrieved_message, expected_first_message);
@@ -1637,12 +1678,14 @@ mod tests {
             payload
         });
         let compressed_payload = compression.compress(&payload);
-        let total_chunks = compressed_payload.len().div_ceil(max_chunk_size) as u8;
+        let total_chunks = u8::try_from(compressed_payload.len().div_ceil(max_chunk_size)).unwrap();
         assert!(total_chunks < GELF_MAX_TOTAL_CHUNKS);
         let mut chunks = compressed_payload
             .chunks(max_chunk_size)
             .enumerate()
-            .map(|(i, chunk)| create_chunk(message_id, i as u8, total_chunks, &chunk))
+            .map(|(i, chunk)| {
+                create_chunk(message_id, u8::try_from(i).unwrap(), total_chunks, &chunk)
+            })
             .collect::<Vec<_>>();
         let (last_chunk, first_chunks) =
             chunks.split_last_mut().expect("chunks should not be empty");

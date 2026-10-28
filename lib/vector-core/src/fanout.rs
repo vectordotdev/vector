@@ -131,7 +131,7 @@ impl Fanout {
     ///
     /// This method should not be used if there is an active `SendGroup` being processed.
     fn apply_control_message(&mut self, message: ControlMessage) {
-        trace!("Processing control message outside of send: {:?}", message);
+        trace!("Processing control message outside of send: {message:?}");
 
         match message {
             ControlMessage::Add(id, sink) => self.add(id, sink),
@@ -272,7 +272,7 @@ impl Fanout {
                 biased;
 
                 maybe_msg = self.control_channel.recv(), if control_channel_open => {
-                    trace!("Processing control message inside of send: {:?}", maybe_msg);
+                    trace!("Processing control message inside of send: {maybe_msg:?}");
 
                     // During a send operation, control messages must be applied via the
                     // `SendGroup`, since it has exclusive access to the senders.

@@ -25,6 +25,24 @@ generated: components: sources: prometheus_scrape: configuration: {
 		required:    true
 		type: array: items: type: string: examples: ["http://localhost:9090/metrics"]
 	}
+	headers: {
+		description: """
+			Headers to apply to the scrape requests.
+
+			One or more values for the same header can be provided.
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				"X-My-Header": ["value1", "value2"]
+			}]
+			options: "*": {
+				description: "An HTTP request header and its value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
+		}
+	}
 	honor_labels: {
 		description: """
 			Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -60,7 +78,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 				"match[]": ["{job=\"somejob\"}", "{__name__=~\"job:.*\"}"]
 			}]
 			options: "*": {
-				description: "A query string parameter."
+				description: "Configuration of the query parameter value for HTTP requests."
 				required:    true
 				type:        _schemaDefinitions["vector::http::ParameterValue"]
 			}

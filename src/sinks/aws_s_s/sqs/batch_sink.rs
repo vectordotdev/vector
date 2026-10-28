@@ -7,7 +7,7 @@ use super::client::{BatchSendMessageRequest, SqsBatchMessagePublisher};
 use super::{SSRequestBuilder, SendMessageEntry};
 use crate::sinks::prelude::*;
 
-/// Batched SQS sink using the send_message_batch API.
+/// Batched SQS sink using the `send_message_batch` API.
 ///
 /// ## All-or-Nothing Retry Semantics
 ///
@@ -39,17 +39,17 @@ pub(super) struct BatchedSqsSink {
 }
 
 impl BatchedSqsSink {
-    pub(super) fn new(
+    pub(super) const fn new(
         batch_settings: BatcherSettings,
         request_builder: SSRequestBuilder,
         _request: TowerRequestConfig,
         publisher: SqsBatchMessagePublisher,
-    ) -> crate::Result<Self> {
-        Ok(BatchedSqsSink {
+    ) -> Self {
+        Self {
             batch_settings,
             request_builder,
             service: BatchSqsService::new(publisher),
-        })
+        }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

@@ -6,7 +6,7 @@ use vector_lib::configurable::configurable_component;
 use super::{
     BaseSSSinkConfig, SSRequestBuilder, SSSink,
     client::{SqsBatchMessagePublisher, SqsMessagePublisher},
-    message_deduplication_id, message_group_id,
+    is_fifo, message_deduplication_id, message_group_id,
 };
 use crate::{
     aws::{RegionOrEndpoint, create_client},
@@ -20,8 +20,8 @@ use crate::{
 };
 
 /// Default batch settings for the SQS sink.
-/// Uses 256KB as the safe default for max_bytes (standard SQS queue limit).
-/// Users with extended message size queues (1MB) can explicitly set max_bytes = 1048576.
+/// Uses 256KB as the safe default for `max_bytes` (standard SQS queue limit).
+/// Users with extended message size queues (1MB) can explicitly set `max_bytes` = 1048576.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SqsDefaultBatchSettings;
 
@@ -80,10 +80,10 @@ pub(super) struct SqsSinkConfig {
 impl GenerateConfig for SqsSinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_yaml::from_str(indoc::indoc! {
-            r#"queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
+            r"queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
             region: us-east-2
             encoding:
-              codec: json"#,
+              codec: json",
         })
         .unwrap()
     }
@@ -139,8 +139,8 @@ impl ValidatedSink for SqsSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedSqsSink> {
         let message_group_id = message_group_id(
-            self.base_config.message_group_id.clone(),
-            self.queue_url.ends_with(".fifo"),
+            self.base_config.message_group_id.as_deref(),
+            is_fifo(&self.queue_url),
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
@@ -163,7 +163,7 @@ impl ValidatedSink for SqsSinkConfig {
             SSRequestBuilder::new(
                 validated.message_group_id.clone(),
                 validated.message_deduplication_id.clone(),
-                self.base_config.encoding.clone(),
+                &self.base_config.encoding,
             )
         };
 
@@ -174,20 +174,20 @@ impl ValidatedSink for SqsSinkConfig {
                 .limit_max_events(10)?
                 .limit_max_bytes(1_048_576)?
                 .into_batcher_settings()?;
-            let publisher = SqsBatchMessagePublisher::new(client.clone(), self.queue_url.clone());
+            let publisher = SqsBatchMessagePublisher::new(client, self.queue_url.clone());
             let sink = super::batch_sink::BatchedSqsSink::new(
                 batch_settings,
                 request_builder()?,
                 self.base_config.request,
                 publisher,
-            )?;
+            );
             Ok((
                 crate::sinks::VectorSink::from_event_streamsink(sink),
                 healthcheck,
             ))
         } else {
-            let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
-            let sink = SSSink::new(request_builder()?, self.base_config.request, publisher)?;
+            let publisher = SqsMessagePublisher::new(client, self.queue_url.clone());
+            let sink = SSSink::new(request_builder()?, self.base_config.request, publisher);
             Ok((
                 crate::sinks::VectorSink::from_event_streamsink(sink),
                 healthcheck,
@@ -209,7 +209,7 @@ pub(super) async fn healthcheck(client: SqsClient, queue_url: String) -> crate::
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aws::RegionOrEndpoint;
+    use crate::{aws::AwsAuthentication, sinks::util::TowerRequestConfig};
     use vector_lib::codecs::JsonSerializerConfig;
 
     const TEST_REGION: &str = "us-east-2";
@@ -219,11 +219,11 @@ mod tests {
             encoding: JsonSerializerConfig::default().into(),
             message_group_id: None,
             message_deduplication_id: None,
-            request: Default::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
             assume_role: None,
-            auth: Default::default(),
-            acknowledgements: Default::default(),
+            auth: AwsAuthentication::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 
@@ -232,7 +232,7 @@ mod tests {
         let config = SqsSinkConfig {
             queue_url: "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue".to_string(),
             region: RegionOrEndpoint::with_region(String::from(TEST_REGION)),
-            batch: Default::default(),
+            batch: BatchConfig::default(),
             base_config: create_test_base_config(),
         };
 
@@ -247,7 +247,7 @@ mod tests {
         let config = SqsSinkConfig {
             queue_url: "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue.fifo".to_string(),
             region: RegionOrEndpoint::with_region(String::from(TEST_REGION)),
-            batch: Default::default(),
+            batch: BatchConfig::default(),
             base_config: create_test_base_config(),
         };
         let err = config.validate().unwrap_err().to_string();
@@ -262,7 +262,7 @@ mod tests {
         let config = SqsSinkConfig {
             queue_url: "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue".to_string(),
             region: RegionOrEndpoint::with_region(String::from(TEST_REGION)),
-            batch: Default::default(),
+            batch: BatchConfig::default(),
             base_config: create_test_base_config(),
         };
         config.validate().expect("validation should succeed");

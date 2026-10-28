@@ -78,7 +78,10 @@ mod tests {
     use crate::transforms::test::create_topology;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::event::TraceEvent;
+    use vector_lib::{
+        config::LogNamespace,
+        event::{TraceEvent, TraceLayout},
+    };
 
     #[test]
     fn generate_config() {
@@ -86,7 +89,7 @@ mod tests {
     }
 
     async fn do_transform(trace: TraceEvent) -> Option<LogEvent> {
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let config = TraceToLogConfig {
                 log_namespace: Some(false),
             };
@@ -102,9 +105,9 @@ mod tests {
             assert_eq!(out.recv().await, None);
 
             result
-        })
+        }))
         .await
-        .map(|e| e.into_log())
+        .map(Event::into_log)
     }
 
     #[tokio::test]
@@ -120,7 +123,7 @@ mod tests {
 
         let (expected_map, _) = trace.clone().into_parts();
 
-        let log = do_transform(trace).await.unwrap();
+        let log = Box::pin(do_transform(trace)).await.unwrap();
         let (actual_value, _) = log.into_parts();
         let actual_map = actual_value
             .into_object()
@@ -129,6 +132,25 @@ mod tests {
         assert_eq!(
             actual_map, expected_map,
             "Trace data fields should be preserved"
+        );
+    }
+
+    #[tokio::test]
+    async fn drops_trace_layout_marker() {
+        use vrl::btreemap;
+
+        let mut trace = TraceEvent::from(btreemap! {
+            "host" => "a_hostname",
+            "span_id" => "abc123",
+        });
+        trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+
+        let log = Box::pin(do_transform(trace)).await.unwrap();
+        assert_eq!(log.namespace(), LogNamespace::Legacy);
+        assert_eq!(log.metadata().trace_layout(), None);
+        assert_eq!(
+            log.get(vrl::event_path!("host")),
+            Some(&"a_hostname".into())
         );
     }
 }

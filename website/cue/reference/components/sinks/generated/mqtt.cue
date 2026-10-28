@@ -10,7 +10,7 @@ generated: components: sinks: mqtt: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	clean_session: {
 		description: "If set to true, the MQTT session is cleaned on login."
@@ -78,9 +78,9 @@ generated: components: sinks: mqtt: configuration: {
 		type: string: {
 			default: "atleastonce"
 			enum: {
-				atleastonce: "AtLeastOnce."
-				atmostonce:  "AtMostOnce."
-				exactlyonce: "ExactlyOnce."
+				atleastonce: "`AtLeastOnce`."
+				atmostonce:  "`AtMostOnce`."
+				exactlyonce: "`ExactlyOnce`."
 			}
 		}
 	}

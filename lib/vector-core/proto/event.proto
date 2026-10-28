@@ -79,6 +79,7 @@ message DatadogOriginMetadata {
   optional uint32 origin_product = 1;
   optional uint32 origin_category = 2;
   optional uint32 origin_service = 3;
+  optional int32 metric_type = 4;
 }
 
 message Secrets {
@@ -90,6 +91,13 @@ message OutputId {
   optional string port = 2;
 }
 
+enum TraceLayout {
+  TRACE_LAYOUT_UNSPECIFIED = 0;
+  TRACE_LAYOUT_DATADOG = 1;
+  TRACE_LAYOUT_OTEL_FLATTENED = 2;
+  TRACE_LAYOUT_OTLP_RESOURCE_SPANS = 3;
+}
+
 message Metadata {
   Value value = 1;
   DatadogOriginMetadata datadog_origin_metadata = 2;
@@ -98,6 +106,8 @@ message Metadata {
   OutputId upstream_id = 5;
   Secrets secrets = 6;
   bytes source_event_id = 7;
+  optional TraceLayout trace_layout = 8;
+  optional string datadog_metric_unit = 9;
 }
 
 message Metric {
@@ -189,6 +199,10 @@ message AggregatedHistogram3 {
   repeated HistogramBucket3 buckets = 1;
   uint64 count = 2;
   double sum = 3;
+  // Set when the source reported no sum; `sum` then carries no meaning.
+  // Negative on purpose: payloads without this field leave it false, so their
+  // `sum` keeps reading as reported, including a genuine zero.
+  bool sum_missing = 4;
 }
 
 message HistogramBucket {

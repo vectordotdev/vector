@@ -16,7 +16,7 @@ generated: components: sources: windows_event_log: configuration: {
 			delivered to sinks.
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	batch_size: {
 		description: """
@@ -86,8 +86,13 @@ generated: components: sources: windows_event_log: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: "An individual event data format override."
-			required:    true
+			description: """
+				Event data formatting options for custom field type conversion.
+
+				These options control how specific event fields are formatted in the output.
+				Use `event_data_format` config to map field names to their desired format.
+				"""
+			required: true
 			type: string: enum: {
 				auto: """
 					Keep the original format unchanged (passthrough).
@@ -105,7 +110,7 @@ generated: components: sources: windows_event_log: configuration: {
 	}
 	event_query: {
 		description: """
-			The XPath query for filtering events.
+			The `XPath` query for filtering events.
 
 			Allows filtering events using XML Path Language queries.
 			If not specified, all events from the specified channels will be collected.
@@ -180,7 +185,7 @@ generated: components: sources: windows_event_log: configuration: {
 				description: """
 					Whether to include system fields.
 
-					System fields include metadata like Computer, TimeCreated, etc.
+					System fields include metadata like Computer, `TimeCreated`, etc.
 					"""
 				required: false
 				type: bool: default: true
@@ -265,7 +270,7 @@ generated: components: sources: windows_event_log: configuration: {
 		description: """
 			Whether to render human-readable event messages.
 
-			When enabled (default), Vector will use the Windows EvtFormatMessage API
+			When enabled (default), Vector will use the Windows `EvtFormatMessage` API
 			to render localized, human-readable event messages with parameter
 			substitution. This matches the behavior of Windows Event Viewer.
 

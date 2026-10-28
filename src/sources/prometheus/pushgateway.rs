@@ -27,7 +27,6 @@ use crate::{
     },
     event::Event,
     http::KeepaliveConfig,
-    serde::bool_or_struct,
     sources::{
         self,
         util::{HttpSource, http::HttpMethod},
@@ -52,7 +51,7 @@ pub struct PrometheusPushgatewayConfig {
 
     auth: Option<HttpServerAuthConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -215,7 +214,7 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
             ));
         }
 
-        return Ok((stripped_key.to_owned(), "".to_owned()));
+        return Ok((stripped_key.to_owned(), String::new()));
     }
 
     // The Prometheus Pushgateway has a fairly permissive base64 implementation
@@ -367,6 +366,10 @@ mod test {
     async fn test_whole_request_happy_path_https() {
         whole_request_happy_path(Some(TlsEnableableConfig::test_config())).await;
     }
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn whole_request_happy_path(tls: Option<TlsEnableableConfig>) {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (_guard, address) = test_util::addr::next_addr();
@@ -391,13 +394,7 @@ mod test {
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";
-            let push_url = format!(
-                "{}://{}:{}/{}",
-                proto,
-                address.ip(),
-                address.port(),
-                push_path
-            );
+            let push_url = format!("{proto}://{}:{}/{push_path}", address.ip(), address.port());
             let push_body = r#"
                 # TYPE jobs_total counter
                 # HELP jobs_total Total number of jobs

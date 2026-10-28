@@ -52,6 +52,11 @@ pub trait Deserializer: DynClone + Send + Sync {
     /// **Note**: The type of the produced events depends on the implementation.
     ///
     /// TODO: <https://github.com/vectordotdev/vector/issues/25044>
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     fn parse(
         &self,
         bytes: Bytes,

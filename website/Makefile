@@ -31,20 +31,17 @@ cue-%:
 	${CUE} $*
 
 .PHONY: component-examples
-component-examples: setup-vdev
+component-examples: generate-vrl-docs
 	$(VDEV) build component-examples website/generated/example-configs
 
 .PHONY: config-examples
 config-examples: component-examples
 
-generate-vrl-docs:
+generate-vrl-docs: setup-vdev
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
 		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
 
-generate-deprecations-json:
-	$(VDEV) deprecation generate
-
-structured-data: generate-vrl-docs generate-deprecations-json component-examples
+structured-data: generate-vrl-docs component-examples
 
 serve: clean setup cargo-data structured-data
 	$(MAKE) serve-development
@@ -110,3 +107,9 @@ local-preview-build: clean setup cargo-data structured-data preview-build run-li
 # Generate Lighthouse scores locally
 lighthouse-report:
 	yarn lighthouse
+
+# Browser tests use a static server over the same minified assets as deployment.
+.PHONY: test
+test: cargo-data structured-data
+	$(MAKE) production-build
+	yarn test

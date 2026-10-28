@@ -46,7 +46,7 @@ impl Client<SendMessageError> for SqsMessagePublisher {
     }
 }
 
-/// Batch request wrapper for send_message_batch API
+/// Batch request wrapper for `send_message_batch` API
 #[derive(Debug, Clone)]
 pub(super) struct BatchSendMessageRequest {
     pub(super) entries: Vec<SendMessageEntry>,
@@ -75,7 +75,7 @@ impl vector_lib::request_metadata::MetaDescriptive for BatchSendMessageRequest {
     }
 }
 
-/// Client for batched SQS operations using send_message_batch API
+/// Client for batched SQS operations using `send_message_batch` API
 #[derive(Clone, Debug)]
 pub(super) struct SqsBatchMessagePublisher {
     client: aws_sdk_sqs::Client,
@@ -87,7 +87,7 @@ impl SqsBatchMessagePublisher {
         Self { client, queue_url }
     }
 
-    /// Send a batch of messages using SQS send_message_batch API.
+    /// Send a batch of messages using SQS `send_message_batch` API.
     ///
     /// ## Retry Behavior
     ///

@@ -51,13 +51,14 @@ pub struct SecretBackendLoader {
 
 impl SecretBackendLoader {
     /// Sets whether to interpolate environment variables in the config.
+    #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
     }
 
     /// Retrieve secrets from backends.
-    /// Returns an empty HashMap if there are no secrets to retrieve.
+    /// Returns an empty `HashMap` if there are no secrets to retrieve.
     pub(crate) async fn retrieve_secrets(
         mut self,
         signal_handler: &mut signal::SignalHandler,
@@ -132,6 +133,49 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
     }
 }
 
+/// Collects secret references from string leaves in a parsed configuration.
+/// Keys are excluded, matching tree-based interpolation.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
+pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, HashSet<String>>) {
+    fn visit(value: &serde_json::Value, keys: &mut HashMap<String, HashSet<String>>) {
+        match value {
+            serde_json::Value::String(string) => collect_secret_keys(string, keys),
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    visit(value, keys);
+                }
+            }
+            serde_json::Value::Object(map) => collect_secret_keys_from_map(map, keys),
+            _ => {}
+        }
+    }
+    for value in map.values() {
+        visit(value, keys);
+    }
+}
+
+/// Replaces secret references in string leaves, preserving keys and value types.
+///
+/// # Errors
+///
+/// Returns an error message for each `SECRET[backend.key]` reference in a string leaf that has
+/// no matching entry in `secrets`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
+pub fn interpolate_config_map_with_secrets(
+    map: &ConfigMap,
+    secrets: &HashMap<String, String>,
+) -> Result<ConfigMap, Vec<String>> {
+    super::interpolation::interpolate_config_map(map, secrets, interpolate)
+}
+
 fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>) {
     COLLECTOR.captures_iter(input).for_each(|cap| {
         if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
@@ -140,13 +184,27 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
             } else {
                 keys.insert(
                     backend.as_str().to_string(),
-                    HashSet::from_iter(std::iter::once(key.as_str().to_string())),
+                    HashSet::from([key.as_str().to_string()]),
                 );
             }
         }
     });
 }
 
+/// Replaces `SECRET[backend.key]` references in `input` with values from `secrets`.
+///
+/// # Errors
+///
+/// Returns an error message for each reference that has no matching entry in `secrets`.
+///
+/// # Panics
+///
+/// Panics if a regex match has no overall capture group, which cannot happen in practice.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
 pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
     let output = COLLECTOR
@@ -160,7 +218,7 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
                         "Unable to find secret replacement for {}.",
                         caps.get(0).unwrap().as_str()
                     ));
-                    "".to_string()
+                    String::new()
                 })
         })
         .into_owned();
@@ -177,7 +235,40 @@ mod tests {
 
     use indoc::indoc;
 
-    use super::{collect_secret_keys, interpolate};
+    use super::{
+        collect_secret_keys, collect_secret_keys_from_map, interpolate,
+        interpolate_config_map_with_secrets,
+    };
+
+    #[test]
+    fn tree_secret_collection_and_interpolation_agree() {
+        let input = serde_json::json!({
+            "SECRET[unused.key]": ["SECRET[backend.key]", {"nested": "SECRET[backend.key]"}],
+            "typed": [42, true, null]
+        });
+        let map = input.as_object().unwrap();
+        let mut keys = HashMap::new();
+        collect_secret_keys_from_map(map, &mut keys);
+        assert_eq!(
+            keys,
+            HashMap::from([(
+                "backend".into(),
+                std::collections::HashSet::from(["key".into()])
+            )])
+        );
+        let secrets = HashMap::from([("backend.key".into(), "42\n\"quoted\"".into())]);
+        let result = interpolate_config_map_with_secrets(map, &secrets).unwrap();
+        assert_eq!(
+            serde_json::Value::Object(result),
+            serde_json::json!({
+                "SECRET[unused.key]": ["42\n\"quoted\"", {"nested": "42\n\"quoted\""}],
+                "typed": [42, true, null]
+            })
+        );
+        assert_eq!(input["SECRET[unused.key]"][0], "SECRET[backend.key]");
+        let errors = interpolate_config_map_with_secrets(map, &HashMap::new()).unwrap_err();
+        assert_eq!(errors.len(), 2);
+    }
 
     #[test]
     fn replacement() {

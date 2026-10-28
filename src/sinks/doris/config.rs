@@ -257,8 +257,7 @@ impl ValidatedSink for DorisConfig {
                         compression,
                         label_prefix,
                         headers,
-                    )
-                    .await;
+                    );
 
                     let doris_client_safe = doris_client.into_thread_safe();
 
@@ -279,10 +278,10 @@ impl ValidatedSink for DorisConfig {
             .collect::<Vec<_>>();
 
         let service = request_settings.distributed_service(
-            DorisRetryLogic {},
+            &DorisRetryLogic {},
             services,
-            health_config,
-            DorisHealthLogic,
+            &health_config,
+            &DorisHealthLogic,
             1, // Buffer bound is hardcoded to 1 for sinks
         );
 
@@ -306,8 +305,7 @@ impl ValidatedSink for DorisConfig {
                 self.compression,
                 self.label_prefix.clone(),
                 self.headers.clone(),
-            )
-            .await;
+            );
             doris_client.into_thread_safe()
         };
 

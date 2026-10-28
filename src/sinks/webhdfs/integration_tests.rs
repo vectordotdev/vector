@@ -30,7 +30,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
         .expect("config build must with success");
     let result = health_check.await;
 
-    assert!(result.is_err())
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -41,7 +41,7 @@ async fn hdfs_healthchecks_valid_node_node() {
         .expect("config build must with success");
     let result = health_check.await;
 
-    assert!(result.is_ok())
+    assert!(result.is_ok());
 }
 
 #[tokio::test]
@@ -120,7 +120,7 @@ fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        acknowledgements: crate::config::AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     }
 }
