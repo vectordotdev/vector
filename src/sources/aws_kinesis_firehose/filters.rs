@@ -199,7 +199,7 @@ fn authenticate(
         .untuple_one()
 }
 
-/// Maps RequestError and warp errors to AWS Kinesis Firehose response structure
+/// Maps `RequestError` and warp errors to AWS Kinesis Firehose response structure
 async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Reply, Infallible> {
     let request_id: Option<&str>;
     let message: String;

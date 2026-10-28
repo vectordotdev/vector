@@ -242,6 +242,10 @@ impl FromMeta for Metadata {
                     errors.push(darling::Error::unexpected_type("literal").with_span(nmeta));
                     None
                 }
+                NestedMeta::NameValueInvalidExpr(invalid) => {
+                    errors.push(invalid.error.clone().with_span(nmeta));
+                    None
+                }
             })
             .collect::<Vec<_>>();
 

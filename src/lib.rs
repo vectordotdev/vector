@@ -136,8 +136,9 @@ static USE_COLOR: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 /// The name used to identify this Vector application.
 ///
-/// This can be set at compile-time through the VECTOR_APP_NAME env variable.
+/// This can be set at compile-time through the `VECTOR_APP_NAME` env variable.
 /// Defaults to "Vector".
+#[must_use]
 pub fn get_app_name() -> &'static str {
     option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
 }
@@ -180,6 +181,7 @@ pub fn format_vrl_diagnostics(
 
 /// The current version of Vector in simplified format.
 /// `<version-number>-nightly`.
+#[must_use]
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
@@ -201,11 +203,12 @@ pub fn vector_version() -> impl std::fmt::Display {
 }
 
 /// Returns a string containing full version information of the current build.
+#[must_use]
 pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
     let build_string = match build_desc {
-        Some(desc) => format!("{} {}", built_info::TARGET, desc),
+        Some(desc) => format!("{} {desc}", built_info::TARGET),
         None => built_info::TARGET.into(),
     };
 
@@ -228,10 +231,13 @@ pub mod built_info {
 }
 
 /// Returns the host name of the current system.
-/// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
+/// The hostname can be overridden by setting the `VECTOR_HOSTNAME` environment variable.
+///
+/// # Errors
+/// Returns an error if the operating system hostname query fails.
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
-        hostname.to_string()
+        hostname
     } else {
         hostname::get()?.to_string_lossy().into_owned()
     })
@@ -267,7 +273,7 @@ pub fn num_threads() -> usize {
         Ok(count) => count,
         Err(error) => {
             warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
-            std::num::NonZeroUsize::new(1).unwrap()
+            std::num::NonZeroUsize::MIN
         }
     };
     usize::from(count)

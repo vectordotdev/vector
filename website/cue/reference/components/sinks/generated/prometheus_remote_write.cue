@@ -10,7 +10,7 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	auth: {
 		description: "Authentication strategies."
@@ -136,7 +136,7 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 					bearer: """
 						Bearer authentication.
 
-						A bearer token (OAuth2, JWT, etc) is passed as-is.
+						A bearer token (`OAuth2`, JWT, etc) is passed as-is.
 						"""
 				}
 			}
@@ -412,7 +412,7 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 															strategy.
 
 															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
-															of creating accidental denial of service (DoS) conditions against your own systems when
+															of creating accidental denial of service (`DoS`) conditions against your own systems when
 															many clients are recovering from a failure state.
 															"""
 						None: "No jitter."
@@ -451,27 +451,7 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 			"""
 		required: false
-		type: object: options: {
-			status_codes: {
-				description:   "Retry on these specific HTTP status codes"
-				relevant_when: "type = \"custom\""
-				required:      true
-				type: array: items: type: uint: {}
-			}
-			type: {
-				description: "The retry strategy enum."
-				required:    false
-				type: string: {
-					default: "default"
-					enum: {
-						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
-						custom:  "Custom retry strategy"
-						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
-						none:    "Don't retry any errors, including request timeouts."
-					}
-				}
-			}
-		}
+		type:     _schemaDefinitions["derived::vector::sinks::util::http::RetryStrategy::64fe77681a1c274eed24cca6"]
 	}
 	tenant_id: {
 		description: """

@@ -83,12 +83,18 @@ impl FromLua for TagValueSet {
                 for value in table.sequence_values() {
                     match value {
                         Ok(value) => string_values.push(value),
-                        Err(_) => unimplemented!(),
+                        Err(err) => {
+                            return Err(LuaError::FromLuaConversionError {
+                                from: "metric tag value",
+                                to: String::from("string"),
+                                message: Some(err.to_string()),
+                            });
+                        }
                     }
                 }
                 Ok(Self::from(string_values))
             }
-            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy().clone()])),
+            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy()])),
             _ => Err(mlua::Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: String::from("metric tag value"),
@@ -358,8 +364,7 @@ mod test {
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
-                "{}",
-                assertion
+                "{assertion}"
             );
         }
     }
@@ -448,6 +453,22 @@ mod test {
                 "metric.tags['example tag'][2] == 'b'",
             ],
         );
+    }
+
+    #[test]
+    fn from_lua_tag_value_set_rejects_non_string_element() {
+        let lua = Lua::new();
+
+        let table = lua.create_table().unwrap();
+        table.push("example value").unwrap();
+        table.push(true).unwrap();
+
+        let result = TagValueSet::from_lua(LuaValue::Table(table), &lua);
+
+        assert!(matches!(
+            result,
+            Err(LuaError::FromLuaConversionError { .. })
+        ));
     }
 
     #[test]

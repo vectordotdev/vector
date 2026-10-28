@@ -5,6 +5,12 @@ use crate::event::{ObjectMap, Value};
 const SAMPLING_RATE_KEY: &str = "_sample_rate";
 
 /// This extracts the relative weights from the top level span (i.e. the span that does not have a parent).
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve diagnostic trace ID conversion."
+)]
 pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
     // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
 
@@ -20,7 +26,7 @@ pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
 
     let mut parent_id_to_child_weight = BTreeMap::<i64, f64>::new();
     let mut span_ids = Vec::<i64>::new();
-    for s in spans.iter() {
+    for s in spans {
         // TODO these need to change to u64 when the following issue is fixed:
         // https://github.com/vectordotdev/vector/issues/14687
         let parent_id = match s.get("parent_id") {
@@ -42,7 +48,7 @@ pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
         let weight = s
             .get("metrics")
             .and_then(|m| m.as_object())
-            .map(|m| match m.get(SAMPLING_RATE_KEY) {
+            .map_or(1.0, |m| match m.get(SAMPLING_RATE_KEY) {
                 Some(Value::Float(v)) => {
                     let sample_rate = v.into_inner();
                     if sample_rate <= 0.0 || sample_rate > 1.0 {
@@ -52,8 +58,7 @@ pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
                     }
                 }
                 _ => 1.0,
-            })
-            .unwrap_or(1.0);
+            });
 
         // found root
         if parent_id == 0 {
@@ -66,17 +71,16 @@ pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
     }
 
     // Remove all spans that have a parent
-    span_ids.iter().for_each(|id| {
+    for id in &span_ids {
         parent_id_to_child_weight.remove(id);
-    });
+    }
 
     // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
         // TODO remove the debug print and emit the Error event as outlined in
         // https://github.com/vectordotdev/vector/issues/14859
         debug!(
-            "Didn't reliably find the root span for weight calculation of trace_id {:?}.",
-            trace_id
+            "Didn't reliably find the root span for weight calculation of trace_id {trace_id:?}."
         );
     }
 
@@ -87,8 +91,7 @@ pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
             // TODO remove the debug print and emit the Error event as outlined in
             // https://github.com/vectordotdev/vector/issues/14859
             debug!(
-                "Root span was not found. Defaulting to weight of 1.0 for trace_id {:?}.",
-                trace_id
+                "Root span was not found. Defaulting to weight of 1.0 for trace_id {trace_id:?}."
             );
             &1.0
         })

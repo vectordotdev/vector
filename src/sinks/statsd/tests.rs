@@ -11,8 +11,11 @@ use vector_lib::{
 
 use super::StatsdSinkConfig;
 use crate::{
-    config::{SinkConfig, SinkContext},
-    sinks::{statsd::config::Mode, util::service::net::UdpConnectorConfig},
+    config::{AcknowledgementsConfig, SinkConfig, SinkContext},
+    sinks::{
+        statsd::config::Mode,
+        util::{BatchConfig, service::net::UdpConnectorConfig},
+    },
     test_util::{
         addr::next_addr,
         collect_n,
@@ -43,8 +46,8 @@ async fn test_send_to_statsd() {
             addr.ip().to_string(),
             addr.port(),
         )),
-        batch: Default::default(),
-        acknowledgements: Default::default(),
+        batch: BatchConfig::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
     };
 
     let events = vec![
@@ -88,7 +91,7 @@ async fn test_send_to_statsd() {
 
         sink.run(stream::iter(events).map(Into::into))
             .await
-            .expect("Running sink failed")
+            .expect("Running sink failed");
     })
     .await;
 

@@ -4,6 +4,7 @@
 
 mod generator;
 mod json_schema;
+mod navigation;
 pub mod visit;
 
 pub(crate) const DEFINITIONS_PREFIX: &str = "#/definitions/";

@@ -2,6 +2,7 @@
 
 use std::{
     env,
+    ffi::{OsStr, OsString},
     fmt::Debug,
     fs,
     io::ErrorKind,
@@ -108,6 +109,23 @@ pub fn npm_tool_path(repo_root: &Path, tool: &str) -> Result<PathBuf> {
         "Could not find {tool} at {}. Run `scripts/environment/prepare.sh --modules={tool}`.",
         path.display()
     )
+}
+
+pub fn prettier<T: AsRef<OsStr>>(args: impl IntoIterator<Item = T>, in_repo: bool) -> Result<()> {
+    // Cached root; the cwd may have been removed by long-running commands.
+    let repo_root = PathBuf::from(crate::app::path());
+    let prettier = npm_tool_path(&repo_root, "prettier")?;
+    let args: Vec<OsString> = [
+        OsString::from("--ignore-path"),
+        OsString::from(".prettierignore"),
+        OsString::from("--log-level"),
+        OsString::from("error"),
+    ]
+    .into_iter()
+    .chain(args.into_iter().map(|arg| arg.as_ref().to_os_string()))
+    .collect();
+    crate::app::exec(prettier, &args, in_repo)?;
+    Ok(())
 }
 
 /// Check if a path exists

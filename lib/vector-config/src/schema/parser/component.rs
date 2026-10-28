@@ -45,6 +45,7 @@ pub struct ComponentSchema<'a> {
 
 impl ComponentSchema<'_> {
     /// The type of the component represented by this schema.
+    #[must_use]
     pub fn component_type(&self) -> ComponentType {
         self.component_type
     }
@@ -55,6 +56,7 @@ impl ComponentSchema<'_> {
     /// within the `type` field.
     ///
     /// For example, the AWS S3 sink would be `aws_s3`.
+    #[must_use]
     pub fn component_name(&self) -> &str {
         &self.component_name
     }
@@ -94,7 +96,7 @@ impl<'a> TryFrom<SimpleSchema<'a>> for ComponentSchema<'a> {
         let component_type =
             get_component_metadata_kv_str(&value, constants::DOCS_META_COMPONENT_TYPE).and_then(
                 |s| {
-                    ComponentType::try_from(s.as_str()).map_err(|_| {
+                    ComponentType::try_from(s.as_str()).map_err(|()| {
                         SchemaError::invalid_component_schema(
                             constants::DOCS_META_COMPONENT_TYPE,
                             "value was not a valid component type",

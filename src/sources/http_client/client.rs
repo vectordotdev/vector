@@ -5,7 +5,6 @@ use std::{collections::HashMap, time::Duration};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use futures_util::FutureExt;
 use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
@@ -24,6 +23,7 @@ use vector_lib::{
 use vrl::{
     compiler::{CompileConfig, Function, Program, runtime::Runtime},
     prelude::TypeState,
+    value::Value,
 };
 
 use crate::{
@@ -37,8 +37,8 @@ use crate::{
         http::HttpMethod,
         http_client,
         http_client::{
-            GenericHttpClientInputs, HttpClientBuilder, build_url, call, default_interval,
-            default_timeout, warn_if_interval_too_low,
+            GenericHttpClientInputs, HttpClientBuilder, build_headers, build_url, call,
+            default_interval, default_timeout, warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -85,9 +85,6 @@ pub struct HttpClientConfig {
     /// use functions like `now()` to dynamically modify query
     /// parameter values.
     #[serde(default)]
-    #[configurable(metadata(
-        docs::additional_props_description = "A query string parameter and its value(s)."
-    ))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: QueryParameters,
 
@@ -202,7 +199,7 @@ fn compile_parameter_vrl(
         Err(diagnostics) => {
             let error = format_vrl_diagnostics(param.value(), diagnostics);
             Err(sources::BuildError::VrlCompilationError {
-                message: format!("VRL compilation failed: {}", error),
+                message: format!("VRL compilation failed: {error}"),
             })
         }
     }
@@ -260,17 +257,21 @@ pub struct Query {
 }
 
 impl Query {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a query parameter VRL expression cannot be compiled.
     pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, sources::BuildError> {
         let functions = vector_vrl_functions::all();
 
         let mut compiled: HashMap<String, CompiledQueryParameterValue> = HashMap::new();
 
-        for (k, v) in params.iter() {
+        for (k, v) in params {
             let compiled_param = Self::compile_param(v, &functions)?;
             compiled.insert(k.clone(), compiled_param);
         }
 
-        let has_vrl = compiled.values().any(|v| v.has_vrl());
+        let has_vrl = compiled.values().any(CompiledQueryParameterValue::has_vrl);
 
         Ok(Query {
             original: params.clone(),
@@ -356,6 +357,7 @@ impl SourceConfig for HttpClientConfig {
         let decoder = self.get_decoding_config(Some(log_namespace)).build()?;
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
+        let headers = build_headers(&self.headers)?;
 
         // Create context with the config for dynamic query parameter and body evaluation
         let context = HttpClientContext {
@@ -371,7 +373,7 @@ impl SourceConfig for HttpClientConfig {
             urls,
             interval: self.interval,
             timeout: self.timeout,
-            headers: self.headers.clone(),
+            headers,
             content_type,
             auth: self.auth.clone(),
             tls,
@@ -379,7 +381,12 @@ impl SourceConfig for HttpClientConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(call(inputs, context, cx.out, self.method).boxed())
+        Ok(crate::sources::source_with_error(call(
+            inputs,
+            context,
+            cx.out,
+            self.method,
+        )))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -404,6 +411,7 @@ impl SourceConfig for HttpClientConfig {
 }
 
 impl HttpClientConfig {
+    #[must_use]
     pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();
@@ -558,7 +566,7 @@ impl http_client::HttpClientContext for HttpClientContext {
         Some(build_url(&base_uri, &processed_query?))
     }
 
-    /// Enriches events with source_type, timestamp
+    /// Enriches events with `source_type`, timestamp
     fn enrich_events(&mut self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
@@ -581,7 +589,7 @@ impl http_client::HttpClientContext for HttpClientContext {
                 }
                 Event::Trace(trace) => {
                     trace.maybe_insert(log_schema().source_type_key_target_path(), || {
-                        Bytes::from(HttpClientConfig::NAME).into()
+                        Value::from_static_str(HttpClientConfig::NAME)
                     });
                 }
             }

@@ -68,7 +68,7 @@ indoc.workspace = true
 proptest.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
-similar-asserts = "2.0.0"
+similar-asserts.workspace = true
 tempfile.workspace = true
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
 rstest = "0.26.1"

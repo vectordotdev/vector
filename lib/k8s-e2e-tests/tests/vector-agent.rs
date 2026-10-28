@@ -2,7 +2,6 @@
 
 use std::{
     collections::{BTreeMap, HashSet},
-    iter::FromIterator,
     str::FromStr,
 };
 
@@ -108,7 +107,7 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -156,11 +155,8 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
@@ -233,7 +229,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -282,11 +278,8 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure the message we got matches the one we emitted.
         assert_eq!(val["message"], test_message);
 
-        if got_expected_line {
-            // We've already seen our expected line once! This is not good, we
-            // only emitted one.
-            panic!("Test message seen more than once");
-        }
+        // Only one test message was emitted, so reject duplicates.
+        assert!(!got_expected_line, "Test message seen more than once");
 
         // If we did, remember it.
         got_expected_line = true;
@@ -385,7 +378,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -409,11 +402,8 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
@@ -487,7 +477,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -566,6 +556,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 /// This test validates that vector properly annotates log events with pod
 /// and namespace metadata obtained from the k8s API.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the scenario setup and assertions together; splitting is deferred"
+)]
 async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
@@ -614,7 +609,7 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -625,13 +620,14 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(
                 pod_namespace.clone(),
-                Some(BTreeMap::from_iter(
+                Some(
                     [
                         ("label3".to_string(), "foobar".to_string()),
                         ("label4".to_string(), "fizzbuzz".to_string()),
                     ]
-                    .into_iter(),
-                )),
+                    .into_iter()
+                    .collect::<BTreeMap<_, _>>(),
+                ),
             ),
         )?)
         .await?;
@@ -664,7 +660,7 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let k8s_version = framework.kubernetes_version().await?;
 
     // Replace all non numeric chars from the version number
-    let numeric_regex = regex::Regex::new(r#"[^\d]"#).unwrap();
+    let numeric_regex = regex::Regex::new(r"[^\d]").unwrap();
     let minor = k8s_version.minor();
     let numeric_minor = numeric_regex.replace(&minor, "");
     let minor = u8::from_str(&numeric_minor).unwrap_or_else(|_| {
@@ -686,11 +682,8 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
@@ -754,6 +747,11 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 /// This test validates that vector properly filters out the logs that are
 /// requested to be excluded from collection, based on k8s API `Pod` labels.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the scenario setup and assertions together; splitting is deferred"
+)]
 async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
@@ -803,7 +801,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -892,11 +890,8 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             }
             line = log_reader.read_line() => line,
         };
-        let line = match line {
-            Some(line) => line,
-            None => break,
-        };
-        debug!("Got line: {:?}", line);
+        let Some(line) = line else { break };
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -925,11 +920,8 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         // If we get an excluded marker here - it's an error.
         assert_eq!(val["message"], "CONTROL_MARKER");
 
-        if got_control_marker {
-            // We've already seen one control marker! This is not good, we only
-            // emitted one.
-            panic!("Control marker seen more than once");
-        }
+        // Only one control marker was emitted, so reject duplicates.
+        assert!(!got_control_marker, "Control marker seen more than once");
 
         // Remember that we've seen a control marker.
         got_control_marker = true;
@@ -946,7 +938,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // apply a reasonably big timeout before we stop waiting for the
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
-            let duration = std::time::Duration::from_secs(120);
+            let duration = std::time::Duration::from_mins(2);
             info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
             info!("Stop timer complete");
@@ -975,15 +967,12 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 /// This test validates that vector properly filters out the logs by the
 /// custom selectors, based on k8s API `Pod` labels and annotations.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the scenario setup and assertions together; splitting is deferred"
+)]
 async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
-    let _guard = lock();
-    init();
-
-    let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
-    let framework = make_framework();
-    let override_name = get_override_name(&namespace, "vector-agent");
-
     const CONFIG: &str = indoc! {r#"
         role: "Agent"
         customConfig:
@@ -1006,6 +995,14 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
                 json:
                     pretty: false
     "#};
+
+    let _guard = lock();
+    init();
+
+    let namespace = get_namespace();
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let framework = make_framework();
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .helm_chart(
@@ -1115,11 +1112,8 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             }
             line = log_reader.read_line() => line,
         };
-        let line = match line {
-            Some(line) => line,
-            None => break,
-        };
-        debug!("Got line: {:?}", line);
+        let Some(line) = line else { break };
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1148,11 +1142,8 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         // If we get an excluded marker here - it's an error.
         assert_eq!(val["message"], "CONTROL_MARKER");
 
-        if got_control_marker {
-            // We've already seen one control marker! This is not good, we only
-            // emitted one.
-            panic!("Control marker seen more than once");
-        }
+        // Only one control marker was emitted, so reject duplicates.
+        assert!(!got_control_marker, "Control marker seen more than once");
 
         // Remember that we've seen a control marker.
         got_control_marker = true;
@@ -1169,7 +1160,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             // apply a reasonably big timeout before we stop waiting for the
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
-            let duration = std::time::Duration::from_secs(120);
+            let duration = std::time::Duration::from_mins(2);
             info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
             info!("Stop timer complete");
@@ -1193,6 +1184,11 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
 /// particular containers that are requested to be excluded from collection,
 /// based on k8s API `Pod` annotations.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the scenario setup and assertions together; splitting is deferred"
+)]
 async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
@@ -1241,7 +1237,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -1296,11 +1292,8 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             }
             line = log_reader.read_line() => line,
         };
-        let line = match line {
-            Some(line) => line,
-            None => break,
-        };
-        debug!("Got line: {:?}", line);
+        let Some(line) = line else { break };
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1332,11 +1325,8 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         // If we get an excluded marker here - it's an error.
         assert_eq!(val["message"], "CONTROL_MARKER");
 
-        if got_control_marker {
-            // We've already seen one control marker! This is not good, we only
-            // emitted one.
-            panic!("Control marker seen more than once");
-        }
+        // Only one control marker was emitted, so reject duplicates.
+        assert!(!got_control_marker, "Control marker seen more than once");
 
         // Remember that we've seen a control marker.
         got_control_marker = true;
@@ -1382,14 +1372,6 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
 /// configuration.
 #[tokio::test]
 async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
-    let _guard = lock();
-    init();
-
-    let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
-    let framework = make_framework();
-    let override_name = get_override_name(&namespace, "vector-agent");
-
     const CONFIG: &str = indoc! {r#"
         role: "Agent"
         customConfig:
@@ -1410,6 +1392,14 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
                 json:
                     pretty: false
     "#};
+
+    let _guard = lock();
+    init();
+
+    let namespace = get_namespace();
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let framework = make_framework();
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .helm_chart(
@@ -1482,11 +1472,8 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             }
             line = log_reader.read_line() => line,
         };
-        let line = match line {
-            Some(line) => line,
-            None => break,
-        };
-        debug!("Got line: {:?}", line);
+        let Some(line) = line else { break };
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1518,11 +1505,8 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         // If we get an excluded marker here - it's an error.
         assert_eq!(val["message"], "CONTROL_MARKER");
 
-        if got_control_marker {
-            // We've already seen one control marker! This is not good, we only
-            // emitted one.
-            panic!("Control marker seen more than once");
-        }
+        // Only one control marker was emitted, so reject duplicates.
+        assert!(!got_control_marker, "Control marker seen more than once");
 
         // Remember that we've seen a control marker.
         got_control_marker = true;
@@ -1561,6 +1545,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
 /// This test validates that vector properly collects logs from multiple
 /// `Namespace`s and `Pod`s.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the scenario setup and assertions together; splitting is deferred"
+)]
 async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
@@ -1610,7 +1599,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -1640,7 +1629,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut test_pods = vec![];
     for ns in &expected_namespaces {
-        debug!("creating {}", ns);
+        debug!("creating {ns}");
         let test_pod = framework
             .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
                 ns,
@@ -1800,11 +1789,8 @@ async fn existing_config_file() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
@@ -1825,6 +1811,11 @@ async fn existing_config_file() -> Result<(), Box<dyn std::error::Error>> {
 /// This test validates that vector properly exposes metrics in
 /// a Prometheus scraping format.
 #[tokio::test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "keep the scenario setup and assertions together; splitting is deferred"
+)]
 async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     init();
@@ -1873,7 +1864,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -1936,11 +1927,8 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
@@ -2028,7 +2016,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),
-        std::time::Instant::now() + std::time::Duration::from_secs(60),
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
     )
     .await?;
 
@@ -2112,11 +2100,8 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
         // Ensure we got the marker.
         assert_eq!(val["message"], "CHECKED_MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;
@@ -2142,17 +2127,15 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
             return FlowControlCommand::GoOn;
         }
 
-        if val["message"].eq("CHECKED_MARKER") {
-            panic!("Checkpointed marker should not be found");
-        };
+        assert!(
+            !val["message"].eq("CHECKED_MARKER"),
+            "Checkpointed marker should not be found"
+        );
 
         assert_eq!(val["message"], "MARKER");
 
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
+        // Only one marker was emitted, so a second occurrence is a duplicate.
+        assert!(!got_marker, "Marker seen more than once");
 
         // If we did, remember it.
         got_marker = true;

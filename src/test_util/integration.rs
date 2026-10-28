@@ -5,22 +5,29 @@
 pub mod postgres {
     use std::path::PathBuf;
 
+    #[must_use]
     pub fn pg_host() -> String {
         std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())
     }
 
+    ///
+    /// # Panics
+    ///
+    /// Panics if the current directory cannot be read.
     pub fn pg_socket() -> PathBuf {
-        std::env::var("PG_SOCKET")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| {
+        std::env::var("PG_SOCKET").map_or_else(
+            |_| {
                 let current_dir = std::env::current_dir().unwrap();
                 current_dir
                     .join("tests")
                     .join("data")
                     .join("postgresql-local-socket")
-            })
+            },
+            PathBuf::from,
+        )
     }
 
+    #[must_use]
     pub fn pg_url() -> String {
         std::env::var("PG_URL")
             .unwrap_or_else(|_| format!("postgres://vector:vector@{}/postgres", pg_host()))

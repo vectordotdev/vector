@@ -15,7 +15,7 @@ use crate::{
     app::CommandExt as _,
     testing::{
         build::ALL_INTEGRATIONS_FEATURE_FLAG,
-        docker::{CONTAINER_TOOL, DOCKER_SOCKET},
+        docker::{CONTAINER_TOOL, DOCKER_SOCKET, docker_command},
     },
     utils::environment::{Environment, extract_present, rename_environment_keys},
 };
@@ -25,7 +25,6 @@ const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
 /// Check if a Docker image exists locally
 fn docker_image_exists(image_name: &str) -> Result<bool> {
-    use crate::testing::docker::docker_command;
     let output =
         docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"]).check_output()?;
     Ok(output.lines().any(|line| line == image_name))
@@ -148,8 +147,8 @@ impl ComposeTest {
         // hyphens, and underscores. Replace any dots with hyphens.
         let sanitized_env = self.environment.replace('.', "-");
         format!(
-            "vector-{}-{}-{}",
-            self.local_config.directory, self.test_name, sanitized_env
+            "vector-{}-{}-{sanitized_env}",
+            self.local_config.directory, self.test_name
         )
     }
 
@@ -205,9 +204,12 @@ impl ComposeTest {
 
         args.push("--features".to_string());
 
-        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
-        // If using per-test runner: use test-specific features from test.yaml
-        args.push(if self.runner.is_shared_runner() {
+        // Integration tests always compile only the suite's own `test.yaml` features: each CI
+        // job runs a single suite, so compiling `all-integration-tests` there only adds build
+        // time. E2E tests on the shared runner still use `all-e2e-tests`.
+        let use_all_features =
+            self.runner.is_shared_runner() && self.local_config.kind == ComposeTestKind::E2E;
+        args.push(if use_all_features {
             format!("{},vendored", self.local_config.feature_flag)
         } else {
             format!("{},vendored", self.config.features.join(","))
@@ -381,12 +383,37 @@ impl Compose {
     }
 
     fn logs(&self, environment: &Environment, project_name: &str) -> Result<ExitStatus> {
+        // Preserve exit and OOM details before cleanup removes the containers.
+        if let Err(error) = self.container_states(project_name) {
+            warn!("Failed to collect container states: {error}");
+        }
+
         let mut command = self.command(project_name);
         command.arg("logs");
         command.envs(extract_present(environment));
         command
             .status()
             .with_context(|| "Failed to collect compose logs")
+    }
+
+    fn container_states(&self, project_name: &str) -> Result<()> {
+        let containers = docker_command([
+            "ps",
+            "--all",
+            "--quiet",
+            "--filter",
+            &format!("label=com.docker.compose.project={project_name}"),
+        ])
+        .check_output()?;
+
+        if !containers.trim().is_empty() {
+            info!("Container states for compose project '{project_name}':");
+            docker_command(["inspect", "--format", "{{.Name}} {{json .State}}"])
+                .args(containers.split_whitespace())
+                .check_run()?;
+        }
+
+        Ok(())
     }
 
     fn command(&self, project_name: &str) -> Command {

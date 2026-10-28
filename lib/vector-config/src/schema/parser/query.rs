@@ -53,8 +53,31 @@ impl SchemaQuerier {
         Ok(Self { schema })
     }
 
+    #[must_use]
     pub fn query(&self) -> SchemaQueryBuilder<'_> {
         SchemaQueryBuilder::from_schema(&self.schema)
+    }
+
+    /// Gets the schema for values in a map at the configuration root.
+    ///
+    /// # Errors
+    ///
+    /// Returns `QueryError::NoMatches` if the property has no resolvable object schema for its values.
+    pub fn root_map_value_schema(&self, property: &str) -> Result<SimpleSchema<'_>, QueryError> {
+        let value = self
+            .schema
+            .root_map_value_schema(property)
+            .ok_or(QueryError::NoMatches)?;
+        let schema = value.as_object().ok_or(QueryError::NoMatches)?;
+        let schema = match schema.reference.as_deref() {
+            Some(reference) => reference
+                .strip_prefix("#/definitions/")
+                .and_then(|name| self.schema.definitions.get(name))
+                .and_then(Schema::as_object)
+                .ok_or(QueryError::NoMatches)?,
+            None => schema,
+        };
+        Ok(schema.into())
     }
 }
 
@@ -82,6 +105,7 @@ impl<'a> SchemaQueryBuilder<'a> {
     /// not a key/value attribute, and vice versa. For key/value attributes where the attribute in
     /// the schema itself has multiple values, the schema is considered a match so long as it
     /// contains the value specified in the query.
+    #[must_use]
     pub fn with_custom_attribute_kv<K, V>(mut self, key: K, value: V) -> Self
     where
         K: Into<String>,
@@ -95,6 +119,7 @@ impl<'a> SchemaQueryBuilder<'a> {
     }
 
     /// Executes the query, returning all matching schemas.
+    #[must_use]
     pub fn run(self) -> Vec<SimpleSchema<'a>> {
         let mut matches = Vec::new();
 
@@ -102,7 +127,7 @@ impl<'a> SchemaQueryBuilder<'a> {
         'schema: for schema_definition in self.schema.definitions.values() {
             match schema_definition {
                 // We don't match against boolean schemas because there's nothing to match against.
-                Schema::Bool(_) => continue,
+                Schema::Bool(_) => {}
                 Schema::Object(schema_object) => {
                     // If we have custom attribute matches defined, but the schema has no metadata,
                     // it's not possible for it to match, so just bail out early.
@@ -228,7 +253,17 @@ pub trait QueryableSchema {
     fn description(&self) -> Option<&str>;
     fn title(&self) -> Option<&str>;
     fn get_attributes(&self, key: &str) -> Option<OneOrMany<CustomAttribute>>;
+    /// Get a single custom attribute, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attribute has multiple values.
     fn get_attribute(&self, key: &str) -> Result<Option<CustomAttribute>, QueryError>;
+    /// Check whether a custom flag attribute is present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the attribute has multiple values or is not a flag.
     fn has_flag_attribute(&self, key: &str) -> Result<bool, QueryError>;
 }
 
@@ -281,11 +316,10 @@ impl QueryableSchema for &SchemaObject {
                 return SchemaType::OneOf(one_of.iter().map(schema_to_simple_schema).collect());
             } else if let Some(any_of) = subschemas.any_of.as_ref() {
                 return SchemaType::AnyOf(any_of.iter().map(schema_to_simple_schema).collect());
-            } else {
-                panic!(
-                    "Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf, anyOf."
-                );
             }
+            panic!(
+                "Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf, anyOf."
+            );
         }
 
         if let Some(instance_types) = self.instance_type.as_ref() {
@@ -374,6 +408,7 @@ pub struct SimpleSchema<'a> {
 }
 
 impl<'a> SimpleSchema<'a> {
+    #[must_use]
     pub fn into_inner(self) -> &'a SchemaObject {
         self.schema
     }
@@ -428,5 +463,39 @@ fn schema_to_simple_schema(schema: &Schema) -> SimpleSchema<'_> {
 
     SimpleSchema {
         schema: schema_object,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn queries_component_base_through_the_root_map() {
+        let querier = SchemaQuerier {
+            schema: serde_json::from_value(json!({
+                "allOf": [{"properties": {"sources": {
+                    "additionalProperties": {"$ref": "#/definitions/outer"}
+                }}}],
+                "definitions": {"outer": {"type": "object", "properties": {
+                    "shared": {"type": "boolean"}
+                }}}
+            }))
+            .unwrap(),
+        };
+        let base = querier.root_map_value_schema("sources").unwrap();
+        assert!(
+            base.into_inner()
+                .object
+                .as_ref()
+                .unwrap()
+                .properties
+                .contains_key("shared")
+        );
+        assert!(matches!(
+            querier.root_map_value_schema("sinks"),
+            Err(QueryError::NoMatches)
+        ));
     }
 }

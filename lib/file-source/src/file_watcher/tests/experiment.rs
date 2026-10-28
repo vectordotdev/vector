@@ -44,7 +44,7 @@ async fn experiment(actions: Vec<FileWatcherAction>) {
 
     let mut fwfiles: Vec<FileWatcherFile> = vec![FileWatcherFile::new()];
     let mut read_index = 0;
-    for action in actions.iter() {
+    for action in &actions {
         match *action {
             FileWatcherAction::DeleteFile => {
                 _ = fs::remove_file(&path);
@@ -100,11 +100,9 @@ async fn experiment(actions: Vec<FileWatcherAction>) {
                             ..
                         }) if line.bytes.is_empty() => {
                             attempts -= 1;
-                            continue;
                         }
                         Ok(RawLineResult { raw_line: None, .. }) => {
                             attempts -= 1;
-                            continue;
                         }
                         Ok(_) => {
                             sut_reads += 1;
@@ -136,7 +134,7 @@ async fn file_watcher_with_truncation() {
         QuickCheck::new()
             .tests(5000)
             .max_tests(50000)
-            .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult)
+            .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
     })
     .await
     .unwrap();

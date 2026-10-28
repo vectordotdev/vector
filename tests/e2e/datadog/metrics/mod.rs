@@ -1,8 +1,13 @@
+use std::time::Duration;
+
 use async_compression::tokio::bufread::{ZstdDecoder, ZstdEncoder};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use bytes::Bytes;
 use serde_json::Value;
-use tokio::io::{AsyncReadExt, BufReader};
+use tokio::{
+    io::{AsyncReadExt, BufReader},
+    time::{Instant, sleep},
+};
 use tracing::{debug, warn};
 use vector::test_util::{compression::is_zstd, trace_init};
 use vector_common::Result;
@@ -47,7 +52,7 @@ where
         // decode base64
         let payload = BASE64_STANDARD
             .decode(&payload.data)
-            .map_err(|e| format!("Invalid base64 data: {}", e))?;
+            .map_err(|e| format!("Invalid base64 data: {e}"))?;
 
         // Skip empty or near-empty payloads (e.g., health checks like '{}' sent with
         // X-Requested-With: datadog-agent-diagnose header)
@@ -55,55 +60,49 @@ where
             let content_str = String::from_utf8_lossy(&payload);
 
             // Try to parse as JSON to show structured content
-            let json_repr = serde_json::from_slice::<Value>(&payload)
-                .map(|v| format!("JSON: {}", v))
-                .unwrap_or_else(|_| format!("raw: '{}'", content_str));
+            let json_repr = serde_json::from_slice::<Value>(&payload).map_or_else(
+                |_| format!("raw: '{content_str}'"),
+                |v| format!("JSON: {v}"),
+            );
 
             warn!(
-                "Skipping small payload (likely diagnostic/health check): expected protobuf type {}, got {} bytes, content: {}, hex: {:02x?}",
+                "Skipping small payload (likely diagnostic/health check): expected protobuf type {}, got {} bytes, content: {json_repr}, hex: {payload:02x?}",
                 std::any::type_name::<T>(),
-                payload.len(),
-                json_repr,
-                payload
+                payload.len()
             );
             continue;
         }
 
         // Try to decode directly first (handles decompressed data from fakeintake)
-        let decoded = match T::decode(Bytes::from(payload.clone())) {
-            Ok(decoded) => {
-                // Successfully decoded directly - fakeintake returned decompressed data
-                debug!(
-                    "Decoded protobuf directly (fakeintake returned decompressed): type {}, size {} bytes",
+        let decoded = if let Ok(decoded) = T::decode(Bytes::from(payload.clone())) {
+            // Successfully decoded directly - fakeintake returned decompressed data
+            debug!(
+                "Decoded protobuf directly (fakeintake returned decompressed): type {}, size {} bytes",
+                std::any::type_name::<T>(),
+                payload.len()
+            );
+            decoded
+        } else {
+            // Direct decode failed - payload is still compressed, decompress first
+            debug!(
+                "Direct decode failed, attempting decompression: type {}, size {} bytes",
+                std::any::type_name::<T>(),
+                payload.len()
+            );
+            let decompressed = decompress_payload(payload.as_slice()).await.map_err(|e| {
+                format!(
+                    "Failed to decompress payload: {e}. Type {}, length {}, first 4 bytes: {:02x?}",
                     std::any::type_name::<T>(),
-                    payload.len()
-                );
-                decoded
-            }
-            Err(_) => {
-                // Direct decode failed - payload is still compressed, decompress first
-                debug!(
-                    "Direct decode failed, attempting decompression: type {}, size {} bytes",
-                    std::any::type_name::<T>(),
-                    payload.len()
-                );
-                let decompressed = decompress_payload(payload.as_slice())
-                    .await
-                    .map_err(|e| format!(
-                        "Failed to decompress payload: {}. Type {}, length {}, first 4 bytes: {:02x?}",
-                        e,
-                        std::any::type_name::<T>(),
-                        payload.len(),
-                        &payload[..payload.len().min(4)]
-                    ))?;
-                T::decode(Bytes::from(decompressed)).map_err(|e| {
-                    format!(
-                        "Failed to decode protobuf after decompression: {} (type {})",
-                        e,
-                        std::any::type_name::<T>()
-                    )
-                })?
-            }
+                    payload.len(),
+                    &payload[..payload.len().min(4)]
+                )
+            })?;
+            T::decode(Bytes::from(decompressed)).map_err(|e| {
+                format!(
+                    "Failed to decode protobuf after decompression: {e} (type {})",
+                    std::any::type_name::<T>()
+                )
+            })?
         };
 
         out_payloads.push(decoded);
@@ -116,13 +115,12 @@ where
 async fn validate() {
     trace_init();
 
-    // Even with configuring docker service dependencies, we need a small buffer of time
-    // to ensure events flow through to fakeintake before asking for them
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    // Wait for workload data, not compilation time, to make both pipelines ready.
+    // Leave time to report failures before nextest's two-minute test timeout.
+    let deadline = Instant::now() + Duration::from_secs(90);
+    series::validate(deadline).await;
 
-    series::validate().await;
-
-    sketches::validate().await;
+    sketches::validate(deadline).await;
 }
 
 async fn compress_with_zstd(data: &[u8]) -> Vec<u8> {

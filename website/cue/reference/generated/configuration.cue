@@ -455,7 +455,7 @@ generated: configuration: {
 								type: bool: default: false
 								description: """
 																		If set to true, all data will be removed from cache after exporting.
-																		Only valid if used as a source and export_interval > 0
+																		Only valid if used as a source and `export_interval` is greater than 0.
 
 																		By default, export will not remove data from cache
 																		"""
@@ -495,7 +495,7 @@ generated: configuration: {
 						description: """
 														The locale to use when querying the database.
 
-														MaxMind includes localized versions of some of the fields within their database, such as
+														`MaxMind` includes localized versions of some of the fields within their database, such as
 														country name. This setting can control which of those localized versions are returned by the
 														transform.
 
@@ -741,8 +741,43 @@ generated: configuration: {
 						description: "secret type"
 					}
 				}
-				description: "A secret backend."
-				required:    true
+				description: """
+					Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
+					in Vector config. Multiple backends can be configured. Use `SECRET[<backend_name>.<secret_key>]` to tell Vector to retrieve the secret. This placeholder is replaced by the secret
+					retrieved from the relevant backend.
+
+					When `type` is `exec`, the provided command will be run and provided a list of
+					secrets to fetch, determined from the configuration file, on stdin as JSON in the format:
+
+					```json
+					{"version": "1.0", "secrets": ["secret1", "secret2"]}
+					```
+
+					The executable is expected to respond with the values of these secrets on stdout, also as JSON, in the format:
+
+					```json
+					{
+					    "secret1": {"value": "secret_value", "error": null},
+					    "secret2": {"value": null, "error": "could not fetch the secret"}
+					}
+					```
+					If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
+					Vector will log the errors and exit.
+
+					Otherwise, the secret must be a JSON text string with key/value pairs. For example:
+					```json
+					{
+					    "username": "test",
+					    "password": "example-password"
+					}
+					```
+
+					If an error occurred while reading the file or retrieving the secrets, Vector logs the error and exits.
+
+					Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+					configuration reload process.
+					"""
+				required: true
 			}
 			description: "All configured secrets backends."
 			group:       "secrets"
@@ -751,69 +786,7 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					buffer: {
-						type: object: options: {
-							when_full: {
-								type: string: {
-									enum: {
-										block: """
-																					Wait for free space in the buffer.
-
-																					This applies backpressure up the topology, signalling that sources should slow down
-																					the acceptance/consumption of events. This means that while no data is lost, data will pile
-																					up at the edge.
-																					"""
-										drop_newest: """
-																					Drops the event instead of waiting for free space in buffer.
-
-																					The event will be intentionally dropped. This mode is typically used when performance is the
-																					highest priority, and it is preferable to temporarily lose events rather than cause a
-																					slowdown in the acceptance/consumption of events.
-																					"""
-									}
-									default: "block"
-								}
-								description: "Event handling behavior when a buffer is full."
-								required:    false
-							}
-							max_events: {
-								type: uint: default: 500
-								required:      false
-								description:   "The maximum number of events allowed in the buffer."
-								relevant_when: "type = \"memory\""
-							}
-							max_size: {
-								type: uint: unit: "bytes"
-								required: true
-								description: """
-																		The maximum allowed amount of allocated memory the buffer can hold.
-
-																		If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
-																		"""
-							}
-							type: {
-								required: false
-								type: string: {
-									enum: {
-										memory: """
-																					Events are buffered in memory.
-
-																					This is more performant, but less durable. Data will be lost if Vector is restarted
-																					forcefully or crashes.
-																					"""
-										disk: """
-																					Events are buffered on disk.
-
-																					This is less performant, but more durable. Data that has been synchronized to disk will not
-																					be lost if Vector is restarted forcefully or crashes.
-
-																					Data is synchronized to disk every 500ms.
-																					"""
-									}
-									default: "memory"
-								}
-								description: "The type of buffer to use."
-							}
-						}
+						type: _schemaDefinitions["derived::vector_buffers::config::BufferType::6c60e9549d874ce4350c077a"]
 						description: """
 														Configures the buffering behavior for this sink.
 
@@ -834,31 +807,7 @@ generated: configuration: {
 						required: false
 					}
 					healthcheck: {
-						type: object: options: {
-							enabled: {
-								type: bool: default: true
-								description: "Whether or not to check the health of the sink when Vector starts up."
-								required:    false
-							}
-							timeout: {
-								type: float: {
-									default: 10.0
-									unit:    "seconds"
-								}
-								description: "Timeout duration for healthcheck in seconds."
-								required:    false
-							}
-							uri: {
-								type: string: {}
-								description: """
-																		The full URI to make HTTP healthcheck requests to.
-
-																		This must be a valid URI, which requires at least the scheme and host. All other
-																		components -- port, path, etc -- are allowed as well.
-																		"""
-								required: false
-							}
-						}
+						type:        _schemaDefinitions["derived::7ad58e4d9af48ec29d981195"]
 						description: "Healthcheck configuration."
 						required:    false
 					}
@@ -978,7 +927,7 @@ generated: configuration: {
 			group:       "pipeline_components"
 		}
 		acknowledgements: {
-			type: _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+			type: _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 			description: """
 				Controls how acknowledgements are handled for all sinks by default.
 

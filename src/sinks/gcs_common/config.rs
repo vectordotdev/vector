@@ -1,24 +1,30 @@
 use std::marker::PhantomData;
 
 use futures::FutureExt;
-use http::StatusCode;
-use hyper::Body;
+use http_1::StatusCode;
 use snafu::Snafu;
+use vector_http::empty_body;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
         util::{
             HttpEndpoint,
+            http::IntoStatusCode,
             retries::{RetryAction, RetryLogic},
         },
     },
 };
 
+/// Returns the default Google Cloud Storage endpoint.
+///
+/// # Panics
+/// Panics if the static endpoint is not a valid HTTP URL.
+#[must_use]
 pub fn default_endpoint() -> HttpEndpoint {
     HttpEndpoint::parse("https://storage.googleapis.com")
         .expect("static default endpoint should be a valid http(s) URL")
@@ -109,36 +115,43 @@ pub enum GcsError {
     BucketNotFound { bucket: String },
 }
 
+/// Builds a bucket healthcheck.
+///
+/// The returned future reports request failures and non-successful health statuses.
 pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
     base_url: HttpEndpoint,
     auth: GcpAuthenticator,
-) -> crate::Result<Healthcheck> {
+) -> Healthcheck {
     let healthcheck = async move {
-        let uri = base_url.into_uri();
-        let mut request = http::Request::head(uri).body(Body::empty())?;
+        let mut request = http_1::Request::head(base_url.into_v1()).body(empty_body())?;
 
-        auth.apply(&mut request);
+        auth.apply_v1(&mut request);
 
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
         let response = client.send(request).await?;
-        healthcheck_response(response, not_found_error)
+        healthcheck_status(response.status(), not_found_error)
     };
 
-    Ok(healthcheck.boxed())
+    healthcheck.boxed()
 }
 
-pub fn healthcheck_response(
-    response: http::Response<hyper::Body>,
+/// Classifies a GCP healthcheck response by status alone, shared by the legacy and native
+/// HTTP clients.
+///
+/// # Errors
+/// Returns an error for forbidden, missing, or unexpected response statuses.
+pub fn healthcheck_status(
+    status: impl IntoStatusCode,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
-        StatusCode::NOT_FOUND => Err(not_found_error),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+    match status.into_status_code() {
+        http::StatusCode::OK => Ok(()),
+        http::StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
+        http::StatusCode::NOT_FOUND => Err(not_found_error),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 
@@ -162,9 +175,9 @@ impl<Request> Clone for GcsRetryLogic<Request> {
     }
 }
 
-// This is a clone of HttpRetryLogic for the Body type, should get merged
+// This is a clone of HttpRetryLogic for `GcsResponse`, should get merged
 impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
-    type Error = hyper::Error;
+    type Error = hyper_1::Error;
     type Request = Request;
     type Response = GcsResponse;
 

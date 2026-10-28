@@ -78,11 +78,7 @@ impl OracleClient {
         if !response.status().is_success() {
             return false;
         }
-        response
-            .text()
-            .await
-            .map(|body| body.trim() == "1")
-            .unwrap_or(false)
+        response.text().await.is_ok_and(|body| body.trim() == "1")
     }
 }
 

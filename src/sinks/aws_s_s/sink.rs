@@ -17,16 +17,16 @@ where
     C: Client<E> + Clone + Send + Sync + 'static,
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
-    pub(super) fn new(
+    pub(super) const fn new(
         request_builder: SSRequestBuilder,
         request: TowerRequestConfig,
         publisher: C,
-    ) -> crate::Result<Self> {
-        Ok(SSSink {
+    ) -> Self {
+        Self {
             request_builder,
             service: SSService::new(publisher),
             request,
-        })
+        }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

@@ -1,10 +1,15 @@
 //! This mod implements `kubernetes_logs` source.
 //! The scope of this source is to consume the log files that a kubelet keeps
 //! at "/var/log/pods" on the host of the Kubernetes Node when Vector itself is
-//! running inside the cluster as a DaemonSet.
+//! running inside the cluster as a `DaemonSet`.
 
 #![deny(missing_docs)]
-use std::{cmp::min, path::PathBuf, time::Duration};
+use std::{
+    cmp::min,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -35,7 +40,7 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use crate::{
     SourceSender,
@@ -48,8 +53,8 @@ use crate::{
     internal_events::{
         FileInternalMetricsConfig, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
-        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
-        KubernetesLogsPodInfo, StreamClosedError,
+        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived, PodCountersCache,
+        StreamClosedError,
     },
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
@@ -78,6 +83,10 @@ use self::{
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Restructuring these source configuration fields is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
 #[configurable_component(source("kubernetes_logs", "Collect Pod logs from Kubernetes Nodes."))]
@@ -313,11 +322,11 @@ impl GenerateConfig for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            extra_label_selector: "".to_string(),
-            extra_namespace_label_selector: "".to_string(),
+            extra_label_selector: String::new(),
+            extra_namespace_label_selector: String::new(),
             insert_namespace_fields: true,
             self_node_name: default_self_node_name_env_template(),
-            extra_field_selector: "".to_string(),
+            extra_field_selector: String::new(),
             auto_partial_merge: true,
             data_dir: None,
             pod_annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
@@ -340,7 +349,7 @@ impl Default for Config {
             use_apiserver_cache: false,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
             rotate_wait: default_rotate_wait(),
         }
     }
@@ -359,11 +368,16 @@ impl SourceConfig for Config {
                 .map(|result| {
                     result.map_err(|error| {
                         error!(message = "Source future failed.", %error);
+                        crate::sources::SourceError::from(error)
                     })
                 }),
         ))
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = BytesDeserializerConfig
@@ -419,6 +433,17 @@ impl SourceConfig for Config {
                     .clone()
                     .map(|x| LegacyKey::Overwrite(x.path)),
                 &owned_value_path!("namespace_labels"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.namespace_annotation_fields
+                    .namespace_annotations
+                    .path
+                    .clone()
+                    .map(|x| LegacyKey::Overwrite(x.path)),
+                &owned_value_path!("namespace_annotations"),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
@@ -581,6 +606,10 @@ impl SourceConfig for Config {
     }
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Restructuring these source configuration fields is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[derive(Clone)]
 struct Source {
     client: Client,
@@ -611,6 +640,7 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    pod_counters_sweep_interval: Option<Duration>,
 }
 
 impl Source {
@@ -701,9 +731,14 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
+            pod_counters_sweep_interval: pod_counters_sweep_interval(globals),
         })
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn run(
         self,
         mut out: SourceSender,
@@ -739,6 +774,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
+            pod_counters_sweep_interval,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -905,6 +941,10 @@ impl Source {
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+        // The line stream and the sweep below both run on this task, so the lock is never
+        // contended.
+        let pod_counters = Arc::new(Mutex::new(PodCountersCache::default()));
+        let swept_pod_counters = Arc::clone(&pod_counters);
         let events = events.map(move |line| {
             let byte_size = line.text.len();
             bytes_received.emit(ByteSize(byte_size));
@@ -918,13 +958,15 @@ impl Source {
 
             let file_info = annotator.annotate(&mut event, &line.filename);
 
+            let event_json_size = event.estimated_json_encoded_size_of();
+
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size: event.estimated_json_encoded_size_of(),
-                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
-                    name: info.pod_name.to_owned(),
-                    namespace: info.pod_namespace.to_owned(),
-                }),
+                byte_size: event_json_size,
+                pod: file_info
+                    .as_ref()
+                    .map(|info| (info.pod_name, info.pod_namespace)),
+                counters: &mut pod_counters.lock().expect("Pod counters mutex is poisoned"),
             });
 
             if file_info.is_none() {
@@ -994,19 +1036,39 @@ impl Source {
                 shutdown,
                 Duration::from_secs(30), // more than enough time to propagate
             )
-            .map(|result| {
-                match result {
-                    Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(_)) => emit!(StreamClosedError {
-                        count: events_count
-                    }),
-                    Err(error) => emit!(KubernetesLifecycleError {
-                        error,
-                        message: "Event processing loop timed out during the shutdown.",
-                        count: events_count,
-                    }),
-                };
+            .map(|result| match result {
+                Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
+                Ok(Err(_)) => emit!(StreamClosedError {
+                    count: events_count
+                }),
+                Err(error) => emit!(KubernetesLifecycleError {
+                    error,
+                    message: "Event processing loop timed out during the shutdown.",
+                    count: events_count,
+                }),
             });
+            slot.bind(Box::pin(fut));
+        }
+        if let Some(sweep_interval) = pod_counters_sweep_interval {
+            let (slot, mut shutdown) = lifecycle.add();
+            let fut = async move {
+                let mut sweeps = tokio::time::interval_at(
+                    tokio::time::Instant::now() + sweep_interval,
+                    sweep_interval,
+                );
+                sweeps.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                loop {
+                    tokio::select! {
+                        () = &mut shutdown => break,
+                        _ = sweeps.tick() => {
+                            swept_pod_counters
+                                .lock()
+                                .expect("Pod counters mutex is poisoned")
+                                .remove_idle();
+                        }
+                    }
+                }
+            };
             slot.bind(Box::pin(fut));
         }
 
@@ -1027,6 +1089,28 @@ fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
     } else {
         watcher::Config::default().page_size
     }
+}
+
+/// Returns how often the source releases the cached counters of the pods that stopped logging.
+///
+/// A held handle keeps its metric from expiring, and a pod keeps its handles for at most twice
+/// this interval after its last line. Use half the shortest configured expiry, clamped to at
+/// least one millisecond to avoid excessive polling for very short expiries. Returns `None`
+/// when metrics never expire, since held handles then block nothing.
+fn pod_counters_sweep_interval(globals: &GlobalOptions) -> Option<Duration> {
+    let per_metric_set = globals
+        .expire_metrics_per_metric_set
+        .iter()
+        .flatten()
+        .map(|set| set.expire_secs);
+    let shortest = globals
+        .effective_expire_metrics_secs()
+        .into_iter()
+        .chain(per_metric_set)
+        .min_by(f64::total_cmp)?;
+    Duration::try_from_secs_f64(shortest / 2.0)
+        .ok()
+        .map(|interval| interval.max(Duration::from_millis(1)))
 }
 
 fn create_event(
@@ -1050,7 +1134,7 @@ fn create_event(
         &mut log,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from(Config::NAME),
+        Value::from_static_str(Config::NAME),
     );
     match (log_namespace, ingestion_timestamp_field) {
         // When using LogNamespace::Vector always set the ingest_timestamp.
@@ -1061,11 +1145,11 @@ fn create_event(
         }
         // When LogNamespace::Legacy, only set when the `ingestion_timestamp_field` is configured.
         (LogNamespace::Legacy, Some(ingestion_timestamp_field)) => {
-            log.try_insert(ingestion_timestamp_field, Utc::now())
+            log.try_insert(ingestion_timestamp_field, Utc::now());
         }
         // The CRI/Docker parsers handle inserting the `log_schema().timestamp_key()` value.
         (LogNamespace::Legacy, None) => (),
-    };
+    }
 
     log.into()
 }
@@ -1113,7 +1197,7 @@ const fn default_max_line_bytes() -> usize {
 }
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
-    Duration::from_millis(60_000)
+    Duration::from_mins(1)
 }
 
 const fn default_fingerprint_lines() -> usize {
@@ -1121,7 +1205,7 @@ const fn default_fingerprint_lines() -> usize {
 }
 
 const fn default_delay_deletion_ms() -> Duration {
-    Duration::from_millis(60_000)
+    Duration::from_mins(1)
 }
 
 const fn default_rotate_wait() -> Duration {
@@ -1166,6 +1250,10 @@ fn prepare_glob_patterns(paths: &[PathBuf], op: &str) -> crate::Result<Vec<glob:
 
 // This function constructs the effective field selector to use, based on
 // the specified configuration.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Result<String> {
     info!(
         message = "Obtained Kubernetes Node name to collect logs for (self).",
@@ -1178,13 +1266,14 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
         return Ok(field_selector);
     }
 
-    Ok(format!(
-        "{},{}",
-        field_selector, config.extra_field_selector
-    ))
+    Ok(format!("{field_selector},{}", config.extra_field_selector))
 }
 
 // This function constructs the selector for a node to annotate entries with a node metadata.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
     Ok(format!("metadata.name={self_node_name}"))
 }
@@ -1219,6 +1308,8 @@ fn resolve_max_line_bytes(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use vector_lib::{
@@ -1235,6 +1326,54 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn pod_counters_sweep_interval_follows_shortest_metric_expiry() {
+        let sweep_interval =
+            |yaml: &str| super::pod_counters_sweep_interval(&serde_yaml::from_str(yaml).unwrap());
+
+        // Metrics expire after 300 seconds by default.
+        assert_eq!(sweep_interval(""), Some(Duration::from_secs(150)));
+        assert_eq!(sweep_interval("expire_metrics_secs: -1.0"), None);
+        assert_eq!(
+            sweep_interval(indoc! {"
+                expire_metrics_secs: 600.0
+                expire_metrics_per_metric_set:
+                  - expire_secs: 60.0
+            "}),
+            Some(Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn pod_counters_sweep_interval_has_millisecond_minimum() {
+        let sweep_interval =
+            |yaml: &str| super::pod_counters_sweep_interval(&serde_yaml::from_str(yaml).unwrap());
+
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.0000000001"),
+            Some(Duration::from_millis(1))
+        );
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.001"),
+            Some(Duration::from_millis(1))
+        );
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.004"),
+            Some(Duration::from_millis(2))
+        );
+        assert_eq!(
+            sweep_interval(indoc! {"
+                expire_metrics_secs: 600.0
+                expire_metrics_per_metric_set:
+                  - name:
+                      type: exact
+                      value: unrelated_metric
+                    expire_secs: 0.0000000001
+            "}),
+            Some(Duration::from_millis(1))
+        );
     }
 
     #[test]
@@ -1255,9 +1394,9 @@ mod tests {
     #[test]
     fn test_config_serialization_insert_namespace_fields() {
         // Test that the flag serializes/deserializes correctly from YAML
-        let yaml_config = indoc! {r#"
+        let yaml_config = indoc! {r"
             insert_namespace_fields: false
-        "#};
+        "};
         let config: Config = serde_yaml::from_str(yaml_config).unwrap();
         assert_eq!(config.insert_namespace_fields, false);
 
@@ -1347,7 +1486,7 @@ mod tests {
             (
                 Config {
                     self_node_name: "qwe".to_owned(),
-                    extra_field_selector: "".to_owned(),
+                    extra_field_selector: String::new(),
                     ..Default::default()
                 },
                 "spec.nodeName=qwe",
@@ -1381,7 +1520,7 @@ mod tests {
             ),
             (
                 Config {
-                    extra_label_selector: "".to_owned(),
+                    extra_label_selector: String::new(),
                     ..Default::default()
                 }
                 .extra_label_selector,
@@ -1389,7 +1528,7 @@ mod tests {
             ),
             (
                 Config {
-                    extra_namespace_label_selector: "".to_owned(),
+                    extra_namespace_label_selector: String::new(),
                     ..Default::default()
                 }
                 .extra_namespace_label_selector,
@@ -1419,6 +1558,10 @@ mod tests {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn test_output_schema_definition_vector_namespace() {
         let definitions = serde_yaml::from_str::<Config>("")
@@ -1453,6 +1596,12 @@ mod tests {
                     )
                     .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "namespace_labels"),
+                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
+                            .or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "namespace_annotations"),
                         Kind::object(Collection::empty().with_unknown(Kind::bytes()))
                             .or_undefined(),
                         None
@@ -1537,9 +1686,13 @@ mod tests {
                     )
                     .with_meaning(OwnedTargetPath::event_root(), "message")
             )
-        )
+        );
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
         let definitions = serde_yaml::from_str::<Config>("")
@@ -1578,6 +1731,11 @@ mod tests {
                 )
                 .with_event_field(
                     &owned_value_path!("kubernetes", "namespace_labels"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None
+                )
+                .with_event_field(
+                    &owned_value_path!("kubernetes", "namespace_annotations"),
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     None
                 )
@@ -1648,7 +1806,7 @@ mod tests {
                     None
                 )
             )
-        )
+        );
     }
 
     #[test]

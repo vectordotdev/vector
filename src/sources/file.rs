@@ -23,7 +23,7 @@ use vector_lib::{
     finalizer::OrderedFinalizer,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
@@ -39,7 +39,6 @@ use crate::{
         FileSourceInternalEventsEmitter, StreamClosedError,
     },
     line_agg::{self, LineAgg},
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
 };
 
@@ -220,7 +219,7 @@ pub struct FileConfig {
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -239,6 +238,10 @@ pub struct FileConfig {
     pub rotate_wait: Duration,
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
@@ -252,7 +255,7 @@ const fn default_read_from() -> ReadFromConfig {
 }
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
-    Duration::from_millis(1000)
+    Duration::from_secs(1)
 }
 
 const fn default_multi_line_timeout() -> u64 {
@@ -373,9 +376,9 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: default_line_delimiter(),
             encoding: None,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
-            internal_metrics: Default::default(),
+            internal_metrics: FileInternalMetricsConfig::default(),
             rotate_wait: default_rotate_wait(),
         }
     }
@@ -470,6 +473,14 @@ impl SourceConfig for FileConfig {
     }
 }
 
+///
+/// # Panics
+///
+/// Panics if an include or exclude glob pattern is invalid.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
@@ -480,11 +491,9 @@ pub fn file_source(
 ) -> super::Source {
     // the include option must be specified but also must contain at least one entry.
     if config.include.is_empty() {
-        error!(
-            message = "`include` configuration option must contain at least one file pattern.",
-            internal_log_rate_limit = false
-        );
-        return Box::pin(future::ready(Err(())));
+        let error = "`include` configuration option must contain at least one file pattern.";
+        error!(message = error, internal_log_rate_limit = false);
+        return Box::pin(future::ready(Err(error.into())));
     }
 
     let exclude_patterns = config
@@ -587,7 +596,7 @@ pub fn file_source(
 
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
-    Box::pin(async move {
+    crate::sources::opaque_source(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
@@ -605,7 +614,7 @@ pub fn file_source(
                 });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
-                    Some(d) => d.decode_to_utf8(line.text),
+                    Some(d) => d.decode_to_utf8(&line.text),
                     None => line.text,
                 };
                 line
@@ -657,18 +666,15 @@ pub fn file_source(
             event
         });
         tokio::spawn(async move {
-            match out
+            if let Ok(()) = out
                 .send_event_stream(&mut messages)
                 .instrument(span.or_current())
                 .await
             {
-                Ok(()) => {
-                    debug!("Finished sending.");
-                }
-                Err(_) => {
-                    let (count, _) = messages.size_hint();
-                    emit!(StreamClosedError { count });
-                }
+                debug!("Finished sending.");
+            } else {
+                let (count, _) = messages.size_hint();
+                emit!(StreamClosedError { count });
             }
         });
 
@@ -699,13 +705,13 @@ fn reconcile_position_options(
     if start_at_beginning.is_some() {
         warn!(
             message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead."
-        )
+        );
     }
 
     match start_at_beginning {
         Some(true) => (
             ignore_checkpoints.unwrap_or(true),
-            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
+            read_from.map_or(ReadFrom::Beginning, Into::into),
         ),
         _ => (
             ignore_checkpoints.unwrap_or(false),
@@ -766,7 +772,7 @@ fn create_event(
         &mut event,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(FileConfig::NAME.as_bytes()),
+        Value::from_static_str(FileConfig::NAME),
     );
     log_namespace.insert_vector_metadata(
         &mut event,
@@ -900,25 +906,25 @@ mod tests {
         );
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             fingerprint:
               strategy: device_and_inode
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             fingerprint:
               strategy: checksum
               bytes: 128
               ignored_header_bytes: 512
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(
@@ -930,32 +936,32 @@ mod tests {
         );
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             encoding:
               charset: utf-16le
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             read_from: beginning
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
         let config: FileConfig = serde_yaml::from_str(indoc! {
-            r#"
+            r"
             include:
               - /var/log/**/*.log
             read_from: end
-            "#,
+            ",
         })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::End);
@@ -1016,7 +1022,7 @@ mod tests {
                     )
                     .with_metadata_field(&owned_value_path!("file", "path"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[test]
@@ -1048,7 +1054,7 @@ mod tests {
                 .with_event_field(&owned_value_path!("offset"), Kind::undefined(), None)
                 .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
             )
-        )
+        );
     }
 
     #[test]
@@ -1185,14 +1191,14 @@ mod tests {
             let line =
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
             if line.starts_with("hello") {
-                assert_eq!(line, format!("hello {}", hello_i));
+                assert_eq!(line, format!("hello {hello_i}"));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
                     path1.to_str().unwrap()
                 );
                 hello_i += 1;
             } else {
-                assert_eq!(line, format!("goodbye {}", goodbye_i));
+                assert_eq!(line, format!("goodbye {goodbye_i}"));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
                     path2.to_str().unwrap()
@@ -1281,9 +1287,9 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_trunc {
-                assert_eq!(line, format!("pretrunc {}", i));
+                assert_eq!(line, format!("pretrunc {i}"));
             } else {
-                assert_eq!(line, format!("posttrunc {}", i));
+                assert_eq!(line, format!("posttrunc {i}"));
             }
 
             i += 1;
@@ -1346,9 +1352,9 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_rot {
-                assert_eq!(line, format!("prerot {}", i));
+                assert_eq!(line, format!("prerot {i}"));
             } else {
-                assert_eq!(line, format!("postrot {}", i));
+                assert_eq!(line, format!("postrot {i}"));
             }
 
             i += 1;
@@ -1359,6 +1365,10 @@ mod tests {
         }
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn file_multiple_paths() {
         let n = 5;
@@ -1412,6 +1422,10 @@ mod tests {
         assert_eq!(is, [n as usize; 3]);
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn file_exclude_paths() {
         let n = 5;
@@ -1460,12 +1474,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_key_acknowledged() {
-        file_key(Acks).await
+        file_key(Acks).await;
     }
 
     #[tokio::test]
     async fn file_key_no_acknowledge() {
-        file_key(NoAcks).await
+        file_key(NoAcks).await;
     }
 
     async fn file_key(acks: AckingMode) {
@@ -1566,12 +1580,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
-        file_start_position_server_restart(Acks).await
+        file_start_position_server_restart(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_no_acknowledge() {
-        file_start_position_server_restart(NoAcks).await
+        file_start_position_server_restart(NoAcks).await;
     }
 
     async fn file_start_position_server_restart(acking: AckingMode) {
@@ -1743,12 +1757,12 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
-        file_start_position_server_restart_with_file_rotation(Acks).await
+        file_start_position_server_restart_with_file_rotation(Acks).await;
     }
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation_no_acknowledge() {
-        file_start_position_server_restart_with_file_rotation(NoAcks).await
+        file_start_position_server_restart_with_file_rotation(NoAcks).await;
     }
 
     async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
@@ -1793,6 +1807,10 @@ mod tests {
         }
     }
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
     #[tokio::test]
     async fn file_start_position_ignore_old_files() {
@@ -1839,6 +1857,7 @@ mod tests {
             };
             let after_times = [after_time, after_time];
 
+            // SAFETY: The descriptors and both two-element arrays remain valid for these calls.
             unsafe {
                 libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
                 libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
@@ -2405,14 +2424,14 @@ mod tests {
             // Event 1: Position \r\n to split at first boundary
             let event1_prefix = "Event 1: ";
             let padding1_len = buffer_size - event1_prefix.len() - 1; // -1 for the \r
-            write!(&mut file, "{}", event1_prefix).unwrap();
+            write!(&mut file, "{event1_prefix}").unwrap();
             file.write_all(&vec![b'X'; padding1_len]).unwrap();
             write!(&mut file, "\r\n").unwrap(); // \r at byte 8191, \n at byte 8192
 
             // Event 2: Position \r\n to split at second boundary
             let event2_prefix = "Event 2: ";
             let padding2_len = buffer_size - event2_prefix.len() - 1;
-            write!(&mut file, "{}", event2_prefix).unwrap();
+            write!(&mut file, "{event2_prefix}").unwrap();
             file.write_all(&vec![b'Y'; padding2_len]).unwrap();
             write!(&mut file, "\r\n").unwrap(); // \r at byte 16383, \n at byte 16384
 
@@ -2439,13 +2458,11 @@ mod tests {
 
         assert!(
             msg0.starts_with("Event 1: "),
-            "First event should start with 'Event 1: ', got: {}",
-            msg0
+            "First event should start with 'Event 1: ', got: {msg0}"
         );
         assert!(
             msg1.starts_with("Event 2: "),
-            "Second event should start with 'Event 2: ', got: {}",
-            msg1
+            "Second event should start with 'Event 2: ', got: {msg1}"
         );
         assert_eq!(msg2, "Event 3: Final");
 
@@ -2454,13 +2471,11 @@ mod tests {
             let msg_str = msg.to_string_lossy();
             assert!(
                 !msg_str.contains('\r'),
-                "Event {} should not contain embedded \\r",
-                i
+                "Event {i} should not contain embedded \\r"
             );
             assert!(
                 !msg_str.contains('\n'),
-                "Event {} should not contain embedded \\n",
-                i
+                "Event {i} should not contain embedded \\n"
             );
         }
     }
