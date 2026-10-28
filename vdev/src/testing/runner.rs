@@ -477,17 +477,24 @@ mod tests {
 
     #[test]
     fn locked_build_runs_build_and_follow_up_under_one_lock() {
-        let args = vec!["--features".to_string(), "a,b".to_string()];
-        let command = locked_build_command(&args, "cp x y");
-        let (lock, rest) = command.split_at(4);
-        assert_eq!(lock, ["flock", BUILD_LOCK_PATH, "sh", "-c"]);
-        // The follow-up only runs if the build succeeded, inside the same `flock`.
-        assert_eq!(rest[0], r#""$@" && cp x y"#);
-        assert_eq!(rest[1], "sh");
-        let build: Vec<&str> = rest[2..].iter().map(String::as_str).collect();
+        let args = ["--features".to_string(), "a,b".to_string()];
         assert_eq!(
-            build,
-            [BUILD_TESTS_COMMAND, &["--features", "a,b"]].concat()
+            locked_build_command(&args, "cp x y"),
+            [
+                "flock",
+                "/home/target/.vdev-build.lock",
+                "sh",
+                "-c",
+                r#""$@" && cp x y"#,
+                "sh",
+                "cargo",
+                "nextest",
+                "run",
+                "--no-run",
+                "--no-default-features",
+                "--features",
+                "a,b",
+            ]
         );
     }
 }
