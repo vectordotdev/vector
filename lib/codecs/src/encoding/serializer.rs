@@ -224,7 +224,7 @@ impl BatchSerializerConfig {
         match self {
             BatchSerializerConfig::AvroOcf(avro_config) => {
                 let serializer = avro_config.build()?;
-                Ok(super::BatchSerializer::AvroOcf(serializer))
+                Ok(super::BatchSerializer::AvroOcf(Box::new(serializer)))
             }
             #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => {

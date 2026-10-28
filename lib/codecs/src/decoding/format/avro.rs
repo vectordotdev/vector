@@ -46,6 +46,7 @@ impl AvroDeserializerConfig {
     }
 
     /// Creates a new `AvroDeserializerConfig` with custom options.
+    #[must_use]
     pub const fn new_with_options(
         schema: String,
         strip_schema_id_prefix: bool,

@@ -28,7 +28,7 @@ pub enum BatchSerializer {
     ///
     /// Encodes a batch of events as a single, self-contained OCF file with an embedded schema and
     /// randomly generated sync marker.
-    AvroOcf(AvroOcfSerializer),
+    AvroOcf(Box<AvroOcfSerializer>),
     /// Arrow IPC stream format serializer.
     #[cfg(feature = "arrow")]
     Arrow(ArrowStreamSerializer),
@@ -74,14 +74,21 @@ impl BatchEncoder {
         clippy::missing_errors_doc,
         reason = "The codec API error documentation needs a separate audit."
     )]
-    pub fn encode_batch(&self, _events: &[Event]) -> Result<BatchOutput, Error> {
+    #[cfg_attr(
+        not(feature = "arrow"),
+        allow(
+            unused_variables,
+            reason = "events is only used when the `arrow` feature is enabled"
+        )
+    )]
+    pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
         match &self.serializer {
             BatchSerializer::AvroOcf(_) => Err(Error::SerializingError(Box::from(
                 "AvroOcf serializer does not support encode_batch; use the tokio Encoder interface instead",
             ))),
             #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
-                let record_batch = serializer.encode_to_record_batch(_events).map_err(|err| {
+                let record_batch = serializer.encode_to_record_batch(events).map_err(|err| {
                     use crate::encoding::ArrowEncodingError;
                     match err {
                         ArrowEncodingError::NullConstraint { .. } => {
@@ -135,7 +142,7 @@ pub enum EncoderKind {
     /// Uses framing to encode individual events
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
-    Batch(BatchEncoder),
+    Batch(Box<BatchEncoder>),
 }
 
 #[derive(Debug, Clone)]

@@ -30,7 +30,7 @@ fn roundtrip_avro_fixtures(
     let schema_path = path.as_path().with_extension("avsc");
     assert!(schema_path.exists());
 
-    roundtrip_avro(path, schema_path, reserialize);
+    roundtrip_avro(&path, &schema_path, reserialize);
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
@@ -38,15 +38,15 @@ fn roundtrip_avro_fixtures(
     clippy::needless_pass_by_value,
     reason = "Keep the existing owned-argument API during the lint rollout."
 )]
-fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
-    let schema = load_file(&schema_path);
+fn roundtrip_avro(data_path: &Path, schema_path: &Path, reserialize: bool) {
+    let schema = load_file(schema_path);
     let schema = from_utf8(&schema).unwrap().to_string();
     let deserializer = AvroDeserializerConfig::new(schema.clone(), false)
         .build()
         .unwrap();
-    let mut serializer = AvroSerializerConfig::new(schema.clone()).build().unwrap();
+    let mut serializer = AvroSerializerConfig::new(schema).build().unwrap();
 
-    let (buf, event) = load_deserialize(&data_path, &deserializer);
+    let (buf, event) = load_deserialize(data_path, &deserializer);
 
     if reserialize {
         // Serialize the parsed event
@@ -86,11 +86,11 @@ fn roundtrip_avro_ocf_fixtures(
     );
     assert!(schema_path.exists());
 
-    roundtrip_avro_ocf(path, schema_path, reserialize);
+    roundtrip_avro_ocf(&path, &schema_path, reserialize);
 }
 
-fn roundtrip_avro_ocf(data_path: PathBuf, schema_path: PathBuf, _reserialize: bool) {
-    let schema = load_file(&schema_path);
+fn roundtrip_avro_ocf(data_path: &Path, schema_path: &Path, _reserialize: bool) {
+    let schema = load_file(schema_path);
     let schema = from_utf8(&schema).unwrap().to_string();
     // Use Embedded schema source: the OCF file contains its own schema in the header, and
     // apache_avro::Writer may normalize logical-type schemas differently from the PCF stored in
@@ -104,12 +104,10 @@ fn roundtrip_avro_ocf(data_path: PathBuf, schema_path: PathBuf, _reserialize: bo
     )
     .build()
     .unwrap();
-    let options = AvroSerializerOptions {
-        schema: schema.clone(),
-    };
+    let options = AvroSerializerOptions { schema };
     let mut serializer = AvroOcfSerializerConfig::new(options).build().unwrap();
 
-    let (_, event) = load_deserialize(&data_path, &deserializer);
+    let (_, event) = load_deserialize(data_path, &deserializer);
 
     // Serialize the parsed event in OCF format using the batch serializer
     let mut buf = BytesMut::new();
