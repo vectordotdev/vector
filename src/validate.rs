@@ -181,12 +181,13 @@ pub async fn validate(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
     color: bool,
+    verbose: bool,
 ) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
 
-    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt).await else {
+    let Some(mut config) = validate_config(opts, signal_handler, &mut fmt, verbose).await else {
         return exitcode::CONFIG;
     };
 
@@ -214,6 +215,7 @@ pub async fn validate_config(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
     fmt: &mut Formatter,
+    verbose: bool,
 ) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
@@ -225,8 +227,11 @@ pub async fn validate_config(
     // Load
     let paths_list: Vec<_> = paths.iter().map(<&PathBuf>::from).collect();
 
+    let paths_count = paths_list.len();
+
     let mut report_error = |errors| {
-        fmt.title(format!("Failed to load {:?}", &paths_list));
+        fmt.title(format!("Failed to load {paths_count} config path(s)"));
+        fmt.paths(&paths_list, verbose);
         fmt.sub_error(errors);
     };
 
@@ -252,14 +257,16 @@ pub async fn validate_config(
 
     // Warnings
     if warnings.is_empty() {
-        fmt.success(format!("Loaded {:?}", &paths_list));
+        fmt.success(format!("Loaded {paths_count} config path(s)"));
+        fmt.paths(&paths_list, verbose);
     } else {
         if opts.deny_warnings {
             report_error(warnings);
             return None;
         }
 
-        fmt.title(format!("Loaded with warnings {:?}", &paths_list));
+        fmt.title(format!("Loaded {paths_count} config path(s) with warnings"));
+        fmt.paths(&paths_list, verbose);
         fmt.sub_warning(warnings);
     }
 
@@ -468,6 +475,9 @@ fn remove_tmp_directory(path: &Path) {
     }
 }
 
+/// Number of config paths listed by default; `-v` lists all of them.
+const MAX_PATHS_SHOWN: usize = 20;
+
 pub struct Formatter {
     /// Width of largest printed line
     max_line_width: usize,
@@ -505,11 +515,18 @@ impl Formatter {
         }
     }
 
+    /// Width usable as a format width. Rust panics with
+    /// "Formatting argument out of range" for widths above `u16::MAX`.
+    fn clamped_width(&self) -> usize {
+        self.max_line_width.min(usize::from(u16::MAX))
+    }
+
     /// Final confirmation that validation process was successful.
     fn validated(&self) {
+        let max_line_width = self.clamped_width();
         #[allow(clippy::print_stdout)]
         {
-            println!("{:-^width$}", "", width = self.max_line_width);
+            println!("{:-^width$}", "", width = max_line_width);
         }
         if self.color {
             // Coloring needs to be used directly so that print
@@ -518,16 +535,12 @@ impl Formatter {
             // calculated into the length.
             #[allow(clippy::print_stdout)]
             {
-                println!(
-                    "{:>width$}",
-                    "Validated".green(),
-                    width = self.max_line_width
-                );
+                println!("{:>width$}", "Validated".green(), width = max_line_width);
             }
         } else {
             #[allow(clippy::print_stdout)]
             {
-                println!("{:>width$}", "Validated", width = self.max_line_width);
+                println!("{:>width$}", "Validated", width = max_line_width);
             }
         }
     }
@@ -550,12 +563,27 @@ impl Formatter {
     /// Marks sub
     fn title(&mut self, title: impl AsRef<str>) {
         self.space();
-        self.print(format!(
-            "{}\n{:-<width$}\n",
-            title.as_ref(),
-            "",
-            width = title.as_ref().len()
-        ));
+        let width = title.as_ref().chars().count();
+        self.print(format!("{}\n{}\n", title.as_ref(), "-".repeat(width)));
+    }
+
+    /// Lists config paths, one per line. Without `verbose` only the first
+    /// `MAX_PATHS_SHOWN` paths are listed.
+    fn paths(&mut self, paths: &[&PathBuf], verbose: bool) {
+        let shown = if verbose {
+            paths.len()
+        } else {
+            paths.len().min(MAX_PATHS_SHOWN)
+        };
+        for path in &paths[..shown] {
+            self.print(format!("  {}\n", path.display()));
+        }
+        if shown < paths.len() {
+            self.print(format!(
+                "  ... and {} more (use -v to list all)\n",
+                paths.len() - shown
+            ));
+        }
     }
 
     /// A list of warnings that go with a title.
