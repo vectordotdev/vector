@@ -194,7 +194,8 @@ async fn gzip_multi_stream_reads_all_members() {
     fs::write(&path, &bytes).unwrap();
 
     let mut fw = FileWatcher::new(
-        path,
+        path.clone(),
+        tokio::fs::File::open(&path).await.unwrap(),
         file_source_common::ReadFrom::Beginning,
         None,
         100_000,
@@ -289,6 +290,7 @@ async fn updating_path_resets_eof_backoff() {
         std::fs::write(&old_path, b"first\n").unwrap();
         let mut watcher = FileWatcher::new(
             old_path.clone(),
+            tokio::fs::File::open(&old_path).await.unwrap(),
             file_source_common::ReadFrom::Beginning,
             None,
             1024,
@@ -307,7 +309,13 @@ async fn updating_path_resets_eof_backoff() {
         } else {
             std::fs::rename(&old_path, &new_path).unwrap();
         }
-        let old_info = watcher.update_path(new_path).await.unwrap();
+        let old_info = watcher
+            .update_path(
+                new_path.clone(),
+                tokio::fs::File::open(&new_path).await.unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(old_info.is_some(), replace_file);
         if let Some(old_info) = old_info {
             assert!(old_info.reached_eof);

@@ -158,23 +158,22 @@ impl FileWatcher {
     /// Create a new `FileWatcher`
     ///
     /// The input path will be used by `FileWatcher` to prime its state
-    /// machine. A `FileWatcher` tracks _only one_ file. This function returns
-    /// an error if the path does not exist or is not readable by the current process.
+    /// machine. A `FileWatcher` tracks _only one_ file. The open file must be
+    /// the same one used for fingerprinting to avoid a race with log rotation.
     ///
     /// # Errors
-    /// Returns an error if opening the file, reading its metadata, or checking
-    /// its compression header fails.
+    /// Returns an error if reading file metadata or checking its compression header fails.
     ///
     /// # Panics
     /// Panics if seeking to the initial position in an uncompressed file fails.
     pub async fn new(
         path: PathBuf,
+        f: File,
         read_from: ReadFrom,
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
     ) -> Result<FileWatcher, std::io::Error> {
-        let f = File::open(&path).await?;
         let file_info = f.file_info().await?;
         let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
 
@@ -278,11 +277,12 @@ impl FileWatcher {
     /// containing metrics about the old file so the caller can emit appropriate events.
     ///
     /// # Errors
-    /// Returns an error if opening the replacement file, reading its metadata
-    /// or compression header, or restoring the file position fails.
-    pub async fn update_path(&mut self, path: PathBuf) -> io::Result<Option<FileUnwatchInfo>> {
-        let new_file = File::open(&path).await?;
-
+    /// Returns an error if reading metadata, checking compression, or restoring the position fails.
+    pub async fn update_path(
+        &mut self,
+        path: PathBuf,
+        new_file: File,
+    ) -> io::Result<Option<FileUnwatchInfo>> {
         let file_info = new_file.file_info().await?;
         let unwatch_info =
             if (file_info.portable_dev(), file_info.portable_ino()) == (self.devno, self.inode) {
