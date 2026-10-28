@@ -1,6 +1,12 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    fmt,
+    sync::{Arc, LazyLock},
+    time::Instant,
+};
 
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
@@ -20,6 +26,38 @@ use crate::{
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
+
+/// Which legacy trace key layout an event was produced with.
+///
+/// This is an internal, unstable discriminator so Vector's own transforms and
+/// sinks can dispatch on layout after `source_type` is rewritten (for example
+/// across a vector sink/source hop). It names the original source layout so a
+/// converter can select a decoder; it is not a guarantee that the event object
+/// still has that shape. `remap` can rewrite or replace the payload while this
+/// field is retained, because it is not exposed to VRL. The converter that
+/// consumes the hint is still responsible for validating the payload.
+///
+/// It is not documented for users, is not a compatibility contract, and may
+/// change or be removed without a deprecation cycle. It is meaningful only on
+/// trace events; it is `None` on logs and metrics.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TraceLayout {
+    /// Layout written by the `datadog_agent` source.
+    Datadog,
+    /// Flattened per-span traces from the `opentelemetry` source.
+    ///
+    /// This is Vector's historical projection of an OTLP span (one event per
+    /// span), not an OTLP `resourceSpans` message.
+    OtelFlattened,
+    /// Raw OTLP `resourceSpans` batches from the `opentelemetry` source.
+    OtlpResourceSpans,
+    /// A protobuf value that is present but not a known layout.
+    ///
+    /// Conversion must treat this as an error rather than falling back to shape
+    /// detection. The original wire number is preserved so a later Vector that
+    /// understands it can still decode the record.
+    Unrecognized(i32),
+}
 
 /// The event metadata structure is a `Arc` wrapper around the actual metadata to avoid cloning the
 /// underlying data until it becomes necessary to provide a `mut` copy.
@@ -66,10 +104,13 @@ pub(super) struct Inner {
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
     /// This definition is only currently valid for logs, and shouldn't be used for other event types.
+    /// `None` stands for the shared default definition, so creating an event allocates nothing
+    /// for it.
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
-    #[serde(default = "default_schema_definition", skip)]
-    pub(crate) schema_definition: Arc<schema::Definition>,
+    #[derivative(PartialEq(compare_with = "schema_definition_eq"))]
+    #[serde(default, skip)]
+    pub(crate) schema_definition: Option<Arc<schema::Definition>>,
 
     /// A store of values that may be dropped during the encoding process but may be needed
     /// later on. The map is indexed by meaning.
@@ -84,6 +125,15 @@ pub(super) struct Inner {
     #[serde(default)]
     pub(crate) datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
 
+    /// Datadog metric unit received from an upstream Agent payload.
+    #[serde(default)]
+    pub(crate) datadog_metric_unit: Option<Arc<str>>,
+
+    /// Which legacy trace key layout produced this event. `None` means unmarked.
+    /// Meaningful only on traces; always `None` for logs and metrics.
+    #[serde(default)]
+    pub(crate) trace_layout: Option<TraceLayout>,
+
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Option<Uuid>,
@@ -92,6 +142,8 @@ pub(super) struct Inner {
 /// Metric Origin metadata for submission to Datadog.
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
+    /// Datadog origin metric type.
+    metric_type: Option<i32>,
     /// `OriginProduct`
     product: Option<u32>,
     /// `OriginCategory`
@@ -109,10 +161,23 @@ impl DatadogMetricOriginMetadata {
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
         Self {
+            metric_type: None,
             product,
             category,
             service,
         }
+    }
+
+    /// Returns the Datadog origin metric type.
+    pub fn metric_type(&self) -> Option<i32> {
+        self.metric_type
+    }
+
+    /// Sets the Datadog origin metric type.
+    #[must_use]
+    pub fn with_metric_type(mut self, metric_type: Option<i32>) -> Self {
+        self.metric_type = metric_type;
+        self
     }
 
     /// Returns a reference to the `OriginProduct`.
@@ -204,6 +269,26 @@ impl EventMetadata {
         self.get_mut().source_type = Some(source_type.into());
     }
 
+    /// Sets the internal, unstable trace-layout hint.
+    pub fn set_trace_layout(&mut self, layout: TraceLayout) {
+        self.get_mut().trace_layout = Some(layout);
+    }
+
+    /// Returns the internal, unstable trace-layout marker, if present.
+    #[must_use]
+    pub fn trace_layout(&self) -> Option<TraceLayout> {
+        self.inner.trace_layout
+    }
+
+    /// Removes the internal trace-layout marker.
+    ///
+    /// Call this when converting a trace to a log. The marker is only meaningful
+    /// to components that consume traces as traces; leaving it would let a later
+    /// `TraceEvent` reconstructed from that log inherit a stale layout.
+    pub fn clear_trace_layout(&mut self) {
+        self.get_mut().trace_layout = None;
+    }
+
     /// Sets the `upstream_id` in the metadata to the provided value.
     pub fn set_upstream_id(&mut self, upstream_id: Arc<OutputId>) {
         self.get_mut().upstream_id = Some(upstream_id);
@@ -247,6 +332,21 @@ impl EventMetadata {
         self.inner.datadog_origin_metadata.as_ref()
     }
 
+    /// Returns the Datadog metric unit.
+    pub fn datadog_metric_unit(&self) -> Option<&str> {
+        self.inner.datadog_metric_unit.as_deref()
+    }
+
+    /// Sets the Datadog metric unit.
+    pub fn set_datadog_metric_unit(&mut self, unit: impl Into<Arc<str>>) {
+        self.get_mut().datadog_metric_unit = Some(unit.into());
+    }
+
+    /// Clears the Datadog metric unit.
+    pub fn clear_datadog_metric_unit(&mut self) {
+        self.get_mut().datadog_metric_unit = None;
+    }
+
     /// Returns a reference to the event id.
     pub fn source_event_id(&self) -> Option<Uuid> {
         self.inner.source_event_id
@@ -270,12 +370,14 @@ impl Default for Inner {
             value: Value::Object(ObjectMap::new()),
             secrets: Secrets::new(),
             finalizers: Default::default(),
-            schema_definition: default_schema_definition(),
+            schema_definition: None,
             source_id: None,
             source_type: None,
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
+            datadog_metric_unit: None,
+            trace_layout: None,
             source_event_id: Some(Uuid::new_v4()),
         }
     }
@@ -290,23 +392,59 @@ impl Default for EventMetadata {
     }
 }
 
-pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
+static DEFAULT_SCHEMA_DEFINITION: LazyLock<Arc<schema::Definition>> = LazyLock::new(|| {
     Arc::new(schema::Definition::new_with_default_metadata(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
     ))
+});
+
+fn default_schema_definition() -> &'static Arc<schema::Definition> {
+    &DEFAULT_SCHEMA_DEFINITION
+}
+
+fn resolve_schema_definition(
+    definition: Option<&Arc<schema::Definition>>,
+) -> &Arc<schema::Definition> {
+    definition.unwrap_or_else(|| default_schema_definition())
+}
+
+#[expect(clippy::ref_option, reason = "signature required by `derivative`")]
+fn schema_definition_eq(
+    left: &Option<Arc<schema::Definition>>,
+    right: &Option<Arc<schema::Definition>>,
+) -> bool {
+    resolve_schema_definition(left.as_ref()) == resolve_schema_definition(right.as_ref())
 }
 
 impl ByteSizeOf for EventMetadata {
     fn allocated_bytes(&self) -> usize {
-        // NOTE we don't count the `str` here because it's allocated somewhere
-        // else. We're just moving around the pointer, which is already captured
-        // by `ByteSizeOf::size_of`.
-        self.inner.finalizers.allocated_bytes()
+        // Most Arc-backed metadata points to allocations owned or accounted for elsewhere. The
+        // Datadog metric unit is retained solely by event metadata, so include its allocation.
+        // Charge each event conservatively. Arc owner counts are transient: fanout branches can
+        // disappear after a memory queue has snapshotted this value, leaving that queue as the sole
+        // owner without updating its reservation.
+        let datadog_metric_unit_bytes = self
+            .inner
+            .datadog_metric_unit
+            .as_ref()
+            .map_or(0, |unit| unit.len());
+
+        self.inner.finalizers.allocated_bytes() + datadog_metric_unit_bytes
     }
 }
 
 impl EventMetadata {
+    /// Returns the size of the out-of-line allocation shared by cloned event metadata.
+    ///
+    /// This excludes allocations referenced by the metadata fields themselves. It is intended for
+    /// ingestion paths that must budget for a later copy-on-write operation on every event.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn allocated_inner_size() -> usize {
+        std::mem::size_of::<Inner>()
+    }
+
     /// Replaces the existing event finalizers with the given one.
     #[must_use]
     pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
@@ -339,7 +477,7 @@ impl EventMetadata {
     /// Replace the schema definition with the given one.
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: &Arc<schema::Definition>) -> Self {
-        self.get_mut().schema_definition = Arc::clone(schema_definition);
+        self.get_mut().schema_definition = Some(Arc::clone(schema_definition));
         self
     }
 
@@ -354,6 +492,13 @@ impl EventMetadata {
     #[must_use]
     pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
         self.get_mut().datadog_origin_metadata = Some(origin_metadata);
+        self
+    }
+
+    /// Sets the Datadog metric unit.
+    #[must_use]
+    pub fn with_datadog_metric_unit(mut self, unit: impl Into<Arc<str>>) -> Self {
+        self.get_mut().datadog_metric_unit = Some(unit.into());
         self
     }
 
@@ -381,10 +526,8 @@ impl EventMetadata {
 
         // Keep the earliest `last_transform_timestamp` for accurate latency measurement.
         match (self.last_transform_timestamp, other_timestamp) {
-            (Some(self_ts), Some(other_ts)) => {
-                if other_ts < self_ts {
-                    self.last_transform_timestamp = Some(other_ts);
-                }
+            (Some(self_ts), Some(other_ts)) if other_ts < self_ts => {
+                self.last_transform_timestamp = Some(other_ts);
             }
             (None, Some(other_ts)) => {
                 self.last_transform_timestamp = Some(other_ts);
@@ -425,12 +568,12 @@ impl EventMetadata {
 
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
-        &self.inner.schema_definition
+        resolve_schema_definition(self.inner.schema_definition.as_ref())
     }
 
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
-        self.get_mut().schema_definition = Arc::clone(definition);
+        self.get_mut().schema_definition = Some(Arc::clone(definition));
     }
 
     /// Helper function to add a semantic meaning to the schema definition.
@@ -449,7 +592,11 @@ impl EventMetadata {
     ///     .set_schema_definition(new_schema);
     /// ````
     pub fn add_schema_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
-        let schema = Arc::make_mut(&mut self.get_mut().schema_definition);
+        let schema = Arc::make_mut(
+            self.get_mut()
+                .schema_definition
+                .get_or_insert_with(|| Arc::clone(default_schema_definition())),
+        );
         schema.add_meaning(target_path, meaning);
     }
 }
@@ -565,12 +712,70 @@ mod test {
     const SECRET2: &str = "secret2";
 
     #[test]
+    fn trace_layout_round_trip() {
+        let mut metadata = EventMetadata::default();
+        assert_eq!(metadata.trace_layout(), None);
+        metadata.set_trace_layout(TraceLayout::Datadog);
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Datadog));
+        metadata.set_trace_layout(TraceLayout::OtelFlattened);
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::OtelFlattened));
+        metadata.set_trace_layout(TraceLayout::OtlpResourceSpans);
+        assert_eq!(
+            metadata.trace_layout(),
+            Some(TraceLayout::OtlpResourceSpans)
+        );
+    }
+
+    #[test]
+    fn clear_trace_layout() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_trace_layout(TraceLayout::Datadog);
+        metadata.clear_trace_layout();
+        assert_eq!(metadata.trace_layout(), None);
+    }
+
+    #[test]
+    fn unrecognized_trace_layout_is_preserved() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_trace_layout(TraceLayout::Unrecognized(99));
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Unrecognized(99)));
+        metadata.set_trace_layout(TraceLayout::Unrecognized(0));
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Unrecognized(0)));
+    }
+
+    #[test]
     fn metadata_hardcoded_secrets_get_set() {
         let mut metadata = EventMetadata::default();
         metadata.set_datadog_api_key(Arc::from(SECRET));
         metadata.set_splunk_hec_token(Arc::from(SECRET2));
         assert_eq!(metadata.datadog_api_key().unwrap().as_ref(), SECRET);
         assert_eq!(metadata.splunk_hec_token().unwrap().as_ref(), SECRET2);
+    }
+
+    #[test]
+    fn metadata_copy_on_write_keeps_datadog_metric_unit_shared() {
+        let metadata = EventMetadata::default().with_datadog_metric_unit("byte");
+        let mut cloned = metadata.clone();
+
+        cloned.set_datadog_api_key(Arc::from(SECRET));
+
+        let original_unit = metadata.inner.datadog_metric_unit.as_ref().unwrap();
+        let cloned_unit = cloned.inner.datadog_metric_unit.as_ref().unwrap();
+        assert!(Arc::ptr_eq(original_unit, cloned_unit));
+    }
+
+    #[test]
+    fn metadata_byte_size_conservatively_accounts_for_shared_datadog_metric_unit() {
+        let unit = "x".repeat(1024);
+        let metadata = EventMetadata::default().with_datadog_metric_unit(unit);
+        let mut shared_inner = metadata.clone();
+
+        assert_eq!(metadata.allocated_bytes(), 1024);
+        assert_eq!(shared_inner.allocated_bytes(), 1024);
+
+        shared_inner.set_datadog_api_key(Arc::from(SECRET));
+        assert_eq!(metadata.allocated_bytes(), 1024);
+        assert_eq!(shared_inner.allocated_bytes(), 1024);
     }
 
     #[test]
@@ -604,7 +809,7 @@ mod test {
 
         {
             let mut merged = m2.clone();
-            merged.merge(m1.clone());
+            merged.merge(m1);
             assert_eq!(merged.source_event_id(), m2.source_event_id());
         }
     }

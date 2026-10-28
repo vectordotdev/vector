@@ -1,6 +1,6 @@
 use hickory_proto::{
     ProtoError,
-    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder},
+    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder, DecodeError},
 };
 
 pub const EDE_OPTION_CODE: u16 = 15u16;
@@ -12,6 +12,7 @@ pub struct EDE {
 }
 
 impl EDE {
+    #[must_use]
     pub fn new(info_code: u16, extra_text: Option<String>) -> Self {
         Self {
             info_code,
@@ -20,6 +21,7 @@ impl EDE {
     }
 
     // https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#extended-dns-error-codes
+    #[must_use]
     pub fn purpose(&self) -> Option<&str> {
         match self.info_code {
             0 => Some("Other Error"),
@@ -57,10 +59,12 @@ impl EDE {
         }
     }
 
+    #[must_use]
     pub fn info_code(&self) -> u16 {
         self.info_code
     }
 
+    #[must_use]
     pub fn extra_text(&self) -> Option<String> {
         self.extra_text.clone()
     }
@@ -77,14 +81,15 @@ impl BinEncodable for EDE {
 }
 
 impl<'a> BinDecodable<'a> for EDE {
-    fn read(decoder: &mut BinDecoder<'a>) -> Result<Self, ProtoError> {
+    fn read(decoder: &mut BinDecoder<'a>) -> Result<Self, DecodeError> {
         let info_code = decoder.read_u16()?.unverified();
         let extra_text = if decoder.is_empty() {
             None
         } else {
-            Some(String::from_utf8(
-                decoder.read_vec(decoder.len())?.unverified(),
-            )?)
+            Some(
+                String::from_utf8(decoder.read_vec(decoder.len())?.unverified())
+                    .map_err(DecodeError::Utf8)?,
+            )
         };
         Ok(Self {
             info_code,

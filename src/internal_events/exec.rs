@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_lib::{
-    NamedInternalEvent,
+    NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL,
+        error_stage, error_type,
     },
     json_size::JsonSize,
 };
@@ -28,12 +28,12 @@ impl InternalEvent for ExecEventsReceived<'_> {
             command = %self.command,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
@@ -57,7 +57,7 @@ impl InternalEvent for ExecFailedError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
             "error_code" => io_error_code(&self.error),
@@ -85,7 +85,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
@@ -120,14 +120,14 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             elapsed_millis = %self.exec_duration.as_millis(),
         );
         counter!(
-            "command_executed_total",
+            CounterName::CommandExecutedTotal,
             "command" => self.command.to_owned(),
             "exit_status" => exit_status.clone(),
         )
         .increment(1);
 
         histogram!(
-            "command_execution_duration_seconds",
+            HistogramName::CommandExecutionDurationSeconds,
             "exit_status" => exit_status,
             "command" => self.command.to_owned(),
         )
@@ -148,34 +148,30 @@ pub enum ExecFailedToSignalChild {
 
 impl ExecFailedToSignalChild {
     fn to_error_code(&self) -> String {
-        use ExecFailedToSignalChild::*;
-
         match self {
             #[cfg(unix)]
-            SignalError(err) => format!("errno_{err}"),
+            Self::SignalError(err) => format!("errno_{err}"),
             #[cfg(unix)]
-            FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
+            Self::FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
             #[cfg(unix)]
-            NoPid => String::from("no_pid"),
+            Self::NoPid => String::from("no_pid"),
             #[cfg(windows)]
-            IoError(err) => err.to_string(),
+            Self::IoError(err) => err.to_string(),
         }
     }
 }
 
 impl std::fmt::Display for ExecFailedToSignalChild {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use ExecFailedToSignalChild::*;
-
         match self {
             #[cfg(unix)]
-            SignalError(err) => write!(f, "errno: {err}"),
+            Self::SignalError(err) => write!(f, "errno: {err}"),
             #[cfg(unix)]
-            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {err}"),
+            Self::FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {err}"),
             #[cfg(unix)]
-            NoPid => write!(f, "child had no pid"),
+            Self::NoPid => write!(f, "child had no pid"),
             #[cfg(windows)]
-            IoError(err) => write!(f, "io error: {}", err),
+            Self::IoError(err) => write!(f, "io error: {err}"),
         }
     }
 }
@@ -196,7 +192,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => format!("{:?}", self.command.as_std()),
             "error_code" => self.error.to_error_code(),
             "error_type" => error_type::COMMAND_FAILED,
@@ -218,7 +214,7 @@ impl InternalEvent for ExecChannelClosedError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         )

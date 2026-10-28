@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 
-use super::{BoxedFramingError, CharacterDelimitedDecoder};
+use super::{BoxedFramingError, CharacterDelimitedDecoder, OversizedAction};
 
 /// Config used to build a `NewlineDelimitedDecoder`.
 #[configurable_component]
@@ -21,33 +21,47 @@ pub struct NewlineDelimitedDecoderOptions {
     ///
     /// This length does *not* include the trailing delimiter.
     ///
-    /// By default, there is no maximum length enforced. If events are malformed, this can lead to
+    /// By default, no maximum length is enforced. If events are malformed, this can lead to
     /// additional resource usage as events continue to be buffered in memory, and can potentially
     /// lead to memory exhaustion in extreme cases.
     ///
     /// If there is a risk of processing malformed data, such as logs with user-controlled input,
     /// consider setting the maximum length to a reasonably large value as a safety net. This
-    /// ensures that processing is not actually unbounded.
+    /// prevents processing from being unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::is_default")]
     pub max_length: Option<usize>,
+
+    /// The behavior when a line exceeds `max_length`.
+    ///
+    /// When set to `drop` (the default), the entire oversized line is discarded.
+    /// When set to `truncate`, the line is truncated to `max_length` bytes and the
+    /// remainder is discarded up to the next newline.
+    ///
+    /// This option has no effect if `max_length` is not set.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub oversized_action: OversizedAction,
 }
 
 impl NewlineDelimitedDecoderOptions {
     /// Creates a `NewlineDelimitedDecoderOptions` with a maximum frame length limit.
+    #[must_use]
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self {
             max_length: Some(max_length),
+            oversized_action: OversizedAction::Drop,
         }
     }
 }
 
 impl NewlineDelimitedDecoderConfig {
     /// Creates a new `NewlineDelimitedDecoderConfig`.
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        NewlineDelimitedDecoderConfig::default()
     }
 
     /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
+    #[must_use]
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self {
             newline_delimited: { NewlineDelimitedDecoderOptions::new_with_max_length(max_length) },
@@ -55,9 +69,12 @@ impl NewlineDelimitedDecoderConfig {
     }
 
     /// Build the `NewlineDelimitedDecoder` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> NewlineDelimitedDecoder {
+        let oversized_action = self.newline_delimited.oversized_action;
         if let Some(max_length) = self.newline_delimited.max_length {
             NewlineDelimitedDecoder::new_with_max_length(max_length)
+                .with_oversized_action(oversized_action)
         } else {
             NewlineDelimitedDecoder::new()
         }
@@ -70,6 +87,7 @@ pub struct NewlineDelimitedDecoder(CharacterDelimitedDecoder);
 
 impl NewlineDelimitedDecoder {
     /// Creates a new `NewlineDelimitedDecoder`.
+    #[must_use]
     pub const fn new() -> Self {
         Self(CharacterDelimitedDecoder::new(b'\n'))
     }
@@ -77,10 +95,18 @@ impl NewlineDelimitedDecoder {
     /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
+    #[must_use]
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self(CharacterDelimitedDecoder::new_with_max_length(
             b'\n', max_length,
         ))
+    }
+
+    /// Sets the behavior when a line exceeds `max_length`.
+    #[must_use]
+    pub const fn with_oversized_action(mut self, action: OversizedAction) -> Self {
+        self.0.oversized_action = action;
+        self
     }
 }
 

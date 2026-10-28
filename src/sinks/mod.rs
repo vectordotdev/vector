@@ -30,8 +30,6 @@ pub mod azure_blob;
 pub mod azure_common;
 #[cfg(feature = "sinks-azure_logs_ingestion")]
 pub mod azure_logs_ingestion;
-#[cfg(feature = "sinks-azure_monitor_logs")]
-pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
@@ -40,6 +38,8 @@ pub mod clickhouse;
 pub mod console;
 #[cfg(feature = "sinks-databend")]
 pub mod databend;
+#[cfg(feature = "sinks-databricks_zerobus")]
+pub mod databricks_zerobus;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
@@ -88,6 +88,8 @@ pub mod nats;
 pub mod new_relic;
 #[cfg(feature = "sinks-webhdfs")]
 pub mod opendal_common;
+#[cfg(feature = "sinks-opensearch")]
+pub mod opensearch;
 #[cfg(feature = "sinks-opentelemetry")]
 pub mod opentelemetry;
 #[cfg(feature = "sinks-papertrail")]
@@ -116,7 +118,7 @@ pub mod vector;
 pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
-#[cfg(feature = "sinks-websocket-server")]
+#[cfg(feature = "sinks-websocket_server")]
 pub mod websocket_server;
 
 pub use vector_lib::{config::Input, sink::VectorSink};
@@ -136,6 +138,8 @@ pub enum BuildError {
     UriParseError { source: ::http::uri::InvalidUri },
     #[snafu(display("HTTP request build error: {}", source))]
     HTTPRequestBuilderError { source: ::http::Error },
+    #[snafu(display("HTTP request build error: {}", source))]
+    HTTPV1RequestBuilderError { source: ::http_1::Error },
 }
 
 /// Common healthcheck errors
@@ -143,4 +147,15 @@ pub enum BuildError {
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
+}
+
+impl HealthcheckError {
+    /// Builds an [`HealthcheckError::UnexpectedStatus`] from a status code of either `http`
+    /// crate version.
+    #[must_use]
+    pub fn unexpected_status(status: impl util::http::IntoStatusCode) -> Self {
+        Self::UnexpectedStatus {
+            status: status.into_status_code(),
+        }
+    }
 }

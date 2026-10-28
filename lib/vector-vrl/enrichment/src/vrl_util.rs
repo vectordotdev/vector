@@ -1,5 +1,5 @@
 //! Utilities shared between both VRL functions.
-use std::{collections::BTreeMap, sync::LazyLock};
+use std::collections::BTreeMap;
 
 use vrl::{
     diagnostic::{Label, Span},
@@ -103,7 +103,7 @@ pub(crate) fn add_index(
 
     Ok(index)
 }
-pub(crate) static DEFAULT_CASE_SENSITIVE: LazyLock<Value> = LazyLock::new(|| Value::Boolean(true));
+pub(crate) static DEFAULT_CASE_SENSITIVE: Value = Value::Boolean(true);
 
 #[allow(clippy::result_large_err)]
 pub(crate) fn is_case_sensitive(

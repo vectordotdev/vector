@@ -74,6 +74,7 @@ impl EstimatedJsonEncodedSizeOf for Value {
             Value::Object(v) => v.estimated_json_encoded_size_of(),
             Value::Array(v) => v.estimated_json_encoded_size_of(),
             Value::Bytes(v) => v.estimated_json_encoded_size_of(),
+            Value::String(v) => v.estimated_json_encoded_size_of(),
             Value::Regex(v) => v.as_str().estimated_json_encoded_size_of(),
             Value::Integer(v) => v.estimated_json_encoded_size_of(),
             Value::Float(v) => v.estimated_json_encoded_size_of(),
@@ -120,13 +121,13 @@ impl EstimatedJsonEncodedSizeOf for bool {
 
 impl EstimatedJsonEncodedSizeOf for f64 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        ryu::Buffer::new().format_finite(*self).len().into()
+        zmij::Buffer::new().format_finite(*self).len().into()
     }
 }
 
 impl EstimatedJsonEncodedSizeOf for f32 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        ryu::Buffer::new().format_finite(*self).len().into()
+        zmij::Buffer::new().format_finite(*self).len().into()
     }
 }
 
@@ -637,6 +638,7 @@ mod tests {
     fn is_inaccurately_counted_value(v: &Value) -> bool {
         match v {
             Value::Bytes(v) => is_inaccurately_counted_bytes(v),
+            Value::String(v) => is_inaccurately_counted_bytes(v.as_bytes()),
             Value::Object(v) => v.iter().any(|(k, v)| {
                 is_inaccurately_counted_bytes(k.as_bytes()) || is_inaccurately_counted_value(v)
             }),

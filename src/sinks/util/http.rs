@@ -7,6 +7,10 @@ use futures::{Sink, future::BoxFuture};
 use headers::HeaderName;
 use http::{HeaderValue, Request, Response, StatusCode, header};
 use http_body::Body as _;
+use tracing::debug;
+
+/// Maximum number of response body bytes to include in a non-retriable error's reason.
+pub(crate) const MAX_ERROR_BODY_BYTES: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -74,7 +78,6 @@ use crate::{
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
-    template::Template,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -142,7 +145,7 @@ where
     pub fn new(
         sink: T,
         batch: B,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -170,7 +173,7 @@ where
         sink: T,
         batch: B,
         retry_logic: RL,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -288,7 +291,7 @@ where
     pub fn new(
         sink: T,
         batch: B,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -318,7 +321,7 @@ where
         sink: T,
         batch: B,
         retry_logic: RL,
-        request_settings: TowerRequestSettings,
+        request_settings: &TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
     ) -> Self {
@@ -343,6 +346,7 @@ where
     }
 
     /// Enforces per partition ordering of request.
+    #[must_use]
     pub fn ordered(mut self) -> Self {
         self.inner.ordered();
         self
@@ -417,11 +421,11 @@ pub struct SigV4Config {
     pub(crate) service: String,
 }
 
-/// @struct HttpBatchService
+/// @struct `HttpBatchService`
 ///
 /// NOTE: This has been deprecated, please do not use directly when creating new sinks.
 ///       The `HttpService` currently wraps this structure. Eventually all sinks currently using the
-///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
+///       `HttpBatchService` directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.
 pub struct HttpBatchService<F, B = Bytes> {
     inner: HttpClient<Body>,
@@ -550,14 +554,160 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
     }
 }
 
+/// Serializes and deserializes a [`Vec<StatusCode>`]
+mod status_code_vec {
+    use http::StatusCode;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
+
+    /// Deserializes a [`Vec<StatusCode>`]
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<StatusCode>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Vec::<u16>::deserialize(deserializer)?
+            .into_iter()
+            .map(StatusCode::from_u16)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Error::custom)
+    }
+
+    /// Serializes a [`Vec<StatusCode>`]
+    pub fn serialize<S>(status_codes: &[StatusCode], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        status_codes
+            .iter()
+            .map(StatusCode::as_u16)
+            .collect::<Vec<_>>()
+            .serialize(serializer)
+    }
+}
+
+/// Configurable retry strategy for `http` based sinks.
+///
+/// For more information about error responses, see [Client Error Responses][error_responses].
+///
+/// [error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+#[configurable_component]
+#[derive(Debug, Clone, Default, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The retry strategy enum."))]
+pub enum RetryStrategy {
+    /// Don't retry any errors, including request timeouts.
+    None,
+
+    /// Default strategy. See [`RetryStrategy::retry_action`] for more details.
+    #[default]
+    Default,
+
+    /// Retry on *all* HTTP status codes except for success codes (2xx)
+    All,
+
+    /// Custom retry strategy
+    Custom {
+        /// Retry on these specific HTTP status codes
+        #[serde(with = "status_code_vec")]
+        status_codes: Vec<StatusCode>,
+    },
+}
+
+impl RetryStrategy {
+    /// Returns the name of the retry strategy.
+    #[must_use]
+    const fn name(&self) -> &str {
+        match self {
+            Self::None => "Never retry strategy",
+            Self::Default => "Default retry strategy",
+            Self::All => "Retry all strategy",
+            Self::Custom { .. } => "Custom retry strategy",
+        }
+    }
+
+    /// Determines if the given status code should be retried.
+    ///
+    /// For the `Default` strategy, the following status codes will be retried:
+    /// - 429 (Too Many Requests)
+    /// - 408 (Request Timeout)
+    /// - 5xx (Server Error)
+    ///
+    /// For the `Custom` strategy, the status codes specified in the `status_codes` field will be retried.
+    ///
+    /// For the `All` strategy, all non-success status codes will be retried.
+    #[must_use]
+    pub fn retry_action<Req>(&self, status: impl IntoStatusCode) -> RetryAction<Req> {
+        let status = status.into_status_code();
+        if status.is_success() {
+            return RetryAction::Successful;
+        }
+
+        let reason = format!(
+            "{}: {}",
+            self.name(),
+            status.canonical_reason().unwrap_or_else(|| status.as_str())
+        )
+        .into();
+
+        match self {
+            Self::None => RetryAction::DontRetry(reason),
+            Self::Default => match status {
+                StatusCode::TOO_MANY_REQUESTS | StatusCode::REQUEST_TIMEOUT => {
+                    RetryAction::Retry(reason)
+                }
+                StatusCode::NOT_IMPLEMENTED => RetryAction::DontRetry(reason),
+                _ => {
+                    if status.is_server_error() {
+                        RetryAction::Retry(reason)
+                    } else {
+                        RetryAction::DontRetry(reason)
+                    }
+                }
+            },
+            Self::All => RetryAction::Retry(reason),
+            Self::Custom { status_codes } => {
+                if status_codes.contains(&status) {
+                    RetryAction::Retry(reason)
+                } else {
+                    RetryAction::DontRetry(reason)
+                }
+            }
+        }
+    }
+}
+
+/// A response status code from either `http` crate version.
+///
+/// Retry logic and healthcheck errors accept both versions through this trait, so callers never
+/// convert between them. This is the only place that converts.
+// TODO: Use `http_1::StatusCode` natively and remove the `http` 0.2 impl once the HTTP v1
+// migration is complete: https://github.com/vectordotdev/vector/issues/19179
+pub trait IntoStatusCode {
+    fn into_status_code(self) -> StatusCode;
+}
+
+impl IntoStatusCode for StatusCode {
+    fn into_status_code(self) -> StatusCode {
+        self
+    }
+}
+
+impl IntoStatusCode for http_1::StatusCode {
+    fn into_status_code(self) -> StatusCode {
+        StatusCode::from_u16(self.as_u16()).expect("HTTP status codes are valid u16 values")
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HttpRetryLogic<Req> {
     request: PhantomData<Req>,
+    retry_strategy: RetryStrategy,
 }
+
 impl<Req> Default for HttpRetryLogic<Req> {
     fn default() -> Self {
         Self {
             request: PhantomData,
+            retry_strategy: RetryStrategy::Default,
         }
     }
 }
@@ -567,85 +717,129 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
     type Request = Req;
     type Response = hyper::Response<Bytes>;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false
+        } else {
+            error.is_retriable()
+        }
+    }
+
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         let status = response.status();
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
+        if !status.is_success() {
+            debug!(
+                message = "HTTP response.",
+                %status,
+                body = %String::from_utf8_lossy(response.body()),
+            );
         }
+        self.retry_strategy.retry_action(status)
     }
 }
 
 /// A more generic version of `HttpRetryLogic` that accepts anything that can be converted
 /// to a status code
 #[derive(Debug)]
-pub struct HttpStatusRetryLogic<F, Req, Res> {
+pub struct HttpStatusRetryLogic<F, Req, Res, E = HttpError> {
     func: F,
     request: PhantomData<Req>,
     response: PhantomData<Res>,
+    error: PhantomData<E>,
+    retry_strategy: RetryStrategy,
 }
 
-impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res>
+// TODO: Remove this compatibility trait, the generic error parameter on
+// `HttpStatusRetryLogic`, and `new_with_error` once the HTTP v1 migration is complete:
+// https://github.com/vectordotdev/vector/issues/19179
+pub trait HttpErrorClassify {
+    fn is_retriable(&self) -> bool;
+}
+
+impl HttpErrorClassify for HttpError {
+    fn is_retriable(&self) -> bool {
+        HttpError::is_retriable(self)
+    }
+}
+
+impl HttpErrorClassify for vector_http::HttpError {
+    fn is_retriable(&self) -> bool {
+        vector_http::HttpError::is_retriable(self)
+    }
+}
+
+impl<F, S, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
-    pub const fn new(func: F) -> HttpStatusRetryLogic<F, Req, Res> {
+    pub const fn new(func: F, retry_strategy: RetryStrategy) -> Self {
         HttpStatusRetryLogic {
             func,
             request: PhantomData,
             response: PhantomData,
+            error: PhantomData,
+            retry_strategy,
         }
     }
 }
 
-impl<F, Req, Res> RetryLogic for HttpStatusRetryLogic<F, Req, Res>
+impl<F, S, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
 where
-    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
+    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
 {
-    type Error = HttpError;
+    pub const fn new_with_error(func: F, retry_strategy: RetryStrategy) -> Self {
+        HttpStatusRetryLogic {
+            func,
+            request: PhantomData,
+            response: PhantomData,
+            error: PhantomData,
+            retry_strategy,
+        }
+    }
+}
+
+impl<F, S, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
+where
+    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
+    S: IntoStatusCode,
+    Req: Send + Sync + 'static,
+    Res: Send + Sync + 'static,
+    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
+{
+    type Error = E;
     type Request = Req;
     type Response = Res;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        if self.retry_strategy == RetryStrategy::None {
+            false
+        } else {
+            error.is_retriable()
+        }
+    }
+
+    fn is_retriable_timeout(&self) -> bool {
+        self.retry_strategy != RetryStrategy::None
     }
 
     fn should_retry_response(&self, response: &Res) -> RetryAction<Req> {
         let status = (self.func)(response);
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => {
-                RetryAction::Retry(format!("Http Status: {status}").into())
-            }
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("Http status: {status}").into()),
-        }
+        self.retry_strategy.retry_action(status)
     }
 }
 
-impl<F, Req, Res> Clone for HttpStatusRetryLogic<F, Req, Res>
+impl<F, Req, Res, E> Clone for HttpStatusRetryLogic<F, Req, Res, E>
 where
     F: Clone,
 {
@@ -654,6 +848,8 @@ where
             func: self.func.clone(),
             request: PhantomData,
             response: PhantomData,
+            error: PhantomData,
+            retry_strategy: self.retry_strategy.clone(),
         }
     }
 }
@@ -684,6 +880,8 @@ fn headers_examples() -> BTreeMap<String, String> {
 }
 
 impl RequestConfig {
+    /// Split headers into static (non-dynamic) and template (dynamic) maps.
+    #[must_use]
     pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
@@ -720,6 +918,11 @@ pub enum HeaderValidationError {
     },
 }
 
+/// Validates HTTP header names and values.
+///
+/// # Errors
+///
+/// Returns an error if a header name or value is invalid.
 pub fn validate_headers(
     headers: &BTreeMap<String, String>,
 ) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
@@ -820,12 +1023,30 @@ impl DriverResponse for HttpResponse {
 }
 
 /// Creates a `RetryLogic` for use with `HttpResponse`.
-pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>() -> HttpStatusRetryLogic<
+#[must_use]
+pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
+    retry_strategy: RetryStrategy,
+) -> HttpStatusRetryLogic<
     impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
 > {
-    HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status())
+    HttpStatusRetryLogic::new(
+        |req: &HttpResponse| {
+            let status = req.http_response.status();
+            let body = req.http_response.body();
+            let truncated = &body[..body.len().min(MAX_ERROR_BODY_BYTES)];
+            if !status.is_success() {
+                debug!(
+                    message = "HTTP response.",
+                    %status,
+                    body = %String::from_utf8_lossy(truncated),
+                );
+            }
+            status
+        },
+        retry_strategy,
+    )
 }
 
 /// Uses the estimated json encoded size to determine batch sizing.
@@ -840,6 +1061,9 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
 
 /// HTTP request builder for HTTP stream sinks using the generic `HttpService`
 pub trait HttpServiceRequestBuilder<T: Send> {
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be built.
     fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
 }
 
@@ -966,6 +1190,93 @@ mod test {
             logic
                 .should_retry_response(&response_501)
                 .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_none_preserves_success_and_rejects_failures() {
+        let strategy = RetryStrategy::None;
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_none_disables_timeout_retries() {
+        let logic = HttpRetryLogic::<()> {
+            request: PhantomData,
+            retry_strategy: RetryStrategy::None,
+        };
+        let status_logic =
+            HttpStatusRetryLogic::<_, (), ()>::new(|(): &()| StatusCode::OK, RetryStrategy::None);
+
+        assert!(!logic.is_retriable_timeout());
+        assert!(!status_logic.is_retriable_timeout());
+    }
+
+    #[test]
+    fn retry_strategy_all_preserves_success_and_retries_failures() {
+        let strategy = RetryStrategy::All;
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::BAD_REQUEST)
+                .is_retryable()
+        );
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_custom_only_retries_configured_statuses() {
+        let strategy = RetryStrategy::Custom {
+            status_codes: vec![StatusCode::BAD_REQUEST],
+        };
+
+        assert!(strategy.retry_action::<()>(StatusCode::OK).is_successful());
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::BAD_REQUEST)
+                .is_retryable()
+        );
+        assert!(
+            strategy
+                .retry_action::<()>(StatusCode::INTERNAL_SERVER_ERROR)
+                .is_not_retryable()
+        );
+    }
+
+    #[test]
+    fn retry_strategy_custom_serde_roundtrips_status_codes() {
+        let json = r#"{"type":"custom","status_codes":[400,503]}"#;
+        let strategy: RetryStrategy = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            strategy,
+            RetryStrategy::Custom {
+                status_codes: vec![StatusCode::BAD_REQUEST, StatusCode::SERVICE_UNAVAILABLE],
+            }
+        );
+        let encoded = serde_json::to_string(&strategy).unwrap();
+        let roundtrip: RetryStrategy = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(roundtrip, strategy);
+    }
+
+    #[test]
+    fn retry_strategy_custom_serde_rejects_invalid_status_codes() {
+        // `http::StatusCode::from_u16` only accepts 100–999; 1000 is out of range.
+        let json = r#"{"type":"custom","status_codes":[1000]}"#;
+        let result = serde_json::from_str::<RetryStrategy>(json);
+        assert!(
+            result.is_err(),
+            "expected invalid status code to fail deserialization"
         );
     }
 

@@ -89,24 +89,21 @@ where
                 Poll::Ready(Some(Err(error))) => {
                     if self.enqueued.is_empty() {
                         return Poll::Ready(Some(Err(error)));
-                    } else {
-                        self.error_slot = Some(error);
-                        return Poll::Ready(Some(Ok(self.flush())));
                     }
+                    self.error_slot = Some(error);
+                    return Poll::Ready(Some(Ok(self.flush())));
                 }
                 Poll::Ready(None) => {
-                    if !self.enqueued.is_empty() {
-                        return Poll::Ready(Some(Ok(self.flush())));
-                    } else {
+                    if self.enqueued.is_empty() {
                         return Poll::Ready(None);
                     }
+                    return Poll::Ready(Some(Ok(self.flush())));
                 }
                 Poll::Pending => {
-                    if !self.enqueued.is_empty() {
-                        return Poll::Ready(Some(Ok(self.flush())));
-                    } else {
+                    if self.enqueued.is_empty() {
                         return Poll::Pending;
                     }
+                    return Poll::Ready(Some(Ok(self.flush())));
                 }
             }
         }

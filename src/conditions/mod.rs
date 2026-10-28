@@ -70,6 +70,8 @@ impl Condition {
     ///
     /// This can be mildly expensive for conditions that do not often match, as it allocates a string for the error
     /// case. As such, it should typically be avoided in hot paths.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         match self {
             Condition::IsLog => check_is_log_with_context(e),
@@ -118,6 +120,8 @@ pub enum ConditionConfig {
 }
 
 impl ConditionConfig {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -154,6 +158,8 @@ pub trait Conditional: std::fmt::Debug {
 }
 
 pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -194,6 +200,12 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -209,6 +221,16 @@ impl AnyCondition {
             }
             AnyCondition::Map(m) => m.build(enrichment_tables, metrics_storage),
         }
+    }
+
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    pub fn validate(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
+    ) -> crate::Result<()> {
+        self.build(enrichment_tables, metrics_storage).map(|_| ())
     }
 }
 
@@ -232,24 +254,25 @@ mod tests {
 
     #[test]
     fn deserialize_anycondition_default() {
-        let conf: Test = toml::from_str(r#"condition = ".nork == false""#).unwrap();
+        let conf: Test = serde_yaml::from_str(r#"condition: ".nork == false""#).unwrap();
         assert_eq!(
             r#"String(".nork == false")"#,
             format!("{:?}", conf.condition)
-        )
+        );
     }
 
     #[test]
     fn deserialize_anycondition_vrl() {
-        let conf: Test = toml::from_str(indoc! {r#"
-            condition.type = "vrl"
-            condition.source = '.nork == true'
-        "#})
+        let conf: Test = serde_yaml::from_str(indoc! {"
+            condition:
+              type: vrl
+              source: '.nork == true'
+        "})
         .unwrap();
 
         assert_eq!(
             r#"Map(Vrl(VrlConfig { source: ".nork == true", runtime: Ast }))"#,
             format!("{:?}", conf.condition)
-        )
+        );
     }
 }

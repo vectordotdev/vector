@@ -20,6 +20,7 @@ use crate::{
     common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
     internal_events::DatadogAgentJsonParseError,
+    sources::util::http::capped_body,
 };
 
 pub(super) fn build_warp_filter(
@@ -32,7 +33,7 @@ pub(super) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then(
             move |_,
                   path: FullPath,
@@ -59,6 +60,14 @@ pub(super) fn build_warp_filter(
         .boxed()
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(crate) fn decode_log_body(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -81,7 +90,7 @@ pub(crate) fn decode_log_body(
     })?;
 
     let now = Utc::now();
-    let mut decoded = Vec::new();
+    let mut decoded_events = Vec::new();
     let mut event_bytes_received = JsonSize::zero();
 
     for LogMsg {
@@ -178,7 +187,7 @@ pub(crate) fn decode_log_body(
                                 .set_schema_definition(logs_schema_definition);
                         }
 
-                        decoded.push(event);
+                        decoded_events.push(event);
                     }
                 }
                 Ok(None) => break,
@@ -195,9 +204,9 @@ pub(crate) fn decode_log_body(
 
     source
         .events_received
-        .emit(CountByteSize(decoded.len(), event_bytes_received));
+        .emit(CountByteSize(decoded_events.len(), event_bytes_received));
 
-    Ok(decoded)
+    Ok(decoded_events)
 }
 
 // ddtags input is a string containing a list of tags which
@@ -217,13 +226,13 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
     let ddtags: Vec<Value> = ddtags_str
         .split(',')
         .filter(|kv| !kv.is_empty())
-        .map(|kv| Value::Bytes(Bytes::from(kv.trim().to_string())))
+        .map(|kv| Value::from(kv.trim()))
         .collect();
 
     if ddtags.is_empty() && !ddtags_str.is_empty() {
         warn!(
             message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed."
-        )
+        );
     }
 
     ddtags.into()
@@ -238,7 +247,7 @@ mod tests {
 
     #[test]
     fn ddtags_parse_empty() {
-        let raw = Bytes::from(String::from(""));
+        let raw = Bytes::from(String::new());
         let val = parse_ddtags(&raw);
 
         assert_eq!(val, value!([]));

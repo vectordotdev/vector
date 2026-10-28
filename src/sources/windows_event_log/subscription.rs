@@ -18,25 +18,38 @@ use windows::Win32::System::EventLog::{
     EvtSubscribeStartAfterBookmark, EvtSubscribeStartAtOldestRecord, EvtSubscribeStrict,
     EvtSubscribeToFutureEvents,
 };
-#[cfg(test)]
-use windows::Win32::System::Threading::SetEvent;
-use windows::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForMultipleObjects};
+use windows::Win32::System::Threading::{
+    CreateEventW, ResetEvent, SetEvent, WaitForMultipleObjects,
+};
 use windows::core::HSTRING;
 
 use super::{
-    bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*,
-    metadata, sid_resolver::SidResolver, xml_parser,
+    bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig,
+    error::WindowsEventLogError, metadata, sid_resolver::SidResolver, xml_parser,
 };
 
 use crate::internal_events::WindowsEventLogBookmarkError;
 
-/// Maximum number of entries in the EvtFormatMessage result cache.
+/// Test-only hook called inside the `pull_events` drain loop after each
+/// `EvtNext` invocation. Used by the lost-wakeup regression test
+/// (see `test_pull_events_preserves_setevent_during_drain`) to race a
+/// `SetEvent` against the drain without relying on thread-timing.
+/// No-op and zero-cost in non-test builds.
+///
+/// Only one test should install a hook at a time; tests that install a hook
+/// must use `#[serial_test::serial]` or equivalent serialization to prevent
+/// concurrent tests from triggering each other's hook.
+#[cfg(test)]
+static DRAIN_STEP_HOOK: std::sync::Mutex<Option<std::sync::Arc<dyn Fn(HANDLE) + Send + Sync>>> =
+    std::sync::Mutex::new(None);
+
+/// Maximum number of entries in the `EvtFormatMessage` result cache.
 pub const FORMAT_CACHE_CAPACITY: usize = 10_000;
 /// Maximum number of cached publisher metadata handles.
 const PUBLISHER_CACHE_CAPACITY: usize = 256;
 
-/// RAII wrapper for EvtOpenPublisherMetadata handles.
-/// Calls EvtClose on drop to prevent handle leaks when evicted from LRU cache.
+/// RAII wrapper for `EvtOpenPublisherMetadata` handles.
+/// Calls `EvtClose` on drop to prevent handle leaks when evicted from LRU cache.
 pub struct PublisherHandle(pub isize);
 
 impl Drop for PublisherHandle {
@@ -56,7 +69,7 @@ const ERROR_ACCESS_DENIED: u32 = 5;
 const ERROR_NO_MORE_ITEMS: u32 = 259;
 const ERROR_EVT_QUERY_RESULT_STALE: u32 = 4317;
 const ERROR_EVT_CHANNEL_NOT_FOUND: u32 = 0x3AA1; // 15009
-const ERROR_EVT_INVALID_QUERY: u32 = 15007;
+const ERROR_EVT_INVALID_QUERY: u32 = 15_007;
 const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 0x4239; // 16953
 
 /// Per-channel subscription state for pull model.
@@ -80,6 +93,7 @@ struct ChannelSubscription {
 
 // SAFETY: Same rationale as EventLogSubscription - Windows kernel handles are thread-safe.
 unsafe impl Send for ChannelSubscription {}
+unsafe impl Sync for ChannelSubscription {}
 
 /// Result of waiting for events across all channels.
 pub enum WaitResult {
@@ -91,7 +105,7 @@ pub enum WaitResult {
     Shutdown,
 }
 
-/// Pull-model Windows Event Log subscription using EvtSubscribe + signal event + EvtNext.
+/// Pull-model Windows Event Log subscription using `EvtSubscribe` + signal event + `EvtNext`.
 ///
 /// Instead of a callback (push model), we use:
 /// 1. `CreateEventW` to create a manual-reset signal per channel
@@ -108,10 +122,10 @@ pub struct EventLogSubscription {
     rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     shutdown_event: HANDLE,
     render_buffer: Vec<u8>,
-    /// Cached EvtOpenPublisherMetadata handles keyed by provider name.
+    /// Cached `EvtOpenPublisherMetadata` handles keyed by provider name.
     /// Bounded LRU; evicted handles are closed via `PublisherHandle::drop`.
     publisher_cache: LruCache<String, PublisherHandle>,
-    /// Cached EvtFormatMessage results. Outer key is provider name (looked up
+    /// Cached `EvtFormatMessage` results. Outer key is provider name (looked up
     /// via `&str` — zero allocation on the hot path), inner LRU is bounded per provider.
     format_cache: HashMap<String, LruCache<(u32, u64), Option<String>>>,
     /// Pre-registered counter for metadata cache hits.
@@ -123,21 +137,27 @@ pub struct EventLogSubscription {
     /// Reusable UTF-16 decode buffer to avoid per-event allocations.
     decode_buffer: Vec<u16>,
     /// Round-robin index for fair channel scheduling. Rotates the starting
-    /// channel each pull_events call to prevent a single busy channel
+    /// channel each `pull_events` call to prevent a single busy channel
     /// (e.g., Security on a domain controller) from starving others.
     round_robin_index: usize,
 }
 
 // SAFETY: Windows HANDLE and EVT_HANDLE are kernel objects safe to use across
 // threads. In windows 0.58, HANDLE wraps *mut c_void which is !Send/!Sync,
-// but the underlying kernel handles are thread-safe.
+// but the underlying kernel handles are thread-safe. All mutation requires
+// &mut self; &self methods are read-only or delegate to Sync types (RateLimiter).
 unsafe impl Send for EventLogSubscription {}
+unsafe impl Sync for EventLogSubscription {}
 
 impl EventLogSubscription {
     /// Create a new pull-model subscription for all configured channels.
     ///
-    /// Each channel gets its own signal event and EvtSubscribe handle.
+    /// Each channel gets its own signal event and `EvtSubscribe` handle.
     /// A shutdown event is created for clean termination of blocking waits.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn new(
         config: &WindowsEventLogConfig,
         checkpointer: Arc<Checkpointer>,
@@ -245,7 +265,7 @@ impl EventLogSubscription {
                 query = %query,
                 has_valid_checkpoint = has_valid_checkpoint,
                 read_existing = config.read_existing_events,
-                flags = format!("{:#x}", subscription_flags)
+                flags = format!("{subscription_flags:#x}")
             );
 
             // EvtSubscribe with signal event and NULL callback = pull mode
@@ -269,7 +289,7 @@ impl EventLogSubscription {
                                 message = "Strict bookmark subscribe failed, retrying without bookmark. Potential re-delivery of events.",
                                 channel = %channel,
                                 error = %e,
-                                fallback_flags = format!("{:#x}", fallback_flags)
+                                fallback_flags = format!("{fallback_flags:#x}")
                             );
                             EvtSubscribe(
                                 None,
@@ -339,7 +359,7 @@ impl EventLogSubscription {
                     });
                 }
                 Err(e) => {
-                    let error_code = (e.code().0 as u32) & 0xFFFF;
+                    let error_code = e.code().0.cast_unsigned() & 0xFFFF;
                     if error_code == ERROR_EVT_CHANNEL_NOT_FOUND
                         || error_code == ERROR_EVT_INVALID_QUERY
                     {
@@ -361,20 +381,18 @@ impl EventLogSubscription {
                             let _ = CloseHandle(signal_event);
                         }
                         continue;
-                    } else {
-                        // Clean up already-created subscriptions on failure
-                        for sub in channel_subscriptions {
-                            unsafe {
-                                let _ = EvtClose(sub.subscription_handle);
-                                let _ = CloseHandle(sub.signal_event);
-                            }
-                        }
-                        unsafe {
-                            let _ =
-                                CloseHandle(HANDLE(shutdown_event_raw as *mut std::ffi::c_void));
-                        }
-                        return Err(WindowsEventLogError::CreateSubscriptionError { source: e });
                     }
+                    // Clean up already-created subscriptions on failure
+                    for sub in channel_subscriptions {
+                        unsafe {
+                            let _ = EvtClose(sub.subscription_handle);
+                            let _ = CloseHandle(sub.signal_event);
+                        }
+                    }
+                    unsafe {
+                        let _ = CloseHandle(HANDLE(shutdown_event_raw as *mut std::ffi::c_void));
+                    }
+                    return Err(WindowsEventLogError::CreateSubscriptionError { source: e });
                 }
             }
         }
@@ -401,7 +419,7 @@ impl EventLogSubscription {
             checkpointer,
             rate_limiter,
             shutdown_event,
-            render_buffer: vec![0u8; 16384],
+            render_buffer: vec![0u8; 16_384],
             publisher_cache: LruCache::new(NonZeroUsize::new(PUBLISHER_CACHE_CAPACITY).unwrap()),
             format_cache: HashMap::new(),
             cache_hits_counter: counter!("windows_event_log_cache_hits_total"),
@@ -415,21 +433,24 @@ impl EventLogSubscription {
     /// Wait for events to become available on any channel, or for shutdown.
     ///
     /// Uses `WaitForMultipleObjects` via `spawn_blocking` to avoid blocking the
-    /// Tokio runtime. The wait array includes all channel signal events plus the
-    /// shutdown event.
+    /// Tokio runtime. The wait array puts shutdown first so a stop request wins
+    /// over any channel that is already signaled.
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub fn wait_for_events_blocking(&self, timeout_ms: u32) -> WaitResult {
-        // Build wait handle array: [channel0_signal, channel1_signal, ..., shutdown_event]
-        let mut handles: Vec<HANDLE> = self.channels.iter().map(|c| c.signal_event).collect();
+        // Build wait handle array: [shutdown_event, channel0_signal, channel1_signal, ...]
+        let mut handles = Vec::with_capacity(self.channels.len() + 1);
         handles.push(self.shutdown_event);
+        handles.extend(self.channels.iter().map(|c| c.signal_event));
 
         let result = unsafe { WaitForMultipleObjects(&handles, false, timeout_ms) };
 
-        let shutdown_index = (self.channels.len()) as u32;
-
         match result {
             r if r == WAIT_TIMEOUT => WaitResult::Timeout,
-            r if r.0 < WAIT_OBJECT_0.0 + shutdown_index => WaitResult::EventsAvailable,
-            r if r.0 == WAIT_OBJECT_0.0 + shutdown_index => WaitResult::Shutdown,
+            r if r == WAIT_OBJECT_0 => WaitResult::Shutdown,
+            r if r.0 <= WAIT_OBJECT_0.0 + self.channels.len() as u32 => WaitResult::EventsAvailable,
             _ => {
                 // WAIT_FAILED or unexpected - treat as timeout to avoid tight loop
                 warn!(
@@ -446,7 +467,7 @@ impl EventLogSubscription {
     /// Each channel gets a per-channel budget of `max_events / num_channels`
     /// to prevent a single busy channel (e.g., Security) from starving others.
     /// The starting channel rotates each call via round-robin. Channels that
-    /// don't use their budget simply leave slots unused — the next pull_events
+    /// don't use their budget simply leave slots unused — the next `pull_events`
     /// call reclaims them naturally since the signal stays set.
     ///
     /// # At-least-once delivery semantics
@@ -459,6 +480,36 @@ impl EventLogSubscription {
     pub fn pull_events(
         &mut self,
         max_events: usize,
+    ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
+        self.pull_events_inner(max_events, true)
+    }
+
+    /// Pull events for timeout-based speculative recovery.
+    ///
+    /// This keeps the same event-drain behavior as `pull_events`, but avoids
+    /// refreshing per-channel record-count gauges for channels that were empty.
+    /// Timeout pulls can run repeatedly while the host is idle, so skipping
+    /// those metadata queries prevents steady `EvtOpenLog`/`EvtGetLogInfo`
+    /// churn without changing event recovery behavior.
+    pub fn pull_events_speculative(
+        &mut self,
+        max_events: usize,
+    ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
+        self.pull_events_inner(max_events, false)
+    }
+
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    fn pull_events_inner(
+        &mut self,
+        max_events: usize,
+        update_records_for_empty_channels: bool,
     ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
         let mut all_events = Vec::with_capacity(max_events.min(1000));
         let num_channels = self.channels.len().max(1);
@@ -479,9 +530,25 @@ impl EventLogSubscription {
             let mut bookmark_failed = false;
             let mut channel_count = 0usize;
 
-            // Drain loop: keep calling EvtNext until ERROR_NO_MORE_ITEMS or channel budget.
-            // Only reset the signal once the channel is fully drained; if we hit the
-            // budget limit the signal stays set so WaitForMultipleObjects returns immediately.
+            // Reset the signal BEFORE draining to avoid a lost-wakeup race
+            // (see vectordotdev/vector#25194). The Windows Event Log service
+            // signals this manual-reset event via SetEvent each time a new
+            // matching event is recorded; SetEvent on an already-signaled
+            // event is a no-op, so if we reset AFTER draining, any signal
+            // that arrives between our last EvtNext and ResetEvent is lost
+            // — the subscription then hangs until the next event arrives.
+            // Resetting first means any signal raised during the drain is
+            // preserved, causing the next WaitForMultipleObjects to return
+            // immediately.
+            //
+            // If we exit the drain loop early (channel budget exhausted or
+            // bookmark update failed mid-batch), we re-SetEvent at the end
+            // of this iteration so the next pull_events call revisits this
+            // channel without waiting for a fresh OS signal.
+            unsafe {
+                let _ = ResetEvent(channel_sub.signal_event);
+            }
+
             'drain: loop {
                 if channel_count >= channel_limit {
                     break;
@@ -501,8 +568,19 @@ impl EventLogSubscription {
                     )
                 };
 
+                // Test-only hook: lets the lost-wakeup regression test race
+                // a SetEvent against the drain without thread-timing. No-op
+                // and zero-cost in non-test builds.
+                #[cfg(test)]
+                {
+                    let hook = DRAIN_STEP_HOOK.lock().unwrap().clone();
+                    if let Some(h) = hook {
+                        h(channel_sub.signal_event);
+                    }
+                }
+
                 if let Err(err) = result {
-                    let code = (err.code().0 as u32) & 0xFFFF;
+                    let code = err.code().0.cast_unsigned() & 0xFFFF;
                     if code == ERROR_NO_MORE_ITEMS {
                         channel_drained = true;
                         break;
@@ -513,6 +591,8 @@ impl EventLogSubscription {
                             channel = %channel_sub.channel
                         );
                         channel_drained = true;
+                        // Speculative pull on timeout in mod.rs is a safety net if the
+                        // re-subscribed channel does not immediately re-signal.
                         break;
                     }
                     if code == ERROR_EVT_QUERY_RESULT_INVALID_POSITION {
@@ -526,7 +606,9 @@ impl EventLogSubscription {
                                     message = "Re-subscription succeeded after stale query.",
                                     channel = %channel_sub.channel
                                 );
-                                // Retry from fresh subscription — the signal will fire again
+                                // Retry from fresh subscription — the signal will fire again.
+                                // Speculative pull on timeout in mod.rs is a safety net if
+                                // the new subscription does not immediately re-signal.
                                 channel_drained = true;
                                 break;
                             }
@@ -538,9 +620,22 @@ impl EventLogSubscription {
                                 );
                                 channel_sub.subscription_active_gauge.set(0.0);
                                 channel_drained = true;
+                                // Speculative pull on timeout in mod.rs is a safety net if
+                                // the failed channel does not re-signal after recovery.
                                 break;
                             }
                         }
+                    }
+                    // Re-arm the signal before returning. We reset it pre-drain
+                    // but are bailing out without confirming the drain completed,
+                    // so if events were left un-drained the next pull_events must
+                    // still revisit this channel without waiting for a fresh OS
+                    // signal. This mirrors the `else` branch below that handles
+                    // budget-exhaustion and bookmark-failure early breaks, and
+                    // avoids the same lost-wakeup symptom (vectordotdev/vector#25194)
+                    // on transient EvtNext failures.
+                    unsafe {
+                        let _ = SetEvent(channel_sub.signal_event);
                     }
                     return Err(WindowsEventLogError::PullEventsError {
                         channel: channel_sub.channel.clone(),
@@ -553,7 +648,9 @@ impl EventLogSubscription {
                     break;
                 }
 
-                channel_sub.events_read_counter.increment(returned as u64);
+                channel_sub
+                    .events_read_counter
+                    .increment(u64::from(returned));
                 channel_sub
                     .last_event_timestamp_gauge
                     .set(chrono::Utc::now().timestamp() as f64);
@@ -604,12 +701,14 @@ impl EventLogSubscription {
                                 system_fields.channel.clone()
                             };
                             let provider_name = system_fields.provider_name.clone();
-                            let task_val = system_fields.task as u64;
-                            let opcode_val = system_fields.opcode as u64;
+                            let task_val = u64::from(system_fields.task);
+                            let opcode_val = u64::from(system_fields.opcode);
                             let keywords_val = system_fields.keywords;
 
                             let (task_name, opcode_name, keyword_names) =
-                                if !provider_name.is_empty() {
+                                if provider_name.is_empty() {
+                                    (None, None, Vec::new())
+                                } else {
                                     metadata::resolve_event_metadata(
                                         &mut self.publisher_cache,
                                         &mut self.format_cache,
@@ -621,8 +720,6 @@ impl EventLogSubscription {
                                         opcode_val,
                                         keywords_val,
                                     )
-                                } else {
-                                    (None, None, Vec::new())
                                 };
 
                             let rendered_message =
@@ -697,15 +794,22 @@ impl EventLogSubscription {
             }
 
             if channel_drained && !bookmark_failed {
-                unsafe {
-                    let _ = ResetEvent(channel_sub.signal_event);
-                }
-
                 // Update channel record count gauge for lag detection.
-                super::render::update_channel_records(
-                    &channel_sub.channel,
-                    &channel_sub.channel_records_gauge,
-                );
+                if update_records_for_empty_channels || channel_count > 0 {
+                    super::render::update_channel_records(
+                        &channel_sub.channel,
+                        &channel_sub.channel_records_gauge,
+                    );
+                }
+            } else {
+                // Drain exited early (budget exhausted or bookmark_failed
+                // mid-batch). Re-arm the signal so the next pull_events
+                // revisits this channel immediately without waiting for a
+                // fresh OS notification. Pairs with the pre-drain ResetEvent
+                // above.
+                unsafe {
+                    let _ = SetEvent(channel_sub.signal_event);
+                }
             }
         }
 
@@ -765,7 +869,7 @@ impl EventLogSubscription {
                             message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
                             channel = %channel_sub.channel,
                             error = %e,
-                            fallback_flags = format!("{:#x}", fallback_flags)
+                            fallback_flags = format!("{fallback_flags:#x}")
                         );
                         EvtSubscribe(
                             None,
@@ -816,6 +920,15 @@ impl EventLogSubscription {
         self.shutdown_event.0
     }
 
+    /// Test-only accessor for the first channel's signal event handle. Used
+    /// by the lost-wakeup regression test to scope its drain-loop hook to
+    /// exactly this subscription, so it does not fire on concurrent
+    /// `pull_events` calls from other tests in the same process.
+    #[cfg(test)]
+    pub(super) fn first_channel_signal_raw(&self) -> isize {
+        self.channels[0].signal_event.0 as isize
+    }
+
     /// Returns a reference to the rate limiter, if configured.
     pub const fn rate_limiter(
         &self,
@@ -823,7 +936,7 @@ impl EventLogSubscription {
         self.rate_limiter.as_ref()
     }
 
-    /// Returns (total_channels, active_channels) for health reporting.
+    /// Returns (`total_channels`, `active_channels`) for health reporting.
     pub fn channel_health_summary(&self) -> (usize, usize) {
         let total = self.channels.len();
         // A channel is considered active if its subscription handle is non-null
@@ -902,7 +1015,7 @@ impl EventLogSubscription {
                     }
                 }
                 Err(e) => {
-                    let error_code = (e.code().0 as u32) & 0xFFFF;
+                    let error_code = e.code().0.cast_unsigned() & 0xFFFF;
                     if error_code == ERROR_FILE_NOT_FOUND
                         || error_code == ERROR_EVT_CHANNEL_NOT_FOUND
                         || error_code == ERROR_EVT_INVALID_QUERY
@@ -920,12 +1033,11 @@ impl EventLogSubscription {
                             channel = %channel
                         );
                         continue;
-                    } else {
-                        return Err(WindowsEventLogError::OpenChannelError {
-                            channel: channel.clone(),
-                            source: e,
-                        });
                     }
+                    return Err(WindowsEventLogError::OpenChannelError {
+                        channel: channel.clone(),
+                        source: e,
+                    });
                 }
             }
         }
@@ -934,11 +1046,11 @@ impl EventLogSubscription {
     }
 }
 
-/// Maximum XPath query length supported by Windows Event Log API.
+/// Maximum `XPath` query length supported by Windows Event Log API.
 /// Queries exceeding this limit fall back to `"*"` (all events).
 const XPATH_MAX_LENGTH: usize = 4096;
 
-/// Build an XPath query from config, incorporating `only_event_ids` when no
+/// Build an `XPath` query from config, incorporating `only_event_ids` when no
 /// explicit `event_query` is set.
 ///
 /// When `only_event_ids` is configured and no custom `event_query` is provided,
@@ -948,6 +1060,10 @@ const XPATH_MAX_LENGTH: usize = 4096;
 ///
 /// If the generated query exceeds [`XPATH_MAX_LENGTH`] (4096 chars), falls back
 /// to `"*"` and lets the downstream filter in `build_event()` handle it.
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+)]
 pub(super) fn build_xpath_query(
     config: &WindowsEventLogConfig,
 ) -> Result<String, WindowsEventLogError> {
@@ -1005,6 +1121,7 @@ impl Drop for EventLogSubscription {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     async fn create_test_checkpointer() -> (Arc<Checkpointer>, tempfile::TempDir) {
         let temp_dir = tempfile::TempDir::new().unwrap();
@@ -1054,7 +1171,7 @@ mod tests {
         );
     }
 
-    /// Test that wait_for_events_blocking returns timeout or events available
+    /// Test that `wait_for_events_blocking` returns timeout or events available
     #[tokio::test]
     async fn test_wait_for_events_timeout() {
         let mut config = WindowsEventLogConfig::default();
@@ -1087,7 +1204,7 @@ mod tests {
         drop(subscription);
     }
 
-    /// Test that signal_shutdown wakes a waiting thread
+    /// Test that `signal_shutdown` wakes a waiting thread
     #[tokio::test]
     async fn test_shutdown_signal_wakes_wait() {
         let mut config = WindowsEventLogConfig::default();
@@ -1111,7 +1228,7 @@ mod tests {
         let shutdown_event_raw = subscription.shutdown_event_raw() as isize;
 
         let wait_handle = tokio::task::spawn_blocking(move || {
-            let r = subscription.wait_for_events_blocking(30000);
+            let r = subscription.wait_for_events_blocking(30_000);
             (subscription, r)
         });
 
@@ -1124,10 +1241,8 @@ mod tests {
 
         let (subscription, result) = wait_handle.await.unwrap();
         match result {
-            WaitResult::Shutdown => {} // Expected
-            WaitResult::EventsAvailable => {
-                // Acceptable - there may have been real events
-            }
+            // Shutdown is expected; actual events are also acceptable.
+            WaitResult::Shutdown | WaitResult::EventsAvailable => {}
             WaitResult::Timeout => {
                 panic!("Should not timeout - shutdown should have woken the wait");
             }
@@ -1136,7 +1251,32 @@ mod tests {
         drop(subscription);
     }
 
-    /// Test pull_events with read_existing_events=true
+    /// Test that shutdown wins when both shutdown and channel handles are signaled.
+    #[tokio::test]
+    async fn test_shutdown_signal_takes_priority_over_channel_signal() {
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.event_timeout_ms = 500;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let subscription = EventLogSubscription::new(&config, checkpointer, false)
+            .await
+            .expect("Subscription creation should succeed");
+
+        unsafe {
+            let handle = HANDLE(subscription.shutdown_event_raw());
+            let _ = SetEvent(handle);
+        }
+
+        let result = subscription.wait_for_events_blocking(0);
+        assert!(
+            matches!(result, WaitResult::Shutdown),
+            "shutdown should take priority over already-signaled channels"
+        );
+    }
+
+    /// Test `pull_events` with `read_existing_events=true`
     #[tokio::test]
     async fn test_pull_events_returns_events() {
         let mut config = WindowsEventLogConfig::default();
@@ -1201,7 +1341,7 @@ mod tests {
         assert_eq!(sub2.channels[0].channel, "System");
     }
 
-    /// Test read_existing_events=false only receives future events
+    /// Test `read_existing_events=false` only receives future events
     #[tokio::test]
     async fn test_read_existing_events_false_only_receives_future_events() {
         use chrono::Utc;
@@ -1229,10 +1369,9 @@ mod tests {
         for event in &events {
             assert!(
                 event.time_created >= earliest_allowed,
-                "Event timestamp {} is before subscription start time {} (minus tolerance). \
+                "Event timestamp {} is before subscription start time {subscription_start_time} (minus tolerance). \
                  read_existing_events=false may not be respected. Event ID: {}, Record ID: {}",
                 event.time_created,
-                subscription_start_time,
                 event.event_id,
                 event.record_id
             );
@@ -1246,7 +1385,7 @@ mod tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let checkpointer = Arc::new(Checkpointer::new(temp_dir.path()).await.unwrap());
 
-        let fake_bookmark = r#"<BookmarkList><Bookmark Channel='Application' RecordId='999999999' IsCurrent='true'/></BookmarkList>"#;
+        let fake_bookmark = r"<BookmarkList><Bookmark Channel='Application' RecordId='999999999' IsCurrent='true'/></BookmarkList>";
 
         checkpointer
             .set("Application".to_string(), fake_bookmark.to_string())
@@ -1271,5 +1410,214 @@ mod tests {
         // subscription will fall back to reading from scratch. We only assert
         // that the subscription is functional.
         let _events = subscription.pull_events(100).unwrap_or_default();
+    }
+
+    /// Proves that `pull_events` works independently of signal state — the
+    /// invariant the speculative timeout pull in mod.rs relies on.
+    ///
+    /// Steps:
+    /// 1. Subscribe to the Application log with `read_existing_events = true`.
+    /// 2. Manually clear the channel signal via `ResetEvent`, simulating a lost wakeup.
+    /// 3. Assert `wait_for_events_blocking` times out (signal cleared, no OS wake-up).
+    /// 4. Assert `pull_events` still returns events — `EvtNext` fetches from the queue
+    ///    regardless of signal state, so the speculative pull in mod.rs self-heals.
+    #[tokio::test]
+    #[serial]
+    async fn test_pull_events_works_with_cleared_signal() {
+        // Seed the Application log with a record so the "events remain
+        // available despite cleared signal" assertion below does not depend
+        // on whatever backlog the runner happens to have. Freshly provisioned
+        // CI images can have an empty Application log, which would otherwise
+        // make `pull_events` legitimately return empty and produce a spurious
+        // failure unrelated to the invariant under test.
+        let seed_output = std::process::Command::new("eventcreate")
+            .args([
+                "/T",
+                "INFORMATION",
+                "/ID",
+                "100",
+                "/L",
+                "APPLICATION",
+                "/SO",
+                "VectorTestSpeculativePullSeed",
+                "/D",
+                "seed event for #25194 speculative-pull regression test",
+            ])
+            .output()
+            .expect("failed to spawn eventcreate — required for deterministic seeding");
+        assert!(
+            seed_output.status.success(),
+            "eventcreate failed to seed Application log (exit={:?}): stdout={:?} stderr={:?}. \
+             This test requires a seeded event to be deterministic; a locked-down runner \
+             without the privilege to write to Application cannot run this test reliably.",
+            seed_output.status.code(),
+            String::from_utf8_lossy(&seed_output.stdout),
+            String::from_utf8_lossy(&seed_output.stderr),
+        );
+        // Give the service a moment to persist the record before we subscribe.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true;
+        config.event_timeout_ms = 500;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Manually clear the signal to simulate a lost wakeup. The seeded
+        // event above guarantees at least one record is queued in EvtNext
+        // regardless of the runner's pre-existing log state.
+        let signal_raw = subscription.first_channel_signal_raw();
+        unsafe {
+            let _ = ResetEvent(HANDLE(signal_raw as *mut std::ffi::c_void));
+        }
+
+        // Signal is cleared: an immediate (0ms) poll must report Timeout.
+        // A 0ms wait reads only the current signal state with no grace
+        // window, so unrelated Windows system events arriving between the
+        // `ResetEvent` above and the poll cannot re-signal the handle and
+        // cause a spurious failure.
+        let wait_result = subscription.wait_for_events_blocking(0);
+
+        assert!(
+            matches!(wait_result, WaitResult::Timeout),
+            "expected Timeout after manual ResetEvent; signal was not cleared"
+        );
+
+        // Despite the cleared signal, pull_events must still return events.
+        // This is the invariant the speculative timeout pull in mod.rs depends on.
+        let events = subscription.pull_events(100).unwrap_or_default();
+        assert!(
+            !events.is_empty(),
+            "pull_events must return events independently of signal state; \
+             this is the invariant the speculative timeout pull in mod.rs depends on"
+        );
+    }
+
+    /// Regression test for vectordotdev/vector#25194.
+    ///
+    /// The Windows Event Log service signals the pull-mode wait handle via
+    /// `SetEvent` each time a new matching event is recorded. Because the
+    /// handle is manual-reset, `SetEvent` on an already-signaled handle is
+    /// a no-op. If `pull_events` resets the signal *after* draining events
+    /// via `EvtNext`, any signal that fires between the last `EvtNext` and
+    /// the `ResetEvent` call is silently lost — the subscription then
+    /// permanently hangs until a subsequent event arrives.
+    ///
+    /// The fix is to reset the signal *before* the drain loop, so signals
+    /// raised during the drain are preserved and the next wait returns
+    /// immediately.
+    ///
+    /// This test pins that invariant by driving the real `pull_events`
+    /// against a real `EvtSubscribe` handle. It installs a
+    /// `DRAIN_STEP_HOOK` that runs inside the drain loop after each
+    /// `EvtNext` and fires `SetEvent` on the subscription's signal
+    /// handle — simulating the OS signaling a new event arrival during
+    /// the drain window. After `pull_events` returns, the signal must
+    /// still be set — observed via a 0ms `wait_for_events_blocking`
+    /// so the check measures only the reset/preserve behavior of
+    /// `pull_events` and is not contaminated by unrelated Windows
+    /// system events arriving during a nonzero wait. Under the old
+    /// post-drain `ResetEvent` order, the hook's `SetEvent` would be
+    /// clobbered by the reset and the immediate poll would return
+    /// `Timeout` — which is exactly what #25194 reports.
+    #[tokio::test]
+    #[serial]
+    #[allow(
+        clippy::items_after_statements,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    async fn test_pull_events_preserves_setevent_during_drain() {
+        use std::sync::Arc as StdArc;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true;
+        config.event_timeout_ms = 1000;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Capture THIS subscription's signal handle so the hook can scope
+        // itself to this test. DRAIN_STEP_HOOK is a process-global, and
+        // cargo runs tests in parallel by default; without handle-keying,
+        // a concurrent test's pull_events could trigger our one-shot
+        // hook first, flip `fired`, and SetEvent on the wrong handle.
+        let target_signal_raw = subscription.first_channel_signal_raw();
+
+        // Install the drain-loop hook: every EvtNext call inside
+        // pull_events fires SetEvent on the subscription's signal
+        // handle. This simulates the OS signaling a fresh event
+        // mid-drain, which is exactly the race window #25194 exposes.
+        // The hook only needs to fire once to prove the invariant; we
+        // use an AtomicBool to keep it deterministic. The hook is keyed
+        // to `target_signal_raw` so concurrent pull_events calls from
+        // other tests no-op here.
+        let fired = StdArc::new(std::sync::atomic::AtomicBool::new(false));
+        {
+            let fired = StdArc::clone(&fired);
+            let hook: StdArc<dyn Fn(HANDLE) + Send + Sync> = StdArc::new(move |signal: HANDLE| {
+                if signal.0 as isize != target_signal_raw {
+                    return;
+                }
+                if !fired.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    unsafe {
+                        let _ = SetEvent(signal);
+                    }
+                }
+            });
+            *DRAIN_STEP_HOOK.lock().unwrap() = Some(hook);
+        }
+
+        // Drop-guard: clear the hook even if the test panics, so it
+        // doesn't contaminate other tests in the same process.
+        struct HookGuard;
+        impl Drop for HookGuard {
+            fn drop(&mut self) {
+                *DRAIN_STEP_HOOK.lock().unwrap() = None;
+            }
+        }
+        let _guard = HookGuard;
+
+        // Drive pull_events with a very large budget so the drain
+        // exits via ERROR_NO_MORE_ITEMS (channel_drained = true),
+        // which is the path that ran the post-drain ResetEvent in the
+        // old buggy code. Exiting via budget exhaustion would skip
+        // that reset and cause this test to false-pass against the
+        // pre-fix code.
+        let _ = subscription.pull_events(usize::MAX).unwrap_or_default();
+
+        assert!(
+            fired.load(std::sync::atomic::Ordering::SeqCst),
+            "drain-loop hook never ran — pull_events must call EvtNext \
+             at least once even on an empty channel"
+        );
+
+        // Observe the signal state IMMEDIATELY with a 0ms wait. We want
+        // to know whether pull_events's reset clobbered the hook's
+        // SetEvent — NOT whether new real events arrive during some
+        // wait window. A nonzero timeout against the live Application
+        // channel lets arbitrary Windows system events re-signal us
+        // and false-pass against the pre-fix code. 0ms = WaitForMultiple-
+        // Objects returns the current state with no grace period, so
+        // only the reset/preserve behavior of pull_events is measured.
+        let result = subscription.wait_for_events_blocking(0);
+
+        match result {
+            WaitResult::EventsAvailable => {}
+            WaitResult::Timeout => panic!(
+                "signal set during the drain window was lost — this is the \
+                 lost-wakeup race from vectordotdev/vector#25194. \
+                 pull_events must call ResetEvent BEFORE draining, not after."
+            ),
+            WaitResult::Shutdown => panic!("unexpected shutdown"),
+        }
     }
 }

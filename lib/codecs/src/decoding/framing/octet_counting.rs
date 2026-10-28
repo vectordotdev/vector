@@ -18,6 +18,7 @@ pub struct OctetCountingDecoderConfig {
 
 impl OctetCountingDecoderConfig {
     /// Build the `OctetCountingDecoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> OctetCountingDecoder {
         if let Some(max_length) = self.octet_counting.max_length {
             OctetCountingDecoder::new_with_max_length(max_length)
@@ -53,6 +54,7 @@ pub enum State {
 
 impl OctetCountingDecoder {
     /// Creates a new `OctetCountingDecoder`.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             other: LinesCodec::new(),
@@ -61,6 +63,7 @@ impl OctetCountingDecoder {
     }
 
     /// Creates a `OctetCountingDecoder` with a maximum frame length limit.
+    #[must_use]
     pub fn new_with_max_length(max_length: usize) -> Self {
         Self {
             other: LinesCodec::new_with_max_length(max_length),
@@ -105,7 +108,7 @@ impl OctetCountingDecoder {
                 //
                 // There aren't enough in this frame so we need to discard the
                 // entire frame and adjust the amount to discard accordingly.
-                self.octet_decoding = Some(State::Discarding(src.len() - chars));
+                self.octet_decoding = Some(State::Discarding(chars - src.len()));
                 src.advance(src.len());
                 Ok(None)
             }
@@ -135,23 +138,22 @@ impl OctetCountingDecoder {
                 // We aren't discarding, we have a space that is not beyond our
                 // maximum length. Attempt to parse the bytes as a number which
                 // will hopefully give us a sensible length for our message.
-                let len: usize = match std::str::from_utf8(&src[..space_pos])
+                let len: usize = if let Ok(len) = std::str::from_utf8(&src[..space_pos])
                     .map_err(|_| ())
                     .and_then(|num| num.parse().map_err(|_| ()))
                 {
-                    Ok(len) => len,
-                    Err(_) => {
-                        // It was not a sensible number.
-                        //
-                        // Advance the buffer past the erroneous bytes to
-                        // prevent us getting stuck in an infinite loop.
-                        src.advance(space_pos + 1);
-                        self.octet_decoding = None;
-                        return Err(LinesCodecError::Io(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unable to decode message len as number",
-                        )));
-                    }
+                    len
+                } else {
+                    // It was not a sensible number.
+                    //
+                    // Advance the buffer past the erroneous bytes to
+                    // prevent us getting stuck in an infinite loop.
+                    src.advance(space_pos + 1);
+                    self.octet_decoding = None;
+                    return Err(LinesCodecError::Io(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unable to decode message len as number",
+                    )));
                 };
 
                 let from = space_pos + 1;
@@ -166,20 +168,19 @@ impl OctetCountingDecoder {
 
                     Ok(None)
                 } else if let Some(msg) = src.get(from..to) {
-                    let bytes = match std::str::from_utf8(msg) {
-                        Ok(_) => Bytes::copy_from_slice(msg),
-                        Err(_) => {
-                            // The data was not valid UTF8 :-(.
-                            //
-                            // Advance the buffer past the erroneous bytes to
-                            // prevent us getting stuck in an infinite loop.
-                            src.advance(to);
-                            self.octet_decoding = None;
-                            return Err(LinesCodecError::Io(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Unable to decode message as UTF8",
-                            )));
-                        }
+                    let bytes = if std::str::from_utf8(msg).is_ok() {
+                        Bytes::copy_from_slice(msg)
+                    } else {
+                        // The data was not valid UTF8 :-(.
+                        //
+                        // Advance the buffer past the erroneous bytes to
+                        // prevent us getting stuck in an infinite loop.
+                        src.advance(to);
+                        self.octet_decoding = None;
+                        return Err(LinesCodecError::Io(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Unable to decode message as UTF8",
+                        )));
                     };
 
                     // We have managed to read the entire message as valid UTF8!
@@ -259,9 +260,7 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
             ret
         } else {
             // Octet counting isn't used so fallback to newline codec.
-            self.other
-                .decode(src)
-                .map(|line| line.map(|line| line.into()))
+            self.other.decode(src).map(|line| line.map(Into::into))
         }
         .map_err(Into::into)
     }
@@ -271,9 +270,7 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
             ret
         } else {
             // Octet counting isn't used so fallback to newline codec.
-            self.other
-                .decode_eof(buf)
-                .map(|line| line.map(|line| line.into()))
+            self.other.decode_eof(buf).map(|line| line.map(Into::into))
         }
         .map_err(Into::into)
     }
@@ -406,5 +403,24 @@ mod tests {
 
         assert!(result.is_err());
         assert_eq!(b"32 something valid"[..], buffer);
+    }
+
+    #[test]
+    fn octet_decode_discard_partial_frame_underflow() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
+        let mut buffer = BytesMut::with_capacity(32);
+
+        // A length prefix of 26 exceeds the max length of 16, so the decoder
+        // enters the discarding state with 26 bytes to discard, leaving "abc".
+        buffer.put(&b"26 abc"[..]);
+        let _result = decoder.decode(&mut buffer);
+        assert_eq!(decoder.octet_decoding, Some(State::Discarding(26)));
+
+        // Only three more bytes arrive, so the buffer holds fewer bytes than
+        // remain to be discarded. This is the branch that previously underflowed.
+        buffer.put(&b"def"[..]);
+        let result = decoder.decode(&mut buffer);
+        assert_eq!(Ok(None), result.map_err(|_| false));
+        assert_eq!(decoder.octet_decoding, Some(State::Discarding(20)));
     }
 }

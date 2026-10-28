@@ -54,18 +54,17 @@ impl RetryLogic for DorisRetryLogic {
                     error_message = %message
                 );
                 return RetryAction::Retry(
-                    format!("Doris error: {} - {}", doris_resp.status, message).into(),
+                    format!("Doris error: {} - {message}", doris_resp.status).into(),
                 );
-            } else {
-                // HTTP success but failed to parse response
-                // Don't retry to avoid data duplication, but log the response for debugging
-                error!(
-                    message = "Failed to parse Doris response, not retrying to avoid data duplication.",
-                    status_code = %status,
-                    body = %body_str
-                );
-                return RetryAction::DontRetry("Failed to parse Doris response".into());
             }
+            // HTTP success but failed to parse response
+            // Don't retry to avoid data duplication, but log the response for debugging
+            error!(
+                message = "Failed to parse Doris response, not retrying to avoid data duplication.",
+                status_code = %status,
+                body = %body_str
+            );
+            return RetryAction::DontRetry("Failed to parse Doris response".into());
         }
 
         // Retry only for server errors (5xx)
@@ -74,7 +73,7 @@ impl RetryLogic for DorisRetryLogic {
                 message = "Server error encountered, will retry.",
                 status_code = %status
             );
-            return RetryAction::Retry(format!("Server error from Doris: {}", status).into());
+            return RetryAction::Retry(format!("Server error from Doris: {status}").into());
         }
 
         // Don't retry for client errors (4xx) and other cases
@@ -82,6 +81,6 @@ impl RetryLogic for DorisRetryLogic {
             message = "Client error encountered, not retrying.",
             status_code = %status
         );
-        RetryAction::DontRetry(format!("Client error from Doris: {}", status).into())
+        RetryAction::DontRetry(format!("Client error from Doris: {status}").into())
     }
 }

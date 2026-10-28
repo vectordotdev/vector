@@ -34,6 +34,12 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
     /// implementors to specify what kinds of errors can be retried.
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
+    /// When the Service call times out, this function allows implementors to
+    /// specify if the timeout should be retried.
+    fn is_retriable_timeout(&self) -> bool {
+        true
+    }
+
     /// When the Service call returns an `Ok` response, this function allows
     /// implementors to specify additional logic to determine if the success response
     /// is actually an error. This is particularly useful when the downstream service
@@ -62,7 +68,7 @@ pub enum JitterMode {
     /// strategy.
     ///
     /// Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
-    /// of creating accidental denial of service (DoS) conditions against your own systems when
+    /// of creating accidental denial of service (`DoS`) conditions against your own systems when
     /// many clients are recovering from a failure state.
     #[default]
     Full,
@@ -103,7 +109,13 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
     }
 
     fn add_full_jitter(d: Duration) -> Duration {
-        let jitter = (rand::random::<u64>() % (d.as_millis() as u64)) + 1;
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Preserve jitter conversion."
+        )]
+        let millis = d.as_millis() as u64;
+        let jitter = (rand::random::<u64>() % millis) + 1;
         Duration::from_millis(jitter)
     }
 
@@ -197,10 +209,18 @@ where
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!(
-                        "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
-                    );
-                    Some(self.build_retry())
+                    if self.logic.is_retriable_timeout() {
+                        warn!(
+                            "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
+                        );
+                        Some(self.build_retry())
+                    } else {
+                        error!(
+                            message =
+                                "Request timed out and is not retriable; dropping the request."
+                        );
+                        None
+                    }
                 } else {
                     error!(
                         message = "Unexpected error type; dropping the request.",
@@ -231,14 +251,17 @@ impl Future for RetryPolicyFuture {
 }
 
 impl<Request> RetryAction<Request> {
+    #[must_use]
     pub const fn is_retryable(&self) -> bool {
         matches!(self, RetryAction::Retry(_) | RetryAction::RetryPartial(_))
     }
 
+    #[must_use]
     pub const fn is_not_retryable(&self) -> bool {
         matches!(self, RetryAction::DontRetry(_))
     }
 
+    #[must_use]
     pub const fn is_successful(&self) -> bool {
         matches!(self, RetryAction::Successful)
     }
@@ -338,6 +361,27 @@ mod tests {
         assert_eq!(fut.await.unwrap(), "world");
     }
 
+    #[tokio::test]
+    async fn timeout_error_no_retry() {
+        trace_init();
+
+        let policy = FibonacciRetryPolicy::new(
+            5,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            NoTimeoutRetryLogic,
+            JitterMode::None,
+        );
+
+        let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
+
+        assert_ready_ok!(svc.poll_ready());
+
+        let mut fut = task::spawn(svc.call("hello"));
+        assert_request_eq!(handle, "hello").send_error(Elapsed::new());
+        assert_ready_err!(fut.poll());
+    }
+
     #[test]
     fn backoff_grows_to_max() {
         let mut policy = FibonacciRetryPolicy::new(
@@ -391,10 +435,8 @@ mod tests {
             // Check if the backoff is within the expected range, considering the jitter
             assert!(
                 !backoff.is_zero() && backoff <= upper_bound,
-                "Attempt {}: Expected backoff to be within 0 and {:?}, got {:?}",
-                i + 1,
-                upper_bound,
-                backoff
+                "Attempt {}: Expected backoff to be within 0 and {upper_bound:?}, got {backoff:?}",
+                i + 1
             );
 
             policy.advance();
@@ -422,6 +464,23 @@ mod tests {
 
         fn is_retriable_error(&self, error: &Self::Error) -> bool {
             error.0
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct NoTimeoutRetryLogic;
+
+    impl RetryLogic for NoTimeoutRetryLogic {
+        type Error = Error;
+        type Request = &'static str;
+        type Response = &'static str;
+
+        fn is_retriable_error(&self, error: &Self::Error) -> bool {
+            error.0
+        }
+
+        fn is_retriable_timeout(&self) -> bool {
+            false
         }
     }
 

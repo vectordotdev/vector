@@ -1,0 +1,87 @@
+name: "Datadog Short-Lived Token"
+description: "Federate a short-lived Datadog token via dd-sts-action and export DD_API_KEY (and DD_APP_KEY when available) to the job environment."
+
+inputs:
+  policy:
+    required: false
+    default: public-vectordotdev-vector
+    description: "dd-sts policy to federate against."
+  fail-on-error:
+    required: false
+    default: "false"
+    description: "Fail when federation or credential validation fails, instead of continuing without Datadog credentials. Fork PRs without an OIDC token still skip federation."
+
+runs:
+  using: "composite"
+  steps:
+    # Fork PRs don't get `id-token: write`, so ACTIONS_ID_TOKEN_REQUEST_URL is
+    # unset. Read it via shell (env context only covers YAML-declared vars) and
+    # skip federation when absent to avoid a hard failure.
+    - name: Check OIDC token availability
+      id: oidc
+      shell: bash
+      run: |
+        if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL}" ]; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    # Best effort by default so a dd-sts outage doesn't block jobs that only use
+    # Datadog for reporting. With `fail-on-error`, the job fails here, next to
+    # the dd-sts error output.
+    - name: Federate Datadog token
+      id: dd-sts
+      if: ${{ steps.oidc.outputs.available == 'true' }}
+      continue-on-error: ${{ inputs.fail-on-error != 'true' }}
+      uses: DataDog/dd-sts-action@2e8187910199bd93129520183c093e19aa585c75
+      with:
+        policy: ${{ inputs.policy }}
+
+    - name: Export Datadog credentials to environment
+      shell: bash
+      env:
+        DD_STS_API_KEY: ${{ steps.dd-sts.outputs.api_key }}
+        DD_STS_APP_KEY: ${{ steps.dd-sts.outputs.app_key }}
+        DD_STS_OUTCOME: ${{ steps.dd-sts.outcome }}
+        FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        POLICY: ${{ inputs.policy }}
+      run: |
+        if [ "${DD_STS_OUTCOME}" = "failure" ]; then
+          echo "::warning title=Datadog token federation failed::dd-sts could not federate a token for policy '${POLICY}'; continuing without Datadog credentials. See the 'Federate Datadog token' step for details."
+        fi
+        if [ -n "${DD_STS_API_KEY}" ]; then
+          validated=false
+          # Poll until the API key is valid; the DD API can be slow to propagate
+          # permissions after token issuance.
+          app_key_header=()
+          if [ -n "${DD_STS_APP_KEY}" ]; then
+            app_key_header=(-H "DD-APPLICATION-KEY: ${DD_STS_APP_KEY}")
+          fi
+          delay=1
+          for i in $(seq 1 6); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+              -H "DD-API-KEY: ${DD_STS_API_KEY}" \
+              "${app_key_header[@]}" \
+              "https://api.datadoghq.com/api/v1/validate") || status="000"
+            if [ "$status" = "200" ]; then
+              echo "DD_API_KEY=${DD_STS_API_KEY}" >> "$GITHUB_ENV"
+              validated=true
+              break
+            fi
+            echo "Credentials not yet valid (attempt ${i}/6, HTTP ${status}), retrying in ${delay}s..."
+            sleep "${delay}"
+            delay=$((delay * 2))
+          done
+          if [ "${validated}" != "true" ]; then
+            message="Federated Datadog credentials could not be validated after 6 attempts (last HTTP status: ${status})."
+            if [ "${FAIL_ON_ERROR}" = "true" ]; then
+              echo "::error title=Datadog credential validation failed::${message}"
+              exit 1
+            fi
+            echo "::warning title=Datadog credential validation failed::${message} Continuing without DD_API_KEY."
+          fi
+        fi
+        if [ -n "${DD_STS_APP_KEY}" ]; then
+          echo "DD_APP_KEY=${DD_STS_APP_KEY}" >> "$GITHUB_ENV"
+        fi

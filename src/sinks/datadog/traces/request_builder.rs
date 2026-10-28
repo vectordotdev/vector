@@ -22,6 +22,7 @@ use super::{
     sink::PartitionKey,
 };
 use crate::{
+    common::datadog::decode_u64_id,
     event::{Event, ObjectMap, TraceEvent, Value},
     sinks::util::{
         Compression, Compressor, IncrementalRequestBuilder, metadata::RequestMetadataBuilder,
@@ -38,17 +39,19 @@ pub enum RequestBuilderError {
     FailedToBuild {
         message: &'static str,
         reason: String,
-        dropped_events: u64,
+        dropped_events: usize,
     },
 
     #[allow(dead_code)]
     #[snafu(display("Unsupported endpoint ({})", reason))]
-    UnsupportedEndpoint { reason: String, dropped_events: u64 },
+    UnsupportedEndpoint {
+        reason: String,
+        dropped_events: usize,
+    },
 }
 
 impl RequestBuilderError {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn into_parts(self) -> (&'static str, String, u64) {
+    pub fn into_parts(self) -> (&'static str, String, usize) {
         match self {
             Self::FailedToBuild {
                 message,
@@ -79,14 +82,14 @@ impl DatadogTracesRequestBuilder {
         compression: Compression,
         max_size: usize,
         stats_aggregator: Arc<Mutex<Aggregator>>,
-    ) -> Result<Self, RequestBuilderError> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             api_key,
             endpoint_configuration,
             compression,
             max_size,
             stats_aggregator,
-        })
+        }
     }
 }
 
@@ -111,12 +114,12 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         let (key, events) = input;
         let trace_events = events
             .into_iter()
-            .filter_map(|e| e.try_into_trace())
+            .filter_map(Event::try_into_trace)
             .collect::<Vec<TraceEvent>>();
 
         // Compute APM stats from the incoming events. The stats payloads are sent out
         // separately from the sink framework, by the thread `flush_apm_stats_thread()`
-        compute_apm_stats(&key, Arc::clone(&self.stats_aggregator), &trace_events);
+        compute_apm_stats(&key, &self.stats_aggregator, &trace_events);
 
         encode_traces(&key, trace_events, self.max_size)
             .into_iter()
@@ -151,7 +154,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                         Err(e) => Err(RequestBuilderError::FailedToBuild {
                             message: "Payload compression failed.",
                             reason: e.to_string(),
-                            dropped_events: processed.len() as u64,
+                            dropped_events: processed.len(),
                         }),
                     }
                 })
@@ -229,14 +232,13 @@ fn encode_traces(
                     }));
 
                     break;
-                } else {
-                    // try with a fresh payload
-                    results.push(Ok((
-                        payload.encode_to_vec(),
-                        std::mem::take(&mut processed),
-                    )));
-                    payload = build_empty_payload(key);
                 }
+                // try with a fresh payload
+                results.push(Ok((
+                    payload.encode_to_vec(),
+                    std::mem::take(&mut processed),
+                )));
+                payload = build_empty_payload(key);
             } else {
                 processed.push(trace);
                 break;
@@ -250,21 +252,28 @@ fn encode_traces(
     results
 }
 
-fn build_empty_payload(key: &PartitionKey) -> dd_proto::TracePayload {
-    dd_proto::TracePayload {
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::cast_precision_loss, reason = "Sampling rates use f64.")]
+fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
+    dd_proto::AgentPayload {
         host_name: key.hostname.clone().unwrap_or_default(),
         env: key.env.clone().unwrap_or_default(),
-        traces: vec![],       // Field reserved for the older trace payloads
-        transactions: vec![], // Field reserved for the older trace payloads
         tracer_payloads: vec![],
         // We only send tags at the Trace level
         tags: BTreeMap::new(),
         agent_version: key.agent_version.clone().unwrap_or_default(),
         target_tps: key.target_tps.map(|tps| tps as f64).unwrap_or_default(),
         error_tps: key.error_tps.map(|tps| tps as f64).unwrap_or_default(),
+        rare_sampler_enabled: false,
+        idx_tracer_payloads: vec![],
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve wire priority conversion."
+)]
 fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
     let tags = trace
         .get(event_path!("tags"))
@@ -299,7 +308,7 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
             .unwrap_or_default(),
         dropped_trace: trace
             .get(event_path!("dropped"))
-            .and_then(|v| v.as_boolean())
+            .and_then(Value::as_boolean)
             .unwrap_or(false),
         spans,
         tags: tags.clone(),
@@ -340,9 +349,16 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
             .get(event_path!("app_version"))
             .map(|v| v.to_string_lossy().into_owned())
             .unwrap_or_default(),
+        container_debug: None,
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve wire ID and error conversions."
+)]
 fn convert_span(span: &ObjectMap) -> dd_proto::Span {
     let trace_id = match span.get("trace_id") {
         Some(Value::Integer(val)) => *val,
@@ -431,6 +447,168 @@ fn convert_span(span: &ObjectMap) -> dd_proto::Span {
         meta,
         metrics,
         meta_struct,
+        span_links: span
+            .get("span_links")
+            .and_then(Value::as_array)
+            .map(convert_span_links)
+            .unwrap_or_default(),
+        span_events: span
+            .get("span_events")
+            .and_then(Value::as_array)
+            .map(convert_span_events)
+            .unwrap_or_default(),
+    }
+}
+
+fn convert_span_links(links: &[Value]) -> Vec<dd_proto::SpanLink> {
+    links
+        .iter()
+        .filter_map(|link| link.as_object().map(convert_span_link))
+        .collect()
+}
+
+fn convert_span_events(events: &[Value]) -> Vec<dd_proto::SpanEvent> {
+    events
+        .iter()
+        .filter_map(|event| event.as_object().map(convert_span_event))
+        .collect()
+}
+
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve wire flag conversion."
+)]
+fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
+    dd_proto::SpanLink {
+        trace_id: u64_id_field(link, "trace_id"),
+        trace_id_high: u64_id_field(link, "trace_id_high"),
+        span_id: u64_id_field(link, "span_id"),
+        attributes: string_map_field(link, "attributes"),
+        tracestate: string_field(link, "tracestate"),
+        flags: integer_field(link, "flags") as u32,
+    }
+}
+
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::cast_sign_loss, reason = "Preserve wire timestamp conversion.")]
+fn convert_span_event(event: &ObjectMap) -> dd_proto::SpanEvent {
+    dd_proto::SpanEvent {
+        time_unix_nano: match event.get("time_unix_nano") {
+            Some(Value::Timestamp(val)) => val.timestamp_nanos_opt().unwrap_or_default() as u64,
+            Some(Value::Integer(val)) => *val as u64,
+            _ => 0,
+        },
+        name: string_field(event, "name"),
+        attributes: event
+            .get("attributes")
+            .and_then(Value::as_object)
+            .map(encode_span_event_attributes)
+            .unwrap_or_default(),
+    }
+}
+
+fn encode_span_event_attributes(
+    attrs: &ObjectMap,
+) -> BTreeMap<String, dd_proto::AttributeAnyValue> {
+    attrs
+        .iter()
+        .map(|(k, v)| (k.to_string(), encode_attribute_any_value(v)))
+        .collect()
+}
+
+fn integer_field(object: &ObjectMap, key: &str) -> i64 {
+    match object.get(key) {
+        Some(Value::Integer(val)) => *val,
+        _ => 0,
+    }
+}
+
+fn u64_id_field(object: &ObjectMap, key: &str) -> u64 {
+    object.get(key).map_or(0, decode_u64_id)
+}
+
+fn string_field(object: &ObjectMap, key: &str) -> String {
+    object
+        .get(key)
+        .map(|v| v.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+fn string_map_field(object: &ObjectMap, key: &str) -> BTreeMap<String, String> {
+    object
+        .get(key)
+        .and_then(Value::as_object)
+        .map(object_to_string_map)
+        .unwrap_or_default()
+}
+
+fn object_to_string_map(object: &ObjectMap) -> BTreeMap<String, String> {
+    object
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string_lossy().into_owned()))
+        .collect()
+}
+
+fn encode_attribute_any_value(value: &Value) -> dd_proto::AttributeAnyValue {
+    use dd_proto::attribute_any_value::AttributeAnyValueType;
+
+    match value {
+        Value::Boolean(v) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::BoolValue as i32,
+            bool_value: *v,
+            ..Default::default()
+        },
+        Value::Integer(v) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::IntValue as i32,
+            int_value: *v,
+            ..Default::default()
+        },
+        Value::Float(v) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::DoubleValue as i32,
+            double_value: v.into_inner(),
+            ..Default::default()
+        },
+        Value::Array(values) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::ArrayValue as i32,
+            array_value: Some(dd_proto::AttributeArray {
+                values: values.iter().map(encode_attribute_array_value).collect(),
+            }),
+            ..Default::default()
+        },
+        other => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::StringValue as i32,
+            string_value: other.to_string_lossy().into_owned(),
+            ..Default::default()
+        },
+    }
+}
+
+fn encode_attribute_array_value(value: &Value) -> dd_proto::AttributeArrayValue {
+    use dd_proto::attribute_array_value::AttributeArrayValueType;
+
+    match value {
+        Value::Boolean(v) => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::BoolValue as i32,
+            bool_value: *v,
+            ..Default::default()
+        },
+        Value::Integer(v) => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::IntValue as i32,
+            int_value: *v,
+            ..Default::default()
+        },
+        Value::Float(v) => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::DoubleValue as i32,
+            double_value: v.into_inner(),
+            ..Default::default()
+        },
+        other => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::StringValue as i32,
+            string_value: other.to_string_lossy().into_owned(),
+            ..Default::default()
+        },
     }
 }
 
@@ -439,8 +617,8 @@ mod test {
     use proptest::prelude::*;
     use vrl::event_path;
 
-    use super::{PartitionKey, encode_traces};
-    use crate::event::{LogEvent, TraceEvent};
+    use super::{PartitionKey, convert_span_link, encode_traces};
+    use crate::event::{LogEvent, ObjectMap, TraceEvent, Value};
 
     proptest! {
         #[test]
@@ -519,9 +697,8 @@ mod test {
                     assert_eq!(1, processed.len());
                     assert!(
                         encoded.len() <= max_size,
-                        "encoded len {} longer than max size {}",
-                        encoded.len(),
-                        max_size
+                        "encoded len {} longer than max size {max_size}",
+                        encoded.len()
                     );
                 }
             }
@@ -533,5 +710,18 @@ mod test {
                     .collect::<Vec<_>>()
             ),
         }
+    }
+
+    #[test]
+    fn encodes_span_link_hex_ids_above_i64_max() {
+        let link = ObjectMap::from([
+            ("trace_id".into(), Value::from("ffffffffffffffff")),
+            ("trace_id_high".into(), Value::from("8000000000000000")),
+            ("span_id".into(), Value::from("deadbeefcafebabe")),
+        ]);
+        let encoded = convert_span_link(&link);
+        assert_eq!(encoded.trace_id, u64::MAX);
+        assert_eq!(encoded.trace_id_high, 1u64 << 63);
+        assert_eq!(encoded.span_id, 0xdead_beef_cafe_babe);
     }
 }

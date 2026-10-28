@@ -9,14 +9,16 @@ administration: {
 		#Type: "archive" | *"package"
 
 		#Option: {
-			_file_type:       #FileType
-			_version_postfix: string | *""
-			arch:             #Arch
-			tag:              string | *strings.ToLower(arch)
-			extra?:           string
-			filename:         string
-			min_version?:     string
-			max_version?:     string
+			_file_type:           #FileType
+			_version_postfix:     string | *""
+			arch:                 #Arch
+			tag:                  string | *strings.ToLower(arch)
+			extra?:               string
+			filename:             string
+			min_version?:         string
+			max_version?:         string
+			legacy_download_url?: string
+			legacy_max_minor?:    int
 
 			if extra == _|_ {
 				filename: "\(tag).\(_file_type)"
@@ -25,7 +27,7 @@ administration: {
 				filename: "\(tag)-\(extra).\(_file_type)"
 			}
 
-			// Calculate the download URL without needing site templating
+			// Calculate the download URL without needing site templating.
 			if _file_type != "deb" {
 				download_url: "\(urls.vector_packages_root)/vector/{v1}/vector-{v2}-\(_version_postfix)\(filename)"
 			}
@@ -113,6 +115,10 @@ administration: {
 					{
 						target: "armv7-rpm"
 						arch:   "ARMv7"
+						tag:    "armv7hl"
+						// Releases through 0.32 used armv7 rather than armv7hl.
+						legacy_download_url: "\(urls.vector_packages_root)/vector/{v1}/vector-{v2}-1.armv7.rpm"
+						legacy_max_minor:    32
 					},
 					{
 						target: "x86_64-rpm"

@@ -1,6 +1,7 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct DatadogAgentJsonParseError<'a> {
@@ -16,9 +17,32 @@ impl InternalEvent for DatadogAgentJsonParseError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct DatadogAgentUnsupportedTracePayloadError {
+    pub error_code: &'static str,
+}
+
+impl InternalEvent for DatadogAgentUnsupportedTracePayloadError {
+    fn emit(self) {
+        error!(
+            message = "Unsupported Datadog Agent trace payload shape.",
+            error_code = self.error_code,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "error_code" => self.error_code,
         )
         .increment(1);
     }

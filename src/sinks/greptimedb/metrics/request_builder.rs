@@ -1,5 +1,8 @@
 use chrono::Utc;
-use greptimedb_ingester::{api::v1::*, helpers::values::*};
+use greptimedb_ingester::api::v1::{
+    ColumnDataType, ColumnSchema, Row, RowInsertRequest, Rows, SemanticType, Value,
+};
+use greptimedb_ingester::helpers::values::{f64_value, string_value, timestamp_millisecond_value};
 use vector_lib::{
     event::{
         Metric, MetricValue,
@@ -32,8 +35,13 @@ fn encode_f64_value(
     columns.push(f64_value(value));
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the metric wire conversion."
+)]
 pub fn metric_to_insert_request(
-    metric: Metric,
+    metric: &Metric,
     options: &RequestBuilderOptions,
 ) -> RowInsertRequest {
     let ns = metric.namespace();
@@ -49,8 +57,7 @@ pub fn metric_to_insert_request(
     // timestamp
     let timestamp = metric
         .timestamp()
-        .map(|t| t.timestamp_millis())
-        .unwrap_or_else(|| Utc::now().timestamp_millis());
+        .map_or_else(|| Utc::now().timestamp_millis(), |t| t.timestamp_millis());
     schema.push(ts_column(if options.use_new_naming {
         TIME_INDEX_COLUMN_NAME
     } else {
@@ -68,19 +75,7 @@ pub fn metric_to_insert_request(
 
     // fields
     match metric.value() {
-        MetricValue::Counter { value } => {
-            encode_f64_value(
-                if options.use_new_naming {
-                    VALUE_COLUMN_NAME
-                } else {
-                    LEGACY_VALUE_COLUMN_NAME
-                },
-                *value,
-                &mut schema,
-                &mut columns,
-            );
-        }
-        MetricValue::Gauge { value } => {
+        MetricValue::Counter { value } | MetricValue::Gauge { value } => {
             encode_f64_value(
                 if options.use_new_naming {
                     VALUE_COLUMN_NAME
@@ -141,6 +136,11 @@ pub fn metric_to_insert_request(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the metric wire conversion."
+)]
 fn encode_distribution(
     samples: &[Sample],
     schema: &mut Vec<ColumnSchema>,
@@ -164,6 +164,11 @@ fn encode_distribution(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the metric wire conversion."
+)]
 fn encode_histogram(buckets: &[Bucket], schema: &mut Vec<ColumnSchema>, columns: &mut Vec<Value>) {
     for bucket in buckets {
         let column_name = format!("b{}", bucket.upper_limit);
@@ -183,7 +188,7 @@ fn encode_quantiles(
 }
 
 fn encode_sketch(sketch: &AgentDDSketch, schema: &mut Vec<ColumnSchema>, columns: &mut Vec<Value>) {
-    encode_f64_value("count", sketch.count() as f64, schema, columns);
+    encode_f64_value("count", f64::from(sketch.count()), schema, columns);
     if let Some(min) = sketch.min() {
         encode_f64_value("min", min, schema, columns);
     }
@@ -238,6 +243,7 @@ fn tag_column(name: &str) -> ColumnSchema {
 #[cfg(test)]
 mod tests {
 
+    use greptimedb_ingester::api::v1::value;
     use similar_asserts::assert_eq;
 
     use super::*;
@@ -263,6 +269,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_metric_data_to_insert_request() {
         let metric = Metric::new(
             "load1",
@@ -277,7 +288,7 @@ mod tests {
             use_new_naming: false,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
 
         assert_eq!(insert.table_name, "ns_load1");
         let rows = insert.rows.expect("Empty insert request");
@@ -300,11 +311,16 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.1 },
         );
-        let insert2 = metric_to_insert_request(metric2, &options);
+        let insert2 = metric_to_insert_request(&metric2, &options);
         assert_eq!(insert2.table_name, "load1");
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_metric_data_to_insert_request_new_naming() {
         let metric = Metric::new(
             "load1",
@@ -319,7 +335,7 @@ mod tests {
             use_new_naming: true,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
 
         assert_eq!(insert.table_name, "ns_load1");
         let rows = insert.rows.expect("Empty insert request");
@@ -342,11 +358,16 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.1 },
         );
-        let insert2 = metric_to_insert_request(metric2, &options);
+        let insert2 = metric_to_insert_request(&metric2, &options);
         assert_eq!(insert2.table_name, "load1");
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_counter() {
         let metric = Metric::new(
             "cpu_seconds_total",
@@ -357,7 +378,7 @@ mod tests {
             use_new_naming: false,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(rows.rows[0].values.len(), 2);
 
@@ -365,6 +386,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_set() {
         let metric = Metric::new(
             "cpu_seconds_total",
@@ -377,7 +403,7 @@ mod tests {
             use_new_naming: false,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(rows.rows[0].values.len(), 2);
 
@@ -385,6 +411,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_distribution() {
         let metric = Metric::new(
             "cpu_seconds_total",
@@ -398,7 +429,7 @@ mod tests {
             use_new_naming: false,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),
@@ -418,6 +449,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_histogram() {
         let buckets = vector_lib::buckets![1.0 => 1, 2.0 => 2, 3.0 => 1];
         let buckets_len = buckets.len();
@@ -434,7 +470,7 @@ mod tests {
             use_new_naming: false,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),
@@ -449,6 +485,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_summary() {
         let quantiles = vector_lib::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0];
         let quantiles_len = quantiles.len();
@@ -465,7 +506,7 @@ mod tests {
             use_new_naming: false,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),
@@ -480,11 +521,16 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert exact values from fixed metric fixtures."
+    )]
     fn test_sketch() {
         let mut sketch = AgentDDSketch::with_agent_defaults();
         let samples = 10;
         for i in 0..samples {
-            sketch.insert(i as f64);
+            sketch.insert(f64::from(i));
         }
 
         let metric = Metric::new(
@@ -498,7 +544,7 @@ mod tests {
             use_new_naming: false,
         };
 
-        let insert = metric_to_insert_request(metric, &options);
+        let insert = metric_to_insert_request(&metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),
@@ -510,7 +556,7 @@ mod tests {
         assert!(get_column(&rows, "p95") <= 9.0);
         assert!(get_column(&rows, "p99") > 8.0);
         assert!(get_column(&rows, "p99") <= 9.0);
-        assert_eq!(get_column(&rows, "count"), samples as f64);
+        assert_eq!(get_column(&rows, "count"), f64::from(samples));
         assert_eq!(get_column(&rows, "sum"), 45.0);
         assert_eq!(get_column(&rows, "max"), 9.0);
         assert_eq!(get_column(&rows, "min"), 0.0);

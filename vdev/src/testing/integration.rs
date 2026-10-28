@@ -1,6 +1,6 @@
 use std::{
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, ExitStatus},
 };
 
 use anyhow::{Context, Result, bail};
@@ -15,7 +15,7 @@ use crate::{
     app::CommandExt as _,
     testing::{
         build::ALL_INTEGRATIONS_FEATURE_FLAG,
-        docker::{CONTAINER_TOOL, DOCKER_SOCKET},
+        docker::{CONTAINER_TOOL, DOCKER_SOCKET, docker_command},
     },
     utils::environment::{Environment, extract_present, rename_environment_keys},
 };
@@ -25,7 +25,6 @@ const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
 /// Check if a Docker image exists locally
 fn docker_image_exists(image_name: &str) -> Result<bool> {
-    use crate::testing::docker::docker_command;
     let output =
         docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"]).check_output()?;
     Ok(output.lines().any(|line| line == image_name))
@@ -66,6 +65,14 @@ impl ComposeTestLocalConfig {
     }
 }
 
+pub(crate) fn collect_compose_logs(
+    local_config: ComposeTestLocalConfig,
+    test_name: &str,
+    environment: &str,
+) -> Result<Option<ExitStatus>> {
+    ComposeTest::generate(local_config, test_name, environment, 0, false)?.logs()
+}
+
 #[derive(Debug)]
 pub(crate) struct ComposeTest {
     local_config: ComposeTestLocalConfig,
@@ -76,6 +83,7 @@ pub(crate) struct ComposeTest {
     compose: Option<Compose>,
     env_config: Environment,
     retries: u8,
+    coverage: bool,
 }
 
 impl ComposeTest {
@@ -84,6 +92,7 @@ impl ComposeTest {
         test_name: impl Into<String>,
         environment: impl Into<String>,
         retries: u8,
+        coverage: bool,
     ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
         let environment = environment.into();
@@ -127,6 +136,7 @@ impl ComposeTest {
             compose,
             env_config: rename_environment_keys(&env_config),
             retries,
+            coverage,
         };
         trace!("Generated {compose_test:#?}");
         Ok(compose_test)
@@ -137,8 +147,8 @@ impl ComposeTest {
         // hyphens, and underscores. Replace any dots with hyphens.
         let sanitized_env = self.environment.replace('.', "-");
         format!(
-            "vector-{}-{}-{}",
-            self.local_config.directory, self.test_name, sanitized_env
+            "vector-{}-{}-{sanitized_env}",
+            self.local_config.directory, self.test_name
         )
     }
 
@@ -187,13 +197,19 @@ impl ComposeTest {
         }
 
         env_vars.insert("VECTOR_LOG".to_string(), Some("info".into()));
+        if let Ok(val) = std::env::var("CARGO_TERM_COLOR") {
+            env_vars.insert("CARGO_TERM_COLOR".to_string(), Some(val));
+        }
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
 
-        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
-        // If using per-test runner: use test-specific features from test.yaml
-        args.push(if self.runner.is_shared_runner() {
+        // Integration tests always compile only the suite's own `test.yaml` features: each CI
+        // job runs a single suite, so compiling `all-integration-tests` there only adds build
+        // time. E2E tests on the shared runner still use `all-e2e-tests`.
+        let use_all_features =
+            self.runner.is_shared_runner() && self.local_config.kind == ComposeTestKind::E2E;
+        args.push(if use_all_features {
             format!("{},vendored", self.local_config.feature_flag)
         } else {
             format!("{},vendored", self.config.features.join(","))
@@ -230,6 +246,12 @@ impl ComposeTest {
             Some(&self.config.features),
             &args,
             self.local_config.kind == ComposeTestKind::E2E,
+            self.coverage,
+            if self.coverage {
+                Some(self.environment.as_str())
+            } else {
+                None
+            },
         )?;
 
         Ok(())
@@ -275,6 +297,16 @@ impl ComposeTest {
         self.runner.remove()?;
 
         Ok(())
+    }
+
+    fn logs(&self) -> Result<Option<ExitStatus>> {
+        let Some(compose) = &self.compose else {
+            return Ok(None);
+        };
+
+        compose
+            .logs(&self.env_config, &self.project_name())
+            .map(Some)
     }
 }
 
@@ -340,34 +372,65 @@ impl Compose {
         environment: Option<&Environment>,
         project_name: &str,
     ) -> Result<()> {
-        let mut command = Command::new(CONTAINER_TOOL.clone());
-        command.arg("compose");
-        command.arg("--project-name");
-        command.arg(project_name);
-        command.arg("--file");
-        command.arg(&self.yaml_path);
-
+        let mut command = self.command(project_name);
         command.args(args);
-
-        command.current_dir(&self.test_dir);
-
-        command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
-        command.env(NETWORK_ENV_VAR, &self.network);
-
-        // some services require this in order to build Vector
-        command.env("RUST_VERSION", RustToolchainConfig::rust_version());
-
-        for (key, value) in &self.env {
-            if let Some(value) = value {
-                command.env(key, value);
-            }
-        }
         if let Some(environment) = environment {
             command.envs(extract_present(environment));
         }
 
         waiting!("{action} service environment");
         command.check_run()
+    }
+
+    fn logs(&self, environment: &Environment, project_name: &str) -> Result<ExitStatus> {
+        // Preserve exit and OOM details before cleanup removes the containers.
+        if let Err(error) = self.container_states(project_name) {
+            warn!("Failed to collect container states: {error}");
+        }
+
+        let mut command = self.command(project_name);
+        command.arg("logs");
+        command.envs(extract_present(environment));
+        command
+            .status()
+            .with_context(|| "Failed to collect compose logs")
+    }
+
+    fn container_states(&self, project_name: &str) -> Result<()> {
+        let containers = docker_command([
+            "ps",
+            "--all",
+            "--quiet",
+            "--filter",
+            &format!("label=com.docker.compose.project={project_name}"),
+        ])
+        .check_output()?;
+
+        if !containers.trim().is_empty() {
+            info!("Container states for compose project '{project_name}':");
+            docker_command(["inspect", "--format", "{{.Name}} {{json .State}}"])
+                .args(containers.split_whitespace())
+                .check_run()?;
+        }
+
+        Ok(())
+    }
+
+    fn command(&self, project_name: &str) -> Command {
+        let mut command = Command::new(CONTAINER_TOOL.clone());
+        command.arg("compose");
+        command.arg("--project-name");
+        command.arg(project_name);
+        command.arg("--file");
+        command.arg(&self.yaml_path);
+        command.current_dir(&self.test_dir);
+        command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
+        command.env(NETWORK_ENV_VAR, &self.network);
+
+        // Some services require this in order to build Vector.
+        command.env("RUST_VERSION", RustToolchainConfig::rust_version());
+        command.envs(extract_present(&self.env));
+        command
     }
 }
 

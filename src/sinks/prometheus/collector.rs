@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, fmt::Write as _};
+use std::{
+    collections::{BTreeMap, btree_map::Entry},
+    fmt::Write as _,
+};
 
 use chrono::Utc;
 use indexmap::map::IndexMap;
@@ -11,6 +14,23 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
+
+pub(super) fn metric_identifiers_have_no_line_breaks(
+    metric: &Metric,
+    default_namespace: Option<&str>,
+) -> bool {
+    let name = encode_namespace(metric.namespace().or(default_namespace), '_', metric.name());
+    identifiers_have_no_line_breaks(&name, metric.tags())
+}
+
+fn identifiers_have_no_line_breaks(name: &str, tags: Option<&MetricTags>) -> bool {
+    !contains_line_break(name)
+        && tags.is_none_or(|tags| tags.iter_single().all(|(key, _)| !contains_line_break(key)))
+}
+
+fn contains_line_break(value: &str) -> bool {
+    value.contains(['\r', '\n'])
+}
 
 pub(super) trait MetricCollector {
     type Output;
@@ -31,6 +51,13 @@ pub(super) trait MetricCollector {
 
     fn finish(self) -> Self::Output;
 
+    fn should_encode_metric(&self, _name: &str, _tags: Option<&MetricTags>) -> bool {
+        true
+    }
+
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep metric variants together.")]
+    #[allow(clippy::cast_precision_loss, reason = "Preserve f64 count rounding.")]
     fn encode_metric(
         &mut self,
         default_namespace: Option<&str>,
@@ -40,17 +67,19 @@ pub(super) trait MetricCollector {
     ) {
         let name = encode_namespace(metric.namespace().or(default_namespace), '_', metric.name());
         let name = &name;
+        let tags = metric.tags();
+
+        if !self.should_encode_metric(name, tags) {
+            return;
+        }
+
         let timestamp = metric.timestamp().map(|t| t.timestamp_millis());
 
         if metric.kind() == MetricKind::Absolute {
-            let tags = metric.tags();
             self.emit_metadata(metric.name(), name, metric.value());
 
             match metric.value() {
-                MetricValue::Counter { value } => {
-                    self.emit_value(timestamp, name, "", *value, tags, None);
-                }
-                MetricValue::Gauge { value } => {
+                MetricValue::Counter { value } | MetricValue::Gauge { value } => {
                     self.emit_value(timestamp, name, "", *value, tags, None);
                 }
                 MetricValue::Set { values } => {
@@ -91,7 +120,7 @@ pub(super) trait MetricCollector {
                 } => {
                     if let Some(statistic) = DistributionStatistic::from_samples(samples, quantiles)
                     {
-                        for (q, v) in statistic.quantiles.iter() {
+                        for (q, v) in &statistic.quantiles {
                             self.emit_value(
                                 timestamp,
                                 name,
@@ -209,7 +238,7 @@ pub(super) trait MetricCollector {
                             timestamp,
                             name,
                             "_count",
-                            ddsketch.count() as f64,
+                            f64::from(ddsketch.count()),
                             tags,
                             None,
                         );
@@ -233,10 +262,14 @@ impl MetricCollector for StringCollector {
         Self { processed }
     }
 
+    fn should_encode_metric(&self, name: &str, tags: Option<&MetricTags>) -> bool {
+        identifiers_have_no_line_breaks(name, tags)
+    }
+
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
-        if !self.processed.contains_key(fullname) {
-            let header = Self::encode_header(name, fullname, value);
-            self.processed.insert(fullname.into(), header);
+        if let Entry::Vacant(entry) = self.processed.entry(fullname.into()) {
+            let header = Self::encode_header(name, entry.key(), value);
+            entry.insert(header);
         }
     }
 
@@ -280,7 +313,7 @@ impl StringCollector {
                     .collect::<Vec<_>>();
 
                 if let Some((key, value)) = tag {
-                    parts.push(Self::format_tag(key, value))
+                    parts.push(Self::format_tag(key, value));
                 }
 
                 parts.sort();
@@ -292,22 +325,39 @@ impl StringCollector {
 
     fn encode_header(name: &str, fullname: &str, value: &MetricValue) -> String {
         let r#type = prometheus_metric_type(value).as_str();
-        format!("# HELP {fullname} {name}\n# TYPE {fullname} {type}\n")
+        let help = Self::escape_help(name);
+        format!("# HELP {fullname} {help}\n# TYPE {fullname} {type}\n")
     }
 
-    fn format_tag(key: &str, mut value: &str) -> String {
+    fn escape_help(help: &str) -> String {
+        let mut result = String::with_capacity(help.len());
+
+        for character in help.chars() {
+            match character {
+                '\\' => result.push_str(r"\\"),
+                '\n' => result.push_str(r"\n"),
+                character => result.push(character),
+            }
+        }
+
+        result
+    }
+
+    fn format_tag(key: &str, value: &str) -> String {
         // For most tags, this is just `{KEY}="{VALUE}"` so allocate optimistically
         let mut result = String::with_capacity(key.len() + value.len() + 3);
         result.push_str(key);
         result.push_str("=\"");
-        while let Some(i) = value.find(['\\', '"']) {
-            result.push_str(&value[..i]);
-            result.push('\\');
-            // Ugly but works because we know the character at `i` is ASCII
-            result.push(value.as_bytes()[i] as char);
-            value = &value[i + 1..];
+
+        for character in value.chars() {
+            match character {
+                '\\' => result.push_str(r"\\"),
+                '"' => result.push_str(r#"\""#),
+                '\n' => result.push_str(r"\n"),
+                character => result.push(character),
+            }
         }
-        result.push_str(value);
+
         result.push('"');
         result
     }
@@ -360,8 +410,8 @@ impl MetricCollector for TimeSeries {
 
     fn new() -> Self {
         Self {
-            buffer: Default::default(),
-            metadata: Default::default(),
+            buffer: IndexMap::default(),
+            metadata: IndexMap::default(),
             timestamp: None,
         }
     }
@@ -421,14 +471,14 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
         MetricValue::Distribution {
             statistic: StatisticKind::Histogram,
             ..
-        } => MetricType::Histogram,
+        }
+        | MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
         MetricValue::Distribution {
             statistic: StatisticKind::Summary,
             ..
-        } => MetricType::Summary,
-        MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
-        MetricValue::AggregatedSummary { .. } => MetricType::Summary,
-        MetricValue::Sketch { .. } => MetricType::Summary,
+        }
+        | MetricValue::AggregatedSummary { .. }
+        | MetricValue::Sketch { .. } => MetricType::Summary,
     }
 }
 
@@ -439,7 +489,7 @@ mod tests {
     use chrono::{DateTime, TimeZone, Timelike};
     use indoc::indoc;
     use similar_asserts::assert_eq;
-    use vector_lib::metric_tags;
+    use vector_lib::{metric_tags, prometheus::parser::parse_text};
 
     use super::{super::default_summary_quantiles, *};
     use crate::{
@@ -518,7 +568,7 @@ mod tests {
     fn encodes_counter_request() {
         assert_eq!(
             encode_counter::<TimeSeries>(),
-            write_request!("vector_hits", "hits", Counter ["" @ 1612325106789 = 10.0 ["code" => "200"]])
+            write_request!("vector_hits", "hits", Counter ["" @ 1_612_325_106_789 = 10.0 ["code" => "200"]])
         );
     }
 
@@ -549,7 +599,7 @@ mod tests {
     fn encodes_gauge_request() {
         assert_eq!(
             encode_gauge::<TimeSeries>(),
-            write_request!("vector_temperature", "temperature", Gauge ["" @ 1612325106789 = -1.1 ["code" => "200"]])
+            write_request!("vector_temperature", "temperature", Gauge ["" @ 1_612_325_106_789 = -1.1 ["code" => "200"]])
         );
     }
 
@@ -580,7 +630,7 @@ mod tests {
     fn encodes_set_request() {
         assert_eq!(
             encode_set::<TimeSeries>(),
-            write_request!("vector_users", "users", Gauge [ "" @ 1612325106789 = 1.0 []])
+            write_request!("vector_users", "users", Gauge [ "" @ 1_612_325_106_789 = 1.0 []])
         );
     }
 
@@ -612,7 +662,7 @@ mod tests {
     fn encodes_expired_set_request() {
         assert_eq!(
             encode_expired_set::<TimeSeries>(),
-            write_request!("vector_users", "users", Gauge ["" @ 1612325106789 = 0.0 []])
+            write_request!("vector_users", "users", Gauge ["" @ 1_612_325_106_789 = 0.0 []])
         );
     }
 
@@ -651,12 +701,12 @@ mod tests {
             encode_distribution::<TimeSeries>(),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 1612325106789 = 0.0 ["le" => "0"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "2.5"],
-                        "_bucket" @ 1612325106789 = 8.0 ["le" => "5"],
-                        "_bucket" @ 1612325106789 = 8.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 15.0 [],
-                        "_count" @ 1612325106789 = 8.0 []
+                        "_bucket" @ 1_612_325_106_789 = 0.0 ["le" => "0"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "2.5"],
+                        "_bucket" @ 1_612_325_106_789 = 8.0 ["le" => "5"],
+                        "_bucket" @ 1_612_325_106_789 = 8.0 ["le" => "+Inf"],
+                        "_sum" @ 1_612_325_106_789 = 15.0 [],
+                        "_count" @ 1_612_325_106_789 = 8.0 []
                 ]
             )
         );
@@ -698,12 +748,12 @@ mod tests {
             encode_histogram::<TimeSeries>(false),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
-                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 11.5 [],
-                        "_count" @ 1612325106789 = 6.0 []
+                        "_bucket" @ 1_612_325_106_789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1_612_325_106_789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "+Inf"],
+                        "_sum" @ 1_612_325_106_789 = 11.5 [],
+                        "_count" @ 1_612_325_106_789 = 6.0 []
                     ]
             )
         );
@@ -732,12 +782,12 @@ mod tests {
             encode_histogram::<TimeSeries>(true),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
-                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
-                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 11.5 [],
-                        "_count" @ 1612325106789 = 6.0 []
+                        "_bucket" @ 1_612_325_106_789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1_612_325_106_789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1_612_325_106_789 = 6.0 ["le" => "+Inf"],
+                        "_sum" @ 1_612_325_106_789 = 11.5 [],
+                        "_count" @ 1_612_325_106_789 = 6.0 []
                     ]
             )
         );
@@ -787,11 +837,11 @@ mod tests {
             encode_summary::<TimeSeries>(),
             write_request!(
                 "ns_requests", "requests", Summary [
-                    "" @ 1612325106789 = 1.5 ["code" => "200", "quantile" => "0.01"],
-                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.5"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.99"],
-                    "_sum" @ 1612325106789 = 12.0 ["code" => "200"],
-                    "_count" @ 1612325106789 = 6.0 ["code" => "200"]
+                    "" @ 1_612_325_106_789 = 1.5 ["code" => "200", "quantile" => "0.01"],
+                    "" @ 1_612_325_106_789 = 2.0 ["code" => "200", "quantile" => "0.5"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.99"],
+                    "_sum" @ 1_612_325_106_789 = 12.0 ["code" => "200"],
+                    "_count" @ 1_612_325_106_789 = 6.0 ["code" => "200"]
                 ]
             )
         );
@@ -839,16 +889,16 @@ mod tests {
             encode_distribution_summary::<TimeSeries>(),
             write_request!(
                 "ns_requests", "requests", Summary [
-                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.5"],
-                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.75"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.9"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.95"],
-                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.99"],
-                    "_sum" @ 1612325106789 = 15.0 ["code" => "200"],
-                    "_count" @ 1612325106789 = 8.0 ["code" => "200"],
-                    "_min" @ 1612325106789 = 1.0 ["code" => "200"],
-                    "_max" @ 1612325106789 = 3.0 ["code" => "200"],
-                    "_avg" @ 1612325106789 = 1.875 ["code" => "200"]
+                    "" @ 1_612_325_106_789 = 2.0 ["code" => "200", "quantile" => "0.5"],
+                    "" @ 1_612_325_106_789 = 2.0 ["code" => "200", "quantile" => "0.75"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.9"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.95"],
+                    "" @ 1_612_325_106_789 = 3.0 ["code" => "200", "quantile" => "0.99"],
+                    "_sum" @ 1_612_325_106_789 = 15.0 ["code" => "200"],
+                    "_count" @ 1_612_325_106_789 = 8.0 ["code" => "200"],
+                    "_min" @ 1_612_325_106_789 = 1.0 ["code" => "200"],
+                    "_max" @ 1_612_325_106_789 = 3.0 ["code" => "200"],
+                    "_avg" @ 1_612_325_106_789 = 1.875 ["code" => "200"]
                 ]
             )
         );
@@ -884,7 +934,7 @@ mod tests {
     fn encodes_timestamp_request() {
         assert_eq!(
             encode_timestamp::<TimeSeries>(),
-            write_request!("temperature", "temperature", Counter ["" @ 1612325106789 = 2.0 []])
+            write_request!("temperature", "temperature", Counter ["" @ 1_612_325_106_789 = 2.0 []])
         );
     }
 
@@ -921,6 +971,7 @@ mod tests {
     fn escapes_tags_text() {
         let tags = metric_tags!(
             "code" => "200",
+            "line" => "first\nsecond",
             "quoted" => r#"host"1""#,
             "path" => r"c:\Windows",
         );
@@ -936,8 +987,80 @@ mod tests {
             indoc! {r#"
                 # HELP something something
                 # TYPE something counter
-                something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+                something{code="200",line="first\nsecond",path="c:\\Windows",quoted="host\"1\""} 1
             "#}
+        );
+        parse_text(&encoded).unwrap();
+    }
+
+    #[test]
+    fn rejects_metric_name_and_namespace_line_breaks_text() {
+        for (default_namespace, name) in [
+            (None, "invalid_metric\nname"),
+            (None, "invalid_metric\rname"),
+            (Some("invalid\nnamespace"), "valid_metric"),
+            (Some("invalid\rnamespace"), "valid_metric"),
+        ] {
+            let metric = Metric::new(
+                name.to_owned(),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            let encoded = encode_one::<StringCollector>(default_namespace, &[], &[], &metric);
+            assert_eq!(encoded, "");
+            parse_text(&encoded).unwrap();
+        }
+    }
+
+    #[test]
+    fn rejects_tag_name_line_breaks_text() {
+        for key in ["invalid_tag\nname", "invalid_tag\rname"] {
+            let mut tags = MetricTags::default();
+            tags.replace(key.to_owned(), "value".to_owned());
+            let metric = Metric::new(
+                "valid_metric".to_owned(),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(tags));
+            let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+            assert_eq!(encoded, "");
+            parse_text(&encoded).unwrap();
+        }
+    }
+
+    #[test]
+    fn rejected_metric_name_does_not_collide_text() {
+        let invalid = Metric::new(
+            "requests\ncount".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let valid = Metric::new(
+            "requests_count".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+        );
+        let mut collector = StringCollector::new();
+        collector.encode_metric(None, &[], &[], &invalid);
+        collector.encode_metric(None, &[], &[], &valid);
+        let encoded = collector.finish();
+        assert_eq!(
+            encoded,
+            indoc! {r"
+                # HELP requests_count requests_count
+                # TYPE requests_count gauge
+                requests_count 2
+            "}
+        );
+        parse_text(&encoded).unwrap();
+    }
+
+    #[test]
+    fn escapes_help_text() {
+        assert_eq!(
+            StringCollector::escape_help("line\npath\\name"),
+            r"line\npath\\name"
         );
     }
 

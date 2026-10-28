@@ -1,8 +1,9 @@
-use metrics::{counter, gauge};
 use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, GaugeName, InternalEvent, UNINTENTIONAL, error_stage,
+    error_type,
 };
+use vector_lib::{counter, gauge};
 
 use crate::transforms::lua::v2::BuildError;
 
@@ -12,8 +13,10 @@ pub struct LuaGcTriggered {
 }
 
 impl InternalEvent for LuaGcTriggered {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        gauge!("lua_memory_used_bytes").set(self.used_memory as f64);
+        gauge!(GaugeName::LuaMemoryUsedBytes).set(self.used_memory as f64);
     }
 }
 
@@ -32,7 +35,7 @@ impl InternalEvent for LuaScriptError {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => mlua_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -62,19 +65,26 @@ impl InternalEvent for LuaBuildError {
             internal_log_rate_limit = false,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => lua_build_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,
         )
         .increment(1);
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
 fn mlua_error_code(err: &mlua::Error) -> &'static str {
-    use mlua::Error::*;
+    use mlua::Error::{
+        BadArgument, BindError, CallbackDestructed, CallbackError, CoroutineUnresumable,
+        ExternalError, FromLuaConversionError, MemoryControlNotAvailable, MemoryError,
+        MetaMethodRestricted, MetaMethodTypeError, MismatchedRegistryKey, PreviouslyResumedPanic,
+        RecursiveMutCallback, RuntimeError, SafetyError, StackError, SyntaxError,
+        ToLuaConversionError, UserDataBorrowError, UserDataBorrowMutError, UserDataDestructed,
+        UserDataTypeMismatch, WithContext,
+    };
 
     match err {
         SyntaxError { .. } => "syntax_error",
@@ -106,7 +116,11 @@ fn mlua_error_code(err: &mlua::Error) -> &'static str {
 }
 
 const fn lua_build_error_code(err: &BuildError) -> &'static str {
-    use BuildError::*;
+    use BuildError::{
+        InvalidHooksInit, InvalidHooksProcess, InvalidHooksShutdown, InvalidSearchDirs,
+        InvalidSource, InvalidTimerHandler, RuntimeErrorGc, RuntimeErrorHooksInit,
+        RuntimeErrorHooksProcess, RuntimeErrorHooksShutdown, RuntimeErrorTimerHandler,
+    };
 
     match err {
         InvalidSearchDirs { .. } => "invalid_search_dir",

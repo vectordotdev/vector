@@ -8,13 +8,15 @@ use futures::TryFutureExt;
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use toml::value::Table;
 use vector_lib::config::ComponentKey;
 
 use crate::{
     config::{
         SecretBackend,
-        loading::{ComponentHint, Loader, deserialize_table, prepare_input, process::Process},
+        loading::{
+            ComponentHint, Loader, deserialize_config_map, prepare_input, process::Process,
+            representation::ConfigMap,
+        },
     },
     secrets::SecretBackends,
     signal,
@@ -23,13 +25,14 @@ use crate::{
 // The following regex aims to extract a pair of strings, the first being the secret backend name
 // and the second being the secret key. Here are some matching & non-matching examples:
 // - "SECRET[backend.secret_name]" will match and capture "backend" and "secret_name"
+// - "SECRET[my-backend.secret_name]" will match and capture "my-backend" and "secret_name"
 // - "SECRET[backend.secret.name]" will match and capture "backend" and "secret.name"
 // - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
 // - "SECRET[backend.path/to/secret]" will match and capture "backend" and "path/to/secret"
 // - "SECRET[secret_name]" will not match
 // - "SECRET[.secret.name]" will not match
 pub static COLLECTOR: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].\-/]+)\]").unwrap());
+    LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]").unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -48,13 +51,14 @@ pub struct SecretBackendLoader {
 
 impl SecretBackendLoader {
     /// Sets whether to interpolate environment variables in the config.
+    #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
     }
 
     /// Retrieve secrets from backends.
-    /// Returns an empty HashMap if there are no secrets to retrieve.
+    /// Returns an empty `HashMap` if there are no secrets to retrieve.
     pub(crate) async fn retrieve_secrets(
         mut self,
         signal_handler: &mut signal::SignalHandler,
@@ -97,13 +101,11 @@ impl SecretBackendLoader {
 }
 
 impl Default for SecretBackendLoader {
-    /// Creates a new SecretBackendLoader with default settings.
-    /// By default, environment variable interpolation is enabled.
     fn default() -> Self {
         Self {
             backends: IndexMap::new(),
             secret_keys: HashMap::new(),
-            interpolate_env: true,
+            interpolate_env: super::env_var_interpolation_enabled(),
         }
     }
 }
@@ -116,9 +118,9 @@ impl Process for SecretBackendLoader {
         Ok(config_string)
     }
 
-    fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if table.contains_key("secret") {
-            let additional = deserialize_table::<SecretBackendOuter>(table)?;
+    fn merge(&mut self, map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        if map.contains_key("secret") {
+            let additional = deserialize_config_map::<SecretBackendOuter>(map)?;
             self.backends.extend(additional.secret);
         }
         Ok(())
@@ -131,6 +133,49 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
     }
 }
 
+/// Collects secret references from string leaves in a parsed configuration.
+/// Keys are excluded, matching tree-based interpolation.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
+pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, HashSet<String>>) {
+    fn visit(value: &serde_json::Value, keys: &mut HashMap<String, HashSet<String>>) {
+        match value {
+            serde_json::Value::String(string) => collect_secret_keys(string, keys),
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    visit(value, keys);
+                }
+            }
+            serde_json::Value::Object(map) => collect_secret_keys_from_map(map, keys),
+            _ => {}
+        }
+    }
+    for value in map.values() {
+        visit(value, keys);
+    }
+}
+
+/// Replaces secret references in string leaves, preserving keys and value types.
+///
+/// # Errors
+///
+/// Returns an error message for each `SECRET[backend.key]` reference in a string leaf that has
+/// no matching entry in `secrets`.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
+pub fn interpolate_config_map_with_secrets(
+    map: &ConfigMap,
+    secrets: &HashMap<String, String>,
+) -> Result<ConfigMap, Vec<String>> {
+    super::interpolation::interpolate_config_map(map, secrets, interpolate)
+}
+
 fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>) {
     COLLECTOR.captures_iter(input).for_each(|cap| {
         if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
@@ -139,19 +184,33 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
             } else {
                 keys.insert(
                     backend.as_str().to_string(),
-                    HashSet::from_iter(std::iter::once(key.as_str().to_string())),
+                    HashSet::from([key.as_str().to_string()]),
                 );
             }
         }
     });
 }
 
+/// Replaces `SECRET[backend.key]` references in `input` with values from `secrets`.
+///
+/// # Errors
+///
+/// Returns an error message for each reference that has no matching entry in `secrets`.
+///
+/// # Panics
+///
+/// Panics if a regex match has no overall capture group, which cannot happen in practice.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Preserve collection type and API bounds"
+)]
 pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
     let output = COLLECTOR
         .replace_all(input, |caps: &Captures<'_>| {
             caps.get(1)
-                .and_then(|b| caps.get(2).map(|k| (b, k)))
+                .zip(caps.get(2))
                 .and_then(|(b, k)| secrets.get(&format!("{}.{}", b.as_str(), k.as_str())))
                 .cloned()
                 .unwrap_or_else(|| {
@@ -159,7 +218,7 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
                         "Unable to find secret replacement for {}.",
                         caps.get(0).unwrap().as_str()
                     ));
-                    "".to_string()
+                    String::new()
                 })
         })
         .into_owned();
@@ -176,7 +235,40 @@ mod tests {
 
     use indoc::indoc;
 
-    use super::{collect_secret_keys, interpolate};
+    use super::{
+        collect_secret_keys, collect_secret_keys_from_map, interpolate,
+        interpolate_config_map_with_secrets,
+    };
+
+    #[test]
+    fn tree_secret_collection_and_interpolation_agree() {
+        let input = serde_json::json!({
+            "SECRET[unused.key]": ["SECRET[backend.key]", {"nested": "SECRET[backend.key]"}],
+            "typed": [42, true, null]
+        });
+        let map = input.as_object().unwrap();
+        let mut keys = HashMap::new();
+        collect_secret_keys_from_map(map, &mut keys);
+        assert_eq!(
+            keys,
+            HashMap::from([(
+                "backend".into(),
+                std::collections::HashSet::from(["key".into()])
+            )])
+        );
+        let secrets = HashMap::from([("backend.key".into(), "42\n\"quoted\"".into())]);
+        let result = interpolate_config_map_with_secrets(map, &secrets).unwrap();
+        assert_eq!(
+            serde_json::Value::Object(result),
+            serde_json::json!({
+                "SECRET[unused.key]": ["42\n\"quoted\"", {"nested": "42\n\"quoted\""}],
+                "typed": [42, true, null]
+            })
+        );
+        assert_eq!(input["SECRET[unused.key]"][0], "SECRET[backend.key]");
+        let errors = interpolate_config_map_with_secrets(map, &HashMap::new()).unwrap_err();
+        assert_eq!(errors.len(), 2);
+    }
 
     #[test]
     fn replacement() {
@@ -185,6 +277,7 @@ mod tests {
             ("a...key".into(), "a...value".into()),
             ("backend.path/to/secret".into(), "secret_value".into()),
             ("backend.nested/dir/file".into(), "nested_value".into()),
+            ("my-backend.secret.key".into(), "hyphenated_value".into()),
         ]
         .into_iter()
         .collect();
@@ -215,6 +308,10 @@ mod tests {
             interpolate("SECRET[backend.nested/dir/file]", &secrets)
         );
         assert_eq!(
+            Ok("hyphenated_value".into()),
+            interpolate("SECRET[my-backend.secret.key]", &secrets)
+        );
+        assert_eq!(
             Ok("xxxSECRET[non_matching_syntax]yyy".into()),
             interpolate("xxxSECRET[non_matching_syntax]yyy", &secrets)
         );
@@ -238,16 +335,19 @@ mod tests {
             SECRET[second_backend.secret.key]
             SECRET[first_backend.a_third.secret_key]
             SECRET[first_backend...an_extra_secret_key]
+            SECRET[third-backend.secret_key]
             SECRET[first_backend.path/to/secret]
             SECRET[second_backend.nested/dir/secret]
+            SECRET[third-backend.another-secret]
             SECRET[non_matching_syntax]
             SECRET[.non.matching.syntax]
         "},
             &mut keys,
         );
-        assert_eq!(keys.len(), 2);
+        assert_eq!(keys.len(), 3);
         assert!(keys.contains_key("first_backend"));
         assert!(keys.contains_key("second_backend"));
+        assert!(keys.contains_key("third-backend"));
 
         let first_backend_keys = keys.get("first_backend").unwrap();
         assert_eq!(first_backend_keys.len(), 6);
@@ -263,6 +363,11 @@ mod tests {
         assert!(second_backend_keys.contains("secret_key"));
         assert!(second_backend_keys.contains("secret.key"));
         assert!(second_backend_keys.contains("nested/dir/secret"));
+
+        let third_backend_keys = keys.get("third-backend").unwrap();
+        assert_eq!(third_backend_keys.len(), 2);
+        assert!(third_backend_keys.contains("secret_key"));
+        assert!(third_backend_keys.contains("another-secret"));
     }
 
     #[test]

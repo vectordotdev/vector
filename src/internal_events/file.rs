@@ -1,16 +1,14 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
-use std::borrow::Cow;
-
-use metrics::{counter, gauge};
 use vector_lib::{
     NamedInternalEvent,
     configurable::configurable_component,
-    internal_event::{
-        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
-    },
+    gauge,
+    internal_event::{GaugeName, InternalEvent},
 };
 
+#[cfg(feature = "sources-file")]
+pub use self::file_source::*;
+#[cfg(feature = "sinks-file")]
+pub use self::sink::*;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
 
@@ -33,92 +31,132 @@ pub struct FileOpen {
 }
 
 impl InternalEvent for FileOpen {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        gauge!("open_files").set(self.count as f64);
+        gauge!(GaugeName::OpenFiles).set(self.count as f64);
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct FileBytesSent<'a> {
-    pub byte_size: usize,
-    pub file: Cow<'a, str>,
-    pub include_file_metric_tag: bool,
-}
+#[cfg(feature = "sinks-file")]
+mod sink {
+    use std::borrow::Cow;
 
-impl InternalEvent for FileBytesSent<'_> {
-    fn emit(self) {
-        trace!(
-            message = "Bytes sent.",
-            byte_size = %self.byte_size,
-            protocol = "file",
-            file = %self.file,
-        );
-        if self.include_file_metric_tag {
-            counter!(
-                "component_sent_bytes_total",
-                "protocol" => "file",
-                "file" => self.file.clone().into_owned(),
-            )
-        } else {
-            counter!(
-                "component_sent_bytes_total",
-                "protocol" => "file",
-            )
+    use vector_lib::{
+        NamedInternalEvent, counter, emit,
+        internal_event::{
+            ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+            error_stage, error_type,
+        },
+    };
+
+    use crate::sinks::util::path_confinement::ConfineError;
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileBytesSent<'a> {
+        pub byte_size: usize,
+        pub file: Cow<'a, str>,
+        pub include_file_metric_tag: bool,
+    }
+
+    impl InternalEvent for FileBytesSent<'_> {
+        fn emit(self) {
+            trace!(
+                message = "Bytes sent.",
+                byte_size = %self.byte_size,
+                protocol = "file",
+                file = %self.file,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    CounterName::ComponentSentBytesTotal,
+                    "protocol" => "file",
+                    "file" => self.file.clone().into_owned(),
+                )
+            } else {
+                counter!(
+                    CounterName::ComponentSentBytesTotal,
+                    "protocol" => "file",
+                )
+            }
+            .increment(self.byte_size as u64);
         }
-        .increment(self.byte_size as u64);
     }
-}
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct FileIoError<'a, P> {
-    pub error: std::io::Error,
-    pub code: &'static str,
-    pub message: &'static str,
-    pub path: &'a P,
-    pub dropped_events: usize,
-}
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileIoError<'a, P> {
+        pub error: std::io::Error,
+        pub code: &'static str,
+        pub message: &'static str,
+        pub path: &'a P,
+        pub dropped_events: usize,
+    }
 
-impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
-    fn emit(self) {
-        error!(
-            message = %self.message,
-            path = ?self.path,
-            error = %self.error,
-            error_code = %self.code,
-            error_type = error_type::IO_FAILED,
-            stage = error_stage::SENDING,
-        );
-        counter!(
-            "component_errors_total",
-            "error_code" => self.code,
-            "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
+    impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
+        fn emit(self) {
+            error!(
+                message = %self.message,
+                path = ?self.path,
+                error = %self.error,
+                error_code = %self.code,
+                error_type = error_type::IO_FAILED,
+                stage = error_stage::SENDING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => self.code,
+                "error_type" => error_type::IO_FAILED,
+                "stage" => error_stage::SENDING,
+            )
+            .increment(1);
 
-        if self.dropped_events > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: self.dropped_events,
-                reason: self.message,
+            if self.dropped_events > 0 {
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count: self.dropped_events,
+                    reason: self.message,
+                });
+            }
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FilePathOutsideBaseDirError<'a> {
+        pub path: &'a std::path::Path,
+        pub base_dir: &'a std::path::Path,
+        pub error: ConfineError,
+    }
+
+    impl InternalEvent for FilePathOutsideBaseDirError<'_> {
+        fn emit(self) {
+            error!(
+                message = "Rendered path is outside the configured base directory; dropping event.",
+                path = ?self.path,
+                base_dir = ?self.base_dir,
+                error = %self.error,
+                error_type = error_type::CONFINEMENT_FAILED,
+                stage = error_stage::PROCESSING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_type" => error_type::CONFINEMENT_FAILED,
+                "stage" => error_stage::PROCESSING,
+            )
+            .increment(1);
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "Rendered path outside base_dir.",
             });
         }
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
-mod source {
-    use std::{io::Error, path::Path, time::Duration};
-
-    use bytes::BytesMut;
-    use metrics::counter;
+#[cfg(feature = "sources-file")]
+mod file_source {
     use vector_lib::{
-        NamedInternalEvent, emit,
-        file_source_common::internal_events::FileSourceInternalEvents,
-        internal_event::{ComponentEventsDropped, INTENTIONAL, error_stage, error_type},
+        NamedInternalEvent, counter,
+        internal_event::{CounterName, InternalEvent},
         json_size::JsonSize,
     };
-
-    use super::{FileOpen, InternalEvent};
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
@@ -137,13 +175,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_bytes_total",
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "file",
                     "file" => self.file.to_owned()
                 )
             } else {
                 counter!(
-                    "component_received_bytes_total",
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "file",
                 )
             }
@@ -169,22 +207,38 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_events_total",
+                    CounterName::ComponentReceivedEventsTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.count as u64);
                 counter!(
-                    "component_received_event_bytes_total",
+                    CounterName::ComponentReceivedEventBytesTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.byte_size.get() as u64);
             } else {
-                counter!("component_received_events_total").increment(self.count as u64);
-                counter!("component_received_event_bytes_total")
+                counter!(CounterName::ComponentReceivedEventsTotal).increment(self.count as u64);
+                counter!(CounterName::ComponentReceivedEventBytesTotal)
                     .increment(self.byte_size.get() as u64);
             }
         }
     }
+}
+
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+mod source {
+    use std::{io::Error, path::Path, time::Duration};
+
+    use bytes::BytesMut;
+    use vector_lib::{
+        NamedInternalEvent, counter, emit,
+        file_source_common::internal_events::FileSourceInternalEvents,
+        internal_event::{
+            ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
+        },
+    };
+
+    use super::{FileOpen, InternalEvent};
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileChecksumFailed<'a> {
@@ -200,11 +254,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "checksum_errors_total",
+                    CounterName::ChecksumErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("checksum_errors_total")
+                counter!(CounterName::ChecksumErrorsTotal)
             }
             .increment(1);
         }
@@ -229,7 +283,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -237,7 +291,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -268,7 +322,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
@@ -276,7 +330,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -300,11 +354,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_deleted_total",
+                    CounterName::FilesDeletedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_deleted_total")
+                counter!(CounterName::FilesDeletedTotal)
             }
             .increment(1);
         }
@@ -315,6 +369,9 @@ mod source {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
         pub reached_eof: bool,
+        /// Number of unread bytes, or None when the count cannot be determined.
+        /// An unknown count does not imply that no unread bytes remain.
+        pub bytes_unread: Option<u64>,
     }
 
     impl InternalEvent for FileUnwatched<'_> {
@@ -323,21 +380,51 @@ mod source {
             info!(
                 message = "Stopped watching file.",
                 file = %self.file.display(),
-                reached_eof
+                reached_eof,
+                bytes_unread = self.bytes_unread,
+                bytes_unread_known = self.bytes_unread.is_some(),
             );
             if self.include_file_metric_tag {
+                let file_tag = self.file.to_string_lossy().into_owned();
                 counter!(
-                    "files_unwatched_total",
-                    "file" => self.file.to_string_lossy().into_owned(),
+                    CounterName::FilesUnwatchedTotal,
+                    "file" => file_tag.clone(),
                     "reached_eof" => reached_eof,
                 )
+                .increment(1);
+                match self.bytes_unread {
+                    Some(bytes_unread) => counter!(
+                        CounterName::FilesUnwatchedBytesUnreadTotal,
+                        "file" => file_tag,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(bytes_unread),
+                    None => counter!(
+                        CounterName::FilesUnwatchedWithUnknownBytesTotal,
+                        "file" => file_tag,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(1),
+                }
             } else {
                 counter!(
-                    "files_unwatched_total",
+                    CounterName::FilesUnwatchedTotal,
                     "reached_eof" => reached_eof,
                 )
+                .increment(1);
+                match self.bytes_unread {
+                    Some(bytes_unread) => counter!(
+                        CounterName::FilesUnwatchedBytesUnreadTotal,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(bytes_unread),
+                    None => counter!(
+                        CounterName::FilesUnwatchedWithUnknownBytesTotal,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(1),
+                }
             }
-            .increment(1);
         }
     }
 
@@ -360,7 +447,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -368,7 +455,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -394,11 +481,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_resumed_total",
+                    CounterName::FilesResumedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_resumed_total")
+                counter!(CounterName::FilesResumedTotal)
             }
             .increment(1);
         }
@@ -418,11 +505,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_added_total",
+                    CounterName::FilesAddedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_added_total")
+                counter!(CounterName::FilesAddedTotal)
             }
             .increment(1);
         }
@@ -435,13 +522,18 @@ mod source {
     }
 
     impl InternalEvent for FileCheckpointed {
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "Bounds and overflow audit deferred"
+        )]
         fn emit(self) {
             debug!(
                 message = "Files checkpointed.",
                 count = %self.count,
                 duration_ms = self.duration.as_millis() as u64,
             );
-            counter!("checkpoints_total").increment(self.count as u64);
+            counter!(CounterName::CheckpointsTotal).increment(self.count as u64);
         }
     }
 
@@ -460,7 +552,7 @@ mod source {
                 stage = error_stage::RECEIVING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "writing_checkpoints",
                 "error_type" => error_type::WRITER_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -486,7 +578,7 @@ mod source {
                 path = %self.path.display(),
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -513,7 +605,7 @@ mod source {
                 stage = error_stage::RECEIVING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "reading_line_from_file",
                 "error_type" => error_type::CONDITION_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -555,11 +647,12 @@ mod source {
             });
         }
 
-        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool) {
+        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_unread: Option<u64>) {
             emit!(FileUnwatched {
                 file,
                 include_file_metric_tag: self.include_file_metric_tag,
-                reached_eof
+                reached_eof,
+                bytes_unread,
             });
         }
 
@@ -620,6 +713,65 @@ mod source {
                 configured_limit,
                 encountered_size_so_far
             });
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use vector_lib::{event::MetricValue, metrics::Controller};
+
+        use super::*;
+
+        #[test]
+        fn file_unwatched_metrics_distinguish_known_and_unknown_bytes() {
+            vector_lib::metrics::init_test();
+            let controller = Controller::get().unwrap();
+            let file = Path::new("unwatched.log");
+
+            for include_file_metric_tag in [false, true] {
+                for reached_eof in [false, true] {
+                    for (bytes_unread, expected_name, expected_value) in [
+                        (Some(12), "files_unwatched_bytes_unread_total", 24.0),
+                        (Some(0), "files_unwatched_bytes_unread_total", 0.0),
+                        (None, "files_unwatched_with_unknown_bytes_total", 2.0),
+                    ] {
+                        controller.reset();
+                        let emitter = FileSourceInternalEventsEmitter {
+                            include_file_metric_tag,
+                        };
+                        for _ in 0..2 {
+                            emitter.emit_file_unwatched(file, reached_eof, bytes_unread);
+                        }
+                        let metrics = controller.capture_metrics();
+                        let counters: Vec<_> = metrics
+                            .iter()
+                            .filter(|metric| metric.name().starts_with("files_unwatched"))
+                            .collect();
+                        // The alternate size counter must be absent, so unknown
+                        // measurements cannot masquerade as known zero-byte samples.
+                        assert_eq!(counters.len(), 2);
+                        for (name, value) in [
+                            ("files_unwatched_total", 2.0),
+                            (expected_name, expected_value),
+                        ] {
+                            let metric = counters
+                                .iter()
+                                .find(|metric| metric.name() == name)
+                                .unwrap_or_else(|| panic!("missing counter {name}"));
+                            assert_eq!(metric.value(), &MetricValue::Counter { value });
+                            let tags = metric.tags().unwrap();
+                            assert_eq!(
+                                tags.get("reached_eof"),
+                                Some(if reached_eof { "true" } else { "false" }),
+                            );
+                            assert_eq!(
+                                tags.get("file"),
+                                include_file_metric_tag.then_some("unwatched.log"),
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 }

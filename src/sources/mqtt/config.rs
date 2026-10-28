@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use rand::Rng;
+use rand::RngExt;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::{
@@ -33,17 +31,14 @@ pub struct MqttSourceConfig {
     pub common: MqttCommonConfig,
 
     /// MQTT topic or topics from which messages are to be read.
-    #[configurable(derived)]
     #[serde(default = "default_topic")]
     #[derivative(Default(value = "default_topic()"))]
     pub topic: OneOrMany<String>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -83,7 +78,7 @@ impl SourceConfig for MqttSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(connector.clone(), decoder, log_namespace, self.clone())?;
+        let sink = MqttSource::new(connector, decoder, log_namespace, self.clone())?;
         Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
     }
 
@@ -128,14 +123,15 @@ impl MqttSourceConfig {
 
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(client_id, &self.common.host, self.common.port);
-        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
+        let mut options =
+            MqttOptions::new(client_id, (self.common.host.as_str(), self.common.port));
+        options.set_keep_alive(self.common.keep_alive);
         options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
 
         options.set_clean_session(false);
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
-                options.set_credentials(user, password);
+                options.set_credentials(user, password.clone());
             }
             (None, None) => {
                 // Credentials were not provided
@@ -148,12 +144,23 @@ impl MqttSourceConfig {
 
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
-            let client_auth = None;
-            let alpn = Some(vec!["mqtt".into()]);
+            let client_auth = tls.identity_pem();
+            // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
+            // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
+            let alpn = self
+                .common
+                .tls
+                .as_ref()
+                .and_then(|tls| tls.options.alpn_protocols.as_ref())
+                .filter(|protocols| !protocols.is_empty())
+                .map_or_else(
+                    || vec![b"mqtt".to_vec()],
+                    |protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect(),
+                );
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,
-                alpn,
+                alpn: Some(alpn),
             }));
         }
 

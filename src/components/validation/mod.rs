@@ -47,6 +47,7 @@ pub enum ComponentType {
 
 impl ComponentType {
     /// Gets the name of this component type as a string.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Source => "source",
@@ -132,6 +133,7 @@ pub struct ValidationConfiguration {
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
+    #[must_use]
     pub const fn from_source(
         component_name: &'static str,
         log_namespace: LogNamespace,
@@ -146,6 +148,7 @@ impl ValidationConfiguration {
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
+    #[must_use]
     pub const fn from_transform(
         component_name: &'static str,
         log_namespace: LogNamespace,
@@ -160,6 +163,7 @@ impl ValidationConfiguration {
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
+    #[must_use]
     pub const fn from_sink(
         component_name: &'static str,
         log_namespace: LogNamespace,
@@ -174,35 +178,40 @@ impl ValidationConfiguration {
     }
 
     /// Gets the name of the component.
+    #[must_use]
     pub const fn component_name(&self) -> &'static str {
         self.component_name
     }
 
     /// Gets the type of the component.
+    #[must_use]
     pub const fn component_type(&self) -> ComponentType {
         self.component_type
     }
 
     /// Gets the configuration of the component.
+    #[must_use]
     pub fn component_configurations(&self) -> Vec<ComponentTestCaseConfig> {
         self.component_configurations.clone()
     }
 
-    /// Gets the LogNamespace that the component is using.
+    /// Gets the `LogNamespace` that the component is using.
+    #[must_use]
     pub const fn log_namespace(&self) -> LogNamespace {
         self.log_namespace
     }
 
     fn get_comp_test_case(&self, test_case: Option<&String>) -> Option<ComponentTestCaseConfig> {
-        let empty = String::from("");
+        let empty = String::new();
         let test_case = test_case.unwrap_or(&empty);
         self.component_configurations
             .clone()
             .into_iter()
-            .find(|c| c.test_case.as_ref().unwrap_or(&String::from("")) == test_case)
+            .find(|c| c.test_case.as_ref().unwrap_or(&String::new()) == test_case)
     }
 
     /// Gets the configuration of the component.
+    #[must_use]
     pub fn component_configuration_for_test_case(
         &self,
         test_case: Option<&String>,
@@ -211,6 +220,7 @@ impl ValidationConfiguration {
     }
 
     /// Gets the external resource definition for validating the component, if any.
+    #[must_use]
     pub fn external_resource(&self, test_case: Option<&String>) -> Option<ExternalResource> {
         self.get_comp_test_case(test_case)
             .and_then(|c| c.external_resource)
@@ -236,6 +246,7 @@ impl ValidatableComponentDescription {
     ///
     /// This creates a validatable component description for a component identified by the given
     /// component type `V`.
+    #[must_use]
     pub const fn new<V: ValidatableComponent>() -> Self {
         Self {
             validation_configuration: <V as ValidatableComponent>::validation_configuration,
@@ -243,6 +254,7 @@ impl ValidatableComponentDescription {
     }
 
     /// Queries the list of validatable components for a component with the given name and component type.
+    #[must_use]
     pub fn query(
         component_name: &str,
         component_type: ComponentType,
@@ -284,8 +296,7 @@ pub struct RunnerMetrics {
 fn run_validation(configuration: ValidationConfiguration, test_case_data_path: std::path::PathBuf) {
     let component_name = configuration.component_name();
     info!(
-        "Running validation for component '{}' (type: {:?})...",
-        component_name,
+        "Running validation for component '{component_name}' (type: {:?})...",
         configuration.component_type()
     );
 
@@ -307,7 +318,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                 let mut details = Vec::new();
                 let mut had_failures = false;
 
-                for test_case_result in test_case_results.into_iter() {
+                for test_case_result in test_case_results {
                     for validator_result in test_case_result.validator_results() {
                         match validator_result {
                             Ok(success) => {
@@ -356,14 +367,12 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
 
                 if had_failures {
                     panic!(
-                        "Failed to validate component '{}':\n{}",
-                        component_name,
+                        "Failed to validate component '{component_name}':\n{}",
                         details.join("")
                     );
                 } else {
                     info!(
-                        "Successfully validated component '{}':\n{}",
-                        component_name,
+                        "Successfully validated component '{component_name}':\n{}",
                         details.join("")
                     );
                 }
@@ -427,20 +436,20 @@ fn get_validation_configuration_from_test_case_path(
     // Now that we've theoretically got the component type and component name, try to query the
     // validatable component descriptions to find it.
     ValidatableComponentDescription::query(&component_name, component_type).ok_or(format!(
-        "No validation configuration for component '{}' with component type '{}'.",
-        component_name,
+        "No validation configuration for component '{component_name}' with component type '{}'.",
         component_type.as_str()
     ))
 }
 
 #[cfg(feature = "component-validation-runner")]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn validate_component(test_case_data_path: std::path::PathBuf) {
-    if !test_case_data_path.exists() {
-        panic!(
-            "Component validation test invoked with path to test case data that could not be found: {}",
-            test_case_data_path.to_string_lossy()
-        );
-    }
+    assert!(
+        test_case_data_path.exists(),
+        "Component validation test invoked with path to test case data that could not be found: {}",
+        test_case_data_path.to_string_lossy()
+    );
 
     let configuration = get_validation_configuration_from_test_case_path(&test_case_data_path)
         .expect("Failed to find validation configuration from given test case data path.");

@@ -1,6 +1,6 @@
 //! Shared test harness for Vector integration tests
 //!
-//! Provides TestHarness for managing Vector process lifecycle with API enabled.
+//! Provides `TestHarness` for managing Vector process lifecycle with API enabled.
 //! Used by both `vector top` and `vector tap` integration tests.
 
 use std::fs::{OpenOptions, create_dir};
@@ -64,7 +64,6 @@ impl TestHarness {
                 }
                 Err(e) if e.contains("Address already in use") => {
                     sleep(RETRY_DELAY).await;
-                    continue;
                 }
                 Err(e) => {
                     // Non-port-conflict error - fail immediately
@@ -97,7 +96,10 @@ impl TestHarness {
         let mut cmd =
             Command::cargo_bin("vector").map_err(|e| format!("Failed to get cargo bin: {e}"))?;
 
-        cmd.arg("-c").arg(&config_path);
+        cmd.arg("-c")
+            .arg(&config_path)
+            .arg("--graceful-shutdown-limit-secs")
+            .arg("1");
 
         if watch_mode {
             cmd.arg("-w");
@@ -133,6 +135,11 @@ impl TestHarness {
         &mut self.api_client
     }
 
+    /// Returns the TCP port the API server is bound to
+    pub fn api_port(&self) -> u16 {
+        self.api_port
+    }
+
     /// Reloads Vector configuration by sending SIGHUP or using watch mode
     ///
     /// Polls Vector to detect crashes early and succeed fast when reload completes.
@@ -158,8 +165,11 @@ impl TestHarness {
 
         // Send SIGHUP only if not in watch mode (watch mode auto-reloads on file change)
         if !self.watch_mode {
-            kill(Pid::from_raw(self.vector.id() as i32), Signal::SIGHUP)
-                .map_err(|e| format!("Failed to send SIGHUP: {e}"))?;
+            kill(
+                Pid::from_raw(self.vector.id().cast_signed()),
+                Signal::SIGHUP,
+            )
+            .map_err(|e| format!("Failed to send SIGHUP: {e}"))?;
         }
 
         // Give Vector a moment to process the reload signal before polling
@@ -183,7 +193,11 @@ impl TestHarness {
 impl Drop for TestHarness {
     fn drop(&mut self) {
         // Send SIGTERM for graceful shutdown
-        kill(Pid::from_raw(self.vector.id() as i32), Signal::SIGTERM).ok();
+        kill(
+            Pid::from_raw(self.vector.id().cast_signed()),
+            Signal::SIGTERM,
+        )
+        .ok();
 
         // Wait for process to exit
         self.vector.wait().ok();
@@ -192,8 +206,8 @@ impl Drop for TestHarness {
 
 /// Finds an available port by binding to port 0 and getting the OS-assigned port
 ///
-/// Note: There's a small race condition between releasing the port (when TcpListener
-/// is dropped) and Vector binding to it. In practice this is rare, but TestHarness::new()
+/// Note: There's a small race condition between releasing the port (when `TcpListener`
+/// is dropped) and Vector binding to it. In practice this is rare, but `TestHarness::new()`
 /// handles this by retrying with a new port if Vector fails to start.
 fn find_available_port() -> u16 {
     TcpListener::bind("127.0.0.1:0")
@@ -234,7 +248,7 @@ pub fn overwrite_config_file(path: &PathBuf, config: &str) {
     file.sync_all().unwrap();
 }
 
-/// Creates a temporary directory for Vector's data_dir
+/// Creates a temporary directory for Vector's `data_dir`
 pub fn create_data_directory() -> PathBuf {
     let path = temp_dir();
     create_dir(&path).unwrap();
@@ -250,7 +264,10 @@ pub async fn wait_for_startup(
     timeout: Duration,
 ) -> Result<(), String> {
     let start = Instant::now();
-    let mut connected = false;
+    // This opens no connection; the health RPC below fails until the API is ready.
+    client
+        .connect()
+        .map_err(|e| format!("Failed to set up the API client: {e}"))?;
 
     loop {
         // Check if Vector crashed
@@ -265,13 +282,8 @@ pub async fn wait_for_startup(
             };
         }
 
-        // Try to connect if not connected yet
-        if !connected && client.connect().await.is_ok() {
-            connected = true;
-        }
-
-        // Check if API is ready (only if connected)
-        if connected && client.health().await.is_ok() {
+        // Check if API is ready
+        if client.health().await.is_ok() {
             return Ok(());
         }
 
@@ -314,13 +326,13 @@ pub async fn wait_for_topology_match(
 
             let mut expected_sorted: Vec<String> = expected_component_ids
                 .iter()
-                .map(|s| s.to_string())
+                .map(ToString::to_string)
                 .collect();
             expected_sorted.sort_unstable();
 
             // Track last seen components for better error reporting
             if current_ids != last_components {
-                last_components = current_ids.clone();
+                last_components.clone_from(&current_ids);
             }
 
             if current_ids == expected_sorted {
@@ -331,8 +343,7 @@ pub async fn wait_for_topology_match(
         // Check timeout
         if start.elapsed() >= STARTUP_TIMEOUT {
             return Err(format!(
-                "Topology did not match expected components within {STARTUP_TIMEOUT:?}. Last seen: {:?}, expected: {:?}",
-                last_components, expected_component_ids
+                "Topology did not match expected components within {STARTUP_TIMEOUT:?}. Last seen: {last_components:?}, expected: {expected_component_ids:?}"
             ));
         }
 
@@ -342,7 +353,7 @@ pub async fn wait_for_topology_match(
 
 /// Waits for a component to process the expected number of events
 ///
-/// Polls the gRPC API until the component's sent_events_total
+/// Polls the gRPC API until the component's `sent_events_total`
 /// reaches or exceeds the expected count.
 pub async fn wait_for_component_events(
     client: &mut Client,

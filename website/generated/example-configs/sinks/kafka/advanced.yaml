@@ -1,0 +1,20 @@
+sinks:
+  my_sink_id:
+    type: kafka
+    inputs:
+      - my-source-or-transform-id
+    bootstrap_servers: 10.14.22.123:9092,10.14.23.332:9092
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    headers_key: headers
+    key_field: user_id
+    librdkafka_options:
+      client.id: ${ENV_VAR}
+      fetch.error.backoff.ms: "1000"
+      socket.send.buffer.bytes: "100"
+    message_timeout_ms: 300000
+    rate_limit_duration_secs: 1
+    socket_timeout_ms: 60000
+    topic: topic-1234

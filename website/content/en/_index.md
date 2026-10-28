@@ -95,11 +95,11 @@ community:
   title: Backed by a strong open source community
   stats:
   - title: "GitHub stars"
-    figure: "13k+"
+    figure: "22k+"
   - title: "Contributors"
-    figure: "300+"
+    figure: "800+"
   - title: "Downloads"
-    figure: "30m+"
+    figure: "1B+"
   - title: "Countries"
     figure: "40"
 ---

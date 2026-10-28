@@ -35,19 +35,17 @@ pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
 pub struct ArrowStreamSerializerConfig {
     /// The Arrow schema to use for encoding
     #[serde(skip)]
-    #[configurable(derived)]
     pub schema: Option<arrow::datatypes::Schema>,
 
     /// Allow null values for non-nullable fields in the schema.
     ///
-    /// When enabled, missing or incompatible values will be encoded as null even for fields
+    /// When enabled, missing or incompatible values are encoded as null, even for fields
     /// marked as non-nullable in the Arrow schema. This is useful when working with downstream
     /// systems that can handle null values through defaults, computed columns, or other mechanisms.
     ///
-    /// When disabled (default), missing values for non-nullable fields will cause encoding errors,
-    /// ensuring all required data is present before sending to the sink.
+    /// When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
+    /// help ensure all required data is present before sending it to the sink.
     #[serde(default)]
-    #[configurable(derived)]
     pub allow_nullable_fields: bool,
 }
 
@@ -67,7 +65,8 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
 }
 
 impl ArrowStreamSerializerConfig {
-    /// Create a new ArrowStreamSerializerConfig with a schema
+    /// Create a new `ArrowStreamSerializerConfig` with a schema
+    #[must_use]
     pub fn new(schema: arrow::datatypes::Schema) -> Self {
         Self {
             schema: Some(schema),
@@ -76,11 +75,13 @@ impl ArrowStreamSerializerConfig {
     }
 
     /// The data type of events that are accepted by `ArrowStreamEncoder`.
+    #[must_use]
     pub fn input_type(&self) -> vector_core::config::DataType {
         vector_core::config::DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> vector_core::schema::Requirement {
         vector_core::schema::Requirement::empty()
     }
@@ -93,7 +94,30 @@ pub struct ArrowStreamSerializer {
 }
 
 impl ArrowStreamSerializer {
-    /// Create a new ArrowStreamSerializer with the given configuration
+    /// Encode events into a `RecordBatch` without writing to IPC stream format.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
+    pub fn encode_to_record_batch(
+        &self,
+        events: &[Event],
+    ) -> Result<RecordBatch, ArrowEncodingError> {
+        let values = vector_log_events_to_json_values(events).map_err(|e| {
+            ArrowEncodingError::RecordBatchCreation {
+                source: arrow::error::ArrowError::JsonError(e.to_string()),
+            }
+        })?;
+        build_record_batch(self.schema.clone(), &values)
+    }
+
+    /// Create a new `ArrowStreamSerializer` with the given configuration
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
         let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
 
@@ -276,6 +300,7 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
 
 /// Returns true if the field is absent from the value's object map, or explicitly null.
 /// Find non-nullable schema fields that are missing or null in any of the given events.
+#[must_use]
 pub fn find_null_non_nullable_fields<'a>(
     schema: &'a Schema,
     values: &[serde_json::Value],
@@ -306,7 +331,7 @@ pub(crate) fn vector_log_events_to_json_values(
         .collect()
 }
 
-/// Build an Arrow RecordBatch from a slice of events using the provided schema.
+/// Build an Arrow `RecordBatch` from a slice of events using the provided schema.
 pub(crate) fn build_record_batch(
     schema: SchemaRef,
     values: &[serde_json::Value],
@@ -322,7 +347,6 @@ pub(crate) fn build_record_batch(
         });
         vector_common::internal_event::emit(crate::internal_events::EncoderNullConstraintError {
             error: &error,
-            count: values.len(),
         });
         return Err(ArrowEncodingError::NullConstraint {
             field_name: missing.join(", "),
@@ -331,12 +355,32 @@ pub(crate) fn build_record_batch(
 
     let mut decoder = ReaderBuilder::new(schema)
         .build_decoder()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_record_batch_creation",
+            });
+        })
         .context(RecordBatchCreationSnafu)?;
 
-    decoder.serialize(values).context(ArrowJsonDecodeSnafu)?;
+    decoder
+        .serialize(values)
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
+        .context(ArrowJsonDecodeSnafu)?;
 
     decoder
         .flush()
+        .inspect_err(|e| {
+            vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
+                error: e,
+                error_code: "arrow_json_decode",
+            });
+        })
         .context(ArrowJsonDecodeSnafu)?
         .ok_or(ArrowEncodingError::NoEvents)
 }
@@ -352,13 +396,19 @@ mod tests {
     use chrono::Utc;
     use std::io::Cursor;
     use vector_core::event::{LogEvent, Value};
+    use vrl::event_path;
 
-    /// Helper to encode events and return the decoded RecordBatch
+    /// Helper to encode events and return the decoded `RecordBatch`
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     fn encode_and_decode(
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone())?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, schema)?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
@@ -371,7 +421,7 @@ mod tests {
     {
         let mut log = LogEvent::default();
         for (key, value) in fields {
-            log.insert(key, value.into());
+            log.insert(&vrl::path::parse_target_path(key).unwrap(), value.into());
         }
         Event::Log(log)
     }
@@ -380,6 +430,11 @@ mod tests {
         use super::*;
 
         #[test]
+        // https://github.com/vectordotdev/vector/issues/23659
+        #[allow(
+            clippy::too_many_lines,
+            reason = "Keep this codec mapping together during the lint rollout."
+        )]
         fn test_encode_all_types() {
             use arrow::datatypes::{
                 Decimal128Type, Float32Type, Float64Type, Int8Type, Int16Type, Int32Type,
@@ -413,25 +468,28 @@ mod tests {
 
             let mut log = LogEvent::default();
             // Primitive types
-            log.insert("string_field", "test");
-            log.insert("int8_field", 127);
-            log.insert("int16_field", 32000);
-            log.insert("int32_field", 1000000);
-            log.insert("int64_field", 42);
-            log.insert("uint8_field", 255);
-            log.insert("uint16_field", 65535);
-            log.insert("uint32_field", 4000000);
-            log.insert("uint64_field", 9000000000_i64);
-            log.insert("float32_field", 3.15);
-            log.insert("float64_field", 3.15);
-            log.insert("bool_field", true);
-            log.insert("timestamp_field", now);
-            log.insert("decimal_field", 99.99);
+            log.insert(event_path!("string_field"), "test");
+            log.insert(event_path!("int8_field"), 127);
+            log.insert(event_path!("int16_field"), 32000);
+            log.insert(event_path!("int32_field"), 1_000_000);
+            log.insert(event_path!("int64_field"), 42);
+            log.insert(event_path!("uint8_field"), 255);
+            log.insert(event_path!("uint16_field"), 65535);
+            log.insert(event_path!("uint32_field"), 4_000_000);
+            log.insert(event_path!("uint64_field"), 9_000_000_000_i64);
+            log.insert(event_path!("float32_field"), 3.15);
+            log.insert(event_path!("float64_field"), 3.15);
+            log.insert(event_path!("bool_field"), true);
+            log.insert(event_path!("timestamp_field"), now);
+            log.insert(event_path!("decimal_field"), 99.99);
             // Complex types
-            log.insert("list_field", list_value);
-            log.insert("struct_field", Value::Object(tuple_value));
-            log.insert("named_struct_field", Value::Object(named_tuple_value));
-            log.insert("map_field", Value::Object(map_value));
+            log.insert(event_path!("list_field"), list_value);
+            log.insert(event_path!("struct_field"), Value::Object(tuple_value));
+            log.insert(
+                event_path!("named_struct_field"),
+                Value::Object(named_tuple_value),
+            );
+            log.insert(event_path!("map_field"), Value::Object(map_value));
 
             let events = vec![Event::Log(log)];
 
@@ -500,18 +558,18 @@ mod tests {
             assert_eq!(batch.column(2).as_primitive::<Int16Type>().value(0), 32000);
             assert_eq!(
                 batch.column(3).as_primitive::<Int32Type>().value(0),
-                1000000
+                1_000_000
             );
             assert_eq!(batch.column(4).as_primitive::<Int64Type>().value(0), 42);
             assert_eq!(batch.column(5).as_primitive::<UInt8Type>().value(0), 255);
             assert_eq!(batch.column(6).as_primitive::<UInt16Type>().value(0), 65535);
             assert_eq!(
                 batch.column(7).as_primitive::<UInt32Type>().value(0),
-                4000000
+                4_000_000
             );
             assert_eq!(
                 batch.column(8).as_primitive::<UInt64Type>().value(0),
-                9000000000
+                9_000_000_000
             );
             assert!((batch.column(9).as_primitive::<Float32Type>().value(0) - 3.15).abs() < 0.001);
             assert!((batch.column(10).as_primitive::<Float64Type>().value(0) - 3.15).abs() < 0.001);
@@ -607,10 +665,10 @@ mod tests {
         fn test_encode_timestamp_precisions() {
             let now = Utc::now();
             let mut log = LogEvent::default();
-            log.insert("ts_second", now);
-            log.insert("ts_milli", now);
-            log.insert("ts_micro", now);
-            log.insert("ts_nano", now);
+            log.insert(event_path!("ts_second"), now);
+            log.insert(event_path!("ts_milli"), now);
+            log.insert(event_path!("ts_micro"), now);
+            log.insert(event_path!("ts_nano"), now);
 
             let events = vec![Event::Log(log)];
 
@@ -665,13 +723,13 @@ mod tests {
             let now = Utc::now();
 
             let mut log1 = LogEvent::default();
-            log1.insert("ts", "2025-10-22T10:18:44.256Z"); // RFC3339 String
+            log1.insert(event_path!("ts"), "2025-10-22T10:18:44.256Z"); // RFC3339 String
 
             let mut log2 = LogEvent::default();
-            log2.insert("ts", now); // Native Timestamp
+            log2.insert(event_path!("ts"), now); // Native Timestamp
 
             let mut log3 = LogEvent::default();
-            log3.insert("ts", 1729594724256000000_i64); // Integer (nanoseconds)
+            log3.insert(event_path!("ts"), 1_729_594_724_256_000_000_i64); // Integer (nanoseconds)
 
             let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
@@ -704,7 +762,7 @@ mod tests {
             assert_eq!(ts_array.value(1), now.timestamp_nanos_opt().unwrap());
 
             // Third one should match the integer
-            assert_eq!(ts_array.value(2), 1729594724256000000_i64);
+            assert_eq!(ts_array.value(2), 1_729_594_724_256_000_000_i64);
         }
     }
 
@@ -715,7 +773,7 @@ mod tests {
         #[test]
         fn test_config_allow_nullable_fields_overrides_schema() {
             let mut log1 = LogEvent::default();
-            log1.insert("strict_field", 42);
+            log1.insert(event_path!("strict_field"), 42);
             let log2 = LogEvent::default();
             let events = vec![Event::Log(log1), Event::Log(log2)];
 

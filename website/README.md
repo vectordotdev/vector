@@ -44,7 +44,7 @@ There's a variety of helper commands available for working with CUE. Run `make c
 
 For the most part, vector.dev uses the [Alpine] framework for interactive functionality. If you see directives like `x-show`, `x-data`, `@click`, and `:class` in HTML templates, those are Alpine directives. Alpine was chosen over jQuery and other frameworks for the sake of maintainability. Alpine directives live inside your HTML rather than in separate JavaScript files, which enables you to see how a component behaves without referring to an external `.js` file.
 
-The [Spruce] library is used for all JavaScript state management. It stores things like light/dark mode preferences in `localStorage` and makes those values available in Alpine-wired components. See the [`app.js`](./assets/js/app.js) for managed state values.
+Alpine's persistence plugin stores global JavaScript state, such as light/dark-mode preferences, in `localStorage` and makes it available in Alpine-wired components. See [`app.js`](./assets/js/app.js) for managed state values.
 
 The [Tocbot] library is used to auto-generate documentation table of contents on each page. The TOC is generated at page load time.
 
@@ -54,7 +54,7 @@ All JavaScript for the site is built using [Hugo Pipes] rather than tools like W
 
 ### CSS
 
-Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. The Tailwind configuration is in [`tailwind.config.js`](./tailwind.config.js); it mostly consists of default values but there are some custom colors, sizes, and other attributes provided there. Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
+Most of the site's CSS is provided by [Tailwind], which is a framework based on CSS utility classes. Tailwind configuration, including custom colors, sizes, and other attributes, is defined in [`assets/css/style.css`](./assets/css/style.css). Tailwind was chosen for the sake of maintainability; having most CSS *inside* the HTML templates makes it easier to understand and update a given component's styling. CSS post-processing for Tailwind is performed by [PostCSS], which is configured via the [`postcss.config.js`](./postcss.config.js) file.
 
 In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files are in [`assets/sass`](./assets/sass)):
 
@@ -65,12 +65,7 @@ In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files a
 
 ### Search
 
-Search for vector.dev is provided by [Typesense]. Our search solution is largely custom:
-
-* The [`typesense-index.ts`](./scripts/typesense-index.ts) script generates an index of all of the relevant pages on the site and stores the result in a single JSON file (output to `public/search.json`).
-* The [`typesense-sync.ts`](./scripts/typesense-sync.ts) script syncs the generated JSON index with the Typesense backend, performing all the necessary create, update, and delete operations, using a custom package, `typesense-sync`. Reach out in #websites for more details.
-
-The Typesense configuration for the site is captured via the [`typesense.config.json`](./typesense.config.json) file.
+Search for vector.dev uses [Pagefind], which generates a static search index from the built site. Every production and preview build creates the index locally; no search service or search credentials are required.
 
 
 #### De-indexing pages
@@ -129,6 +124,7 @@ Below is a list of common tasks that maintainers will need to carry out from tim
 ### Run the site locally
 
 ```shell
+make generate-docs # Note: required only when schema or VRL documentation was changed
 make serve
 ```
 
@@ -136,10 +132,76 @@ This builds all the necessary [prereqs](#prerequisites) for the site and starts 
 
 When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
 
+### Run browser tests locally
+
+The browser suite uses [Playwright](https://playwright.dev) to test the built website in Chromium,
+Firefox, and WebKit.
+
+Install dependencies and browser binaries once from this directory:
+
+```shell
+yarn install --frozen-lockfile
+yarn playwright install chromium firefox webkit
+```
+
+Python 3 is required for the local static server. On Linux, install browser system dependencies with
+`yarn playwright install --with-deps chromium firefox webkit`.
+
+Build the production site and its Pagefind index, then run all browser tests:
+
+```shell
+make test
+```
+
+This uses the existing component-example generator to prepare the documentation data. Playwright
+starts and stops a static server on `127.0.0.1:4173`; that port must be free. Tests use isolated browser
+contexts and do not use an existing Hugo development server.
+
+In GitHub Actions, `make generate-vector-vrl-docs` runs from the repository root before the website build.
+The browser suite uses one worker when `CI=true` and three workers otherwise.
+
+To run tests again against the current `public/` build, or inspect a failure:
+
+```shell
+yarn test --project=chromium
+yarn test:ui
+yarn test:report
+```
+
+Rebuild with `make test` after website changes; `yarn test` alone does not rebuild the site. To test
+the preview build instead, run `make preview-build` after `make test`, then `yarn test`.
+
+The HTML report is in `playwright-report/`. Failed tests save screenshots and traces in
+`test-results/`; both directories are ignored by Git.
+
+Tests load real local JavaScript, CSS, and search indexes. The search theme comes from the installed
+Yarn package instead of the CDN. External requests are blocked and stubbed out. External services,
+CDN availability, and external fonts and icons are not covered by this suite.
+
+### Run the site with Docker
+
+If you don't want to install Hugo, CUE, Node.js, Rust, or [vdev] locally, you can use Docker instead. The first startup installs the matching vdev version (or builds the checkout when it is unreleased), then runs `make generate-docs` and generates CUE JSON inside the container.
+
+> **Note:** This Docker setup is experimental and not currently enforced by CI. It may break as dependencies or the build process evolve.
+
+Build and start the site:
+
+```shell
+cd website
+docker compose build
+docker compose up
+```
+
+Navigate to http://localhost:1313. The repository is mounted as a volume so Hugo's live-reload works for Markdown, CSS, and JavaScript changes. If you modify [structured data](#structured-data) sources, restart the container.
+
 ### Add a new version of Vector
 
-1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue). Make sure to preserve reverse ordering.
-2. Generate a new CUE file for the release by running `make release-prepare` in the root directory of the Vector repo. This generates a CUE file at `cue/releases/{VERSION}.cue`.
+This is automated by `cargo vdev release prepare` (see the
+[release issue templates](../.github/ISSUE_TEMPLATE)). The steps it performs, listed
+here for reference:
+
+1. Add the new version to the `versions` list in [`cue/reference/versions.cue`](./cue/reference/versions.cue), preserving reverse ordering.
+2. Generate a new CUE file at `cue/reference/releases/{VERSION}.cue`.
 3. Add a new Markdown file to [`content/en/releases`](./content/en/releases), where the filename is `{version}.md` (e.g. `0.12.0.md`) and the file has metadata that looks like this:
 
     ```markdown
@@ -153,7 +215,7 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
 ## Known issues
 
-* Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
+* Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in [`assets/css/style.css`](./assets/css/style.css), but it will take some time to iron all of these issues out.
 
 ## CUE pro tips
 
@@ -195,7 +257,7 @@ description: """
         """
 ```
 
-[typesense]: https://typesense.org
+[pagefind]: https://pagefind.app
 [aliases]: https://gohugo.io/content-management/urls
 [alpine]: https://alpinejs.dev
 [components]: https://vector.dev/components
@@ -215,7 +277,6 @@ description: """
 [react.js]: https://reactjs.org
 [reference documentation]: https://vector.dev/docs/reference
 [sass]: https://sass-lang.com
-[spruce]: https://spruce.ryangjchandler.co.uk
 [tailwind]: https://tailwindcss.com
 [tocbot]: https://tscanlin.github.io/tocbot
 [typescript]: https://www.typescriptlang.org
