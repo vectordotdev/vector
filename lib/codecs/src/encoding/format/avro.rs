@@ -235,20 +235,18 @@ impl Encoder<Event> for AvroSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
-        let value = apache_avro::to_value(log)?;
         if self.named_schemas.is_none() {
             self.named_schemas = Some(resolve_named_schemas(&self.schema).map_err(|error| {
                 vector_common::Error::from(format!("Failed resolving Avro schema: {error}"))
             })?);
         }
-        let value = coerce_logical_types(
-            value,
+        let value = log_to_avro_value(
+            log,
             &self.schema,
             self.named_schemas
                 .as_ref()
                 .expect("named schemas are initialized above"),
         )?;
-        let value = value.resolve(&self.schema)?;
         let writer =
             apache_avro::writer::datum::GenericDatumWriter::builder(&self.schema).build()?;
         let bytes = writer.write_value_to_vec(value)?;
@@ -259,6 +257,24 @@ impl Encoder<Event> for AvroSerializer {
 
 /// Compatibility alias for the shared batch-file compression configuration.
 pub type AvroOcfCompression = BatchSerializerCompression;
+
+/// Convert a VRL LogEvent to an Avro value with logical type coercion and resolution.
+/// This is the single shared path used by both datum and OCF encoders to ensure
+/// they handle dates, times, named schemas, and unions identically.
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Union indexes are checked by apache_avro and use u32."
+)]
+fn log_to_avro_value(
+    log: vector_core::event::LogEvent,
+    schema: &apache_avro::Schema,
+    named_schemas: &NamedSchemas,
+) -> vector_common::Result<AvroValue> {
+    let value = apache_avro::to_value(log)?;
+    let value = coerce_logical_types(value, schema, named_schemas)?;
+    let value = value.resolve(schema)?;
+    Ok(value)
+}
 
 fn resolve_ocf_compression(
     compression: BatchSerializerCompression,
@@ -304,10 +320,11 @@ impl AvroOcfSerializerConfig {
     pub fn build(&self) -> Result<AvroOcfSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro OCF serializer: {error}"))?;
-        Ok(AvroOcfSerializer::new(
+        AvroOcfSerializer::new(
             schema,
             resolve_ocf_compression(self.compression)?,
-        ))
+        )
+        .map_err(|error| format!("Failed resolving Avro schema: {error}").into())
     }
 
     /// The data type of events that are accepted by `AvroOcfSerializer`.
@@ -334,15 +351,18 @@ impl AvroOcfSerializerConfig {
 pub struct AvroOcfSerializer {
     schema: apache_avro::Schema,
     compression: apache_avro::Codec,
+    named_schemas: NamedSchemas,
 }
 
 impl AvroOcfSerializer {
     /// Creates a new `AvroOcfSerializer`.
-    pub fn new(schema: apache_avro::Schema, compression: apache_avro::Codec) -> Self {
-        Self {
+    pub fn new(schema: apache_avro::Schema, compression: apache_avro::Codec) -> Result<Self, apache_avro::Error> {
+        let named_schemas = resolve_named_schemas(&schema)?;
+        Ok(Self {
             schema,
             compression,
-        }
+            named_schemas,
+        })
     }
 }
 
@@ -355,8 +375,7 @@ impl Encoder<Vec<Event>> for AvroOcfSerializer {
 
         for event in events {
             let log = event.into_log();
-            let value = apache_avro::to_value(log)?;
-            let value = value.resolve(&self.schema)?;
+            let value = log_to_avro_value(log, &self.schema, &self.named_schemas)?;
             writer.append_value(value).map_err(|e| {
                 vector_common::Error::from(format!("Failed to append Avro record: {e}"))
             })?;
@@ -954,5 +973,281 @@ mod tests {
         // (Invalid) greater than MILLIS_PER_DAY
         let value = AvroValue::Record(vec![("time".to_owned(), AvroValue::Long(90_000_000))]);
         assert!(coerce_logical_types(value, &schema, &named_schemas).is_err());
+    }
+
+    fn ocf_records(bytes: &[u8]) -> Vec<apache_avro::types::Value> {
+        let reader = apache_avro::Reader::new(bytes).expect("Failed to create OCF reader");
+        reader.collect::<Result<Vec<_>, _>>().expect("Failed to read OCF records")
+    }
+
+    #[test]
+    fn ocf_encodes_date_field_as_avro_date() {
+        let schema_json = indoc! {r#"
+            {
+                "type": "record",
+                "name": "t",
+                "fields": [
+                    {
+                        "name": "day",
+                        "type": {"type": "int", "logicalType": "date"}
+                    }
+                ]
+            }
+        "#}
+        .to_owned();
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "day" => Value::from(19_646_i64)
+        }));
+
+        let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
+            schema: schema_json,
+        });
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(vec![event], &mut bytes).unwrap();
+
+        let records = ocf_records(&bytes);
+        assert_eq!(records.len(), 1);
+
+        let record = &records[0];
+        let AvroValue::Record(fields) = record else {
+            panic!("Expected Record, got: {:?}", record);
+        };
+        assert_eq!(fields.len(), 1);
+        assert!(matches!(
+            fields[0].1,
+            AvroValue::Date(19_646)
+        ), "Expected day field to be Date(19646), got: {:?}", fields[0].1);
+    }
+
+    #[test]
+    fn ocf_encodes_time_millis_field_as_avro_time_millis() {
+        let schema_json = indoc! {r#"
+            {
+                "type": "record",
+                "name": "t",
+                "fields": [
+                    {
+                        "name": "millis",
+                        "type": {"type": "int", "logicalType": "time-millis"}
+                    }
+                ]
+            }
+        "#}
+        .to_owned();
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "millis" => Value::from(59_820_123_i64)
+        }));
+
+        let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
+            schema: schema_json,
+        });
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(vec![event], &mut bytes).unwrap();
+
+        let records = ocf_records(&bytes);
+        assert_eq!(records.len(), 1);
+
+        let record = &records[0];
+        let AvroValue::Record(fields) = record else {
+            panic!("Expected Record, got: {:?}", record);
+        };
+        assert_eq!(fields.len(), 1);
+        assert!(matches!(
+            fields[0].1,
+            AvroValue::TimeMillis(59_820_123)
+        ), "Expected millis field to be TimeMillis(59820123), got: {:?}", fields[0].1);
+    }
+
+    #[test]
+    fn ocf_encodes_nested_named_record_reference_dates() {
+        let schema_json = indoc! {r#"
+            {
+                "type": "record",
+                "name": "Outer",
+                "fields": [
+                    {
+                        "name": "first",
+                        "type": {
+                            "type": "record",
+                            "name": "Inner",
+                            "fields": [
+                                {
+                                    "name": "date",
+                                    "type": {"type": "int", "logicalType": "date"}
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "second",
+                        "type": "Inner"
+                    }
+                ]
+            }
+        "#}
+        .to_owned();
+
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "first" => Value::Object(vrl::btreemap! {
+                "date" => Value::from(20_000_i64)
+            }),
+            "second" => Value::Object(vrl::btreemap! {
+                "date" => Value::from(20_001_i64)
+            })
+        }));
+
+        let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
+            schema: schema_json,
+        });
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(vec![event], &mut bytes).unwrap();
+
+        let records = ocf_records(&bytes);
+        assert_eq!(records.len(), 1);
+
+        let record = &records[0];
+        let AvroValue::Record(fields) = record else {
+            panic!("Expected Record, got: {:?}", record);
+        };
+        assert_eq!(fields.len(), 2);
+
+        // Check first field (direct Inner record)
+        let first_inner = &fields[0].1;
+        let AvroValue::Record(first_fields) = first_inner else {
+            panic!("Expected Record for first field, got: {:?}", first_inner);
+        };
+        assert!(matches!(
+            first_fields[0].1,
+            AvroValue::Date(20_000)
+        ), "Expected first.date to be Date(20000), got: {:?}", first_fields[0].1);
+
+        // Check second field (named reference to Inner)
+        let second_inner = &fields[1].1;
+        let AvroValue::Record(second_fields) = second_inner else {
+            panic!("Expected Record for second field, got: {:?}", second_inner);
+        };
+        assert!(matches!(
+            second_fields[0].1,
+            AvroValue::Date(20_001)
+        ), "Expected second.date to be Date(20001), got: {:?}", second_fields[0].1);
+    }
+
+    #[test]
+    fn ocf_rejects_out_of_range_time_millis_without_partial_output() {
+        let schema_json = indoc! {r#"
+            {
+                "type": "record",
+                "name": "t",
+                "fields": [
+                    {
+                        "name": "millis",
+                        "type": {"type": "int", "logicalType": "time-millis"}
+                    }
+                ]
+            }
+        "#}
+        .to_owned();
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "millis" => Value::from(86_400_000_i64)
+        }));
+
+        let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
+            schema: schema_json,
+        });
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        let result = serializer.encode(vec![event], &mut bytes);
+        
+        assert!(result.is_err(), "Expected encode to fail for out-of-range time-millis");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("time-millis"), "Error message should mention time-millis, got: {}", err_msg);
+        assert!(bytes.is_empty(), "Buffer should be empty after error, but has {} bytes", bytes.len());
+    }
+
+    #[test]
+    fn ocf_preserves_resolvable_union_branch() {
+        let event = Event::Log(LogEvent::from(btreemap! {
+            "x" => Value::Array(vec![Value::from(65), Value::from(66)]),
+            "y" => Value::from(123)
+        }));
+        let schema_json = indoc! {r#"
+            [
+                {
+                    "type": "record",
+                    "name": "A",
+                    "fields": [
+                        {"name": "x", "type": "string"}
+                    ]
+                },
+                {
+                    "type": "record",
+                    "name": "B",
+                    "fields": [
+                        {"name": "x", "type": "bytes"},
+                        {"name": "y", "type": "long"}
+                    ]
+                }
+            ]
+        "#}
+        .to_owned();
+
+        let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
+            schema: schema_json,
+        });
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(vec![event], &mut bytes).unwrap();
+
+        let records = ocf_records(&bytes);
+        assert_eq!(records.len(), 1);
+
+        let value = &records[0];
+        assert_eq!(
+            value,
+            &AvroValue::Union(
+                1,
+                Box::new(AvroValue::Record(vec![
+                    ("x".to_owned(), AvroValue::Bytes(vec![65, 66])),
+                    ("y".to_owned(), AvroValue::Long(123)),
+                ]))
+            )
+        );
+    }
+
+    #[test]
+    fn ocf_empty_batch_is_valid_header_only_file() {
+        let schema_json = indoc! {r#"
+            {
+                "type": "record",
+                "name": "Log",
+                "fields": [
+                    {"name": "foo", "type": "string"}
+                ]
+            }
+        "#}
+        .to_owned();
+
+        let config = AvroOcfSerializerConfig::new(AvroSerializerOptions {
+            schema: schema_json,
+        });
+        let mut serializer = config.build().unwrap();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(vec![], &mut bytes).unwrap();
+
+        let result = bytes.freeze();
+        assert!(!result.is_empty(), "Empty batch should still produce OCF header");
+        assert_eq!(&result[0..4], b"Obj\x01", "OCF should start with magic bytes");
+
+        let records = ocf_records(&result);
+        assert_eq!(records.len(), 0, "Empty batch should produce no records");
     }
 }

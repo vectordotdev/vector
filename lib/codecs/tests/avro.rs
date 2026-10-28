@@ -72,7 +72,7 @@ fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
 #[case(true)]
 fn roundtrip_avro_ocf_fixtures(
     #[files("tests/data/avro/generated/*.ocf.avro")]
-    #[exclude(".*(date|decimal|duration|fixed|time_millis|named_record_reference).ocf.avro")]
+    #[exclude(".*fixed.ocf.avro")]
     path: PathBuf,
     #[case] reserialize: bool,
 ) {
