@@ -2,6 +2,7 @@
 
 import os
 import signal
+import socket
 import sys
 
 import requests
@@ -19,6 +20,11 @@ signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
 @app.get("/health")
 def health():
+    # The client starts once this succeeds, so wait for the downstream services too.
+    # Raw sockets are not traced.
+    for url in (PRICING_URL, INVENTORY_URL):
+        host, port = url.removeprefix("http://").split(":")
+        socket.create_connection((host, int(port)), timeout=1).close()
     return "ok"
 
 

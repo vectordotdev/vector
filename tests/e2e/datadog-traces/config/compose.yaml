@@ -41,6 +41,8 @@ services:
 
   frontend:
     build: ../workload/python
+    # vdev runs `up` without `--build`; rebuild so workload edits are not ignored.
+    pull_policy: build
     command: ["ddtrace-run", "flask", "--app", "frontend", "run", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - DD_TRACE_AGENT_URL=http://datadog-agent:8126
@@ -69,6 +71,7 @@ services:
 
   pricing:
     build: ../workload/node
+    pull_policy: build
     environment:
       - DD_TRACE_AGENT_URL=http://datadog-agent:8126
       - DD_ENV=e2e
@@ -82,6 +85,7 @@ services:
 
   inventory:
     build: ../workload/go
+    pull_policy: build
     environment:
       - DD_TRACE_AGENT_URL=http://datadog-agent:8126
       - DD_ENV=e2e
@@ -98,6 +102,7 @@ services:
 
   client:
     build: ../workload/python
+    pull_policy: build
     command: ["python", "client.py"]
     environment:
       - FRONTEND_URL=http://frontend:8000
@@ -107,6 +112,7 @@ services:
 
   finalize-captures:
     build: ../workload/python
+    pull_policy: build
     command: ["python", "/finalize.py"]
     environment:
       - VECTOR_NETWORK=${VECTOR_NETWORK}

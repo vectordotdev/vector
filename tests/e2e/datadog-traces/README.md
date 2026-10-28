@@ -32,7 +32,7 @@ client → frontend (Python) ─┬→ pricing (Node)
 ## Completion
 
 Compose starts the tracers only after the Agent answers `/info`, and the client only
-after the frontend is healthy. When the client exits, [finalize.py](data/finalize.py)
+after the frontend and both downstream services accept connections. When the client exits, [finalize.py](data/finalize.py)
 stops the services in order. Each tracer flushes on stop, then the Agent flushes to both
 endpoints, then Vector drains its sink. Any unclean exit fails the run, and so does
 Vector logging a graceful-shutdown timeout, because it exits 0 in that case. Rust then
@@ -44,6 +44,8 @@ captures.
 The [Rust test](../datadog/traces/mod.rs) verifies:
 
 - Input guard: no indexed tracer payloads, which the source would drop.
+- Completeness: all six checkout traces contain spans from all three tracers, so a
+  tracer that failed to flush fails the run.
 - Coverage: the input contains all three tracers and five services, sampling
   priorities 1 and 2, roots, cross-service parents, a trace spread across tracer
   payloads, multi-service chunks, several chunks in one tracer payload, error spans with
@@ -86,3 +88,5 @@ cargo vdev e2e run datadog-traces
 - Native span events come only from Python: Agent 7.84.6 rejects native span events from
   dd-trace-js 6.21.0.
 - APM stats are not compared.
+- Only top-level Python and Node dependencies are pinned, so transitive versions can
+  change between image builds.

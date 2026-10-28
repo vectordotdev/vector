@@ -31,6 +31,9 @@ apm_config:
   # which the `datadog_agent` source does not decode yet.
   features:
     - disable-convert-traces
+  # Drop the frontend healthcheck traces so the captures contain only the scenario.
+  ignore_resources:
+    - "GET /health"
   # Keep every workload trace; the scenario is far below these limits anyway.
   max_traces_per_second: 100000
   errors_per_second: 100000

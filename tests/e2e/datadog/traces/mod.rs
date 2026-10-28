@@ -18,6 +18,9 @@ use super::*;
 const OUTPUT: &str = "/output/datadog-traces";
 const TRACES_ENDPOINT: &str = "/api/v0.2/traces";
 const REQUIRED_TRACERS: &[&str] = &["go", "nodejs", "python"];
+/// Checkouts sent by `workload/python/client.py`.
+const CHECKOUTS: usize = 6;
+const CHECKOUT_RESOURCE: &str = "GET /checkout/<int:order>";
 const REQUIRED_SERVICES: &[&str] = &[
     "frontend",
     "frontend-cache",
@@ -109,6 +112,9 @@ struct Coverage {
     priorities: BTreeMap<i32, usize>,
     spans: usize,
     traces: usize,
+    /// Checkout traces, and those with spans from every required tracer.
+    checkouts: usize,
+    complete_checkouts: usize,
     root_spans: usize,
     cross_service_parents: usize,
     traces_across_tracer_payloads: usize,
@@ -125,6 +131,8 @@ impl Coverage {
     fn new(payloads: &[AgentPayload]) -> Self {
         let mut coverage = Self::default();
         let mut tracer_payloads_by_trace = BTreeMap::<u64, BTreeSet<usize>>::new();
+        let mut tracers_by_trace = BTreeMap::<u64, BTreeSet<&str>>::new();
+        let mut checkout_traces = BTreeSet::new();
         let mut services_by_span = BTreeMap::new();
         let mut parents = Vec::new();
         coverage.idx_tracer_payloads = payloads
@@ -150,9 +158,16 @@ impl Coverage {
                         .entry(span.trace_id)
                         .or_default()
                         .insert(index);
+                    tracers_by_trace
+                        .entry(span.trace_id)
+                        .or_default()
+                        .insert(&tracer.language_name);
                     services_by_span.insert((span.trace_id, span.span_id), &span.service);
                     if span.parent_id == 0 {
                         coverage.root_spans += 1;
+                        if span.resource == CHECKOUT_RESOURCE {
+                            checkout_traces.insert(span.trace_id);
+                        }
                     } else {
                         parents.push((span.trace_id, span.parent_id, &span.service));
                     }
@@ -166,6 +181,11 @@ impl Coverage {
         }
         coverage.spans = coverage.services.values().sum();
         coverage.traces = tracer_payloads_by_trace.len();
+        coverage.checkouts = checkout_traces.len();
+        coverage.complete_checkouts = checkout_traces
+            .iter()
+            .filter(|trace_id| tracers_by_trace[*trace_id].len() == REQUIRED_TRACERS.len())
+            .count();
         coverage.traces_across_tracer_payloads = tracer_payloads_by_trace
             .values()
             .filter(|tracer_payloads| tracer_payloads.len() > 1)
@@ -192,6 +212,13 @@ impl Coverage {
             if !self.services.contains_key(*service) {
                 missing.push(format!("Missing service: {service}"));
             }
+        }
+        // A tracer that failed to flush would otherwise only reduce coverage.
+        if self.checkouts != CHECKOUTS || self.complete_checkouts != CHECKOUTS {
+            missing.push(format!(
+                "Expected {CHECKOUTS} checkout traces with spans from every tracer, found {} ({} complete)",
+                self.checkouts, self.complete_checkouts
+            ));
         }
         // Auto keep and user keep.
         for priority in [1, 2] {
@@ -294,10 +321,10 @@ mod tests {
 
     use super::*;
 
-    fn span(service: &str, span_id: u64, parent_id: u64) -> Span {
+    fn span(service: &str, trace_id: u64, span_id: u64, parent_id: u64) -> Span {
         Span {
             service: service.into(),
-            trace_id: 1,
+            trace_id,
             span_id,
             parent_id,
             ..Default::default()
@@ -311,7 +338,8 @@ mod tests {
                 .into_iter()
                 .enumerate()
                 .map(|(index, spans)| TraceChunk {
-                    priority: i32::try_from(index).unwrap() + 1,
+                    // Alternate auto keep and user keep.
+                    priority: if index % 2 == 0 { 1 } else { 2 },
                     spans,
                     ..Default::default()
                 })
@@ -320,27 +348,32 @@ mod tests {
         }
     }
 
-    /// A trace covering every required tracer, service and shape.
+    /// Checkout traces covering every required tracer, service and shape.
     fn covered() -> Vec<AgentPayload> {
-        let mut root = span("frontend", 1, 0);
-        root.meta
-            .insert("_dd.p.tid".into(), "6a1b2c3d00000000".into());
-        root.span_links.push(SpanLink::default());
-        let mut failed = span("frontend-cache", 2, 1);
-        failed.error = 1;
-        failed.meta.insert("error.message".into(), "failed".into());
-        failed.span_events.push(SpanEvent::default());
+        let (mut python, mut nodejs, mut go) = (Vec::new(), Vec::new(), Vec::new());
+        for trace_id in 1..=u64::try_from(CHECKOUTS).unwrap() {
+            let mut root = span("frontend", trace_id, 1, 0);
+            root.resource = CHECKOUT_RESOURCE.into();
+            root.meta
+                .insert("_dd.p.tid".into(), "6a1b2c3d00000000".into());
+            root.span_links.push(SpanLink::default());
+            let mut failed = span("frontend-cache", trace_id, 2, 1);
+            failed.error = 1;
+            failed.meta.insert("error.message".into(), "failed".into());
+            failed.span_events.push(SpanEvent::default());
+            python.push(vec![root, failed]);
+            python.push(vec![span("frontend", trace_id, 6, 1)]);
+            nodejs.push(vec![span("pricing", trace_id, 3, 1)]);
+            go.push(vec![
+                span("inventory", trace_id, 4, 1),
+                span("inventory-db", trace_id, 5, 4),
+            ]);
+        }
         vec![AgentPayload {
             tracer_payloads: vec![
-                tracer(
-                    "python",
-                    vec![vec![root, failed], vec![span("frontend", 6, 1)]],
-                ),
-                tracer("nodejs", vec![vec![span("pricing", 3, 1)]]),
-                tracer(
-                    "go",
-                    vec![vec![span("inventory", 4, 1), span("inventory-db", 5, 4)]],
-                ),
+                tracer("python", python),
+                tracer("nodejs", nodejs),
+                tracer("go", go),
             ],
             ..Default::default()
         }]
@@ -350,12 +383,13 @@ mod tests {
     fn coverage_counts_required_shapes() {
         let coverage = Coverage::new(&covered());
         assert!(coverage.missing().is_empty(), "{:?}", coverage.missing());
-        assert_eq!(coverage.spans, 6);
-        assert_eq!(coverage.traces, 1);
-        assert_eq!(coverage.traces_across_tracer_payloads, 1);
-        assert_eq!(coverage.multi_service_chunks, 2);
-        assert_eq!(coverage.cross_service_parents, 4);
-        assert_eq!(coverage.error_spans, 1);
+        assert_eq!(coverage.spans, 6 * CHECKOUTS);
+        assert_eq!(coverage.traces, CHECKOUTS);
+        assert_eq!(coverage.complete_checkouts, CHECKOUTS);
+        assert_eq!(coverage.traces_across_tracer_payloads, CHECKOUTS);
+        assert_eq!(coverage.multi_service_chunks, 2 * CHECKOUTS);
+        assert_eq!(coverage.cross_service_parents, 4 * CHECKOUTS);
+        assert_eq!(coverage.error_spans, CHECKOUTS);
 
         let mut single_tracer = covered();
         single_tracer[0].tracer_payloads.truncate(1);
@@ -367,6 +401,21 @@ mod tests {
         ] {
             assert!(missing.iter().any(|m| m == expected), "{missing:?}");
         }
+    }
+
+    #[test]
+    fn coverage_requires_every_checkout_to_be_complete() {
+        // One unflushed Node span leaves a checkout without pricing.
+        let mut incomplete = covered();
+        incomplete[0].tracer_payloads[1].chunks.pop();
+        let missing = Coverage::new(&incomplete).missing();
+        assert_eq!(
+            missing,
+            [format!(
+                "Expected {CHECKOUTS} checkout traces with spans from every tracer, found {CHECKOUTS} ({} complete)",
+                CHECKOUTS - 1
+            )]
+        );
     }
 
     #[test]
