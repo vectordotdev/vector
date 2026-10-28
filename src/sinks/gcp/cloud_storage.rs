@@ -2,7 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::header::{HeaderName, HeaderValue};
+use http_1::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -24,7 +24,7 @@ use crate::{
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::{HttpClient, get_http_scheme_from_uri},
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
         Healthcheck, VectorSink,
@@ -299,7 +299,7 @@ impl ValidatedSink for GcsSinkConfig {
 
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
             client.clone(),
@@ -586,8 +586,8 @@ mod tests {
         let context = SinkContext::default();
 
         let tls = TlsSettings::default();
-        let client =
-            HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
+        let client = HttpClient::new(tls.into(), context.proxy())
+            .expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
             endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
@@ -613,7 +613,7 @@ mod tests {
         let (_guard, addr) = next_addr();
 
         let context = SinkContext::default();
-        let client = HttpClient::new(TlsSettings::default(), context.proxy())
+        let client = HttpClient::new(TlsSettings::default().into(), context.proxy())
             .expect("should not fail to create HTTP client");
         let endpoint = HttpEndpoint::parse(&format!("http://{addr}")).expect("valid mock endpoint");
         let config = GcsSinkConfig {
