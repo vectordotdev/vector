@@ -341,9 +341,22 @@ pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>>
 }
 
 pub(super) fn log_warnings(warnings: &[String]) {
+    static LAST_WARNINGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    let mut warnings = warnings.to_vec();
+    warnings.sort_unstable();
+    warnings.dedup();
+
+    let mut previous = LAST_WARNINGS.lock().expect("warning lock poisoned");
+    if *previous == warnings {
+        return;
+    }
+    previous.clone_from(&warnings);
+    drop(previous);
+
     if !warnings.is_empty() {
-        // Keep every warning visible on the first load while rate limiting repeated loads.
-        warn!(warnings = ?warnings, "Configuration warnings.");
+        // Suppress identical reloads, but never hide a changed warning set behind log throttling.
+        warn!(warnings = ?warnings, internal_log_rate_limit = false, "Configuration warnings.");
     }
 }
 

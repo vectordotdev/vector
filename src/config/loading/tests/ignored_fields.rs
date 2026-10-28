@@ -41,6 +41,8 @@ const CONFIG: &str = indoc! {r#"
         uri: "http://127.0.0.1:18081/"
         encoding:
           codec: json
+        buffer:
+          max_events: 100
         request:
           retry_atempts: 3
           headers:
@@ -104,28 +106,36 @@ fn with_logs<T>(f: impl FnOnce() -> T) -> (T, String) {
 
 #[test]
 fn loading_warns_without_changing_values_or_flooding_logs() {
-    let expected: ConfigBuilder = serde_yaml::from_str(CONFIG).unwrap();
-    let expected = serde_json::to_value(expected).unwrap();
+    let load = |input: &str| {
+        let expected: ConfigBuilder = serde_yaml::from_str(input).unwrap();
+        let builder = ConfigBuilderLoader::default()
+            .interpolate_env(false)
+            .load_from_input(input.as_bytes(), Format::Yaml)
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(&builder).unwrap(),
+            serde_json::to_value(expected).unwrap()
+        );
+        builder.build().unwrap();
+    };
+    let updated = CONFIG.replace("retry_atempts", "timeout_sec");
     let ((), logs) = with_logs(|| {
         for _ in 0..5 {
-            let builder = ConfigBuilderLoader::default()
-                .interpolate_env(false)
-                .load_from_input(CONFIG.as_bytes(), Format::Yaml)
-                .unwrap();
-            assert_eq!(serde_json::to_value(&builder).unwrap(), expected);
-            builder.build().unwrap();
+            load(CONFIG);
         }
+        load(&updated);
+        load(&updated);
     });
-    assert_eq!(logs.matches("DEPRECATED:").count(), 5, "{logs}");
-    assert!(logs.contains("is being suppressed"), "{logs}");
-    for path in [
-        "/sinks/out/request/retry_atempts",
-        "/sources/files/fingerprinting/ignored_header_bytes",
-        "/sources/files/fingerprinting/unknown_option",
-        "/sources/http/auth/password",
-        "/sources/http/auth/username",
+    assert_eq!(logs.matches("DEPRECATED:").count(), 10, "{logs}");
+    for (path, count) in [
+        ("/sinks/out/request/retry_atempts", 1),
+        ("/sinks/out/request/timeout_sec", 1),
+        ("/sources/files/fingerprinting/ignored_header_bytes", 2),
+        ("/sources/files/fingerprinting/unknown_option", 2),
+        ("/sources/http/auth/password", 2),
+        ("/sources/http/auth/username", 2),
     ] {
-        assert_eq!(logs.matches(path).count(), 1, "{logs}");
+        assert_eq!(logs.matches(path).count(), count, "{logs}");
     }
     for secret in [
         "BEARER_SECRET",

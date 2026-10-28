@@ -147,6 +147,7 @@ pub async fn build_unit_tests(
     config_builder.sources = IndexMap::default();
     config_builder.sinks = IndexMap::default();
 
+    let loading_warnings = std::mem::take(&mut config_builder.loading_warnings);
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
@@ -172,6 +173,7 @@ pub async fn build_unit_tests(
     }
 
     if build_errors.is_empty() {
+        loading::log_warnings(&loading_warnings);
         Ok(tests)
     } else {
         Err(build_errors)

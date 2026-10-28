@@ -24,6 +24,7 @@ const CLOSED_OBJECT: &str = "x-vector-closed-object";
 const OPEN_OBJECT: &str = "x-vector-open-object";
 const IGNORED_FIELD: &str = "x-vector-ignored-field";
 const SERDE_IGNORED: &str = "serde::ignored";
+const SERDE_OPTIONAL_TAG: &str = "serde::optional_tag";
 
 static VALIDATOR: LazyLock<Option<Validator>> = LazyLock::new(|| {
     let result = generate_root_schema::<ConfigBuilder>()
@@ -126,6 +127,14 @@ fn prepare_schema(schema: &mut Value) {
         return;
     };
     add_aliases(object);
+    if let Some(tag) = object
+        .get(METADATA)
+        .and_then(|metadata| metadata.get(SERDE_OPTIONAL_TAG))
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+    {
+        make_tag_optional(object, &tag);
+    }
     let ignored = object
         .get(METADATA)
         .and_then(|metadata| metadata.get(SERDE_IGNORED))
@@ -199,6 +208,18 @@ fn prepare_schema(schema: &mut Value) {
         }
     }
     prepare_subschemas(object);
+}
+
+fn make_tag_optional(schema: &mut Map<String, Value>, tag: &str) {
+    if let Some(required) = schema.get_mut("required").and_then(Value::as_array_mut) {
+        required.retain(|name| name.as_str() != Some(tag));
+    }
+    // Flattened fields place the variant's own properties inside allOf.
+    if let Some(children) = schema.get_mut("allOf").and_then(Value::as_array_mut) {
+        for child in children.iter_mut().filter_map(Value::as_object_mut) {
+            make_tag_optional(child, tag);
+        }
+    }
 }
 
 fn prepare_subschemas(object: &mut Map<String, Value>) {
