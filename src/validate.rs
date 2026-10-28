@@ -576,7 +576,10 @@ impl Formatter {
             paths.len().min(MAX_PATHS_SHOWN)
         };
         for path in &paths[..shown] {
-            self.print(format!("  {:?}\n", path.to_string_lossy()));
+            // `Debug` escapes control characters and invalid UTF-8 bytes, so every
+            // path stays on its own line and distinct paths stay distinguishable.
+            #[allow(clippy::unnecessary_debug_formatting)]
+            self.print(format!("  {path:?}\n"));
         }
         if shown < paths.len() {
             self.print(format!(
