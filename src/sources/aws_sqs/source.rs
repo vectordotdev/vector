@@ -9,6 +9,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
+    time::Duration,
 };
 
 use aws_sdk_sqs::{
@@ -17,7 +18,10 @@ use aws_sdk_sqs::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt, stream::FuturesUnordered};
-use tokio::{pin, select, sync::Notify};
+use tokio::{
+    pin, select,
+    sync::{Notify, watch},
+};
 use vector_lib::{
     config::LogNamespace,
     finalizer::UnorderedFinalizer,
@@ -42,6 +46,8 @@ const MAX_BATCH_SIZE: i32 = 10;
 // Standard SQS queues distribute messages across partitions and may return fewer than
 // MAX_BATCH_SIZE messages even when a backlog exists.
 const BUSY_BATCH_THRESHOLD: usize = (MAX_BATCH_SIZE as usize) / 2;
+
+const RECEIVE_ERROR_RETRY_DELAY: Duration = Duration::from_secs(1);
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
@@ -181,11 +187,9 @@ impl SqsSource {
 
         if let Ok(()) = out.send_batch(events).await {
             if self.delete_message {
-                match batch_receiver {
-                    Some(receiver) => finalizer
-                        .expect("Finalizer must exist for the batch receiver to be created")
-                        .add(receipts_to_ack, receiver),
-                    None => {
+                match (finalizer, batch_receiver) {
+                    (Some(finalizer), Some(receiver)) => finalizer.add(receipts_to_ack, receiver),
+                    _ => {
                         delete_messages(
                             self.client.clone(),
                             receipts_to_ack,
@@ -223,7 +227,8 @@ fn spawn_worker_task<F, Fut>(
     tasks: &FuturesUnordered<Task>,
     concurrency: &Arc<AtomicUsize>,
     scale_up: &Arc<Notify>,
-    stream_closed: &Arc<AtomicBool>,
+    stream_closed_tx: &Arc<watch::Sender<bool>>,
+    mut stream_closed_rx: watch::Receiver<bool>,
     poll_fn: &Arc<F>,
     shutdown: ShutdownSignal,
 ) where
@@ -241,7 +246,7 @@ fn spawn_worker_task<F, Fut>(
     let active_flag_worker = Arc::clone(&active_flag);
     let concurrency_worker = Arc::clone(concurrency);
     let scale_up_worker = Arc::clone(scale_up);
-    let stream_closed_worker = Arc::clone(stream_closed);
+    let stream_closed_tx_worker = Arc::clone(stream_closed_tx);
     let poll_fn_worker = Arc::clone(poll_fn);
 
     let handle = crate::spawn_in_current_span(async move {
@@ -251,6 +256,12 @@ fn spawn_worker_task<F, Fut>(
             select! {
                 biased;
                 _ = &mut shutdown => break,
+                _ = stream_closed_rx.changed() => {
+                    busy_flag_worker.store(false, Ordering::Release);
+                    active_flag_worker.store(false, Ordering::SeqCst);
+                    concurrency_worker.fetch_sub(1, Ordering::SeqCst);
+                    break;
+                }
                 outcome = poll_fn_worker() => match outcome {
                     PollOutcome::Messages(count) if count >= BUSY_BATCH_THRESHOLD => {
                         busy_flag_worker.store(true, Ordering::Release);
@@ -271,11 +282,23 @@ fn spawn_worker_task<F, Fut>(
                             debug!(message = "Shutting down inactive polling task.");
                             break;
                         }
+                        if matches!(outcome, PollOutcome::ReceiveError) {
+                            select! {
+                                biased;
+                                _ = &mut shutdown => break,
+                                _ = stream_closed_rx.changed() => {
+                                    active_flag_worker.store(false, Ordering::SeqCst);
+                                    concurrency_worker.fetch_sub(1, Ordering::SeqCst);
+                                    break;
+                                }
+                                () = tokio::time::sleep(RECEIVE_ERROR_RETRY_DELAY) => {}
+                            }
+                        }
                     }
                     PollOutcome::StreamClosed => {
                         busy_flag_worker.store(false, Ordering::Release);
                         active_flag_worker.store(false, Ordering::SeqCst);
-                        stream_closed_worker.store(true, Ordering::SeqCst);
+                        stream_closed_tx_worker.send_replace(true);
                         concurrency_worker.fetch_sub(1, Ordering::SeqCst);
                         break;
                     }
@@ -304,14 +327,16 @@ where
     let max_concurrency = max_concurrency.max(1);
     let poll_fn = Arc::new(poll_fn);
     let scale_up = Arc::new(Notify::new());
-    let stream_closed = Arc::new(AtomicBool::new(false));
+    let (stream_closed_tx, stream_closed_rx) = watch::channel(false);
+    let stream_closed_tx = Arc::new(stream_closed_tx);
     let mut tasks = FuturesUnordered::new();
 
     spawn_worker_task(
         &tasks,
         &concurrency,
         &scale_up,
-        &stream_closed,
+        &stream_closed_tx,
+        stream_closed_rx.clone(),
         &poll_fn,
         shutdown.clone(),
     );
@@ -330,7 +355,7 @@ where
                     panic::resume_unwind(e.into_panic());
                 }
                 if tasks.is_empty() {
-                    if stream_closed.load(Ordering::SeqCst) {
+                    if *stream_closed_rx.borrow() {
                         break;
                     }
                     concurrency.store(0, Ordering::SeqCst);
@@ -338,7 +363,8 @@ where
                         &tasks,
                         &concurrency,
                         &scale_up,
-                        &stream_closed,
+                        &stream_closed_tx,
+                        stream_closed_rx.clone(),
                         &poll_fn,
                         shutdown.clone(),
                     );
@@ -346,7 +372,7 @@ where
             }
             () = scale_up.notified() => {
                 let current = concurrency.load(Ordering::SeqCst);
-                if !stream_closed.load(Ordering::SeqCst)
+                if !*stream_closed_rx.borrow()
                     && current < max_concurrency
                     && tasks
                         .iter()
@@ -357,7 +383,8 @@ where
                         &tasks,
                         &concurrency,
                         &scale_up,
-                        &stream_closed,
+                        &stream_closed_tx,
+                        stream_closed_rx.clone(),
                         &poll_fn,
                         shutdown.clone(),
                     );
@@ -383,11 +410,8 @@ fn get_timestamp(
 ) -> Option<DateTime<Utc>> {
     attributes.and_then(|attributes| {
         let sent_time_str = attributes.get(&MessageSystemAttributeName::SentTimestamp)?;
-        Some(
-            Utc.timestamp_millis_opt(i64::from_str(sent_time_str).ok()?)
-                .single()
-                .expect("invalid timestamp"),
-        )
+        Utc.timestamp_millis_opt(i64::from_str(sent_time_str).ok()?)
+            .single()
     })
 }
 
@@ -802,5 +826,115 @@ mod tests {
                     .expect("invalid timestamp")
             )
         );
+    }
+
+    #[test]
+    fn test_get_timestamp_ignores_invalid_and_out_of_range_values() {
+        let out_of_range = HashMap::from([(
+            MessageSystemAttributeName::SentTimestamp,
+            i64::MAX.to_string(),
+        )]);
+        assert_eq!(get_timestamp(Some(&out_of_range)), None);
+
+        let non_numeric = HashMap::from([(
+            MessageSystemAttributeName::SentTimestamp,
+            "not-a-timestamp".to_string(),
+        )]);
+        assert_eq!(get_timestamp(Some(&non_numeric)), None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn adaptive_concurrency_scales_down_and_backs_off_on_receive_error() {
+        let (trigger, shutdown, _) = ShutdownSignal::new_wired();
+        let concurrency = Arc::new(AtomicUsize::new(0));
+        let phase = Arc::new(AtomicUsize::new(0));
+        let phase_clone = Arc::clone(&phase);
+        let concurrency_clone = Arc::clone(&concurrency);
+        let scaled_up = Arc::new(Notify::new());
+        let scaled_up_clone = Arc::clone(&scaled_up);
+        let error_polls = Arc::new(AtomicUsize::new(0));
+        let error_polls_clone = Arc::clone(&error_polls);
+
+        let handle = tokio::spawn(run_adaptive_concurrency(
+            3,
+            shutdown,
+            Arc::clone(&concurrency),
+            move || {
+                let phase = Arc::clone(&phase_clone);
+                let concurrency = Arc::clone(&concurrency_clone);
+                let scaled_up = Arc::clone(&scaled_up_clone);
+                let error_polls = Arc::clone(&error_polls_clone);
+                async move {
+                    if concurrency.load(Ordering::SeqCst) == 3
+                        && phase.swap(1, Ordering::SeqCst) == 0
+                    {
+                        scaled_up.notify_one();
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                    if phase.load(Ordering::SeqCst) == 0 {
+                        PollOutcome::Messages(10)
+                    } else {
+                        error_polls.fetch_add(1, Ordering::SeqCst);
+                        PollOutcome::ReceiveError
+                    }
+                }
+            },
+        ));
+
+        scaled_up.notified().await;
+        // Within 100ms, surplus workers scale down to 1 and the floor worker enters 1s backoff.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(concurrency.load(Ordering::SeqCst), 1);
+        let polls_before_backoff_elapsed = error_polls.load(Ordering::SeqCst);
+        assert!(
+            polls_before_backoff_elapsed <= 4,
+            "floor worker must back off instead of hot-looping on ReceiveError, got {polls_before_backoff_elapsed}"
+        );
+
+        drop(trigger);
+        handle.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn adaptive_concurrency_cancels_in_flight_siblings_on_stream_closed() {
+        let (_trigger, shutdown, _) = ShutdownSignal::new_wired();
+        let concurrency = Arc::new(AtomicUsize::new(0));
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let call_count_clone = Arc::clone(&call_count);
+
+        let handle = tokio::spawn(run_adaptive_concurrency(
+            2,
+            shutdown,
+            Arc::clone(&concurrency),
+            move || {
+                let call_count = Arc::clone(&call_count_clone);
+                async move {
+                    match call_count.fetch_add(1, Ordering::SeqCst) {
+                        0 => {
+                            tokio::time::sleep(Duration::from_millis(10)).await;
+                            PollOutcome::Messages(10)
+                        }
+                        1 => {
+                            // Worker 1 blocks in a 15-second long poll
+                            tokio::time::sleep(Duration::from_secs(15)).await;
+                            PollOutcome::Messages(0)
+                        }
+                        _ => {
+                            // Worker 2 encounters downstream channel closure after 10ms
+                            tokio::time::sleep(Duration::from_millis(10)).await;
+                            PollOutcome::StreamClosed
+                        }
+                    }
+                }
+            },
+        ));
+
+        // Advance only 50ms (< 15s long poll); supervisor and both workers must exit immediately.
+        tokio::time::timeout(Duration::from_millis(50), handle)
+            .await
+            .expect("in-flight sibling worker should be cancelled immediately on StreamClosed")
+            .unwrap()
+            .unwrap();
+        assert_eq!(concurrency.load(Ordering::SeqCst), 0);
     }
 }
