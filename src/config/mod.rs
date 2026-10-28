@@ -240,8 +240,13 @@ impl Config {
             .and_then(|component| component.inputs())
     }
 
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Enables sink acknowledgements on every source upstream of a sink that has
+    /// acknowledgements enabled, following inputs through transforms.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error. Sources that cannot acknowledge are logged as a
+    /// warning instead.
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
         let inputs: Vec<_> = self
             .sinks
