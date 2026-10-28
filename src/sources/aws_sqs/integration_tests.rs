@@ -124,7 +124,7 @@ pub(crate) async fn test() {
 }
 
 #[tokio::test]
-pub(crate) async fn test_adaptive_scaling_multiple_batches() {
+pub(crate) async fn test_max_concurrency_delivers_multiple_batches() {
     Box::pin(assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
         let sqs_client = get_sqs_client().await;
         let queue_name = gen_queue_name();
