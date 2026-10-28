@@ -69,6 +69,14 @@ pub struct AwsSqsConfig {
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
+    /// Maximum number of concurrent tasks to create for polling the queue for messages.
+    ///
+    /// Defaults to the number of available CPUs on the system.
+    ///
+    /// Vector starts with one polling task and dynamically scales up to `max_concurrency` tasks
+    /// as message volume increases, scaling back down when the queue is idle.
+    pub max_concurrency: Option<NonZeroUsize>,
+
     /// Number of concurrent tasks to create for polling the queue for messages.
     ///
     /// Defaults to the number of available CPUs on the system.
@@ -78,6 +86,7 @@ pub struct AwsSqsConfig {
     /// being fetched are small. In these cases, system resources may not be fully utilized without
     /// fetching more messages per second, as it spends more time fetching the messages than
     /// processing them.
+    #[configurable(deprecated = "This option has been deprecated, use `max_concurrency` instead.")]
     pub client_concurrency: Option<NonZeroUsize>,
 
     #[serde(default = "default_framing_message_based")]
@@ -117,9 +126,7 @@ impl SourceConfig for AwsSqsConfig {
                 queue_url: self.queue_url.clone(),
                 decoder,
                 poll_secs: self.poll_secs,
-                concurrency: self
-                    .client_concurrency
-                    .map_or_else(crate::num_threads, NonZeroUsize::get),
+                max_concurrency: self.resolve_max_concurrency(),
                 visibility_timeout_secs: self.visibility_timeout_secs,
                 delete_message: self.delete_message,
                 acknowledgements,
@@ -154,6 +161,25 @@ impl SourceConfig for AwsSqsConfig {
 }
 
 impl AwsSqsConfig {
+    pub(super) fn resolve_max_concurrency(&self) -> usize {
+        match (self.max_concurrency, self.client_concurrency) {
+            (Some(max), Some(_)) => {
+                warn!(
+                    "The `client_concurrency` setting is deprecated and ignored because `max_concurrency` is also set."
+                );
+                max.get()
+            }
+            (Some(max), None) => max.get(),
+            (None, Some(legacy)) => {
+                warn!(
+                    "The `client_concurrency` setting is deprecated, use `max_concurrency` instead."
+                );
+                legacy.get()
+            }
+            (None, None) => crate::num_threads(),
+        }
+    }
+
     async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
         create_client::<SqsClientBuilder>(
             &SqsClientBuilder {},
@@ -181,3 +207,53 @@ const fn default_true() -> bool {
 }
 
 impl_generate_config_from_default!(AwsSqsConfig);
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+
+    use super::AwsSqsConfig;
+
+    #[test]
+    fn resolve_max_concurrency_defaults_to_num_threads() {
+        let config = AwsSqsConfig::default();
+        assert_eq!(config.resolve_max_concurrency(), crate::num_threads());
+    }
+
+    #[test]
+    fn resolve_max_concurrency_uses_max_concurrency() {
+        let config = AwsSqsConfig {
+            max_concurrency: Some(NonZeroUsize::new(12).unwrap()),
+            ..Default::default()
+        };
+        assert_eq!(config.resolve_max_concurrency(), 12);
+    }
+
+    #[test]
+    fn resolve_max_concurrency_falls_back_to_deprecated_client_concurrency() {
+        let config = AwsSqsConfig {
+            client_concurrency: Some(NonZeroUsize::new(6).unwrap()),
+            ..Default::default()
+        };
+        assert_eq!(config.resolve_max_concurrency(), 6);
+    }
+
+    #[test]
+    fn resolve_max_concurrency_prefers_max_concurrency_over_client_concurrency() {
+        let config = AwsSqsConfig {
+            max_concurrency: Some(NonZeroUsize::new(16).unwrap()),
+            client_concurrency: Some(NonZeroUsize::new(4).unwrap()),
+            ..Default::default()
+        };
+        assert_eq!(config.resolve_max_concurrency(), 16);
+    }
+
+    #[test]
+    fn deserialize_yaml_rejects_zero_max_concurrency() {
+        let yaml = r#"
+            queue_url: "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+            max_concurrency: 0
+        "#;
+        assert!(serde_yaml::from_str::<AwsSqsConfig>(yaml).is_err());
+    }
+}

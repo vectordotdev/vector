@@ -37,7 +37,7 @@ pub struct SqsSource {
     pub poll_secs: u32,
     pub visibility_timeout_secs: u32,
     pub delete_message: bool,
-    pub concurrency: usize,
+    pub max_concurrency: usize,
     pub(super) acknowledgements: bool,
     pub(super) log_namespace: LogNamespace,
 }
@@ -60,7 +60,7 @@ impl SqsSource {
         });
         let events_received = register!(EventsReceived);
 
-        for _ in 0..self.concurrency {
+        for _ in 0..self.max_concurrency {
             let source = self.clone();
             let shutdown = shutdown.clone().fuse();
             let mut out = out.clone();
