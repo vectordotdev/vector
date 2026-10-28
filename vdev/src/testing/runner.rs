@@ -36,6 +36,9 @@ const BUILD_TESTS_COMMAND: &[&str] = &[
     "--no-run",
     "--no-default-features",
 ];
+/// Lock file in the shared target volume (`TARGET_PATH`), held by [`ContainerTestRunner::build_tests`]
+/// so concurrent runners can't relink shared artifacts before the follow-up step reads them.
+const BUILD_LOCK_PATH: &str = "/home/target/.vdev-build.lock";
 const LOCAL_TEST_COMMAND: &[&str] = &["cargo", "nextest", "run", "--no-fail-fast"];
 const COVERAGE_COMMAND: &[&str] = &[
     "cargo",
@@ -173,8 +176,9 @@ pub trait ContainerTestRunner: TestRunner {
         command.check_run()
     }
 
-    /// Compile the tests selected by `args` in the running container without running them.
-    fn build_tests(&self, args: &[String]) -> Result<()> {
+    /// Compile the tests selected by `args` in the running container without running them, then
+    /// run the shell command `then` while still holding the target-volume build lock.
+    fn build_tests(&self, args: &[String], then: &str) -> Result<()> {
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
             command.arg("--tty");
@@ -184,8 +188,7 @@ pub trait ContainerTestRunner: TestRunner {
             command.args(["--env", &format!("CARGO_TERM_COLOR={color}")]);
         }
         command.arg(self.container_name());
-        command.args(BUILD_TESTS_COMMAND);
-        command.args(args);
+        command.args(locked_build_command(args, then));
         waiting!("Compiling tests in {}", self.container_name());
         command.check_run()
     }
@@ -253,6 +256,18 @@ pub trait ContainerTestRunner: TestRunner {
         )
         .wait(format!("Creating container {}", self.container_name()))
     }
+}
+
+/// The command that compiles tests and then runs `then`, both under one `flock`.
+fn locked_build_command(args: &[String], then: &str) -> Vec<String> {
+    let mut command: Vec<String> = ["flock", BUILD_LOCK_PATH, "sh", "-c"]
+        .map(String::from)
+        .into();
+    command.push(format!(r#""$@" && {then}"#));
+    command.push("sh".to_string());
+    command.extend(BUILD_TESTS_COMMAND.iter().map(ToString::to_string));
+    command.extend(args.iter().cloned());
+    command
 }
 
 impl<T> TestRunner for T
@@ -453,5 +468,26 @@ impl TestRunner for LocalTestRunner {
         }
 
         command.check_run()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn locked_build_runs_build_and_follow_up_under_one_lock() {
+        let args = vec!["--features".to_string(), "a,b".to_string()];
+        let command = locked_build_command(&args, "cp x y");
+        let (lock, rest) = command.split_at(4);
+        assert_eq!(lock, ["flock", BUILD_LOCK_PATH, "sh", "-c"]);
+        // The follow-up only runs if the build succeeded, inside the same `flock`.
+        assert_eq!(rest[0], r#""$@" && cp x y"#);
+        assert_eq!(rest[1], "sh");
+        let build: Vec<&str> = rest[2..].iter().map(String::as_str).collect();
+        assert_eq!(
+            build,
+            [BUILD_TESTS_COMMAND, &["--features", "a,b"]].concat()
+        );
     }
 }

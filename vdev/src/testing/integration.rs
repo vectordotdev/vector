@@ -26,6 +26,10 @@ use crate::{
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
+/// Where the committed E2E image keeps Vector.
+const E2E_VECTOR_BINARY: &str = "/usr/bin/vector";
+/// Where the runner records the sha256 of [`E2E_VECTOR_BINARY`] after the build.
+const E2E_VECTOR_DIGEST: &str = "/tmp/vector.sha256";
 /// Records the sha256 of the Vector binary an E2E Vector image was committed with.
 const E2E_VECTOR_BINARY_LABEL: &str = "vector.e2e.binary-sha256";
 
@@ -42,6 +46,16 @@ fn docker_image_exists(image_name: &str) -> Result<bool> {
 /// overwriting each other's image when they run concurrently.
 fn e2e_vector_image_name(runner_container: &str) -> String {
     format!("{runner_container}-e2e-vector:latest")
+}
+
+/// Runs right after the build, under the same lock: copy the shared `debug/vector` into the runner
+/// and hash the copy. Another runner relinking the shared binary afterwards then can't change
+/// what gets committed, and the digest always describes the committed binary.
+fn e2e_snapshot_script() -> String {
+    format!(
+        "cp {TARGET_PATH}/debug/vector {E2E_VECTOR_BINARY} && \
+         sha256sum {E2E_VECTOR_BINARY} > {E2E_VECTOR_DIGEST}"
+    )
 }
 
 /// Extract the digest from `sha256sum` output (`<digest>  <path>`).
@@ -390,13 +404,12 @@ impl ComposeTest {
         self.runner.ensure_network()?;
         self.runner.ensure_external_volumes()?;
         self.runner.ensure_running(&self.env_config)?;
-        self.runner.build_tests(&self.cargo_target_args())?;
+        self.runner
+            .build_tests(&self.cargo_target_args(), &e2e_snapshot_script())?;
 
         let container = self.runner.container_name();
-        let binary = format!("{TARGET_PATH}/debug/vector");
-        let output = docker_command(["exec", &container, "sha256sum", &binary])
-            .check_output()
-            .with_context(|| format!("{binary} was not built by the test target"))?;
+        let output =
+            docker_command(["exec", &container, "cat", E2E_VECTOR_DIGEST]).check_output()?;
         let Some(digest) = parse_sha256sum(&output) else {
             bail!("Unexpected sha256sum output: {output:?}");
         };
@@ -415,7 +428,6 @@ impl ComposeTest {
             return Ok(());
         }
 
-        docker_command(["exec", &container, "cp", &binary, "/usr/bin/vector"]).check_run()?;
         docker_command([
             "commit",
             "--change",
@@ -659,6 +671,25 @@ mod tests {
             cargo_features(Some("all-e2e-tests"), &["all-e2e-tests".to_string()]),
             "all-e2e-tests,vendored"
         );
+    }
+
+    #[test]
+    fn snapshot_hashes_the_copied_binary() {
+        let script = e2e_snapshot_script();
+        let copy = script
+            .find(&format!(
+                "cp {TARGET_PATH}/debug/vector {E2E_VECTOR_BINARY}"
+            ))
+            .expect("copies the built binary");
+        let hash = script
+            .find(&format!(
+                "sha256sum {E2E_VECTOR_BINARY} > {E2E_VECTOR_DIGEST}"
+            ))
+            .expect("hashes the copy");
+        // Hashing the copy means the label always matches the binary in the image, even if
+        // another suite relinks the shared `debug/vector` afterwards.
+        assert!(copy < hash);
+        assert!(!script.contains(&format!("sha256sum {TARGET_PATH}")));
     }
 
     #[test]
