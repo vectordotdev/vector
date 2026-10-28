@@ -187,7 +187,7 @@ impl ValidatedSink for InfluxDbConfig {
 
 impl InfluxDbSvc {
     #[cfg(all(test, feature = "influxdb-integration-tests"))]
-    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
+    pub fn build_sink(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
         let validated = config.validate()?;
         Ok(Self::from_validated(config, &validated, client))
     }
@@ -1303,7 +1303,7 @@ mod integration_tests {
         }
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
-        let sink = InfluxDbSvc::new(config, client).unwrap();
+        let sink = InfluxDbSvc::build_sink(config, client).unwrap();
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();

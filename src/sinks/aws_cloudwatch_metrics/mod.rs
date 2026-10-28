@@ -182,7 +182,7 @@ impl ValidatedSink for CloudWatchMetricsSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = CloudWatchMetricsSvc::new(self, client, validated);
+        let sink = CloudWatchMetricsSvc::build_sink(self, client, validated);
         Ok((sink, healthcheck))
     }
 }
@@ -266,7 +266,7 @@ pub struct CloudWatchMetricsSvc {
 
 impl CloudWatchMetricsSvc {
     #[must_use]
-    pub fn new(
+    pub fn build_sink(
         config: &CloudWatchMetricsSinkConfig,
         client: CloudwatchClient,
         validated: &ValidatedCloudWatchMetrics,
