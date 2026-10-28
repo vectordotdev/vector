@@ -162,8 +162,6 @@ impl WebSocketSource {
                     break;
                 },
 
-                res = ping_manager.tick(&mut ws_sink) => res,
-
                 Some(ack) = ack_rx.recv() => {
                     Ok(self.handle_ack(&mut ws_sink, ack, stateful).await)
                 }
@@ -178,6 +176,7 @@ impl WebSocketSource {
                     }
                 }
 
+                res = ping_manager.tick(&mut ws_sink) => res,
             };
 
             if let Err(error) = result {
