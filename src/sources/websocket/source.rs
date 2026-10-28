@@ -168,21 +168,13 @@ impl WebSocketSource {
                 }
 
                 // Split "fairly" between pings and incoming messages
-                () = async {} => {
-                    tokio::select! {
-                        Some(msg_result) = ws_source.next() => {
-                            match msg_result {
-                                Ok(msg) => self.handle_message(msg, &mut ping_manager, ack_tx.clone(), &mut out).await,
-                                Err(error) => {
-                                    emit!(WebSocketReceiveError { error: &error });
-                                    Err(WebSocketSourceError::Tungstenite { source: error })
-                                }
-                            }
-                        }
-
-                        res = ping_manager.tick(&mut ws_sink) => res,
-                    }
-                }
+                res = self.handle_messages_and_pings(
+                    &mut ws_source,
+                    &mut ws_sink,
+                    &mut ping_manager,
+                    ack_tx.clone(),
+                    &mut out
+                ) => res
             };
 
             if let Err(error) = result {
@@ -243,6 +235,29 @@ impl WebSocketSource {
         }
 
         Ok(())
+    }
+
+    async fn handle_messages_and_pings(
+        &mut self,
+        ws_source: &mut WebSocketStream,
+        ws_sink: &mut WebSocketSink,
+        ping_manager: &mut PingManager,
+        ack_tx: Sender<String>,
+        out: &mut SourceSender,
+    ) -> Result<(), WebSocketSourceError> {
+        tokio::select! {
+            Some(msg_result) = ws_source.next() => {
+                match msg_result {
+                    Ok(msg) => self.handle_message(msg, ping_manager, ack_tx, out).await,
+                    Err(error) => {
+                        emit!(WebSocketReceiveError { error: &error });
+                        Err(WebSocketSourceError::Tungstenite { source: error })
+                    }
+                }
+            }
+
+            res = ping_manager.tick(ws_sink) => res,
+        }
     }
 
     async fn store_last_message_id(&self) {
