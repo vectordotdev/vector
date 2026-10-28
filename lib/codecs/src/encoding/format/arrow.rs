@@ -95,11 +95,12 @@ pub struct ArrowStreamSerializer {
 
 impl ArrowStreamSerializer {
     /// Encode events into a `RecordBatch` without writing to IPC stream format.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `events` contains no log events, a log event cannot be serialized to
+    /// JSON, a non-nullable schema field is missing or null in any event, or the values cannot be
+    /// decoded into the schema.
     pub fn encode_to_record_batch(
         &self,
         events: &[Event],
@@ -113,11 +114,11 @@ impl ArrowStreamSerializer {
     }
 
     /// Create a new `ArrowStreamSerializer` with the given configuration
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `schema` is not set, or if `allow_nullable_fields` is enabled and the
+    /// schema contains a `Map` field whose entries are not a struct of exactly two fields.
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
         let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
 

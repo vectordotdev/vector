@@ -288,8 +288,8 @@ mod tests {
     }
 
     fn test_client() -> HttpClient {
-        HttpClient::new(TlsSettings::default().into(), &ProxyConfig::default())
-            .expect("HTTP client should build")
+        let tls = TlsSettings::from_options(None).expect("TLS settings should build");
+        HttpClient::new(tls.into(), &ProxyConfig::default()).expect("HTTP client should build")
     }
 
     /// Reserved characters in the credentials and in each table-name segment
