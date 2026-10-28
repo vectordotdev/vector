@@ -1160,6 +1160,7 @@ e2e-tests-datadog = [
   "sources-datadog_agent",
   "sinks-datadog_logs",
   "sinks-datadog_metrics",
+  "sinks-datadog_traces",
   "dep:async-compression"
 ]
 

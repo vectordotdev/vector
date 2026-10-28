@@ -1,0 +1,140 @@
+services:
+  prepare-output:
+    image: alpine:3.20
+    command: ["sh", "-c", "rm -rf /output/datadog-traces/* && mkdir -p /output/datadog-traces"]
+    volumes:
+      - datadog_traces_evidence:/output/datadog-traces
+
+  # Input capture: the Agent's primary trace endpoint.
+  fakeintake-agent:
+    image: docker.io/datadog/fakeintake@sha256:bd5f58f1fdd7b45f25fd4b8c522b6705b0f805c1d0651e43cc3bcfdb1354334c
+
+  # Output capture: Vector's `datadog_traces` sink. Must match `fakeintake-agent`.
+  fakeintake-vector:
+    image: docker.io/datadog/fakeintake@sha256:bd5f58f1fdd7b45f25fd4b8c522b6705b0f805c1d0651e43cc3bcfdb1354334c
+
+  vector:
+    image: ${CONFIG_VECTOR_IMAGE}
+    command: ["vector", "--config", "/etc/vector/vector.yaml"]
+    environment:
+      - VECTOR_LOG=${VECTOR_LOG:-info}
+    depends_on:
+      - fakeintake-vector
+    volumes:
+      - ../data/vector.yaml:/etc/vector/vector.yaml:ro
+
+  datadog-agent:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    environment:
+      - DD_API_KEY=DEADBEEF
+    depends_on:
+      - fakeintake-agent
+      - vector
+    volumes:
+      - ../data/agent.yaml:/etc/datadog-agent/datadog.yaml:ro
+    # Tracers choose their protocol from /info, so start them only after it answers.
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8126/info"]
+      interval: 1s
+      timeout: 1s
+      retries: 120
+
+  frontend:
+    build: ../workload/python
+    command: ["ddtrace-run", "flask", "--app", "frontend", "run", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      - DD_TRACE_AGENT_URL=http://datadog-agent:8126
+      - DD_ENV=e2e
+      - DD_VERSION=1.0.0
+      - DD_SERVICE=frontend
+      # v0.4 carries native span links and events; Python's default v0.5 does not.
+      - DD_TRACE_API_VERSION=v0.4
+      - DD_TRACE_NATIVE_SPAN_EVENTS=true
+      - PRICING_URL=http://pricing:3000
+      - INVENTORY_URL=http://inventory:8080
+    depends_on:
+      datadog-agent:
+        condition: service_healthy
+      pricing:
+        condition: service_started
+      inventory:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    labels:
+      vector.datadog-traces.producer: "true"
+
+  pricing:
+    build: ../workload/node
+    environment:
+      - DD_TRACE_AGENT_URL=http://datadog-agent:8126
+      - DD_ENV=e2e
+      - DD_VERSION=1.0.0
+      - DD_SERVICE=pricing
+    depends_on:
+      datadog-agent:
+        condition: service_healthy
+    labels:
+      vector.datadog-traces.producer: "true"
+
+  inventory:
+    build: ../workload/go
+    environment:
+      - DD_TRACE_AGENT_URL=http://datadog-agent:8126
+      - DD_ENV=e2e
+      - DD_VERSION=1.0.0
+      - DD_SERVICE=inventory
+      # dd-trace-go v2 otherwise sends /v1.0/traces, which the Agent always forwards as
+      # indexed payloads that the `datadog_agent` source drops.
+      - DD_TRACE_AGENT_PROTOCOL_VERSION=0.4
+    depends_on:
+      datadog-agent:
+        condition: service_healthy
+    labels:
+      vector.datadog-traces.producer: "true"
+
+  client:
+    build: ../workload/python
+    command: ["python", "client.py"]
+    environment:
+      - FRONTEND_URL=http://frontend:8000
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+  finalize-captures:
+    build: ../workload/python
+    command: ["python", "/finalize.py"]
+    environment:
+      - VECTOR_NETWORK=${VECTOR_NETWORK}
+    depends_on:
+      prepare-output:
+        condition: service_completed_successfully
+      client:
+        condition: service_completed_successfully
+    volumes:
+      - ../data/finalize.py:/finalize.py:ro
+      - ${DOCKER_SOCKET}:/var/run/docker.sock
+      - datadog_traces_evidence:/output/datadog-traces
+
+  # Wait for finalized captures and stay running so vdev does not restart the workload.
+  traces-ready:
+    image: alpine:3.20
+    command: ["sh", "-c", "test -f /output/datadog-traces/capture-complete && exec sleep infinity"]
+    depends_on:
+      finalize-captures:
+        condition: service_completed_successfully
+    volumes:
+      - datadog_traces_evidence:/output/datadog-traces
+
+volumes:
+  datadog_traces_evidence:
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
