@@ -22,6 +22,8 @@ pub const DDTAGS: &str = "ddtags";
 /// The datadog message event path.
 pub const MESSAGE: &str = "message";
 pub(crate) const DATADOG_METRIC_RESOURCE_TAG_PREFIX: &str = "resource.";
+/// Datadog origin metric-type value for metrics excluded from indexing.
+pub(crate) const DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX: i32 = 9;
 
 /// Mapping of the semantic meaning of well known Datadog reserved attributes
 /// to the field name that Datadog intake expects.
@@ -65,6 +67,9 @@ pub struct DatadogSeriesMetric {
     /// device
     #[serde(skip_serializing_if = "Option::is_none")]
     pub device: Option<String>,
+    /// unit
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
     /// metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<DatadogSeriesMetricMetadata>,

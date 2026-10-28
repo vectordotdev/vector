@@ -53,11 +53,10 @@ impl CsvSerializerConfig {
     }
 
     /// Build the `CsvSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no CSV fields are configured.
     pub fn build(&self) -> Result<CsvSerializer, BuildError> {
         if self.csv.fields.is_empty() {
             Err("At least one CSV field must be specified".into())

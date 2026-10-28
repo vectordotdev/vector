@@ -66,6 +66,7 @@ async-stream,https://github.com/tokio-rs/async-stream,MIT,Carl Lerche <me@carlle
 async-stream-impl,https://github.com/tokio-rs/async-stream,MIT,Carl Lerche <me@carllerche.com>
 async-task,https://github.com/smol-rs/async-task,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-trait,https://github.com/dtolnay/async-trait,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
+async-tungstenite,https://github.com/sdroege/async-tungstenite,MIT,Sebastian Dröge <sebastian@centricular.com>
 asyncband,https://github.com/fast/asyncband,Apache-2.0,The asyncband Authors
 atoi,https://github.com/pacman82/atoi-rs,MIT,Markus Klein
 atomic-waker,https://github.com/smol-rs/atomic-waker,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, Contributors to futures-rs"
@@ -109,6 +110,7 @@ azure_core,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_core_macros,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_identity,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_storage_blob,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
+azure_storage_common,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 backon,https://github.com/Xuanwo/backon,Apache-2.0,The backon Authors
 base16,https://github.com/thomcc/rust-base16,CC0-1.0,Thom Chiovoloni <tchiovoloni@mozilla.com>
 base16ct,https://github.com/RustCrypto/formats/tree/master/base16ct,Apache-2.0 OR MIT,RustCrypto Developers
@@ -504,6 +506,7 @@ mongocrypt,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egn
 mongocrypt-sys,https://github.com/mongodb/libmongocrypt-rust,Apache-2.0,"Abraham Egnor <abraham.egnor@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>"
 mongodb,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>"
 mongodb-internal-macros,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <saghmrossi@gmail.com>, Patrick Freed <patrick.freed@mongodb.com>, Isabel Atkinson <isabel.atkinson@mongodb.com>, Abraham Egnor <abraham.egnor@mongodb.com>, Kaitlin Mahar <kaitlin.mahar@mongodb.com>, Patrick Meredith <pmeredit@protonmail.com>"
+mqttbytes-core-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
 multiversion,https://github.com/calebzulawski/multiversion,MIT OR Apache-2.0,Caleb Zulawski <caleb.zulawski@gmail.com>
 multiversion-macros,https://github.com/calebzulawski/multiversion,MIT OR Apache-2.0,Caleb Zulawski <caleb.zulawski@gmail.com>
 multiversion_no_op,https://github.com/hsivonen/multiversion_no_op,Apache-2.0 OR MIT,Henri Sivonen <hsivonen@hsivonen.fi>
@@ -680,7 +683,7 @@ regex,https://github.com/rust-lang/regex,MIT OR Apache-2.0,"The Rust Project Dev
 regex-automata,https://github.com/rust-lang/regex,MIT OR Apache-2.0,"The Rust Project Developers, Andrew Gallant <jamslam@gmail.com>"
 regex-filtered,https://github.com/ua-parser/uap-rust,BSD-3-Clause,The regex-filtered Authors
 regex-lite,https://github.com/rust-lang/regex,MIT OR Apache-2.0,"The Rust Project Developers, Andrew Gallant <jamslam@gmail.com>"
-regex-syntax,https://github.com/rust-lang/regex/tree/master/regex-syntax,MIT OR Apache-2.0,"The Rust Project Developers, Andrew Gallant <jamslam@gmail.com>"
+regex-syntax,https://github.com/rust-lang/regex,MIT OR Apache-2.0,"The Rust Project Developers, Andrew Gallant <jamslam@gmail.com>"
 relative-path,https://github.com/udoprog/relative-path,MIT OR Apache-2.0,John-John Tedro <udoprog@tedro.se>
 rend,https://github.com/djkoloski/rend,MIT,David Koloski <djkoloski@gmail.com>
 reqwest,https://github.com/seanmonstar/reqwest,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
@@ -698,7 +701,8 @@ rmpv,https://github.com/3Hren/msgpack-rust,MIT,Evgeny Safronov <division494@gmai
 roaring,https://github.com/RoaringBitmap/roaring-rs,MIT OR Apache-2.0,"Wim Looman <wim@nemo157.com>, Kerollmops <kero@meilisearch.com>"
 roxmltree,https://github.com/RazrFalcon/roxmltree,MIT OR Apache-2.0,Yevhenii Reizner <razrfalcon@gmail.com>
 rsa,https://github.com/RustCrypto/RSA,MIT OR Apache-2.0,"RustCrypto Developers, dignifiedquire <dignifiedquire@gmail.com>"
-rumqttc-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
+rumqttc-core-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
+rumqttc-v4-next,https://github.com/thehouseisonfire/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
 rust_decimal,https://github.com/paupino/rust-decimal,MIT,Paul Mason <paul@form1.co.nz>
 rustc-hash,https://github.com/rust-lang/rustc-hash,Apache-2.0 OR MIT,The Rust Project Developers
 rustc_version,https://github.com/djc/rustc-version-rs,MIT OR Apache-2.0,The rustc_version Authors
@@ -736,7 +740,7 @@ serde_bytes,https://github.com/serde-rs/bytes,MIT OR Apache-2.0,David Tolnay <dt
 serde_core,https://github.com/serde-rs/serde,MIT OR Apache-2.0,"Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>"
 serde_derive,https://github.com/serde-rs/serde,MIT OR Apache-2.0,"Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>"
 serde_derive_internals,https://github.com/serde-rs/serde,MIT OR Apache-2.0,"Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>"
-serde_json,https://github.com/serde-rs/json,MIT OR Apache-2.0,"Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>"
+serde_json,https://github.com/serde-rs/json,MIT OR Apache-2.0,The serde_json Authors
 serde_nanos,https://github.com/caspervonb/serde_nanos,MIT OR Apache-2.0,Casper Beyer <caspervonb@pm.me>
 serde_path_to_error,https://github.com/dtolnay/path-to-error,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 serde_plain,https://github.com/mitsuhiko/serde-plain,MIT OR Apache-2.0,Armin Ronacher <armin.ronacher@active-4.com>
@@ -981,6 +985,8 @@ zerovec,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Devel
 zerovec-derive,https://github.com/unicode-org/icu4x,Unicode-3.0,Manish Goregaokar <manishsmail@gmail.com>
 zlib-rs,https://github.com/trifectatechfoundation/zlib-rs,Zlib,The zlib-rs Authors
 zmij,https://github.com/dtolnay/zmij,MIT,David Tolnay <dtolnay@gmail.com>
+zstd,https://github.com/gyscos/zstd-rs,BSD-3-Clause,Alexandre Bury <alexandre.bury@gmail.com>
 zstd,https://github.com/gyscos/zstd-rs,MIT,Alexandre Bury <alexandre.bury@gmail.com>
+zstd-safe,https://github.com/gyscos/zstd-rs,BSD-3-Clause,Alexandre Bury <alexandre.bury@gmail.com>
 zstd-safe,https://github.com/gyscos/zstd-rs,MIT OR Apache-2.0,Alexandre Bury <alexandre.bury@gmail.com>
-zstd-sys,https://github.com/gyscos/zstd-rs,MIT OR Apache-2.0,Alexandre Bury <alexandre.bury@gmail.com>
+zstd-sys,https://github.com/gyscos/zstd-rs,BSD-3-Clause,Alexandre Bury <alexandre.bury@gmail.com>

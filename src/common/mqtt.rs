@@ -116,16 +116,18 @@ impl MqttConnector {
 
     /// Connects the connector and generates a client and eventloop
     pub fn connect(&self) -> (AsyncClient, EventLoop) {
-        let (client, eventloop) = AsyncClient::new(self.options.clone(), 1024);
-        (client, eventloop)
+        AsyncClient::builder(self.options.clone())
+            .capacity(1024)
+            .build()
     }
 
+    /// Checks the health of the MQTT connection. Currently a no-op.
+    ///
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error.
     pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
     }
