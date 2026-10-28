@@ -25,9 +25,12 @@ impl GrpcAddress {
     /// Gets the fully-qualified endpoint address.
     ///
     /// This is a URI in the form of `http://<socket address>/`. The scheme and path are hard-coded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the socket address does not form a valid URI authority, which should not happen
+    /// for any `SocketAddr`.
     #[must_use]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
     pub fn as_uri(&self) -> Uri {
         let addr_str = self.addr.to_string();
         Uri::builder()

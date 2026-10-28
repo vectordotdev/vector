@@ -19,6 +19,7 @@ use tonic::Code::{
 };
 use tonic::body::BoxBody;
 use tower::{Service, ServiceBuilder};
+use vector_http::Http2Client;
 use vector_lib::configurable::configurable_component;
 use vector_lib::stream::BatcherSettings;
 
@@ -33,7 +34,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions, ValidatedSink,
     },
-    http::{VectorAuthConfig, client_v1::Http2Client},
+    http::VectorAuthConfig,
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,

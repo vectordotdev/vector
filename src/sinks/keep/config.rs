@@ -4,6 +4,7 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http_1::{Request, StatusCode};
 use http_body_util::BodyExt;
+use vector_http::full_body;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
@@ -13,7 +14,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::client_v1::{HttpClient, full_body},
+    http::client_v1::HttpClient,
     sinks::{
         prelude::*,
         util::{

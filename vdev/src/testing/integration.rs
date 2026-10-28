@@ -204,9 +204,12 @@ impl ComposeTest {
 
         args.push("--features".to_string());
 
-        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
-        // If using per-test runner: use test-specific features from test.yaml
-        args.push(if self.runner.is_shared_runner() {
+        // Integration tests always compile only the suite's own `test.yaml` features: each CI
+        // job runs a single suite, so compiling `all-integration-tests` there only adds build
+        // time. E2E tests on the shared runner still use `all-e2e-tests`.
+        let use_all_features =
+            self.runner.is_shared_runner() && self.local_config.kind == ComposeTestKind::E2E;
+        args.push(if use_all_features {
             format!("{},vendored", self.local_config.feature_flag)
         } else {
             format!("{},vendored", self.config.features.join(","))

@@ -41,8 +41,13 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if a directory or an opened config file cannot be read, a
+    /// referenced environment variable or secret cannot be interpolated, the content cannot be
+    /// parsed or deserialized, or values cannot be merged into the config builder. Config files
+    /// that cannot be opened are logged and skipped.
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -51,8 +56,12 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if `input` cannot be read as UTF-8, a referenced environment
+    /// variable or secret cannot be interpolated, the content cannot be parsed or deserialized,
+    /// or values cannot be merged into the config builder.
     pub fn load_from_input<R: Read>(
         self,
         input: R,

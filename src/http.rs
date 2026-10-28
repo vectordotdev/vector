@@ -24,7 +24,6 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use rand::RngExt;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
@@ -102,8 +101,17 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Creates a client that uses the given TLS settings and proxy configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
+    /// connector cannot be created, or a configured proxy URL is not a valid URI.
+    ///
+    /// # Panics
+    ///
+    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
+    /// build-time application name and version do not form a valid `User-Agent` header value.
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -111,8 +119,18 @@ where
         HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
     }
 
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Creates a client like [`HttpClient::new`], using `client_builder` to configure the
+    /// underlying hyper client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a TLS connector cannot be built from `tls_settings`, the HTTPS
+    /// connector cannot be created, or a configured proxy URL is not a valid URI.
+    ///
+    /// # Panics
+    ///
+    /// Panics if OpenSSL fails to create the proxy connector's default TLS connector, or the
+    /// build-time application name and version do not form a valid `User-Agent` header value.
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
@@ -142,6 +160,11 @@ where
     /// It only matters for the case of a plaintext-`http` request sent through an HTTP proxy, where
     /// `Proxy-Authorization` must ride on the request itself. HTTPS-through-proxy is unaffected:
     /// proxy auth happens during the CONNECT handshake inside the connector.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the build-time application name and version do not form a valid `User-Agent`
+    /// header value.
     pub fn new_with_connector(connector: C, client_builder: &mut client::Builder) -> Self {
         let client = client_builder.build(connector);
 
@@ -220,9 +243,17 @@ fn default_user_agent() -> HeaderValue {
         .expect("Invalid header value for user-agent!")
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+/// Builds a proxy-aware HTTPS connector from the given TLS settings and proxy configuration.
+///
+/// # Errors
+///
+/// Returns [`HttpError::BuildTlsConnector`] if a TLS connector cannot be built from
+/// `tls_settings`, [`HttpError::MakeHttpsConnector`] if the HTTPS connector cannot be created, or
+/// [`HttpError::MakeProxyConnector`] if a configured proxy URL is not a valid URI.
+///
+/// # Panics
+///
+/// Panics if OpenSSL fails to create the proxy connector's default TLS connector.
 pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
@@ -272,8 +303,12 @@ pub fn build_proxy_connector(
     Ok(proxy)
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Builds an HTTPS connector from the given TLS settings, without proxy support.
+///
+/// # Errors
+///
+/// Returns [`HttpError::BuildTlsConnector`] if a TLS connector cannot be built from
+/// `tls_settings`, or [`HttpError::MakeHttpsConnector`] if the HTTPS connector cannot be created.
 pub fn build_tls_connector(
     tls_settings: MaybeTlsSettings,
 ) -> Result<HttpsConnector<HttpConnector>, HttpError> {
@@ -458,8 +493,11 @@ pub enum Auth {
 }
 
 pub trait MaybeAuth: Sized {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Returns whichever of `self` and `other` is set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if both `self` and `other` are set.
     fn choose_one(&self, other: &Self) -> crate::Result<Self>;
 }
 
@@ -614,8 +652,11 @@ impl VectorAuthConfig {
     }
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+/// Returns the scheme of `uri` as a static string, defaulting to `"http"` when it has none.
+///
+/// # Panics
+///
+/// Panics if `uri` has a scheme other than `http` or `https`.
 pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
     // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
     // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
@@ -748,18 +789,9 @@ impl MaxConnectionAgeLayer {
     pub fn new(max_connection_age: Duration, jitter_factor: f64, peer_addr: SocketAddr) -> Self {
         Self {
             start_reference: Instant::now(),
-            max_connection_age: Self::jittered_duration(max_connection_age, jitter_factor),
+            max_connection_age: vector_http::jittered_duration(max_connection_age, jitter_factor),
             peer_addr,
         }
-    }
-
-    fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
-        // Ensure the jitter_factor is between 0.0 and 1.0
-        let jitter_factor = jitter_factor.clamp(0.0, 1.0);
-        // Generate a random jitter factor between `1 - jitter_factor`` and `1 + jitter_factor`.
-        let mut rng = rand::rng();
-        let random_jitter_factor = rng.random_range(-jitter_factor..=jitter_factor) + 1.;
-        duration.mul_f64(random_jitter_factor)
     }
 }
 
@@ -1120,7 +1152,7 @@ mod tests {
         #[test]
         fn test_jittered_duration(duration_in_secs in 0u64..120, jitter_factor in 0.0..1.0) {
             let duration = Duration::from_secs(duration_in_secs);
-            let jittered_duration = MaxConnectionAgeLayer::jittered_duration(duration, jitter_factor);
+            let jittered_duration = vector_http::jittered_duration(duration, jitter_factor);
 
             // Check properties based on the range of inputs
             if jitter_factor == 0.0 {

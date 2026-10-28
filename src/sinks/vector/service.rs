@@ -3,10 +3,10 @@ use std::task::{Context, Poll};
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
 use http_1::{HeaderValue, header::AUTHORIZATION};
-use hyper_1::body::Incoming;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;
+use vector_http::{GrpcTransport, Http2Client};
 use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
@@ -16,7 +16,6 @@ use super::{VectorSinkError, compression::VectorCompression};
 use crate::{
     Error,
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::client_v1::{Http2Client, HttpError},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
@@ -24,7 +23,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
-    pub client: proto_vector::Client<GrpcTransport>,
+    pub client: proto_vector::Client<AuthTransport>,
     pub protocol: String,
     pub endpoint: String,
 }
@@ -79,7 +78,7 @@ impl VectorService {
         let origin = grpc_origin(&uri)?;
         let (protocol, endpoint) = uri::protocol_endpoint(uri);
         let mut proto_client =
-            proto_vector::Client::with_origin(GrpcTransport { client, auth }, origin);
+            proto_vector::Client::with_origin(AuthTransport::new(client, auth), origin);
 
         if let Some(encoding) = compression.as_tonic_encoding() {
             proto_client = proto_client.send_compressed(encoding);
@@ -152,29 +151,35 @@ impl Service<VectorRequest> for VectorService {
     }
 }
 
-/// Sends tonic's gRPC requests over the native HTTP/2 client.
+/// Adds the configured `Authorization` header to each request sent over the shared transport.
 #[derive(Clone, Debug)]
-pub struct GrpcTransport {
-    client: Http2Client<BoxBody>,
+pub struct AuthTransport {
+    inner: GrpcTransport<BoxBody>,
     auth: Option<HeaderValue>,
 }
 
-impl Service<http_1::Request<BoxBody>> for GrpcTransport {
-    type Response = http_1::Response<Incoming>;
-    type Error = HttpError;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+impl AuthTransport {
+    const fn new(client: Http2Client<BoxBody>, auth: Option<HeaderValue>) -> Self {
+        Self {
+            inner: GrpcTransport(client),
+            auth,
+        }
+    }
+}
 
-    // Emission of an internal event in case of errors is handled upstream by the caller.
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+impl Service<http_1::Request<BoxBody>> for AuthTransport {
+    type Response = <GrpcTransport<BoxBody> as Service<http_1::Request<BoxBody>>>::Response;
+    type Error = <GrpcTransport<BoxBody> as Service<http_1::Request<BoxBody>>>::Error;
+    type Future = <GrpcTransport<BoxBody> as Service<http_1::Request<BoxBody>>>::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
     }
 
-    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut request: http_1::Request<BoxBody>) -> Self::Future {
         if let Some(auth) = &self.auth {
             request.headers_mut().insert(AUTHORIZATION, auth.clone());
         }
-
-        Box::pin(self.client.request(request))
+        self.inner.call(request)
     }
 }
