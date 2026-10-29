@@ -54,7 +54,7 @@ fn preparation() -> (TempDir, String) {
     preparation_with_breaking_changes(false)
 }
 
-fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
+fn development_checkout(breaking: bool) -> (TempDir, String) {
     let temp = tempdir().unwrap();
     let repo = temp.path();
     git(repo, &["init", "-b", "master"]);
@@ -107,6 +107,12 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
         "versions: [\n\"0.1.0\",\n]\n",
     );
     let base = commit(repo);
+    (temp, base)
+}
+
+fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
+    let (temp, base) = development_checkout(breaking);
+    let repo = temp.path();
     git(repo, &["switch", "-c", "prepare-v-0-59-0-website"]);
     version(repo, "0.59.0");
     write(
@@ -674,9 +680,14 @@ mod prepare {
 
     #[test]
     fn cli_default_preparation_accepts_current_master() {
-        let (temp, remote) = fixture();
+        let (temp, _) = development_checkout(false);
         let repo = temp.path();
-        git(repo, &["branch", "-D", "prepare-v-0-59-0-website"]);
+        let remote = tempdir().unwrap();
+        git(remote.path(), &["init", "--bare"]);
+        git(
+            repo,
+            &["remote", "add", "origin", remote.path().to_str().unwrap()],
+        );
         git(repo, &["tag", "v0.58.0"]);
         let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
         write(
@@ -699,6 +710,11 @@ mod prepare {
             ".git/test-bin/gh",
             "#!/bin/sh\nprintf '## 0.28.0\\n- Release fixture\\n'\n",
         );
+        fs::set_permissions(
+            repo.join(".git/test-bin/gh"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
         write(repo, ".git/test-bin/cue", "#!/bin/sh\nexit 0\n");
         fs::set_permissions(
             repo.join(".git/test-bin/cue"),
