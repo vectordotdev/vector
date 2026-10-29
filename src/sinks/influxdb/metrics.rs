@@ -1,14 +1,21 @@
-use std::{collections::HashMap, future::ready, task::Poll};
+use std::{collections::HashMap, fmt, future::ready, mem, sync::Arc, time::Duration};
 
 use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, future::BoxFuture, stream};
+use futures::{StreamExt, stream::BoxStream};
+use http_1::Uri;
 use indoc::indoc;
-use tower::Service;
+use tower::{Service, ServiceBuilder};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     event::metric::{MetricSketch, MetricTags, Quantile},
+    finalization::{EventFinalizers, EventStatus},
+    internal_event::CountByteSize,
+    json_size::JsonSize,
+    request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse, batcher::BatchConfig as StreamBatchConfig},
 };
 
 use crate::{
@@ -19,32 +26,30 @@ use crate::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
     },
-    http::HttpClient,
+    http::client_v1::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
         Healthcheck, VectorSink,
         influxdb::{
-            Field, InfluxDbSettings, ProtocolVersion, encode_timestamp, healthcheck,
-            influx_line_protocol, influxdb_settings,
+            Field, InfluxDbSettings, InfluxDbWriteRequest, ProtocolVersion, encode_timestamp,
+            healthcheck, influx_line_protocol, influxdb_settings,
         },
         util::{
-            BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
-            TowerRequestConfig,
-            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
+            BatchConfig, HttpEndpoint, SinkBatchSettings, TowerRequestConfig,
+            buffer::metrics::{
+                MetricNormalize, MetricNormalizer, MetricSet, MetricSetSettings,
+                compress_distribution,
+            },
+            builder::SinkBuilderExt,
             encode_namespace,
-            http::{HttpBatchService, HttpRetryLogic},
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            service::ServiceBuilderExt,
             statistic::{DistributionStatistic, validate_quantiles},
         },
     },
     tls::{TlsConfig, TlsSettings},
 };
-
-#[derive(Clone)]
-struct InfluxDbSvc {
-    config: InfluxDbConfig,
-    protocol_version: ProtocolVersion,
-    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>>,
-}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct InfluxDbDefaultBatchSettings;
@@ -140,11 +145,10 @@ impl SinkConfig for InfluxDbConfig {
 pub struct ValidatedInfluxDbMetrics {
     // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
     #[debug(skip)]
-    uri: http::Uri,
+    uri: Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,
-    #[debug(skip)]
-    batch: BatchSettings<MetricsBuffer>,
+    batch: BatcherSettings,
 }
 
 #[async_trait::async_trait]
@@ -161,7 +165,11 @@ impl ValidatedSink for InfluxDbConfig {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = self.batch.into_batch_settings()?;
+        let batch = self
+            .batch
+            .validate()?
+            .disallow_max_bytes()?
+            .into_batcher_settings()?;
 
         Ok(ValidatedInfluxDbMetrics {
             uri,
@@ -176,27 +184,6 @@ impl ValidatedSink for InfluxDbConfig {
         validated: &ValidatedInfluxDbMetrics,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck =
-            healthcheck(self.endpoint.clone(), self.settings.clone(), client.clone())?;
-        let sink = InfluxDbSvc::from_validated(self.clone(), validated, client);
-        Ok((sink, healthcheck))
-    }
-}
-
-impl InfluxDbSvc {
-    #[cfg(all(test, feature = "influxdb-integration-tests"))]
-    pub fn build_sink(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
-        let validated = config.validate()?;
-        Ok(Self::from_validated(config, &validated, client))
-    }
-
-    fn from_validated(
-        config: InfluxDbConfig,
-        validated: &ValidatedInfluxDbMetrics,
-        client: HttpClient,
-    ) -> VectorSink {
         let ValidatedInfluxDbMetrics {
             uri,
             token,
@@ -204,84 +191,234 @@ impl InfluxDbSvc {
             batch,
         } = validated;
 
-        let request = config.request.into_settings();
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
+        let healthcheck =
+            healthcheck(self.endpoint.clone(), self.settings.clone(), client.clone())?;
 
-        let http_service =
-            HttpBatchService::new(client, create_build_request(uri.clone(), token.inner()));
-
-        let influxdb_http_service = InfluxDbSvc {
-            config,
+        let request_builder = InfluxDbMetricsRequestBuilder {
+            write: InfluxDbWriteRequest::new(uri.clone(), token),
             protocol_version: *protocol_version,
-            inner: http_service,
+            default_namespace: self.default_namespace.clone(),
+            tags: self.tags.clone(),
+            quantiles: self.quantiles.clone(),
         };
+        let service = HttpService::new(client, request_builder).with_response_decompression();
+        let service = ServiceBuilder::new()
+            .settings(
+                self.request.into_settings(),
+                http_response_retry_logic(RetryStrategy::Default),
+            )
+            .service(service);
+
+        let sink = InfluxDbMetricsSink {
+            service,
+            batch_settings: *batch,
+        };
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
+/// A normalized metric with the finalizers and the accounting of the event it came from.
+struct NormalizedMetric {
+    metric: Metric,
+    finalizers: EventFinalizers,
+    byte_size: usize,
+    json_size: JsonSize,
+}
+
+/// The aggregated metrics of one write request, with the finalizers and the accounting of every
+/// event added to it.
+struct MetricBatch {
+    metrics: Vec<Metric>,
+    finalizers: EventFinalizers,
+    count: usize,
+    byte_size: usize,
+    json_size: JsonSize,
+}
+
+fn metric_set(max_events: usize) -> MetricSet {
+    MetricSet::new(MetricSetSettings {
+        max_events: Some(max_events),
+        ..Default::default()
+    })
+}
+
+/// Aggregates metrics by series until a batch holds `max_events` series.
+struct MetricBatchConfig {
+    metrics: MetricSet,
+    finalizers: EventFinalizers,
+    count: usize,
+    byte_size: usize,
+    json_size: JsonSize,
+    settings: BatcherSettings,
+}
+
+impl MetricBatchConfig {
+    fn new(settings: BatcherSettings) -> Self {
+        Self {
+            metrics: metric_set(settings.item_limit),
+            finalizers: EventFinalizers::default(),
+            count: 0,
+            byte_size: 0,
+            json_size: JsonSize::zero(),
+            settings,
+        }
+    }
+}
+
+impl StreamBatchConfig<NormalizedMetric> for MetricBatchConfig {
+    type ItemMetadata = ();
+    type Batch = MetricBatch;
+
+    fn len(&self) -> usize {
+        self.count
+    }
+
+    fn take_batch(&mut self) -> MetricBatch {
+        let metrics = mem::replace(&mut self.metrics, metric_set(self.settings.item_limit));
+        let mut metrics = metrics.into_metrics();
+        for metric in &mut metrics {
+            if let MetricValue::Distribution { samples, .. } = metric.data_mut().value_mut() {
+                *samples = compress_distribution(samples);
+            }
+        }
+        MetricBatch {
+            metrics,
+            finalizers: mem::take(&mut self.finalizers),
+            count: mem::take(&mut self.count),
+            byte_size: mem::take(&mut self.byte_size),
+            json_size: mem::take(&mut self.json_size),
+        }
+    }
+
+    fn push(&mut self, item: NormalizedMetric, (): ()) {
+        self.finalizers.merge(item.finalizers);
+        self.count += 1;
+        self.byte_size += item.byte_size;
+        self.json_size += item.json_size;
+        self.metrics.insert_update(item.metric);
+    }
+
+    fn is_batch_full(&self) -> bool {
+        self.metrics.len() >= self.settings.item_limit
+    }
+
+    fn item_fits_in_batch(&self, _item: &NormalizedMetric) -> (bool, ()) {
+        // A batch is taken as soon as it is full, so every metric fits.
+        (true, ())
+    }
+
+    fn timeout(&self) -> Duration {
+        self.settings.timeout
+    }
+}
+
+/// Encodes the batched metrics of each request attempt.
+///
+/// Every attempt, retries included, encodes the metrics again: metrics without a timestamp are
+/// written with the time of the attempt.
+#[derive(Clone)]
+struct InfluxDbMetricsRequestBuilder {
+    write: InfluxDbWriteRequest,
+    protocol_version: ProtocolVersion,
+    default_namespace: Option<String>,
+    tags: Option<HashMap<String, String>>,
+    quantiles: Vec<f64>,
+}
+
+impl HttpServiceRequestBuilder<Arc<MetricBatch>> for InfluxDbMetricsRequestBuilder {
+    fn build(
+        &self,
+        request: HttpRequest<Arc<MetricBatch>>,
+    ) -> crate::Result<http_1::Request<Bytes>> {
+        let body = encode_events(
+            self.protocol_version,
+            &request.get_additional_metadata().metrics,
+            self.default_namespace.as_deref(),
+            self.tags.as_ref(),
+            &self.quantiles,
+        );
+        self.write.request(body.freeze())
+    }
+}
+
+/// Creates the request for a batch.
+///
+/// The request takes the finalizers of the batch, so the driver reports the response status to
+/// the events.
+fn build_request(mut batch: MetricBatch) -> HttpRequest<Arc<MetricBatch>> {
+    // The body is only encoded by each attempt, so its size is unknown here. The driver does not
+    // report byte telemetry for this sink, and `EndpointBytesSent` uses the actual body size.
+    let metadata = RequestMetadata::new(
+        batch.count,
+        batch.byte_size,
+        0,
+        0,
+        // Events are reported untagged, with the estimated JSON size of the original events.
+        CountByteSize(batch.count, batch.json_size).into(),
+    );
+    HttpRequest::new(
+        Bytes::new(),
+        mem::take(&mut batch.finalizers),
+        metadata,
+        Arc::new(batch),
+    )
+}
+
+struct InfluxDbMetricsSink<S> {
+    service: S,
+    batch_settings: BatcherSettings,
+}
+
+impl<S> InfluxDbMetricsSink<S>
+where
+    S: Service<HttpRequest<Arc<MetricBatch>>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let Self {
+            service,
+            batch_settings,
+        } = *self;
         let mut normalizer = MetricNormalizer::<InfluxMetricNormalize>::default();
 
-        let sink = request
-            .batch_sink(
-                HttpRetryLogic::default(),
-                influxdb_http_service,
-                MetricsBuffer::new(batch.size),
-                batch.timeout,
-            )
-            .with_flat_map(move |event: Event| {
-                stream::iter({
-                    let byte_size = event.size_of();
-                    let json_size = event.estimated_json_encoded_size_of();
-
-                    normalizer
-                        .normalize(event.into_metric())
-                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
-                })
+        input
+            .filter_map(move |event| {
+                // The accounting of the original event is kept through normalization.
+                let byte_size = event.size_of();
+                let json_size = event.estimated_json_encoded_size_of();
+                let mut metric = event.into_metric();
+                let finalizers = metric.metadata_mut().take_finalizers();
+                ready(normalizer.normalize(metric).map(|metric| NormalizedMetric {
+                    metric,
+                    finalizers,
+                    byte_size,
+                    json_size,
+                }))
             })
-            .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error, internal_log_rate_limit = false));
-
-        #[allow(deprecated)]
-        VectorSink::from_event_sink(sink)
+            .batched(MetricBatchConfig::new(batch_settings))
+            .map(build_request)
+            .into_driver(service)
+            .with_request_error_status(EventStatus::Errored)
+            .run()
+            .await
     }
 }
 
-impl Service<Vec<Metric>> for InfluxDbSvc {
-    type Response = http::Response<Bytes>;
-    type Error = crate::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of Error internal event is handled upstream by the caller
-    fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    // Emission of Error internal event is handled upstream by the caller
-    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = encode_events(
-            self.protocol_version,
-            items,
-            self.config.default_namespace.as_deref(),
-            self.config.tags.as_ref(),
-            &self.config.quantiles,
-        );
-        let body = input.freeze();
-
-        self.inner.call(body)
-    }
-}
-
-fn create_build_request(
-    uri: http::Uri,
-    token: &str,
-) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>
-+ Sync
-+ Send
-+ 'static
-+ use<> {
-    let auth = format!("Token {token}");
-    move |body| {
-        Box::pin(ready(
-            hyper::Request::post(uri.clone())
-                .header("Content-Type", "text/plain")
-                .header("Authorization", auth.clone())
-                .body(body)
-                .map_err(Into::into),
-        ))
+#[async_trait::async_trait]
+impl<S> StreamSink<Event> for InfluxDbMetricsSink<S>
+where
+    S: Service<HttpRequest<Arc<MetricBatch>>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
     }
 }
 
@@ -321,7 +458,7 @@ impl MetricNormalize for InfluxMetricNormalize {
 
 fn encode_events(
     protocol_version: ProtocolVersion,
-    events: Vec<Metric>,
+    events: &[Metric],
     default_namespace: Option<&str>,
     tags: Option<&HashMap<String, String>>,
     quantiles: &[f64],
@@ -332,7 +469,7 @@ fn encode_events(
     for event in events {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
-        let tags = merge_tags(&event, tags);
+        let tags = merge_tags(event, tags);
         let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
         let mut unwrapped_tags = tags.unwrap_or_default();
@@ -491,17 +628,26 @@ fn to_fields(value: f64) -> HashMap<KeyString, Field> {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
+    use futures::stream;
+    use http::StatusCode;
     use indoc::indoc;
     use similar_asserts::assert_eq;
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::{
         config::ValidatedSink,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        sinks::influxdb::{
-            InfluxDb2Settings,
-            test_util::{assert_fields, split_line_protocol, tags, ts},
+        sinks::{
+            influxdb::{
+                InfluxDb2Settings,
+                test_util::{assert_fields, split_line_protocol, tags, ts},
+            },
+            util::test::build_test_server_status,
         },
+        test_util::addr::next_addr,
     };
 
     #[test]
@@ -631,7 +777,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("vector"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, Some("vector"), None, &[]);
         assert_eq!(
             line_protocols,
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
@@ -652,7 +798,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, None, None, &[]);
         assert_eq!(
             line_protocols,
             "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
@@ -674,7 +820,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, None, None, &[]);
         assert_eq!(
             line_protocols,
             "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
@@ -698,7 +844,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, &events, None, None, &[]);
         let line_protocols =
             String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -741,7 +887,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, None, None, &[]);
         let line_protocols =
             String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -784,7 +930,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, &events, None, None, &[]);
         let line_protocols =
             String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -827,7 +973,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, None, None, &[]);
         let line_protocols =
             String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -904,7 +1050,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, None, None, &[]);
         let line_protocols =
             String::from_utf8(line_protocols.freeze().as_ref().to_owned()).unwrap();
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -984,7 +1130,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -1004,7 +1150,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, &events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -1026,7 +1172,7 @@ mod tests {
 
         let line_protocols = encode_events(
             ProtocolVersion::V2,
-            events,
+            &events,
             None,
             None,
             &default_summary_quantiles(),
@@ -1090,7 +1236,7 @@ mod tests {
 
         let line_protocols = encode_events(
             ProtocolVersion::V1,
-            events,
+            &events,
             Some("ns"),
             Some(tags).as_ref(),
             &[],
@@ -1106,6 +1252,118 @@ mod tests {
         assert_eq!(
             line_protocols[1],
             "vector.mem,datacenter=us-east,host=local,metric_type=gauge,normal_tag=value,true_tag=true value=1000 1542182950000000011"
+        );
+    }
+
+    fn counter(name: &str, value: f64, batch: &BatchNotifier) -> NormalizedMetric {
+        let mut metric = Metric::new(
+            name,
+            MetricKind::Incremental,
+            MetricValue::Counter { value },
+        )
+        .with_batch_notifier(batch);
+        NormalizedMetric {
+            finalizers: metric.metadata_mut().take_finalizers(),
+            metric,
+            byte_size: 1,
+            json_size: JsonSize::new(10),
+        }
+    }
+
+    #[tokio::test]
+    async fn batches_aggregate_series_and_count_every_event() {
+        let (batch, _receiver) = BatchNotifier::new_with_receiver();
+        let metrics = vec![
+            counter("a", 1.0, &batch),
+            counter("a", 2.0, &batch),
+            counter("b", 1.0, &batch),
+            counter("c", 1.0, &batch),
+        ];
+        let settings = BatcherSettings::new(
+            Duration::from_secs(1),
+            NonZeroUsize::MAX,
+            NonZeroUsize::new(2).unwrap(),
+        );
+        let batches: Vec<MetricBatch> = stream::iter(metrics)
+            .batched(MetricBatchConfig::new(settings))
+            .collect()
+            .await;
+
+        let series = |batch: &MetricBatch| {
+            batch
+                .metrics
+                .iter()
+                .map(|metric| (metric.name().to_owned(), metric.value().clone()))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(batches.len(), 2);
+        assert_eq!(
+            series(&batches[0]),
+            vec![
+                ("a".to_owned(), MetricValue::Counter { value: 3.0 }),
+                ("b".to_owned(), MetricValue::Counter { value: 1.0 }),
+            ]
+        );
+        assert_eq!(batches[0].count, 3);
+        assert_eq!(batches[0].json_size, JsonSize::new(30));
+        assert_eq!(
+            series(&batches[1]),
+            vec![("c".to_owned(), MetricValue::Counter { value: 1.0 })]
+        );
+        assert_eq!(batches[1].count, 1);
+    }
+
+    /// Sends two metrics to a server that answers with `status` and returns their batch status.
+    async fn batch_status_for_response(status: StatusCode) -> BatchStatus {
+        let (_guard, addr) = next_addr();
+        let config: InfluxDbConfig = serde_yaml::from_str(&format!(
+            indoc! {r#"
+                endpoint: "http://{}"
+                version: "2"
+                bucket: "my-bucket"
+                org: "my-org"
+                token: "my-token"
+                request:
+                  retry_attempts: 0
+            "#},
+            addr
+        ))
+        .unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
+        let (_rx, _trigger, server) = build_test_server_status(addr, status);
+        tokio::spawn(server);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let events = ["a", "b"].map(|name| {
+            Event::Metric(
+                Metric::new(
+                    name,
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_batch_notifier(&batch),
+            )
+        });
+        drop(batch);
+        sink.run_events(events).await.unwrap();
+        receiver.try_recv().expect("batch should be finalized")
+    }
+
+    #[tokio::test]
+    async fn response_status_reaches_the_events() {
+        assert_eq!(
+            batch_status_for_response(StatusCode::NO_CONTENT).await,
+            BatchStatus::Delivered
+        );
+        assert_eq!(
+            batch_status_for_response(StatusCode::BAD_REQUEST).await,
+            BatchStatus::Rejected
+        );
+        assert_eq!(
+            batch_status_for_response(StatusCode::SERVICE_UNAVAILABLE).await,
+            BatchStatus::Errored
         );
     }
 }
@@ -1124,10 +1382,9 @@ mod integration_tests {
             Event,
             metric::{Metric, MetricKind, MetricValue},
         },
-        http::HttpClient,
         sinks::influxdb::{
             InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings,
-            metrics::{InfluxDbConfig, InfluxDbSvc, default_summary_quantiles},
+            metrics::{InfluxDbConfig, default_summary_quantiles},
             test_util::{
                 BUCKET, ORG, TOKEN, address_v1, address_v2, cleanup_v1, format_timestamp,
                 onboarding_v1, onboarding_v2, query_v1,
@@ -1302,8 +1559,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(None, cx.proxy()).unwrap();
-        let sink = InfluxDbSvc::build_sink(config, client).unwrap();
+        let (sink, _) = config.build(cx).await.expect("error when building config");
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();

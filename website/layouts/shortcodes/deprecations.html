@@ -7,42 +7,12 @@
   {{- $enacted := $entries.enacted -}}
 
   {{ if gt (len $pending) 0 }}
-  <div class="mt-6 flex flex-col space-y-6">
-    {{ range $pending }}
-    <div>
-      <span class="text-xl font-semibold text-dark dark:text-gray-300">
-        {{ .what | markdownify }}
-      </span>
-      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Deprecated since {{ .deprecated_since }}
-      </div>
-      {{ with .content }}
-      <div class="mt-2.5 prose dark:prose-invert max-w-none">
-        {{ . }}
-      </div>
-      {{ end }}
-    </div>
-    {{ end }}
-  </div>
+  {{ partial "deprecations/list.html" (dict "entries" $pending "sort_by" "deprecation version") }}
   {{ end }}
 
   {{ if gt (len $enacted) 0 }}
-  <div class="mt-10 flex flex-col space-y-6">
-    {{ range $enacted }}
-    <div class="opacity-75">
-      <span class="text-xl font-semibold text-dark dark:text-gray-300">
-        {{ .what | markdownify }}
-      </span>
-      <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
-      </div>
-      {{ with .content }}
-      <div class="mt-2.5 prose dark:prose-invert max-w-none">
-        {{ . }}
-      </div>
-      {{ end }}
-    </div>
-    {{ end }}
+  <div class="mt-10">
+    {{ partial "deprecations/list.html" (dict "entries" $enacted "sort_by" "removal version" "class" "opacity-75") }}
   </div>
   {{ end }}
 

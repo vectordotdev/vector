@@ -87,15 +87,15 @@ enum HttpServerAuthRepr {
         #[configurable(metadata(docs::examples = "my-secret-token"))]
         token: SensitiveString,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         username: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         password: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         source: String,
     },
@@ -106,15 +106,15 @@ enum HttpServerAuthRepr {
         /// The VRL boolean expression.
         source: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         username: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         password: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         token: String,
     },
@@ -138,11 +138,11 @@ enum HttpServerAuthRepr {
         #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         token: String,
         /// Accepted but ignored for this strategy.
-        #[configurable(metadata(docs::hidden))]
+        #[configurable(metadata(docs::hidden, serde::ignored))]
         #[serde(default, skip_serializing_if = "String::is_empty")]
         source: String,
     },
