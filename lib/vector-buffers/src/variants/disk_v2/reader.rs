@@ -4,6 +4,7 @@ use std::{
     marker::PhantomData,
     num::NonZeroU64,
     sync::Arc,
+    time::Duration,
 };
 
 use crc32fast::Hasher;
@@ -1009,6 +1010,7 @@ where
     #[allow(clippy::too_many_lines)]
     pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
         let mut force_check_pending_data_files = false;
+        let mut visibility_retries = 0_u32;
 
         let token = loop {
             // Handle any pending acknowledgements first.
@@ -1149,7 +1151,31 @@ where
                     continue;
                 }
 
-                self.ledger.wait_for_writer().await;
+                let writer_next_record_id = self.ledger.state().get_next_writer_record_id();
+                if self.last_reader_record_id.saturating_add(1) < writer_next_record_id
+                    && self.ledger.get_total_buffer_size() != 0
+                {
+                    // Tokio files can accept a write before its blocking I/O is visible here.
+                    // Published progress says data is already on its way: waiting only for a new
+                    // writer notification can miss it forever if this was the final write.
+                    if visibility_retries < 3 {
+                        tokio::task::yield_now().await;
+                    } else {
+                        // Slow or inconsistent storage must not turn a transient EOF into a busy
+                        // loop. Stay responsive to writer notifications while backing off.
+                        let delay = Duration::from_millis(
+                            1_u64 << visibility_retries.saturating_sub(3).min(7),
+                        );
+                        tokio::select! {
+                            () = self.ledger.wait_for_writer() => {},
+                            () = tokio::time::sleep(delay) => {},
+                        }
+                    }
+                    visibility_retries = visibility_retries.saturating_add(1);
+                } else {
+                    visibility_retries = 0;
+                    self.ledger.wait_for_writer().await;
+                }
             } else {
                 debug!(
                     bytes_read = self.bytes_read,

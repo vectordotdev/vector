@@ -331,9 +331,6 @@ struct TrackingBufWriter<W> {
     inner: W,
     buf: Vec<u8>,
     unflushed_events: usize,
-    write_pos: usize,
-    pending_flush: FlushResult,
-    flushed_progress: FlushResult,
 }
 
 impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
@@ -343,9 +340,6 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
             inner,
             buf: Vec::with_capacity(cap),
             unflushed_events: 0,
-            write_pos: 0,
-            pending_flush: FlushResult::default(),
-            flushed_progress: FlushResult::default(),
         }
     }
 
@@ -361,84 +355,70 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
     /// count is incremented every time `write` can fully buffer the record without having to flush
     /// to the inner writer.
     ///
-    /// Progress from implicit flushes is retained until [`Self::flush_pending`] or [`Self::flush`]
-    /// completes. Direct writes are accepted here, but their visibility wait must follow the
-    /// caller's record accounting so cancellation cannot allow a record ID to be reused.
+    /// If this call requires the internal buffer to be flushed out to the inner writer, then the
+    /// write result will indicate how many buffered events were flushed, and their total size in
+    /// bytes.  Additionally, if the given buffer is larger than the internal buffer itself, it will
+    /// also be included in the write result as well.
     ///
     /// # Errors
     ///
     /// If a write to the inner writer occurs, and that write encounters an error, an error variant
     /// will be returned describing the error.
-    async fn write(&mut self, event_count: usize, buf: &[u8]) -> io::Result<()> {
-        // Resume a cancelled visibility flush before accepting another record. Keep its progress
-        // in the writer until the caller has accounted for the newly accepted record as well.
-        self.finish_flush().await?;
+    async fn write(&mut self, event_count: usize, buf: &[u8]) -> io::Result<Option<FlushResult>> {
+        let mut flush_result = None;
 
+        // If this write would cause us to exceed our internal buffer capacity, flush whatever we
+        // have buffered already.
         if self.buf.len() + buf.len() > self.buf.capacity() {
-            self.flush_buffer().await?;
+            flush_result = self.flush().await?;
         }
 
+        // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
         if buf.len() >= self.buf.capacity() {
             self.inner.write_all(buf).await?;
-            self.pending_flush.events_flushed += event_count as u64;
-            self.pending_flush.bytes_flushed += buf.len() as u64;
-            // Do not add an await after accepting this record: BufferWriter must track its ID
-            // before a cancellable visibility flush can release the shared writer lock.
+
+            let flush_result = flush_result.get_or_insert(FlushResult::default());
+            flush_result.events_flushed += event_count as u64;
+            flush_result.bytes_flushed += buf.len() as u64;
         } else {
             self.buf.extend_from_slice(buf);
             self.unflushed_events += event_count;
         }
 
-        Ok(())
+        Ok(flush_result)
     }
 
-    /// Flushes buffered records and returns all progress that is now readable.
+    /// Flushes the internal buffer to the underlying writer.
+    ///
+    /// Internally, a counter is kept of how many buffered events are waiting to be flushed. This
+    /// count is incremented every time `write` can fully buffer the record without having to flush
+    /// to the inner writer.
+    ///
+    /// If any buffered record are present, then the write result will indicate how many
+    /// individual events were flushed, including their total size in bytes.
+    ///
+    /// # Errors
+    ///
+    /// If a write to the underlying writer occurs, and that write encounters an error, an error variant
+    /// will be returned describing the error.
     async fn flush(&mut self) -> io::Result<Option<FlushResult>> {
-        self.flush_buffer().await?;
-        Ok(self.take_flushed_progress())
-    }
-
-    /// Completes only already accepted writes, without flushing newly buffered records.
-    async fn flush_pending(&mut self) -> io::Result<Option<FlushResult>> {
-        self.finish_flush().await?;
-        Ok(self.take_flushed_progress())
-    }
-
-    async fn flush_buffer(&mut self) -> io::Result<()> {
-        // `write_all` keeps its offset in the future. Retain it in the writer instead so
-        // cancellation during a partial buffered write cannot replay its accepted prefix.
-        while self.write_pos < self.buf.len() {
-            let written = self.inner.write(&self.buf[self.write_pos..]).await?;
-            if written == 0 {
-                return Err(io::ErrorKind::WriteZero.into());
-            }
-            self.write_pos += written;
+        if self.buf.is_empty() {
+            return Ok(None);
         }
 
-        self.pending_flush.events_flushed += self.unflushed_events as u64;
-        self.pending_flush.bytes_flushed += self.buf.len() as u64;
+        let events_flushed = self.unflushed_events as u64;
+        let bytes_flushed = self.buf.len() as u64;
+
+        let result = self.inner.write_all(&self.buf[..]).await;
         self.unflushed_events = 0;
         self.buf.clear();
-        self.write_pos = 0;
 
-        self.finish_flush().await
-    }
-
-    async fn finish_flush(&mut self) -> io::Result<()> {
-        if self.pending_flush.bytes_flushed != 0 {
-            // Async files may acknowledge writes before another file handle can read them.
-            // Accepted bytes and their progress must survive cancellation of this wait.
-            self.inner.flush().await?;
-            self.flushed_progress.events_flushed += self.pending_flush.events_flushed;
-            self.flushed_progress.bytes_flushed += self.pending_flush.bytes_flushed;
-            self.pending_flush = FlushResult::default();
-        }
-        Ok(())
-    }
-
-    fn take_flushed_progress(&mut self) -> Option<FlushResult> {
-        (self.flushed_progress.bytes_flushed != 0)
-            .then(|| std::mem::take(&mut self.flushed_progress))
+        result.map(|()| {
+            Some(FlushResult {
+                events_flushed,
+                bytes_flushed,
+            })
+        })
     }
 
     /// Gets a reference to the underlying writer.
@@ -462,9 +442,6 @@ impl<W: fmt::Debug> fmt::Debug for TrackingBufWriter<W> {
                 &format_args!("{}/{}", self.buf.len(), self.buf.capacity()),
             )
             .field("unflushed_events", &self.unflushed_events)
-            .field("write_pos", &self.write_pos)
-            .field("pending_flush", &self.pending_flush)
-            .field("flushed_progress", &self.flushed_progress)
             .finish()
     }
 }
@@ -703,17 +680,27 @@ where
         record: T,
     ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
         let token = self.archive_record(id, record)?;
-        let bytes_written = self.flush_record(token).await?;
-        let progress = self.flush_pending().await.context(IoSnafu)?;
-        Ok((bytes_written, progress))
+        self.flush_record(token).await
     }
 
-    /// Accepts the previously archived record and returns its serialized byte size.
+    /// Flushes the previously-archived record.
     ///
-    /// Progress from implicit flushes remains in the writer. The caller must account for the
-    /// accepted record before calling `flush_pending` to wait for visibility and collect progress.
+    /// If the flush is successful, the number of bytes written to the buffer are returned.
+    /// Additionally, if any internal buffers required an implicit flush, the result of that flush
+    /// operation is returned as well.
+    ///
+    /// As we internally buffers write to the underlying data file, to reduce the number of syscalls
+    /// required to pushed serialized records to the data file, we sometimes will write a record
+    /// which would overflow the internal buffer.  Doing so means we have to first flush the buffer
+    /// before continuing with buffering the current write.  As some invariants are based on knowing
+    /// when a record has actually been written to the data file, we return any information of
+    /// implicit flushes so that the writer can be aware of when data has actually made it to the
+    /// data file or not.
     #[instrument(skip(self), level = "trace")]
-    pub async fn flush_record(&mut self, token: WriteToken) -> Result<usize, WriterError<T>> {
+    pub async fn flush_record(
+        &mut self,
+        token: WriteToken,
+    ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
         // Make sure the write token we've been given matches whatever the last call to `archive_record` generated.
         let event_count = token.event_count();
         let serialized_len = token.serialized_len();
@@ -723,7 +710,8 @@ where
             "using write token from non-contiguous archival call"
         );
 
-        self.writer
+        let flush_result = self
+            .writer
             .write(event_count, &self.ser_buf[..])
             .await
             .context(IoSnafu)?;
@@ -751,7 +739,7 @@ where
             );
         }
 
-        Ok(serialized_len)
+        Ok((serialized_len, flush_result))
     }
 
     /// Recovers an archived record that has not yet been flushed.
@@ -813,11 +801,6 @@ where
     #[instrument(skip(self), level = "debug")]
     pub async fn flush(&mut self) -> io::Result<Option<FlushResult>> {
         self.writer.flush().await
-    }
-
-    /// Completes pending visibility flushes without flushing newly buffered records.
-    async fn flush_pending(&mut self) -> io::Result<Option<FlushResult>> {
-        self.writer.flush_pending().await
     }
 
     /// Synchronizes the underlying file to disk.
@@ -1728,10 +1711,6 @@ where
         &mut self,
         mut record: T,
     ) -> Result<Result<usize, T>, WriterError<T>> {
-        // A cancelled direct-write visibility wait may have filled the buffer. Publish that
-        // accepted progress before checking fullness, so a new sender cannot stall behind it.
-        self.flush_pending().await.context(IoSnafu)?;
-
         // If the buffer is already full, we definitely can't complete this write.
         if self.is_buffer_full() {
             return Ok(Err(record));
@@ -1839,7 +1818,7 @@ where
             .as_mut()
             .expect("writer should exist after `ensure_ready_for_write`");
 
-        let bytes_written = if can_write_record {
+        let (bytes_written, flush_result) = if can_write_record {
             // We always return errors here because flushing the record won't return a recoverable
             // error like `DataFileFull`, as that gets checked during archiving. The guard fires
             // Errored automatically on `?` exit.
@@ -1870,9 +1849,12 @@ where
         // could lead to record ID gaps.
         self.track_write(record_events.get(), bytes_written as u64);
 
-        // The accepted record is accounted for before this new cancellable wait. If the future is
-        // dropped, its record ID remains reserved and pending progress stays in the shared writer.
-        self.flush_pending().await.context(IoSnafu)?;
+        // If we did flush some buffered writes during this write, however, we now compensate for
+        // that after updating our internal state. Publishing the flushed state also notifies the
+        // reader, after all shared state reflects the readable bytes.
+        if let Some(flush_result) = flush_result {
+            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
+        }
 
         // A record at or above the write-buffer size forces the buffered writer to
         // flush mid-record, exercising the large-record path that splits a single
@@ -1938,15 +1920,6 @@ where
             0 => Ok(TryWriteOutcome::Dropped),
             _ => Ok(TryWriteOutcome::Written),
         }
-    }
-
-    async fn flush_pending(&mut self) -> io::Result<()> {
-        if let Some(writer) = self.writer.as_mut()
-            && let Some(progress) = writer.flush_pending().await?
-        {
-            self.publish_flushed_progress(progress.events_flushed, progress.bytes_flushed);
-        }
-        Ok(())
     }
 
     #[instrument(skip(self), level = "debug")]
@@ -2029,213 +2002,5 @@ where
 {
     fn drop(&mut self) {
         self.close();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{
-        io,
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
-    use tokio::io::AsyncWrite;
-
-    use super::TrackingBufWriter;
-
-    // AsyncWrite may accept bytes before they are visible to another file handle, as Tokio's
-    // File does while its blocking write is pending. Model that boundary deterministically.
-    #[derive(Default)]
-    struct DeferredWriter {
-        staged: Vec<u8>,
-        visible: Vec<u8>,
-        fail_flush: bool,
-        block_flush: bool,
-        write_calls: usize,
-        max_write: Option<usize>,
-        block_writes_after: Option<usize>,
-    }
-
-    impl AsyncWrite for DeferredWriter {
-        fn poll_write(
-            mut self: Pin<&mut Self>,
-            _: &mut Context<'_>,
-            bytes: &[u8],
-        ) -> Poll<io::Result<usize>> {
-            if self.block_writes_after == Some(self.write_calls) {
-                return Poll::Pending;
-            }
-            let len = self.max_write.unwrap_or(bytes.len()).min(bytes.len());
-            self.staged.extend_from_slice(&bytes[..len]);
-            self.write_calls += 1;
-            Poll::Ready(Ok(len))
-        }
-
-        fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-            if self.block_flush {
-                return Poll::Pending;
-            }
-            if self.fail_flush {
-                return Poll::Ready(Err(io::Error::other("injected flush failure")));
-            }
-            let staged = std::mem::take(&mut self.staged);
-            self.visible.extend(staged);
-            Poll::Ready(Ok(()))
-        }
-
-        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-            self.poll_flush(cx)
-        }
-    }
-
-    #[tokio::test]
-    async fn cancelled_buffer_flush_does_not_replay_accepted_bytes() {
-        let mut writer = TrackingBufWriter::with_capacity(64, DeferredWriter::default());
-        writer.write(1, b"record").await.unwrap();
-        writer.inner.block_flush = true;
-        let mut flush = Box::pin(writer.flush());
-        assert!(
-            std::future::poll_fn(|cx| Poll::Ready(flush.as_mut().poll(cx)))
-                .await
-                .is_pending()
-        );
-        drop(flush);
-        writer.inner.block_flush = false;
-
-        let progress = writer.flush().await.unwrap().unwrap();
-        assert_eq!(progress.events_flushed, 1);
-        assert_eq!(progress.bytes_flushed, 6);
-        assert_eq!(writer.get_ref().visible, b"record");
-        assert!(writer.flush().await.unwrap().is_none());
-    }
-
-    #[tokio::test]
-    async fn cancelled_partial_buffer_flush_resumes_at_accepted_offset() {
-        let io = DeferredWriter {
-            max_write: Some(2),
-            block_writes_after: Some(1),
-            ..DeferredWriter::default()
-        };
-        let mut writer = TrackingBufWriter::with_capacity(64, io);
-        writer.write(1, b"record").await.unwrap();
-        let mut flush = Box::pin(writer.flush());
-        assert!(
-            std::future::poll_fn(|cx| Poll::Ready(flush.as_mut().poll(cx)))
-                .await
-                .is_pending()
-        );
-        drop(flush);
-        assert_eq!(writer.get_ref().staged, b"re");
-        writer.inner.block_writes_after = None;
-
-        let progress = writer.flush().await.unwrap().unwrap();
-        assert_eq!(progress.events_flushed, 1);
-        assert_eq!(progress.bytes_flushed, 6);
-        assert_eq!(writer.get_ref().visible, b"record");
-    }
-
-    #[tokio::test]
-    async fn cancelled_implicit_flush_keeps_progress_for_next_write() {
-        let mut writer = TrackingBufWriter::with_capacity(8, DeferredWriter::default());
-        writer.write(1, b"record").await.unwrap();
-        writer.inner.block_flush = true;
-        let mut write = Box::pin(writer.write(1, b"next"));
-        assert!(
-            std::future::poll_fn(|cx| Poll::Ready(write.as_mut().poll(cx)))
-                .await
-                .is_pending()
-        );
-        drop(write);
-        writer.inner.block_flush = false;
-        writer.write(1, b"new").await.unwrap();
-
-        let progress = writer.flush_pending().await.unwrap().unwrap();
-        assert_eq!(progress.events_flushed, 1);
-        assert_eq!(progress.bytes_flushed, 6);
-        assert_eq!(writer.get_ref().visible, b"record");
-        let progress = writer.flush().await.unwrap().unwrap();
-        assert_eq!(progress.events_flushed, 1);
-        assert_eq!(progress.bytes_flushed, 3);
-        assert_eq!(writer.get_ref().visible, b"recordnew");
-    }
-
-    #[tokio::test]
-    async fn cancelled_direct_visibility_flush_keeps_progress() {
-        let mut writer = TrackingBufWriter::with_capacity(2, DeferredWriter::default());
-        writer.write(1, b"record").await.unwrap();
-        writer.inner.block_flush = true;
-        let mut flush = Box::pin(writer.flush_pending());
-        assert!(
-            std::future::poll_fn(|cx| Poll::Ready(flush.as_mut().poll(cx)))
-                .await
-                .is_pending()
-        );
-        drop(flush);
-        writer.inner.block_flush = false;
-
-        let progress = writer.flush_pending().await.unwrap().unwrap();
-        assert_eq!(progress.events_flushed, 1);
-        assert_eq!(progress.bytes_flushed, 6);
-        assert_eq!(writer.get_ref().visible, b"record");
-        assert!(writer.flush().await.unwrap().is_none());
-        assert_eq!(writer.get_ref().write_calls, 1);
-    }
-
-    #[tokio::test]
-    async fn cancelled_direct_write_retains_earlier_implicit_flush_progress() {
-        let mut writer = TrackingBufWriter::with_capacity(8, DeferredWriter::default());
-        writer.write(1, b"record").await.unwrap();
-        writer.inner.block_writes_after = Some(1);
-        let mut write = Box::pin(writer.write(1, b"large-record"));
-        assert!(
-            std::future::poll_fn(|cx| Poll::Ready(write.as_mut().poll(cx)))
-                .await
-                .is_pending()
-        );
-        drop(write);
-        writer.inner.block_writes_after = None;
-
-        let progress = writer.flush().await.unwrap().unwrap();
-        assert_eq!(progress.events_flushed, 1);
-        assert_eq!(progress.bytes_flushed, 6);
-        assert_eq!(writer.get_ref().visible, b"record");
-    }
-
-    #[tokio::test]
-    async fn buffered_progress_waits_for_underlying_flush() {
-        let mut writer = TrackingBufWriter::with_capacity(64, DeferredWriter::default());
-        writer.write(1, b"record").await.unwrap();
-        let result = writer.flush().await.unwrap().unwrap();
-        assert_eq!(result.events_flushed, 1);
-        assert_eq!(result.bytes_flushed, 6);
-        assert_eq!(writer.get_ref().visible, b"record");
-    }
-
-    #[tokio::test]
-    async fn direct_progress_waits_for_underlying_flush() {
-        let mut writer = TrackingBufWriter::with_capacity(2, DeferredWriter::default());
-        writer.write(1, b"record").await.unwrap();
-        let result = writer.flush_pending().await.unwrap().unwrap();
-        assert_eq!(result.events_flushed, 1);
-        assert_eq!(result.bytes_flushed, 6);
-        assert_eq!(writer.get_ref().visible, b"record");
-    }
-
-    #[tokio::test]
-    async fn underlying_flush_failure_does_not_report_progress() {
-        for capacity in [2, 64] {
-            let mut writer = TrackingBufWriter::with_capacity(
-                capacity,
-                DeferredWriter {
-                    fail_flush: true,
-                    ..DeferredWriter::default()
-                },
-            );
-            writer.write(1, b"record").await.unwrap();
-            let error = writer.flush().await.unwrap_err();
-            assert_eq!(error.kind(), io::ErrorKind::Other);
-            assert!(writer.get_ref().visible.is_empty());
-        }
     }
 }

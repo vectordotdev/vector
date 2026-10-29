@@ -24,7 +24,6 @@ type FilesystemUnderTest = ProductionFilesystem;
 
 mod acknowledgements;
 mod basic;
-mod cancellation;
 mod filter_metrics;
 mod initialization;
 mod invariants;
@@ -32,6 +31,7 @@ mod known_errors;
 mod model;
 mod record;
 mod size_limits;
+mod visibility;
 
 impl AsyncFile for DuplexStream {
     async fn metadata(&self) -> io::Result<Metadata> {
