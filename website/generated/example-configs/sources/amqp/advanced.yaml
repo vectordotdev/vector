@@ -1,0 +1,10 @@
+sources:
+  my_source_id:
+    type: amqp
+    connection_string: amqp://user:password@127.0.0.1:5672/%2f?timeout=10
+    consumer: vector
+    exchange_key: exchange
+    offset_key: offset
+    prefetch_count: 100
+    queue: vector
+    routing_key_field: routing

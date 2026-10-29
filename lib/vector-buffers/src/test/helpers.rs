@@ -1,6 +1,6 @@
 use std::{future::Future, path::Path, str::FromStr, sync::LazyLock};
 
-use temp_dir::TempDir;
+use tempfile::tempdir;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{Layer, Registry, filter::LevelFilter, layer::SubscriberExt};
 use vector_common::finalization::{EventStatus, Finalizable};
@@ -49,8 +49,7 @@ where
     F: FnOnce(&Path) -> Fut,
     Fut: Future<Output = V>,
 {
-    let buf_dir = TempDir::with_prefix("vector-buffers")
-        .expect("cannot recover from failure to create temp dir");
+    let buf_dir = tempdir().expect("cannot recover from failure to create temp dir");
     f(buf_dir.path()).await
 }
 

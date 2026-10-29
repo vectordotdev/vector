@@ -1,1 +1,0 @@
-{"metric":{"name":"u","interval_ms":1037115674,"kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":850112.0,"value":-610944.0},{"quantile":-543232.0,"value":533440.0},{"quantile":-338880.0,"value":-556672.0},{"quantile":-344576.0,"value":398848.0}],"count":2561554351217946653,"sum":-1472.0}}}

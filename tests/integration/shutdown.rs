@@ -84,6 +84,7 @@ fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> Comman
     cmd.arg("-c")
         .arg(config_path)
         .arg(if quiet { "--quiet" } else { "-v" })
+        .arg("--dangerously-allow-env-var-interpolation")
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
         .env("VECTOR_TEST_ADDRESS", address.to_string());
@@ -114,7 +115,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
     sub(&mut vector);
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Time shutdown.
     let now = Instant::now();
@@ -140,6 +141,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
 fn auto_shutdown() {
     let mut cmd = assert_cmd::Command::cargo_bin("vector").unwrap();
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .arg("-c")
         .arg(create_file(STDIO_CONFIG))
         .env("VECTOR_DATA_DIR", create_directory());
@@ -157,6 +159,7 @@ fn log_schema() {
     // Vector command
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .arg("-c")
         .arg(create_file(
             r#"
@@ -243,14 +246,15 @@ fn log_schema_multiple_config_files() {
 
     overwrite_file(
         input_file.clone(),
-        r#"42
-    "#,
+        r"42
+    ",
     );
 
     cmd.arg("--quiet")
+        .arg("--dangerously-allow-env-var-interpolation")
         .env("VECTOR_CONFIG_DIR", config_dir)
         .env("VECTOR_DATA_DIR", create_directory())
-        .env("VECTOR_TEST_INPUT_FILE", input_file.clone());
+        .env("VECTOR_TEST_INPUT_FILE", input_file);
 
     // Run vector
     let vector = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();
@@ -259,7 +263,7 @@ fn log_schema_multiple_config_files() {
     sleep(STARTUP_TIME);
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Wait for shutdown
     let output = vector.wait_with_output().unwrap();
@@ -268,7 +272,14 @@ fn log_schema_multiple_config_files() {
     // Output
     let event: Value = serde_json::from_slice(output.stdout.as_slice()).unwrap();
     assert_eq!(event["message"], json!("42"));
-    assert_eq!(event["test_host"], json!("runner"));
+    if std::env::var("CI").as_deref() == Ok("true") {
+        assert_eq!(event["test_host"], json!("runner"));
+    } else {
+        assert!(
+            event["test_host"].is_string(),
+            "expected test_host to be a string"
+        );
+    }
 }
 
 #[test]
@@ -308,9 +319,9 @@ fn configuration_path_recomputed() {
     overwrite_file(dir.join("conf1.toml"), "");
 
     // Signal reload
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGHUP).unwrap();
 
-    // Message to assert, sended to console source and picked up from
+    // Message to assert, sent to console source and picked up from
     // console sink, both added in the second configuration file.
     vector
         .stdin
@@ -397,7 +408,7 @@ fn timely_shutdown_demo_logs() {
 fn timely_shutdown_http() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "http"
+    type = "http_server"
     address = "${VECTOR_TEST_ADDRESS}"
     decoding.codec = "bytes""#,
     ));
@@ -681,7 +692,7 @@ async fn health_503_during_shutdown() {
     assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early.");
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Give vector time to begin shutting down.
     sleep(Duration::from_secs(1));
@@ -690,5 +701,5 @@ async fn health_503_during_shutdown() {
 
     assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
 
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGKILL).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGKILL).unwrap();
 }

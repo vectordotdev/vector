@@ -33,12 +33,16 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_transform_output_ids};
+use super::{
+    OutputId, compiler::expand_globs, graph::Graph, graph_builder,
+    transform::get_transform_output_ids,
+};
 use crate::{
     conditions::Condition,
     config::{
         self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
+        TestDefinition, TestInput, TestOutput, enrichment_table_sinks, loading,
+        loading::ConfigBuilderLoader,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
@@ -60,6 +64,12 @@ pub struct UnitTestResult {
 }
 
 impl UnitTest {
+    /// Runs the unit test topology to completion and collects the test sink results.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the test topology fails to start, or if a test sink is dropped before
+    /// reporting its result.
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
         let (topology, _) = RunningTopology::start_validated(self.config, diff, self.pieces)
@@ -93,42 +103,51 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
-        .load_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
 
+/// Loads the configuration from `paths`, resolving secrets, and builds its unit tests.
+///
+/// # Errors
+///
+/// Returns error messages if the configuration or its secret backends cannot be loaded from
+/// `paths`, secrets cannot be retrieved, or any unit test fails to build.
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let secrets_backends_loader = loading::loader_from_paths(
-        loading::SecretBackendLoader::default().interpolate_env(true),
-        paths,
-    )?;
+    let secrets_backends_loader =
+        loading::loader_from_paths(loading::SecretBackendLoader::default(), paths)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
     let config_builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
         .secrets(secrets)
         .load_from_paths(paths)?;
 
     build_unit_tests(config_builder).await
 }
 
+/// Builds a runnable unit test for each test definition in `config_builder`.
+///
+/// # Errors
+///
+/// Returns one message per failing test if a test references inputs or outputs that do not
+/// exist, defines invalid input events or output conditions, has no path between its inputs
+/// and outputs, or its test topology fails to compile or build.
 pub async fn build_unit_tests(
     mut config_builder: ConfigBuilder,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     // Sanitize config by removing existing sources and sinks
-    config_builder.sources = Default::default();
-    config_builder.sinks = Default::default();
+    config_builder.sources = IndexMap::default();
+    config_builder.sinks = IndexMap::default();
 
+    let loading_warnings = std::mem::take(&mut config_builder.loading_warnings);
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
@@ -154,6 +173,7 @@ pub async fn build_unit_tests(
     }
 
     if build_errors.is_empty() {
+        loading::log_warnings(&loading_warnings);
         Ok(tests)
     } else {
         Err(build_errors)
@@ -173,6 +193,16 @@ pub struct UnitTestBuildMetadata {
 }
 
 impl UnitTestBuildMetadata {
+    /// Attaches a test source to every transform and records the test source and sink IDs.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a transform has no generated test source ID, which cannot happen because an
+    /// ID is generated for every transform.
     pub fn initialize(config_builder: &mut ConfigBuilder) -> Result<Self, Vec<String>> {
         // A unique id used to name test sources and sinks to avoid name clashes
         let random_id = Uuid::new_v4().to_string();
@@ -185,12 +215,12 @@ impl UnitTestBuildMetadata {
 
         let source_ids = available_insert_targets
             .iter()
-            .map(|key| (key.clone(), format!("{}-{}-{}", key, "source", random_id)))
+            .map(|key| (key.clone(), format!("{key}-{}-{random_id}", "source")))
             .collect::<HashMap<_, _>>();
 
         // Map a test source to every transform
         let mut template_sources = IndexMap::new();
-        for (key, transform) in config_builder.transforms.iter_mut() {
+        for (key, transform) in &mut config_builder.transforms {
             let test_source_id = source_ids
                 .get(key)
                 .expect("Missing test source for a transform")
@@ -219,10 +249,9 @@ impl UnitTestBuildMetadata {
                 (
                     key.clone(),
                     format!(
-                        "{}-{}-{}",
+                        "{}-{}-{random_id}",
                         key.to_string().replace('.', "-"),
-                        "sink",
-                        random_id
+                        "sink"
                     ),
                 )
             })
@@ -237,6 +266,17 @@ impl UnitTestBuildMetadata {
     }
 
     /// Convert test inputs into sources for use in a unit testing topology
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if `inputs` is empty, an input's `insert_at` is not a transform,
+    /// or an input event cannot be built, such as an unknown input type, a missing required
+    /// field, a VRL source that fails to compile or run, or an invalid log field path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a validated insert target has no test source, which cannot happen because
+    /// [`Self::initialize`] creates one for every transform.
     pub fn hydrate_into_sources(
         &self,
         inputs: &[TestInput],
@@ -270,6 +310,18 @@ impl UnitTestBuildMetadata {
     }
 
     /// Convert test outputs into sinks for use in a unit testing topology
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if both `outputs` and `no_outputs_from` are empty, a test
+    /// condition cannot be built, an output sets `expected_event_count` to 0 while defining
+    /// conditions, or outputs with the same `extract_from` set different
+    /// `expected_event_count` values.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an `extract_from` or `no_outputs_from` entry is not a transform output
+    /// recorded by [`Self::initialize`].
     pub fn hydrate_into_sinks(
         &self,
         test_name: &str,
@@ -298,7 +350,7 @@ impl UnitTestBuildMetadata {
             let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
-                transform_ids: ids.iter().map(|id| id.to_string()).collect(),
+                transform_ids: ids.iter().map(std::string::ToString::to_string).collect(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
                 check: UnitTestSinkCheck::Checks {
                     conditions: built.conditions,
@@ -329,7 +381,7 @@ impl UnitTestBuildMetadata {
             .map(|(transform_ids, sink_config)| {
                 let transform_ids_str = transform_ids
                     .iter()
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>();
                 let sink_ids = transform_ids
                     .iter()
@@ -390,18 +442,12 @@ async fn build_unit_test(
     test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let transform_only_config = config_builder.clone();
-    let transform_only_graph = Graph::new_unchecked(
-        &transform_only_config.sources,
-        &transform_only_config.transforms,
-        &transform_only_config.sinks,
-        transform_only_config.schema,
-        transform_only_config
-            .global
-            .wildcard_matching
-            .unwrap_or_default(),
-    );
-    let test = test.resolve_outputs(&transform_only_graph)?;
+    let graph = Graph::new(
+        graph_builder::nodes(&config_builder),
+        config_builder.global.wildcard_matching.unwrap_or_default(),
+    )?;
+    let output_map = graph.output_map()?;
+    let test = test.resolve_outputs(&output_map)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -411,13 +457,13 @@ async fn build_unit_test(
     config_builder.sinks = sinks;
     expand_globs(&mut config_builder);
 
-    let graph = Graph::new_unchecked(
-        &config_builder.sources,
-        &config_builder.transforms,
-        &config_builder.sinks,
-        config_builder.schema,
+    // Original inputs may reference sources or transforms outside this test.
+    // Inspect the connected paths before pruning those inputs; the final config
+    // build below checks all remaining inputs.
+    let graph = Graph::new(
+        graph_builder::nodes(&config_builder),
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    );
+    )?;
 
     let mut valid_components = get_relevant_test_components(
         config_builder.sources.keys().collect::<Vec<_>>().as_ref(),
@@ -438,11 +484,8 @@ async fn build_unit_test(
     // Enrichment tables consume inputs but are referenced dynamically in VRL transforms
     // (via get_enrichment_table_record). Since we can't statically analyze VRL usage,
     // we conservatively include all enrichment table inputs as valid components.
-    config_builder
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
-        .for_each(|i| valid_components.extend(i.into_iter()));
+    enrichment_table_sinks(&config_builder.enrichment_tables)
+        .for_each(|(_, sink)| valid_components.extend(sink.inputs));
 
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder
@@ -452,19 +495,16 @@ async fn build_unit_test(
         .collect();
 
     // Sanitize the inputs of all relevant transforms
-    let graph = Graph::new_unchecked(
-        &config_builder.sources,
-        &config_builder.transforms,
-        &config_builder.sinks,
-        config_builder.schema,
+    let graph = Graph::new(
+        graph_builder::nodes(&config_builder),
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    );
-    let valid_inputs = graph.input_map()?;
-    for (_, transform) in config_builder.transforms.iter_mut() {
+    )?;
+    let valid_outputs = graph.output_map()?;
+    for (_, transform) in &mut config_builder.transforms {
         let inputs = std::mem::take(&mut transform.inputs);
         transform.inputs = inputs
             .into_iter()
-            .filter(|input| valid_inputs.contains_key(input))
+            .filter(|input| valid_outputs.contains_key(input))
             .collect();
     }
 
@@ -490,7 +530,7 @@ async fn build_unit_test(
 /// consumed but its other outputs are left unconsumed.
 ///
 /// To avoid warning logs that occur when building such topologies, we construct
-/// a NoOp sink here whose sole purpose is to consume any "loose end" outputs.
+/// a `NoOp` sink here whose sole purpose is to consume any "loose end" outputs.
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
     let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
@@ -522,7 +562,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
         None
     } else {
         let noop_sink = UnitTestSinkConfig {
-            test_name: "".to_string(),
+            test_name: String::new(),
             transform_ids: vec![],
             result_tx: Arc::new(Mutex::new(None)),
             check: UnitTestSinkCheck::NoOp,
@@ -557,9 +597,9 @@ fn build_and_validate_inputs(
             }
         } else {
             errors.push(format!(
-                "inputs[{}]: unable to locate target transform '{}'",
-                index, input.insert_at
-            ))
+                "inputs[{index}]: unable to locate target transform '{}'",
+                input.insert_at
+            ));
         }
     }
 
@@ -576,6 +616,11 @@ pub(super) struct BuiltOutput {
     pub(super) conditions: Vec<Vec<Condition>>,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Preserve inferred default types"
+)]
 fn build_outputs(
     test_outputs: &[TestOutput],
 ) -> Result<IndexMap<Vec<OutputId>, BuiltOutput>, Vec<String>> {
@@ -615,9 +660,8 @@ fn build_outputs(
                 {
                     if prev != new {
                         errors.push(format!(
-                            "conflicting expected_event_count for extract_from {:?}: {} vs {}",
-                            output.extract_from, prev, new
-                        ));
+                            "conflicting expected_event_count for extract_from {:?}: {prev} vs {new}",
+                            output.extract_from));
                     }
                 } else if existing.expected_event_count.is_none() {
                     existing.expected_event_count = expected_event_count;
@@ -658,7 +702,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
         "vrl" => {
             if let Some(source) = &input.source {
                 let result = vrl::compiler::compile(source, &vector_vrl_functions::all())
-                    .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
+                    .map_err(|e| Formatter::new(source, e).to_string())?;
 
                 let mut target = TargetValue {
                     value: value!({}),

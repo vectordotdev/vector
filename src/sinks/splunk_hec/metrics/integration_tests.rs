@@ -14,12 +14,13 @@ use crate::{
     config::{SinkConfig, SinkContext},
     event::{Metric, MetricKind},
     sinks::{
-        splunk_hec::common::integration_test_helpers::{
-            get_token, splunk_api_address, splunk_hec_address,
+        splunk_hec::common::{
+            acknowledgements::HecClientAcknowledgementsConfig,
+            integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
         },
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
     test_util::components::{
         DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS, run_and_assert_data_volume_sink_compliance,
         run_and_assert_sink_compliance,
@@ -36,7 +37,7 @@ async fn config() -> HecMetricsSinkConfig {
     HecMetricsSinkConfig {
         default_namespace: None,
         default_token: get_token().await.into(),
-        endpoint: splunk_hec_address(),
+        endpoint: HttpEndpoint::parse(&splunk_hec_address()).unwrap(),
         host_key: OptionalValuePath::new("host"),
         index: None,
         sourcetype: None,
@@ -45,11 +46,12 @@ async fn config() -> HecMetricsSinkConfig {
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Default::default(),
+        acknowledgements: HecClientAcknowledgementsConfig::default(),
+        confinement: ConfinementConfig::default(),
     }
 }
 
-fn get_gauge(batch: BatchNotifier) -> Event {
+fn get_gauge(batch: &BatchNotifier) -> Event {
     Metric::new(
         "example-gauge",
         MetricKind::Absolute,
@@ -58,11 +60,11 @@ fn get_gauge(batch: BatchNotifier) -> Event {
     .with_tags(Some(
         metric_tags! {"tag_gauge_test".to_string() => "tag_gauge_value".to_string()},
     ))
-    .with_batch_notifier(&batch)
+    .with_batch_notifier(batch)
     .into()
 }
 
-fn get_counter(batch: BatchNotifier) -> Event {
+fn get_counter(batch: &BatchNotifier) -> Event {
     Metric::new(
         "example-counter",
         MetricKind::Absolute,
@@ -71,7 +73,7 @@ fn get_counter(batch: BatchNotifier) -> Event {
     .with_tags(Some(
         metric_tags! {"tag_counter_test".to_string() => "tag_counter_value".to_string()},
     ))
-    .with_batch_notifier(&batch)
+    .with_batch_notifier(batch)
     .into()
 }
 
@@ -84,7 +86,7 @@ async fn splunk_insert_counter_metric() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = get_counter(batch.clone());
+    let event = get_counter(&batch);
     drop(batch);
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -121,7 +123,7 @@ async fn splunk_insert_counter_metric_data_volume() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = get_counter(batch.clone());
+    let event = get_counter(&batch);
     drop(batch);
     run_and_assert_data_volume_sink_compliance(
         sink,
@@ -149,7 +151,7 @@ async fn splunk_insert_gauge_metric() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = get_gauge(batch.clone());
+    let event = get_gauge(&batch);
     drop(batch);
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -173,8 +175,8 @@ async fn splunk_insert_multiple_counter_metrics() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut events = Vec::new();
-    for _ in [..20] {
-        events.push(get_counter(batch.clone()))
+    for _ in 0..20 {
+        events.push(get_counter(&batch));
     }
     drop(batch);
 
@@ -200,8 +202,8 @@ async fn splunk_insert_multiple_gauge_metrics() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut events = Vec::new();
-    for _ in [..20] {
-        events.push(get_gauge(batch.clone()))
+    for _ in 0..20 {
+        events.push(get_gauge(&batch));
     }
     drop(batch);
 
@@ -251,9 +253,8 @@ async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
 
     let res = client
         .get(format!(
-            "{}/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
-            splunk_api_address(),
-            metric_name
+            "{}/services/catalog/metricstore/dimensions?output_mode=json&metric_name={metric_name}",
+            splunk_api_address()
         ))
         .form(&vec![("filter", "index=*")])
         .basic_auth(USERNAME, Some(PASSWORD))

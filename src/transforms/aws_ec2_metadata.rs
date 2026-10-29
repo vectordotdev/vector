@@ -30,6 +30,7 @@ use crate::{
     config::{
         DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
     },
+    cpu_time::spawn_timed,
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -154,7 +155,6 @@ pub struct Ec2Metadata {
     #[derivative(Default(value = "default_refresh_timeout_secs()"))]
     refresh_timeout_secs: Duration,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
@@ -179,7 +179,7 @@ const fn default_refresh_timeout_secs() -> Duration {
 fn default_fields() -> Vec<String> {
     DEFAULT_FIELD_ALLOWLIST
         .iter()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect()
 }
 
@@ -204,27 +204,27 @@ struct MetadataKey {
 
 #[derive(Debug)]
 struct Keys {
-    account_id_key: MetadataKey,
-    ami_id_key: MetadataKey,
-    availability_zone_key: MetadataKey,
-    availability_zone_id_key: MetadataKey,
-    instance_id_key: MetadataKey,
-    instance_type_key: MetadataKey,
-    local_hostname_key: MetadataKey,
-    local_ipv4_key: MetadataKey,
-    public_hostname_key: MetadataKey,
-    public_ipv4_key: MetadataKey,
-    region_key: MetadataKey,
-    partition_key: MetadataKey,
-    domain_key: MetadataKey,
-    placement_group_name_key: MetadataKey,
-    placement_partition_number_key: MetadataKey,
-    host_id_key: MetadataKey,
-    autoscaling_target_lifecycle_state_key: MetadataKey,
-    subnet_id_key: MetadataKey,
-    vpc_id_key: MetadataKey,
-    role_name_key: MetadataKey,
-    tags_key: MetadataKey,
+    account_id: MetadataKey,
+    ami_id: MetadataKey,
+    availability_zone: MetadataKey,
+    availability_zone_id: MetadataKey,
+    instance_id: MetadataKey,
+    instance_type: MetadataKey,
+    local_hostname: MetadataKey,
+    local_ipv4: MetadataKey,
+    public_hostname: MetadataKey,
+    public_ipv4: MetadataKey,
+    region: MetadataKey,
+    partition: MetadataKey,
+    domain: MetadataKey,
+    placement_group_name: MetadataKey,
+    placement_partition_number: MetadataKey,
+    host_id: MetadataKey,
+    autoscaling_target_lifecycle_state: MetadataKey,
+    subnet_id: MetadataKey,
+    vpc_id: MetadataKey,
+    role_name: MetadataKey,
+    tags: MetadataKey,
 }
 
 impl_generate_config_from_default!(Ec2Metadata);
@@ -261,17 +261,21 @@ impl TransformConfig for Ec2Metadata {
         if let Err(error) = client.refresh_metadata().await {
             if required {
                 return Err(error);
-            } else {
-                emit!(AwsEc2MetadataRefreshError { error });
             }
+            emit!(AwsEc2MetadataRefreshError { error });
         }
 
-        tokio::spawn(
+        // The metadata-refresh loop runs as its own tokio task, so the main
+        // transform task's CPU-time wrapper does not see it. Spawn the
+        // background task with the same component-tagged counter so its CPU
+        // is attributed to this transform.
+        spawn_timed(
             async move {
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
             .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
+            context.cpu_ns.clone(),
         );
 
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
@@ -289,27 +293,27 @@ impl TransformConfig for Ec2Metadata {
         let added_keys = Keys::new(self.namespace.clone());
 
         let paths = [
-            &added_keys.account_id_key.log_path,
-            &added_keys.ami_id_key.log_path,
-            &added_keys.availability_zone_key.log_path,
-            &added_keys.availability_zone_id_key.log_path,
-            &added_keys.instance_id_key.log_path,
-            &added_keys.instance_type_key.log_path,
-            &added_keys.local_hostname_key.log_path,
-            &added_keys.local_ipv4_key.log_path,
-            &added_keys.public_hostname_key.log_path,
-            &added_keys.public_ipv4_key.log_path,
-            &added_keys.region_key.log_path,
-            &added_keys.partition_key.log_path,
-            &added_keys.domain_key.log_path,
-            &added_keys.placement_group_name_key.log_path,
-            &added_keys.placement_partition_number_key.log_path,
-            &added_keys.host_id_key.log_path,
-            &added_keys.autoscaling_target_lifecycle_state_key.log_path,
-            &added_keys.subnet_id_key.log_path,
-            &added_keys.vpc_id_key.log_path,
-            &added_keys.role_name_key.log_path,
-            &added_keys.tags_key.log_path,
+            &added_keys.account_id.log_path,
+            &added_keys.ami_id.log_path,
+            &added_keys.availability_zone.log_path,
+            &added_keys.availability_zone_id.log_path,
+            &added_keys.instance_id.log_path,
+            &added_keys.instance_type.log_path,
+            &added_keys.local_hostname.log_path,
+            &added_keys.local_ipv4.log_path,
+            &added_keys.public_hostname.log_path,
+            &added_keys.public_ipv4.log_path,
+            &added_keys.region.log_path,
+            &added_keys.partition.log_path,
+            &added_keys.domain.log_path,
+            &added_keys.placement_group_name.log_path,
+            &added_keys.placement_partition_number.log_path,
+            &added_keys.host_id.log_path,
+            &added_keys.autoscaling_target_lifecycle_state.log_path,
+            &added_keys.subnet_id.log_path,
+            &added_keys.vpc_id.log_path,
+            &added_keys.role_name.log_path,
+            &added_keys.tags.log_path,
         ];
 
         let schema_definition = input_definitions
@@ -426,7 +430,7 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             match self.refresh_metadata().await {
-                Ok(_) => {
+                Ok(()) => {
                     emit!(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
@@ -469,7 +473,7 @@ impl MetadataClient {
 
         let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
-        let next_refresh = Instant::now() + Duration::from_secs(21600);
+        let next_refresh = Instant::now() + Duration::from_hours(6);
         self.token = Some((token.clone(), next_refresh));
 
         Ok(token)
@@ -486,71 +490,66 @@ impl MetadataClient {
             .transpose()
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         let mut new_state = vec![];
 
         // Fetch all resources, _then_ add them to the state map.
         if let Some(document) = self.get_document().await? {
             if self.fields.contains(ACCOUNT_ID_KEY) {
-                new_state.push((self.keys.account_id_key.clone(), document.account_id.into()));
+                new_state.push((self.keys.account_id.clone(), document.account_id.into()));
             }
 
             if self.fields.contains(AMI_ID_KEY) {
-                new_state.push((self.keys.ami_id_key.clone(), document.image_id.into()));
+                new_state.push((self.keys.ami_id.clone(), document.image_id.into()));
             }
 
             if self.fields.contains(INSTANCE_ID_KEY) {
-                new_state.push((
-                    self.keys.instance_id_key.clone(),
-                    document.instance_id.into(),
-                ));
+                new_state.push((self.keys.instance_id.clone(), document.instance_id.into()));
             }
 
             if self.fields.contains(INSTANCE_TYPE_KEY) {
                 new_state.push((
-                    self.keys.instance_type_key.clone(),
+                    self.keys.instance_type.clone(),
                     document.instance_type.into(),
                 ));
             }
 
             if self.fields.contains(REGION_KEY) {
-                new_state.push((self.keys.region_key.clone(), document.region.into()));
+                new_state.push((self.keys.region.clone(), document.region.into()));
             }
 
             if self.fields.contains(AVAILABILITY_ZONE_KEY)
                 && let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await?
             {
-                new_state.push((self.keys.availability_zone_key.clone(), availability_zone));
+                new_state.push((self.keys.availability_zone.clone(), availability_zone));
             }
 
             if self.fields.contains(AVAILABILITY_ZONE_ID_KEY)
                 && let Some(availability_zone_id) = self.get_metadata(&AVAILABILITY_ZONE_ID).await?
             {
-                new_state.push((
-                    self.keys.availability_zone_id_key.clone(),
-                    availability_zone_id,
-                ));
+                new_state.push((self.keys.availability_zone_id.clone(), availability_zone_id));
             }
 
             if self.fields.contains(PARTITION_KEY)
                 && let Some(partition) = self.get_metadata(&PARTITION).await?
             {
-                new_state.push((self.keys.partition_key.clone(), partition));
+                new_state.push((self.keys.partition.clone(), partition));
             }
 
             if self.fields.contains(DOMAIN_KEY)
                 && let Some(domain) = self.get_metadata(&DOMAIN).await?
             {
-                new_state.push((self.keys.domain_key.clone(), domain));
+                new_state.push((self.keys.domain.clone(), domain));
             }
 
             if self.fields.contains(PLACEMENT_GROUP_NAME_KEY)
                 && let Some(placement_group_name) = self.get_metadata(&PLACEMENT_GROUP_NAME).await?
             {
-                new_state.push((
-                    self.keys.placement_group_name_key.clone(),
-                    placement_group_name,
-                ));
+                new_state.push((self.keys.placement_group_name.clone(), placement_group_name));
             }
 
             if self.fields.contains(PLACEMENT_PARTITION_NUMBER_KEY)
@@ -558,7 +557,7 @@ impl MetadataClient {
                     self.get_metadata(&PLACEMENT_PARTITION_NUMBER).await?
             {
                 new_state.push((
-                    self.keys.placement_partition_number_key.clone(),
+                    self.keys.placement_partition_number.clone(),
                     placement_partition_number,
                 ));
             }
@@ -566,7 +565,7 @@ impl MetadataClient {
             if self.fields.contains(HOST_ID_KEY)
                 && let Some(host_id) = self.get_metadata(&HOST_ID).await?
             {
-                new_state.push((self.keys.host_id_key.clone(), host_id));
+                new_state.push((self.keys.host_id.clone(), host_id));
             }
 
             if self.fields.contains(AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY)
@@ -575,7 +574,7 @@ impl MetadataClient {
                     .await?
             {
                 new_state.push((
-                    self.keys.autoscaling_target_lifecycle_state_key.clone(),
+                    self.keys.autoscaling_target_lifecycle_state.clone(),
                     autoscaling_target_lifecycle_state,
                 ));
             }
@@ -583,25 +582,25 @@ impl MetadataClient {
             if self.fields.contains(LOCAL_HOSTNAME_KEY)
                 && let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await?
             {
-                new_state.push((self.keys.local_hostname_key.clone(), local_hostname));
+                new_state.push((self.keys.local_hostname.clone(), local_hostname));
             }
 
             if self.fields.contains(LOCAL_IPV4_KEY)
                 && let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await?
             {
-                new_state.push((self.keys.local_ipv4_key.clone(), local_ipv4));
+                new_state.push((self.keys.local_ipv4.clone(), local_ipv4));
             }
 
             if self.fields.contains(PUBLIC_HOSTNAME_KEY)
                 && let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await?
             {
-                new_state.push((self.keys.public_hostname_key.clone(), public_hostname));
+                new_state.push((self.keys.public_hostname.clone(), public_hostname));
             }
 
             if self.fields.contains(PUBLIC_IPV4_KEY)
                 && let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await?
             {
-                new_state.push((self.keys.public_ipv4_key.clone(), public_ipv4));
+                new_state.push((self.keys.public_ipv4.clone(), public_ipv4));
             }
 
             if (self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY))
@@ -618,7 +617,7 @@ impl MetadataClient {
                     })?;
 
                     if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
-                        new_state.push((self.keys.subnet_id_key.clone(), subnet_id));
+                        new_state.push((self.keys.subnet_id.clone(), subnet_id));
                     }
                 }
 
@@ -631,7 +630,7 @@ impl MetadataClient {
                     })?;
 
                     if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
-                        new_state.push((self.keys.vpc_id_key.clone(), vpc_id));
+                        new_state.push((self.keys.vpc_id.clone(), vpc_id));
                     }
                 }
             }
@@ -646,10 +645,10 @@ impl MetadataClient {
                         MetadataKey {
                             log_path: self
                                 .keys
-                                .role_name_key
+                                .role_name
                                 .log_path
-                                .with_index_appended(i as isize),
-                            metric_tag: format!("{}[{}]", self.keys.role_name_key.metric_tag, i),
+                                .with_index_appended(i.cast_signed()),
+                            metric_tag: format!("{}[{i}]", self.keys.role_name.metric_tag),
                         },
                         role_name.to_string().into(),
                     ));
@@ -666,8 +665,8 @@ impl MetadataClient {
                 if let Some(tag_content) = self.get_metadata(&tag_path).await? {
                     new_state.push((
                         MetadataKey {
-                            log_path: self.keys.tags_key.log_path.with_field_appended(&tag),
-                            metric_tag: format!("{}[{}]", self.keys.tags_key.metric_tag, &tag),
+                            log_path: self.keys.tags.log_path.with_field_appended(&tag),
+                            metric_tag: format!("{}[{}]", self.keys.tags.metric_tag, &tag),
                         },
                         tag_content,
                     ));
@@ -740,11 +739,11 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
     output
 }
 
-fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
+fn create_key(namespace: Option<&OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
             log_path: namespace.with_field_appended(key),
-            metric_tag: format!("{}.{}", create_metric_namespace(namespace), key),
+            metric_tag: format!("{}.{key}", create_metric_namespace(namespace)),
         }
     } else {
         MetadataKey {
@@ -759,30 +758,33 @@ impl Keys {
         let namespace = namespace.and_then(|namespace| namespace.path);
 
         Keys {
-            account_id_key: create_key(&namespace, ACCOUNT_ID_KEY),
-            ami_id_key: create_key(&namespace, AMI_ID_KEY),
-            availability_zone_key: create_key(&namespace, AVAILABILITY_ZONE_KEY),
-            availability_zone_id_key: create_key(&namespace, AVAILABILITY_ZONE_ID_KEY),
-            instance_id_key: create_key(&namespace, INSTANCE_ID_KEY),
-            instance_type_key: create_key(&namespace, INSTANCE_TYPE_KEY),
-            local_hostname_key: create_key(&namespace, LOCAL_HOSTNAME_KEY),
-            local_ipv4_key: create_key(&namespace, LOCAL_IPV4_KEY),
-            public_hostname_key: create_key(&namespace, PUBLIC_HOSTNAME_KEY),
-            public_ipv4_key: create_key(&namespace, PUBLIC_IPV4_KEY),
-            region_key: create_key(&namespace, REGION_KEY),
-            partition_key: create_key(&namespace, PARTITION_KEY),
-            domain_key: create_key(&namespace, DOMAIN_KEY),
-            placement_group_name_key: create_key(&namespace, PLACEMENT_GROUP_NAME_KEY),
-            placement_partition_number_key: create_key(&namespace, PLACEMENT_PARTITION_NUMBER_KEY),
-            host_id_key: create_key(&namespace, HOST_ID_KEY),
-            autoscaling_target_lifecycle_state_key: create_key(
-                &namespace,
+            account_id: create_key(namespace.as_ref(), ACCOUNT_ID_KEY),
+            ami_id: create_key(namespace.as_ref(), AMI_ID_KEY),
+            availability_zone: create_key(namespace.as_ref(), AVAILABILITY_ZONE_KEY),
+            availability_zone_id: create_key(namespace.as_ref(), AVAILABILITY_ZONE_ID_KEY),
+            instance_id: create_key(namespace.as_ref(), INSTANCE_ID_KEY),
+            instance_type: create_key(namespace.as_ref(), INSTANCE_TYPE_KEY),
+            local_hostname: create_key(namespace.as_ref(), LOCAL_HOSTNAME_KEY),
+            local_ipv4: create_key(namespace.as_ref(), LOCAL_IPV4_KEY),
+            public_hostname: create_key(namespace.as_ref(), PUBLIC_HOSTNAME_KEY),
+            public_ipv4: create_key(namespace.as_ref(), PUBLIC_IPV4_KEY),
+            region: create_key(namespace.as_ref(), REGION_KEY),
+            partition: create_key(namespace.as_ref(), PARTITION_KEY),
+            domain: create_key(namespace.as_ref(), DOMAIN_KEY),
+            placement_group_name: create_key(namespace.as_ref(), PLACEMENT_GROUP_NAME_KEY),
+            placement_partition_number: create_key(
+                namespace.as_ref(),
+                PLACEMENT_PARTITION_NUMBER_KEY,
+            ),
+            host_id: create_key(namespace.as_ref(), HOST_ID_KEY),
+            autoscaling_target_lifecycle_state: create_key(
+                namespace.as_ref(),
                 AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY,
             ),
-            subnet_id_key: create_key(&namespace, SUBNET_ID_KEY),
-            vpc_id_key: create_key(&namespace, VPC_ID_KEY),
-            role_name_key: create_key(&namespace, ROLE_NAME_KEY),
-            tags_key: create_key(&namespace, TAGS_KEY),
+            subnet_id: create_key(namespace.as_ref(), SUBNET_ID_KEY),
+            vpc_id: create_key(namespace.as_ref(), VPC_ID_KEY),
+            role_name: create_key(namespace.as_ref(), ROLE_NAME_KEY),
+            tags: create_key(namespace.as_ref(), TAGS_KEY),
         }
     }
 }
@@ -822,44 +824,48 @@ mod test {
 
     use super::*;
     use crate::{
-        config::{LogNamespace, OutputId, TransformConfig, schema::Definition},
+        config::{LogNamespace, OutputId, TransformConfig, TransformContext, schema::Definition},
         event::{LogEvent, Metric, MetricKind, metric::MetricValue},
         test_util::http::spawn_blackhole_http_server,
         transforms::aws_ec2_metadata::Ec2Metadata,
     };
 
+    const ADDITIONAL_CATEGORIES: [(&str, &str, &str); 7] = [
+        (
+            AVAILABILITY_ZONE_ID_KEY,
+            "/latest/meta-data/placement/availability-zone-id",
+            "use1-az1",
+        ),
+        (PARTITION_KEY, "/latest/meta-data/services/partition", "aws"),
+        (
+            DOMAIN_KEY,
+            "/latest/meta-data/services/domain",
+            "amazonaws.com",
+        ),
+        (
+            PLACEMENT_GROUP_NAME_KEY,
+            "/latest/meta-data/placement/group-name",
+            "test-group",
+        ),
+        (
+            PLACEMENT_PARTITION_NUMBER_KEY,
+            "/latest/meta-data/placement/partition-number",
+            "2",
+        ),
+        (HOST_ID_KEY, "/latest/meta-data/placement/host-id", "h-test"),
+        (
+            AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY,
+            "/latest/meta-data/autoscaling/target-lifecycle-state",
+            "InService",
+        ),
+    ];
+
     #[tokio::test]
     async fn additional_categories_are_selected_and_enrich_logs_and_metrics() {
-        const CATEGORIES: [(&str, &str, &str); 7] = [
-            (
-                AVAILABILITY_ZONE_ID_KEY,
-                "/latest/meta-data/placement/availability-zone-id",
-                "use1-az1",
-            ),
-            (PARTITION_KEY, "/latest/meta-data/services/partition", "aws"),
-            (
-                DOMAIN_KEY,
-                "/latest/meta-data/services/domain",
-                "amazonaws.com",
-            ),
-            (
-                PLACEMENT_GROUP_NAME_KEY,
-                "/latest/meta-data/placement/group-name",
-                "test-group",
-            ),
-            (
-                PLACEMENT_PARTITION_NUMBER_KEY,
-                "/latest/meta-data/placement/partition-number",
-                "2",
-            ),
-            (HOST_ID_KEY, "/latest/meta-data/placement/host-id", "h-test"),
-            (
-                AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY,
-                "/latest/meta-data/autoscaling/target-lifecycle-state",
-                "InService",
-            ),
-        ];
-        let all: Vec<_> = CATEGORIES.iter().map(|(field, _, _)| *field).collect();
+        let all: Vec<_> = ADDITIONAL_CATEGORIES
+            .iter()
+            .map(|(field, _, _)| *field)
+            .collect();
         for (selected, missing) in [
             (all.clone(), None),
             (vec![PARTITION_KEY], None),
@@ -879,7 +885,7 @@ mod test {
                         if path == "/latest/dynamic/instance-identity/document" {
                             (StatusCode::OK, r#"{"accountId":"test-account","architecture":"x86_64","imageId":"ami-test","instanceId":"i-test","instanceType":"t3.micro","privateIp":"192.0.2.1","region":"us-east-1","version":"2017-09-30"}"#)
                         } else {
-                            CATEGORIES.iter()
+                            ADDITIONAL_CATEGORIES.iter()
                                 .find(|(field, uri, _)| *uri == path && Some(*field) != missing)
                                 .map_or((StatusCode::NOT_FOUND, ""), |(_, _, value)| (StatusCode::OK, *value))
                         }
@@ -897,7 +903,7 @@ mod test {
                     OwnedTargetPath::event(owned_value_path!("ec2")).into(),
                 )),
                 Arc::clone(&state),
-                Duration::from_secs(60),
+                Duration::from_mins(1),
                 Duration::from_secs(5),
                 selected.iter().map(|field| (*field).to_owned()).collect(),
                 Vec::new(),
@@ -920,7 +926,7 @@ mod test {
                     .filter(|field| Some(**field) != missing)
                     .count()
             );
-            for (field, uri, value) in CATEGORIES {
+            for (field, uri, value) in ADDITIONAL_CATEGORIES {
                 assert_eq!(
                     requests.lock().unwrap().iter().any(|path| path == uri),
                     selected.contains(&field)
@@ -954,7 +960,7 @@ mod test {
             Definition::new(Kind::bytes(), Kind::any_object(), [LogNamespace::Vector]);
 
         let mut outputs = transform_config.outputs(
-            &Default::default(),
+            &TransformContext::default(),
             &[(OutputId::dummy(), input_definition)],
         );
         assert_eq!(outputs.len(), 1);
@@ -976,7 +982,10 @@ mod integration_tests {
             lookup_v2::{OwnedSegment, OwnedValuePath},
         },
     };
-    use vrl::value::{ObjectMap, Value};
+    use vrl::{
+        path::parse_target_path,
+        value::{ObjectMap, Value},
+    };
     use warp::Filter;
 
     use super::*;
@@ -1078,7 +1087,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn enrich_log() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
@@ -1116,18 +1125,18 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn timeout() {
-        let (_guard, addr) = next_addr();
-
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
             Ok("I waited 3 seconds!")
         }
+
+        let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
         let server = warp::serve(slow).bind(addr);
@@ -1153,12 +1162,12 @@ mod integration_tests {
     // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
     async fn not_required() {
-        let (_guard, addr) = next_addr();
-
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
             Ok("I waited 3 seconds!")
         }
+
+        let (_guard, addr) = next_addr();
 
         let slow = warp::any().and_then(sleepy);
         let server = warp::serve(slow).bind(addr);
@@ -1179,7 +1188,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn enrich_metric() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
@@ -1205,7 +1214,7 @@ mod integration_tests {
 
             let metric = make_metric();
             let mut expected_metric = metric.clone();
-            for (k, v) in expected_metric_fields().iter() {
+            for (k, v) in &expected_metric_fields() {
                 expected_metric.replace_tag(k.to_string(), v.to_string());
             }
 
@@ -1217,13 +1226,13 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn fields_log() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
@@ -1244,10 +1253,16 @@ mod integration_tests {
 
             let log = LogEvent::default();
             let mut expected_log = log.clone();
-            expected_log.insert(format!("\"{PUBLIC_IPV4_KEY}\"").as_str(), "192.0.2.54");
-            expected_log.insert(format!("\"{REGION_KEY}\"").as_str(), "us-east-1");
             expected_log.insert(
-                format!("\"{TAGS_KEY}\"").as_str(),
+                &vrl::path::parse_target_path(&format!("\"{PUBLIC_IPV4_KEY}\"")).unwrap(),
+                "192.0.2.54",
+            );
+            expected_log.insert(
+                &vrl::path::parse_target_path(&format!("\"{REGION_KEY}\"")).unwrap(),
+                "us-east-1",
+            );
+            expected_log.insert(
+                &vrl::path::parse_target_path(&format!("\"{TAGS_KEY}\"")).unwrap(),
                 ObjectMap::from([
                     ("Name".into(), Value::from("test-instance")),
                     ("Test".into(), Value::from("test-tag")),
@@ -1262,13 +1277,13 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn fields_metric() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
                 endpoint: ec2_metadata_address(),
                 fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
@@ -1292,11 +1307,10 @@ mod integration_tests {
             expected_metric.replace_tag(PUBLIC_IPV4_KEY.to_string(), "192.0.2.54".to_string());
             expected_metric.replace_tag(REGION_KEY.to_string(), "us-east-1".to_string());
             expected_metric.replace_tag(
-                format!("{}[{}]", TAGS_KEY, "Name"),
+                format!("{TAGS_KEY}[{}]", "Name"),
                 "test-instance".to_string(),
             );
-            expected_metric
-                .replace_tag(format!("{}[{}]", TAGS_KEY, "Test"), "test-tag".to_string());
+            expected_metric.replace_tag(format!("{TAGS_KEY}[{}]", "Test"), "test-tag".to_string());
 
             tx.send(metric.into()).await.unwrap();
 
@@ -1306,14 +1320,14 @@ mod integration_tests {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn namespace_log() {
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
                     namespace: Some(
@@ -1336,19 +1350,21 @@ mod integration_tests {
                 let event = out.recv().await.unwrap();
 
                 assert_eq!(
-                    event.as_log().get("ec2.metadata.\"availability-zone\""),
+                    event
+                        .as_log()
+                        .get(&parse_target_path("ec2.metadata.\"availability-zone\"").unwrap()),
                     Some(&"us-east-1a".into())
                 );
 
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
 
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
@@ -1376,7 +1392,7 @@ mod integration_tests {
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
     }
@@ -1384,7 +1400,7 @@ mod integration_tests {
     #[tokio::test]
     async fn namespace_metric() {
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
                     namespace: Some(
@@ -1415,12 +1431,12 @@ mod integration_tests {
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
 
         {
-            assert_transform_compliance(async {
+            Box::pin(assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
                     endpoint: ec2_metadata_address(),
@@ -1448,7 +1464,7 @@ mod integration_tests {
                 drop(tx);
                 topology.stop().await;
                 assert_eq!(out.recv().await, None);
-            })
+            }))
             .await;
         }
     }

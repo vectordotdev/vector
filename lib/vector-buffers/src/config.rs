@@ -153,8 +153,11 @@ impl<'de> Deserialize<'de> for BufferType {
     }
 }
 
+/// # Panics
+///
+/// Never panics; the value 500 is non-zero.
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(500) }
+    NonZeroUsize::new(500).expect("500 is non-zero")
 }
 
 /// Disk usage configuration for disk-backed buffers.
@@ -219,12 +222,13 @@ pub enum BufferType {
     /// This is more performant, but less durable. Data will be lost if Vector is restarted
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
+    // BufferTypeVisitor defaults a missing type to memory.
+    #[configurable(metadata(serde::optional_tag = "type"))]
     Memory {
         /// The terms around how to express buffering limits, can be in size or `bytes_size`.
         #[serde(flatten)]
         size: MemoryBufferSize,
 
-        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -247,7 +251,6 @@ pub enum BufferType {
         )]
         max_size: NonZeroU64,
 
-        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -398,7 +401,6 @@ impl BufferConfig {
     ///
     /// If a disk buffer stage is configured and the data directory provided is `None`, an error
     /// variant will be thrown.
-    #[allow(clippy::needless_pass_by_value)]
     pub async fn build<T>(
         &self,
         data_dir: Option<PathBuf>,

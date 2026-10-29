@@ -56,7 +56,7 @@ a major version increment.
 * [Data model]
   * As output in all sinks except the [`vector` sink]
   * As exposed in the source of the [`lua` transform]
-* [GraphQL API]
+* [Observability API]
 * Telemetry
   * Vector's internal metrics as provided by the [`internal_metrics` source]
 * [VRL]
@@ -124,13 +124,12 @@ here. Each minor release bump will include an upgrade guide in the
 [data directory]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 [data model]: https://vector.dev/docs/architecture/data-model/
 [GitHub repository]: https://github.com/vectordotdev/vector
-[GraphQL API]: https://vector.dev/docs/reference/api/
+[Observability API]: https://vector.dev/docs/reference/api/
 [Installation workflows]: https://vector.dev/docs/setup/installation/
 [`internal_logs_` source]: https://vector.dev/docs/reference/configuration/sources/internal_logs/
 [`internal_metrics` source]: https://vector.dev/docs/reference/configuration/sources/internal_metrics/
 [`lua` transform]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [`master` branch]: https://github.com/vectordotdev/vector/tree/master
-[nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [release notes]: https://vector.dev/releases/
 [release policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md

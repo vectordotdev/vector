@@ -81,6 +81,7 @@ pub enum WindowsEventLogError {
 
 impl WindowsEventLogError {
     /// Check if the error is recoverable and the operation should be retried.
+    #[must_use]
     pub const fn is_recoverable(&self) -> bool {
         match self {
             // Network/connection issues are typically recoverable
@@ -89,7 +90,8 @@ impl WindowsEventLogError {
             | Self::ResourceExhaustedError { .. }
             | Self::TimeoutError { .. }
             | Self::SeekEventsError { .. }
-            | Self::PullEventsError { .. } => true,
+            | Self::PullEventsError { .. }
+            | Self::IoError { .. } => true,
 
             // Configuration and permission issues are not recoverable
             Self::OpenChannelError { .. }
@@ -100,38 +102,32 @@ impl WindowsEventLogError {
             | Self::InvalidXPathQuery { .. }
             | Self::ConfigError { .. }
             | Self::CreateRenderContextError { .. }
-            | Self::LoadPublisherMetadataError { .. } => false,
-
-            // Parsing errors might be recoverable depending on the specific error
-            Self::ParseXmlError { .. }
+            // Parsing and filtering failures are not recoverable.
+            | Self::LoadPublisherMetadataError { .. }
+            | Self::ParseXmlError { .. }
             | Self::RenderMessageError { .. }
             | Self::FormatMessageError { .. }
-            | Self::RenderError { .. } => false,
-
-            // I/O errors could be temporary
-            Self::IoError { .. } => true,
-
-            Self::FilterError { .. } => false,
+            | Self::RenderError { .. }
+            | Self::FilterError { .. } => false,
         }
     }
 
     /// Get a user-friendly error message for logging.
+    #[must_use]
     pub fn user_message(&self) -> String {
         match self {
             Self::AccessDeniedError { channel } => {
                 format!(
-                    "Access denied to event log channel '{}'. Try running Vector as Administrator.",
-                    channel
+                    "Access denied to event log channel '{channel}'. Try running Vector as Administrator."
                 )
             }
             Self::ChannelNotFoundError { channel } => {
                 format!(
-                    "Event log channel '{}' not found. Check the channel name and ensure the service is installed.",
-                    channel
+                    "Event log channel '{channel}' not found. Check the channel name and ensure the service is installed."
                 )
             }
             Self::InvalidXPathQuery { query, .. } => {
-                format!("Invalid XPath query '{}'. Check the query syntax.", query)
+                format!("Invalid XPath query '{query}'. Check the query syntax.")
             }
             Self::ResourceExhaustedError { .. } => {
                 "System resources exhausted. Consider reducing batch_size or poll_interval_secs."
@@ -139,8 +135,7 @@ impl WindowsEventLogError {
             }
             Self::TimeoutError { timeout_secs } => {
                 format!(
-                    "Operation timed out after {} seconds. Consider increasing timeout values.",
-                    timeout_secs
+                    "Operation timed out after {timeout_secs} seconds. Consider increasing timeout values."
                 )
             }
             _ => self.to_string(),
@@ -181,8 +176,7 @@ mod tests {
         for error in recoverable_errors {
             assert!(
                 error.is_recoverable(),
-                "Error should be recoverable: {}",
-                error
+                "Error should be recoverable: {error}"
             );
         }
 
@@ -205,8 +199,7 @@ mod tests {
         for error in non_recoverable_errors {
             assert!(
                 !error.is_recoverable(),
-                "Error should not be recoverable: {}",
-                error
+                "Error should not be recoverable: {error}"
             );
         }
     }
@@ -235,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_error_conversions() {
-        let xml_error = quick_xml::Error::UnexpectedEof("test".to_string());
+        let xml_error = quick_xml::Error::Syntax(quick_xml::errors::SyntaxError::UnclosedTag);
         let converted: WindowsEventLogError = xml_error.into();
         assert!(matches!(
             converted,

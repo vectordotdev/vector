@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.3.3"
+version = "0.3.37"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
@@ -16,7 +16,35 @@ include = [
   "src/**",
 ]
 
+[lints]
+workspace = true
+
+[features]
+default = []
+# Opt in to the entire package-repository command and its publisher dependencies.
+# Ordinary developer binaries omit it; the separate Linux publisher binary enables it.
+package-repositories = [
+  "dep:aws-config", "dep:aws-sdk-s3", "dep:aws-sdk-sts", "dep:aws-sdk-iam",
+  "dep:aws-smithy-http-client", "dep:aws-smithy-runtime-api", "dep:aws-smithy-types", "dep:base64", "dep:flate2", "dep:reqwest", "dep:roxmltree", "dep:tar",
+  "dep:tokio", "dep:uuid",
+]
+
 [dependencies]
+aws-config = { version = "=1.12.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-s3 = { version = "=1.146.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sts = { version = "=1.114.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-iam = { version = "1.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+# Match Vector's Ring provider when both packages are built together.
+aws-smithy-http-client = { version = "1.4", default-features = false, features = ["rustls-ring"], optional = true }
+aws-smithy-runtime-api = { version = "1.16", features = ["client"], optional = true }
+aws-smithy-types = { version = "1", optional = true }
+base64 = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["blocking"], optional = true }
+roxmltree = { version = "0.21", optional = true }
+tar = { version = "0.4", optional = true }
+tokio = { workspace = true, features = ["rt-multi-thread"], optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
@@ -24,6 +52,7 @@ clap-verbosity-flag = "3.0.4"
 clap_complete.workspace = true
 directories = "6.0.0"
 glob.workspace = true
+handlebars = { version = "6.4.4", default-features = false }
 hex = "0.4.3"
 indexmap.workspace = true
 indicatif = { version = "0.18.4", features = ["improved_unicode"] }
@@ -33,25 +62,24 @@ log = "0.4.29"
 owo-colors = { version = "4.2.3", features = ["supports-colors"] }
 pastey.workspace = true
 regex.workspace = true
-reqwest = { workspace = true, features = ["blocking"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["preserve_order"] }
 serde_yaml.workspace = true
-sha2 = "0.10.9"
+sha2 = "0.11.0"
 tempfile.workspace = true
 toml.workspace = true
 toml_edit = "0.23"
 semver.workspace = true
 strum.workspace = true
 indoc.workspace = true
-git2 = { version = "0.20.4" }
+git2 = { version = "0.21.0" }
 cfg-if.workspace = true
 convert_case.workspace = true
 # Used by check-events to walk Rust source via syn's AST. The extra features
 # are vdev-local; they do not propagate into the `vector` package's build.
-syn = { workspace = true, features = ["full", "visit", "extra-traits", "printing", "parsing"] }
+syn = { workspace = true, features = ["printing", "parsing"] }
 proc-macro2 = { workspace = true, features = ["span-locations"] }
 quote.workspace = true
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"
+pkg-url = "https://install.datadoghq.com/vector/vdev/{ version }/{ name }-{ target }-v{ version }.tgz"

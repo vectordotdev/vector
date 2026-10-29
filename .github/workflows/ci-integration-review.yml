@@ -64,10 +64,10 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR review author
         id: comment
-        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
+        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
@@ -134,11 +134,13 @@ jobs:
             "mongodb",
             "nats",
             "nginx",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",
             "pulsar",
             "redis",
+            "splunk",
             "webhdfs"
           ]
     steps:
@@ -154,7 +156,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
@@ -164,6 +166,7 @@ jobs:
         if: steps.run_condition.outputs.should_run == 'true'
 
       - uses: ./.github/actions/setup
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           vdev: true
           datadog-ci: true
@@ -181,11 +184,11 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh int ${{ matrix.service }}
+          command: vdev integration run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   e2e-tests:
+    # The dedicated command also starts with the ordinary opentelemetry-traces command.
+    if: github.repository == 'vectordotdev/vector' && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
     needs:
       - prep-pr
       - build-test-runner
@@ -198,7 +201,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
+        service:
+          [
+            "datadog-logs",
+            "datadog-metrics",
+            "opentelemetry-logs",
+            "opentelemetry-metrics",
+            "opentelemetry-metrics-native",
+            "opentelemetry-traces"
+          ]
     steps:
       - name: Evaluate run condition
         id: run_condition
@@ -212,7 +223,7 @@ jobs:
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.run_condition.outputs.should_run == 'true'
         with:
           submodules: "recursive"
@@ -222,6 +233,7 @@ jobs:
         if: steps.run_condition.outputs.should_run == 'true'
 
       - uses: ./.github/actions/setup
+        if: steps.run_condition.outputs.should_run == 'true'
         with:
           vdev: true
           datadog-ci: true
@@ -239,9 +251,71 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+          command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
+
+  otel-traces-multiservice:
+    name: Multiservice OpenTelemetry trace validation
+    if: github.repository == 'vectordotdev/vector' && startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    needs:
+      - prep-pr
+      - build-test-runner
+    runs-on: ubuntu-24.04-8core
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read # Required to pull test runner image from GHCR
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: "recursive"
+          ref: ${{ github.event.review.commit_id }}
+
+      - uses: ./.github/actions/dd-token
+
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+          datadog-ci: true
+
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
+
+      - name: Multiservice OpenTelemetry trace validation
+        run: |
+          mkdir -p target/otel-traces-multiservice-evidence
+          set -o pipefail
+          vdev e2e run opentelemetry-traces-multiservice --always-show-logs 2>&1 | tee target/otel-traces-multiservice-evidence/runner.log
+
+      - name: Collect multiservice trace evidence
+        if: always()
+        run: |
+          mkdir -p target/otel-traces-multiservice-evidence
+          git rev-parse HEAD > target/otel-traces-multiservice-evidence/revision.txt
+          cp -R tests/e2e/opentelemetry-traces-multiservice/config tests/e2e/opentelemetry-traces-multiservice/data target/otel-traces-multiservice-evidence/
+          if docker volume inspect opentelemetry_traces_multiservice_evidence >/dev/null 2>&1; then
+            docker run --rm \
+              -v opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice:ro \
+              -v "$PWD/target/otel-traces-multiservice-evidence:/evidence" \
+              alpine:3.20 sh -c 'if [ -d /output/opentelemetry-traces-multiservice ]; then cp -R /output/opentelemetry-traces-multiservice/. /evidence/; fi'
+          fi
+          summaries=(target/otel-traces-multiservice-evidence/*/summary.md)
+          if [ -f "${summaries[0]}" ]; then
+            cat "${summaries[@]}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Multiservice trace test did not produce a validation summary. See runner.log and the failed job steps.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload multiservice trace evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: otel-traces-multiservice-${{ github.event.review.commit_id }}
+          path: target/otel-traces-multiservice-evidence/
+          retention-days: 14
 
   update-pr-status:
     name: Signal result to PR
@@ -250,6 +324,7 @@ jobs:
     needs:
       - integration-tests
       - e2e-tests
+      - otel-traces-multiservice
     if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
     permissions:
       statuses: write # Required to set final commit status
@@ -265,10 +340,10 @@ jobs:
 
       - name: Validate issue comment
         if: github.event_name == 'pull_request_review'
-        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
+        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
-          team: "Vector"
+          team: "Vector,Observability Pipelines"
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: (PR review) Submit PR result as success

@@ -14,6 +14,7 @@ use codecs::{
 };
 use tokio_util::codec::Encoder;
 use vector_core::config::LogNamespace;
+use vrl::event_path;
 
 fn test_data_dir() -> PathBuf {
     PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/protobuf")
@@ -93,15 +94,18 @@ fn roundtrip_coding_with_json_names() {
     // Verify that protobuf field names are being used (snake_case)
     let event = events_snake_case[0].as_log();
     assert!(
-        event.contains("job_description"),
+        event.contains(event_path!("job_description")),
         "Event should contain 'job_description' (protobuf field name) when use_json_names is disabled"
     );
     assert_eq!(
-        event.get("job_description").unwrap().to_string_lossy(),
+        event
+            .get(event_path!("job_description"))
+            .unwrap()
+            .to_string_lossy(),
         "Software Engineer"
     );
     assert!(
-        !event.contains("jobDescription"),
+        !event.contains(event_path!("jobDescription")),
         "Event should not contain 'jobDescription' (JSON name) when use_json_names is disabled"
     );
 
@@ -127,15 +131,18 @@ fn roundtrip_coding_with_json_names() {
     // Verify that JSON names are being used (camelCase)
     let event = events_camel_case[0].as_log();
     assert!(
-        event.contains("jobDescription"),
+        event.contains(event_path!("jobDescription")),
         "Event should contain 'jobDescription' (JSON name) when use_json_names is enabled"
     );
     assert_eq!(
-        event.get("jobDescription").unwrap().to_string_lossy(),
+        event
+            .get(event_path!("jobDescription"))
+            .unwrap()
+            .to_string_lossy(),
         "Software Engineer"
     );
     assert!(
-        !event.contains("job_description"),
+        !event.contains(event_path!("job_description")),
         "Event should not contain 'job_description' (protobuf name) when use_json_names is enabled"
     );
 

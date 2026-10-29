@@ -1,24 +1,27 @@
 use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
+use http_1::uri::PathAndQuery;
 
+use vector_http::HttpError;
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
-    http::{HttpClient, get_http_scheme_from_uri},
+    config::ValidatedSink,
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
         prelude::*,
         util::{
-            RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
 };
 
 use super::{
-    service::{AzureLogsIngestionResponse, AzureLogsIngestionService},
+    service::{AzureLogsIngestionResponse, AzureLogsIngestionService, request_path},
     sink::AzureLogsIngestionSink,
 };
 
@@ -47,7 +50,7 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(
         docs::examples = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
     ))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
     ///
@@ -61,7 +64,6 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(docs::examples = "Custom-MyTable"))]
     pub stream_name: String,
 
-    #[configurable(derived)]
     pub auth: AzureAuthentication,
 
     /// [Token scope][token_scope] for dedicated Azure regions.
@@ -83,22 +85,17 @@ pub struct AzureLogsIngestionConfig {
     #[serde(default = "default_timestamp_field")]
     pub timestamp_field: String,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -106,7 +103,6 @@ pub struct AzureLogsIngestionConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 }
@@ -114,57 +110,48 @@ pub struct AzureLogsIngestionConfig {
 impl Default for AzureLogsIngestionConfig {
     fn default() -> Self {
         Self {
-            endpoint: Default::default(),
-            dcr_immutable_id: Default::default(),
-            stream_name: Default::default(),
-            auth: Default::default(),
+            endpoint: HttpEndpoint::parse("http://localhost:8080").unwrap(),
+            dcr_immutable_id: String::new(),
+            stream_name: String::new(),
+            auth: AzureAuthentication::default(),
             token_scope: default_scope(),
             timestamp_field: default_timestamp_field(),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            retry_strategy: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            retry_strategy: RetryStrategy::default(),
         }
     }
 }
 
 impl AzureLogsIngestionConfig {
     #[allow(clippy::too_many_arguments)]
-    pub(super) async fn build_inner(
+    pub(super) fn build_inner(
         &self,
-        cx: SinkContext,
-        endpoint: UriSerde,
-        dcr_immutable_id: String,
-        stream_name: String,
+        cx: &SinkContext,
+        validated: &ValidatedAzureLogsIngestion,
+        endpoint: HttpEndpoint,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
         timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = endpoint.with_default_parts().uri;
-        let protocol = get_http_scheme_from_uri(&endpoint).to_string();
-
-        let batch_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(MAX_BATCH_SIZE)?
-            .into_batcher_settings()?;
+        let protocol = get_http_scheme_from_uri(&endpoint.clone().into_uri()).to_string();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let service = AzureLogsIngestionService::new(
             client,
-            endpoint,
-            dcr_immutable_id,
-            stream_name,
+            endpoint.into_v1(),
+            validated.path_and_query.clone(),
             credential,
             token_scope,
         )?;
         let healthcheck = service.healthcheck();
 
-        let retry_logic = HttpStatusRetryLogic::new(
+        let retry_logic = HttpStatusRetryLogic::<_, _, _, HttpError>::new_with_error(
             |res: &AzureLogsIngestionResponse| res.http_status,
             self.retry_strategy.clone(),
         );
@@ -174,7 +161,7 @@ impl AzureLogsIngestionConfig {
             .service(service);
 
         let sink = AzureLogsIngestionSink::new(
-            batch_settings,
+            validated.batch_settings,
             self.encoding.clone(),
             service,
             timestamp_field,
@@ -187,26 +174,15 @@ impl AzureLogsIngestionConfig {
 
 impl_generate_config_from_default!(AzureLogsIngestionConfig);
 
+#[derive(Clone, Debug)]
+pub struct ValidatedAzureLogsIngestion {
+    batch_settings: BatcherSettings,
+    path_and_query: PathAndQuery,
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint: UriSerde = self.endpoint.parse()?;
-
-        let credential: Arc<dyn TokenCredential> = self.auth.credential().await?;
-
-        self.build_inner(
-            cx,
-            endpoint,
-            self.dcr_immutable_id.clone(),
-            self.stream_name.clone(),
-            credential,
-            self.token_scope.clone(),
-            self.timestamp_field.clone(),
-        )
-        .await
-    }
-
     fn input(&self) -> Input {
         let requirements =
             schema::Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
@@ -216,5 +192,42 @@ impl SinkConfig for AzureLogsIngestionConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AzureLogsIngestionConfig {
+    type Validated = ValidatedAzureLogsIngestion;
+
+    fn validate(&self) -> crate::Result<ValidatedAzureLogsIngestion> {
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_SIZE)?
+            .into_batcher_settings()?;
+
+        let path_and_query = request_path(&self.dcr_immutable_id, &self.stream_name)?;
+
+        Ok(ValidatedAzureLogsIngestion {
+            batch_settings,
+            path_and_query,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAzureLogsIngestion,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let credential: Arc<dyn TokenCredential> = self.auth.credential()?;
+
+        self.build_inner(
+            &cx,
+            validated,
+            self.endpoint.clone(),
+            credential,
+            self.token_scope.clone(),
+            self.timestamp_field.clone(),
+        )
     }
 }

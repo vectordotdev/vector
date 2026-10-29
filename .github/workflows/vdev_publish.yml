@@ -9,21 +9,30 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write # Required to upload release assets
     strategy:
       matrix:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
+            features: ""
+            suffix: ""
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            features: ""
+            suffix: ""
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            features: ""
+            suffix: ""
+          # Keep publishing commands out of ordinary developer binaries.
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            features: package-repositories
+            suffix: -package-repositories
 
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:
@@ -32,20 +41,20 @@ jobs:
 
       - name: Build
         working-directory: vdev
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --locked --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
 
       - name: Package
         shell: bash
         run: |
           VERSION=${GITHUB_REF_NAME#vdev-v}
-          OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
+          OUTDIR="vdev${{ matrix.suffix }}-${{ matrix.target }}-v${VERSION}"
           mkdir -p "$OUTDIR"
 
           BIN_ROOT="${CARGO_TARGET_DIR:-target}"
           BIN="${BIN_ROOT}/${{ matrix.target }}/release/vdev"
           if [[ ! -f "$BIN" ]]; then
               echo "Binary not found at: $BIN"
-              find ${BIN_ROOT} -type -d
+              find "${BIN_ROOT}" -type -d
               exit 1
           fi
 
@@ -53,21 +62,67 @@ jobs:
           tar -czf "${OUTDIR}.tgz" "$OUTDIR"
           echo "ASSET=${OUTDIR}.tgz" >> "$GITHUB_ENV"
 
-      - name: Upload asset to release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+      - name: Stage asset for release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          files: ${{ env.ASSET }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: vdev${{ matrix.suffix }}-${{ matrix.target }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  publish-s3:
+    runs-on: ubuntu-24.04
+    needs: build
+    timeout-minutes: 10
+    permissions:
+      id-token: write # Required to publish artifacts with AWS OIDC
+    steps:
+      - name: Download staged assets
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vdev-*
+          path: assets
+          merge-multiple: true
+
+      - name: Configure credentials for COSE release artifacts
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::486234852809:role/vector-release-publisher-github-actions
+          aws-region: us-east-1
+
+      - name: Publish and verify binaries
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#vdev-v}
+          shopt -s nullglob
+          ASSETS=(assets/*.tgz)
+          if (( ${#ASSETS[@]} == 0 )); then
+            echo "No vdev archives found" >&2
+            exit 1
+          fi
+
+          for asset in "${ASSETS[@]}"; do
+            name=$(basename "$asset")
+            aws s3 cp "$asset" \
+              "s3://dd-cose-releases/vector/vdev/${VERSION}/${name}" \
+              --sse AES256
+          done
+
+          for asset in "${ASSETS[@]}"; do
+            name=$(basename "$asset")
+            curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors \
+              "https://install.datadoghq.com/vector/vdev/${VERSION}/${name}" \
+              --output "${RUNNER_TEMP}/${name}"
+            cmp "$asset" "${RUNNER_TEMP}/${name}"
+          done
 
   publish:
     runs-on: ubuntu-24.04
-    needs: build
+    needs: publish-s3
     env:
       DISABLE_MOLD: true
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:

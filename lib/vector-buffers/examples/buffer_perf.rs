@@ -11,8 +11,12 @@ use std::{
 use bytes::{Buf, BufMut};
 use clap::{Arg, Command};
 use hdrhistogram::Histogram;
-use rand::Rng;
-use tokio::{select, sync::oneshot, task, time};
+use rand::RngExt;
+use tokio::{
+    select,
+    sync::oneshot::{self, error::RecvError},
+    task, time,
+};
 use tracing::{Span, debug, info};
 use tracing_subscriber::EnvFilter;
 use vector_buffers::{
@@ -27,6 +31,7 @@ use vector_common::{
     byte_size_of::ByteSizeOf,
     finalization::{
         AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+        MergeFinalizable,
     },
 };
 
@@ -38,14 +43,16 @@ pub struct VariableMessage {
 }
 
 impl VariableMessage {
+    #[must_use]
     pub fn new(id: u64, payload: Vec<u8>) -> Self {
         VariableMessage {
             id,
             payload,
-            finalizers: Default::default(),
+            finalizers: EventFinalizers::default(),
         }
     }
 
+    #[must_use]
     pub fn id(&self) -> u64 {
         self.id
     }
@@ -69,9 +76,17 @@ impl EventCount for VariableMessage {
     }
 }
 
+impl Bufferable for VariableMessage {}
+
 impl Finalizable for VariableMessage {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MergeFinalizable for VariableMessage {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.finalizers.merge(finalizers);
     }
 }
 
@@ -188,7 +203,7 @@ impl Configuration {
 
         let buffer_type = matches
             .get_one::<String>("buffer_type")
-            .map(|s| s.to_string())
+            .cloned()
             .expect("default value for buffer_type should always be present");
         let read_total_records = matches
             .get_one::<String>("read_total_records")
@@ -259,8 +274,7 @@ where
     let variant = match buffer_type {
         "in-memory" => {
             info!(
-                "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
-                max_size_events
+                "[buffer-perf] creating in-memory v2 buffer with max_events={max_size_events}, in blocking mode"
             );
             BufferType::Memory {
                 size: MemoryBufferSize::MaxEvents(max_size_events),
@@ -269,8 +283,7 @@ where
         }
         "disk-v2" => {
             info!(
-                "[buffer-perf] creating disk v2 buffer with max_size={}, in blocking mode",
-                max_size_bytes
+                "[buffer-perf] creating disk v2 buffer with max_size={max_size_bytes}, in blocking mode"
             );
             BufferType::DiskV2 {
                 max_size: max_size_bytes,
@@ -292,6 +305,16 @@ where
         .expect("build should not fail")
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "Preserve the benchmark latency and throughput measurement conversions. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting the benchmark driver is deferred to keep this lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() {
     tracing_subscriber::fmt()
@@ -304,8 +327,7 @@ async fn main() {
     let write_total_records = config.write_total_records;
     let write_batch_size = config.write_batch_size;
     debug!(
-        "[buffer-perf] going to write {} records, with a write batch size of {} record(s), and read {} records",
-        write_total_records, write_batch_size, read_total_records
+        "[buffer-perf] going to write {write_total_records} records, with a write batch size of {write_batch_size} record(s), and read {read_total_records} records"
     );
 
     let record_cache = generate_record_cache(config.min_record_size, config.max_record_size);
@@ -319,8 +341,8 @@ async fn main() {
     let write_position = Arc::new(AtomicUsize::new(0));
     let read_position = Arc::new(AtomicUsize::new(0));
 
-    let writer_position = Arc::clone(&write_position);
-    let reader_position = Arc::clone(&read_position);
+    let writer_progress = Arc::clone(&write_position);
+    let reader_progress = Arc::clone(&read_position);
 
     let start = Instant::now();
     info!(
@@ -333,9 +355,8 @@ async fn main() {
     let buffer_delta = buffer_start.elapsed();
 
     info!(
-        "[buffer-perf] {:?}s: created/loaded buffer in {:?}",
-        start.elapsed().as_secs(),
-        buffer_delta
+        "[buffer-perf] {:?}s: created/loaded buffer in {buffer_delta:?}",
+        start.elapsed().as_secs()
     );
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
@@ -381,7 +402,7 @@ async fn main() {
             let elapsed = write_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
-            writer_position.fetch_add(records_written, Ordering::Relaxed);
+            writer_progress.fetch_add(records_written, Ordering::Relaxed);
         }
 
         writer.flush().await.expect("flush shouldn't fail");
@@ -402,20 +423,19 @@ async fn main() {
         for _ in 0..read_total_records {
             let read_start = Instant::now();
 
-            match reader.next().await {
-                Some(mut record) => record
+            if let Some(mut record) = reader.next().await {
+                record
                     .take_finalizers()
-                    .update_status(EventStatus::Delivered),
-                None => {
-                    info!("[buffer-perf] reader hit end of buffer, closing...");
-                    break;
-                }
+                    .update_status(EventStatus::Delivered);
+            } else {
+                info!("[buffer-perf] reader hit end of buffer, closing...");
+                break;
             }
 
             let elapsed = read_start.elapsed().as_nanos() as u64;
             rx_histo.record(elapsed).expect("should not fail");
 
-            reader_position.fetch_add(1, Ordering::Relaxed);
+            reader_progress.fetch_add(1, Ordering::Relaxed);
         }
         let total_rx_dur = rx_start.elapsed();
 
@@ -438,21 +458,21 @@ async fn main() {
                     writer_result = Some(result);
                     info!("[buffer-perf] {:?}s: writer finished", start.elapsed().as_secs());
                 },
-                Err(_) => panic!("[buffer-perf] writer task failed unexpectedly!"),
+                Err(RecvError { .. }) => panic!("[buffer-perf] writer task failed unexpectedly!"),
             },
             result = &mut reader_rx, if reader_result.is_none() => match result {
                 Ok(result) => {
                     reader_result = Some(result);
                     info!("[buffer-perf] {:?}s: reader finished", start.elapsed().as_secs());
                 },
-                Err(_) => panic!("[buffer-perf] reader task failed unexpectedly!"),
+                Err(RecvError { .. }) => panic!("[buffer-perf] reader task failed unexpectedly!"),
             },
             _ = progress_interval.tick(), if writer_result.is_none() || reader_result.is_none() => {
                 let elapsed = start.elapsed();
                 let write_pos = write_position.load(Ordering::Relaxed);
                 let read_pos = read_position.load(Ordering::Relaxed);
 
-                info!("[buffer-perf] {:?}s: writer pos = {:11}, reader pos = {:11}", elapsed.as_secs(), write_pos, read_pos);
+                info!("[buffer-perf] {:?}s: writer pos = {write_pos:11}, reader pos = {read_pos:11}", elapsed.as_secs());
             },
             else => break,
         }
@@ -464,8 +484,7 @@ async fn main() {
     let write_pos = write_position.load(Ordering::Relaxed);
 
     info!(
-        "[buffer-perf] writer and reader done: {} records written and {} records read in {:?}",
-        write_pos, read_pos, total_time
+        "[buffer-perf] writer and reader done: {write_pos} records written and {read_pos} records read in {total_time:?}"
     );
 
     info!("[buffer-perf] writer summary:");
@@ -478,7 +497,7 @@ async fn main() {
     info!("       q=min -> {:?}", nanos_to_dur(writer_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {
         let latency = writer_histo.value_at_quantile(*q);
-        info!("       q={} -> {:?}", q, nanos_to_dur(latency));
+        info!("       q={q} -> {:?}", nanos_to_dur(latency));
     }
     info!("       q=max -> {:?}", nanos_to_dur(writer_histo.max()));
 
@@ -492,7 +511,7 @@ async fn main() {
     info!("       q=min -> {:?}", nanos_to_dur(reader_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {
         let latency = reader_histo.value_at_quantile(*q);
-        info!("       q={} -> {:?}", q, nanos_to_dur(latency));
+        info!("       q={q} -> {:?}", nanos_to_dur(latency));
     }
     info!("       q=max -> {:?}", nanos_to_dur(reader_histo.max()));
 }

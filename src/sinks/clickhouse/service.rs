@@ -1,30 +1,34 @@
 //! Service implementation for the `Clickhouse` sink.
 
+use std::fmt::Write as _;
+
 use bytes::Bytes;
-use http::{
-    Request, StatusCode, Uri,
+use http::Uri;
+use http_1::{
+    Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
+use tracing::debug;
+use vector_http::HttpError;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, HttpError},
+    http::Auth,
     sinks::{
-        HTTPRequestBuilderSnafu, UriParseSnafu,
+        UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpResponse, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
     },
 };
 
 #[derive(Debug, Default, Clone)]
-pub struct ClickhouseRetryLogic {
-    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
-}
+pub(crate) struct ClickhouseRetryLogic;
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = HttpError;
@@ -32,13 +36,23 @@ impl RetryLogic for ClickhouseRetryLogic {
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        self.inner.is_retriable_error(error)
+        error.is_retriable()
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        match response.http_response.status() {
+        let status = response.response.status();
+
+        if !status.is_success() {
+            debug!(
+                message = "HTTP response.",
+                %status,
+                body = %String::from_utf8_lossy(response.response.body()),
+            );
+        }
+
+        match status {
             StatusCode::INTERNAL_SERVER_ERROR => {
-                let body = response.http_response.body();
+                let body = response.response.body();
 
                 // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
@@ -56,7 +70,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                     RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
             }
-            _ => self.inner.should_retry_response(&response.http_response),
+            _ => RetryStrategy::Default.retry_action(status),
         }
     }
 }
@@ -90,8 +104,6 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             self.query_settings,
         )?;
 
-        let auth: Option<Auth> = self.auth.clone();
-
         // Extract format before taking payload to avoid borrow checker issues
         let format = metadata.format;
         let payload = request.take_payload();
@@ -102,31 +114,29 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             _ => "application/x-ndjson",
         };
 
-        let mut builder = Request::post(&uri)
+        let mut builder = Request::post(uri.to_string())
             .header(CONTENT_TYPE, content_type)
             .header(CONTENT_LENGTH, payload.len());
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
         }
-        if let Some(auth) = auth {
-            builder = auth.apply_builder(builder);
+        let mut request = builder.body(payload).map_err(crate::Error::from)?;
+        if let Some(auth) = &self.auth {
+            auth.apply_v1(&mut request);
         }
 
-        builder
-            .body(payload)
-            .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::into)
+        Ok(request)
     }
 }
 
 fn append_param<T: ToString>(uri: &mut String, key: &str, value: Option<T>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, val.to_string()));
+        write!(uri, "{key}={}&", val.to_string()).expect("writing to a String cannot fail");
     }
 }
 fn append_param_bool(uri: &mut String, key: &str, value: Option<bool>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, if val { 1 } else { 0 }));
+        write!(uri, "{key}={}&", u8::from(val)).expect("writing to a String cannot fail");
     }
 }
 
@@ -141,17 +151,15 @@ fn set_uri_query(
     insert_random_shard: bool,
     query_settings: QuerySettingsConfig,
 ) -> crate::Result<Uri> {
+    // Use ClickHouse query parameters with the Identifier type (introduced in 21.12) so
+    // the server handles identifier quoting — no client-side escaping required.
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
-            format!(
-                "INSERT INTO \"{}\".\"{}\" FORMAT {}",
-                database,
-                table.replace('\"', "\\\""),
-                format
-            )
-            .as_str(),
+            &format!("INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {format}"),
         )
+        .append_pair("param_database", database)
+        .append_pair("param_table", table)
         .finish();
 
     let mut uri = uri.to_string();
@@ -162,10 +170,10 @@ fn set_uri_query(
     uri.push_str("?input_format_import_nested_json=1&");
     append_param_bool(&mut uri, "input_format_skip_unknown_fields", skip_unknown);
     if date_time_best_effort {
-        uri.push_str("date_time_input_format=best_effort&")
+        uri.push_str("date_time_input_format=best_effort&");
     }
     if insert_random_shard {
-        uri.push_str("insert_distributed_one_random_shard=1&")
+        uri.push_str("insert_distributed_one_random_shard=1&");
     }
     append_param_bool(
         &mut uri,
@@ -211,6 +219,12 @@ mod tests {
     use super::super::config::AsyncInsertSettingsConfig;
     use super::*;
 
+    fn parse_query_params(uri: &Uri) -> std::collections::HashMap<String, String> {
+        url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes())
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect()
+    }
+
     #[test]
     fn encode_valid() {
         let uri = set_uri_query(
@@ -230,7 +244,9 @@ mod tests {
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONEachRow&\
+                                     param_database=my_database&\
+                                     param_table=my_table"
         );
 
         let uri = set_uri_query(
@@ -249,7 +265,9 @@ mod tests {
             "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONEachRow&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
 
         let uri = set_uri_query(
@@ -269,7 +287,9 @@ mod tests {
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONAsObject&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
 
         let uri = set_uri_query(
@@ -288,9 +308,14 @@ mod tests {
             "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONAsObject&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
+    }
 
+    #[test]
+    fn encode_async_insert_settings() {
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
             "my_database",
@@ -317,8 +342,61 @@ mod tests {
                                      async_insert=1&\
                                      wait_for_async_insert=1&\
                                      wait_for_async_insert_timeout=500&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+                                     query=INSERT+INTO+%7Bdatabase%3AIdentifier%7D.%7Btable%3AIdentifier%7D+FORMAT+JSONAsObject&\
+                                     param_database=my_database&\
+                                     param_table=my_%22table%22"
         );
+    }
+
+    #[test]
+    fn identifier_params() {
+        fn params(database: &str, table: &str) -> (String, String, String) {
+            let uri = set_uri_query(
+                &"http://localhost:80".parse().unwrap(),
+                database,
+                table,
+                Format::JsonEachRow,
+                None,
+                false,
+                false,
+                QuerySettingsConfig::default(),
+            )
+            .unwrap();
+            let p = parse_query_params(&uri);
+            (
+                p["query"].clone(),
+                p["param_database"].clone(),
+                p["param_table"].clone(),
+            )
+        }
+
+        // The query template is always the same fixed string regardless of identifier content.
+        let template = "INSERT INTO {database:Identifier}.{table:Identifier} FORMAT JSONEachRow";
+
+        // Plain identifiers are passed through as-is.
+        let (q, db, tbl) = params("my_db", "my_table");
+        assert_eq!(q, template);
+        assert_eq!(db, "my_db");
+        assert_eq!(tbl, "my_table");
+
+        // Special characters are passed as raw values; ClickHouse handles quoting.
+        let (q, db, tbl) = params("my_db", r#"my_"table""#);
+        assert_eq!(q, template);
+        assert_eq!(db, "my_db");
+        assert_eq!(tbl, r#"my_"table""#);
+
+        // Injection payload: the database and table params are independent URL parameters,
+        // so there is no SQL to break out of.
+        let (q, db, tbl) = params(r#"valid_db"."other_table" --"#, "my_table");
+        assert_eq!(q, template);
+        assert_eq!(db, r#"valid_db"."other_table" --"#);
+        assert_eq!(tbl, "my_table");
+
+        // Backslash and quotes together.
+        let (q, db, tbl) = params("db_with_\\\"", "my_table");
+        assert_eq!(q, template);
+        assert_eq!(db, "db_with_\\\"");
+        assert_eq!(tbl, "my_table");
     }
 
     #[test]

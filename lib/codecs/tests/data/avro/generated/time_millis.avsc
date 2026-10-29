@@ -1,0 +1,1 @@
+{"type":"record","name":"test","fields":[{"name":"time_millis_field","type":{"type":"int","logicalType":"time-millis"}}]}

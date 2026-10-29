@@ -7,9 +7,12 @@ mod unix;
 use std::{
     io,
     net::SocketAddr,
+    path::{Path, PathBuf},
     task::{Context, Poll, ready},
 };
 
+#[cfg(unix)]
+use crate::sinks::util::unix::UnixEither;
 use futures_util::{FutureExt, future::BoxFuture};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -23,13 +26,9 @@ use vector_lib::{
     configurable::configurable_component,
     tls::{MaybeTlsStream, TlsError},
 };
-#[cfg(unix)]
-use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
 
 #[cfg(unix)]
 use self::unix::UnixConnector;
-#[cfg(unix)]
-pub use self::unix::{UnixConnectorConfig, UnixMode};
 use self::{tcp::TcpConnector, udp::UdpConnector};
 pub use self::{tcp::TcpConnectorConfig, udp::UdpConnectorConfig};
 #[cfg(unix)]
@@ -116,6 +115,54 @@ pub enum NetError {
     ServiceSocketChannelClosed,
 }
 
+/// Unix socket modes.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+pub enum UnixMode {
+    /// Datagram-oriented (`SOCK_DGRAM`).
+    Datagram,
+
+    /// Stream-oriented (`SOCK_STREAM`).
+    Stream,
+}
+
+/// Unix Domain Socket configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixConnectorConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    path: PathBuf,
+
+    /// The Unix socket mode to use.
+    #[serde(default = "default_unix_mode")]
+    unix_mode: UnixMode,
+
+    /// The size of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
+    send_buffer_size: Option<usize>,
+}
+
+const fn default_unix_mode() -> UnixMode {
+    UnixMode::Stream
+}
+
+impl UnixConnectorConfig {
+    /// Creates a Unix Domain Socket configuration for the given path.
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+            unix_mode: UnixMode::Stream,
+            send_buffer_size: None,
+        }
+    }
+}
+
 enum NetworkServiceState {
     /// The service is currently disconnected.
     Disconnected,
@@ -194,7 +241,7 @@ pub struct NetworkConnector {
 }
 
 impl NetworkConnector {
-    fn on_connected(&self, metadata: ConnectionMetadata) {
+    fn on_connected(metadata: ConnectionMetadata) {
         match metadata {
             ConnectionMetadata::Tcp { peer_addr } => {
                 emit!(TcpSocketConnectionEstablished {
@@ -208,7 +255,7 @@ impl NetworkConnector {
         }
     }
 
-    fn on_connection_error<E: std::error::Error>(&self, error: E) {
+    fn on_connection_error<E: std::error::Error>(error: E) {
         emit!(SocketOutgoingConnectionError { error });
     }
 
@@ -247,13 +294,13 @@ impl NetworkConnector {
             match self.connect().await {
                 Ok((connection, maybe_metadata)) => {
                     if let Some(metadata) = maybe_metadata {
-                        self.on_connected(metadata);
+                        Self::on_connected(metadata);
                     }
 
                     return connection;
                 }
                 Err(error) => {
-                    self.on_connection_error(error);
+                    Self::on_connection_error(error);
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -261,12 +308,14 @@ impl NetworkConnector {
     }
 
     /// Gets a `Healthcheck` based on the configured destination of this connector.
+    #[must_use]
     pub fn healthcheck(&self) -> Healthcheck {
         let connector = self.clone();
         Box::pin(async move { connector.connect().await.map(|_| ()).map_err(Into::into) })
     }
 
     /// Gets a `Service` suitable for sending data to the configured destination of this connector.
+    #[must_use]
     pub fn service(&self) -> NetworkService {
         NetworkService::new(self.clone())
     }
@@ -327,10 +376,10 @@ impl Service<Vec<u8>> for NetworkService {
     fn call(&mut self, buf: Vec<u8>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        let mut socket = match std::mem::replace(&mut self.state, NetworkServiceState::Sending(rx))
-        {
-            NetworkServiceState::Connected(socket) => socket,
-            _ => panic!("poll_ready must be called first"),
+        let NetworkServiceState::Connected(mut socket) =
+            std::mem::replace(&mut self.state, NetworkServiceState::Sending(rx))
+        else {
+            panic!("poll_ready must be called first");
         };
 
         Box::pin(async move {
@@ -343,14 +392,14 @@ impl Service<Vec<u8>> for NetworkService {
 
                     // Send the socket back to the service, since theoretically it's still valid to
                     // reuse given that we may have simply overrun the OS socket buffers, etc.
-                    let _ = tx.send(Some(socket));
+                    tx.send(Some(socket)).ok();
 
                     Ok(sent)
                 }
                 Err(e) => {
                     // We need to signal back to the service that it needs to create a fresh socket
                     // since this one could be tainted.
-                    let _ = tx.send(None);
+                    tx.send(None).ok();
 
                     Err(e)
                 }

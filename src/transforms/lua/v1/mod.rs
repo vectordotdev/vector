@@ -1,7 +1,7 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt, stream};
-use mlua::{ExternalError, FromLua};
+use mlua::FromLua;
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
@@ -38,6 +38,10 @@ pub struct LuaConfig {
 }
 
 impl LuaConfig {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua initialization, source compilation, or execution fails.
     pub fn build(&self) -> crate::Result<Transform> {
         warn!(
             "DEPRECATED The `lua` transform API version 1 is deprecated. Please convert your script to version 2."
@@ -45,10 +49,12 @@ impl LuaConfig {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
 
+    #[must_use]
     pub fn input(&self) -> Input {
         Input::log()
     }
 
+    #[must_use]
     pub fn outputs(
         &self,
         input_definitions: &[(OutputId, schema::Definition)],
@@ -81,15 +87,14 @@ impl LuaConfig {
 // after each transform would have significant footprint on the performance.
 const GC_INTERVAL: usize = 16;
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(derive_more::Debug)]
 pub struct Lua {
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     source: String,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     search_dirs: Vec<String>,
-    #[derivative(Debug = "ignore")]
-    lua: mlua::Lua,
+    #[debug(skip)]
+    runtime: mlua::Lua,
     vector_func: mlua::RegistryKey,
     invocations_after_gc: usize,
 }
@@ -109,9 +114,14 @@ struct LuaEvent {
 }
 
 impl Lua {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua initialization, source compilation, or execution fails.
     pub fn new(source: String, search_dirs: Vec<String>) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
+        // SAFETY: Native modules loaded by Lua must be trusted not to violate memory safety.
         let lua = unsafe {
             mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
         };
@@ -140,7 +150,7 @@ impl Lua {
         Ok(Self {
             source,
             search_dirs,
-            lua,
+            runtime: lua,
             vector_func,
             invocations_after_gc: 0,
         })
@@ -148,7 +158,7 @@ impl Lua {
 
     fn process(&mut self, event: Event) -> Result<Option<Event>, mlua::Error> {
         let source_id = event.source_id().cloned();
-        let lua = &self.lua;
+        let lua = &self.runtime;
         let globals = lua.globals();
 
         globals.raw_set("event", LuaEvent { inner: event })?;
@@ -169,9 +179,9 @@ impl Lua {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc.is_multiple_of(GC_INTERVAL) {
             emit!(LuaGcTriggered {
-                used_memory: self.lua.used_memory()
+                used_memory: self.runtime.used_memory()
             });
-            self.lua.gc_collect()?;
+            self.runtime.gc_collect()?;
             self.invocations_after_gc = 0;
         }
 
@@ -222,7 +232,8 @@ impl mlua::UserData for LuaEvent {
         methods.add_meta_method_mut(
             mlua::MetaMethod::NewIndex,
             |_lua, this, (key, value): (String, Option<mlua::Value>)| {
-                let key_path = parse_target_path(key.as_str()).map_err(|e| e.into_lua_err())?;
+                let key_path =
+                    parse_target_path(key.as_str()).map_err(mlua::ExternalError::into_lua_err)?;
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
@@ -310,6 +321,7 @@ impl mlua::UserData for LuaEvent {
     }
 }
 
+#[must_use]
 pub fn format_error(error: &mlua::Error) -> String {
     match error {
         mlua::Error::CallbackError { traceback, cause } => format_error(cause) + "\n" + traceback,
@@ -320,6 +332,8 @@ pub fn format_error(error: &mlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -358,7 +372,7 @@ mod tests {
     #[test]
     fn lua_remove_field() {
         let mut log = LogEvent::default();
-        log.insert("name", "Bob");
+        log.insert(event_path!("name"), "Bob");
         let event = transform_one(
             r#"
               event["name"] = nil
@@ -367,13 +381,13 @@ mod tests {
         )
         .unwrap();
 
-        assert!(event.as_log().get("name").is_none());
+        assert!(event.as_log().get(event_path!("name")).is_none());
     }
 
     #[test]
     fn lua_drop_event() {
         let mut log = LogEvent::default();
-        log.insert("name", "Bob");
+        log.insert(event_path!("name"), "Bob");
         let event = transform_one(
             r"
               event = nil
@@ -388,7 +402,7 @@ mod tests {
     fn lua_read_empty_field() {
         let event = transform_one(
             r#"
-              if event["non-existant"] == nil then
+              if event["non-existent"] == nil then
                 event["result"] = "empty"
               else
                 event["result"] = "found"
@@ -446,7 +460,7 @@ mod tests {
             LogEvent::default(),
         )
         .unwrap();
-        assert_eq!(event.as_log().get("junk"), None);
+        assert_eq!(event.as_log().get(event_path!("junk")), None);
     }
 
     #[test]
@@ -465,8 +479,7 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
     }
 
@@ -486,8 +499,7 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
     }
 
@@ -505,7 +517,7 @@ mod tests {
 
         let err = transform.process(LogEvent::default().into()).unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("this is an error"), "{}", err);
+        assert!(err.contains("this is an error"), "{err}");
     }
 
     #[test]
@@ -522,7 +534,7 @@ mod tests {
         .unwrap_err()
         .to_string();
 
-        assert!(err.contains("syntax error:"), "{}", err);
+        assert!(err.contains("syntax error:"), "{err}");
     }
 
     #[test]
@@ -563,8 +575,8 @@ mod tests {
     #[test]
     fn lua_pairs() {
         let mut event = LogEvent::default();
-        event.insert("name", "Bob");
-        event.insert("friend", "Alice");
+        event.insert(event_path!("name"), "Bob");
+        event.insert(event_path!("friend"), "Alice");
 
         let event = transform_one(
             r"

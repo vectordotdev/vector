@@ -17,6 +17,7 @@ use crate::{
 pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
 
 impl SharedTopologyController {
+    #[must_use]
     pub fn new(inner: TopologyController) -> Self {
         Self(Arc::new(Mutex::new(inner)))
     }
@@ -29,6 +30,11 @@ impl SharedTopologyController {
         self.0.lock().await
     }
 
+    /// Unwraps the controller when no other shared handles remain.
+    ///
+    /// # Errors
+    ///
+    /// Returns this handle if another handle still shares the controller.
     pub fn try_into_inner(self) -> Result<Mutex<TopologyController>, Self> {
         Arc::try_unwrap(self.0).map_err(Self)
     }
@@ -48,7 +54,7 @@ impl std::fmt::Debug for TopologyController {
         f.debug_struct("TopologyController")
             .field("config_paths", &self.config_paths)
             .field("require_healthy", &self.require_healthy)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -150,8 +156,10 @@ impl TopologyController {
         }
     }
 
+    /// Stops the topology. Returns `true` if every component finished on its own before the
+    /// graceful shutdown deadline, or `false` if any component had to be forcefully killed.
     #[cfg_attr(not(feature = "api"), allow(unused_mut))]
-    pub async fn stop(mut self) {
+    pub async fn stop(mut self) -> bool {
         // Phase 1: Mark the gRPC API as unavailable so that external probes
         // (e.g. Kubernetes readiness) fail early and stop routing traffic
         // to this instance.
@@ -162,7 +170,7 @@ impl TopologyController {
 
         // Phase 2: Drain the topology -- shuts down sources, waits for
         // in-flight events to flush through transforms and sinks.
-        self.topology.stop().await;
+        self.topology.stop().await
     }
 
     // The `sources_finished` method on `RunningTopology` only considers sources that are currently
@@ -193,8 +201,6 @@ impl TopologyController {
             let top = mutex.lock().await;
             if top.topology.sources_finished().now_or_never().is_some() {
                 return;
-            } else {
-                continue;
             }
         }
     }

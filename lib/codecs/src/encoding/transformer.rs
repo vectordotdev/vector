@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
-use lookup::{PathPrefix, event_path, lookup_v2::ConfigValuePath};
+use lookup::{PathPrefix, lookup_v2::ConfigValuePath};
 use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
@@ -64,8 +64,10 @@ impl<'de> Deserialize<'de> for Transformer {
 impl Transformer {
     /// Creates a new `Transformer`.
     ///
-    /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
-    /// exclusive.
+    /// # Errors
+    ///
+    /// Returns an error if `only_fields` and `except_fields` are not mutually exclusive, i.e. they
+    /// share at least one field path.
     pub fn new(
         only_fields: Option<Vec<ConfigValuePath>>,
         except_fields: Option<Vec<ConfigValuePath>>,
@@ -82,16 +84,19 @@ impl Transformer {
 
     /// Get the `Transformer`'s `only_fields`.
     #[cfg(any(test, feature = "test"))]
+    #[must_use]
     pub const fn only_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.only_fields
     }
 
     /// Get the `Transformer`'s `except_fields`.
+    #[must_use]
     pub const fn except_fields(&self) -> &Option<Vec<ConfigValuePath>> {
         &self.except_fields
     }
 
     /// Get the `Transformer`'s `timestamp_format`.
+    #[must_use]
     pub const fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
     }
@@ -173,7 +178,7 @@ impl Transformer {
         }
     }
 
-    fn format_timestamps<F, T>(&self, log: &mut LogEvent, extract: F)
+    fn format_timestamps<F, T>(log: &mut LogEvent, extract: F)
     where
         F: Fn(&DateTime<Utc>) -> T,
         T: Into<Value>,
@@ -197,21 +202,30 @@ impl Transformer {
                 None
             };
             if let Some(ts) = timestamp {
-                log.insert(event_path!(), ts.into());
+                log.insert(&vrl::path::OwnedTargetPath::event_root(), ts.into());
             }
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing floating-point representation of numeric values."
+    )]
     fn apply_timestamp_format(&self, log: &mut LogEvent) {
         if let Some(timestamp_format) = self.timestamp_format.as_ref() {
             match timestamp_format {
-                TimestampFormat::Unix => self.format_timestamps(log, |ts| ts.timestamp()),
-                TimestampFormat::UnixMs => self.format_timestamps(log, |ts| ts.timestamp_millis()),
-                TimestampFormat::UnixUs => self.format_timestamps(log, |ts| ts.timestamp_micros()),
-                TimestampFormat::UnixNs => self.format_timestamps(log, |ts| {
+                TimestampFormat::Unix => Self::format_timestamps(log, chrono::DateTime::timestamp),
+                TimestampFormat::UnixMs => {
+                    Self::format_timestamps(log, chrono::DateTime::timestamp_millis);
+                }
+                TimestampFormat::UnixUs => {
+                    Self::format_timestamps(log, chrono::DateTime::timestamp_micros);
+                }
+                TimestampFormat::UnixNs => Self::format_timestamps(log, |ts| {
                     ts.timestamp_nanos_opt().expect("Timestamp out of range")
                 }),
-                TimestampFormat::UnixFloat => self.format_timestamps(log, |ts| {
+                TimestampFormat::UnixFloat => Self::format_timestamps(log, |ts| {
                     NotNan::new(ts.timestamp_micros() as f64 / 1e6)
                         .expect("this division will never produce a NaN")
                 }),
@@ -223,8 +237,10 @@ impl Transformer {
 
     /// Set the `except_fields` value.
     ///
-    /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
-    /// with `only_fields`.
+    /// # Errors
+    ///
+    /// Returns an error if the new `except_fields` are not mutually exclusive with `only_fields`,
+    /// i.e. they share at least one field path.
     #[cfg(any(test, feature = "test"))]
     pub fn set_except_fields(
         &mut self,
@@ -265,7 +281,7 @@ mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
     use indoc::indoc;
-    use lookup::path::parse_target_path;
+    use lookup::{event_path, path::parse_target_path};
     use vector_core::{
         config::{LogNamespace, log_schema},
         schema,
@@ -303,29 +319,29 @@ mod tests {
             toml::from_str(r#"except_fields = ["a.b.c", "b", "c[0].y", "d.z", "e"]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("a", 1);
-            log.insert("a.b", 1);
-            log.insert("a.b.c", 1);
-            log.insert("a.b.d", 1);
-            log.insert("b[0]", 1);
-            log.insert("b[1].x", 1);
-            log.insert("c[0].x", 1);
-            log.insert("c[0].y", 1);
-            log.insert("d.z", 1);
-            log.insert("e.a", 1);
-            log.insert("e.b", 1);
+            log.insert(event_path!("a"), 1);
+            log.insert(event_path!("a", "b"), 1);
+            log.insert(event_path!("a", "b", "c"), 1);
+            log.insert(event_path!("a", "b", "d"), 1);
+            log.insert(event_path!("b", 0isize), 1);
+            log.insert(event_path!("b", 1isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "y"), 1);
+            log.insert(event_path!("d", "z"), 1);
+            log.insert(event_path!("e", "a"), 1);
+            log.insert(event_path!("e", "b"), 1);
         }
         let mut event = Event::from(log);
         transformer.transform(&mut event);
-        assert!(!event.as_mut_log().contains("a.b.c"));
-        assert!(!event.as_mut_log().contains("b"));
-        assert!(!event.as_mut_log().contains("b[1].x"));
-        assert!(!event.as_mut_log().contains("c[0].y"));
-        assert!(!event.as_mut_log().contains("d.z"));
-        assert!(!event.as_mut_log().contains("e.a"));
+        assert!(!event.as_mut_log().contains(event_path!("a", "b", "c")));
+        assert!(!event.as_mut_log().contains(event_path!("b")));
+        assert!(!event.as_mut_log().contains(event_path!("b", 1isize, "x")));
+        assert!(!event.as_mut_log().contains(event_path!("c", 0isize, "y")));
+        assert!(!event.as_mut_log().contains(event_path!("d", "z")));
+        assert!(!event.as_mut_log().contains(event_path!("e", "a")));
 
-        assert!(event.as_mut_log().contains("a.b.d"));
-        assert!(event.as_mut_log().contains("c[0].x"));
+        assert!(event.as_mut_log().contains(event_path!("a", "b", "d")));
+        assert!(event.as_mut_log().contains(event_path!("c", 0isize, "x")));
     }
 
     #[test]
@@ -334,41 +350,46 @@ mod tests {
             toml::from_str(r#"only_fields = ["a.b.c", "b", "c[0].y", "\"g.z\""]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("a", 1);
-            log.insert("a.b", 1);
-            log.insert("a.b.c", 1);
-            log.insert("a.b.d", 1);
-            log.insert("b[0]", 1);
-            log.insert("b[1].x", 1);
-            log.insert("c[0].x", 1);
-            log.insert("c[0].y", 1);
-            log.insert("d.y", 1);
-            log.insert("d.z", 1);
-            log.insert("e[0]", 1);
-            log.insert("e[1]", 1);
-            log.insert("\"f.z\"", 1);
-            log.insert("\"g.z\"", 1);
-            log.insert("h", BTreeMap::new());
-            log.insert("i", Vec::<Value>::new());
+            log.insert(event_path!("a"), 1);
+            log.insert(event_path!("a", "b"), 1);
+            log.insert(event_path!("a", "b", "c"), 1);
+            log.insert(event_path!("a", "b", "d"), 1);
+            log.insert(event_path!("b", 0isize), 1);
+            log.insert(event_path!("b", 1isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "y"), 1);
+            log.insert(event_path!("d", "y"), 1);
+            log.insert(event_path!("d", "z"), 1);
+            log.insert(event_path!("e", 0isize), 1);
+            log.insert(event_path!("e", 1isize), 1);
+            log.insert(event_path!("f.z"), 1);
+            log.insert(event_path!("g.z"), 1);
+            log.insert(event_path!("h"), BTreeMap::new());
+            log.insert(event_path!("i"), Vec::<Value>::new());
         }
         let mut event = Event::from(log);
         transformer.transform(&mut event);
-        assert!(event.as_mut_log().contains("a.b.c"));
-        assert!(event.as_mut_log().contains("b"));
-        assert!(event.as_mut_log().contains("b[1].x"));
-        assert!(event.as_mut_log().contains("c[0].y"));
-        assert!(event.as_mut_log().contains("\"g.z\""));
+        assert!(event.as_mut_log().contains(event_path!("a", "b", "c")));
+        assert!(event.as_mut_log().contains(event_path!("b")));
+        assert!(event.as_mut_log().contains(event_path!("b", 1isize, "x")));
+        assert!(event.as_mut_log().contains(event_path!("c", 0isize, "y")));
+        assert!(event.as_mut_log().contains(event_path!("g.z")));
 
-        assert!(!event.as_mut_log().contains("a.b.d"));
-        assert!(!event.as_mut_log().contains("c[0].x"));
-        assert!(!event.as_mut_log().contains("d"));
-        assert!(!event.as_mut_log().contains("e"));
-        assert!(!event.as_mut_log().contains("f"));
-        assert!(!event.as_mut_log().contains("h"));
-        assert!(!event.as_mut_log().contains("i"));
+        assert!(!event.as_mut_log().contains(event_path!("a", "b", "d")));
+        assert!(!event.as_mut_log().contains(event_path!("c", 0isize, "x")));
+        assert!(!event.as_mut_log().contains(event_path!("d")));
+        assert!(!event.as_mut_log().contains(event_path!("e")));
+        assert!(!event.as_mut_log().contains(event_path!("f")));
+        assert!(!event.as_mut_log().contains(event_path!("h")));
+        assert!(!event.as_mut_log().contains(event_path!("i")));
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing floating-point representation of numeric values."
+    )]
     fn deserialize_and_transform_timestamp() {
         let mut base = Event::Log(LogEvent::from("Demo"));
         let timestamp = base
@@ -378,7 +399,7 @@ mod tests {
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
         base.as_mut_log()
-            .insert("another", Value::Timestamp(*timestamp));
+            .insert(event_path!("another"), Value::Timestamp(*timestamp));
 
         let cases = [
             ("unix", Value::from(timestamp.timestamp())),
@@ -405,7 +426,7 @@ mod tests {
                 log.get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
                     .unwrap(),
                 // second key
-                log.get("another").unwrap(),
+                log.get(event_path!("another")).unwrap(),
             ] {
                 // type matches
                 assert_eq!(expected.kind_str(), actual.kind_str());
@@ -421,7 +442,7 @@ mod tests {
             except_fields = ["Doop"]
             only_fields = ["Doop"]
         "#});
-        assert!(config.is_err())
+        assert!(config.is_err());
     }
 
     #[test]
@@ -433,7 +454,7 @@ mod tests {
         let config: std::result::Result<Transformer, _> = toml::from_str(indoc! {r#"
             onlyfields = ["Doop"]
         "#});
-        assert!(config.is_err())
+        assert!(config.is_err());
     }
 
     #[test]
@@ -441,8 +462,8 @@ mod tests {
         let transformer: Transformer = toml::from_str(r#"only_fields = ["message"]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("message", 1);
-            log.insert("thing.service", "carrot");
+            log.insert(event_path!("message"), 1);
+            log.insert(event_path!("thing", "service"), "carrot");
         }
 
         let schema = schema::Definition::new_with_default_metadata(
@@ -463,10 +484,10 @@ mod tests {
             .set_schema_definition(&Arc::new(schema));
 
         transformer.transform(&mut event);
-        assert!(event.as_mut_log().contains("message"));
+        assert!(event.as_mut_log().contains(event_path!("message")));
 
         // Event no longer contains the service field.
-        assert!(!event.as_mut_log().contains("thing.service"));
+        assert!(!event.as_mut_log().contains(event_path!("thing", "service")));
 
         // But we can still get the service by meaning.
         assert_eq!(
@@ -481,8 +502,8 @@ mod tests {
             toml::from_str(r#"except_fields = ["thing.service"]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("message", 1);
-            log.insert("thing.service", "carrot");
+            log.insert(event_path!("message"), 1);
+            log.insert(event_path!("thing", "service"), "carrot");
         }
 
         let schema = schema::Definition::new_with_default_metadata(
@@ -503,10 +524,10 @@ mod tests {
             .set_schema_definition(&Arc::new(schema));
 
         transformer.transform(&mut event);
-        assert!(event.as_mut_log().contains("message"));
+        assert!(event.as_mut_log().contains(event_path!("message")));
 
         // Event no longer contains the service field.
-        assert!(!event.as_mut_log().contains("thing.service"));
+        assert!(!event.as_mut_log().contains(event_path!("thing", "service")));
 
         // But we can still get the service by meaning.
         assert_eq!(

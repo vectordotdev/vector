@@ -16,24 +16,20 @@ pub struct MqttCommonConfig {
     pub host: String,
 
     /// TCP port of the MQTT server to connect to.
-    #[configurable(derived)]
     #[serde(default = "default_port")]
     #[derivative(Default(value = "default_port()"))]
     pub port: u16,
 
     /// MQTT username.
     #[serde(default)]
-    #[configurable(derived)]
     pub user: Option<String>,
 
     /// MQTT password.
     #[serde(default)]
-    #[configurable(derived)]
     pub password: Option<String>,
 
     /// MQTT client ID.
     #[serde(default)]
-    #[configurable(derived)]
     pub client_id: Option<String>,
 
     /// Connection keep-alive interval.
@@ -47,7 +43,6 @@ pub struct MqttCommonConfig {
     pub max_packet_size: usize,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 }
 
@@ -96,7 +91,7 @@ pub enum ConfigurationError {
     /// Invalid credentials provided error
     #[snafu(display("Username and password must be either both provided or both missing."))]
     InvalidCredentials,
-    /// Invalid client ID provied error
+    /// Invalid client ID provided error
     #[snafu(display(
         "Client ID must be 1-23 characters long and must consist of only alphanumeric characters."
     ))]
@@ -114,19 +109,36 @@ pub struct MqttConnector {
 }
 
 impl MqttConnector {
-    /// Creates a new MqttConnector
+    /// Creates a new `MqttConnector`
     pub const fn new(options: MqttOptions) -> Self {
         Self { options }
     }
 
     /// Connects the connector and generates a client and eventloop
     pub fn connect(&self) -> (AsyncClient, EventLoop) {
-        let (client, eventloop) = AsyncClient::new(self.options.clone(), 1024);
-        (client, eventloop)
+        AsyncClient::builder(self.options.clone())
+            .capacity(1024)
+            .build()
     }
 
+    /// Checks the health of the MQTT connection. Currently a no-op.
+    ///
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
-    pub async fn healthcheck(&self) -> crate::Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error.
+    pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn tls_config_uses_explicit_crypto_provider() {
+        // Exercise MQTT's provider selection, including when VRL enables AWS-LC.
+        rumqttc::TlsConfiguration::try_default_rustls()
+            .expect("MQTT TLS should select Ring without a process-wide default provider");
     }
 }

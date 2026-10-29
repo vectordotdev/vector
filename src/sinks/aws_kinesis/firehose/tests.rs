@@ -4,13 +4,13 @@ use vector_lib::codecs::JsonSerializerConfig;
 
 use super::*;
 use crate::{
-    aws::RegionOrEndpoint,
-    config::{SinkConfig, SinkContext},
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    config::{AcknowledgementsConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis::firehose::config::{
             KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
         },
-        util::{BatchConfig, Compression, batch::BatchError},
+        util::{BatchConfig, Compression, TowerRequestConfig, batch::BatchError},
     },
 };
 
@@ -30,15 +30,15 @@ async fn check_batch_size() {
         region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
         encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
-        request: Default::default(),
+        request: TowerRequestConfig::default(),
         tls: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         request_retry_partial: false,
-        acknowledgements: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         partition_key_field: None,
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
     let res = config.build(cx).await;
@@ -61,15 +61,15 @@ async fn check_batch_events() {
         region: RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
         encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
-        request: Default::default(),
+        request: TowerRequestConfig::default(),
         tls: None,
-        auth: Default::default(),
+        auth: AwsAuthentication::default(),
         request_retry_partial: false,
-        acknowledgements: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         partition_key_field: None,
     };
 
-    let config = KinesisFirehoseSinkConfig { batch, base };
+    let config = KinesisFirehoseSinkConfig { base, batch };
 
     let cx = SinkContext::default();
     let res = config.build(cx).await;

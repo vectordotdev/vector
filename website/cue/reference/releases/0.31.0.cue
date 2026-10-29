@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.31.0": {
-	date:     "2023-07-05"
-	codename: ""
+	date: "2023-07-05"
 
 	description: """
 		The Vector team is pleased to announce version 0.31.0!
@@ -367,7 +366,7 @@ releases: "0.31.0": {
 		{sha: "c7d7cf8e36b9de6de7cd963e472d33b792c24413", date: "2023-05-19 14:51:58 UTC", description: "use get for page request", pr_number: 17373, scopes: ["databend sink"], type: "fix", breaking_change: false, author: "everpcpc", files_count: 1, insertions_count: 9, deletions_count: 14},
 		{sha: "d1949921a81181e2eeb1780d7e081d767f758f5e", date: "2023-05-19 09:55:39 UTC", description: "fix ack message format", pr_number: 17407, scopes: ["fluent source"], type: "fix", breaking_change: false, author: "Benoît GARNIER", files_count: 1, insertions_count: 16, deletions_count: 10},
 		{sha: "187f142ef5c28dec8e9b1ffbdfe0196acbe45804", date: "2023-05-19 02:00:47 UTC", description: "update fluentd link", pr_number: 17436, scopes: ["external docs"], type: "chore", breaking_change: false, author: "neuronull", files_count: 1, insertions_count: 1, deletions_count: 1},
-		{sha: "54d9c99492ec14924994a4857961aaafe3200f9b", date: "2023-05-20 08:46:28 UTC", description: "Add info about Vector Operator to Kubernetes instalation page", pr_number: 17432, scopes: ["docs"], type: "chore", breaking_change: false, author: "Vladimir", files_count: 1, insertions_count: 7, deletions_count: 1},
+		{sha: "54d9c99492ec14924994a4857961aaafe3200f9b", date: "2023-05-20 08:46:28 UTC", description: "Add info about Vector Operator to Kubernetes installation page", pr_number: 17432, scopes: ["docs"], type: "chore", breaking_change: false, author: "Vladimir", files_count: 1, insertions_count: 7, deletions_count: 1},
 		{sha: "a8b7899bea771e6f2ca2e7c78c5a1c578f03d78f", date: "2023-05-20 00:00:07 UTC", description: "bump lapin from 2.1.1 to 2.1.2", pr_number: 17439, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 3, deletions_count: 3},
 		{sha: "ac0c7e82fc5877a58a60da872c40ad9b63143953", date: "2023-05-20 00:03:07 UTC", description: "bump security-framework from 2.9.0 to 2.9.1", pr_number: 17441, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 3, deletions_count: 3},
 		{sha: "91ba052ba59d920761a02f7999c4b5d8b39d1766", date: "2023-05-20 08:27:29 UTC", description: "bump toml from 0.7.3 to 0.7.4", pr_number: 17440, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 6, insertions_count: 21, deletions_count: 21},

@@ -13,9 +13,9 @@ use super::{
 };
 use crate::sinks::prelude::*;
 
-/// Stores the event together with the rendered exchange and routing_key values.
+/// Stores the event together with the rendered exchange and `routing_key` values.
 /// This is passed into the `RequestBuilder` which then splits it out into the event
-/// and metadata containing the exchange and routing_key.
+/// and metadata containing the exchange and `routing_key`.
 /// This event needs to be created prior to building the request so we can filter out
 /// any events that error whilst rendering the templates.
 #[derive(Serialize)]
@@ -28,15 +28,19 @@ pub(super) struct AmqpEvent {
 
 pub(super) struct AmqpSink {
     pub(super) channels: AmqpSinkChannels,
-    exchange: Template,
-    routing_key: Option<Template>,
+    exchange: ConfinedTemplate,
+    routing_key: Option<ConfinedTemplate>,
     properties: Option<AmqpPropertiesConfig>,
     transformer: Transformer,
     encoder: vector_lib::codecs::Encoder<()>,
 }
 
 impl AmqpSink {
-    pub(super) async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
+    pub(super) fn new(
+        config: AmqpSinkConfig,
+        exchange: ConfinedTemplate,
+        routing_key: Option<ConfinedTemplate>,
+    ) -> crate::Result<Self> {
         let channels = super::channel::new_channel_pool(&config)
             .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
 
@@ -46,8 +50,8 @@ impl AmqpSink {
 
         Ok(AmqpSink {
             channels,
-            exchange: config.exchange,
-            routing_key: config.routing_key,
+            exchange,
+            routing_key,
             properties: config.properties,
             transformer,
             encoder,
@@ -65,7 +69,7 @@ impl AmqpSink {
                     error: missing_keys,
                     field: Some("exchange"),
                     drop_event: true,
-                })
+                });
             })
             .ok()?;
 
@@ -78,14 +82,14 @@ impl AmqpSink {
                         error: missing_keys,
                         field: Some("routing_key"),
                         drop_event: true,
-                    })
+                    });
                 })
                 .ok()?,
         };
 
         let properties = match &self.properties {
             None => BasicProperties::default(),
-            Some(prop) => prop.build(&event)?,
+            Some(prop) => prop.build(&event),
         };
 
         Some(AmqpEvent {
@@ -113,7 +117,7 @@ impl AmqpSink {
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build AMQP request: {:?}.", e);
+                        error!("Failed to build AMQP request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),

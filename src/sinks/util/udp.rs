@@ -62,6 +62,7 @@ pub struct UdpSinkConfig {
 }
 
 impl UdpSinkConfig {
+    #[must_use]
     pub const fn from_address(address: String) -> Self {
         Self {
             address,
@@ -69,13 +70,31 @@ impl UdpSinkConfig {
         }
     }
 
-    fn build_connector(&self) -> crate::Result<UdpConnector> {
+    /// Parses the configured address into its host and port components.
+    ///
+    /// The address must include a port; this is a pure check (no network I/O)
+    /// shared by validation and `build_connector`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the address is invalid or lacks a host or valid port.
+    pub fn parse_address(&self) -> crate::Result<(String, u16)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
+        Ok((host, port))
+    }
+
+    fn build_connector(&self) -> crate::Result<UdpConnector> {
+        let (host, port) = self.parse_address()?;
         Ok(UdpConnector::new(host, port, self.send_buffer_bytes))
     }
 
+    /// Builds the sink and its healthcheck.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the address is invalid or lacks a host or valid port.
     pub fn build(
         &self,
         transformer: Transformer,

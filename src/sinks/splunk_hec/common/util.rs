@@ -23,7 +23,7 @@ use crate::{
         self, UriParseSnafu,
         util::{SinkBatchSettings, http::HttpBatchService},
     },
-    template::Template,
+    template::ConfinedTemplate,
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -44,6 +44,10 @@ pub enum HealthcheckError {
     QueuesFull,
 }
 
+/// Builds the HTTP client.
+///
+/// # Errors
+/// Returns an error if the TLS or proxy configuration is invalid.
 pub fn create_client(
     tls: Option<&TlsConfig>,
     proxy_config: &ProxyConfig,
@@ -85,6 +89,13 @@ pub fn build_http_batch_service(
     })
 }
 
+/// Checks the HEC endpoint.
+///
+/// # Errors
+/// Returns an error if the URI is invalid, the request fails, or Splunk reports an unhealthy status.
+///
+/// # Panics
+/// Panics if the token cannot be used in an HTTP authorization header.
 pub async fn build_healthcheck(
     endpoint: String,
     token: String,
@@ -107,16 +118,20 @@ pub async fn build_healthcheck(
     }
 }
 
+/// Builds a HEC URI with percent-encoded query parameters.
+///
+/// # Errors
+/// Returns an error if the resulting URI is invalid.
 pub fn build_uri(
     host: &str,
     path: &str,
     query: impl IntoIterator<Item = (&'static str, String)>,
 ) -> Result<Uri, http::uri::InvalidUri> {
-    let mut uri = format!("{}{}", host.trim_end_matches('/'), path);
+    let mut uri = format!("{}{path}", host.trim_end_matches('/'));
 
     let mut first = true;
 
-    for (key, value) in query.into_iter() {
+    for (key, value) in query {
         if first {
             uri.push('?');
             first = false;
@@ -137,12 +152,14 @@ pub fn build_uri(
     uri.parse::<Uri>()
 }
 
+#[must_use]
 pub fn config_host_key() -> OptionalValuePath {
     OptionalValuePath {
         path: crate::config::log_schema().host_key().cloned(),
     }
 }
 
+#[must_use]
 pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
     OptionalTargetPath {
         path: crate::config::log_schema()
@@ -152,7 +169,7 @@ pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
 }
 
 pub fn render_template_string<'a>(
-    template: &Template,
+    template: &ConfinedTemplate,
     event: impl Into<EventRef<'a>>,
     field_name: &str,
 ) -> Option<String> {
@@ -200,7 +217,7 @@ mod tests {
         let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
-        assert!(healthcheck.await.is_ok())
+        assert!(healthcheck.await.is_ok());
     }
 
     #[tokio::test]
@@ -303,7 +320,7 @@ mod tests {
 
         assert_eq!(request.headers().get("Content-Encoding"), None);
 
-        assert_eq!(request.body(), &events)
+        assert_eq!(request.body(), &events);
     }
 
     #[tokio::test]
@@ -349,7 +366,7 @@ mod tests {
             Some(&HeaderValue::from_static("gzip"))
         );
 
-        assert_eq!(request.body(), &events)
+        assert_eq!(request.body(), &events);
     }
 
     #[tokio::test]
@@ -374,7 +391,7 @@ mod tests {
                 false,
             )
             .unwrap_err();
-        assert_eq!(err.to_string(), "URI parse error: invalid format")
+        assert_eq!(err.to_string(), "URI parse error: invalid format");
     }
 
     #[test]
@@ -470,14 +487,21 @@ pub mod integration_test_helpers {
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
 
+    #[must_use]
     pub fn splunk_hec_address() -> String {
         std::env::var("SPLUNK_HEC_ADDRESS").unwrap_or_else(|_| "http://localhost:8088".into())
     }
 
+    #[must_use]
     pub fn splunk_api_address() -> String {
         std::env::var("SPLUNK_API_ADDRESS").unwrap_or_else(|_| "https://localhost:8089".into())
     }
 
+    /// Fetches the configured HEC token.
+    ///
+    /// # Panics
+    /// Panics if the client cannot be built, Splunk returns an unexpected response,
+    /// or no HTTP Event Collector input is configured.
     pub async fn get_token() -> String {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -495,16 +519,17 @@ pub mod integration_test_helpers {
                     .send()
             },
             Duration::from_millis(500),
-            Duration::from_secs(30),
+            Duration::from_mins(1),
         )
         .await;
 
         let json: JsonValue = res.json().await.unwrap();
         let entries = json["entry"].as_array().unwrap().clone();
 
-        if entries.is_empty() {
-            panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
-        }
+        assert!(
+            !entries.is_empty(),
+            "You don't have any HTTP Event Collector inputs set up in Splunk"
+        );
 
         entries[0]["content"]["token"].as_str().unwrap().to_owned()
     }

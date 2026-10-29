@@ -1,0 +1,27 @@
+sources:
+  my_source_id:
+    type: kubernetes_logs
+    auto_partial_merge: true
+    data_dir: /var/local/lib/vector/
+    delay_deletion_ms: 60000
+    exclude_paths_glob_patterns:
+      - "**/exclude/**"
+    extra_field_selector: metadata.name!=pod-name-to-exclude
+    extra_label_selector: my_custom_label!=my_value
+    extra_namespace_label_selector: my_custom_label!=my_value
+    fingerprint_lines: 1
+    glob_minimum_cooldown_ms: 60000
+    ignore_older_secs: 600
+    include_paths_glob_patterns:
+      - "**/include/**"
+    ingestion_timestamp_field: .ingest_timestamp
+    insert_namespace_fields: true
+    kube_config_file: /path/to/.kube/config
+    max_line_bytes: 32768
+    max_merged_line_action: drop
+    max_read_bytes: 2048
+    oldest_first: true
+    read_from: beginning
+    self_node_name: ${VECTOR_SELF_NODE_NAME}
+    timezone: local
+    use_apiserver_cache: false

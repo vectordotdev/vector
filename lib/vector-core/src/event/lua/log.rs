@@ -3,7 +3,6 @@ use mlua::prelude::*;
 use super::super::{EventMetadata, LogEvent, Value};
 
 impl IntoLua for LogEvent {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let (value, _metadata) = self.into_parts();
         value.into_lua(lua)
@@ -20,14 +19,15 @@ impl FromLua for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
+    use vrl::event_path;
 
     #[test]
     fn into_lua() {
         let mut log = LogEvent::default();
-        log.insert("a", 1);
-        log.insert("nested.field", "2");
-        log.insert("nested.array[0]", "example value");
-        log.insert("nested.array[2]", "another value");
+        log.insert(event_path!("a"), 1);
+        log.insert(event_path!("nested", "field"), "2");
+        log.insert(event_path!("nested", "array", 0isize), "example value");
+        log.insert(event_path!("nested", "array", 2isize), "another value");
 
         let assertions = vec![
             "type(log) == 'table'",
@@ -47,7 +47,7 @@ mod test {
                 .load(assertion)
                 .eval()
                 .unwrap_or_else(|_| panic!("Failed to verify assertion {assertion:?}"));
-            assert!(result, "{}", assertion);
+            assert!(result, "{assertion}");
         }
     }
 
