@@ -17,14 +17,8 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
 - [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed.
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml)
-      workflow from `master`. Both version inputs are optional.
-  - `vdev` resolves omitted versions; the workflow only forwards supplied overrides.
-  - Leave `version` empty to prepare the next minor release recorded in `master`'s `Cargo.toml`
-    (for example, `0.61.0-dev` becomes `0.61.0`), or specify the stable version explicitly.
-    Explicit versions must also match `master`'s development version.
-  - Leave `vrl_version` empty to pin the latest stable, non-yanked VRL release on crates.io,
-    or specify a released version explicitly. Retries reuse an existing preparation branch's VRL pin
-    unless an explicit version is supplied, which must match that pin.
+      workflow from `master`. Leave the version inputs empty for the next Vector minor release and
+      latest stable VRL release on crates.io, or supply overrides.
   - The workflow activates the `RELEASE_FREEZE_RULESET_ID` ruleset and grants `vectordotdev-bot` an **Always** bypass
     to some of `master`'s rulesets (`RELEASE_FREEZE_BOT_BYPASS`).
   - If preparation fails after activation, the freeze remains active. Retry, or run
