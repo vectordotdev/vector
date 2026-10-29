@@ -45,64 +45,7 @@ Use this folder in each terminal throughout the guide. It includes the walkthrou
 `vector-start.yaml` connects two `demo_logs` sources to a `remap` transform and an `http` sink. A separate console sink prints Vector's
 internal metrics every five seconds.
 
-```yaml
-api:
-  enabled: true
-
-sources:
-  source_0:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "a", "property": "foo" }'
-      - '{ "key": "b", "property": "bar" }'
-    interval: 0.1
-
-  source_1:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "c", "property": "some" }'
-      - '{ "key": "d", "property": "another" }'
-    interval: 0.1
-
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 5
-
-transforms:
-  transform_0:
-    type: remap
-    inputs:
-      - source_*
-    source: |
-      . = parse_json!(.message)
-      if .key == "a" {
-        .group = 0
-      } else {
-        .group = 1
-      }
-
-sinks:
-  sink_0:
-    type: http
-    inputs:
-      - transform_0
-    uri: http://127.0.0.1:8000/logs
-    healthcheck:
-      enabled: false
-    encoding:
-      codec: json
-    batch:
-      timeout_secs: 1
-
-  sink_1:
-    type: console
-    inputs:
-      - internal_metrics
-    encoding:
-      codec: json
-```
+{{< code-file file="static/guides/debugging/vector-debugging-guide/vector-start.yaml" lang="yaml" >}}
 
 ### Start the Python HTTP server {#python-http-server}
 
@@ -557,66 +500,7 @@ size for your own data. Review the destination's limit and the HTTP sink's [batc
 
 `vector-final.yaml` contains the complete configuration after all three scenarios, including zlib compression and batches of up to four events:
 
-```yaml
-api:
-  enabled: true
-
-sources:
-  source_0:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "a", "property": "foo" }'
-      - '{ "key": "b", "property": "bar" }'
-    interval: 0.1
-
-  source_1:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "c", "property": "some" }'
-      - '{ "key": "d", "property": "another" }'
-    interval: 0.1
-
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 5
-
-transforms:
-  transform_0:
-    type: remap
-    inputs:
-      - source_*
-    source: |
-      . = parse_json!(.message)
-      if .key == "a" {
-        .group = 0
-      } else {
-        .group = 1
-      }
-
-sinks:
-  sink_0:
-    type: http
-    inputs:
-      - transform_0
-    uri: http://127.0.0.1:8000/logs
-    healthcheck:
-      enabled: false
-    encoding:
-      codec: json
-    compression: zlib
-    batch:
-      timeout_secs: 1
-      max_events: 4
-
-  sink_1:
-    type: console
-    inputs:
-      - internal_metrics
-    encoding:
-      codec: json
-```
+{{< code-file file="static/guides/debugging/vector-debugging-guide/vector-final.yaml" lang="yaml" >}}
 
 This file is already in the downloaded folder. Stop the running Vector process before trying it:
 
@@ -682,107 +566,15 @@ Use `vector-prometheus.yaml`, which extends `vector-final.yaml` with this sink:
 
 Here is the complete `vector-prometheus.yaml`:
 
-```yaml
-api:
-  enabled: true
-
-sources:
-  source_0:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "a", "property": "foo" }'
-      - '{ "key": "b", "property": "bar" }'
-    interval: 0.1
-
-  source_1:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "c", "property": "some" }'
-      - '{ "key": "d", "property": "another" }'
-    interval: 0.1
-
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 5
-
-transforms:
-  transform_0:
-    type: remap
-    inputs:
-      - source_*
-    source: |
-      . = parse_json!(.message)
-      if .key == "a" {
-        .group = 0
-      } else {
-        .group = 1
-      }
-
-sinks:
-  sink_0:
-    type: http
-    inputs:
-      - transform_0
-    uri: http://127.0.0.1:8000/logs
-    healthcheck:
-      enabled: false
-    encoding:
-      codec: json
-    compression: zlib
-    batch:
-      timeout_secs: 1
-      max_events: 4
-
-  sink_1:
-    type: console
-    inputs:
-      - internal_metrics
-    encoding:
-      codec: json
-
-  sink_2:
-    type: prometheus_exporter
-    inputs:
-      - internal_metrics
-    address: 0.0.0.0:9598
-```
+{{< code-file file="static/guides/debugging/vector-debugging-guide/vector-prometheus.yaml" lang="yaml" >}}
 
 `prometheus.yaml` tells Prometheus where to scrape Vector:
 
-```yaml
-global:
-  scrape_interval: 5s
-
-scrape_configs:
-  - job_name: vector
-    static_configs:
-      - targets: ["host.docker.internal:9598"]
-```
+{{< code-file file="static/guides/debugging/vector-debugging-guide/prometheus.yaml" lang="yaml" >}}
 
 `compose.yaml` starts Prometheus and Grafana and mounts that scrape configuration:
 
-```yaml
-services:
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "127.0.0.1:9090:9090"
-    volumes:
-      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    depends_on:
-      - prometheus
-```
+{{< code-file file="static/guides/debugging/vector-debugging-guide/compose.yaml" lang="yaml" >}}
 
 Start Vector in its terminal:
 
