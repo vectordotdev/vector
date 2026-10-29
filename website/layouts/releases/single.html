@@ -10,6 +10,13 @@
 {{ $breaking := where ($release.changelog | default slice) "breaking" true }}
 {{ $breakingTitled := where $breaking "title" "ne" nil }}
 {{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
+{{/* Keep legacy entries in their categories unless they are rendered above. */}}
+{{ $groupedChanges := slice }}
+{{ range $release.changelog }}
+{{ if not (and .breaking (ne .title nil) (gt (len $upgradeGuides) 0)) }}
+{{ $groupedChanges = $groupedChanges | append . }}
+{{ end }}
+{{ end }}
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "security" "security changes" "deprecation" "deprecations" "chore" "chore"}}
 {{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
@@ -124,10 +131,11 @@
           {{ range $orderedGroups }}
           {{ $key := . }}
           {{ $value := index $groups $key }}
-          {{ $changes := where $release.changelog ".type" "eq" $key }}
+          {{ $changes := where $groupedChanges ".type" "eq" $key }}
           {{ if $changes }}
           {{ $numChanges := len $changes }}
-          {{ $heading := printf "%d %s" $numChanges $value }}
+          {{ $label := cond (eq $numChanges 1) ($value | singularize) ($value | pluralize) }}
+          {{ $heading := printf "%d %s" $numChanges $label }}
           <div>
             <div class="prose dark:prose-invert max-w-none">
               {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false) }}
@@ -160,7 +168,8 @@
           {{ $commits := where $release.commits ".type" "eq" $key }}
           {{ if $commits }}
           {{ $numCommits := len $commits }}
-          {{ $heading := printf "%d %s" $numCommits $value }}
+          {{ $label := cond (eq $numCommits 1) ($value | singularize) ($value | pluralize) }}
+          {{ $heading := printf "%d %s" $numCommits $label }}
           <div class="ml-6">
             <div class="prose dark:prose-invert max-w-none">
               {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false) }}
