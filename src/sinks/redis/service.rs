@@ -74,6 +74,7 @@ impl Service<RedisRequest> for RedisService {
         }
 
         let byte_size = kvs.metadata.events_byte_size();
+        let is_sorted_set = matches!(self.data_type, super::DataType::SortedSet(_));
 
         Box::pin(async move {
             let ConnectionState {
@@ -81,12 +82,20 @@ impl Service<RedisRequest> for RedisService {
                 generation,
             } = redis_conn.get_connection_manager().await?;
 
-            match pipe.query_async(&mut conn).await {
-                Ok(event_status) => Ok(RedisResponse {
-                    event_status,
-                    events_byte_size: kvs.metadata.into_events_estimated_json_encoded_byte_size(),
-                    byte_size,
-                }),
+            match pipe.query_async::<Vec<bool>>(&mut conn).await {
+                Ok(mut event_status) => {
+                    // ZADD returns zero when it successfully updates an existing member.
+                    if is_sorted_set {
+                        event_status.fill(true);
+                    }
+                    Ok(RedisResponse {
+                        event_status,
+                        events_byte_size: kvs
+                            .metadata
+                            .into_events_estimated_json_encoded_byte_size(),
+                        byte_size,
+                    })
+                }
                 Err(error) => Err(RedisSinkError::SendError {
                     source: error,
                     generation,

@@ -2,7 +2,7 @@ use futures::stream;
 use rand::RngExt;
 use redis::AsyncCommands;
 use vector_lib::{
-    codecs::JsonSerializerConfig,
+    codecs::{JsonSerializerConfig, TextSerializerConfig},
     config::{Tags, Telemetry, init_telemetry},
     event::LogEvent,
 };
@@ -12,6 +12,7 @@ use super::config::{
 };
 use crate::{
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent},
+    metrics::{self, Controller},
     serde::OneOrMany,
     sinks::prelude::*,
     template::Template,
@@ -30,6 +31,154 @@ fn redis_server() -> String {
 
 fn redis_sentinel_server() -> Vec<String> {
     vec![std::env::var("SENTINEL_URL").unwrap_or_else(|_| "redis://127.0.0.1:26379/".to_owned())]
+}
+
+#[tokio::test]
+async fn redis_sink_terminal_outcome_metrics() {
+    use BatchStatus::{Delivered, Errored};
+    use DataTypeConfig::{Channel, List, SortedSet};
+    use ListMethod::{LPush, RPush};
+
+    metrics::init_test();
+    for (name, data_type, list_method, messages, expected_status) in [
+        (
+            "sorted-set-mixed",
+            SortedSet,
+            None,
+            vec!["new", "existing"],
+            Delivered,
+        ),
+        (
+            "sorted-set-existing",
+            SortedSet,
+            None,
+            vec!["existing"],
+            Delivered,
+        ),
+        (
+            "list-lpush",
+            List,
+            Some(LPush),
+            vec!["first", "second"],
+            Delivered,
+        ),
+        (
+            "list-rpush",
+            List,
+            Some(RPush),
+            vec!["first", "second"],
+            Delivered,
+        ),
+        (
+            "channel-no-subscribers",
+            Channel,
+            None,
+            vec!["first", "second"],
+            Errored,
+        ),
+    ] {
+        assert_redis_sink_outcome(name, data_type, list_method, &messages, expected_status).await;
+    }
+}
+
+async fn assert_redis_sink_outcome(
+    name: &str,
+    data_type: DataTypeConfig,
+    list_method: Option<ListMethod>,
+    messages: &[&str],
+    expected_status: BatchStatus,
+) {
+    let controller = Controller::get().unwrap();
+    controller.reset();
+    let key = format!("test-{name}-{}", random_string(10));
+    let mut config = RedisSinkConfig {
+        endpoint: OneOrMany::One(redis_server()),
+        key: Template::try_from(key.clone()).unwrap(),
+        encoding: TextSerializerConfig::default().into(),
+        data_type,
+        list_option: list_method.map(|method| ListOption { method }),
+        sorted_set_option: Some(SortedSetOption {
+            method: Some(SortedSetMethod::ZAdd),
+            score: Some(UnsignedIntTemplate::try_from("2").unwrap()),
+        }),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            timeout_secs: 2,
+            ..Default::default()
+        },
+        sentinel_service: None,
+        sentinel_connect: None,
+        acknowledgements: AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
+    };
+    config.batch.max_events = Some(messages.len());
+
+    let mut conn = config
+        .build_connection()
+        .await
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
+    if matches!(data_type, DataTypeConfig::SortedSet) {
+        let added: usize = conn.zadd(&key, "existing", 1).await.unwrap();
+        assert_eq!(added, 1);
+    }
+
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let events = messages
+        .iter()
+        .map(|message| LogEvent::from(*message).with_batch_notifier(&batch).into())
+        .collect::<Vec<Event>>();
+    drop(batch);
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+    sink.run_events(events).await.unwrap();
+
+    match data_type {
+        DataTypeConfig::SortedSet => {
+            let members: Vec<(String, f64)> = conn.zrange_withscores(&key, 0, -1).await.unwrap();
+            let mut expected: Vec<_> = messages
+                .iter()
+                .map(|message| (message.to_string(), 2.0))
+                .collect();
+            expected.sort_by(|left, right| left.0.cmp(&right.0));
+            assert_eq!(members, expected, "{name}");
+        }
+        DataTypeConfig::List => {
+            let length: usize = conn.llen(&key).await.unwrap();
+            assert_eq!(length, messages.len(), "{name}");
+        }
+        DataTypeConfig::Channel => {}
+    }
+    let _: usize = conn.del(&key).await.unwrap();
+
+    let delivered = expected_status == BatchStatus::Delivered;
+    let event_count = f64::from(u32::try_from(messages.len()).unwrap());
+    let metrics = controller.capture_metrics();
+    for (metric_name, expected) in [
+        (
+            "component_discarded_events_total",
+            if delivered { 0.0 } else { event_count },
+        ),
+        ("component_errors_total", if delivered { 0.0 } else { 1.0 }),
+        (
+            "component_sent_events_total",
+            if delivered { event_count } else { 0.0 },
+        ),
+    ] {
+        let count: f64 = metrics
+            .iter()
+            .filter(|metric| metric.name() == metric_name)
+            .map(|metric| match metric.value() {
+                MetricValue::Counter { value } => *value,
+                _ => panic!("{metric_name} must be a counter"),
+            })
+            .sum();
+        assert_eq!(count, expected, "{name}: {metric_name}");
+    }
+    assert_eq!(receiver.await, expected_status, "{name}");
 }
 
 #[tokio::test]
