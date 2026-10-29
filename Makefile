@@ -37,8 +37,6 @@ export SCOPE ?=
 export CARGO_BENCH_FLAGS ?=
 # override this to put criterion output elsewhere
 export CRITERION_HOME ?= $(mkfile_dir)target/criterion
-# Override to control if services are turned off after integration tests.
-export AUTODESPAWN ?= true
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
@@ -250,9 +248,6 @@ test: ## Run the unit test suite
 test-docs: ## Run the docs test suite
 	cargo test --doc --workspace --no-fail-fast $(if $(FEATURES),--no-default-features --features "$(FEATURES)") ${SCOPE}
 
-.PHONY: test-all
-test-all: test test-docs test-behavior test-integration test-component-validation ## Runs all tests: unit, docs, behavioral, integration, and component validation.
-
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
 	${EMPTY}
@@ -274,31 +269,12 @@ test-behavior-%: ## Runs behavioral test for a given category
 test-behavior: ## Runs all behavioral tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
-.PHONY: test-integration
-test-integration: ## Runs all integration tests
-test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch test-integration-opensearch
-test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
-test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
-test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs test-integration-e2e-opentelemetry-logs
-test-integration: test-integration-datadog-traces test-integration-shutdown
-
 .PHONY: test-integration-windows-event-log
 test-integration-windows-event-log: ## Runs Windows Event Log integration tests (Windows only)
 ifeq ($(OS),Windows_NT)
 	cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests
 else
 	@echo "Skipping windows-event-log integration tests (Windows only)"
-endif
-
-test-integration-%-cleanup:
-	$(VDEV) --verbose integration stop $*
-
-test-integration-%:
-	$(VDEV) --verbose integration test $*
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-$*-cleanup
 endif
 
 .PHONY: test-e2e-kubernetes

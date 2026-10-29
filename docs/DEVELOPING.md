@@ -89,12 +89,12 @@ make test SCOPE="sources::example"
 # Validate tests (that do not require other services) pass
 cargo test
 make test
-# Validate your tests pass (starting required services in Docker)
-make test-integration SCOPE="sources::example"
+# Run an integration suite (starting and stopping required services in Docker)
+cargo vdev integration run amqp
 # Validate your tests pass against a live service.
 cargo test --features docker sources::example
-# Validate all tests pass (starting required services in Docker)
-make test-integration
+# List available integration suites
+cargo vdev integration show
 # Run your benchmarks
 make bench SCOPE="transforms::example"
 cargo bench transforms::example
@@ -322,24 +322,28 @@ to run. A few rules when setting up integration tests:
       run in a Docker container.
 - [ ] The service must be configured on a unique port that is configured through
       an environment variable.
-- [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
-      ensure that it starts the service before running the integration test.
-- [ ] Add the name of your integration to the include matrix of the `test-integration` job to Vector's
-      [`.github/workflows/integration-test.yml`](../.github/workflows/integration-test.yml) workflow.
+- [ ] Add `test.yaml` and `compose.yaml` under `tests/integration/<name>/config`
+      so that `vdev` can discover the integration and start its services.
+- [ ] Add the integration to the service matrices in
+      [`.github/workflows/integration.yml`](../.github/workflows/integration.yml) and
+      [`.github/workflows/ci-integration-review.yml`](../.github/workflows/ci-integration-review.yml).
 
 Once complete, you can run your integration tests with:
 
 ```bash
-make test-integration-<name>
+cargo vdev integration run <name>
 ```
 
-These Make targets start the test environment as needed and stop it after a
-successful run. To keep the environment running for repeated tests or debugging,
-set `AUTODESPAWN=false`, then stop it explicitly when finished:
+This command starts each configured environment, runs its tests, and stops it
+even when tests fail.
+
+For repeated tests or debugging, manage the environment explicitly:
 
 ```bash
-make test-integration-<name> AUTODESPAWN=false
-make test-integration-<name>-cleanup
+cargo vdev integration start <name>
+cargo vdev integration test <name>
+# Repeat the test command while iterating, then stop the environment.
+cargo vdev integration stop <name>
 ```
 
 ### Blackbox tests
