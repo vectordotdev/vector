@@ -38,7 +38,6 @@ pub(super) fn preparation_version(
     requested: Option<Version>,
 ) -> Result<Version> {
     let version = requested.unwrap_or_else(|| Version::new(current.major, current.minor, 0));
-    ensure_stable(&version, "release version")?;
     let expected_current = development_version(&version)?;
     ensure!(
         *current == expected_current,
@@ -111,10 +110,13 @@ mod tests {
     #[test]
     fn preparation_version_validates_explicit_versions() {
         let current = "0.61.0-dev".parse().unwrap();
-        assert_eq!(
-            preparation_version(&current, Some("0.61.0".parse().unwrap())).unwrap(),
-            "0.61.0".parse().unwrap()
-        );
+        for version in ["0.61.0", "0.61.1"] {
+            let development = format!("{version}-dev").parse().unwrap();
+            assert_eq!(
+                preparation_version(&development, Some(version.parse().unwrap())).unwrap(),
+                version.parse().unwrap()
+            );
+        }
         for version in ["0.60.0", "0.62.0", "0.61.1", "0.61.0-rc.1", "0.61.0+build"] {
             assert!(
                 preparation_version(&current, Some(version.parse().unwrap())).is_err(),
@@ -143,15 +145,6 @@ mod tests {
         assert_eq!(
             parse_cargo_version(cargo_toml).expect("valid Cargo.toml"),
             "0.59.0-dev".parse().expect("valid version")
-        );
-    }
-
-    #[test]
-    fn explicit_patch_versions_remain_supported_for_local_preparation() {
-        let version = "0.61.1".parse().unwrap();
-        assert_eq!(
-            preparation_version(&"0.61.1-dev".parse().unwrap(), Some(version)).unwrap(),
-            "0.61.1".parse().unwrap()
         );
     }
 
