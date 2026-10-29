@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: honeycomb
+    inputs:
+      - my-source-or-transform-id
+    api_key: ${HONEYCOMB_API_KEY}
+    compression: zstd
+    dataset: my-honeycomb-dataset
+    endpoint: https://api.honeycomb.io/

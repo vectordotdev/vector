@@ -8,7 +8,6 @@ components: transforms: filter: {
 		"""
 
 	classes: {
-		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
@@ -21,7 +20,6 @@ components: transforms: filter: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.filter.configuration

@@ -175,8 +175,8 @@ fn check_component_name_validity(component_name: &str) -> Result<(), String> {
     // have an example string to show in the error to explain what the user needs to specify.
     let component_name_converted = component_name
         .chars()
-        .flat_map(|c| c.to_lowercase())
-        .map(|c| if !c.is_ascii_alphanumeric() { '_' } else { c })
+        .flat_map(char::to_lowercase)
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect::<String>();
 
     if component_name == component_name_converted {

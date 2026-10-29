@@ -1,0 +1,6 @@
+sinks:
+  my_sink_id:
+    type: aws_cloudwatch_metrics
+    inputs:
+      - my-source-or-transform-id
+    default_namespace: service

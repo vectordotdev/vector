@@ -14,7 +14,6 @@ components: sinks: datadog_metrics: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   100_000
 				timeout_secs: 2.0
 			}

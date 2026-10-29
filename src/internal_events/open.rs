@@ -17,6 +17,8 @@ pub struct ConnectionOpen {
 }
 
 impl InternalEvent for ConnectionOpen {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         gauge!(GaugeName::OpenConnections).set(self.count as f64);
     }
@@ -28,6 +30,8 @@ pub struct EndpointsActive {
 }
 
 impl InternalEvent for EndpointsActive {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
         gauge!(GaugeName::ActiveEndpoints).set(self.count as f64);
     }
@@ -39,6 +43,7 @@ pub struct OpenGauge {
 }
 
 impl OpenGauge {
+    #[must_use]
     pub fn new() -> Self {
         OpenGauge {
             gauge: Arc::default(),
@@ -56,6 +61,7 @@ impl OpenGauge {
     }
 
     #[cfg(all(feature = "sources-utils-net-unix", unix))]
+    #[must_use]
     pub fn any_open(&self) -> bool {
         self.gauge.load(Ordering::Acquire) != 0
     }
@@ -81,6 +87,9 @@ impl<E: Fn(usize)> Drop for OpenToken<E> {
 /// If reporting gauges from multiple threads, they can end up in a wrong order
 /// resulting in having wrong value for a prolonged period of time.
 /// This function performs a synchronization procedure that corrects that.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::cast_possible_wrap, reason = "Preserve gauge arithmetic")]
+#[allow(clippy::cast_sign_loss, reason = "Preserve gauge arithmetic")]
 fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
     // The goal of this function is to properly sequence calls to `emitter` from
     // multiple threads. It is possible that `emitter` will be called multiple

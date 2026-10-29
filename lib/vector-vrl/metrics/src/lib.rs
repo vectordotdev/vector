@@ -15,6 +15,7 @@ the snapshot is updated is controlled through the \
 global option. Higher values can reduce performance impact of that process, but may cause \
 stale metrics data in the snapshot.";
 
+#[must_use]
 pub fn all() -> Vec<Box<dyn Function>> {
     vec![
         Box::new(get_vector_metric::GetVectorMetric) as _,

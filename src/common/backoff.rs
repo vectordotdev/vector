@@ -20,7 +20,7 @@ impl Default for ExponentialBackoff {
     fn default() -> Self {
         Self::from_millis(2)
             .factor(250)
-            .max_delay(Duration::from_secs(60))
+            .max_delay(Duration::from_mins(1))
     }
 }
 
@@ -105,11 +105,11 @@ mod tests {
             Duration::from_secs(8),     // 32 * 250
             Duration::from_secs(16),    // 64 * 250
             Duration::from_secs(32),    // 128 * 250
-            Duration::from_secs(60),    // 256 * 250 = 64s, capped at 60
-            Duration::from_secs(60),    // Should stay capped
+            Duration::from_mins(1),     // 256 * 250 = 64s, capped at 60
+            Duration::from_mins(1),     // Should stay capped
         ];
 
-        for expected in expected_delays.iter() {
+        for expected in &expected_delays {
             let actual = backoff.next().unwrap();
             assert_eq!(actual, *expected);
         }

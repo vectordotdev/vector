@@ -4,13 +4,14 @@ use std::str::FromStr;
 
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
-use http::{Request, StatusCode};
-use hyper::Body;
+use http_1::{Request, StatusCode};
+use http_body_util::BodyExt;
 use serde::Deserialize;
 use url::form_urlencoded;
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
-use crate::http::{Auth, HttpClient};
+use crate::http::{Auth, client_v1::HttpClient};
 
 use super::parser::ClickHouseType;
 
@@ -65,11 +66,11 @@ pub async fn fetch_table_schema(
         .finish();
     let uri = format!("{endpoint}?{query_string}");
     let mut request = Request::get(&uri)
-        .body(Body::empty())
+        .body(empty_body())
         .map_err(|e| format!("Failed to build request: {e}"))?;
 
     if let Some(auth) = auth {
-        auth.apply(&mut request);
+        auth.apply_v1(&mut request);
     }
 
     let response = client.send(request).await?;
@@ -82,15 +83,13 @@ pub async fn fetch_table_schema(
         .into());
     }
 
-    let body_bytes = http_body::Body::collect(response.into_body())
-        .await?
-        .to_bytes();
+    let body_bytes = response.into_body().collect().await?.to_bytes();
 
     // Pass bytes directly instead of converting to a UTF-8 String first
     parse_schema_from_response(&body_bytes)
 }
 
-/// Parses the JSONEachRow response from ClickHouse and builds an Arrow schema.
+/// Parses the `JSONEachRow` response from ClickHouse and builds an Arrow schema.
 fn parse_schema_from_response(response: &[u8]) -> crate::Result<Schema> {
     let fields = serde_json::Deserializer::from_slice(response)
         .into_iter::<ColumnInfo>()

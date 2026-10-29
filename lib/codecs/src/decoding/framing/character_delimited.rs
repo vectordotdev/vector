@@ -2,9 +2,27 @@ use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
+use vector_common::internal_event::emit;
 use vector_config::configurable_component;
+use vector_core::serde::AsciiChar;
 
 use super::BoxedFramingError;
+use crate::internal_events::DecoderFrameTooLongError;
+
+/// The behavior to apply when a frame exceeds the maximum allowed byte size.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum OversizedAction {
+    /// Drop the entire oversized frame.
+    #[default]
+    Drop,
+
+    /// Truncate the frame to the maximum allowed size and emit the partial content.
+    ///
+    /// The remainder of the oversized frame is discarded up to the next delimiter.
+    Truncate,
+}
 
 /// Config used to build a `CharacterDelimitedDecoder`.
 #[configurable_component]
@@ -16,20 +34,24 @@ pub struct CharacterDelimitedDecoderConfig {
 
 impl CharacterDelimitedDecoderConfig {
     /// Creates a `CharacterDelimitedDecoderConfig` with the specified delimiter and default max length.
-    pub const fn new(delimiter: u8) -> Self {
+    #[must_use]
+    pub const fn new(delimiter: AsciiChar) -> Self {
         Self {
             character_delimited: CharacterDelimitedDecoderOptions::new(delimiter, None),
         }
     }
     /// Build the `CharacterDelimitedDecoder` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> CharacterDelimitedDecoder {
+        let oversized_action = self.character_delimited.oversized_action;
         if let Some(max_length) = self.character_delimited.max_length {
             CharacterDelimitedDecoder::new_with_max_length(
-                self.character_delimited.delimiter,
+                self.character_delimited.delimiter.as_byte(),
                 max_length,
             )
+            .with_oversized_action(oversized_action)
         } else {
-            CharacterDelimitedDecoder::new(self.character_delimited.delimiter)
+            CharacterDelimitedDecoder::new(self.character_delimited.delimiter.as_byte())
         }
     }
 }
@@ -39,9 +61,7 @@ impl CharacterDelimitedDecoderConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
-    #[configurable(metadata(docs::type_override = "ascii_char"))]
-    #[serde(with = "vector_core::serde::ascii_char")]
-    pub delimiter: u8,
+    pub delimiter: AsciiChar,
 
     /// The maximum length of the byte buffer.
     ///
@@ -56,14 +76,26 @@ pub struct CharacterDelimitedDecoderOptions {
     /// prevents processing from being unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::is_default")]
     pub max_length: Option<usize>,
+
+    /// The behavior when a frame exceeds `max_length`.
+    ///
+    /// When set to `drop` (the default), the entire oversized frame is discarded.
+    /// When set to `truncate`, the frame is truncated to `max_length` bytes and the
+    /// remainder is discarded up to the next delimiter.
+    ///
+    /// This option has no effect if `max_length` is not set.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub oversized_action: OversizedAction,
 }
 
 impl CharacterDelimitedDecoderOptions {
-    /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional max_length.
-    pub const fn new(delimiter: u8, max_length: Option<usize>) -> Self {
+    /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional `max_length`.
+    #[must_use]
+    pub const fn new(delimiter: AsciiChar, max_length: Option<usize>) -> Self {
         Self {
             delimiter,
             max_length,
+            oversized_action: OversizedAction::Drop,
         }
     }
 }
@@ -75,20 +107,25 @@ pub struct CharacterDelimitedDecoder {
     pub delimiter: u8,
     /// The maximum length of the byte buffer.
     pub max_length: usize,
+    /// The behavior when a frame exceeds `max_length`.
+    pub oversized_action: OversizedAction,
 }
 
 impl CharacterDelimitedDecoder {
     /// Creates a `CharacterDelimitedDecoder` with the specified delimiter.
+    #[must_use]
     pub const fn new(delimiter: u8) -> Self {
         CharacterDelimitedDecoder {
             delimiter,
             max_length: usize::MAX,
+            oversized_action: OversizedAction::Drop,
         }
     }
 
     /// Creates a `CharacterDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
+    #[must_use]
     pub const fn new_with_max_length(delimiter: u8, max_length: usize) -> Self {
         CharacterDelimitedDecoder {
             max_length,
@@ -96,7 +133,15 @@ impl CharacterDelimitedDecoder {
         }
     }
 
+    /// Sets the behavior when a frame exceeds `max_length`.
+    #[must_use]
+    pub const fn with_oversized_action(mut self, action: OversizedAction) -> Self {
+        self.oversized_action = action;
+        self
+    }
+
     /// Returns the maximum frame length when decoding.
+    #[must_use]
     pub const fn max_length(&self) -> usize {
         self.max_length
     }
@@ -111,21 +156,34 @@ impl Decoder for CharacterDelimitedDecoder {
             // This function has the following goal: we are searching for
             // sub-buffers delimited by `self.delimiter` with size no more than
             // `self.max_length`. If a sub-buffer is found that exceeds
-            // `self.max_length` we discard it, else we return it. At the end of
+            // `self.max_length` we either discard it or truncate it (depending
+            // on `self.oversized_action`), else we return it. At the end of
             // the buffer if the delimiter is not present the remainder of the
             // buffer is discarded.
             match memchr(self.delimiter, buf) {
                 None => return Ok(None),
                 Some(next_delimiter_idx) => {
                     if next_delimiter_idx > self.max_length {
-                        // The discovered sub-buffer is too big, so we discard
-                        // it, taking care to also discard the delimiter.
-                        warn!(
-                            message = "Discarding frame larger than max_length.",
-                            buf_len = buf.len(),
-                            max_length = self.max_length
-                        );
-                        buf.advance(next_delimiter_idx + 1);
+                        match self.oversized_action {
+                            OversizedAction::Drop => {
+                                emit(DecoderFrameTooLongError {
+                                    length: next_delimiter_idx,
+                                    max_length: self.max_length,
+                                });
+                                buf.advance(next_delimiter_idx + 1);
+                            }
+                            OversizedAction::Truncate => {
+                                warn!(
+                                    message = "Truncating frame larger than max_length.",
+                                    original_len = next_delimiter_idx,
+                                    max_length = self.max_length,
+                                );
+                                let frame = buf.split_to(self.max_length).freeze();
+                                // Discard the remaining bytes up to and including the delimiter.
+                                buf.advance(next_delimiter_idx - self.max_length + 1);
+                                return Ok(Some(frame));
+                            }
+                        }
                     } else {
                         let frame = buf.split_to(next_delimiter_idx).freeze();
                         trace!(
@@ -147,12 +205,26 @@ impl Decoder for CharacterDelimitedDecoder {
                 if buf.is_empty() {
                     Ok(None)
                 } else if buf.len() > self.max_length {
-                    warn!(
-                        message = "Discarding frame larger than max_length.",
-                        buf_len = buf.len(),
-                        max_length = self.max_length
-                    );
-                    Ok(None)
+                    match self.oversized_action {
+                        OversizedAction::Drop => {
+                            emit(DecoderFrameTooLongError {
+                                length: buf.len(),
+                                max_length: self.max_length,
+                            });
+                            buf.clear();
+                            Ok(None)
+                        }
+                        OversizedAction::Truncate => {
+                            warn!(
+                                message = "Truncating frame larger than max_length.",
+                                original_len = buf.len(),
+                                max_length = self.max_length,
+                            );
+                            let frame = buf.split_to(self.max_length).freeze();
+                            buf.clear();
+                            Ok(Some(frame))
+                        }
+                    }
                 } else {
                     let bytes: Bytes = buf.split_to(buf.len()).freeze();
                     Ok(Some(bytes))
@@ -170,6 +242,28 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
+
+    #[test]
+    fn delimiter_schema_matches_its_ascii_string_representation() {
+        let schema = serde_json::to_value(
+            vector_config::schema::generate_root_schema::<CharacterDelimitedDecoderOptions>()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(schema["properties"]["delimiter"]["type"], "string");
+
+        let input = serde_json::json!({"delimiter": "1"});
+        let options: CharacterDelimitedDecoderOptions =
+            serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(options.delimiter.as_byte(), b'1');
+        assert_eq!(serde_json::to_value(options).unwrap(), input);
+        assert!(
+            serde_json::from_value::<CharacterDelimitedDecoderOptions>(
+                serde_json::json!({"delimiter": 1})
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn decode() {
@@ -200,6 +294,48 @@ mod tests {
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123456")));
         assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("123")));
         assert_eq!(codec.decode_eof(buf).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_drop_emits_frame_too_long_error() {
+        use vector_core::{
+            event::MetricValue,
+            metrics::{Controller, init_test},
+        };
+
+        init_test();
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', 3);
+        let buf = &mut BytesMut::new();
+
+        // One oversized frame dropped by `decode`, one by `decode_eof`.
+        buf.put_slice(b"toolong\nok\nalsotoolong");
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("ok")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), None);
+
+        let metrics = Controller::get()
+            .expect("There must be a controller")
+            .capture_metrics();
+
+        let errors = metrics
+            .iter()
+            .filter(|metric| metric.name() == "component_errors_total")
+            .collect::<Vec<_>>();
+        assert_eq!(errors.len(), 1);
+        let tags = errors[0].tags().expect("component_errors_total has tags");
+        assert_eq!(tags.get("error_code"), Some("decoder_frame_too_long"));
+        assert_eq!(tags.get("error_type"), Some("parser_failed"));
+        assert_eq!(tags.get("stage"), Some("processing"));
+        let MetricValue::Counter { value } = errors[0].value() else {
+            panic!("component_errors_total has invalid type")
+        };
+        assert!((*value - 2.0).abs() < f64::EPSILON);
+
+        // Frames are dropped before any event exists, so no events are counted as discarded.
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| metric.name() == "component_discarded_events_total")
+        );
     }
 
     // Regression test for [infinite loop bug](https://github.com/vectordotdev/vector/issues/2564)
@@ -306,5 +442,100 @@ mod tests {
         }
 
         assert_eq!(i, 51);
+    }
+
+    #[test]
+    fn decode_truncate_oversized() {
+        const MAX_LENGTH: usize = 6;
+
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH)
+            .with_oversized_action(OversizedAction::Truncate);
+        let buf = &mut BytesMut::new();
+
+        buf.put_slice(b"1234567890\n123456\n");
+
+        // Oversized frame is truncated to 6 bytes
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("123456")));
+        // Next frame is correctly parsed
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("123456")));
+        assert_eq!(codec.decode(buf).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_truncate_exact_boundary() {
+        const MAX_LENGTH: usize = 6;
+
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH)
+            .with_oversized_action(OversizedAction::Truncate);
+        let buf = &mut BytesMut::new();
+
+        // Exactly at max_length — should be emitted normally, not truncated
+        buf.put_slice(b"123456\n");
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("123456")));
+        assert_eq!(codec.decode(buf).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_truncate_next_frame_intact() {
+        const MAX_LENGTH: usize = 3;
+
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH)
+            .with_oversized_action(OversizedAction::Truncate);
+        let buf = &mut BytesMut::new();
+
+        buf.put_slice(b"toolong\nok\nanother_too_long\nfin\n");
+
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("too")));
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("ok")));
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("ano")));
+        assert_eq!(codec.decode(buf).unwrap(), Some(Bytes::from("fin")));
+        assert_eq!(codec.decode(buf).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_eof_truncate() {
+        const MAX_LENGTH: usize = 4;
+
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH)
+            .with_oversized_action(OversizedAction::Truncate);
+        let buf = &mut BytesMut::new();
+
+        // No trailing delimiter — decode_eof should truncate
+        buf.put_slice(b"abcdefgh");
+        assert_eq!(codec.decode_eof(buf).unwrap(), Some(Bytes::from("abcd")));
+        assert_eq!(codec.decode_eof(buf).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_truncate_mixed_with_drop() {
+        const MAX_LENGTH: usize = 6;
+
+        // Default (Drop) behavior — oversized frames are dropped entirely
+        let mut codec_drop = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH);
+        let buf = &mut BytesMut::new();
+        buf.put_slice(b"1234567\n123456\n123412314\n123");
+
+        assert_eq!(codec_drop.decode(buf).unwrap(), Some(Bytes::from("123456")));
+        assert_eq!(codec_drop.decode(buf).unwrap(), None);
+
+        // Truncate behavior — oversized frames are truncated
+        let mut codec_trunc = CharacterDelimitedDecoder::new_with_max_length(b'\n', MAX_LENGTH)
+            .with_oversized_action(OversizedAction::Truncate);
+        let buf = &mut BytesMut::new();
+        buf.put_slice(b"1234567\n123456\n123412314\n123");
+
+        assert_eq!(
+            codec_trunc.decode(buf).unwrap(),
+            Some(Bytes::from("123456"))
+        );
+        assert_eq!(
+            codec_trunc.decode(buf).unwrap(),
+            Some(Bytes::from("123456"))
+        );
+        assert_eq!(
+            codec_trunc.decode(buf).unwrap(),
+            Some(Bytes::from("123412"))
+        );
+        assert_eq!(codec_trunc.decode(buf).unwrap(), None);
     }
 }

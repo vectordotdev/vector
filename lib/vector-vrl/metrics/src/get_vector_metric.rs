@@ -7,12 +7,21 @@ use crate::common::{
     metric_into_vrl, metrics_vrl_typedef, resolve_tags, validate_tags, Error, MetricsStorage,
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn get_metric(
     metrics_storage: &MetricsStorage,
     key: Value,
     tags: BTreeMap<String, String>,
 ) -> Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("argument must be a string");
+    let key_str = key.to_str_lossy().expect("argument must be a string");
     let value = match metrics_storage.get_metric(&key_str, tags) {
         Some(value) => metric_into_vrl(&value),
         None => Value::Null,

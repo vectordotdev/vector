@@ -1,7 +1,7 @@
 use std::io;
 
 use bytes::BytesMut;
-use itertools::{Itertools, Position};
+use itertools::Itertools;
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -50,10 +50,9 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) 
 
             let mut bytes = BytesMut::new();
             match (position, encoder.framer()) {
-                (
-                    Position::Last | Position::Only,
-                    Framer::CharacterDelimited(_) | Framer::NewlineDelimited(_),
-                ) => {
+                (position, Framer::CharacterDelimited(_) | Framer::NewlineDelimited(_))
+                    if position.is_last() =>
+                {
                     encoder
                         .serialize(event, &mut bytes)
                         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
@@ -99,6 +98,7 @@ impl Encoder<Event> for (Transformer, vector_lib::codecs::Encoder<()>) {
     }
 }
 
+#[cfg(feature = "codecs-arrow")]
 impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
     fn encode_input(
         &self,
@@ -155,6 +155,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
             vector_lib::codecs::EncoderKind::Framed(encoder) => {
                 (self.0.clone(), *encoder.clone()).encode_input(events, writer)
             }
+            #[cfg(feature = "codecs-arrow")]
             vector_lib::codecs::EncoderKind::Batch(encoder) => {
                 (self.0.clone(), encoder.clone()).encode_input(events, writer)
             }
@@ -163,13 +164,17 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
 }
 
 /// Write the buffer to the writer. If the operation fails, emit an internal event which complies with the
-/// instrumentation spec- as this necessitates both an Error and EventsDropped event.
+/// instrumentation spec- as this necessitates both an error and an `EventsDropped` event.
 ///
 /// # Arguments
 ///
-/// * `writer`           - The object implementing io::Write to write data to.
+/// * `writer`           - The object implementing `io::Write` to write data to.
 /// * `n_events_pending` - The number of events that are dropped if this write fails.
 /// * `buf`              - The buffer to write.
+///
+/// # Errors
+///
+/// Returns an error if writing the buffer fails.
 pub fn write_all(
     writer: &mut dyn io::Write,
     n_events_pending: usize,
@@ -183,6 +188,11 @@ pub fn write_all(
     })
 }
 
+/// Writes input while counting bytes written.
+///
+/// # Errors
+///
+/// Returns any error from the supplied write operation.
 pub fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>
 where
     F: FnOnce(&mut dyn io::Write, I) -> Result<(), E>,
@@ -207,7 +217,7 @@ where
     }
 
     let mut tracked = Tracked { count: 0, inner };
-    f(&mut tracked, input).map_err(|e| e.into())?;
+    f(&mut tracked, input).map_err(Into::into)?;
     Ok(tracked.count)
 }
 
@@ -281,7 +291,7 @@ mod tests {
 
         let input_json_size = input
             .iter()
-            .map(|event| event.estimated_json_encoded_size_of())
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
             .sum::<JsonSize>();
 
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
@@ -318,7 +328,7 @@ mod tests {
 
         let input_json_size = input
             .iter()
-            .map(|event| event.estimated_json_encoded_size_of())
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
             .sum::<JsonSize>();
 
         let mut writer = Vec::new();
@@ -371,7 +381,7 @@ mod tests {
         )])))];
         let input_json_size = input
             .iter()
-            .map(|event| event.estimated_json_encoded_size_of())
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
             .sum::<JsonSize>();
 
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
@@ -408,7 +418,7 @@ mod tests {
         ];
         let input_json_size = input
             .iter()
-            .map(|event| event.estimated_json_encoded_size_of())
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
             .sum::<JsonSize>();
 
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
@@ -508,7 +518,7 @@ mod tests {
 
         let input_json_size = input
             .iter()
-            .map(|event| event.estimated_json_encoded_size_of())
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
             .sum::<JsonSize>();
 
         let (written, size) = encoding.encode_input(input, &mut writer).unwrap();
@@ -522,8 +532,8 @@ mod tests {
     #[test]
     fn test_encode_batch_protobuf_multiple() {
         let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
-        let messages = vec![message_raw.clone(), message_raw.clone()];
-        let total_input_proto_size: usize = messages.iter().map(|m| m.len()).sum();
+        let messages = vec![message_raw.clone(), message_raw];
+        let total_input_proto_size: usize = messages.iter().map(Vec::len).sum();
 
         let mut buf = BytesMut::with_capacity(128);
         for message in messages {
@@ -574,7 +584,7 @@ mod tests {
 
         let input_json_size: JsonSize = input
             .iter()
-            .map(|event| event.estimated_json_encoded_size_of())
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
             .sum();
 
         let (written, size) = encoding.encode_input(input, &mut writer).unwrap();

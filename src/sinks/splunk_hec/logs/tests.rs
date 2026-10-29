@@ -18,17 +18,29 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
-            common::EndpointTarget,
+            common::{EndpointTarget, acknowledgements::HecClientAcknowledgementsConfig},
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
         util::{
-            Compression, encoding::Encoder as _, processed_event::ProcessedEvent,
-            test::build_test_server,
+            BatchConfig, Compression, HttpEndpoint, TowerRequestConfig, encoding::Encoder as _,
+            processed_event::ProcessedEvent, test::build_test_server,
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     test_util::addr::next_addr,
 };
+
+// Tests exercise the sink, not confinement; build a checkerless confined template.
+fn confined(s: &str) -> ConfinedTemplate {
+    Template::try_from(s)
+        .unwrap()
+        .confine(
+            &ConfinementConfig::unconfined(),
+            HecLogsSinkConfig::NAME,
+            "template",
+        )
+        .unwrap()
+}
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {
@@ -53,7 +65,7 @@ struct HecEventText {
 }
 
 fn get_encoded_event<D: de::DeserializeOwned>(
-    encoding: EncodingConfig,
+    encoding: &EncodingConfig,
     processed_event: ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>,
 ) -> D {
     let encoder = hec_encoder(encoding);
@@ -72,14 +84,24 @@ fn get_processed_event_timestamp(
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
         .as_mut_log()
-        .insert("event_sourcetype", "test_sourcetype");
-    event.as_mut_log().insert("event_source", "test_source");
-    event.as_mut_log().insert("event_index", "test_index");
-    event.as_mut_log().insert("host_key", "test_host");
-    event.as_mut_log().insert("event_field1", "test_value1");
-    event.as_mut_log().insert("event_field2", "test_value2");
-    event.as_mut_log().insert("key", "value");
-    event.as_mut_log().insert("int_val", 123);
+        .insert(event_path!("event_sourcetype"), "test_sourcetype");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_source"), "test_source");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_index"), "test_index");
+    event
+        .as_mut_log()
+        .insert(event_path!("host_key"), "test_host");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_field1"), "test_value1");
+    event
+        .as_mut_log()
+        .insert(event_path!("event_field2"), "test_value2");
+    event.as_mut_log().insert(event_path!("key"), "value");
+    event.as_mut_log().insert(event_path!("int_val"), 123);
 
     if let Some(OptionalTargetPath {
         path: Some(ts_path),
@@ -96,9 +118,9 @@ fn get_processed_event_timestamp(
         }
     }
 
-    let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
-    let source = Template::try_from("{{ event_source }}".to_string()).ok();
-    let index = Template::try_from("{{ event_index }}".to_string()).ok();
+    let sourcetype = Some(confined("{{ event_sourcetype }}"));
+    let source = Some(confined("{{ event_source }}"));
+    let index = Some(confined("{{ event_index }}"));
     let indexed_fields = vec![
         owned_value_path!("event_field1"),
         owned_value_path!("event_field2"),
@@ -126,7 +148,7 @@ fn get_processed_event_timestamp(
 fn get_processed_event() -> HecProcessedEvent {
     get_processed_event_timestamp(
         Some(vrl::value::Value::Timestamp(
-            Utc.timestamp_nanos(1638366107111456123),
+            Utc.timestamp_nanos(1_638_366_107_111_456_123),
         )),
         Some(OptionalTargetPath {
             path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
@@ -150,11 +172,11 @@ fn splunk_process_log_event() {
     assert_eq!(metadata.source, Some("test_source".to_string()));
     assert_eq!(metadata.index, Some("test_index".to_string()));
     assert_eq!(metadata.host, Some(Value::from("test_host")));
-    assert!(metadata.fields.contains("event_field1"));
-    assert!(metadata.fields.contains("event_field2"));
+    assert!(metadata.fields.contains(vrl::event_path!("event_field1")));
+    assert!(metadata.fields.contains(vrl::event_path!("event_field2")));
 }
 
-fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
+fn hec_encoder(encoding: &EncodingConfig) -> HecLogsEncoder {
     let transformer = encoding.transformer();
     let serializer = encoding.build().unwrap();
     let encoder = Encoder::<()>::new(serializer);
@@ -169,7 +191,7 @@ fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
 fn splunk_encode_log_event_json() {
     let processed_event = get_processed_event();
     let hec_data =
-        get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event);
+        get_encoded_event::<HecEventJson>(&JsonSerializerConfig::default().into(), processed_event);
     let event = hec_data.event;
 
     assert_eq!(event.get("key").unwrap(), &serde_json::Value::from("value"));
@@ -189,18 +211,19 @@ fn splunk_encode_log_event_json() {
 
     assert_eq!(hec_data.fields.get("event_field1").unwrap(), "test_value1");
 
-    assert_eq!(hec_data.time, Some(1638366107.111));
+    assert_eq!(hec_data.time, Some(1_638_366_107.111));
     assert_eq!(
         event.get("ts_nanos_key").unwrap(),
-        &serde_json::Value::from(456123)
+        &serde_json::Value::from(456_123)
     );
 }
 
 #[test]
+#[expect(clippy::float_cmp, reason = "Verify the exact value.")]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
     let hec_data =
-        get_encoded_event::<HecEventText>(TextSerializerConfig::default().into(), processed_event);
+        get_encoded_event::<HecEventText>(&TextSerializerConfig::default().into(), processed_event);
 
     assert_eq!(hec_data.event.as_str(), "hello world");
 
@@ -211,7 +234,7 @@ fn splunk_encode_log_event_text() {
 
     assert_eq!(hec_data.fields.get("event_field1").unwrap(), "test_value1");
 
-    assert_eq!(hec_data.time, 1638366107.111);
+    assert_eq!(hec_data.time, 1_638_366_107.111);
 }
 
 #[tokio::test]
@@ -219,7 +242,7 @@ async fn splunk_passthrough_token() {
     let (_guard, addr) = next_addr();
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
-        endpoint: format!("http://{addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{addr}")).unwrap(),
         host_key: None,
         indexed_fields: Vec::new(),
         index: None,
@@ -227,14 +250,15 @@ async fn splunk_passthrough_token() {
         source: None,
         encoding: JsonSerializerConfig::default().into(),
         compression: Compression::None,
-        batch: Default::default(),
-        request: Default::default(),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Default::default(),
+        acknowledgements: HecClientAcknowledgementsConfig::default(),
         timestamp_nanos_key: None,
         timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
+        confinement: ConfinementConfig::default(),
     };
     let cx = SinkContext::default();
 
@@ -265,13 +289,11 @@ async fn splunk_passthrough_token() {
             "Splunk passthrough-token-2",
             "Splunk token"
         ]
-    )
+    );
 }
 
 #[test]
 fn splunk_encode_log_event_json_timestamps() {
-    crate::test_util::trace_init();
-
     fn get_hec_data_for_timestamp_test(
         timestamp: Option<Value>,
         timestamp_path: Option<OptionalTargetPath>,
@@ -279,8 +301,10 @@ fn splunk_encode_log_event_json_timestamps() {
     ) -> HecEventJson {
         let processed_event =
             get_processed_event_timestamp(timestamp, timestamp_path, auto_extract_timestamp);
-        get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event)
+        get_encoded_event::<HecEventJson>(&JsonSerializerConfig::default().into(), processed_event)
     }
+
+    crate::test_util::trace_init();
 
     let timestamp_key = Some(OptionalTargetPath {
         path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
@@ -317,7 +341,7 @@ fn splunk_encode_log_event_json_timestamps() {
     // timestamp_key is provided and timestamp is valid, but auto_extract_timestamp is set
     hec_data = get_hec_data_for_timestamp_test(
         Some(Value::Timestamp(Utc::now())),
-        timestamp_key.clone(),
+        timestamp_key,
         do_auto_extract,
     );
     assert_eq!(hec_data.time, None);
@@ -352,6 +376,7 @@ fn splunk_encode_log_event_semantic_meanings() {
     let og_time = Utc::now();
 
     // determine the time we expect to get after encoding
+    #[expect(clippy::cast_precision_loss, reason = "Match HEC timestamp rounding.")]
     let expected_time = (og_time.timestamp_millis() as f64) / 1000f64;
 
     log.insert(metadata_path!("splunk_hec", "hostname"), "roast");
@@ -380,7 +405,7 @@ fn splunk_encode_log_event_semantic_meanings() {
     );
 
     let hec_data =
-        get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event);
+        get_encoded_event::<HecEventJson>(&JsonSerializerConfig::default().into(), processed_event);
 
     assert_eq!(hec_data.time, Some(expected_time));
 

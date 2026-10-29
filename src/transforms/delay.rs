@@ -47,10 +47,10 @@ const fn default_queue_capacity() -> NonZeroUsize {
 impl Default for DelayConfig {
     fn default() -> Self {
         Self {
-            delay_ms: Default::default(),
+            delay_ms: Duration::default(),
             queue_capacity: default_queue_capacity(),
-            overflow_strategy: Default::default(),
-            condition: Default::default(),
+            overflow_strategy: OverflowStrategy::default(),
+            condition: Option::default(),
         }
     }
 }
@@ -106,10 +106,25 @@ impl TransformConfig for DelayConfig {
             clone_input_definitions(input_definitions),
         )]
     }
+
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        if self.delay_ms.as_millis() == 0 {
+            Err(vec!["delay must not be zero".to_string()])
+        } else {
+            Ok(())
+        }
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        self.condition.as_ref().map_or(Ok(()), |c| {
+            c.validate(&context.enrichment_tables, &context.metrics_storage)
+                .map_err(|e| vec![format!("condition: {e}")])
+        })
+    }
 }
 
 pub struct Delay {
-    delay: Duration,
+    duration: Duration,
     queue: DelayQueue<Event>,
     queue_capacity: NonZeroUsize,
     overflow_strategy: OverflowStrategy,
@@ -117,9 +132,13 @@ pub struct Delay {
 }
 
 impl Delay {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the delay configuration is invalid.
     pub fn new(config: &DelayConfig, context: &TransformContext) -> crate::Result<Self> {
         Ok(Self {
-            delay: config.delay_ms,
+            duration: config.delay_ms,
             queue: DelayQueue::with_capacity(config.queue_capacity.get()),
             queue_capacity: config.queue_capacity,
             overflow_strategy: config.overflow_strategy,
@@ -165,7 +184,7 @@ impl TaskTransform<Event> for Delay {
                         if result {
                             yield event;
                         } else {
-                            self.queue.insert(event, self.delay);
+                            self.queue.insert(event, self.duration);
                         }
                         if done && self.queue.is_empty() {
                             break;
@@ -191,7 +210,7 @@ impl TaskTransform<Event> for Delay {
                                                     if result {
                                                         yield event;
                                                     } else {
-                                                        self.queue.insert(event, self.delay);
+                                                        self.queue.insert(event, self.duration);
                                                     }
                                                 }
                                             },
@@ -208,7 +227,7 @@ impl TaskTransform<Event> for Delay {
                                             }
                                         }
                                     }
-                                    self.queue.insert(event, self.delay);
+                                    self.queue.insert(event, self.duration);
                                 }
                             }
                         }
@@ -243,8 +262,8 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events() {
-        let config = toml::from_str::<DelayConfig>(indoc! {"
-            delay_ms = 200
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
         "})
         .unwrap();
 
@@ -264,18 +283,19 @@ mod tests {
         // Wait long enough for delay to end
         tokio::time::sleep(Duration::from_secs_f64(0.3)).await;
 
-        if !matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))) {
-            panic!("Unexpectedly received None or Pending in output stream");
-        }
+        assert!(
+            matches!(futures::poll!(out_stream.next()), Poll::Ready(Some(_event))),
+            "Unexpectedly received None or Pending in output stream"
+        );
     }
 
     #[tokio::test]
     async fn delay_events_at_capacity_drop_newest() {
-        let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_ms = 200
-            queue_capacity = 1
-            overflow_strategy = "drop_newest"
-        "#})
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
+            queue_capacity: 1
+            overflow_strategy: drop_newest
+        "})
         .unwrap();
 
         let delay =
@@ -306,11 +326,11 @@ mod tests {
 
     #[tokio::test]
     async fn delay_events_at_capacity_pass() {
-        let config = toml::from_str::<DelayConfig>(indoc! {r#"
-            delay_ms = 200
-            queue_capacity = 1
-            overflow_strategy = "forward"
-        "#})
+        let config = serde_yaml::from_str::<DelayConfig>(indoc! {"
+            delay_ms: 200
+            queue_capacity: 1
+            overflow_strategy: forward
+        "})
         .unwrap();
 
         let delay =

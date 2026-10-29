@@ -180,10 +180,8 @@ fn push_const_variants(result: &mut Vec<Value>, value: Value) {
                 }
             }
         }
-        obj @ Value::Object(_) => {
-            if !result.contains(&obj) {
-                result.push(obj);
-            }
+        obj @ Value::Object(_) if !result.contains(&obj) => {
+            result.push(obj);
         }
         _ => {}
     }

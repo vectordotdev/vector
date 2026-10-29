@@ -1,11 +1,15 @@
 use indexmap::{IndexMap, IndexSet};
+use std::sync::Arc;
+use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, OutputId, builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids,
-    validation,
+    Config, DynValidatedSink, OutputId, builder::ConfigBuilder, graph::Graph, graph_builder,
+    sink::SinkOuter, transform::get_transform_output_ids, validation,
 };
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
@@ -40,6 +44,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(alpha_errors);
     }
 
+    let nodes = graph_builder::expanded_nodes(&builder);
+
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]
@@ -55,39 +61,20 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         secret,
         graceful_shutdown_duration,
         allow_empty: _,
+        loading_warnings: mut warnings,
     } = builder;
-    let all_sinks = sinks
-        .clone()
-        .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_sink(key)),
-        )
-        .collect::<IndexMap<_, _>>();
-    let sources_and_table_sources = sources
-        .clone()
-        .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_source(key)),
-        )
-        .collect::<IndexMap<_, _>>();
-
-    let graph = match Graph::new(
-        &sources_and_table_sources,
-        &transforms,
-        &all_sinks,
-        schema,
-        global.wildcard_matching.unwrap_or_default(),
-    ) {
+    let graph = match Graph::new(nodes, global.wildcard_matching.unwrap_or_default()) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
             return Err(errors);
         }
     };
+
+    if let Err(input_errors) = graph.check_inputs() {
+        errors.extend(input_errors);
+        return Err(errors);
+    }
 
     if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
@@ -99,51 +86,62 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them
     // here before adding to the final config (the types require this).
-    let sinks = sinks
+    let sinks: IndexMap<ComponentKey, SinkOuter<OutputId>> = sinks
         .into_iter()
         .map(|(key, sink)| {
-            let inputs = graph.inputs_for(&key);
+            let inputs = graph.inputs_for_component(&key);
             (key, sink.with_inputs(inputs))
         })
         .collect();
     let transforms = transforms
         .into_iter()
         .map(|(key, transform)| {
-            let inputs = graph.inputs_for(&key);
+            let inputs = graph.inputs_for_component(&key);
             (key, transform.with_inputs(inputs))
         })
         .collect();
     let enrichment_tables = enrichment_tables
         .into_iter()
         .map(|(key, table)| {
-            let inputs = graph.inputs_for(&key);
+            let inputs = graph.inputs_for_component(&key);
             (key, table.with_inputs(inputs))
         })
         .collect();
+    let output_map = graph.output_map().expect("ambiguous outputs");
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph))
+        .map(|test| test.resolve_outputs(&output_map))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
         let mut config = Config {
-            global,
             #[cfg(feature = "api")]
             api,
             schema,
+            global,
             healthchecks,
-            enrichment_tables,
             sources,
             sinks,
             transforms,
+            enrichment_tables,
             tests,
             secret,
             graceful_shutdown_duration,
         };
 
+        // Validate sinks in place
+        let validate_errors = validate_sinks(&mut config);
+        if !validate_errors.is_empty() {
+            errors.extend(validate_errors);
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
         config.propagate_acknowledgements()?;
 
-        let warnings = validation::warnings(&config);
+        warnings.extend(validation::warnings(&config));
 
         Ok((config, warnings))
     } else {
@@ -171,13 +169,46 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();
 
-    for (id, transform) in config.transforms.iter_mut() {
+    for (id, transform) in &mut config.transforms {
         expand_globs_inner(&mut transform.inputs, &id.to_string(), &candidates);
     }
 
-    for (id, sink) in config.sinks.iter_mut() {
+    for (id, sink) in &mut config.sinks {
         expand_globs_inner(&mut sink.inputs, &id.to_string(), &candidates);
     }
+}
+
+/// Validate all sinks (direct and enrichment-table-derived) in place.
+///
+/// Fills the `validated` field on each sink's `SinkOuter` (and on enrichment tables that
+/// double as sinks) with the erased validated state. Returns a list of errors for sinks
+/// that failed validation. An empty Vec means success.
+fn validate_sinks(config: &mut Config) -> Vec<String> {
+    let mut errors = Vec::new();
+
+    // Validate direct sinks
+    for (key, sink) in &mut config.sinks {
+        let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+        match dyn_sink.validate_dyn() {
+            Ok(state) => sink.validated = Some(Arc::from(state)),
+            Err(e) => errors.push(format!("Failed to validate sink \"{key}\": {e}")),
+        }
+    }
+
+    // Validate enrichment table sinks with resolved inputs.
+    for (key, table) in &mut config.enrichment_tables {
+        if let Some((_, sink)) = table.as_sink(key) {
+            let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+            match dyn_sink.validate_dyn() {
+                Ok(state) => table.validated = Some(Arc::from(state)),
+                Err(error) => errors.push(format!(
+                    "Failed to validate enrichment table sink \"{key}\": {error}"
+                )),
+            }
+        }
+    }
+
+    errors
 }
 
 enum InputMatcher {
@@ -187,7 +218,7 @@ enum InputMatcher {
 
 impl InputMatcher {
     fn matches(&self, candidate: &str) -> bool {
-        use InputMatcher::*;
+        use InputMatcher::{Pattern, String};
 
         match self {
             Pattern(pattern) => pattern.matches(candidate),
@@ -196,26 +227,29 @@ impl InputMatcher {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::similar_names, reason = "Naming cleanup deferred")]
 fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexSet<String>) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
-        let matcher = glob::Pattern::new(&raw_input)
-            .map(InputMatcher::Pattern)
-            .unwrap_or_else(|error| {
+        let matcher = glob::Pattern::new(&raw_input).map_or_else(
+            |error| {
                 warn!(message = "Invalid glob pattern for input.", component_id = %id, %error);
-                InputMatcher::String(raw_input.to_string())
-            });
+                InputMatcher::String(raw_input.clone())
+            },
+            InputMatcher::Pattern,
+        );
         let mut matched = false;
         for input in candidates {
             if matcher.matches(input) && input != id {
                 matched = true;
-                inputs.extend(Some(input.to_string()))
+                inputs.extend(Some(input.clone()));
             }
         }
         // If it didn't work as a glob pattern, leave it in the inputs as-is. This lets us give
         // more accurate error messages about nonexistent inputs.
         if !matched {
-            inputs.extend(Some(raw_input))
+            inputs.extend(Some(raw_input));
         }
     }
 }

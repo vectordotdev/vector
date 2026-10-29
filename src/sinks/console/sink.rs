@@ -9,6 +9,7 @@ use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
+    sink::SinkError,
 };
 
 use crate::{
@@ -24,11 +25,11 @@ pub struct WriterSink<T> {
 }
 
 #[async_trait]
-impl<T> StreamSink<Event> for WriterSink<T>
+impl<T> StreamSink<Event, SinkError> for WriterSink<T>
 where
     T: io::AsyncWrite + Send + Sync + Unpin,
 {
-    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), SinkError> {
         let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
         let events_sent = register!(EventsSent::from(Output(None)));
         while let Some(mut event) = input.next().await {
@@ -37,26 +38,22 @@ where
 
             let finalizers = event.take_finalizers();
             let mut bytes = BytesMut::new();
-            self.encoder.encode(event, &mut bytes).map_err(|_| {
-                // Error is handled by `Encoder`.
+            self.encoder.encode(event, &mut bytes).map_err(|error| {
                 finalizers.update_status(EventStatus::Errored);
+                SinkError::new(error)
             })?;
 
-            match self.output.write_all(&bytes).await {
-                Err(error) => {
-                    // Error when writing to stdout/stderr is likely irrecoverable,
-                    // so stop the sink.
-                    error!(message = "Error writing to output. Stopping sink.", %error, internal_log_rate_limit = false);
-                    finalizers.update_status(EventStatus::Errored);
-                    return Err(());
-                }
-                Ok(()) => {
-                    finalizers.update_status(EventStatus::Delivered);
-
-                    events_sent.emit(CountByteSize(1, event_byte_size));
-                    bytes_sent.emit(ByteSize(bytes.len()));
-                }
+            if let Err(error) = self.output.write_all(&bytes).await {
+                // Error when writing to stdout/stderr is likely irrecoverable,
+                // so stop the sink.
+                error!(message = "Error writing to output. Stopping sink.", %error, internal_log_rate_limit = false);
+                finalizers.update_status(EventStatus::Errored);
+                return Err(SinkError::new(error));
             }
+
+            finalizers.update_status(EventStatus::Delivered);
+            events_sent.emit(CountByteSize(1, event_byte_size));
+            bytes_sent.emit(ByteSize(bytes.len()));
         }
 
         Ok(())
@@ -89,15 +86,44 @@ mod test {
 
         let sink = WriterSink {
             output: Vec::new(),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
             encoder,
         };
 
         run_and_assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
+            VectorSink::from_detailed_event_streamsink(sink),
             stream::once(ready(event)),
             &SINK_TAGS,
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn write_error_retains_cause() {
+        let (output, input) = io::duplex(64);
+        drop(input);
+
+        let encoder = Encoder::<Framer>::new(
+            NewlineDelimitedEncoder::default().into(),
+            JsonSerializerConfig::default().build().into(),
+        );
+        let sink = WriterSink {
+            output,
+            transformer: Transformer::default(),
+            encoder,
+        };
+
+        let error = VectorSink::from_detailed_event_streamsink(sink)
+            .run_events([Event::Log(LogEvent::from("foo"))])
+            .await
+            .expect_err("writing to a closed pipe should fail");
+
+        assert_eq!(
+            error
+                .downcast_ref::<io::Error>()
+                .expect("the sink should retain the I/O error")
+                .kind(),
+            io::ErrorKind::BrokenPipe
+        );
     }
 }

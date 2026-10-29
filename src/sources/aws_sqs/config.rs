@@ -13,7 +13,7 @@ use crate::{
     codecs::DecodingConfig,
     common::sqs::SqsClientBuilder,
     config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::aws_sqs::source::SqsSource,
     tls::TlsConfig,
 };
@@ -27,7 +27,6 @@ pub struct AwsSqsConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
@@ -81,21 +80,17 @@ pub struct AwsSqsConfig {
     /// processing them.
     pub client_concurrency: Option<NonZeroUsize>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -116,7 +111,7 @@ impl SourceConfig for AwsSqsConfig {
                 .build()?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
-        Ok(Box::pin(
+        Ok(crate::sources::opaque_source(
             SqsSource {
                 client,
                 queue_url: self.queue_url.clone(),
@@ -124,8 +119,7 @@ impl SourceConfig for AwsSqsConfig {
                 poll_secs: self.poll_secs,
                 concurrency: self
                     .client_concurrency
-                    .map(|n| n.get())
-                    .unwrap_or_else(crate::num_threads),
+                    .map_or_else(crate::num_threads, NonZeroUsize::get),
                 visibility_timeout_secs: self.visibility_timeout_secs,
                 delete_message: self.delete_message,
                 acknowledgements,

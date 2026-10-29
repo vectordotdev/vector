@@ -2,6 +2,41 @@ use super::{SchemaContext, get_schema_metadata, schema_aware_nested_merge};
 use anyhow::{Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Map, Value, json};
+
+/// Flattened optional enums replace the JSON-null branch with
+/// `{ "not": { "required": [<tag field>] } }`. That sentinel is not a
+/// documentable variant; drop it the same way we drop `"type": "null"`.
+fn is_absence_sentinel(schema: &Value) -> bool {
+    let Some(required) = schema.pointer("/not/required").and_then(Value::as_array) else {
+        return false;
+    };
+    !required.is_empty() && schema.get("type").is_none()
+}
+
+fn enum_variant_value(ctx: &SchemaContext, schema: &Value) -> Value {
+    let desc = ctx.get_rendered_description_from_schema(schema);
+    // Check both the top-level `deprecated` flag (#[configurable(deprecated)]) and the
+    // metadata form (#[configurable(metadata(deprecated))]).
+    let deprecated = schema
+        .get("deprecated")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || get_schema_metadata(schema, "deprecated")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+    if deprecated {
+        let mut obj = Map::new();
+        obj.insert("description".to_string(), Value::String(desc));
+        obj.insert("deprecated".to_string(), Value::Bool(true));
+        if let Some(msg) = get_schema_metadata(schema, "deprecated_message") {
+            obj.insert("deprecated_message".to_string(), msg.clone());
+        }
+        Value::Object(obj)
+    } else {
+        Value::String(desc)
+    }
+}
 use std::collections::HashSet;
 
 impl SchemaContext {
@@ -18,7 +53,11 @@ impl SchemaContext {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
         subschemas.retain(|sub| {
+            // Optional wrappers encode absence as JSON `null` (a nullable property) or as
+            // `not: { required: [<tag>] }` (a flattened optional). Neither is a documentable
+            // variant; drop them so the remaining schema can unwrap.
             sub.get("type").and_then(|t| t.as_str()) != Some("null")
+                && !is_absence_sentinel(sub)
                 && get_schema_metadata(sub, "docs::hidden").is_none()
         });
 
@@ -215,8 +254,7 @@ impl SchemaContext {
 
                 let mut enum_vals = Map::new();
                 for (k, v) in unique_tag_values {
-                    let desc = self.get_rendered_description_from_schema(&v);
-                    enum_vals.insert(k, Value::String(desc));
+                    enum_vals.insert(k, enum_variant_value(self, &v));
                 }
 
                 let mut resolved_tag_property_obj = Map::new();
@@ -268,8 +306,7 @@ impl SchemaContext {
                 debug!("Resolved as 'externally-tagged with only unit variants' enum schema.");
                 let mut enum_vals = Map::new();
                 for (k, v) in tag_values {
-                    let desc = self.get_rendered_description_from_schema(&v);
-                    enum_vals.insert(k, Value::String(desc));
+                    enum_vals.insert(k, enum_variant_value(self, &v));
                 }
                 return Ok(json!({ "_resolved": { "type": { "string": { "enum": enum_vals } } } }));
             }
@@ -365,7 +402,7 @@ impl SchemaContext {
 
         // Fallback schema pattern: mixed-mode enums.
         debug!("Resolved as 'fallback mixed-mode' enum schema.");
-        debug!("Tagging mode: {}", enum_tagging);
+        debug!("Tagging mode: {enum_tagging}");
 
         let mut resolved_subschemas: Vec<Value> = Vec::new();
         for subschema in &subschemas {
@@ -397,8 +434,7 @@ impl SchemaContext {
                     let mut enum_map = Map::new();
                     for const_obj in &const_arr {
                         if let Some(value) = const_obj.get("value").and_then(|v| v.as_str()) {
-                            let desc = self.get_rendered_description_from_schema(const_obj);
-                            enum_map.insert(value.to_string(), Value::String(desc));
+                            enum_map.insert(value.to_string(), enum_variant_value(self, const_obj));
                         }
                     }
                     if !enum_map.is_empty() {
@@ -409,5 +445,121 @@ impl SchemaContext {
         }
 
         Ok(json!({ "_resolved": { "type": merged_type }, "annotations": "mixed_mode" }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Once;
+
+    use indexmap::IndexMap;
+    use log::LevelFilter;
+    use serde_json::json;
+
+    use super::*;
+    use crate::app;
+
+    fn test_context() -> SchemaContext {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| app::set_global_verbosity(LevelFilter::Off));
+        SchemaContext {
+            root_schema: json!({}),
+            cue_binary_path: String::new(),
+            resolved_schema_cache: IndexMap::new(),
+            expanded_schema_cache: IndexMap::new(),
+        }
+    }
+
+    #[test]
+    fn absence_sentinel_matches_flattened_optional_not_required() {
+        assert!(is_absence_sentinel(&json!({
+            "not": { "required": ["type"] }
+        })));
+        assert!(!is_absence_sentinel(&json!({ "type": "null" })));
+        assert!(!is_absence_sentinel(&json!({
+            "not": { "type": "null" }
+        })));
+        assert!(!is_absence_sentinel(&json!({
+            "type": "object",
+            "not": { "required": ["type"] }
+        })));
+    }
+
+    #[test]
+    fn optional_null_branch_unwraps_to_inner_schema() {
+        let schema = json!({
+            "oneOf": [
+                { "type": "null" },
+                { "type": "string" }
+            ],
+            "_metadata": { "docs::optional": true }
+        });
+        let resolved = test_context().resolve_enum_schema(&schema).unwrap();
+        assert_eq!(
+            resolved,
+            json!({ "_resolved": { "type": { "string": {} } } })
+        );
+    }
+
+    #[test]
+    fn optional_absence_sentinel_unwraps_to_inner_schema() {
+        let schema = json!({
+            "oneOf": [
+                { "not": { "required": ["type"] } },
+                { "type": "string" }
+            ],
+            "_metadata": { "docs::optional": true }
+        });
+        let resolved = test_context().resolve_enum_schema(&schema).unwrap();
+        assert_eq!(
+            resolved,
+            json!({ "_resolved": { "type": { "string": {} } } })
+        );
+    }
+
+    #[test]
+    fn optional_absence_sentinel_with_inner_enum_resolves() {
+        // Shape produced by `generate_flattened_optional_schema`: optional wrapper with
+        // an absence sentinel plus the real internally-tagged enum. Without
+        // discarding the sentinel, this bails for missing `docs::enum_tagging`.
+        let schema = json!({
+            "oneOf": [
+                { "not": { "required": ["type"] } },
+                {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": ["type", "value"],
+                            "properties": {
+                                "type": { "const": "Foo" },
+                                "value": { "type": "string" }
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "required": ["count", "type"],
+                            "properties": {
+                                "count": { "type": "integer" },
+                                "type": { "const": "Bar" }
+                            }
+                        }
+                    ],
+                    "_metadata": {
+                        "docs::enum_tagging": "internal",
+                        "docs::enum_tag_field": "type",
+                        "docs::enum_tag_description": "The variant to use."
+                    }
+                }
+            ],
+            "_metadata": { "docs::optional": true }
+        });
+        let resolved = test_context().resolve_enum_schema(&schema).unwrap();
+        let options = resolved
+            .pointer("/_resolved/type/object/options")
+            .and_then(Value::as_object)
+            .expect("flattened optional enum should resolve to an object");
+        assert!(options.contains_key("type"));
+        assert!(options.contains_key("value"));
+        assert!(options.contains_key("count"));
     }
 }

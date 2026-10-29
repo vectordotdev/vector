@@ -2,16 +2,20 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{
+        Arc, LazyLock, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Instant,
 };
 
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
+use metrics::Counter;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
-    sync::{mpsc::UnboundedSender, oneshot},
+    sync::{Mutex as AsyncMutex, mpsc::UnboundedSender, oneshot},
     time::timeout,
 };
 use tracing::{Instrument, Span};
@@ -27,10 +31,11 @@ use vector_lib::{
             },
         },
     },
+    enrichment::Table,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     latency::LatencyRecorder,
     schema::Definition,
-    source_sender::{CHUNK_SIZE, SourceSenderItem},
+    source_sender::{DEFAULT_CHUNK_SIZE_EVENTS, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
 use vector_lib::{gauge, internal_event::GaugeName};
@@ -47,8 +52,9 @@ use crate::{
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
-        TransformOuter, TransformOutput,
+        TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
     },
+    cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
     internal_events::EventsReceived,
@@ -64,18 +70,58 @@ use crate::{
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
     LazyLock::new(vector_lib::enrichment::TableRegistry::default);
+// `TableRegistry::load` and `finish_load` are separate operations on a process-global registry.
+// Keep topology builds and enrichment-table reloads from interleaving that transition.
+static ENRICHMENT_TABLES_LOAD_LOCK: LazyLock<AsyncMutex<()>> = LazyLock::new(AsyncMutex::default);
 static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
-pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
-    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
+// Resolved once at startup in `crate::app::build_runtime`, together with `chunk_size_events`. `0`
+// means startup didn't run (e.g. tests that bypass it), in which case the getters fall back to the
+// `DEFAULT_CHUNK_SIZE_EVENTS`-based values.
+static SOURCE_SENDER_BUFFER_SIZE: AtomicUsize = AtomicUsize::new(0);
+static READY_ARRAY_CAPACITY: AtomicUsize = AtomicUsize::new(0);
 
-const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
+/// How many `chunk_size_events`-sized batches the concurrent transform runner's `ReadyArrays`
+/// buffers before applying backpressure: `ready_array_capacity = chunk_size_events * this`.
+pub(crate) const READY_ARRAY_CAPACITY_CHUNKS: usize = 4;
+
+/// Returns the source sender output buffer base size.
+pub(crate) fn source_sender_buffer_size() -> usize {
+    match SOURCE_SENDER_BUFFER_SIZE.load(Ordering::Relaxed) {
+        0 => *TRANSFORM_CONCURRENCY_LIMIT * DEFAULT_CHUNK_SIZE_EVENTS,
+        size => size,
+    }
+}
+
+/// Sets the process-wide source sender buffer size. Must be called at most once, before the
+/// topology is built. Panics if called more than once.
+pub(crate) fn set_source_sender_buffer_size(size: usize) {
+    SOURCE_SENDER_BUFFER_SIZE
+        .compare_exchange(0, size, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double source_sender_buffer_size initialization"));
+}
+
+/// Returns the `ReadyArrays` capacity used by concurrent transform runners.
+pub(crate) fn ready_array_capacity() -> NonZeroUsize {
+    let size = match READY_ARRAY_CAPACITY.load(Ordering::Relaxed) {
+        0 => DEFAULT_CHUNK_SIZE_EVENTS * READY_ARRAY_CAPACITY_CHUNKS,
+        size => size,
+    };
+    NonZeroUsize::new(size).expect("ready array capacity is non-zero")
+}
+
+/// Sets the process-wide concurrent transform runner `ReadyArrays` capacity. Must be called at most
+/// once, before the topology is built. Panics if called more than once.
+pub(crate) fn set_ready_array_capacity(size: usize) {
+    READY_ARRAY_CAPACITY
+        .compare_exchange(0, size, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double ready_array_capacity initialization"));
+}
+
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
-    crate::app::worker_threads()
-        .map(std::num::NonZeroUsize::get)
-        .unwrap_or_else(crate::num_threads)
+    crate::app::worker_threads().map_or_else(crate::num_threads, NonZeroUsize::get)
 });
 
 const INTERNAL_SOURCES: [&str; 2] = ["internal_logs", "internal_metrics"];
@@ -131,16 +177,20 @@ impl<'a> Builder<'a> {
 
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
+        // Library callers may build topologies without going through CLI startup.
+        vector_lib::tls::install_default_crypto_provider();
+
+        let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources(enrichment_tables).await;
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
 
-        // We should have all the data for the enrichment tables loaded now, so switch them over to
-        // readonly.
-        enrichment_tables.finish_load();
-
         if self.errors.is_empty() {
+            // We should have all the data for the enrichment tables loaded now, so switch them over to
+            // readonly.
+            enrichment_tables.finish_load();
+
             Ok(TopologyPieces {
                 inputs: self.inputs,
                 outputs: Self::finalize_outputs(self.outputs),
@@ -177,21 +227,32 @@ impl<'a> Builder<'a> {
     /// Loads, or reloads the enrichment tables.
     /// The tables are stored in the `ENRICHMENT_TABLES` global variable.
     async fn load_enrichment_tables(&mut self) -> &'static vector_lib::enrichment::TableRegistry {
-        let mut enrichment_tables = HashMap::new();
+        let mut enrichment_tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
         // Build enrichment tables
-        'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
+        'tables: for (name, table_outer) in &self.config.enrichment_tables {
             let table_name = name.to_string();
-            if ENRICHMENT_TABLES.needs_reload(&table_name) {
-                let indexes = if !self.diff.enrichment_tables.is_added(name) {
-                    // If this is an existing enrichment table, we need to store the indexes to reapply
-                    // them again post load.
-                    Some(ENRICHMENT_TABLES.index_fields(&table_name))
-                } else {
-                    None
-                };
+            if ENRICHMENT_TABLES.needs_reload(&table_name)
+                || self.diff.enrichment_tables.tables.is_changed(name)
+                || self.diff.enrichment_tables.tables.is_added(name)
+            {
+                // Indexes are registered dynamically by VRL lookups against the global
+                // enrichment table registry. Preserve any existing registry indexes even
+                // when this config diff sees the table as newly added.
+                let indexes = ENRICHMENT_TABLES.index_fields(&table_name);
 
-                let mut table = match table_outer.inner.build(&self.config.global).await {
+                let mut prev_state = None;
+                if !self.diff.enrichment_tables.tables.is_added(name)
+                    && table_outer.inner.wants_previous_state()
+                {
+                    prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
+                }
+
+                let mut table = match table_outer
+                    .inner
+                    .build(&self.config.global, prev_state)
+                    .await
+                {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
@@ -200,21 +261,19 @@ impl<'a> Builder<'a> {
                     }
                 };
 
-                if let Some(indexes) = indexes {
-                    for (case, index) in indexes {
-                        match table
-                            .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
-                        {
-                            Ok(_) => (),
-                            Err(error) => {
-                                // If there is an error adding an index we do not want to use the reloaded
-                                // data, the previously loaded data will still need to be used.
-                                // Just report the error and continue.
-                                error!(message = "Unable to add index to reloaded enrichment table.",
-                                    table = ?name.to_string(),
-                                    %error);
-                                continue 'tables;
-                            }
+                for (case, index) in indexes {
+                    match table
+                        .add_index(case, &index.iter().map(AsRef::as_ref).collect::<Vec<_>>())
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            // If there is an error adding an index we do not want to use the reloaded
+                            // data, the previously loaded data will still need to be used.
+                            // Just report the error and continue.
+                            error!(message = "Unable to add index to reloaded enrichment table.",
+                                table = ?name.to_string(),
+                                %error);
+                            continue 'tables;
                         }
                     }
                 }
@@ -234,12 +293,8 @@ impl<'a> Builder<'a> {
     ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
-        let table_sources = self
-            .config
-            .enrichment_tables
-            .iter()
-            .filter_map(|(key, table)| table.as_source(key))
-            .collect::<Vec<_>>();
+        let table_sources =
+            enrichment_table_sources(&self.config.enrichment_tables).collect::<Vec<_>>();
         for (key, source) in self
             .config
             .sources()
@@ -248,7 +303,7 @@ impl<'a> Builder<'a> {
                 table_sources
                     .iter()
                     .map(|(key, source)| (key, source))
-                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+                    .filter(|(key, _)| self.diff.enrichment_tables.sources.contains_new(key)),
             )
         {
             debug!(component_id = %key, "Building new source.");
@@ -272,6 +327,10 @@ impl<'a> Builder<'a> {
         source_tasks
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn build_instrumented_source(
         &mut self,
         key: &ComponentKey,
@@ -288,7 +347,7 @@ impl<'a> Builder<'a> {
         );
 
         let mut builder = SourceSender::builder()
-            .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+            .with_buffer(source_sender_buffer_size())
             .with_timeout(source.inner.send_timeout())
             .with_ewma_half_life_seconds(
                 self.config.global.buffer_utilization_ewma_half_life_seconds,
@@ -297,7 +356,7 @@ impl<'a> Builder<'a> {
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
-        for output in source_outputs.into_iter() {
+        for output in source_outputs {
             let rx = builder.add_source_output(output.clone(), key.clone());
 
             let (fanout, control) = Fanout::new(key.clone());
@@ -393,7 +452,7 @@ impl<'a> Builder<'a> {
                 biased;
 
                 // We've been told that we must forcefully shut down.
-                _ = force_shutdown_tripwire => Ok(()),
+                () = force_shutdown_tripwire => Ok(()),
 
                 // The source pump encountered an error, which we're now bubbling up here to stop
                 // the source as well, since the source running makes no sense without the pump.
@@ -403,17 +462,12 @@ impl<'a> Builder<'a> {
                 Ok(e) = &mut pump_error_rx => Err(e),
 
                 // The source finished normally.
-                result = server => result.map_err(|_| TaskError::Opaque),
+                result = server => result.map_err(Into::into),
             };
 
-            // Even though we already tried to receive any pump task error above, we may have exited
-            // on the source itself returning an error due to task scheduling, where the pump task
-            // encountered an error, sent it over the oneshot, but we were polling the source
-            // already and hit an error trying to send to the now-shutdown pump task.
-            //
-            // Since the error from the source is opaque at the moment (i.e. `()`), we try a final
-            // time to see if the pump task encountered an error, using _that_ instead if so, to
-            // propagate the true error that caused the source to have to stop.
+            // The pump may fail while the source is being polled, before its error is received
+            // above. Prefer the pump error if both tasks fail: a source send error can be a
+            // consequence of the pump stopping, even when the source reports its cause.
             if let Ok(e) = pump_error_rx.try_recv() {
                 result = Err(e);
             }
@@ -424,7 +478,7 @@ impl<'a> Builder<'a> {
                     Ok(TaskOutput::Source)
                 }
                 Err(e) => {
-                    debug!("Source finished with an error.");
+                    debug!(error = %e, "Source finished with an error.");
                     Err(e)
                 }
             }
@@ -450,19 +504,16 @@ impl<'a> Builder<'a> {
         {
             debug!(component_id = %key, "Building new transform.");
 
-            let input_definitions = match schema::input_definitions(
+            let Ok(input_definitions) = schema::input_definitions(
                 &transform.inputs,
                 self.config,
-                enrichment_tables.clone(),
+                enrichment_tables,
                 &mut definition_cache,
-            ) {
-                Ok(definitions) => definitions,
-                Err(_) => {
-                    // We have received an error whilst retrieving the definitions,
-                    // there is no point in continuing.
+            ) else {
+                // We have received an error whilst retrieving the definitions,
+                // there is no point in continuing.
 
-                    return;
-                }
+                return;
             };
 
             let span = error_span!(
@@ -520,6 +571,20 @@ impl<'a> Builder<'a> {
             merged_schema_definition: merged_definition.clone(),
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
+            // Resolve the per-component CPU counter inside the transform span so it
+            // picks up component_id/component_kind/component_type tags. The same
+            // handle is shared between the main transform task and any helper
+            // tokio tasks the transform spawns at construction time. On platforms
+            // without per-thread CPU time, `register_counter` returns a noop
+            // handle and the metric is silently omitted.
+            //
+            // `None` when `measure_cpu_usage` is false (the default): no counter
+            // is registered and no per-poll `ThreadTime` measurement takes place.
+            cpu_ns: if transform.measure_cpu_usage {
+                Some(crate::cpu_time::register_counter())
+            } else {
+                None
+            },
         };
 
         let node = TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
@@ -556,12 +621,8 @@ impl<'a> Builder<'a> {
     }
 
     async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
-        let table_sinks = self
-            .config
-            .enrichment_tables
-            .iter()
-            .filter_map(|(key, table)| table.as_sink(key))
-            .collect::<Vec<_>>();
+        let table_sinks =
+            enrichment_table_sinks(&self.config.enrichment_tables).collect::<Vec<_>>();
         for (key, sink) in self
             .config
             .sinks()
@@ -570,7 +631,7 @@ impl<'a> Builder<'a> {
                 table_sinks
                     .iter()
                     .map(|(key, sink)| (key, sink))
-                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+                    .filter(|(key, _)| self.diff.enrichment_tables.sinks.contains_new(key)),
             )
         {
             debug!(component_id = %key, "Building new sink.");
@@ -588,6 +649,10 @@ impl<'a> Builder<'a> {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this orchestration method is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn build_instrumented_sink(
         &mut self,
         key: &ComponentKey,
@@ -606,34 +671,33 @@ impl<'a> Builder<'a> {
         // transform that mutates the schema provided by their sources. We can now validate the
         // schema expectations of each individual sink.
         if let Err(mut err) =
-            schema::validate_sink_expectations(key, sink, self.config, enrichment_tables.clone())
+            schema::validate_sink_expectations(key, sink, self.config, enrichment_tables)
         {
             self.errors.append(&mut err);
-        };
+        }
 
-        let (tx, rx) = match self.buffers.remove(key) {
-            Some(buffer) => buffer,
-            _ => {
-                let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                    BufferType::Memory { .. } => "memory",
-                    BufferType::DiskV2 { .. } => "disk",
-                };
-                let buffer_span = error_span!("sink", buffer_type);
-                let buffer = sink
-                    .buffer
-                    .build(
-                        self.config.global.data_dir.clone(),
-                        key.to_string(),
-                        buffer_span,
-                    )
-                    .await;
-                match buffer {
-                    Err(error) => {
-                        self.errors.push(format!("Sink \"{key}\": {error}"));
-                        return;
-                    }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
+        let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
+            buffer
+        } else {
+            let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
+                BufferType::Memory { .. } => "memory",
+                BufferType::DiskV2 { .. } => "disk",
+            };
+            let buffer_span = error_span!("sink", buffer_type);
+            let buffer = sink
+                .buffer
+                .build(
+                    self.config.global.data_dir.clone(),
+                    key.to_string(),
+                    buffer_span,
+                )
+                .await;
+            match buffer {
+                Err(error) => {
+                    self.errors.push(format!("Sink \"{key}\": {error}"));
+                    return;
                 }
+                Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
             }
         };
 
@@ -649,7 +713,7 @@ impl<'a> Builder<'a> {
             extra_context: self.extra_context.clone(),
         };
 
-        let (sink, healthcheck) = match sink.inner.build(cx).await {
+        let (sink, healthcheck) = match sink.build(cx).await {
             Err(error) => {
                 self.errors.push(format!("Sink \"{key}\": {error}"));
                 return;
@@ -688,19 +752,17 @@ impl<'a> Builder<'a> {
                         events_received.emit(CountByteSize(
                             events.len(),
                             events.estimated_json_encoded_size_of(),
-                        ))
+                        ));
                     })
                     .take_until_if(tripwire),
             )
             .await
-            .map(|_| {
+            .map(|()| {
                 debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
             })
-            .map_err(|_| {
-                debug!("Sink finished with an error.");
-                TaskError::Opaque
-            })
+            .inspect_err(|error| debug!(%error, "Sink finished with an error."))
+            .map_err(Into::into)
         };
 
         let task = Task::new(key.clone(), typetag, sink);
@@ -710,7 +772,7 @@ impl<'a> Builder<'a> {
             if enable_healthcheck {
                 timeout(healthcheck_timeout, healthcheck)
                     .map(|result| match result {
-                        Ok(Ok(_)) => {
+                        Ok(Ok(())) => {
                             info!("Healthcheck passed.");
                             Ok(TaskOutput::Healthcheck)
                         }
@@ -759,14 +821,7 @@ impl<'a> Builder<'a> {
             // TODO: avoid the double boxing for function transforms here
             Transform::Function(t) => self.build_sync_transform(Box::new(t), node, input_rx),
             Transform::Synchronous(t) => self.build_sync_transform(t, node, input_rx),
-            Transform::Task(t) => self.build_task_transform(
-                t,
-                input_rx,
-                node.input_details.data_type(),
-                node.typetag,
-                &node.key,
-                &node.outputs,
-            ),
+            Transform::Task(t) => self.build_task_transform(t, node, input_rx),
         }
     }
 
@@ -788,11 +843,31 @@ impl<'a> Builder<'a> {
             node.input_details.data_type(),
             outputs,
             LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+            node.cpu_ns.clone(),
         );
+
+        // Attribute the runner task's per-poll CPU time (driver loop +,
+        // for the inline variant, the transform body) to the component. The
+        // concurrent variant additionally spawns transform invocations onto
+        // their own tasks with `spawn_timed`, which feed the same counter.
+        // When `cpu_ns` is `None` the futures are returned as-is — no
+        // `ThreadTime` sampling takes place.
         let transform = if node.enable_concurrency {
-            runner.run_concurrently().boxed()
+            let fut = runner.run_concurrently();
+
+            if let Some(cpu_ns) = node.cpu_ns {
+                fut.cpu_timed(cpu_ns).boxed()
+            } else {
+                fut.boxed()
+            }
         } else {
-            runner.run_inline().boxed()
+            let fut = runner.run_inline();
+
+            if let Some(cpu_ns) = node.cpu_ns {
+                fut.cpu_timed(cpu_ns).boxed()
+            } else {
+                fut.boxed()
+            }
         };
 
         let transform = async move {
@@ -812,9 +887,10 @@ impl<'a> Builder<'a> {
 
         let mut output_controls = HashMap::new();
         for (name, control) in controls {
-            let id = name
-                .map(|name| OutputId::from((&node.key, name)))
-                .unwrap_or_else(|| OutputId::from(&node.key));
+            let id = name.map_or_else(
+                || OutputId::from(&node.key),
+                |name| OutputId::from((&node.key, name)),
+            );
             output_controls.insert(id, control);
         }
 
@@ -826,12 +902,19 @@ impl<'a> Builder<'a> {
     fn build_task_transform(
         &self,
         t: Box<dyn TaskTransform<EventArray>>,
+        node: TransformNode,
         input_rx: BufferReceiver<EventArray>,
-        input_type: DataType,
-        typetag: &str,
-        key: &ComponentKey,
-        outputs: &[TransformOutput],
     ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+        let TransformNode {
+            key,
+            typetag,
+            input_details,
+            outputs,
+            cpu_ns,
+            ..
+        } = node;
+        let input_type = input_details.data_type();
+
         let (mut fanout, control) = Fanout::new(key.clone());
 
         let sender = self
@@ -847,7 +930,7 @@ impl<'a> Builder<'a> {
                 events_received.emit(CountByteSize(
                     events.len(),
                     events.estimated_json_encoded_size_of(),
-                ))
+                ));
             });
         let events_sent = register!(EventsSent::from(internal_event::Output(None)));
         let output_id = Arc::new(OutputId {
@@ -897,13 +980,18 @@ impl<'a> Builder<'a> {
                     Err(TaskError::wrapped(e))
                 }
             }
-        }
-        .boxed();
+        };
+
+        let transform = if let Some(cpu_ns) = cpu_ns {
+            transform.cpu_timed(cpu_ns).boxed()
+        } else {
+            transform.boxed()
+        };
 
         let mut outputs = HashMap::new();
-        outputs.insert(OutputId::from(key), control);
+        outputs.insert(OutputId::from(&key), control);
 
-        let task = Task::new(key.clone(), typetag, transform);
+        let task = Task::new(key, typetag, transform);
 
         (task, outputs)
     }
@@ -961,15 +1049,20 @@ async fn run_source_output_pump(
     Ok(TaskOutput::Source)
 }
 
+/// Reloads file based enrichment tables - not stateful ones
 pub async fn reload_enrichment_tables(config: &Config) {
+    let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
     let mut enrichment_tables = HashMap::new();
     // Build enrichment tables
-    'tables: for (name, table_outer) in config.enrichment_tables.iter() {
+    'tables: for (name, table_outer) in &config.enrichment_tables {
         let table_name = name.to_string();
-        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+        if ENRICHMENT_TABLES.needs_reload(&table_name)
+            // Tables that can act as sinks are reloaded through topology
+            && table_outer.as_sink(name).is_none()
+        {
             let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
 
-            let mut table = match table_outer.inner.build(&config.global).await {
+            let mut table = match table_outer.inner.build(&config.global, None).await {
                 Ok(table) => table,
                 Err(error) => {
                     error!("Enrichment table \"{name}\" reload failed: {error}");
@@ -980,7 +1073,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
             if let Some(indexes) = indexes {
                 for (case, index) in indexes {
                     match table
-                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                        .add_index(case, &index.iter().map(AsRef::as_ref).collect::<Vec<_>>())
                     {
                         Ok(_) => (),
                         Err(error) => {
@@ -1018,7 +1111,7 @@ pub struct TopologyPieces {
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
 }
 
-/// Builder for constructing TopologyPieces with a fluent API.
+/// Builder for constructing `TopologyPieces` with a fluent API.
 ///
 /// # Examples
 ///
@@ -1039,6 +1132,7 @@ pub struct TopologyPiecesBuilder<'a> {
 
 impl<'a> TopologyPiecesBuilder<'a> {
     /// Creates a new builder with required parameters.
+    #[must_use]
     pub fn new(config: &'a Config, diff: &'a ConfigDiff) -> Self {
         Self {
             config,
@@ -1050,18 +1144,21 @@ impl<'a> TopologyPiecesBuilder<'a> {
     }
 
     /// Sets the buffers for the topology.
+    #[must_use]
     pub fn with_buffers(mut self, buffers: HashMap<ComponentKey, BuiltBuffer>) -> Self {
         self.buffers = buffers;
         self
     }
 
     /// Sets the extra context for the topology.
+    #[must_use]
     pub fn with_extra_context(mut self, extra_context: ExtraContext) -> Self {
         self.extra_context = extra_context;
         self
     }
 
     /// Sets the utilization registry for the topology.
+    #[must_use]
     pub fn with_utilization_registry(mut self, registry: Option<UtilizationRegistry>) -> Self {
         self.utilization_registry = registry;
         self
@@ -1071,6 +1168,9 @@ impl<'a> TopologyPiecesBuilder<'a> {
     ///
     /// Use this method when you need to handle errors explicitly,
     /// such as in tests or validation code.
+    /// # Errors
+    ///
+    /// Returns the accumulated errors if any topology component cannot be built.
     pub async fn build(self) -> Result<TopologyPieces, Vec<String>> {
         Builder::new(
             self.config,
@@ -1117,6 +1217,10 @@ impl TopologyPieces {
     }
 
     /// Builds only the new pieces, and doesn't check their topology.
+    ///
+    /// # Errors
+    ///
+    /// Returns the accumulated errors if any topology component cannot be built.
     pub async fn build(
         config: &super::Config,
         diff: &ConfigDiff,
@@ -1149,6 +1253,7 @@ struct TransformNode {
     input_details: Input,
     outputs: Vec<TransformOutput>,
     enable_concurrency: bool,
+    cpu_ns: Option<Counter>,
 }
 
 impl TransformNode {
@@ -1165,6 +1270,7 @@ impl TransformNode {
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
+            cpu_ns: context.cpu_ns.clone(),
         }
     }
 }
@@ -1177,6 +1283,7 @@ struct Runner {
     timer_tx: UtilizationComponentSender,
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
+    cpu_ns: Option<Counter>,
 }
 
 impl Runner {
@@ -1187,6 +1294,7 @@ impl Runner {
         input_type: DataType,
         outputs: TransformOutputs,
         latency_recorder: LatencyRecorder,
+        cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
             transform,
@@ -1196,6 +1304,7 @@ impl Runner {
             timer_tx,
             latency_recorder,
             events_received: register!(EventsReceived),
+            cpu_ns,
         }
     }
 
@@ -1249,7 +1358,7 @@ impl Runner {
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
         let mut input_rx =
-            super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
+            super::ready_arrays::ReadyArrays::with_capacity(input_rx, ready_array_capacity());
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -1265,33 +1374,36 @@ impl Runner {
                             self.send_outputs(&mut outputs_buf).await
                                 .map_err(TaskError::wrapped)?;
                         }
-                        _ => unreachable!("join error or bad poll"),
+                        Some(Err(error)) => return Err(TaskError::from(error)),
+                        None => unreachable!("bad poll"),
                     }
                 }
 
                 input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
-                    match input_arrays {
-                        Some(input_arrays) => {
-                            let mut len = 0;
-                            for events in &input_arrays {
-                                self.on_events_received(events);
-                                len += events.len();
-                            }
+                    if let Some(input_arrays) = input_arrays {
+                        let mut len = 0;
+                        for events in &input_arrays {
+                            self.on_events_received(events);
+                            len += events.len();
+                        }
 
-                            let mut t = self.transform.clone();
-                            let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = tokio::spawn(async move {
+                        let mut t = self.transform.clone();
+                        let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
+                        // Hook CPU-time accounting onto the spawned task at
+                        // the `Future::poll` boundary.
+                        // This is a separate task from the current one, so there is no double-counting.
+                        let task = spawn_timed(
+                            async move {
                                 for events in input_arrays {
                                     t.transform_all(events, &mut outputs_buf);
                                 }
                                 outputs_buf
-                            }.in_current_span());
-                            in_flight.push_back(task);
-                        }
-                        None => {
-                            shutting_down = true;
-                            continue
-                        }
+                            },
+                            self.cpu_ns.clone(),
+                        );
+                        in_flight.push_back(task);
+                    } else {
+                        shutting_down = true;
                     }
                 }
 

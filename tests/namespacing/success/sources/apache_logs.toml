@@ -1,3 +1,0 @@
-type = "file"
-include = ["/var/log/apache2/*.log"]
-ignore_older = 86400

@@ -46,6 +46,13 @@ To build Vector on your own host will require a fairly complete development envi
 Loosely, you'll need the following:
 
 - **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
+  - To skip compiling bundled librdkafka during local Kafka builds, developers with `pkg-config` and `librdkafka >= 2.12.1` may explicitly opt in:
+
+    ```bash
+    FEATURES="default,rdkafka/dynamic-linking" make build
+    ```
+
+    Plain `cargo build`, `make build`, and CI continue to use bundled librdkafka.
   - The `default` feature does not enable Kerberos/GSSAPI SASL for kafka, so local dev builds (`cargo build`, `make build`) have no extra system prerequisites beyond the C build tools above.
   - To enable GSSAPI for kafka, choose one of:
     - `gssapi`: dynamically links against system `libsasl2`. Requires `libsasl2-dev` (Ubuntu: `sudo apt-get install -y libsasl2-dev`) or `cyrus-sasl` (macOS: `brew install cyrus-sasl`) installed.
@@ -264,7 +271,8 @@ to detect common problems.
 
 ### Disabling internal log rate limiting
 
-Vector rate limits its own internal logs by default (10-second windows). During development, you may want to see all log occurrences.
+Vector rate limits the console output of internal logs by default (10-second windows). During
+development, you may want to see all log occurrences.
 
 **Globally** (CLI flag or environment variable):
 
@@ -283,6 +291,10 @@ warn!(message = "Error occurred.", %error, internal_log_rate_limit = false);
 // Override rate limit window to 1 second
 info!(message = "Processing batch.", batch_size, internal_log_rate_secs = 1);
 ```
+
+Note: The `internal_logs` source is _not_ rate limited by default. To enable rate limiting on all
+such sources, set the `--internal-logs-source-rate-limit` CLI flag or
+`VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT` environment variable to an integer number of seconds.
 
 ## Testing
 

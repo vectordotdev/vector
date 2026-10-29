@@ -71,7 +71,7 @@ if #[cfg(windows)] {
 /// the batch since a single batch may span multiple channels.
 #[derive(Debug, Clone)]
 struct FinalizerEntry {
-    /// Channel bookmarks: (channel_name, bookmark_xml) pairs
+    /// Channel bookmarks: (`channel_name`, `bookmark_xml`) pairs
     bookmarks: Vec<(String, String)>,
 }
 
@@ -91,6 +91,10 @@ enum Finalizer {
 
 impl Finalizer {
     /// Create a new finalizer based on acknowledgement configuration.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve the existing Windows source helper interfaces during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn new(
         acknowledgements: bool,
         checkpointer: SharedCheckpointer,
@@ -101,7 +105,7 @@ impl Finalizer {
                 OrderedFinalizer::<FinalizerEntry>::new(Some(shutdown.clone()));
 
             // Spawn background task to process acknowledgments and update checkpoints
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 while let Some((status, entry)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
@@ -276,6 +280,11 @@ pub struct WindowsEventLogSource {
 }
 
 impl WindowsEventLogSource {
+    /// Creates the Windows Event Log source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source configuration fails validation.
     pub fn new(
         config: WindowsEventLogConfig,
         data_dir: PathBuf,
@@ -292,11 +301,21 @@ impl WindowsEventLogSource {
         })
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting routines or reorganizing test fixtures is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve existing Windows API buffer, counter, and event numeric representations during this mechanical lint cleanup. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn run_internal(
         &mut self,
         mut out: SourceSender,
         shutdown: ShutdownSignal,
     ) -> Result<(), WindowsEventLogError> {
+        const MAX_ERROR_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
+
         let checkpointer = Arc::new(Checkpointer::new(&self.data_dir).await?);
 
         let finalizer = Finalizer::new(
@@ -361,7 +380,7 @@ impl WindowsEventLogSource {
             }
         };
         let shutdown_watcher = shutdown.clone();
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             shutdown_watcher.await;
             unsafe {
                 let handle =
@@ -380,7 +399,6 @@ impl WindowsEventLogSource {
 
         // Exponential backoff on consecutive recoverable errors
         let mut error_backoff = std::time::Duration::from_millis(100);
-        const MAX_ERROR_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
 
         // Health heartbeat: log every ~30s regardless of checkpoint interval
         let mut timeout_count: u32 = 0;
@@ -413,7 +431,6 @@ impl WindowsEventLogSource {
                     match events_result {
                         Ok(events) if events.is_empty() => {
                             error_backoff = std::time::Duration::from_millis(100);
-                            continue;
                         }
                         Ok(events) => {
                             error_backoff = std::time::Duration::from_millis(100);
@@ -618,16 +635,13 @@ impl SourceConfig for WindowsEventLogConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let log_namespace = self
-            .log_namespace
-            .map(|b| {
-                if b {
-                    LogNamespace::Vector
-                } else {
-                    LogNamespace::Legacy
-                }
-            })
-            .unwrap_or(global_log_namespace);
+        let log_namespace = self.log_namespace.map_or(global_log_namespace, |b| {
+            if b {
+                LogNamespace::Vector
+            } else {
+                LogNamespace::Legacy
+            }
+        });
 
         let schema_definition = match log_namespace {
             LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(

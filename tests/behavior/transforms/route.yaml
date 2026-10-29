@@ -1,0 +1,67 @@
+transforms:
+  foo:
+    inputs:
+      - "ignored"
+    type: "route"
+    route:
+      first:
+        type: "vrl"
+        source: |
+          .message == "test swimlane 1"
+      second:
+        type: "vrl"
+        source: |
+          .message == "test swimlane 2"
+      third:
+        type: "is_log"
+
+  bar:
+    inputs:
+      - "foo.first"
+    type: "remap"
+    source: |
+      .new_field = "new field added"
+
+tests:
+  - name: "route test 1"
+    no_outputs_from:
+      - "foo.second"
+    inputs:
+      - insert_at: "foo"
+        value: "test swimlane 1"
+    outputs:
+      - extract_from: "foo.first"
+        conditions:
+          - type: "vrl"
+            source: |
+              .message == "test swimlane 1"
+      - extract_from: "bar"
+        conditions:
+          - type: "vrl"
+            source: |
+              .message == "test swimlane 1"
+              .new_field == "new field added"
+      - extract_from: "foo.third"
+        conditions:
+          - type: "vrl"
+            source: |
+              .message == "test swimlane 1"
+
+  - name: "route test 2"
+    no_outputs_from:
+      - "foo.first"
+      - "bar"
+    inputs:
+      - insert_at: "foo"
+        value: "test swimlane 2"
+    outputs:
+      - extract_from: "foo.second"
+        conditions:
+          - type: "vrl"
+            source: |
+              .message == "test swimlane 2"
+      - extract_from: "foo.third"
+        conditions:
+          - type: "vrl"
+            source: |
+              .message == "test swimlane 2"

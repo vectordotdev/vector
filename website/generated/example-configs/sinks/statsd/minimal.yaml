@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: statsd
+    inputs:
+      - my-source-or-transform-id
+    address: 92.12.333.224:5000
+    mode: tcp

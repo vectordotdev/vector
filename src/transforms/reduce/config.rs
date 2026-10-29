@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use serde_with::serde_as;
 use vector_lib::configurable::configurable_component;
 use vrl::{
-    path::{PathPrefix, parse_target_path},
+    path::{OwnedSegment, PathPrefix, parse_target_path},
     prelude::{Collection, KeyString, Kind},
 };
 
@@ -39,7 +39,7 @@ pub struct ReduceConfig {
     pub expire_after_ms: Duration,
 
     /// If supplied, every time this interval elapses for a given grouping, the reduced value
-    /// for that grouping is flushed. Checked every flush_period_ms.
+    /// for that grouping is flushed. Checked every `flush_period_ms`.
     #[serde_as(as = "Option<serde_with::DurationMilliSeconds<u64>>")]
     #[derivative(Default(value = "Option::None"))]
     #[configurable(metadata(docs::human_name = "End-Every Period"))]
@@ -87,9 +87,6 @@ pub struct ReduceConfig {
     /// - Numeric values are summed.
     /// - For nested paths, the field value is retrieved and then reduced using the default strategies mentioned above (unless explicitly specified otherwise).
     #[serde(default)]
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual merge strategy."
-    ))]
     pub merge_strategies: IndexMap<KeyString, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.
@@ -106,11 +103,11 @@ pub struct ReduceConfig {
 }
 
 const fn default_expire_after_ms() -> Duration {
-    Duration::from_millis(30000)
+    Duration::from_secs(30)
 }
 
 const fn default_flush_period_ms() -> Duration {
-    Duration::from_millis(1000)
+    Duration::from_secs(1)
 }
 
 impl_generate_config_from_default!(ReduceConfig);
@@ -142,10 +139,8 @@ impl TransformConfig for ReduceConfig {
 
         let mut schema_definition = merged_definition;
 
-        for (key, merge_strategy) in self.merge_strategies.iter() {
-            let key = if let Ok(key) = parse_target_path(key) {
-                key
-            } else {
+        for (key, merge_strategy) in &self.merge_strategies {
+            let Ok(key) = parse_target_path(key) else {
                 continue;
             };
 
@@ -230,6 +225,55 @@ impl TransformConfig for ReduceConfig {
         }
 
         vec![TransformOutput::new(DataType::Log, output_definitions)]
+    }
+
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if self.ends_when.is_some() && self.starts_when.is_some() {
+            errors.push("only one of `ends_when` and `starts_when` can be provided".to_string());
+        }
+
+        for (path, _) in &self.merge_strategies {
+            match parse_target_path(path) {
+                Err(_) => errors.push(format!("Could not parse path: `{path}`")),
+                Ok(parsed) if parsed.path.segments.iter().any(OwnedSegment::is_index) => {
+                    errors.push(format!(
+                        "Merge strategies with indexes are currently not supported. Path: `{path}`"
+                    ));
+                }
+                Ok(_) => {}
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if let Some(Err(e)) = self
+            .ends_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("ends_when: {e}"));
+        }
+        if let Some(Err(e)) = self
+            .starts_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("starts_when: {e}"));
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
 

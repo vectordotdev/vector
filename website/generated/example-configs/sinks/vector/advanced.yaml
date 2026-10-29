@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: vector
+    inputs:
+      - my-source-or-transform-id
+    address: http://127.0.0.1:6000
+    compression: none

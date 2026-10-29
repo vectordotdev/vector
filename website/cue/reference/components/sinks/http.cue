@@ -4,7 +4,6 @@ components: sinks: http: {
 	title: "HTTP"
 
 	classes: {
-		commonly_used: true
 		service_providers: []
 		delivery:      "at_least_once"
 		development:   "stable"
@@ -22,7 +21,6 @@ components: sinks: http: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -74,7 +72,6 @@ components: sinks: http: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
 	configuration: generated.components.sinks.http.configuration

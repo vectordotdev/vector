@@ -13,10 +13,11 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 
 /// Shared Key authorization policy for Azure Blob Storage requests.
 ///
-/// This policy injects the required headers (x-ms-date, x-ms-version) if missing and
-/// adds the `Authorization: SharedKey {account}:{signature}` header. The signature
+/// This policy injects the required headers (x-ms-date, x-ms-version, and
+/// content-length) if missing and adds the `Authorization: SharedKey {account}:{signature}` header. The signature
 /// is computed according to the "Authorize with Shared Key" rules for the Blob service:
 ///
+/// ```text
 /// StringToSign =
 ///   VERB + "\n" +
 ///   Content-Encoding + "\n" +
@@ -32,6 +33,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 ///   Range + "\n" +
 ///   CanonicalizedHeaders +
 ///   CanonicalizedResource
+/// ```
 ///
 /// Notes:
 /// - We set x-ms-date, leaving the standard Date field empty in the signature.
@@ -52,9 +54,12 @@ impl SharedKeyAuthorizationPolicy {
     /// - `account_name`: The storage account name.
     /// - `account_key_b64`: Base64-encoded storage account key.
     /// - `storage_version`: x-ms-version value to send (e.g. "2025-11-05").
+    ///
+    /// # Errors
+    /// Returns an error if the account key is not valid base64.
     pub fn new(
         account_name: String,
-        account_key_b64: String,
+        account_key_b64: &str,
         storage_version: String,
     ) -> AzureResult<Self> {
         let account_key = base64::decode(account_key_b64.as_bytes()).map_err(|e| {
@@ -70,22 +75,28 @@ impl SharedKeyAuthorizationPolicy {
         })
     }
 
-    fn ensure_ms_headers(&self, request: &mut Request) -> AzureResult<(String, String)> {
+    fn ensure_signing_headers(&self, request: &mut Request) -> (String, String) {
         // Always set x-ms-date and x-ms-version explicitly to known values for signing.
         let now = OffsetDateTime::now_utc();
         let ms_date = to_rfc7231(&now);
         request.insert_header("x-ms-date", ms_date.clone());
         let ms_version = self.storage_version.clone();
         request.insert_header("x-ms-version", ms_version.clone());
-        Ok((ms_date, ms_version))
+
+        // Set a known body length before signing so the signature and wire request use the
+        // same explicit value. Preserve a Content-Length supplied by the SDK.
+        let has_content_length = request
+            .headers()
+            .iter()
+            .any(|(name, _)| name.as_str().eq_ignore_ascii_case("content-length"));
+        if !has_content_length && let Some(content_length) = request.body().len() {
+            request.insert_header("content-length", content_length.to_string());
+        }
+
+        (ms_date, ms_version)
     }
 
-    fn build_string_to_sign(
-        &self,
-        req: &Request,
-        ms_date: &str,
-        ms_version: &str,
-    ) -> AzureResult<String> {
+    fn build_string_to_sign(&self, req: &Request, ms_date: &str, ms_version: &str) -> String {
         let method = req.method().as_str();
         let url = req.url();
 
@@ -118,9 +129,11 @@ impl SharedKeyAuthorizationPolicy {
         }
         s.push('\n');
 
-        // Content-Length (include value if present; keep "0")
-        if let Some(v) = header("Content-Length") {
-            s.push_str(v);
+        // Content-Length
+        // Azure's Shared Key format represents zero length as an empty field.
+        let content_length = header("Content-Length").filter(|value| *value != "0");
+        if let Some(content_length) = content_length {
+            s.push_str(content_length);
         }
         s.push('\n');
 
@@ -192,13 +205,13 @@ impl SharedKeyAuthorizationPolicy {
             vals.sort();
             vals.dedup();
             let joined = vals.join(",");
-            let _ = writeln!(s, "{}:{}", k, joined);
+            writeln!(s, "{k}:{joined}").ok();
         }
 
         // CanonicalizedResource
-        append_canonicalized_resource(&mut s, &self.account_name, url)?;
+        append_canonicalized_resource(&mut s, &self.account_name, url);
 
-        Ok(s)
+        s
     }
 
     fn sign(&self, string_to_sign: &str) -> AzureResult<String> {
@@ -239,16 +252,16 @@ impl Policy for SharedKeyAuthorizationPolicy {
         request: &mut Request,
         next: &[Arc<dyn Policy>],
     ) -> PolicyResult {
-        // Ensure required x-ms headers are present
-        let (ms_date, ms_version) = self.ensure_ms_headers(request)?;
+        // Ensure required signing headers are present
+        let (ms_date, ms_version) = self.ensure_signing_headers(request);
         // Build string to sign
-        let sts = self.build_string_to_sign(request, &ms_date, &ms_version)?;
+        let sts = self.build_string_to_sign(request, &ms_date, &ms_version);
         let signature = self.sign(&sts)?;
 
         // Authorization: SharedKey {account}:{signature}
         request.insert_header(
             "authorization",
-            format!("SharedKey {}:{}", self.account_name, signature),
+            format!("SharedKey {}:{signature}", self.account_name),
         );
 
         // Continue pipeline
@@ -258,7 +271,7 @@ impl Policy for SharedKeyAuthorizationPolicy {
 
 // ---------- Helpers ----------
 
-fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> AzureResult<()> {
+fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) {
     // "/{account_name}{path}\n"
     s.push('/');
     s.push_str(account);
@@ -280,12 +293,85 @@ fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> Az
         for (k, mut vals) in qp_map {
             vals.sort();
             let mut line = String::new();
-            let _ = write!(&mut line, "\n{}:", k);
+            write!(&mut line, "\n{k}:").ok();
             let joined = vals.join(",");
             line.push_str(&joined);
             s.push_str(&line);
         }
     }
+}
 
-    Ok(())
+#[cfg(test)]
+mod tests {
+    use azure_core::http::Method;
+
+    use super::*;
+
+    fn policy() -> SharedKeyAuthorizationPolicy {
+        SharedKeyAuthorizationPolicy::new(
+            "account".to_owned(),
+            "ZmFrZS10ZXN0LWFjY291bnQta2V5",
+            "2025-11-05".to_owned(),
+        )
+        .expect("test key should be valid base64")
+    }
+
+    fn content_length_header(request: &Request) -> Option<&str> {
+        request.headers().iter().find_map(|(name, value)| {
+            name.as_str()
+                .eq_ignore_ascii_case("content-length")
+                .then_some(value.as_str())
+        })
+    }
+
+    fn content_length_field(request: &mut Request) -> String {
+        let policy = policy();
+        policy.ensure_signing_headers(request);
+        policy
+            .build_string_to_sign(request, "Thu, 30 Jul 2026 16:02:25 GMT", "2025-11-05")
+            .lines()
+            .nth(3)
+            .expect("string to sign should contain content length")
+            .to_owned()
+    }
+
+    #[test]
+    fn sets_and_signs_the_body_length_when_content_length_is_missing() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob?comp=blocklist")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.set_body(vec![0_u8; 123]);
+
+        assert_eq!(content_length_field(&mut request), "123");
+        assert_eq!(content_length_header(&request), Some("123"));
+    }
+
+    #[test]
+    fn preserves_a_nonzero_content_length_header() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.insert_header("content-length", "42");
+        request.set_body(vec![0_u8; 123]);
+
+        assert_eq!(content_length_field(&mut request), "42");
+        assert_eq!(content_length_header(&request), Some("42"));
+    }
+
+    #[test]
+    fn canonicalizes_zero_content_length_as_empty() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.insert_header("content-length", "0");
+
+        assert_eq!(content_length_field(&mut request), "");
+        assert_eq!(content_length_header(&request), Some("0"));
+    }
 }

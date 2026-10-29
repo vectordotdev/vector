@@ -160,14 +160,17 @@ Given those definitions, the fundamental process of wiring up a Vector topology
 is one of adding the appropriate inputs to the appropriate outputs. As a simple
 example, consider the following config:
 
-```toml
-[sources.foo]
-type = "stdin"
+```yaml
+sources:
+  foo:
+    type: "stdin"
 
-[sinks.bar]
-type = "console"
-inputs = ["foo"]
-encoding.codec = "json"
+sinks:
+  bar:
+    type: "console"
+    inputs: ["foo"]
+    encoding:
+      codec: "json"
 ```
 
 After the component construction phase, we'll be left with the tasks for each

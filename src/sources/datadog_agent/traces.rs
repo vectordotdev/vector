@@ -8,6 +8,7 @@ use ordered_float::NotNan;
 use prost::Message;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    event::TraceLayout,
     internal_event::{CountByteSize, InternalEventHandle as _},
 };
 use vrl::event_path;
@@ -15,8 +16,10 @@ use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath,
 
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto};
 use crate::{
-    common::http::ErrorMessage,
+    common::{datadog::encode_u64_id_hex, http::ErrorMessage},
     event::{Event, ObjectMap, TraceEvent, Value},
+    internal_events::DatadogAgentUnsupportedTracePayloadError,
+    sources::util::http::capped_body,
 };
 
 pub(super) fn build_warp_filter(
@@ -38,16 +41,12 @@ fn build_trace_filter(
         .and(warp::path::full())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::header::optional::<String>(
-            "X-Datadog-Reported-Languages",
-        ))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
-                  reported_language: Option<String>,
                   query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
@@ -60,7 +59,6 @@ fn build_trace_filter(
                                 api_token,
                                 query_params.dd_api_key,
                             ),
-                            reported_language.as_ref(),
                             &source,
                         )
                         .map_err(|error| {
@@ -91,22 +89,35 @@ fn build_stats_filter() -> BoxedFilter<(Response,)> {
 fn handle_dd_trace_payload(
     frame: Bytes,
     api_key: Option<Arc<str>>,
-    lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let decoded_payload = ddtrace_proto::TracePayload::decode(frame)?;
-    if decoded_payload.tracer_payloads.is_empty() {
-        debug!("Older trace payload decoded.");
-        handle_dd_trace_payload_v0(decoded_payload, api_key, lang, source)
-    } else {
-        debug!("Newer trace payload decoded.");
-        handle_dd_trace_payload_v1(decoded_payload, api_key, source)
+    let decoded_payload = ddtrace_proto::AgentPayload::decode(frame)?;
+    if !decoded_payload.idx_tracer_payloads.is_empty() {
+        emit!(DatadogAgentUnsupportedTracePayloadError {
+            error_code: "idx_tracer_payloads",
+        });
     }
+    if decoded_payload.tracer_payloads.is_empty() {
+        if decoded_payload.idx_tracer_payloads.is_empty() {
+            emit!(DatadogAgentUnsupportedTracePayloadError {
+                error_code: "empty_tracer_payloads",
+            });
+        }
+        return Ok(Vec::new());
+    }
+    handle_dd_trace_payload_v1(decoded_payload, api_key, source)
 }
 
-/// Decode Datadog newer protobuf schema
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Request handlers own payload and token values at this boundary."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Removing this fallible API is deferred to keep source construction and error handling unchanged. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn handle_dd_trace_payload_v1(
-    decoded_payload: ddtrace_proto::TracePayload,
+    decoded_payload: ddtrace_proto::AgentPayload,
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
@@ -138,7 +149,7 @@ fn handle_dd_trace_payload_v1(
             }
             trace_event.insert(
                 &source.log_schema_source_type_key,
-                Bytes::from("datadog_agent"),
+                Value::from_static_str("datadog_agent"),
             );
             trace_event.insert(event_path!("payload_version"), "v2".to_string());
             trace_event.insert(&source.log_schema_host_key, hostname.clone());
@@ -163,14 +174,22 @@ fn handle_dd_trace_payload_v1(
     Ok(enriched_events)
 }
 
+fn new_trace_event() -> TraceEvent {
+    let mut trace_event = TraceEvent::default();
+    trace_event
+        .metadata_mut()
+        .set_trace_layout(TraceLayout::Datadog);
+    trace_event
+}
+
 fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<TraceEvent> {
     let tags = convert_tags(payload.tags);
     payload
         .chunks
         .into_iter()
         .map(|trace| {
-            let mut trace_event = TraceEvent::default();
-            trace_event.insert(event_path!("priority"), trace.priority as i64);
+            let mut trace_event = new_trace_event();
+            trace_event.insert(event_path!("priority"), i64::from(trace.priority));
             trace_event.insert(event_path!("origin"), trace.origin);
             trace_event.insert(event_path!("dropped"), trace.dropped_trace);
             let mut trace_tags = convert_tags(trace.tags);
@@ -203,78 +222,10 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
         .collect()
 }
 
-// Decode Datadog older protobuf schema
-fn handle_dd_trace_payload_v0(
-    decoded_payload: ddtrace_proto::TracePayload,
-    api_key: Option<Arc<str>>,
-    lang: Option<&String>,
-    source: &DatadogAgentSource,
-) -> crate::Result<Vec<Event>> {
-    let env = decoded_payload.env;
-    let hostname = decoded_payload.host_name;
-
-    let trace_events: Vec<TraceEvent> =
-    // Each traces is mapped to one event...
-    decoded_payload
-        .traces
-        .into_iter()
-        .map(|dd_trace| {
-            let mut trace_event = TraceEvent::default();
-
-            // TODO trace_id is being forced into an i64 but
-            // the incoming payload is u64. This is a bug and needs to be fixed per:
-            // https://github.com/vectordotdev/vector/issues/14687
-            trace_event.insert(event_path!("trace_id"), dd_trace.trace_id as i64);
-            trace_event.insert(event_path!("start_time"), Utc.timestamp_nanos(dd_trace.start_time));
-            trace_event.insert(event_path!("end_time"), Utc.timestamp_nanos(dd_trace.end_time));
-            trace_event.insert(
-                event_path!("spans"),
-                dd_trace
-                    .spans
-                    .into_iter()
-                    .map(|s| Value::from(convert_span(s)))
-                    .collect::<Vec<Value>>(),
-            );
-            trace_event
-        })
-        //... and each APM event is also mapped into its own event
-        .chain(decoded_payload.transactions.into_iter().map(|s| {
-            let mut trace_event = TraceEvent::default();
-            trace_event.insert(event_path!("spans"), vec![Value::from(convert_span(s))]);
-            trace_event.insert(event_path!("dropped"), true);
-            trace_event
-        })).collect();
-
-    source.events_received.emit(CountByteSize(
-        trace_events.len(),
-        trace_events.estimated_json_encoded_size_of(),
-    ));
-
-    let enriched_events = trace_events
-        .into_iter()
-        .map(|mut trace_event| {
-            if let Some(k) = &api_key {
-                trace_event
-                    .metadata_mut()
-                    .set_datadog_api_key(Arc::clone(k));
-            }
-            if let Some(lang) = lang {
-                trace_event.insert(event_path!("language_name"), lang.clone());
-            }
-            trace_event.insert(
-                &source.log_schema_source_type_key,
-                Bytes::from("datadog_agent"),
-            );
-            trace_event.insert(event_path!("payload_version"), "v1".to_string());
-            trace_event.insert(&source.log_schema_host_key, hostname.clone());
-            trace_event.insert(event_path!("env"), env.clone());
-            Event::Trace(trace_event)
-        })
-        .collect();
-
-    Ok(enriched_events)
-}
-
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
     let mut span = ObjectMap::new();
     span.insert("service".into(), Value::from(dd_span.service));
@@ -293,7 +244,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
         Value::from(Utc.timestamp_nanos(dd_span.start)),
     );
     span.insert("duration".into(), Value::from(dd_span.duration));
-    span.insert("error".into(), Value::from(dd_span.error as i64));
+    span.insert("error".into(), Value::from(i64::from(dd_span.error)));
     span.insert("meta".into(), Value::from(convert_tags(dd_span.meta)));
     span.insert(
         "metrics".into(),
@@ -301,12 +252,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
             dd_span
                 .metrics
                 .into_iter()
-                .map(|(k, v)| {
-                    (
-                        k.into(),
-                        NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
-                    )
-                })
+                .map(|(k, v)| (k.into(), NotNan::new(v).map_or(Value::Null, Value::Float)))
                 .collect::<ObjectMap>(),
         ),
     );
@@ -321,8 +267,117 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> ObjectMap {
                 .collect::<ObjectMap>(),
         ),
     );
+    span.insert(
+        "span_links".into(),
+        Value::Array(
+            dd_span
+                .span_links
+                .into_iter()
+                .map(|link| Value::from(convert_span_link(link)))
+                .collect(),
+        ),
+    );
+    span.insert(
+        "span_events".into(),
+        Value::Array(
+            dd_span
+                .span_events
+                .into_iter()
+                .map(|event| Value::from(convert_span_event(event)))
+                .collect(),
+        ),
+    );
 
     span
+}
+
+fn convert_span_link(link: ddtrace_proto::SpanLink) -> ObjectMap {
+    ObjectMap::from([
+        (
+            "trace_id".into(),
+            Value::from(encode_u64_id_hex(link.trace_id)),
+        ),
+        (
+            "trace_id_high".into(),
+            Value::from(encode_u64_id_hex(link.trace_id_high)),
+        ),
+        (
+            "span_id".into(),
+            Value::from(encode_u64_id_hex(link.span_id)),
+        ),
+        (
+            "attributes".into(),
+            Value::from(convert_tags(link.attributes)),
+        ),
+        ("tracestate".into(), Value::from(link.tracestate)),
+        ("flags".into(), Value::from(i64::from(link.flags))),
+    ])
+}
+
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
+fn convert_span_event(event: ddtrace_proto::SpanEvent) -> ObjectMap {
+    ObjectMap::from([
+        (
+            "time_unix_nano".into(),
+            Value::from(Utc.timestamp_nanos(event.time_unix_nano as i64)),
+        ),
+        ("name".into(), Value::from(event.name)),
+        (
+            "attributes".into(),
+            Value::from(
+                event
+                    .attributes
+                    .into_iter()
+                    .map(|(k, v)| (k.into(), convert_attribute_any_value(v)))
+                    .collect::<ObjectMap>(),
+            ),
+        ),
+    ])
+}
+
+fn convert_attribute_any_value(value: ddtrace_proto::AttributeAnyValue) -> Value {
+    use ddtrace_proto::attribute_any_value::AttributeAnyValueType;
+
+    match AttributeAnyValueType::try_from(value.r#type)
+        .unwrap_or(AttributeAnyValueType::StringValue)
+    {
+        AttributeAnyValueType::StringValue => Value::from(value.string_value),
+        AttributeAnyValueType::BoolValue => Value::from(value.bool_value),
+        AttributeAnyValueType::IntValue => Value::from(value.int_value),
+        AttributeAnyValueType::DoubleValue => {
+            NotNan::new(value.double_value).map_or(Value::Null, Value::Float)
+        }
+        AttributeAnyValueType::ArrayValue => Value::Array(
+            value
+                .array_value
+                .map(|array| {
+                    array
+                        .values
+                        .into_iter()
+                        .map(convert_attribute_array_value)
+                        .collect()
+                })
+                .unwrap_or_default(),
+        ),
+    }
+}
+
+fn convert_attribute_array_value(value: ddtrace_proto::AttributeArrayValue) -> Value {
+    use ddtrace_proto::attribute_array_value::AttributeArrayValueType;
+
+    match AttributeArrayValueType::try_from(value.r#type)
+        .unwrap_or(AttributeArrayValueType::StringValue)
+    {
+        AttributeArrayValueType::StringValue => Value::from(value.string_value),
+        AttributeArrayValueType::BoolValue => Value::from(value.bool_value),
+        AttributeArrayValueType::IntValue => Value::from(value.int_value),
+        AttributeArrayValueType::DoubleValue => {
+            NotNan::new(value.double_value).map_or(Value::Null, Value::Float)
+        }
+    }
 }
 
 fn convert_tags(original_map: BTreeMap<String, String>) -> ObjectMap {

@@ -1,0 +1,38 @@
+{{/* Renders the "Deprecation Announcements" section for a specific release.
+     Each entry whose `deprecated_since` matches the page version is listed.
+     Enactments (removals) are not duplicated here — they are surfaced via
+     the changelog's Breaking changes section and on /deprecations/.
+     Params: version (string, e.g. "0.56" or "0.56.0") */}}
+{{- $pending := (partialCached "deprecations/entries.html" .).active -}}
+{{- /* Entries carry X.Y.Z versions (see deprecations/entries.html), so normalize
+       a "0.56" shorthand param the same way and match exactly: "0.56" fragments
+       belong to the 0.56.0 page only, never to 0.56.1. */ -}}
+{{- $version := .version -}}
+{{- if eq (len (split $version ".")) 2 }}{{ $version = printf "%s.0" $version }}{{ end -}}
+
+{{- $announced := where $pending "deprecated_since" $version -}}
+
+{{ if gt (len $announced) 0 }}
+<div class="mt-8">
+  <div class="prose dark:prose-invert max-w-none">
+    {{ partial "heading.html" (dict "text" "Deprecation Announcements" "level" 2) }}
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+      See the <a href="/deprecations/">deprecations page</a> for all active and historical deprecations.
+    </p>
+  </div>
+  <div class="mt-6 flex flex-col space-y-6">
+    {{ range $announced }}
+    <div>
+      <span class="text-xl font-semibold text-dark dark:text-gray-300">
+        {{ .what | markdownify }}
+      </span>
+      {{ with .content }}
+      <div class="mt-2.5 prose dark:prose-invert max-w-none">
+        {{ . }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}

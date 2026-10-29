@@ -13,7 +13,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -30,17 +30,30 @@ impl_generate_config_from_default!(ErrorSinkConfig);
 #[async_trait]
 #[typetag::serde(name = "test_error")]
 impl SinkConfig for ErrorSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        #[allow(deprecated)]
-        Ok((VectorSink::from_event_sink(ErrorSink), ok(()).boxed()))
-    }
-
     fn input(&self) -> Input {
         Input::log()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for ErrorSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        #[allow(deprecated)]
+        Ok((VectorSink::from_event_sink(ErrorSink), ok(()).boxed()))
     }
 }
 

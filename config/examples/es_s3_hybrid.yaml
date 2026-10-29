@@ -38,4 +38,4 @@ sinks:
       codec: "json"
     compression: "gzip"
     batch:
-      max_size: 10000000 # 10mb uncompressed
+      max_bytes: 10000000 # 10mb uncompressed

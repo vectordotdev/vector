@@ -27,6 +27,7 @@ pub struct MetricsBuffer {
 
 impl MetricsBuffer {
     /// Creates a new `MetricsBuffer` with the given batch settings.
+    #[must_use]
     pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::with_capacity(settings.events)
     }
@@ -85,10 +86,7 @@ impl Batch for MetricsBuffer {
     }
 
     fn num_items(&self) -> usize {
-        self.metrics
-            .as_ref()
-            .map(|metrics| metrics.len())
-            .unwrap_or(0)
+        self.metrics.as_ref().map_or(0, normalize::MetricSet::len)
     }
 }
 
@@ -99,6 +97,7 @@ fn finalize_metric(metric: &mut Metric) {
     }
 }
 
+#[expect(clippy::float_cmp, reason = "Merge only equal sample values.")]
 pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
     if samples.is_empty() {
         return Vec::new();
@@ -142,7 +141,7 @@ mod tests {
 
     type Buffer = Vec<Vec<Metric>>;
 
-    pub fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
+    pub fn sample_counter(num: u32, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
         Metric::new(
             format!("counter-{num}"),
             kind,
@@ -151,7 +150,7 @@ mod tests {
         .with_tags(Some(metric_tags!(tagstr => "true")))
     }
 
-    pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
+    pub fn sample_gauge(num: u32, kind: MetricKind, value: f64) -> Metric {
         Metric::new(format!("gauge-{num}"), kind, MetricValue::Gauge { value })
     }
 
@@ -160,7 +159,7 @@ mod tests {
             format!("set-{num}"),
             kind,
             MetricValue::Set {
-                values: values.iter().map(|s| s.to_string()).collect(),
+                values: values.iter().map(ToString::to_string).collect(),
             },
         )
     }
@@ -170,14 +169,14 @@ mod tests {
             format!("dist-{num}"),
             kind,
             MetricValue::Distribution {
-                samples: vector_lib::samples![num as f64 => rate],
+                samples: vector_lib::samples![f64::from(num) => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
     }
 
     pub fn sample_aggregated_histogram(
-        num: usize,
+        num: u32,
         kind: MetricKind,
         bpower: f64,
         cfactor: u64,
@@ -198,18 +197,18 @@ mod tests {
         )
     }
 
-    pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
+    pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: u32) -> Metric {
         Metric::new(
             format!("quantiles-{num}"),
             kind,
             MetricValue::AggregatedSummary {
                 quantiles: vector_lib::quantiles![
-                    0.0 => factor,
-                    0.5 => factor * 2.0,
-                    1.0 => factor * 4.0
+                    0.0 => f64::from(factor),
+                    0.5 => f64::from(factor) * 2.0,
+                    1.0 => f64::from(factor) * 4.0
                 ],
-                count: factor as u64 * 10,
-                sum: factor * 7.0,
+                count: u64::from(factor) * 10,
+                sum: f64::from(factor) * 7.0,
             },
         )
     }
@@ -238,7 +237,7 @@ mod tests {
         }
 
         if !buffer.is_empty() {
-            result.push(buffer.finish())
+            result.push(buffer.finish());
         }
 
         // Sort each batch to provide a predictable result ordering
@@ -255,17 +254,17 @@ mod tests {
         let mut events = Vec::new();
         for i in 0..4 {
             // counter-0 is repeated 5 times
-            events.push(sample_counter(0, "production", Incremental, i as f64));
+            events.push(sample_counter(0, "production", Incremental, f64::from(i)));
         }
 
         for i in 0..4 {
             // these counters cause a buffer flush
-            events.push(sample_counter(i, "staging", Incremental, i as f64));
+            events.push(sample_counter(i, "staging", Incremental, f64::from(i)));
         }
 
         for i in 0..4 {
             // counter-0 increments the previous buffer, the rest are new
-            events.push(sample_counter(i, "production", Incremental, i as f64));
+            events.push(sample_counter(i, "production", Incremental, f64::from(i)));
         }
 
         rebuffer::<State>(events)
@@ -331,11 +330,16 @@ mod tests {
         // counter-2 and -3 emitted twice
         // counter-4 and -5 emitted once
         for i in 0..4 {
-            events.push(sample_counter(i, "production", Absolute, i as f64));
+            events.push(sample_counter(i, "production", Absolute, f64::from(i)));
         }
 
         for i in 2..6 {
-            events.push(sample_counter(i, "production", Absolute, i as f64 * 3.0));
+            events.push(sample_counter(
+                i,
+                "production",
+                Absolute,
+                f64::from(i) * 3.0,
+            ));
         }
 
         rebuffer::<State>(events)
@@ -381,11 +385,11 @@ mod tests {
         // gauge-2 through -4 are emitted twice
         // gauge-5 emitted once
         for i in 1..5 {
-            events.push(sample_gauge(i, Incremental, i as f64));
+            events.push(sample_gauge(i, Incremental, f64::from(i)));
         }
 
         for i in 2..6 {
-            events.push(sample_gauge(i, Incremental, i as f64));
+            events.push(sample_gauge(i, Incremental, f64::from(i)));
         }
 
         rebuffer::<State>(events)
@@ -433,11 +437,11 @@ mod tests {
         // gauge-3 and -4 emitted twice
         // gauge-5 emitted once
         for i in 2..5 {
-            events.push(sample_gauge(i, Absolute, i as f64 * 2.0));
+            events.push(sample_gauge(i, Absolute, f64::from(i) * 2.0));
         }
 
         for i in 3..6 {
-            events.push(sample_gauge(i, Absolute, i as f64 * 10.0));
+            events.push(sample_gauge(i, Absolute, f64::from(i) * 10.0));
         }
 
         rebuffer::<State>(events)
@@ -589,7 +593,7 @@ mod tests {
 
     #[test]
     fn compress_distributions_doesnt_panic() {
-        let to_float = |v: i32| -> f64 { v as f64 };
+        let to_float = f64::from;
 
         let mut samples = (0..=15)
             .map(to_float)
@@ -620,8 +624,8 @@ mod tests {
                 i,
                 Absolute,
                 1.0,
-                i as u64,
-                i as f64 * 10.0,
+                u64::from(i),
+                f64::from(i) * 10.0,
             ));
         }
 
@@ -694,11 +698,7 @@ mod tests {
         let mut events = Vec::new();
         for factor in 0..2 {
             for num in 2..4 {
-                events.push(sample_aggregated_summary(
-                    num,
-                    Absolute,
-                    (factor + num) as f64,
-                ));
+                events.push(sample_aggregated_summary(num, Absolute, factor + num));
             }
         }
 
@@ -712,8 +712,8 @@ mod tests {
         assert_eq!(
             buffer[0],
             [
-                sample_aggregated_summary(2, Absolute, 3.0),
-                sample_aggregated_summary(3, Absolute, 4.0),
+                sample_aggregated_summary(2, Absolute, 3),
+                sample_aggregated_summary(3, Absolute, 4),
             ]
         );
 
@@ -727,5 +727,44 @@ mod tests {
         // Since aggregated summaries cannot be added, they don't work
         // as incremental metrics and this results in an empty buffer.
         assert_eq!(buffer.len(), 0);
+    }
+
+    #[test]
+    fn normalizer_does_not_hold_finalizer_references() {
+        use vector_common::finalization::{
+            BatchNotifier, BatchStatus, EventFinalizer, EventStatus,
+        };
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+
+        let metrics: Vec<Metric> = (0..3)
+            .map(|i| {
+                let mut m = sample_counter(i, "production", Incremental, 1.0);
+                m.add_finalizer(EventFinalizer::new(batch.clone()));
+                m
+            })
+            .collect();
+
+        // Drop our handle so only the metrics hold references
+        drop(batch);
+
+        let mut normalizer = MetricNormalizer::<AbsoluteMetricNormalizer>::default();
+        let mut output = Vec::new();
+        for metric in metrics {
+            if let Some(m) = normalizer.normalize(metric) {
+                output.push(m);
+            }
+        }
+
+        // Simulate what the Driver does: mark delivered, then drop finalizers
+        for mut metric in output {
+            metric.metadata().update_status(EventStatus::Delivered);
+            metric.metadata_mut().take_finalizers();
+        }
+
+        // The normalization cache must not retain Arc<EventFinalizer> references.
+        // If it did, the batch notification would never fire and the disk buffer
+        // could not acknowledge the events, eventually causing a deadlock.
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 }

@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: aws_sqs
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue

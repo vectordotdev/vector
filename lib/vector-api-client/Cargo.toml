@@ -6,6 +6,9 @@ edition = "2024"
 publish = false
 license = "MPL-2.0"
 
+[lints]
+workspace = true
+
 [dependencies]
 # gRPC
 tonic.workspace = true
@@ -14,7 +17,6 @@ prost.workspace = true
 prost-types.workspace = true
 
 # Async
-futures.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }
 tokio-stream = { workspace = true, features = ["sync"] }
 
@@ -22,8 +24,17 @@ tokio-stream = { workspace = true, features = ["sync"] }
 snafu.workspace = true
 
 # Utils
-http = { version = "0.2", default-features = false }
+http = { version = "1", default-features = false, features = ["std"] }
+hyper-util = { version = "0.1", default-features = false, features = ["client-legacy", "http2", "tokio"] }
+
+# Internal libs
+vector-common = { path = "../vector-common", default-features = false }
+vector-core = { path = "../vector-core", default-features = false }
+vector-http = { path = "../vector-http" }
 
 [build-dependencies]
 tonic-build.workspace = true
 prost-build.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["io-util", "net", "time"] }

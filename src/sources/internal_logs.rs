@@ -113,7 +113,7 @@ impl SourceConfig for InternalLogsConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(run(
+        Ok(crate::sources::source_with_error(run(
             host_key,
             pid_key,
             subscription,
@@ -145,7 +145,7 @@ async fn run(
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
@@ -158,7 +158,9 @@ async fn run(
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
-    // infinite loop since it receives all such logs.
+    // infinite loop since it receives all such logs. Broadcast lag is
+    // reported by `TraceSubscription::into_stream` itself, after an event
+    // has been received, so its log cannot lag the receiver again.
     while let Some(mut log) = rx.next().await {
         // TODO: Should this actually be in memory size?
         let byte_size = log.estimated_json_encoded_size_of().get();
@@ -196,10 +198,10 @@ async fn run(
             Utc::now(),
         );
 
-        if (out.send_event(Event::from(log)).await).is_err() {
+        if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
             emit!(StreamClosedError { count: 1 });
-            return Err(());
+            return Err(error);
         }
     }
 
@@ -214,6 +216,7 @@ mod tests {
     use vrl::value::kind::Collection;
 
     use serial_test::serial;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -238,7 +241,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn receives_logs() {
-        trace::init(false, false, "debug", 10);
+        trace::init(false, false, "debug", 10, None);
         trace::reset_early_buffer();
 
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
@@ -287,9 +290,9 @@ mod tests {
         drop(enter);
 
         sleep(Duration::from_millis(1)).await;
-        let mut events = collect_ready(rx).await;
+        let mut events = collect_ready(rx);
         let test_id = Value::from(test_id.to_string());
-        events.retain(|event| event.as_log().get("test_id") == Some(&test_id));
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id));
 
         let end = chrono::Utc::now();
 
@@ -320,9 +323,9 @@ mod tests {
             assert_eq!(log["metadata.level"], "ERROR".into());
             // The first log event occurs outside our custom span
             if i == 0 {
-                assert!(log.get("vector.component_id").is_none());
-                assert!(log.get("vector.component_kind").is_none());
-                assert!(log.get("vector.component_type").is_none());
+                assert!(log.get(event_path!("vector", "component_id")).is_none());
+                assert!(log.get(event_path!("vector", "component_kind")).is_none());
+                assert!(log.get(event_path!("vector", "component_type")).is_none());
             } else if i < 3 {
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "source".into());
@@ -336,7 +339,7 @@ mod tests {
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
                 assert_eq!(log["vector.component_new_field"], "baz".into());
                 assert_eq!(log["vector.component_numerical_field"], 1.into());
-                assert!(log.get("vector.ignored_field").is_none());
+                assert!(log.get(event_path!("vector", "ignored_field")).is_none());
             }
         }
     }
@@ -363,7 +366,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn registered_extra_span_field_is_captured() {
-        trace::init(false, false, "info", 10);
+        trace::init(false, false, "info", 10, None);
         trace::reset_early_buffer();
 
         let test_id: u8 = rand::random();
@@ -381,9 +384,9 @@ mod tests {
         }
 
         sleep(Duration::from_millis(1)).await;
-        let mut events = collect_ready(rx).await;
+        let mut events = collect_ready(rx);
         let test_id_value = Value::from(test_id.to_string());
-        events.retain(|event| event.as_log().get("test_id") == Some(&test_id_value));
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id_value));
 
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
@@ -392,7 +395,7 @@ mod tests {
             "captured".into()
         );
         // The unregistered span field is still filtered out.
-        assert!(log.get("vector.some_other_field").is_none());
+        assert!(log.get(event_path!("vector", "some_other_field")).is_none());
     }
 
     // NOTE: This test requires #[serial] because it directly interacts with global tracing state.
@@ -400,7 +403,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn repeated_logs_are_not_rate_limited() {
-        trace::init(false, false, "info", 10);
+        trace::init(false, false, "info", 10, None);
         trace::reset_early_buffer();
 
         let rx = start_source().await;
@@ -411,16 +414,15 @@ mod tests {
         }
 
         sleep(Duration::from_millis(50)).await;
-        let events = collect_ready(rx).await;
+        let events = collect_ready(rx);
 
         // Filter to only our test messages
         let test_events: Vec<_> = events
             .iter()
             .filter(|e| {
                 e.as_log()
-                    .get("message")
-                    .map(|m| m.to_string_lossy() == "Repeated test message.")
-                    .unwrap_or(false)
+                    .get(event_path!("message"))
+                    .is_some_and(|m| m.to_string_lossy() == "Repeated test message.")
             })
             .collect();
 
@@ -465,7 +467,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -499,6 +501,101 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
+    }
+
+    // Verify that broadcast lag is surfaced via `component_discarded_events_total` rather
+    // than being silently swallowed.
+    //
+    // Strategy: run inside a single-threaded tokio runtime (the default for `#[tokio::test]`).
+    // While the current task holds the CPU without yielding, no other tokio tasks are scheduled.
+    // We flood the broadcast channel (capacity 99) with more events than it can hold. The source
+    // task cannot poll between emits, so the broadcast overflows and records a lag count. After
+    // we yield, the source observes the lag and emits `ComponentEventsDropped`.
+    #[tokio::test]
+    #[serial]
+    async fn broadcast_lag_increments_discarded_metric() {
+        trace::init(false, false, "error", 10, None);
+        vector_lib::metrics::init_test();
+        trace::reset_early_buffer();
+
+        // The downstream receiver is kept alive but never polled, so the source does not stop
+        // on a closed output and no events are consumed downstream before we check the metric.
+        let (tx, _rx) = SourceSender::new_test();
+        let source = InternalLogsConfig::default()
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+
+        // Yield so the source task subscribes and starts polling the broadcast, then stop early
+        // buffering so new events go to the live broadcast.
+        tokio::task::yield_now().await;
+        trace::stop_early_buffering();
+        tokio::task::yield_now().await;
+
+        let controller =
+            vector_lib::metrics::Controller::get().expect("metrics controller must be initialized");
+        controller.reset();
+
+        // Emit more events than the broadcast capacity (99) without yielding. In a
+        // single-threaded runtime this guarantees the source task cannot poll between emits,
+        // so the broadcast overflows and accumulates a lag count.
+        for i in 0usize..200 {
+            error!(message = "Broadcast lag test.", i);
+        }
+
+        // Yield enough times for the source task to observe the lag and emit
+        // `ComponentEventsDropped`.
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+
+        let discarded_any = controller
+            .capture_metrics()
+            .into_iter()
+            .any(|m| m.name() == "component_discarded_events_total");
+
+        assert!(
+            discarded_any,
+            "expected component_discarded_events_total to be emitted when broadcast lags"
+        );
+    }
+
+    // After a lag, the broadcast receiver points at the oldest slot of a full buffer. Any log
+    // emitted before the next receive, such as the `ComponentEventsDropped` error, overwrites
+    // that slot and lags the receiver again. Verify the source still delivers the newest event of
+    // the burst instead of repeating that cycle.
+    #[tokio::test]
+    #[serial]
+    async fn recovers_after_broadcast_lag() {
+        trace::init(false, false, "error", 10, None);
+        trace::reset_early_buffer();
+
+        let mut rx = start_source().await;
+
+        // Overflow the broadcast (capacity 99) without yielding, so the source lags on its next
+        // receive. The last event is the newest one retained by the broadcast.
+        for i in 0usize..200 {
+            error!(message = "Broadcast lag test.", i);
+        }
+        error!(message = "Last event after lag.");
+
+        let last = Value::from("Last event after lag.");
+        let delivered = tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(event) = rx.next().await {
+                if event.as_log().get(event_path!("message")) == Some(&last) {
+                    return true;
+                }
+            }
+            false
+        })
+        .await
+        .unwrap_or(false);
+
+        assert!(
+            delivered,
+            "source did not deliver events after broadcast lag"
+        );
     }
 }
