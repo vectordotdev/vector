@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 // should match vector-unit-test-tests feature
 #[cfg(all(
     test,
@@ -67,8 +65,12 @@ pub struct UnitTestResult {
 }
 
 impl UnitTest {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+    /// Runs the unit test topology to completion and collects the test sink results.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the test topology fails to start, or if a test sink is dropped before
+    /// reporting its result.
     pub async fn run(self) -> UnitTestResult {
         let diff = config::ConfigDiff::initial(&self.config);
         let (topology, _) = RunningTopology::start_validated(self.config, diff, self.pieces)
@@ -110,8 +112,12 @@ fn init_log_schema_from_paths(
     Ok(())
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Loads the configuration from `paths`, resolving secrets, and builds its unit tests.
+///
+/// # Errors
+///
+/// Returns error messages if the configuration or its secret backends cannot be loaded from
+/// `paths`, secrets cannot be retrieved, or any unit test fails to build.
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
@@ -133,8 +139,13 @@ pub async fn build_unit_tests_main(
     build_unit_tests(config_builder).await
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Builds a runnable unit test for each test definition in `config_builder`.
+///
+/// # Errors
+///
+/// Returns one message per failing test if a test references inputs or outputs that do not
+/// exist, defines invalid input events or output conditions, has no path between its inputs
+/// and outputs, or its test topology fails to compile or build.
 pub async fn build_unit_tests(
     mut config_builder: ConfigBuilder,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
@@ -142,6 +153,7 @@ pub async fn build_unit_tests(
     config_builder.sources = IndexMap::default();
     config_builder.sinks = IndexMap::default();
 
+    let loading_warnings = std::mem::take(&mut config_builder.loading_warnings);
     let test_definitions = std::mem::take(&mut config_builder.tests);
     let mut tests = Vec::new();
     let mut build_errors = Vec::new();
@@ -167,6 +179,7 @@ pub async fn build_unit_tests(
     }
 
     if build_errors.is_empty() {
+        loading::log_warnings(&loading_warnings);
         Ok(tests)
     } else {
         Err(build_errors)
@@ -186,9 +199,16 @@ pub struct UnitTestBuildMetadata {
 }
 
 impl UnitTestBuildMetadata {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+    /// Attaches a test source to every transform and records the test source and sink IDs.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a transform has no generated test source ID, which cannot happen because an
+    /// ID is generated for every transform.
     pub fn initialize(config_builder: &mut ConfigBuilder) -> Result<Self, Vec<String>> {
         // A unique id used to name test sources and sinks to avoid name clashes
         let random_id = Uuid::new_v4().to_string();
@@ -252,9 +272,17 @@ impl UnitTestBuildMetadata {
     }
 
     /// Convert test inputs into sources for use in a unit testing topology
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if `inputs` is empty, an input's `insert_at` is not a transform,
+    /// or an input event cannot be built, such as an unknown input type, a missing required
+    /// field, a VRL source that fails to compile or run, or an invalid log field path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a validated insert target has no test source, which cannot happen because
+    /// [`Self::initialize`] creates one for every transform.
     pub fn hydrate_into_sources(
         &self,
         inputs: &[TestInput],
@@ -288,9 +316,18 @@ impl UnitTestBuildMetadata {
     }
 
     /// Convert test outputs into sinks for use in a unit testing topology
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
-    #[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if both `outputs` and `no_outputs_from` are empty, a test
+    /// condition cannot be built, an output sets `expected_event_count` to 0 while defining
+    /// conditions, or outputs with the same `extract_from` set different
+    /// `expected_event_count` values.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an `extract_from` or `no_outputs_from` entry is not a transform output
+    /// recorded by [`Self::initialize`].
     pub fn hydrate_into_sinks(
         &self,
         test_name: &str,

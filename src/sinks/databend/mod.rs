@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod compression;
 mod config;
 mod encoding;

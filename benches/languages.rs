@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use criterion::{BatchSize, Criterion, SamplingMode, Throughput, criterion_group, criterion_main};
 use indoc::indoc;
 use vector::{

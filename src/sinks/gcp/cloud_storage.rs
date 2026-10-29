@@ -2,7 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::header::{HeaderName, HeaderValue};
+use http_1::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -24,7 +24,7 @@ use crate::{
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::{HttpClient, get_http_scheme_from_uri},
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
         Healthcheck, VectorSink,
@@ -219,40 +219,40 @@ fn default_time_format() -> String {
 #[cfg(test)]
 fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
     GcsSinkConfig {
-        bucket: Default::default(),
-        acl: Default::default(),
-        storage_class: Default::default(),
-        metadata: Default::default(),
-        key_prefix: Default::default(),
+        bucket: String::default(),
+        acl: Option::default(),
+        storage_class: Option::default(),
+        metadata: Option::default(),
+        key_prefix: Option::default(),
         filename_time_format: default_time_format(),
         filename_append_uuid: true,
-        filename_extension: Default::default(),
-        content_type: Default::default(),
-        content_encoding: Default::default(),
-        cache_control: Default::default(),
+        filename_extension: Option::default(),
+        content_type: Option::default(),
+        content_encoding: Option::default(),
+        cache_control: Option::default(),
         encoding,
         compression: Compression::gzip_default(),
-        batch: Default::default(),
+        batch: BatchConfig::default(),
         endpoint: default_endpoint(),
-        request: Default::default(),
-        auth: Default::default(),
-        tls: Default::default(),
-        acknowledgements: Default::default(),
-        timezone: Default::default(),
+        request: TowerRequestConfig::default(),
+        auth: GcpAuthConfig::default(),
+        tls: Option::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
+        timezone: Option::default(),
         confinement: ConfinementConfig::default(),
     }
 }
 
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             bucket: my-bucket
             credentials_path: /path/to/credentials.json
             framing:
               method: newline_delimited
             encoding:
               codec: json
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -299,15 +299,15 @@ impl ValidatedSink for GcsSinkConfig {
 
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
             client.clone(),
             base_url.clone(),
             auth.clone(),
-        )?;
+        );
         auth.spawn_regenerate_token();
-        let sink = self.build_sink(client, base_url.clone(), auth, cx, validated)?;
+        let sink = self.build_sink(client, base_url.clone(), auth, &cx, validated)?;
         Ok((sink, healthcheck))
     }
 }
@@ -325,7 +325,7 @@ impl GcsSinkConfig {
         client: HttpClient,
         base_url: HttpEndpoint,
         auth: GcpAuthenticator,
-        cx: SinkContext,
+        cx: &SinkContext,
         validated: &ValidatedGcsSink,
     ) -> crate::Result<VectorSink> {
         let request = self.request.into_settings();
@@ -455,7 +455,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 }
 
 impl RequestSettings {
-    fn new(config: &GcsSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+    fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -481,16 +481,15 @@ impl RequestSettings {
             .as_ref()
             .map(|cc| HeaderValue::from_str(cc))
             .transpose()?;
-        let metadata = config
-            .metadata
-            .as_ref()
-            .map(|metadata| {
+        let metadata = config.metadata.as_ref().map_or_else(
+            || Ok(vec![]),
+            |metadata| {
                 metadata
                     .iter()
                     .map(make_header)
                     .collect::<Result<Vec<_>, _>>()
-            })
-            .unwrap_or_else(|| Ok(vec![]))?;
+            },
+        )?;
         let extension = config
             .filename_extension
             .clone()
@@ -581,9 +580,9 @@ mod tests {
 
         let context = SinkContext::default();
 
-        let tls = TlsSettings::default();
-        let client =
-            HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
+        let tls = TlsSettings::from_options(None).expect("should not fail to create TLS settings");
+        let client = HttpClient::new(tls.into(), context.proxy())
+            .expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
             endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
@@ -595,7 +594,7 @@ mod tests {
                 client,
                 HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
-                context,
+                &context,
                 &validated,
             )
             .expect("failed to build sink");
@@ -625,7 +624,7 @@ mod tests {
         assert_eq!(key, "key: value");
     }
 
-    fn request_settings(sink_config: &GcsSinkConfig, context: SinkContext) -> RequestSettings {
+    fn request_settings(sink_config: &GcsSinkConfig, context: &SinkContext) -> RequestSettings {
         RequestSettings::new(sink_config, context).expect("Could not create request settings")
     }
 
@@ -655,7 +654,7 @@ mod tests {
         let mut byte_size = GroupedCountByteSize::new_untagged();
         byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         let (metadata, metadata_request_builder, _events) =
             request_settings.split_input((key, vec![log]));
         let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
@@ -687,7 +686,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should default to encoder's content type which is "text/plain" for text codec
         assert_eq!(
             request_settings.content_type.to_str().unwrap(),
@@ -703,7 +702,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should use custom content type
         assert_eq!(
             request_settings.content_type.to_str().unwrap(),
@@ -720,7 +719,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = RequestSettings::new(&sink_config, &context);
         // Should return an error, not panic
         assert!(result.is_err());
     }
@@ -734,7 +733,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should default to compression's content encoding which is "gzip"
         assert_eq!(
             request_settings.content_encoding.unwrap().to_str().unwrap(),
@@ -751,7 +750,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should be None when compression is None
         assert!(request_settings.content_encoding.is_none());
     }
@@ -765,7 +764,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should use custom content encoding
         assert_eq!(
             request_settings.content_encoding.unwrap().to_str().unwrap(),
@@ -782,7 +781,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = RequestSettings::new(&sink_config, &context);
         // Should return an error, not panic
         assert!(result.is_err());
     }
@@ -792,12 +791,12 @@ mod tests {
         let context = SinkContext::default();
         let sink_config = GcsSinkConfig {
             // Empty string to disable content encoding header even with compression
-            content_encoding: Some("".to_string()),
+            content_encoding: Some(String::new()),
             compression: Compression::gzip_default(),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should use empty content encoding (overriding the compression default)
         assert_eq!(
             request_settings.content_encoding.unwrap().to_str().unwrap(),
@@ -813,7 +812,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         // Should be None by default
         assert!(request_settings.cache_control.is_none());
     }
@@ -826,7 +825,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let request_settings = request_settings(&sink_config, context);
+        let request_settings = request_settings(&sink_config, &context);
         assert_eq!(
             request_settings.cache_control.unwrap().to_str().unwrap(),
             "no-transform"
@@ -842,7 +841,7 @@ mod tests {
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
 
-        let result = RequestSettings::new(&sink_config, context);
+        let result = RequestSettings::new(&sink_config, &context);
         // Should return an error, not panic
         assert!(result.is_err());
     }

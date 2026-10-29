@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use notify::{EventKind, RecursiveMode, recommended_watcher};
 use std::{
     collections::{HashMap, HashSet},
@@ -70,8 +68,12 @@ impl Watcher {
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
+///
+/// # Errors
+///
+/// Returns an error if the file watcher cannot be created or an existing configuration path
+/// cannot be watched.
 // https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
 pub fn spawn_thread<'a>(
     watcher_conf: WatcherConfig,

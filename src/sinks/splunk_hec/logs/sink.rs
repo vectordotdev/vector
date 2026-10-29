@@ -237,7 +237,7 @@ impl Partitioner for EventPartitioner {
                 error,
                 field: Some(field),
                 drop_event: false,
-            })
+            });
         };
 
         let source = self.source.as_ref().and_then(|source| {
@@ -366,7 +366,12 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
                     if let Some(key) = data.timestamp_nanos_key {
                         log.try_insert(event_path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
                     }
-                    Some((ts.timestamp_millis() as f64) / 1000f64)
+                    #[expect(
+                        clippy::cast_precision_loss,
+                        reason = "HEC timestamps use floating-point seconds."
+                    )]
+                    let time = (ts.timestamp_millis() as f64) / 1000f64;
+                    Some(time)
                 }
                 Some(value) => {
                     emit!(SplunkEventTimestampInvalidType {

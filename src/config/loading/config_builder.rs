@@ -7,7 +7,7 @@ use std::{
 use indexmap::IndexMap;
 
 use super::{
-    ComponentHint, Process, deserialize_config_map, loader, prepare_input,
+    ComponentHint, Process, deserialize_config_map, ignored_fields, loader, prepare_input,
     representation::ConfigMap, secret,
 };
 use crate::config::{
@@ -56,8 +56,13 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if a directory or an opened config file cannot be read, a
+    /// referenced environment variable or secret cannot be interpolated, the content cannot be
+    /// parsed or deserialized, or values cannot be merged into the config builder. Config files
+    /// that cannot be opened are logged and skipped.
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -66,8 +71,12 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if `input` cannot be read as UTF-8, a referenced environment
+    /// variable or secret cannot be interpolated, the content cannot be parsed or deserialized,
+    /// or values cannot be merged into the config builder.
     pub fn load_from_input<R: Read>(
         self,
         input: R,
@@ -101,6 +110,7 @@ impl Process for ConfigBuilderLoader {
 
     /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
     fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        let ignored = ignored_fields::find(&map, hint);
         match hint {
             Some(ComponentHint::Source) => {
                 self.builder
@@ -142,6 +152,9 @@ impl Process for ConfigBuilderLoader {
             }
         }
 
+        self.builder
+            .loading_warnings
+            .extend(ignored_fields::warnings(&ignored));
         Ok(())
     }
 }

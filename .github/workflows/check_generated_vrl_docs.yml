@@ -21,7 +21,9 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    # The real check below is upstream-only, so skip the filter and status jobs on forks too.
+    if: github.repository == 'vectordotdev/vector'
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -40,7 +42,7 @@ jobs:
 
   run-check-generated-vrl-docs:
     needs: changes
-    if: needs.changes.outputs.docs == 'true'
+    if: needs.changes.outputs.docs == 'true' && github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04-8core
     permissions:
       contents: write
@@ -115,7 +117,7 @@ jobs:
           && steps.last-commit.outputs.is-auto != 'true'
           && github.event_name == 'pull_request'
           && steps.push.outcome != 'success'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: vrl-docs-check-pr
           path: /tmp/docs-check/pr-number
@@ -127,8 +129,8 @@ jobs:
           exit 1
 
   check-generated-vrl-docs:
-    if: always()
-    runs-on: ubuntu-latest
+    if: always() && github.repository == 'vectordotdev/vector'
+    runs-on: ubuntu-24.04
     needs: run-check-generated-vrl-docs
     steps:
       - run: |

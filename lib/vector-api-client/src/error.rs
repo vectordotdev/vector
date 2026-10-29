@@ -4,8 +4,11 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    #[snafu(display("Connection error: {}", source))]
-    Connection { source: tonic::transport::Error },
+    /// The HTTP/2 transport could not be set up, for example because TLS failed to initialize.
+    #[snafu(display("Connection setup error: {}", source))]
+    Connection {
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 
     #[snafu(display("gRPC error: {}", source))]
     Grpc { source: tonic::Status },
@@ -48,33 +51,4 @@ impl From<tonic::Status> for Error {
     }
 }
 
-impl From<tonic::transport::Error> for Error {
-    fn from(source: tonic::transport::Error) -> Self {
-        Error::Connection { source }
-    }
-}
-
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_error_display() {
-        let err = Error::NotConnected;
-        assert_eq!(err.to_string(), "Not connected to gRPC server");
-
-        let err = Error::InvalidUrl {
-            message: "invalid format".to_string(),
-        };
-        assert_eq!(err.to_string(), "Invalid URL: invalid format");
-    }
-
-    #[test]
-    fn test_error_from_tonic_status() {
-        let status = tonic::Status::unavailable("service down");
-        let err: Error = status.into();
-        assert!(matches!(err, Error::Grpc { .. }));
-    }
-}

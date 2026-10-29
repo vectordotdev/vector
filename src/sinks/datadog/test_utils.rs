@@ -1,5 +1,4 @@
 #![cfg(any(feature = "sinks-datadog_logs", feature = "sinks-datadog_metrics"))]
-#![warn(clippy::pedantic)]
 use bytes::Bytes;
 use http::status::StatusCode;
 

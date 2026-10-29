@@ -41,7 +41,7 @@ impl SourceConfig for UnitTestSourceConfig {
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-            out.send_batch(events).await.map_err(|_| ())?;
+            out.send_batch(events).await?;
             Ok(())
         }))
     }
@@ -98,7 +98,7 @@ impl SourceConfig for UnitTestStreamSourceConfig {
         Ok(Box::pin(async move {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
-            out.send_event_stream(stream).await.map_err(|_| ())?;
+            out.send_event_stream(stream).await?;
             Ok(())
         }))
     }

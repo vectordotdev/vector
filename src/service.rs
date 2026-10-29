@@ -19,7 +19,8 @@ pub struct Opts {
 }
 
 impl Opts {
-    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+    #[must_use]
+    pub const fn dangerously_allow_env_var_interpolation(&self) -> bool {
         matches!(
             &self.sub_command,
             Some(SubCommand::Install(opts)) if opts.dangerously_allow_env_var_interpolation
@@ -108,7 +109,7 @@ impl InstallOpts {
         .chain(
             self.config_dirs
                 .iter()
-                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+                .map(|dir| config::ConfigPath::Dir(dir.clone())),
         )
         .collect()
     }
@@ -236,7 +237,7 @@ impl Default for ServiceInfo {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum ControlAction {
     Install,
     Uninstall { stop_timeout: Duration },
@@ -247,8 +248,8 @@ enum ControlAction {
 
 pub fn cmd(opts: &Opts, data_dir: Option<&Path>) -> exitcode::ExitCode {
     let sub_command = &opts.sub_command;
-    match sub_command {
-        Some(s) => match s {
+    if let Some(command) = sub_command {
+        match command {
             SubCommand::Install(opts) => {
                 let Some(service_info) = opts.service_info(data_dir) else {
                     return exitcode::CONFIG;
@@ -256,7 +257,7 @@ pub fn cmd(opts: &Opts, data_dir: Option<&Path>) -> exitcode::ExitCode {
                 control_service(&service_info, ControlAction::Install)
             }
             SubCommand::Uninstall(opts) => {
-                let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
+                let stop_timeout = Duration::from_secs(u64::from(opts.stop_timeout));
                 control_service(
                     &opts.service_info(),
                     ControlAction::Uninstall { stop_timeout },
@@ -264,23 +265,22 @@ pub fn cmd(opts: &Opts, data_dir: Option<&Path>) -> exitcode::ExitCode {
             }
             SubCommand::Start(opts) => control_service(&opts.service_info(), ControlAction::Start),
             SubCommand::Stop(opts) => {
-                let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
+                let stop_timeout = Duration::from_secs(u64::from(opts.stop_timeout));
                 control_service(&opts.service_info(), ControlAction::Stop { stop_timeout })
             }
             SubCommand::Restart(opts) => {
-                let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
+                let stop_timeout = Duration::from_secs(u64::from(opts.stop_timeout));
                 control_service(
                     &opts.service_info(),
                     ControlAction::Restart { stop_timeout },
                 )
             }
-        },
-        None => {
-            error!(
-                "You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall]."
-            );
-            exitcode::USAGE
         }
+    } else {
+        error!(
+            "You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall]."
+        );
+        exitcode::USAGE
     }
 }
 

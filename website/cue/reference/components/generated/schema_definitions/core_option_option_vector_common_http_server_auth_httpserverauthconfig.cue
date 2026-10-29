@@ -20,7 +20,8 @@ _schemaDefinitions: "core::option::Option<vector::common::http::server_auth::Htt
 			basic: """
 				Basic authentication.
 
-				The username and password are concatenated and encoded using [base64][base64].
+				Used when strategy is omitted. The username and password are concatenated and encoded
+				using [base64][base64].
 
 				[base64]: https://en.wikipedia.org/wiki/Base64
 				"""

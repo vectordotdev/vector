@@ -71,18 +71,22 @@ mod integration_test {
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            confinement: ConfinementConfig::default(),
         };
-        self::sink::healthcheck(config.clone(), confined_topic(topic), Default::default())
-            .await
-            .unwrap();
+        self::sink::healthcheck(
+            config.clone(),
+            confined_topic(topic),
+            crate::config::SinkHealthcheckOptions::default(),
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -101,18 +105,22 @@ mod integration_test {
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            confinement: ConfinementConfig::default(),
         };
-        self::sink::healthcheck(config.clone(), confined_topic(topic), Default::default())
-            .await
-            .unwrap();
+        self::sink::healthcheck(
+            config.clone(),
+            confined_topic(topic),
+            crate::config::SinkHealthcheckOptions::default(),
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -205,19 +213,24 @@ mod integration_test {
                 sasl: None,
                 tls: None,
             },
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             batch,
             librdkafka_options,
             headers_key: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            confinement: ConfinementConfig::default(),
         };
         config.clone().to_rdkafka()?;
         let topic = confined_topic(topic);
-        self::sink::healthcheck(config.clone(), topic.clone(), Default::default()).await?;
+        self::sink::healthcheck(
+            config.clone(),
+            topic.clone(),
+            crate::config::SinkHealthcheckOptions::default(),
+        )
+        .await?;
         KafkaSink::new(config.clone(), topic)
     }
 
@@ -238,7 +251,7 @@ mod integration_test {
             )
             .await
             .is_err()
-        )
+        );
     }
 
     #[tokio::test]
@@ -270,7 +283,7 @@ mod integration_test {
             )
             .await
             .is_err()
-        )
+        );
     }
 
     #[tokio::test]
@@ -290,7 +303,7 @@ mod integration_test {
             )
             .await
             .is_err()
-        )
+        );
     }
 
     #[tokio::test]
@@ -332,6 +345,8 @@ mod integration_test {
     }
 
     #[tokio::test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep the broker fixture together.")]
     async fn kafka_happy_path_trace_events() {
         crate::test_util::trace_init();
 
@@ -342,7 +357,7 @@ mod integration_test {
             let key_field = ConfigTargetPath::try_from("trace_key".to_string()).unwrap();
             let headers_key = ConfigTargetPath::try_from("trace_headers".to_string()).unwrap();
             let trace_key = "trace-partition-key";
-            let header_key = "trace-header-key";
+            let header_name = "trace-header-key";
             let header_value = "trace-header-value";
 
             let config = KafkaSinkConfig {
@@ -354,14 +369,14 @@ mod integration_test {
                 batch: BatchConfig::default(),
                 compression: KafkaCompression::None,
                 auth: KafkaAuthConfig::default(),
-                socket_timeout_ms: Duration::from_millis(60000),
-                message_timeout_ms: Duration::from_millis(300000),
+                socket_timeout_ms: Duration::from_mins(1),
+                message_timeout_ms: Duration::from_mins(5),
                 rate_limit_duration_secs: 1,
                 rate_limit_num: i64::MAX as u64,
                 librdkafka_options: HashMap::new(),
                 headers_key: Some(headers_key.clone()),
-                acknowledgements: Default::default(),
-                confinement: Default::default(),
+                acknowledgements: AcknowledgementsConfig::default(),
+                confinement: ConfinementConfig::default(),
             };
 
             let num_events = 100;
@@ -379,7 +394,7 @@ mod integration_test {
                 trace.insert(event_path!("timestamp"), chrono::Utc::now());
 
                 let mut trace_headers = ObjectMap::new();
-                trace_headers.insert(header_key.into(), Value::Bytes(Bytes::from(header_value)));
+                trace_headers.insert(header_name.into(), Value::Bytes(Bytes::from(header_value)));
                 trace.insert(&headers_key, trace_headers);
 
                 events.push(Event::Trace(trace.with_batch_notifier(&batch)));
@@ -405,7 +420,9 @@ mod integration_test {
 
             wait_for(
                 || match consumer.fetch_watermarks(&topic_now, 0, Duration::from_secs(3)) {
-                    Ok((_low, high)) => ready(high >= num_events as i64),
+                    Ok((_low, high)) => ready(
+                        high >= i64::try_from(num_events).expect("test event count fits in i64"),
+                    ),
                     Err(err) => {
                         println!("retrying due to error fetching watermarks: {err}");
                         ready(false)
@@ -417,7 +434,13 @@ mod integration_test {
             let (low, high) = consumer
                 .fetch_watermarks(&topic_now, 0, Duration::from_secs(3))
                 .unwrap();
-            assert_eq!((0, num_events as i64), (low, high));
+            assert_eq!(
+                (
+                    0,
+                    i64::try_from(num_events).expect("test event count fits in i64")
+                ),
+                (low, high)
+            );
 
             let mut failures = 0;
             let mut observed_messages = Vec::new();
@@ -437,7 +460,7 @@ mod integration_test {
                         assert!(timestamp.is_some());
 
                         let header = msg.headers().unwrap().get(0);
-                        assert_eq!(header.key, header_key);
+                        assert_eq!(header.key, header_name);
                         assert_eq!(header.value.unwrap(), header_value.as_bytes());
                     }
                     None if observed_messages.len() >= num_events => break,
@@ -454,6 +477,8 @@ mod integration_test {
         .await;
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Keep the broker fixture together.")]
     async fn kafka_happy_path(
         server: String,
         sasl: Option<KafkaSaslConfig>,
@@ -488,14 +513,14 @@ mod integration_test {
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),
-            socket_timeout_ms: Duration::from_millis(60000),
-            message_timeout_ms: Duration::from_millis(300000),
+            socket_timeout_ms: Duration::from_mins(1),
+            message_timeout_ms: Duration::from_mins(5),
             rate_limit_duration_secs: 1,
             rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            confinement: ConfinementConfig::default(),
         };
         let topic = format!("{topic}-{}", chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {topic:?}");
@@ -570,7 +595,13 @@ mod integration_test {
         let (low, high) = consumer
             .fetch_watermarks(&topic, 0, Duration::from_secs(3))
             .unwrap();
-        assert_eq!((0, num_events as i64), (low, high));
+        assert_eq!(
+            (
+                0,
+                i64::try_from(num_events).expect("test event count fits in i64")
+            ),
+            (low, high)
+        );
 
         // loop instead of iter so we can set a timeout
         let mut failures = 0;
