@@ -18,7 +18,7 @@ How do we find out what went wrong when those logs stop arriving?
 In this guide, we'll start with a working pipeline, introduce three common failures, and use Vector's logs and metrics to fix them.
 You'll also see how to inspect events as they move through the pipeline.
 
-## Start with a working pipeline {#walkthrough}
+## Getting started {#walkthrough}
 
 You'll need [Vector](/docs/setup/installation/), [Python](https://www.python.org/downloads/), and `curl`.
 Run the examples on the same machine, with ports 8000 and 8686
