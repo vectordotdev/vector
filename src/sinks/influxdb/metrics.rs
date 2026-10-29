@@ -220,16 +220,19 @@ impl ValidatedSink for InfluxDbConfig {
     }
 }
 
-/// A normalized metric with the accounting of the event it came from.
+/// A normalized metric with the finalizers and the accounting of the event it came from.
 struct NormalizedMetric {
     metric: Metric,
+    finalizers: EventFinalizers,
     byte_size: usize,
     json_size: JsonSize,
 }
 
-/// The aggregated metrics of one write request, with the accounting of every event added to it.
+/// The aggregated metrics of one write request, with the finalizers and the accounting of every
+/// event added to it.
 struct MetricBatch {
     metrics: Vec<Metric>,
+    finalizers: EventFinalizers,
     count: usize,
     byte_size: usize,
     json_size: JsonSize,
@@ -245,6 +248,7 @@ fn metric_set(max_events: usize) -> MetricSet {
 /// Aggregates metrics by series until a batch holds `max_events` series.
 struct MetricBatchConfig {
     metrics: MetricSet,
+    finalizers: EventFinalizers,
     count: usize,
     byte_size: usize,
     json_size: JsonSize,
@@ -255,6 +259,7 @@ impl MetricBatchConfig {
     fn new(settings: BatcherSettings) -> Self {
         Self {
             metrics: metric_set(settings.item_limit),
+            finalizers: EventFinalizers::default(),
             count: 0,
             byte_size: 0,
             json_size: JsonSize::zero(),
@@ -281,6 +286,7 @@ impl StreamBatchConfig<NormalizedMetric> for MetricBatchConfig {
         }
         MetricBatch {
             metrics,
+            finalizers: mem::take(&mut self.finalizers),
             count: mem::take(&mut self.count),
             byte_size: mem::take(&mut self.byte_size),
             json_size: mem::take(&mut self.json_size),
@@ -288,6 +294,7 @@ impl StreamBatchConfig<NormalizedMetric> for MetricBatchConfig {
     }
 
     fn push(&mut self, item: NormalizedMetric, (): ()) {
+        self.finalizers.merge(item.finalizers);
         self.count += 1;
         self.byte_size += item.byte_size;
         self.json_size += item.json_size;
@@ -339,9 +346,9 @@ impl HttpServiceRequestBuilder<Arc<MetricBatch>> for InfluxDbMetricsRequestBuild
 
 /// Creates the request for a batch.
 ///
-/// The metrics keep their finalizers, so the driver does not report the response status to
-/// them. They are released without a status once the request and all of its retries complete.
-fn build_request(batch: MetricBatch) -> HttpRequest<Arc<MetricBatch>> {
+/// The request takes the finalizers of the batch, so the driver reports the response status to
+/// the events.
+fn build_request(mut batch: MetricBatch) -> HttpRequest<Arc<MetricBatch>> {
     // The body is only encoded by each attempt, so its size is unknown here. The driver does not
     // report byte telemetry for this sink, and `EndpointBytesSent` uses the actual body size.
     let metadata = RequestMetadata::new(
@@ -354,7 +361,7 @@ fn build_request(batch: MetricBatch) -> HttpRequest<Arc<MetricBatch>> {
     );
     HttpRequest::new(
         Bytes::new(),
-        EventFinalizers::default(),
+        mem::take(&mut batch.finalizers),
         metadata,
         Arc::new(batch),
     )
@@ -384,15 +391,14 @@ where
                 // The accounting of the original event is kept through normalization.
                 let byte_size = event.size_of();
                 let json_size = event.estimated_json_encoded_size_of();
-                ready(
-                    normalizer
-                        .normalize(event.into_metric())
-                        .map(|metric| NormalizedMetric {
-                            metric,
-                            byte_size,
-                            json_size,
-                        }),
-                )
+                let mut metric = event.into_metric();
+                let finalizers = metric.metadata_mut().take_finalizers();
+                ready(normalizer.normalize(metric).map(|metric| NormalizedMetric {
+                    metric,
+                    finalizers,
+                    byte_size,
+                    json_size,
+                }))
             })
             .batched(MetricBatchConfig::new(batch_settings))
             .map(build_request)
@@ -625,21 +631,23 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use futures::stream;
+    use http::StatusCode;
     use indoc::indoc;
     use similar_asserts::assert_eq;
-    use vector_lib::{
-        event::{BatchNotifier, BatchStatus},
-        finalization::Finalizable,
-    };
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::{
         config::ValidatedSink,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        sinks::influxdb::{
-            InfluxDb2Settings,
-            test_util::{assert_fields, split_line_protocol, tags, ts},
+        sinks::{
+            influxdb::{
+                InfluxDb2Settings,
+                test_util::{assert_fields, split_line_protocol, tags, ts},
+            },
+            util::test::build_test_server_status,
         },
+        test_util::addr::next_addr,
     };
 
     #[test]
@@ -1248,13 +1256,15 @@ mod tests {
     }
 
     fn counter(name: &str, value: f64, batch: &BatchNotifier) -> NormalizedMetric {
+        let mut metric = Metric::new(
+            name,
+            MetricKind::Incremental,
+            MetricValue::Counter { value },
+        )
+        .with_batch_notifier(batch);
         NormalizedMetric {
-            metric: Metric::new(
-                name,
-                MetricKind::Incremental,
-                MetricValue::Counter { value },
-            )
-            .with_batch_notifier(batch),
+            finalizers: metric.metadata_mut().take_finalizers(),
+            metric,
             byte_size: 1,
             json_size: JsonSize::new(10),
         }
@@ -1303,46 +1313,58 @@ mod tests {
         assert_eq!(batches[1].count, 1);
     }
 
-    fn request_builder() -> InfluxDbMetricsRequestBuilder {
-        InfluxDbMetricsRequestBuilder {
-            write: InfluxDbWriteRequest::new(
-                "http://localhost:9999/api/v2/write".parse().unwrap(),
-                &SensitiveString::default(),
-            ),
-            protocol_version: ProtocolVersion::V2,
-            default_namespace: None,
-            tags: None,
-            quantiles: Vec::new(),
-        }
-    }
+    /// Sends two metrics to a server that answers with `status` and returns their batch status.
+    async fn batch_status_for_response(status: StatusCode) -> BatchStatus {
+        let (_guard, addr) = next_addr();
+        let config: InfluxDbConfig = serde_yaml::from_str(&format!(
+            indoc! {r#"
+                endpoint: "http://{}"
+                version: "2"
+                bucket: "my-bucket"
+                org: "my-org"
+                token: "my-token"
+                request:
+                  retry_attempts: 0
+            "#},
+            addr
+        ))
+        .unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
+        let (_rx, _trigger, server) = build_test_server_status(addr, status);
+        tokio::spawn(server);
 
-    fn single_metric_request(metric: Metric) -> HttpRequest<Arc<MetricBatch>> {
-        build_request(MetricBatch {
-            metrics: vec![metric],
-            count: 1,
-            byte_size: 1,
-            json_size: JsonSize::new(10),
-        })
-    }
-
-    #[test]
-    fn requests_release_finalizers_without_a_status() {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let mut request = single_metric_request(counter("a", 1.0, &batch).metric);
+        let events = ["a", "b"].map(|name| {
+            Event::Metric(
+                Metric::new(
+                    name,
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_batch_notifier(&batch),
+            )
+        });
         drop(batch);
-        let retry = request.clone();
+        sink.run_events(events).await.unwrap();
+        receiver.try_recv().expect("batch should be finalized")
+    }
 
-        // The driver gets no finalizers, so the response status does not reach the events.
-        request
-            .take_finalizers()
-            .update_status(EventStatus::Rejected);
-        request_builder().build(request).unwrap();
-        assert!(receiver.try_recv().is_err());
-
-        // The events are released once every copy of the request, such as the one kept for
-        // retries, is dropped.
-        drop(retry);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    #[tokio::test]
+    async fn response_status_reaches_the_events() {
+        assert_eq!(
+            batch_status_for_response(StatusCode::NO_CONTENT).await,
+            BatchStatus::Delivered
+        );
+        assert_eq!(
+            batch_status_for_response(StatusCode::BAD_REQUEST).await,
+            BatchStatus::Rejected
+        );
+        assert_eq!(
+            batch_status_for_response(StatusCode::SERVICE_UNAVAILABLE).await,
+            BatchStatus::Errored
+        );
     }
 }
 
