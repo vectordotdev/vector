@@ -24,13 +24,8 @@ You'll need [Vector](/docs/setup/installation/), [Python](https://www.python.org
 Run the examples on the same machine, with ports 8000 and 8686
 available. The Python server uses only the standard library, so you don't need to install any Python packages.
 
-<a href="/guides/debugging/vector-debugging-guide.tar.gz" download>Download all guide files</a>.
-Extract the archive and open the folder:
-
-```shell
-tar -xzf vector-debugging-guide.tar.gz
-cd vector-debugging-guide
-```
+[Download all guide files](https://download-directory.github.io/?url=https%3A%2F%2Fgithub.com%2Fvectordotdev%2Fvector%2Ftree%2Fc944ba02ccda56eecf17094bc9e6f96a2b4244a9%2Fwebsite%2Fstatic%2Fguides%2Fdebugging%2Fvector-debugging-guide) as a ZIP.
+Extract it and open the folder containing `http-server.py`.
 
 Use this folder in each terminal throughout the guide. It includes the walkthrough and monitoring files:
 

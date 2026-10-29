@@ -132,9 +132,6 @@ This builds all the necessary [prereqs](#prerequisites) for the site and starts 
 
 When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
 
-The build also packages `static/guides/debugging/vector-debugging-guide/` into the debugging guide's download.
-After changing those files while the local server is running, run `make debugging-guide` from `website/` to refresh the archive.
-
 ### Run browser tests locally
 
 The browser suite uses [Playwright](https://playwright.dev) to test the built website in Chromium,

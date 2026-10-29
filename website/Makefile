@@ -46,14 +46,8 @@ structured-data: generate-vrl-docs component-examples
 serve: clean setup cargo-data structured-data
 	$(MAKE) serve-development
 
-# Package the guide sources at build time so the download stays in sync.
-.PHONY: debugging-guide
-debugging-guide:
-	cd static/guides/debugging && COPYFILE_DISABLE=1 tar -czf vector-debugging-guide.tar.gz \
-		vector-debugging-guide/*.py vector-debugging-guide/*.yaml vector-debugging-guide/*.md
-
 .PHONY: serve-development
-serve-development: debugging-guide
+serve-development:
 	hugo \
 	--buildDrafts \
 	--buildFuture \
@@ -64,7 +58,7 @@ serve-development: debugging-guide
 		"yarn pagefind:watch"
 
 # Live site
-production-build: debugging-guide
+production-build:
 	hugo \
 	--environment "production" \
 	--minify
@@ -73,7 +67,7 @@ production-build: debugging-guide
 ci-production-build: setup cargo-data structured-data production-build
 
 # Preview site
-preview-build: debugging-guide
+preview-build:
 	hugo \
 	$(if $(DEPLOY_PRIME_URL),--baseURL $(DEPLOY_PRIME_URL),) \
 	--buildFuture \
