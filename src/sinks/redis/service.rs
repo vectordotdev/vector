@@ -121,6 +121,10 @@ impl DriverResponse for RedisResponse {
         &self.events_byte_size
     }
 
+    fn events_dropped(&self) -> Option<usize> {
+        Some(self.event_status.iter().filter(|status| !**status).count())
+    }
+
     fn bytes_sent(&self) -> Option<usize> {
         Some(self.byte_size)
     }
