@@ -3,7 +3,7 @@ use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use bytes::Bytes;
-use http_1::{HeaderName, HeaderValue, StatusCode, header};
+use http::{HeaderName, HeaderValue, StatusCode, header};
 
 /// Maximum number of response body bytes to include in a non-retriable error's reason.
 pub(crate) const MAX_ERROR_BODY_BYTES: usize = 1024;
@@ -63,7 +63,7 @@ pub struct SigV4Config {
 
 /// Serializes and deserializes a [`Vec<StatusCode>`]
 mod status_code_vec {
-    use http_1::StatusCode;
+    use http::StatusCode;
     use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 
     /// Deserializes a [`Vec<StatusCode>`]

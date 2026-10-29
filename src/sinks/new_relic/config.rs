@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use http_1::{Uri, header::HeaderValue};
+use http::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
 

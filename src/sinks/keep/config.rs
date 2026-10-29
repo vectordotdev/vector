@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use vector_http::full_body;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};

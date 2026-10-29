@@ -2,7 +2,7 @@ use std::{collections::HashMap, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use indoc::indoc;
 use snafu::ResultExt;
 use tower::Service;

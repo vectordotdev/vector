@@ -1,6 +1,6 @@
 //! Service implementation for the `honeycomb` sink.
 use bytes::Bytes;
-use http_1::{HeaderValue, Request};
+use http::{HeaderValue, Request};
 use snafu::ResultExt;
 
 use super::config::HTTP_HEADER_HONEYCOMB;

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use http_1::Uri;
+use http::Uri;
 use indoc::indoc;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;

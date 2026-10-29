@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use serde::Deserialize;
 use url::form_urlencoded;

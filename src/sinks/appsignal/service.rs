@@ -1,6 +1,6 @@
 //! Service implementation for the `appsignal` sink.
 use bytes::Bytes;
-use http_1::{Request, header::AUTHORIZATION};
+use http::{Request, header::AUTHORIZATION};
 use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 

@@ -17,7 +17,7 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use chrono::Duration;
 use futures::{FutureExt, future::BoxFuture};
 use futures_util::TryFutureExt;
-use http_1::HeaderValue;
+use http::HeaderValue;
 use tokio::sync::oneshot;
 use tower::{
     Service, ServiceBuilder, ServiceExt,

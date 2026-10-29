@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use http_1::Request;
+use http::Request;
 use snafu::Snafu;
 use vector_http::full_body;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;

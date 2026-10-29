@@ -1,7 +1,7 @@
 //! Service implementation for the `gcp_stackdriver_logs` sink.
 
 use bytes::Bytes;
-use http_1::{Request, header::CONTENT_TYPE};
+use http::{Request, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
 use crate::{

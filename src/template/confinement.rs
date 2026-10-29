@@ -84,7 +84,7 @@ pub(crate) enum BuildError {
     ///
     /// A field-rendered value can inject a `?query` or a `#fragment` that
     /// steers routing or (for `#`) silently drops any operator-authored
-    /// suffix through `http_1::Uri`'s fragment truncation.
+    /// suffix through `http::Uri`'s fragment truncation.
     #[snafu(display(
         "HTTP/HTTPS template {template:?} mixes `{{{{ field }}}}` references \
          with `?` or `#`, which cannot be confined. Move event-driven routing \
@@ -246,7 +246,7 @@ impl ConfinementChecker {
                 // event-controlled). But once a `{{ field }}` is present, the
                 // rendered path segment can smuggle either:
                 //   - a `?extra=...` query string, or
-                //   - a `#frag` that `http_1::Uri` truncates before our checker
+                //   - a `#frag` that `http::Uri` truncates before our checker
                 //     sees the path, silently dropping any operator-authored
                 //     suffix like `/ingest`.
                 let src = tpl.get_ref();
@@ -334,9 +334,9 @@ impl PrefixChecker {
 /// Confinement for HTTP/HTTPS URI templates.
 ///
 /// At build time the operator-authored static prefix is parsed with
-/// `http_1::Uri` and its scheme, authority, and path are stored. Scheme and
+/// `http::Uri` and its scheme, authority, and path are stored. Scheme and
 /// authority are normalized to lowercase; the path prefix remains case-sensitive.
-/// At render time the rendered value is also parsed with `http_1::Uri` and the
+/// At render time the rendered value is also parsed with `http::Uri` and the
 /// structured fields are compared, which avoids all the pitfalls of raw-string
 /// heuristics (case sensitivity in scheme/authority, percent-encoding,
 /// `@`-injection inside the authority component, etc.).
@@ -350,7 +350,7 @@ impl PrefixChecker {
 /// Render-time checks:
 ///
 /// 1. **Fragment rejection** — rejects raw `#` before parsing to prevent
-///    `http_1::Uri` truncation from hiding operator-authored suffixes.
+///    `http::Uri` truncation from hiding operator-authored suffixes.
 ///
 /// 2. **Authority check** — scheme and authority must match the operator-authored
 ///    values (case-insensitive). Catches `@`-userinfo injection and host-extension.
@@ -376,10 +376,10 @@ pub(crate) struct UriChecker {
 }
 
 impl UriChecker {
-    /// Parse `s` with `http_1::Uri`, rejecting raw non-ASCII bytes outside the
+    /// Parse `s` with `http::Uri`, rejecting raw non-ASCII bytes outside the
     /// fragment.
     ///
-    /// `http_1::Uri` accepts raw UTF-8 in the path and query (the `http` 0.2
+    /// `http::Uri` accepts raw UTF-8 in the path and query (the `http` 0.2
     /// parser did not). Some servers map Unicode look-alikes such as U+FF0E
     /// FULLWIDTH FULL STOP or U+FF0F FULLWIDTH SOLIDUS onto `.` and `/`, which
     /// would bypass the dot-dot and separator checks, so non-ASCII stays
@@ -444,7 +444,7 @@ impl UriChecker {
                 prefix: prefix.to_string(),
             });
         }
-        // `http_1::Uri` normalises a missing path to `"/"`, so `uri.path()` can't
+        // `http::Uri` normalises a missing path to `"/"`, so `uri.path()` can't
         // tell us whether the prefix actually had a `/` closing off the host. Check
         // the raw prefix instead: no `/` after `://` means the `{{ field }}`
         // reference sits inside (or extends) the authority we just parsed.
@@ -468,7 +468,7 @@ impl UriChecker {
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {
         // 1. Reject raw fragment injection BEFORE parsing.
-        //    `http_1::Uri` strips fragments server-side, which would hide the
+        //    `http::Uri` strips fragments server-side, which would hide the
         //    operator-authored suffix in templates like:
         //      `https://api.internal/base/{{ tenant }}/ingest`
         //    where tenant = "ok#evil" renders as:
@@ -482,7 +482,7 @@ impl UriChecker {
             });
         }
 
-        // Parse with http_1::Uri so all structural checks use the same tokeniser
+        // Parse with http::Uri so all structural checks use the same tokeniser
         // that built the baseline — no raw-string heuristics.
         let uri = Self::parse_ascii_uri(rendered).ok_or_else(|| ConfineError::UriParseFailed {
             rendered: rendered.to_string(),
@@ -534,7 +534,7 @@ impl UriChecker {
         //    `%2f` (encoded `/`) and `%5c` (encoded `\`) are decoded by many
         //    servers before path normalization, turning an otherwise-safe
         //    segment into a traversal vector.  Raw `\` is accepted by
-        //    `http_1::Uri` but treated as a path separator by Windows/IIS,
+        //    `http::Uri` but treated as a path separator by Windows/IIS,
         //    allowing `/ingest/..\admin` to escape the prefix on those hosts.
         //    `%25` is the encoded form of `%`; a proxy that decodes once
         //    turns `%252e%252e%252fadmin` into `%2e%2e%2fadmin`, which a

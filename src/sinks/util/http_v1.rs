@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, Response};
+use http::{Request, Response};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
 use tower_http_1::decompression::Decompression;
@@ -211,7 +211,7 @@ async fn collect_response<B>(
     endpoint: &str,
 ) -> Result<Response<Bytes>, B::Error>
 where
-    B: http_body_1::Body<Data = Bytes>,
+    B: http_body::Body<Data = Bytes>,
 {
     if response.status().is_success() {
         emit!(EndpointBytesSent {
@@ -233,7 +233,7 @@ where
 pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: super::http::RetryStrategy,
 ) -> super::http::HttpStatusRetryLogic<
-    impl Fn(&HttpResponse) -> http_1::StatusCode + Clone + Send + Sync + 'static,
+    impl Fn(&HttpResponse) -> http::StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
 > {
@@ -279,7 +279,7 @@ mod tests {
 
     #[derive(Clone)]
     struct RequestBuilder {
-        uri: http_1::Uri,
+        uri: http::Uri,
     }
 
     impl HttpServiceRequestBuilder<()> for RequestBuilder {
@@ -348,7 +348,7 @@ mod tests {
 
         assert_eq!(
             response.response.status(),
-            http_1::StatusCode::SERVICE_UNAVAILABLE
+            http::StatusCode::SERVICE_UNAVAILABLE
         );
         assert_eq!(response.response.body().as_ref(), message);
         assert!(!response.response.headers().contains_key("content-encoding"));
@@ -414,7 +414,7 @@ mod tests {
             let mut service = sig_v4_service(&uri, Credentials::from_keys("AKID", "SECRET", None));
 
             let response = service.call(request()).await.unwrap();
-            assert_eq!(response.response.status(), http_1::StatusCode::OK);
+            assert_eq!(response.response.status(), http::StatusCode::OK);
 
             let (headers, body) = rx.recv().await.unwrap();
             assert_eq!(body, "events");

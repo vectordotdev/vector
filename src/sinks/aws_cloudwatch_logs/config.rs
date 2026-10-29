@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
-use http_1::HeaderValue;
+use http::HeaderValue;
 use serde::{Deserialize, Deserializer, de};
 use tower::ServiceBuilder;
 use vector_lib::{

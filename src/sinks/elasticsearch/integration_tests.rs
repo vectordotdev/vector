@@ -84,7 +84,7 @@ fn https_server() -> HttpEndpoint {
 
 impl ElasticsearchCommon {
     async fn flush_request(&self, client: &HttpClient) -> crate::Result<()> {
-        let mut builder = http_1::Request::post(format!("{}/_flush", self.base_url));
+        let mut builder = http::Request::post(format!("{}/_flush", self.base_url));
 
         if let Some(ce) = self.request_builder.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
@@ -117,7 +117,7 @@ impl ElasticsearchCommon {
         let response = client.send(request.map(full_body)).await?;
 
         match response.status() {
-            http_1::StatusCode::OK => Ok(()),
+            http::StatusCode::OK => Ok(()),
             status => Err(HealthcheckError::unexpected_status(status).into()),
         }
     }

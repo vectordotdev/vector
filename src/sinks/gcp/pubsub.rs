@@ -2,7 +2,7 @@ use std::{io, mem, time::Duration};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
-use http_1::{Request, Uri, header::CONTENT_TYPE};
+use http::{Request, Uri, header::CONTENT_TYPE};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;

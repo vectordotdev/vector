@@ -1,7 +1,7 @@
 //! Service implementation for the `keep` sink.
 
 use bytes::Bytes;
-use http_1::Request;
+use http::Request;
 use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 

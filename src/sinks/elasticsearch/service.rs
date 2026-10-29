@@ -5,7 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, Response, Uri};
+use http::{Request, Response, Uri};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
 use tower_http_1::decompression::Decompression;

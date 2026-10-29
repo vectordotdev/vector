@@ -13,7 +13,7 @@ use std::{
 use chrono::DateTime;
 use derivative::Derivative;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
-use http_1::uri::{InvalidUri, Uri};
+use http::uri::{InvalidUri, Uri};
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -928,7 +928,7 @@ mod tests {
                         tokio::spawn(async move {
                             let mut requests = request.into_body();
                             requests.data().await.unwrap().unwrap();
-                            let response = http_1::Response::builder()
+                            let response = http::Response::builder()
                                 .header("content-type", "application/grpc")
                                 .body(())
                                 .unwrap();
@@ -1104,7 +1104,7 @@ mod tests {
             tokio::spawn(async move {
                 let mut requests = request.into_body();
                 requests.data().await.unwrap().unwrap();
-                let response = http_1::Response::builder()
+                let response = http::Response::builder()
                     .header("content-type", "application/grpc")
                     .body(())
                     .unwrap();
@@ -1165,7 +1165,7 @@ mod tests {
             tokio::spawn(async move {
                 let mut requests = request.into_body();
                 requests.data().await.unwrap().unwrap();
-                let response = http_1::Response::builder()
+                let response = http::Response::builder()
                     .header("content-type", "application/grpc")
                     .body(())
                     .unwrap();

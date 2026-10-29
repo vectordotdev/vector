@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use futures::FutureExt;
-use http_1::StatusCode;
+use http::StatusCode;
 use snafu::Snafu;
 use vector_http::empty_body;
 use vector_lib::configurable::configurable_component;
@@ -124,7 +124,7 @@ pub fn build_healthcheck(
     auth: GcpAuthenticator,
 ) -> Healthcheck {
     let healthcheck = async move {
-        let mut request = http_1::Request::head(base_url.into_uri()).body(empty_body())?;
+        let mut request = http::Request::head(base_url.into_uri()).body(empty_body())?;
 
         auth.apply(&mut request);
 

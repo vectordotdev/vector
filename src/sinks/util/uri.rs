@@ -1,6 +1,6 @@
 use std::{fmt, str::FromStr};
 
-use http_1::uri::{Authority, PathAndQuery, Scheme, Uri};
+use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
@@ -15,7 +15,7 @@ const USERINFO: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'_')
     .remove(b'~');
 
-/// A wrapper for `http_1::Uri` that implements `Deserialize` and `Serialize`.
+/// A wrapper for `http::Uri` that implements `Deserialize` and `Serialize`.
 ///
 /// Authorization credentials, if they exist, will be removed from the URI and stored separately in `auth`.
 #[configurable_component]
@@ -223,20 +223,20 @@ pub enum HttpEndpointError {
     #[snafu(display("endpoint `{endpoint}` is not a valid URI: {source}"))]
     InvalidUri {
         endpoint: String,
-        source: http_1::uri::InvalidUri,
+        source: http::uri::InvalidUri,
     },
 
     #[snafu(display("endpoint `{endpoint}` has an invalid path `{path}`: {source}"))]
     InvalidPath {
         endpoint: String,
         path: String,
-        source: http_1::uri::InvalidUri,
+        source: http::uri::InvalidUri,
     },
 
     #[snafu(display("endpoint `{endpoint}` cannot be reassembled from its parts: {source}"))]
     InvalidUriParts {
         endpoint: String,
-        source: http_1::uri::InvalidUriParts,
+        source: http::uri::InvalidUriParts,
     },
 
     #[snafu(display(
@@ -500,9 +500,9 @@ impl fmt::Display for HttpEndpoint {
 /// same way in every component with that same error (bytes in a fragment,
 /// which is dropped, are ignored by both), so the accepted URIs and the errors
 /// are unchanged.
-pub(crate) fn parse_ascii<T>(s: &str) -> Result<T, http_1::uri::InvalidUri>
+pub(crate) fn parse_ascii<T>(s: &str) -> Result<T, http::uri::InvalidUri>
 where
-    T: TryFrom<Vec<u8>, Error = http_1::uri::InvalidUri>,
+    T: TryFrom<Vec<u8>, Error = http::uri::InvalidUri>,
 {
     T::try_from(
         s.bytes()

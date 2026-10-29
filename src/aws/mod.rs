@@ -300,7 +300,7 @@ enum SigningError {
 /// in an HTTP header value, such as a newline.
 pub async fn sign_request_v1(
     service_name: &str,
-    request: &mut http_1::Request<Bytes>,
+    request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
@@ -337,7 +337,7 @@ fn signable_headers<'a>(
 /// does not make the signature's `x-amz-date` stale.
 async fn sign_request_v1_at(
     service_name: &str,
-    request: &mut http_1::Request<Bytes>,
+    request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
@@ -642,7 +642,7 @@ mod tests {
             SharedCredentialsProvider::new(Credentials::from_keys("AKID", "SECRET", None));
         let region = Region::new("us-east-1");
 
-        let mut request = http_1::Request::post(URI)
+        let mut request = http::Request::post(URI)
             .header("content-type", "application/json")
             .body(Bytes::from_static(BODY))
             .expect("valid request");

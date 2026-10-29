@@ -12,7 +12,7 @@ const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'_')
     .remove(b'~');
 use bytes::Bytes;
-use http_1::{
+use http::{
     Method, Request, Response, StatusCode, Uri,
     header::{CONTENT_LENGTH, CONTENT_TYPE, EXPECT, LOCATION},
 };
@@ -141,7 +141,7 @@ impl DorisSinkClient {
             let authority = self
                 .base_url
                 .authority()
-                .map_or("", http_1::uri::Authority::as_str);
+                .map_or("", http::uri::Authority::as_str);
             let encoded_database = utf8_percent_encode(database, PATH_SEGMENT);
             let encoded_table = utf8_percent_encode(table, PATH_SEGMENT);
             let stream_load_url = format!(
@@ -340,7 +340,7 @@ impl DorisSinkClient {
         let scheme = endpoint.scheme_str().unwrap_or("http");
         let authority = endpoint
             .authority()
-            .map_or("", http_1::uri::Authority::as_str);
+            .map_or("", http::uri::Authority::as_str);
         let uri_str = format!("{scheme}://{authority}/api/bootstrap");
 
         let uri = uri_str.parse::<Uri>().map_err(|source| {
@@ -477,10 +477,10 @@ impl From<StreamLoadStatus> for vector_common::finalization::EventStatus {
 #[derive(Debug, Snafu)]
 pub enum StreamLoadError {
     #[snafu(display("Invalid redirect URI: {}", source))]
-    InvalidRedirectUri { source: http_1::uri::InvalidUri },
+    InvalidRedirectUri { source: http::uri::InvalidUri },
 
     #[snafu(display("Invalid stream load URI: {}", source))]
-    InvalidStreamLoadUri { source: http_1::uri::InvalidUri },
+    InvalidStreamLoadUri { source: http::uri::InvalidUri },
 
     #[snafu(display("Detected redirect loop"))]
     RedirectLoop,
@@ -495,7 +495,7 @@ pub enum StreamLoadError {
     MaxRedirectsExceeded { max: u8 },
 
     #[snafu(display("Failed to build request: {}", source))]
-    BuildRequest { source: http_1::Error },
+    BuildRequest { source: http::Error },
 
     #[snafu(display("Failed to read response body: {}", source))]
     ReadResponseBody { source: hyper_1::Error },
@@ -508,10 +508,10 @@ pub enum StreamLoadError {
 #[derive(Debug, Snafu)]
 pub enum HealthCheckError {
     #[snafu(display("Invalid health check URI: {}", source))]
-    InvalidUri { source: http_1::uri::InvalidUri },
+    InvalidUri { source: http::uri::InvalidUri },
 
     #[snafu(display("Failed to build health check request: {}", source))]
-    HealthCheckBuildRequest { source: http_1::Error },
+    HealthCheckBuildRequest { source: http::Error },
 
     #[snafu(display("Failed to read health check response body: {}", source))]
     HealthCheckReadResponseBody { source: hyper_1::Error },

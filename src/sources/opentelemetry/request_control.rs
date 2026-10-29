@@ -20,7 +20,7 @@ use vector_lib::{
 pub(crate) type HttpRequest = http_0::Request<hyper::Body>;
 
 /// Request served by the native Tonic gRPC listener.
-pub(crate) type GrpcRequest = http_1::Request<tonic::body::BoxBody>;
+pub(crate) type GrpcRequest = http::Request<tonic::body::BoxBody>;
 
 /// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
@@ -175,7 +175,7 @@ impl<B: 'static> AcknowledgementResponse for http_0::Response<B> {
     }
 }
 
-impl<B: 'static> AcknowledgementResponse for http_1::Response<B> {
+impl<B: 'static> AcknowledgementResponse for http::Response<B> {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
         self.extensions_mut()
             .remove::<SharedPendingAcknowledgement<Self>>()?
@@ -317,14 +317,14 @@ mod tests {
     };
 
     type HttpResponse = http_0::Response<Body>;
-    type GrpcResponse = http_1::Response<BoxBody>;
+    type GrpcResponse = http::Response<BoxBody>;
 
     fn http_request() -> HttpRequest {
         http_0::Request::new(Body::empty())
     }
 
     fn grpc_request() -> GrpcRequest {
-        http_1::Request::new(empty_body())
+        http::Request::new(empty_body())
     }
 
     fn http_ok() -> HttpResponse {

@@ -9,7 +9,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use http_1::{HeaderMap, Method, Request, Response, StatusCode, Uri, Version, header};
+use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, Version, header};
 use http_body_util::{BodyExt as _, Full};
 use hyper::body::HttpBody as _;
 use hyper_1::{body::Incoming, client::conn, service::service_fn};

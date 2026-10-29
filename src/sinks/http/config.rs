@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
-use http_1::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
+use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use vector_http::empty_body;
 use vector_lib::codecs::{
     CharacterDelimitedEncoderConfig, LengthDelimitedEncoderConfig,

@@ -1,4 +1,4 @@
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use vector_http::empty_body;
 
 use super::append_loki_path;
@@ -9,7 +9,7 @@ use crate::{
 };
 
 async fn fetch_status(
-    uri: http_1::Uri,
+    uri: http::Uri,
     auth: Option<&Auth>,
     client: &HttpClient,
 ) -> crate::Result<StatusCode> {

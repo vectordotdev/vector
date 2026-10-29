@@ -1,7 +1,7 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use http_1::{Request, StatusCode};
+use http::{Request, StatusCode};
 use snafu::Snafu;
 use tracing::Instrument;
 use vector_http::full_body;

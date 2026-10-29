@@ -21,7 +21,7 @@ fn append_loki_path(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEn
     let base_path = parts
         .path_and_query
         .as_ref()
-        .map(http_1::uri::PathAndQuery::path)
+        .map(http::uri::PathAndQuery::path)
         .unwrap_or_default();
     let joined = format!(
         "{}/{}",
@@ -30,7 +30,7 @@ fn append_loki_path(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEn
     );
     parts.path_and_query = Some(joined.parse()?);
 
-    Ok(HttpEndpoint::new(http_1::Uri::from_parts(parts)?)?)
+    Ok(HttpEndpoint::new(http::Uri::from_parts(parts)?)?)
 }
 
 mod config;

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Deserializer, de::Error as _};
 use snafu::ResultExt;
 use vector_http::empty_body;

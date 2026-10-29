@@ -9,7 +9,7 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use http_1::Uri;
+use http::Uri;
 use vector_lib::codecs::{Encoder, SinkType, encoding::Framer};
 
 #[derive(Debug, Clone)]

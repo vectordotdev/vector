@@ -6,7 +6,7 @@ use std::{collections::HashMap, io};
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http_1::{
+use http::{
     Request, StatusCode, Uri,
     header::{self, HeaderName, HeaderValue},
 };

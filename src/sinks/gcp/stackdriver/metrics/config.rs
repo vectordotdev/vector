@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
-use http_1::{Request, header::CONTENT_TYPE};
+use http::{Request, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
 use super::{

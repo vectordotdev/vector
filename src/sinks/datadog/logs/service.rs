@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{
+use http::{
     Request, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderMap},
 };

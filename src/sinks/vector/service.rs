@@ -1,7 +1,7 @@
 use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
-use http_1::Uri;
+use http::Uri;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;

@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     HeaderName, HeaderValue, Method, Request,
     header::{CONTENT_ENCODING, CONTENT_TYPE},
 };

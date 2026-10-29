@@ -566,7 +566,7 @@ fn uri_percent_encoded_dotdot_rejected() {
 #[test]
 fn uri_encoded_slash_traversal_rejected() {
     // `%2f` is a percent-encoded `/`. RFC 3986 treats it as a literal slash
-    // character inside a segment, not a path separator — so `http_1::Uri` keeps
+    // character inside a segment, not a path separator — so `http::Uri` keeps
     // `%2e%2e%2fadmin` as a single segment and the segment-level dot-dot checks
     // alone would miss it. Many HTTP servers decode `%2f` before resolving the
     // path, turning the single segment into `../admin` and escaping the prefix.
@@ -636,7 +636,7 @@ fn uri_authority_mismatch_rejected() {
 
 #[test]
 fn uri_path_field_cannot_smuggle_backslash() {
-    // Raw `\` is accepted by `http_1::Uri` but Windows/IIS servers treat it
+    // Raw `\` is accepted by `http::Uri` but Windows/IIS servers treat it
     // as a path separator — `/ingest/..\admin` escapes the prefix on those
     // hosts. Reject at render time.
     let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
@@ -655,7 +655,7 @@ fn uri_path_field_cannot_smuggle_backslash() {
 
 #[test]
 fn uri_rejects_non_ascii() {
-    // `http_1::Uri` accepts raw UTF-8 in the path, but servers that map
+    // `http::Uri` accepts raw UTF-8 in the path, but servers that map
     // Unicode look-alikes onto `.` and `/` would turn U+FF0E FULLWIDTH FULL
     // STOP and U+FF0F FULLWIDTH SOLIDUS into a traversal. Reject at render
     // time.
@@ -694,7 +694,7 @@ fn uri_path_field_cannot_smuggle_query_or_fragment() {
     // Templates with no `?`/`#` build successfully. A field value that
     // smuggles `?...` or `#...` into the path (e.g. tenant=`ok?tenant=evil`)
     // is caught at render time: neither is part of the operator-authored
-    // path prefix, and `http_1::Uri` would truncate at `#` before the checker
+    // path prefix, and `http::Uri` would truncate at `#` before the checker
     // sees the full value.
     let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
@@ -717,7 +717,7 @@ fn uri_fragment_prevents_suffix_hiding() {
     //   https://api.internal/base/{{ tenant }}/ingest
     // with tenant = "ok#evil" renders:
     //   https://api.internal/base/ok#evil
-    // Without raw fragment checking, http_1::Uri would truncate to:
+    // Without raw fragment checking, http::Uri would truncate to:
     //   https://api.internal/base/ok
     // and the /ingest suffix is never checked or used.
 
@@ -742,7 +742,7 @@ fn uri_fragment_prevents_suffix_hiding() {
 fn uri_template_with_query_or_fragment_rejected_at_build() {
     // URI templates with field references AND `?` / `#` are rejected. A
     // field-rendered value could smuggle a query segment, or a `#frag`
-    // that `http_1::Uri` truncates before the checker can see the path
+    // that `http::Uri` truncates before the checker can see the path
     // (silently dropping any operator-authored suffix).
     // Static URI templates (no `{{ }}`) are exempt — their query/fragment
     // is fixed.
@@ -1031,7 +1031,7 @@ fn uri_template_confine_accepts_strftime_only_path() {
     // A URI with only strftime directives and no `{{ }}` references renders
     // operator-authored, time-derived text — nothing is event-controlled, so
     // no runtime checker is built (matching master). It must still build and
-    // render; in particular `http_1::Uri` must not be fed the raw `%Y`/`%m`
+    // render; in particular `http::Uri` must not be fed the raw `%Y`/`%m`
     // directives as percent escapes.
     let ts = Utc
         .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)

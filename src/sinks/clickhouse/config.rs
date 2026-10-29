@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use vector_http::empty_body;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
@@ -560,7 +560,7 @@ mod tests {
     ) -> ClickhouseConfig {
         ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -600,7 +600,7 @@ mod tests {
     fn preparation_error_on_invalid_batch_encoding_combination() {
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -628,7 +628,7 @@ mod tests {
     fn prepares_valid_config() {
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -650,7 +650,7 @@ mod tests {
     fn rejects_incompatible_batch_encoding() {
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -673,7 +673,7 @@ mod tests {
         // Dynamic table (with a static prefix, so it passes confinement)
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -699,7 +699,7 @@ mod tests {
         // Dynamic database
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -728,7 +728,7 @@ mod tests {
     fn accepts_static_targets_with_arrow_batch_encoding() {
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -748,7 +748,7 @@ mod tests {
     fn rejects_unconfined_template() {
         let config = ClickhouseConfig {
             endpoint: "http://localhost:8123"
-                .parse::<http_1::Uri>()
+                .parse::<http::Uri>()
                 .unwrap()
                 .try_into()
                 .unwrap(),

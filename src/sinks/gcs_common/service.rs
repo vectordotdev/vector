@@ -2,7 +2,7 @@ use std::task::Poll;
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{
+use http::{
     Request,
     header::{HeaderName, HeaderValue},
 };
@@ -86,7 +86,7 @@ pub struct GcsRequestSettings {
 pub struct GcsResponse {
     /// The native client's response; delivery and retries use only its status, so the body
     /// stays unread.
-    pub inner: http_1::Response<Incoming>,
+    pub inner: http::Response<Incoming>,
     pub metadata: RequestMetadata,
 }
 

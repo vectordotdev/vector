@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use http_1::Uri;
+use http::Uri;
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tokio::sync::Semaphore;
 use tonic::Code::{

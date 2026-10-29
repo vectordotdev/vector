@@ -1,6 +1,6 @@
 use std::fmt;
 
-use http_1::{
+use http::{
     HeaderValue, Request, Response,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };

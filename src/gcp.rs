@@ -11,7 +11,7 @@ use goauth::{
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
 };
-use http_1::{Uri, header::AUTHORIZATION, uri::PathAndQuery};
+use http::{Uri, header::AUTHORIZATION, uri::PathAndQuery};
 use http_body_util::{BodyExt as _, Collected};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
@@ -165,7 +165,7 @@ impl GcpAuthenticator {
     /// # Panics
     /// Panics if the token lock is poisoned, the token is not a valid header value, or
     /// adding the API key produces an invalid URI.
-    pub fn apply<T>(&self, request: &mut http_1::Request<T>) {
+    pub fn apply<T>(&self, request: &mut http::Request<T>) {
         if let Some(token) = self.make_token() {
             request
                 .headers_mut()
@@ -293,7 +293,7 @@ async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token>
 
 async fn get_token_implicit() -> Result<Token, GcpError> {
     debug!("Fetching implicit GCP authentication token.");
-    let req = http_1::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
+    let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
         .header("Metadata-Flavor", "Google")
         .body(empty_body())
         .unwrap();

@@ -1,5 +1,5 @@
 use futures::{future::ready, stream};
-use http_1::Uri;
+use http::Uri;
 use sqlx::{
     ConnectOptions, Connection, Executor as _, MySqlConnection, Row, mysql::MySqlConnectOptions,
 };

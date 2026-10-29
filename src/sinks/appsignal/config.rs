@@ -1,5 +1,5 @@
 use futures::FutureExt;
-use http_1::{HeaderValue, Request, header::AUTHORIZATION};
+use http::{HeaderValue, Request, header::AUTHORIZATION};
 use tower::ServiceBuilder;
 use vector_http::empty_body;
 use vector_lib::{

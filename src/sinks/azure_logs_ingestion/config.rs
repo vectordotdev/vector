@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
-use http_1::uri::PathAndQuery;
+use http::uri::PathAndQuery;
 
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;

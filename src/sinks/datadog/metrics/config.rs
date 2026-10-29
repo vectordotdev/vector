@@ -1,4 +1,4 @@
-use http_1::Uri;
+use http::Uri;
 use tower::ServiceBuilder;
 use vector_lib::{
     config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings,

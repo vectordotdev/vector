@@ -3,7 +3,7 @@
 use std::fmt::Write as _;
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };

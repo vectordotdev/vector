@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use http_1::{HeaderName, HeaderValue, Method, StatusCode, Uri, header::AUTHORIZATION};
+use http::{HeaderName, HeaderValue, Method, StatusCode, Uri, header::AUTHORIZATION};
 use vector_http::full_body;
 
 #[cfg(feature = "aws-core")]
