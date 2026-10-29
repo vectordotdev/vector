@@ -220,11 +220,12 @@ where
                     }
 
                     response.events_sent().emit_event(events_sent);
-
-                // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
-                } else if response.event_status() == EventStatus::Rejected {
+                } else if matches!(
+                    response.event_status(),
+                    EventStatus::Rejected | EventStatus::Errored
+                ) {
+                    // The retry service has finished; either outcome abandons these events.
                     Self::emit_call_error(None, request_id, event_count);
-                    finalizers.update_status(EventStatus::Rejected);
                 }
             }
         }
@@ -265,7 +266,9 @@ mod tests {
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
     use vector_common::{
-        finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        finalization::{
+            BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+        },
         internal_event::CountByteSize,
         json_size::JsonSize,
         request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -414,6 +417,96 @@ mod tests {
 
                 Ok(DelayResponse::new())
             })
+        }
+    }
+
+    #[tokio::test]
+    async fn driver_terminal_outcome_metrics() {
+        use vector_core::{
+            event::MetricValue,
+            metrics::{self, Controller},
+        };
+
+        struct StatusResponse(EventStatus, GroupedCountByteSize);
+
+        impl DriverResponse for StatusResponse {
+            fn event_status(&self) -> EventStatus {
+                self.0
+            }
+
+            fn events_sent(&self) -> &GroupedCountByteSize {
+                &self.1
+            }
+        }
+
+        metrics::init_test();
+        let controller = Controller::get().unwrap();
+        for (status, expected_batch_status) in [
+            (Some(EventStatus::Delivered), BatchStatus::Delivered),
+            (Some(EventStatus::Rejected), BatchStatus::Rejected),
+            (Some(EventStatus::Errored), BatchStatus::Errored),
+            (None, BatchStatus::Rejected),
+        ] {
+            controller.reset();
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            let event_count = 3;
+            let sizes: GroupedCountByteSize = CountByteSize(event_count, JsonSize::new(12)).into();
+            let request = DelayRequest(
+                EventFinalizers::new(EventFinalizer::new(batch)),
+                RequestMetadata::new(event_count, 12, 12, 12, sizes.clone()),
+            );
+            let service = tower::service_fn(move |_: DelayRequest| {
+                std::future::ready(match status {
+                    Some(status) => Ok(StatusResponse(status, sizes.clone())),
+                    None => Err("request failed"),
+                })
+            });
+
+            Driver::new(stream::iter([request]), service)
+                .run()
+                .await
+                .unwrap();
+            assert_eq!(receiver.await, expected_batch_status);
+
+            let metrics = controller.capture_metrics();
+            let counter = |name| MetricValue::Counter {
+                value: metrics
+                    .iter()
+                    .filter(|metric| metric.name() == name)
+                    .map(|metric| {
+                        let MetricValue::Counter { value } = metric.value() else {
+                            panic!("{name} must be a counter");
+                        };
+                        *value
+                    })
+                    .sum(),
+            };
+            let delivered = status == Some(EventStatus::Delivered);
+            assert_eq!(
+                counter("component_sent_events_total"),
+                MetricValue::Counter {
+                    value: if delivered { 3.0 } else { 0.0 }
+                }
+            );
+            assert_eq!(
+                counter("component_errors_total"),
+                MetricValue::Counter {
+                    value: if delivered { 0.0 } else { 1.0 }
+                }
+            );
+            assert_eq!(
+                counter("component_discarded_events_total"),
+                MetricValue::Counter {
+                    value: if delivered { 0.0 } else { 3.0 }
+                }
+            );
+            if !delivered {
+                let discarded = metrics
+                    .iter()
+                    .find(|metric| metric.name() == "component_discarded_events_total")
+                    .unwrap();
+                assert_eq!(discarded.tag_value("intentional"), Some("false".into()));
+            }
         }
     }
 
