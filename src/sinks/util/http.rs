@@ -124,11 +124,7 @@ where
 {
     sink: Arc<T>,
     #[pin]
-    inner: TowerBatchedSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>, B::Output>,
-        B,
-        RL,
-    >,
+    inner: TowerBatchedSink<HttpSinkService<B::Output>, B, RL>,
     encoder: T::Encoder,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
@@ -270,12 +266,7 @@ where
 {
     sink: Arc<T>,
     #[pin]
-    inner: TowerPartitionSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>, B::Output>,
-        B,
-        RL,
-        K,
-    >,
+    inner: TowerPartitionSink<HttpSinkService<B::Output>, B, RL, K>,
     encoder: T::Encoder,
     slot: Option<EncodedEvent<B::Input>>,
 }
@@ -420,6 +411,10 @@ pub struct SigV4Config {
     pub(crate) region: Region,
     pub(crate) service: String,
 }
+
+/// The [`HttpBatchService`] used by [`BatchedHttpSink`] and [`PartitionHttpSink`].
+type HttpSinkService<B> =
+    HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>, B>;
 
 /// @struct `HttpBatchService`
 ///

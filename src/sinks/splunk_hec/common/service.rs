@@ -317,15 +317,15 @@ mod tests {
     const TOKEN: &str = "token";
     static ACK_ID: AtomicU64 = AtomicU64::new(0);
 
+    type HecBatchService = HttpBatchService<
+        BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
+        HecRequest,
+    >;
+
     fn get_hec_service(
         endpoint: String,
         acknowledgements_config: HecClientAcknowledgementsConfig,
-    ) -> HecService<
-        HttpBatchService<
-            BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
-            HecRequest,
-        >,
-    > {
+    ) -> HecService<HecBatchService> {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,

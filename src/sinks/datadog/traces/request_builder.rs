@@ -206,11 +206,14 @@ pub fn build_request(
     }
 }
 
+/// An encoded payload and the trace events it contains.
+type EncodeResult = Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>;
+
 fn encode_traces(
     key: &PartitionKey,
     trace_events: Vec<TraceEvent>,
     max_size: usize,
-) -> Vec<Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>> {
+) -> Vec<EncodeResult> {
     let mut results = Vec::new();
     let mut processed = Vec::new();
     let mut payload = build_empty_payload(key);

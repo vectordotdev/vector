@@ -718,11 +718,14 @@ fn handle_event(
     }
 }
 
+/// Events decoded from one frame with the frame's byte size, and the stream it was read from.
+type ReaderMessage = ((SmallVec<[Event; 1]>, usize), &'static str);
+
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
     decoder: Decoder,
     origin: &'static str,
-    sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
+    sender: Sender<ReaderMessage>,
 ) {
     // Start the green background thread for collecting
     drop(crate::spawn_in_current_span(async move {

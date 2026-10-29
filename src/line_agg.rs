@@ -109,7 +109,7 @@ pub struct LineAgg<T, K, C> {
     /// Draining queue. We switch to draining mode when we get `None` from
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
-    draining: Option<Vec<(K, Bytes, C, Option<C>)>>,
+    draining: Option<Vec<AggregatedLine<K, C>>>,
 }
 
 /// Core line aggregation logic.
@@ -166,7 +166,7 @@ where
     /// `Bytes` - the line data,
     /// `C` - the initial context related to the first line of data.
     /// `Option<C>` - context related to the last-seen line data.
-    type Item = (K, Bytes, C, Option<C>);
+    type Item = AggregatedLine<K, C>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -251,7 +251,7 @@ where
         src: K,
         line: Bytes,
         context: C,
-    ) -> Option<(K, Bytes, C, Option<C>)> {
+    ) -> Option<AggregatedLine<K, C>> {
         // Stashed line is always consumed at the start of the `poll`
         // loop before entering this line processing logic. If it's
         // non-empty here - it's a bug.
@@ -282,6 +282,12 @@ where
     }
 }
 
+/// A merged line with the context of its first line and, if more lines were merged, of its last line.
+type MergedLine<C> = (Bytes, C, Option<C>);
+
+/// A merged line together with the key of its source.
+type AggregatedLine<K, C> = (K, Bytes, C, Option<C>);
+
 /// Specifies the amount of lines to emit in response to a single input line.
 /// We have to emit either one or two lines.
 pub enum Emit<T> {
@@ -310,7 +316,7 @@ where
         src: K,
         line: Bytes,
         context: C,
-    ) -> Option<(K, Emit<(Bytes, C, Option<C>)>)> {
+    ) -> Option<(K, Emit<MergedLine<C>>)> {
         // Check if we already have the buffered data for the source.
         match self.buffers.entry(src) {
             Entry::Occupied(mut entry) => {
@@ -393,7 +399,7 @@ impl<C> Aggregate<C> {
         self.lines.push(line);
     }
 
-    fn merge(self) -> (Bytes, C, Option<C>) {
+    fn merge(self) -> MergedLine<C> {
         let capacity = self.lines.iter().map(|line| line.len() + 1).sum::<usize>() - 1;
         let mut bytes_mut = BytesMut::with_capacity(capacity);
         let mut first = true;

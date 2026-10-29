@@ -263,6 +263,9 @@ pub struct FileData {
     pub modified: SystemTime,
 }
 
+/// Maps a hash of the indexed field values to the matching row numbers.
+type FieldIndex = HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>;
+
 /// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
@@ -270,11 +273,7 @@ pub struct File {
     last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
-    indexes: Vec<(
-        Case,
-        Vec<usize>,
-        HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>,
-    )>,
+    indexes: Vec<(Case, Vec<usize>, FieldIndex)>,
 }
 
 impl File {
@@ -407,11 +406,7 @@ impl File {
     /// the index of the row in the data.
     ///
     /// Ensure fields that are searched via a comparison are not included in the index!
-    fn index_data(
-        &self,
-        fieldidx: &[usize],
-        case: Case,
-    ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, Error> {
+    fn index_data(&self, fieldidx: &[usize], case: Case) -> Result<FieldIndex, Error> {
         let mut index = HashMap::with_capacity_and_hasher(
             self.data.len(),
             hash_hasher::HashBuildHasher::default(),

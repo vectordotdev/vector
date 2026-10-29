@@ -603,6 +603,10 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
 ///
 /// This layer emits HTTP specific telemetry for requests received, responses sent, and handler duration.
 #[must_use]
+#[expect(
+    clippy::type_complexity,
+    reason = "The closure types are `impl Fn` and cannot be named in a type alias."
+)]
 pub fn build_http_trace_layer<T, U>(
     span: Span,
 ) -> TraceLayer<
