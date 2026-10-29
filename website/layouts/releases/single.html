@@ -10,6 +10,7 @@
 {{ $breaking := where ($release.changelog | default slice) "breaking" true }}
 {{ $breakingTitled := where $breaking "title" "ne" nil }}
 {{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
+{{ $announced := partial "releases/deprecation-announcements.html" (dict "version" $version) }}
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "security" "security changes" "deprecation" "deprecations" "chore" "chore"}}
 {{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
@@ -92,7 +93,9 @@
       </div>
       {{ end }}
 
-      {{ if gt (len $release.changelog) 0 }}
+      {{/* Deprecation announcements are part of the changelog, so a release that
+           only announces deprecations still renders it with that single group. */}}
+      {{ if or (gt (len $release.changelog) 0) (gt (len $announced) 0) }}
       <div class="mt-8">
         <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
@@ -124,7 +127,7 @@
           {{ range $orderedGroups }}
           {{ $key := . }}
           {{ $value := index $groups $key }}
-          {{ $changes := where $release.changelog ".type" "eq" $key }}
+          {{ $changes := where ($release.changelog | default slice) ".type" "eq" $key }}
           {{ if $changes }}
           {{ $numChanges := len $changes }}
           {{ $heading := printf "%d %s" $numChanges $value }}
@@ -144,6 +147,8 @@
           </div>
           {{ end }}
           {{ end }}
+
+          {{ partial "releases/deprecations.html" (dict "entries" $announced) }}
         </div>
       </div>
       {{ else }}
@@ -231,7 +236,6 @@
         </div>
       </div>
     </div>
-    {{ partial "releases/deprecations.html" (dict "version" $version) }}
   </main>
 
   <div class="hidden lg:block xl:col-span-1">
