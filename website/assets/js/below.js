@@ -123,7 +123,8 @@ const addCodeControls = () => {
 
       const lineCountLabel = document.createElement("span");
       lineCountLabel.className = "code-line-count";
-      lineCountLabel.textContent = `${lineCount} lines`;
+      const filename = block.parentElement.dataset.codeFilename;
+      lineCountLabel.textContent = filename ? `${filename} · ${lineCount} lines` : `${lineCount} lines`;
 
       const toggle = document.createElement("button");
       toggle.type = "button";
