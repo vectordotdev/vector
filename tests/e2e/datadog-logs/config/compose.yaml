@@ -1,5 +1,20 @@
 version: "3.8"
 
+# Healthcheck for both fakeintakes: passes once the intake holds every log event that
+# `log_generator` writes. It's a lower bound: the Rust test asserts the exact count, so
+# duplicates fail there instead of stalling this check. `"hostname"` appears once per event.
+x-logs-received: &logs-received
+  test:
+    - CMD-SHELL
+    - >-
+      found=$$(curl -s 'http://localhost:80/fakeintake/payloads?endpoint=/api/v2/logs&format=json'
+      | grep -o '"hostname"' | wc -l);
+      echo "logs=$$found/1000";
+      [ "$$found" -ge 1000 ]
+  interval: 500ms
+  timeout: 2s
+  retries: 240
+
 services:
   # Generates random log data for consumption by the custom Agent check
   log_generator:
@@ -10,6 +25,7 @@ services:
     command:
       - "-f"
       - "json"
+      # Keep in sync with the fakeintake healthcheck and `EXPECTED_LOG_EVENTS` in test.yaml.
       - "-n"
       - "1000"
       - "-t"
@@ -107,12 +123,28 @@ services:
   fakeintake-agent:
     # TODO: temporarily pegging the image as latest results in failures
     image: docker.io/datadog/fakeintake:v3c2ea716
+    healthcheck: *logs-received
 
   # Receives log data from the `datadog-agent-vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
     # TODO: temporarily pegging the image as latest results in failures
     image: docker.io/datadog/fakeintake:v3c2ea716
+    healthcheck: *logs-received
+
+  # A detached `compose up` waits for all dependency conditions before starting this service.
+  # This keeps the test runner behind the generator finishing and both intakes holding every
+  # log event.
+  logs-ready:
+    image: alpine:3.20
+    depends_on:
+      log_generator:
+        condition: service_completed_successfully
+      fakeintake-agent:
+        condition: service_healthy
+      fakeintake-vector:
+        condition: service_healthy
+    command: ["true"]
 
 networks:
   default:

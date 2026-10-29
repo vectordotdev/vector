@@ -1,7 +1,4 @@
-use std::time::Duration;
-
 use serde_json::Value;
-use tokio::time::{Instant, sleep};
 use tracing::info;
 use vector::test_util::trace_init;
 
@@ -62,49 +59,27 @@ fn reduce_to_data(payloads: Vec<FakeIntakePayload<Value>>) -> Vec<Value> {
         .collect()
 }
 
-fn count_log_events(payloads: &[Value]) -> usize {
-    payloads
-        .iter()
-        .map(|payload| payload.as_array().map_or(0, Vec::len))
-        .sum()
-}
+async fn get_log_payloads(address: &str) -> Vec<Value> {
+    info!("getting log payloads from {address}");
+    let mut payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(address, LOGS_ENDPOINT)
+        .await
+        .payloads;
 
-// Polls a fakeintake until it holds the expected number of log events or the deadline passes.
-async fn get_log_payloads(address: String, deadline: Instant) -> Vec<Value> {
-    loop {
-        info!("getting log payloads from {address}");
-        let mut payloads =
-            get_fakeintake_payloads::<FakeIntakeResponseJson>(&address, LOGS_ENDPOINT)
-                .await
-                .payloads;
-
-        // The logs endpoint receives an empty healthcheck payload in the beginning
-        payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty());
-        let payloads = reduce_to_data(payloads);
-
-        // Wait for at least the expected count. `common_assertions` still checks the exact count,
-        // so duplicates fail there.
-        if count_log_events(&payloads) >= expected_log_events() || Instant::now() >= deadline {
-            break payloads;
-        }
-        sleep(Duration::from_secs(1)).await;
-    }
+    // The logs endpoint receives an empty healthcheck payload in the beginning
+    payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty());
+    reduce_to_data(payloads)
 }
 
 #[tokio::test]
 async fn validate() {
     trace_init();
 
-    // Wait for workload data, not compilation time, to make both pipelines ready.
-    // Leave time to report failures before nextest's two-minute test timeout.
-    let deadline = Instant::now() + Duration::from_secs(90);
-
-    info!("getting log payloads from agent-only pipeline");
-    let mut agent_payloads = get_log_payloads(fake_intake_agent_address(), deadline).await;
+    // The Compose `logs-ready` gate waits until both intakes hold every log event, so this
+    // reads a complete snapshot.
+    let mut agent_payloads = get_log_payloads(&fake_intake_agent_address()).await;
     common_assertions(&mut agent_payloads);
 
-    info!("getting log payloads from agent-vector pipeline");
-    let mut vector_payloads = get_log_payloads(fake_intake_vector_address(), deadline).await;
+    let mut vector_payloads = get_log_payloads(&fake_intake_vector_address()).await;
     common_assertions(&mut vector_payloads);
 
     assert_eq!(agent_payloads, vector_payloads);
