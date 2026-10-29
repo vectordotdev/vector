@@ -85,9 +85,17 @@ generated: components: transforms: aggregate: configuration: {
 		type: string: {
 			default: "Auto"
 			enum: {
-				Auto:   "Default mode. Sums incremental metrics and uses the latest value for absolute metrics."
-				Count:  "Counts metrics for incremental and absolute metrics"
-				Diff:   "Returns difference between latest value for absolute; incremental metrics pass through unchanged."
+				Auto:  "Default mode. Sums incremental metrics and uses the latest value for absolute metrics."
+				Count: "Counts metrics for incremental and absolute metrics"
+				Diff:  "Returns difference between latest value for absolute; incremental metrics pass through unchanged."
+				Distribution: """
+					Collects the values of absolute metrics into a single sorted distribution; incremental
+					metrics pass through unchanged.
+
+					Gauges and sets (numeric members only) contribute one sample per value, distributions
+					contribute their existing samples, and aggregated histograms contribute one sample at each
+					bucket's upper limit per count in that bucket. Other absolute metric types are ignored.
+					"""
 				Latest: "Returns the latest value for absolute metrics; incremental metrics pass through unchanged."
 				Max:    "Max value of absolute metric; incremental metrics pass through unchanged."
 				Mean:   "Mean value of absolute metric; incremental metrics pass through unchanged."
