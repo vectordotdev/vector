@@ -27,19 +27,6 @@ available. The Python server uses only the standard library, so you don't need t
 [Download all guide files](https://download-directory.github.io/?url=https%3A%2F%2Fgithub.com%2Fvectordotdev%2Fvector%2Ftree%2Fmaster%2Fwebsite%2Fstatic%2Fguides%2Fdebugging%2Fvector-debugging-guide) as a ZIP.
 Extract it and open the folder containing `http-server.py`.
 
-Use this folder in each terminal throughout the guide. It includes the walkthrough and monitoring files:
-
-| File | Purpose |
-| --- | --- |
-| `http-server.py` | Local HTTP server used to simulate failures. |
-| `vector-start.yaml` | Starting pipeline. Edit this file during the scenarios. |
-| `vector-final.yaml` | Completed pipeline with zlib compression and smaller batches. |
-| `vector-datadog.yaml` | Final pipeline with internal metrics sent to Datadog. |
-| `vector-prometheus.yaml` | Final pipeline with internal metrics exposed for Prometheus. |
-| `prometheus.yaml` | Prometheus scrape configuration. |
-| `compose.yaml` | Prometheus and Grafana services. |
-| `README.md` | Quick start and file reference. |
-
 ### Initial Vector configuration {#initial-vector-config}
 
 `vector-start.yaml` connects two `demo_logs` sources to a `remap` transform and an `http` sink. A separate console sink prints Vector's
