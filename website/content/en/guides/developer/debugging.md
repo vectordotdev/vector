@@ -10,511 +10,302 @@ aliases: [ "/docs/guides/developer/debugging/debugging" ]
 weight: 1
 ---
 
-## Debugging Guide
+Imagine we have two log sources. We want to parse their events, assign a group ID, and send the logs to an HTTP server.
+How do we find out what went wrong when those logs stop arriving?
 
-This guide will describe an imaginary use case and how to progressively resolve issues using command line tools and Vector commands.
+<img src="/img/guides/debugging-meme.png" alt="debugging-meme" width="400"/>
 
-Imagine we have two sources, and we want to assign group IDs to Vector logs based on the source. Finally, we want to send those modified
-logs to an HTTP server for further processing and/or storage.
+In this guide, we'll start with a working pipeline, introduce three common failures, and use Vector's logs and metrics to fix them.
+You'll also see how to inspect events as they move through the pipeline.
 
-In the following sections we will examine the tools we have at our disposal.
+## Start with a working pipeline {#walkthrough}
 
-<img src="/img/guides/debugging-meme.png"  alt="debugging-meme" width="400"/>
+You'll need [Vector](/docs/setup/installation/), [Python](https://www.python.org/downloads/), and `curl`.
+Run the examples on the same machine, with ports 8000 and 8686
+available. The Python server uses only the standard library, so you don't need to install any Python packages.
 
-### Controlling Log Verbosity
+Download <a href="/guides/debugging/fake_server.py" download>fake_server.py</a>, the local HTTP server that prints the requests it receives.
+Save the following configuration as `vector.yaml` in the same directory. You can also
+<a href="/guides/debugging/vector.yaml" download>download the configuration</a>.
 
-Use the `VECTOR_LOG` environment variable to control log verbosity:
+### Initial Vector configuration {#initial-vector-config}
 
-```shell
-VECTOR_LOG=debug vector --config path/to/config.yaml
-```
-
-You can set different verbosity levels for specific components:
-
-```shell
-VECTOR_LOG=info,vector::sources::aws_s3=warn vector --config path/to/config.yaml
-```
-
-You can find more information on the [EnvFilter syntax](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#usage-notes).
-
-### Vector Tools
-
-#### Vector top
-
-Use [vector top](https://vector.dev/docs/reference/cli/#top) to display topology and metrics in the console.
-For example, you can inspect how many events are produced by sources vs how many events reach the sinks.
-
-Command:
-
-```shell
-vector top
-```
-
-Screen:
-
-<img src="/img/guides/vector-top.png"  alt="top-screen"/>
-
-#### The internal metrics source
-
-The [internal_metrics](https://vector.dev/docs/reference/configuration/sources/internal_metrics/) source can be used to inspect component
-metrics in detail.
-
-For example, you can connect this source to a sink and collect the internal metrics:
+The configuration connects two `demo_logs` sources to a `remap` transform and an `http` sink. A separate console sink prints Vector's
+internal metrics every five seconds.
 
 ```yaml
-data_dir: /var/lib/vector/
+api:
+  enabled: true
+
 sources:
-  source0:
+  source_0:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "a", "property": "foo" }'
+      - '{ "key": "b", "property": "bar" }'
+    interval: 0.1
+
+  source_1:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "c", "property": "some" }'
+      - '{ "key": "d", "property": "another" }'
+    interval: 0.1
+
+  internal_metrics:
     type: internal_metrics
-    scrape_interval_secs: 1.0
+    scrape_interval_secs: 5
+
+transforms:
+  transform_0:
+    type: remap
+    inputs:
+      - source_*
+    source: |
+      . = parse_json!(.message)
+      if .key == "a" {
+        .group = 0
+      } else {
+        .group = 1
+      }
 
 sinks:
-  sink0:
-    type: prometheus_exporter
+  sink_0:
+    type: http
     inputs:
-      - source0
-    address: 0.0.0.0:9598
+      - transform_0
+    uri: http://127.0.0.1:8000/logs
+    healthcheck:
+      enabled: false
+    encoding:
+      codec: json
+    batch:
+      timeout_secs: 1
+
+  sink_1:
+    type: console
+    inputs:
+      - internal_metrics
+    encoding:
+      codec: json
 ```
 
-#### Vector Tap
+### Start the Python HTTP server {#python-http-server}
 
-With [vector tap](https://vector.dev/guides/level-up/vector-tap-guide/) you see the input and/or outputs of your components.
-Here, it is worth mentioning a caveat, sinks don't have outputs thus we cannot tap them. This means we cannot inspect actual payloads that
-are sent downstream.
-
-Command:
-
-```shell
-vector tap --outputs-of source_0,transform_0
-```
-
-Screen:
-
-<img src="/img/guides/vector-tap.png"  alt="tap-screen"/>
-
-#### Console
-
-Note that the [console sink](https://vector.dev/docs/reference/configuration/sinks/console/) can also be very useful here. For example:
-
-```yaml
-my_console_sink:
-  type: console
-  inputs:
-    - my_source_0
-    - my_source_1
-  encoding:
-    codec: json
-    json:
-      pretty: true
-```
-
-### Python HTTP Server
-
-The following code implements a Python server that imitates a downstream system to which Vector publishes logs. We will use this server
-to demonstrate a few scenarios.
-
-#### Code
-
-<details>
-  <summary> 👉 Click to expand the script 👈</summary>
-
-  ```python
-import http.server
-import socketserver
-import json
-import threading
-import zlib
-from http import HTTPStatus  # Import HTTP status codes
-
-# Global variable for the response code
-response_code = HTTPStatus.OK  # Default to 200 OK
-
-class DebuggingHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
-    """
-    HTTP server for debugging.
-
-    - Responds with a dynamically controlled status code (default HTTPStatus.OK).
-    - Supports GET, POST, PUT, DELETE, and other HTTP methods.
-    - Allows changing the response code via a POST request to /set_status.
-    - Logs request headers and JSON payloads (supports zlib-compressed payloads).
-    """
-
-    def do_GET(self):
-        """Handles GET requests by returning the configured response code."""
-        self.send_custom_response()
-
-    def do_POST(self):
-        """Handles POST requests. Logs request details before checking the path."""
-        json_data = self.log_request_details()
-        if self.path == "/set_status":
-            self.set_status(json_data)
-        elif self.path == "/logs":
-            self.send_custom_response()
-
-    def do_PUT(self):
-        """Handles PUT requests."""
-        self.send_custom_response()
-
-    def do_DELETE(self):
-        """Handles DELETE requests."""
-        self.send_custom_response()
-
-    def send_custom_response(self):
-        """Send an HTTP response with the currently configured status code."""
-        global response_code
-        self.send_response(response_code)
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-        response = {"status": response_code, "message": f"Responding with {response_code}"}
-        self.wfile.write(json.dumps(response).encode())
-
-    def log_request_details(self):
-        """Logs headers and JSON payload for all POST requests before processing."""
-        content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length)
-
-        print("\n📥 Received POST request:")
-        print(f"🔗 Path: {self.path}")
-        print("📜 Headers:")
-        for key, value in self.headers.items():
-            print(f"   {key}: {value}")
-
-        if self.headers.get('Content-Encoding') == 'gzip':
-            print("❌ Error: Gzip compression is not supported.")
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Gzip compression is not supported."}).encode())
-            return None
-
-        if self.headers.get('Content-Encoding') == 'deflate':
-            try:
-                body = zlib.decompress(body)
-                print("🗜️ Payload was zlib-compressed. Decompressed successfully.")
-            except zlib.error:
-                print("❌ Error decompressing zlib payload.")
-                self.send_response(HTTPStatus.BAD_REQUEST)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "Invalid zlib-compressed data"}).encode())
-                return None
-
-        try:
-            json_data = json.loads(body.decode())
-            print("📦 JSON Payload:", json.dumps(json_data, indent=2))
-            return json_data
-        except json.JSONDecodeError:
-            print("⚠️  No valid JSON payload received.")
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Invalid zlib-compressed data"}).encode())
-            return None
-
-    def set_status(self, json_data):
-        """Handles POST /set_status to update the response code dynamically."""
-        global response_code
-
-        if json_data is None:
-            self.send_response(HTTPStatus.BAD_REQUEST)
-            response = {"error": "Invalid request format. Send JSON with {'status': <code>}."}
-        else:
-            try:
-                new_status = int(json_data.get("status", HTTPStatus.OK))
-                if HTTPStatus.CONTINUE <= new_status <= HTTPStatus.NETWORK_AUTHENTICATION_REQUIRED:
-                    response_code = new_status
-                    self.send_response(HTTPStatus.OK)
-                    response = {"message": f"Response code updated to {response_code}"}
-                else:
-                    self.send_response(HTTPStatus.BAD_REQUEST)
-                    response = {"error": "Invalid status code. Must be between 100 and 599."}
-            except ValueError:
-                self.send_response(HTTPStatus.BAD_REQUEST)
-                response = {"error": "Invalid status code format."}
-
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(response).encode())
-
-def run_server(port):
-    """Starts the HTTP server on the specified port."""
-    handler = DebuggingHTTPRequestHandler
-    with socketserver.TCPServer(("", port), handler) as httpd:
-        print(f"🚀 Serving on port {port}")
-        httpd.serve_forever()
-
-if __name__ == "__main__":
-    port = 8000
-    server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
-    server_thread.start()
-
-    try:
-        while True:
-            pass
-    except KeyboardInterrupt:
-        print("\n🛑 Server shutting down.")
-  ```
-
-</details>
-
-##### Description
-
-This Python server is a simple HTTP debugging tool that:
-
-* Responds to all HTTP methods with a configurable status code. For this guide, we focus on POST requests.
-* Supports dynamic status code changes via POST /set_status. This allows us to imitate real world scenarios and demonstrate Vector retries.
-* Logs all POST requests sent to /logs, including headers and JSON payloads.
-* Handles both raw JSON and zlib-compressed JSON payloads. Rejects other payloads.
-* By default, it starts on port 8000 and returns HTTP 200 OK unless modified.
-
-#### Usage
-
-Run command:
+In the first terminal, run:
 
 ```shell
 python3 fake_server.py
 ```
 
-Change return status:
+You should see:
+
+```text
+Serving on http://127.0.0.1:8000
+```
+
+Keep this terminal open. The server accepts JSON at `/logs` and returns HTTP 200 by default. Later, we'll change its responses to
+simulate failures. You can [read the server source](/guides/debugging/fake_server.py) without needing to edit it for this walkthrough.
+
+### Start Vector
+
+In a second terminal, from the same directory, run:
 
 ```shell
-curl -X POST http://localhost:8000/set_status -H "Content-Type: application/json" -d '{"status": 404}'
+vector --watch-config --config vector.yaml
 ```
 
-### Walkthrough
+The `--watch-config` flag reloads the configuration when you save changes. Keep this process running while you work through the scenarios.
+The example disables the HTTP sink's startup health check because our server only implements the POST endpoints used in this guide.
 
-#### Initial Vector Config
-
-<details>
-  <summary> 👉 Click to view the whole config 👈</summary>
-
-```yaml
-# version 1
-api:
-  enabled: true
-
-sources:
-  source_0:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "a", "property": "foo" }'
-      - '{ "key": "b", "property": "bar" }'
-    interval: 10
-
-  source_1:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "c", "property": "some" }'
-      - '{ "key": "d", "property": "another" }'
-    interval: 10
-
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 10
-
-transforms:
-  transform_0:
-    type: remap
-    inputs:
-      - source_*
-    source: |
-      . = parse_json!(.message)
-      if .key == "a" {
-        .group = 0
-      } else {
-        .group = 1
-      }
-
-sinks:
-  sink_0:
-    inputs:
-      - transform_0
-    type: http
-    uri: http://localhost:8000/logs
-    encoding:
-      codec: json
-      json:
-        pretty: true
-
-  sink_1:
-    type: console
-    inputs:
-      - internal_metrics
-    encoding:
-      codec: json
-      json:
-        pretty: true
-```
-
-</details>
-
-##### Globals
-
-```yaml
-api:
-  enabled: true
-```
-
-Required by `vector tap`.
-
-##### Sources
-
-```yaml
-sources:
-  source_0:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "a", "property": "foo" }'
-      - '{ "key": "b", "property": "bar" }'
-    interval: 10
-
-  source_1:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "c", "property": "some" }'
-      - '{ "key": "d", "property": "another" }'
-    interval: 10
-```
-
-The above two sources emulate incoming events.
-
-##### Transforms
-
-```yaml
-transforms:
-  transform_0:
-    type: remap
-    inputs:
-      - source_*
-    source: |
-      . = parse_json!(.message)
-      if .key == "a" {
-        .group = 0
-      } else {
-        .group = 1
-      }
-```
-
-This guide doesn't focus on transforms like [Remap](https://vector.dev/docs/reference/configuration/transforms/remap/). At this point, I
-would like to highlight https://playground.vrl.dev/ for quick iterations.
-
-##### Sinks
-
-```yaml
-  sink_0:
-    inputs:
-      - transform_0
-    type: http
-    uri: http://localhost:8000/logs
-    encoding:
-      codec: json
-```
-
-#### Vector Config with internal metrics
-
-##### Full Config Preview
-
-<details>
-  <summary> 👉 Click to view the whole config 👈</summary>
-
-```yaml
-# version 2
-api:
-  enabled: true
-
-sources:
-  source_0:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "a", "property": "foo" }'
-      - '{ "key": "b", "property": "bar" }'
-    interval: 10
-
-  source_1:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "c", "property": "some" }'
-      - '{ "key": "d", "property": "another" }'
-    interval: 10
-
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 10
-
-transforms:
-  transform_0:
-    type: remap
-    inputs:
-      - source_*
-    source: |
-      . = parse_json!(.message)
-      if .key == "a" {
-        .group = 0
-      } else {
-        .group = 1
-      }
-
-sinks:
-  sink_0:
-    inputs:
-      - transform_0
-    type: http
-    uri: http://localhost:8000/logs
-    encoding:
-      codec: json
-
-  sink_1:
-    type: console
-    inputs:
-      - internal_metrics
-    encoding:
-      codec: json
-      json:
-        pretty: true
-```
-
-</details>
-
-You can run the config with the following command:
-
-```shell
-vector --config path/to/config.yaml
-```
-
-##### Description
-
-Note that we added a new source:
-
-```yaml
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 10
-```
-
-And a new sink:
-
-```yaml
-  sink_1:
-    type: console
-    inputs:
-      - internal_metrics
-    encoding:
-      codec: json
-      json:
-        pretty: true
-```
-
-Now we can observe internal metrics such as how many events our components receive:
+In the server terminal, look for `Received POST /logs` followed by a JSON array. One of its events should look like this:
 
 ```json
 {
-  "name": "component_received_events_count",
+  "group": 0,
+  "key": "a",
+  "property": "foo"
+}
+```
+
+The access log should show an HTTP 200 response. Now we have a working baseline to compare against when something breaks.
+
+### Understanding the configuration
+
+#### API
+
+```yaml
+api:
+  enabled: true
+```
+
+The API lets `vector top` and `vector tap` connect to this Vector process.
+
+#### Sources
+
+```yaml
+sources:
+  source_0:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "a", "property": "foo" }'
+      - '{ "key": "b", "property": "bar" }'
+    interval: 0.1
+
+  source_1:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "c", "property": "some" }'
+      - '{ "key": "d", "property": "another" }'
+    interval: 0.1
+```
+
+The two sources emulate incoming events. Each produces one of its sample messages every 0.1 seconds, so we have a steady stream to inspect.
+
+#### Transform
+
+```yaml
+transforms:
+  transform_0:
+    type: remap
+    inputs:
+      - source_*
+    source: |
+      . = parse_json!(.message)
+      if .key == "a" {
+        .group = 0
+      } else {
+        .group = 1
+      }
+```
+
+The `source_*` input pattern connects both demo sources to the transform. The remap program parses each JSON message and sets `group`
+to `0` when `key` is `"a"`, or `1` otherwise. For quick iterations on the program, try the [VRL playground](https://playground.vrl.dev/).
+
+#### HTTP sink
+
+```yaml
+sinks:
+  sink_0:
+    type: http
+    inputs:
+      - transform_0
+    uri: http://127.0.0.1:8000/logs
+    healthcheck:
+      enabled: false
+    encoding:
+      codec: json
+    batch:
+      timeout_secs: 1
+```
+
+The HTTP sink sends the transformed events to our server as JSON. Its one-second batch timeout keeps the example moving even when a
+batch has not reached its size limit. We'll change its compression and batch settings in the scenarios below.
+
+## Follow events through the pipeline {#vector-tools}
+
+Choose a tool based on the question you're trying to answer:
+
+| Question | Tool |
+| --- | --- |
+| Are events reaching each component? | `vector top` |
+| What did a source or transform produce? | `vector tap` |
+| Which component is reporting errors or discarding events? | The `internal_metrics` source |
+| What HTTP headers and payload reached the destination? | The Python server's output |
+
+### Compare component activity with vector top {#vector-top}
+
+In a third terminal, run:
+
+```shell
+vector top
+```
+
+Compare the events received and sent by the sources, transform, and HTTP sink. The starting configuration already enables the API needed
+by `vector top` and `vector tap`.
+
+<img src="/img/guides/vector-top.png" alt="Vector top showing event counts for each component"/>
+
+### Inspect events with vector tap {#vector-tap}
+
+To see events before and after the transform, run:
+
+```shell
+vector tap --outputs-of source_0,transform_0
+```
+
+Look for the original message in the source output and the parsed fields, including `group`, in the transform output.
+If you want to experiment with the remap program separately, use the [VRL playground](https://playground.vrl.dev/).
+
+<img src="/img/guides/vector-tap.png" alt="Vector tap displaying events from a source and transform"/>
+
+{{< info >}}
+`vector tap` shows events at component boundaries. It doesn't show the final HTTP request after the sink has encoded, batched, and
+compressed those events. Use the receiving server's output to inspect that request.
+{{< /info >}}
+
+### Print events with a console sink {#console}
+
+A [console sink](/docs/reference/configuration/sinks/console/) is also useful when you want to keep printing a component's output.
+For example, add `debug_console` under the existing `sinks` section to inspect the transform's output:
+
+```yaml
+sinks:
+  debug_console:
+    type: console
+    inputs:
+      - transform_0
+    encoding:
+      codec: json
+      json:
+        pretty: true
+```
+
+This is an optional diagnostic sink. The starting configuration already has a separate console sink, `sink_1`, for internal metrics.
+
+### Check internal metrics {#the-internal-metrics-source}
+
+The starting configuration includes an [internal_metrics source](/docs/reference/configuration/sources/internal_metrics/):
+
+```yaml
+sources:
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 5
+```
+
+It connects to a console sink that prints those metrics in the Vector terminal:
+
+```yaml
+sinks:
+  sink_1:
+    type: console
+    inputs:
+      - internal_metrics
+    encoding:
+      codec: json
+```
+
+Look at the `tags.component_id` field to identify the component. For our HTTP sink, this is `sink_0`.
+
+| Metric | What to look for on `sink_0` |
+| --- | --- |
+| `component_received_events_total` | Is the sink still receiving events from the transform? |
+| `component_sent_events_total` | Is the sink successfully sending events? |
+| `component_errors_total` | Are errors increasing? |
+| `component_discarded_events_total` | Are events being dropped? |
+| `http_client_responses_total` | Which HTTP response codes is the destination returning? |
+
+For example, this counter shows how many events the HTTP sink has received. The JSON below is formatted for readability.
+Your timestamps, host, and counter values will differ:
+
+```json
+{
+  "name": "component_received_events_total",
   "namespace": "vector",
   "tags": {
     "component_id": "sink_0",
@@ -522,52 +313,76 @@ Now we can observe internal metrics such as how many events our components recei
     "component_type": "http",
     "host": "MY_HOST"
   },
-  "timestamp": "2025-02-12T15:58:03.723449Z",
+  "timestamp": "2026-10-29T16:47:00.323055Z",
   "kind": "absolute",
-  "aggregated_histogram": {
-    "buckets": [
-      // ...
-      {
-        "upper_limit": 1.0,
-        "count": 2
-      },
-      // ...
-      {
-        "upper_limit": "inf",
-        "count": 0
-      }
-    ],
-    "count": 2,
-    "sum": 2.0
+  "counter": {
+    "value": 100.0
   }
 }
 ```
 
-### Scenarios
+Compare the counters over time. A nonzero error count can reflect an earlier failure. If the count keeps increasing, errors are still
+happening. You can use the optional [monitoring setup](#visualizing-and-querying-internal-metrics) below to graph them.
 
-In this section we will create some scenarios where the sink produces errors and we will show how to change the sink config to overcome
-them.
+### Increase log verbosity when needed {#controlling-log-verbosity}
 
-#### Scenario 1 - Unsupported Compression
+For more detail, stop Vector with Ctrl+C and restart it with debug logging:
 
-Now that we have something that works, we want to add compression.
+```shell
+VECTOR_LOG=debug vector --watch-config --config vector.yaml
+```
+
+You can also select a specific Rust module. For example, to inspect HTTP sink retries while keeping other logs at `info`:
+
+```shell
+VECTOR_LOG=info,vector::sinks::util::retries=debug vector --watch-config --config vector.yaml
+```
+
+See the [EnvFilter syntax](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#usage-notes)
+for more filtering options.
+
+## Debug three common failures {#scenarios}
+
+Work through these scenarios in order, keeping the same `vector.yaml`. Use the third terminal for the `curl` commands.
+
+### Scenario 1: Unsupported compression {#scenario-1---unsupported-compression}
+
+**Trigger the failure.** Add `compression: gzip` to `sinks.sink_0` and save `vector.yaml`. Here is the HTTP sink with that change:
 
 ```yaml
 sinks:
   sink_0:
+    type: http
     inputs:
       - transform_0
-    type: http
-    uri: http://localhost:8000/logs
+    uri: http://127.0.0.1:8000/logs
+    healthcheck:
+      enabled: false
     encoding:
       codec: json
     compression: gzip
+    batch:
+      timeout_secs: 1
 ```
 
-{{< warning >}}
-However, our downstream component can only de-compress `zlib` payloads. We now observe the following metrics:
-{{< /warning >}}
+**Observe.** In the server terminal, you'll see `Unsupported compression: gzip` and an HTTP 400 response.
+For example, the server output includes the request headers and explains why it rejected the payload:
 
+```text
+Received POST /logs
+content-type: application/json
+content-encoding: gzip
+accept-encoding: zstd,gzip,deflate,br
+user-agent: Vector/0.59.0 (aarch64-apple-darwin a3231c7 2026-10-06 13:52:51.733983360)
+host: 127.0.0.1:8000
+content-length: 113
+
+Unsupported compression: gzip. Use zlib or no compression.
+127.0.0.1 - - [29/Oct/2026 12:47:02] "POST /logs HTTP/1.1" 400 -
+```
+
+Check the Vector logs and the HTTP sink's `component_errors_total` and `component_discarded_events_total` counters as well.
+An error metric looks like this:
 
 ```json
 {
@@ -581,64 +396,52 @@ However, our downstream component can only de-compress `zlib` payloads. We now o
     "host": "MY_HOST",
     "stage": "sending"
   },
-  "timestamp": "2025-02-12T16:09:51.122851Z",
+  "timestamp": "2026-10-29T16:47:05.323734Z",
   "kind": "absolute",
   "counter": {
-    "value": 2.0
+    "value": 3.0
   }
 }
 ```
 
-If we had access to the server downstream, we would see the following error:
+**Explain.** The example server accepts uncompressed JSON and zlib-compressed JSON, but rejects gzip. Events reaching a sink does not
+mean the destination accepted them. In this case, the HTTP sink treats the 400 response as a failure it cannot retry and discards the batch.
 
-```text
-📥 Received POST request:
-🔗 Path: /logs
-📜 Headers:
-  content-type: application/json
-  content-encoding: gzip
-  accept-encoding: zstd,gzip,deflate,br
-  user-agent: Vector/0.45.0-custom-bac0c2015 (aarch64-apple-darwin debug=full)
-  host: localhost:8000
-  content-length: 76
-❌ Error: Gzip compression is not supported.
-  127.0.0.1 - - [12/Feb/2025 11:10:22] "POST /logs HTTP/1.1" 400 -
-```
-
-So now the fix is obvious, we can change the compression and reload the Vector config:
+**Fix.** Change that same setting to:
 
 ```yaml
-compression: zlib
+    compression: zlib
 ```
 
-Reloading depends on the deployments e.g. `systemctl kill -s HUP --kill-who=main vector.service`.
-You can read more in https://vector.dev/docs/administration/management.
+**Verify.** After Vector reloads, the server should print decoded JSON again and return HTTP 200. The HTTP sink's
+`component_sent_events_total` should resume increasing. Previously discarded events are not recovered.
 
-#### Scenario 2 - Temporary Server Disruptions
-
-##### Step 1
-
-Run the server and the config. Notice that the `component_sent_events_total` metrics for `sinks_0` is increasing during normal operation.
-
-##### Step 2
-
-Simulate rate limiting:
+For other deployments, configuration reloading depends on how Vector is managed. For example, a systemd service can be reloaded with:
 
 ```shell
- curl -X POST http://localhost:8000/set_status -H "Content-Type: application/json" -d '{"status": 429}'
+systemctl kill -s HUP --kill-who=main vector.service
 ```
 
-Shortly after, observe this new Vector log:
+See [Managing Vector](/docs/administration/management/) for more details.
+
+### Scenario 2: Temporary server disruptions {#scenario-2---temporary-server-disruptions}
+
+**Trigger the failure.** Ask the server to simulate rate limiting:
+
+```shell
+curl -X POST http://127.0.0.1:8000/set_status -H "Content-Type: application/json" -d '{"status": 429}'
+```
+
+The control request returns HTTP 200 to confirm the change. Subsequent requests to `/logs` receive HTTP 429.
+
+**Observe.** Look for a retry warning in the Vector terminal:
 
 ```text
-2025-02-12T19:10:54.562556Z  WARN sink{component_kind="sink" component_id=sink_0 component_type=http}:request{request_id=19}: vector::sinks::util::retries: Retrying after response. reason=too many requests internal_log_rate_limit=true
+Retrying after response. reason=Default retry strategy: Too Many Requests
 ```
 
-{{< warning >}}
-The `component_sent_events_total` metric for `sinks_0` has stopped increasing, and we are observing a 429 response status code.
-{{< /warning >}}
-
-A sample metric demonstrating this:
+The HTTP sink's `component_sent_events_total` stops increasing. Its `http_client_responses_total` counter with `status: "429"`
+increases as requests are retried. Here is an example of that response counter:
 
 ```json
 {
@@ -651,221 +454,98 @@ A sample metric demonstrating this:
     "host": "MY_HOST",
     "status": "429"
   },
-  "timestamp": "2025-02-12T19:15:16.377709Z",
+  "timestamp": "2026-10-29T16:47:10.322834Z",
   "kind": "absolute",
   "counter": {
-    "value": 41.0
+    "value": 3.0
   }
 }
 ```
 
-Here it is worth noting Vector will retry these failed requests based on the `http` sink
-[retry policy](http://localhost:1313/docs/reference/configuration/sinks/http/#retry-policy). This policy is defined for each sink
-separately.
+**Explain.** The destination is temporarily refusing requests. Vector retries according to the HTTP sink's
+[retry policy](/docs/reference/configuration/sinks/http/#retry-policy). Retry behavior depends on the sink and response code.
 
-##### Step 3
-
-Command the server to always respond with `OK`:
+**Fix.** Restore successful responses:
 
 ```shell
- curl -X POST http://localhost:8000/set_status -H "Content-Type: application/json" -d '{"status": 200}'
+curl -X POST http://127.0.0.1:8000/set_status -H "Content-Type: application/json" -d '{"status": 200}'
 ```
 
-Notice how the `component_sent_events_total` metrics for `sinks_0` is now increasing again!
+**Verify.** Allow time for the next retry. The server should return HTTP 200 for `/logs`, and `component_sent_events_total` for
+`component_id: sink_0` should start increasing again. The counter for `sink_1` measures console output.
+For example:
 
 ```json
 {
   "name": "component_sent_events_total",
   "namespace": "vector",
   "tags": {
-    "component_id": "sink_1",
+    "component_id": "sink_0",
     "component_kind": "sink",
-    "component_type": "console",
+    "component_type": "http",
     "host": "MY_HOST"
   },
-  "timestamp": "2025-02-12T19:14:56.377942Z",
+  "timestamp": "2026-10-29T16:47:25.323010Z",
   "kind": "absolute",
   "counter": {
-    "value": 3678.0
+    "value": 484.0
   }
 }
 ```
 
-#### Scenario 3 - Smaller Batching
+### Scenario 3: Smaller batching {#scenario-3---smaller-batching}
 
-For this scenario, we will introduce a new limitation imposed by the server.
+**Trigger the failure.** Stop the Python server with Ctrl+C, then restart it with a payload limit:
 
-{{< warning >}}
-Our downstream server enforces a strict limit on the maximum payload size. Payloads larger than 8192 bytes will be rejected.
-{{< /warning >}}
+```shell
+python3 fake_server.py --max-bytes 256
+```
 
-Also, assume Vector sets the maximum batch size to 10MB.
+This deliberately small limit makes the failure easy to reproduce with our demo events. The server measures the JSON body after
+decompression. Keep Vector running with `compression: zlib` and the original batch settings.
 
-{{< info >}}
-Always refer to the documentation as the source of truth for this value.
-{{< /info >}}
+**Observe.** The server reports a payload larger than 256 bytes and returns HTTP 413. Vector may briefly log connection errors while
+the server restarts. Once it's running again, look for HTTP 413 responses. An example request looks like this:
 
 ```text
-📥 Received POST request:
-🔗 Path: /logs
-📜 Headers:
-   content-type: application/json
-   content-encoding: deflate
-   accept-encoding: zstd,gzip,deflate,br
-   user-agent: Vector/0.45.0-custom-bac0c2015 (aarch64-apple-darwin debug=full)
-   host: localhost:8000
-   content-length: 1e+07
-🗜️ Payload was zlib-compressed. Decompressed successfully.
-📦 JSON Payload: [
-  {
-    "group": 0,
-    "key": "a",
-    "property": "foo"
-  },
-  {
-    "group": 0,
-    "key": "a",
-    "property": "foo"
-  },
-  // Assume a lot more bytes...
-],
-❌ Error: Maximum payload size exceeded. Rejecting payloads over 8192 bytes.
+Received POST /logs
+content-type: application/json
+content-encoding: deflate
+accept-encoding: zstd,gzip,deflate,br
+user-agent: Vector/0.59.0 (aarch64-apple-darwin a3231c7 2026-10-06 13:52:51.733983360)
+host: 127.0.0.1:8000
+content-length: 109
+
+Payload is 888 bytes; limit is 256 bytes after decompression.
+127.0.0.1 - - [29/Oct/2026 12:47:25] "POST /logs HTTP/1.1" 413 -
 ```
 
-Hmm, does Vector expose any relevant settings?
+The `content-length` header describes the compressed body. The server's error reports the larger, decompressed body that exceeded its limit.
 
-Yes, this behavior can be changed using [batch settings]({{< ref "/docs/reference/configuration/sinks/http/#batch" >}})!
+**Explain.** The destination cannot accept a batch that large. The HTTP sink does not automatically split a rejected request into
+smaller batches. With the default retry policy, a 413 response causes the batch to be discarded.
 
-We can add to significantly reduce the batch size:
+**Fix.** Add `max_events: 4` to the existing `sinks.sink_0.batch` section:
 
 ```yaml
     batch:
+      timeout_secs: 1
       max_events: 4
 ```
 
-#### Final Config
-
-<details>
-  <summary> 👉 Click to view the whole config 👈</summary>
-
-```yaml
-# version 3
-api:
-  enabled: true
-
-sources:
-  source_0:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "a", "property": "foo" }'
-      - '{ "key": "b", "property": "bar" }'
-    interval: 10
-
-  source_1:
-    type: demo_logs
-    format: shuffle
-    lines:
-      - '{ "key": "c", "property": "some" }'
-      - '{ "key": "d", "property": "another" }'
-    interval: 10
-
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 10
-
-transforms:
-  transform_0:
-    type: remap
-    inputs:
-      - source_*
-    source: |
-      . = parse_json!(.message)
-      if .key == "a" {
-        .group = 0
-      } else {
-        .group = 1
-      }
-
-sinks:
-  sink_0:
-    inputs:
-      - transform_0
-    type: http
-    uri: http://localhost:8000/logs
-    encoding:
-      codec: json
-      json:
-        pretty: true
-    compression: zlib
-    batch:
-      max_events: 4
-
-  sink_1:
-    type: console
-    inputs:
-      - internal_metrics
-    encoding:
-      codec: json
-      json:
-        pretty: true
-```
-
-</details>
-
-Now that we have a final configuration, we can also write
-[Vector configuration unit tests]({{< ref "/docs/reference/configuration/unit-tests/" >}}).
-
-### Visualizing and querying internal metrics
-
-#### Datadog Metrics
-
-It is surprisingly simple to integrate Vector with the [Datadog Metrics Explorer](https://docs.datadoghq.com/metrics/explorer/).
-
-##### Step 1: Update the Vector config
-
-```yaml
-sinks:
-  sink_2:
-    datadog_metrics:
-      type: datadog_metrics
-      inputs: ["internal_metrics"]
-      api_key: "${DATADOG_API_KEY}"
-```
-
-##### Step 2: Navigate to the Datadog metrics explorer
-
-* https://app.datadoghq.com/metric/explorer
-* Use the UI to search for Vector metrics.
-  * Sample query: `sum:vector.component_sent_event_bytes_total{host:foo}.as_count()`
-
-<img src="/img/guides/dd-metrics-vector-errors-visualization.png"  alt="dd-metrics" width="800"/>
+**Verify.** After the reload, requests should contain at most four events and receive HTTP 200. Check that the HTTP sink's sent-event
+counter is increasing again.
 
 {{< info >}}
-If you are investigating an issue, you can create a [notebook](https://app.datadoghq.com/notebook/list)
-with and add multiple queries for a bird's-eye view of the system.
+Four events fit this example's limit because the demo events are small. An event-count limit does not guarantee a particular payload
+size for your own data. Review the destination's limit and the HTTP sink's [batch settings](/docs/reference/configuration/sinks/http/#batch).
 {{< /info >}}
 
-#### Prometheus and Grafana
+### Final configuration {#final-config}
 
-We will use Docker Compose to start a Vector, Prometheus and Grafana instance.
-
-##### Step 1: Update your Vector config
+Here is the complete configuration after all three scenarios, including zlib compression and batches of up to four events:
 
 ```yaml
-sinks:
-  sink_2:
-    type: prometheus_exporter
-    inputs:
-      - internal_metrics
-    address: 0.0.0.0:9598
-```
-
-<details>
-  <summary> 👉 Click to view the whole config 👈</summary>
-
-```yaml
-# Vector config - version 4
 api:
   enabled: true
 
@@ -876,7 +556,7 @@ sources:
     lines:
       - '{ "key": "a", "property": "foo" }'
       - '{ "key": "b", "property": "bar" }'
-    interval: 10
+    interval: 0.1
 
   source_1:
     type: demo_logs
@@ -884,11 +564,11 @@ sources:
     lines:
       - '{ "key": "c", "property": "some" }'
       - '{ "key": "d", "property": "another" }'
-    interval: 10
+    interval: 0.1
 
   internal_metrics:
     type: internal_metrics
-    scrape_interval_secs: 10
+    scrape_interval_secs: 5
 
 transforms:
   transform_0:
@@ -905,16 +585,17 @@ transforms:
 
 sinks:
   sink_0:
+    type: http
     inputs:
       - transform_0
-    type: http
-    uri: http://host.docker.internal:8000/logs
+    uri: http://127.0.0.1:8000/logs
+    healthcheck:
+      enabled: false
     encoding:
       codec: json
-      json:
-        pretty: true
     compression: zlib
     batch:
+      timeout_secs: 1
       max_events: 4
 
   sink_1:
@@ -923,8 +604,125 @@ sinks:
       - internal_metrics
     encoding:
       codec: json
-      json:
-        pretty: true
+```
+
+Save it as `vector-final.yaml`, or <a href="/guides/debugging/vector-final.yaml" download>download a copy</a>.
+Stop the running Vector process before trying it:
+
+```shell
+vector --watch-config --config vector-final.yaml
+```
+
+You now have a way to check each stage: inspect events with `tap`, compare component counters, and confirm what the destination receives.
+You can also add [Vector configuration unit tests](/docs/reference/configuration/unit-tests/) for your transform's expected output.
+When you're finished, stop Vector and the Python server with Ctrl+C.
+
+## Optional: Visualize and query internal metrics {#visualizing-and-querying-internal-metrics}
+
+The console is enough for the walkthrough. For longer investigations, send the same internal metrics to Datadog or Prometheus/Grafana
+so you can compare changes over time.
+
+### Datadog Metrics
+
+Add this sink under the existing `sinks` section, alongside `sink_0` and `sink_1`:
+
+```yaml
+  sink_2:
+    type: datadog_metrics
+    inputs:
+      - internal_metrics
+    default_api_key: "${DATADOG_API_KEY}"
+```
+
+Set `DATADOG_API_KEY` in Vector's environment before starting the process. If your account uses a different Datadog site, set the sink's
+[`site`](/docs/reference/configuration/sinks/datadog_metrics/#site) option too.
+
+Open the [Datadog Metrics Explorer](https://app.datadoghq.com/metric/explorer) and search for Vector metrics. For example:
+
+```text
+sum:vector.component_sent_events_total{component_id:sink_0}.as_count()
+```
+
+<img src="/img/guides/dd-metrics-vector-errors-visualization.png" alt="Vector internal metrics displayed in Datadog" width="800"/>
+
+You can collect related queries in a [notebook](https://app.datadoghq.com/notebook/list) to keep the investigation in one place.
+
+### Prometheus and Grafana
+
+For this setup, keep Vector and the Python server running on your host. Run Prometheus and Grafana with Docker Compose.
+This configuration uses Docker Desktop's `host.docker.internal` hostname. On Linux Docker Engine, `extra_hosts` adds that hostname.
+
+Add this sink under the existing `sinks` section, alongside `sink_0` and `sink_1`. Use this instead of the Datadog `sink_2` above:
+
+```yaml
+  sink_2:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: 0.0.0.0:9598
+```
+
+With that addition, the complete Vector configuration is:
+
+```yaml
+api:
+  enabled: true
+
+sources:
+  source_0:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "a", "property": "foo" }'
+      - '{ "key": "b", "property": "bar" }'
+    interval: 0.1
+
+  source_1:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "c", "property": "some" }'
+      - '{ "key": "d", "property": "another" }'
+    interval: 0.1
+
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 5
+
+transforms:
+  transform_0:
+    type: remap
+    inputs:
+      - source_*
+    source: |
+      . = parse_json!(.message)
+      if .key == "a" {
+        .group = 0
+      } else {
+        .group = 1
+      }
+
+sinks:
+  sink_0:
+    type: http
+    inputs:
+      - transform_0
+    uri: http://127.0.0.1:8000/logs
+    healthcheck:
+      enabled: false
+    encoding:
+      codec: json
+    compression: zlib
+    batch:
+      timeout_secs: 1
+      max_events: 4
+
+  sink_1:
+    type: console
+    inputs:
+      - internal_metrics
+    encoding:
+      codec: json
 
   sink_2:
     type: prometheus_exporter
@@ -933,74 +731,52 @@ sinks:
     address: 0.0.0.0:9598
 ```
 
-</details>
-
-##### Step 2: Prometheus configuration
+Save the following as `prometheus.yaml` in the same directory:
 
 ```yaml
-# prometheus config
 global:
-  scrape_interval: 15s
+  scrape_interval: 5s
 
 scrape_configs:
-  - job_name: "vector"
+  - job_name: vector
     static_configs:
       - targets: ["host.docker.internal:9598"]
 ```
 
-##### Step 3: Docker Compose configuration
-
-Use the following template and replace with the actual paths:
+Save this as `docker-compose.yaml` alongside it:
 
 ```yaml
-# docker-compose.yaml
 services:
-  vector:
-    image: timberio/vector:0.45.0-debian
-    container_name: vector
-    ports:
-      - "9598:9598"
-    volumes:
-      - <path to Vector config here>:/etc/vector/vector.yaml
-    networks:
-      - vector-net
-
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
-      - - <path to Prometheus config here>:/etc/prometheus/prometheus.yml
-    networks:
-      - vector-net
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
     ports:
-      - "3000:3000"
-    networks:
-      - vector-net
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
-
-networks:
-  vector-net:
-    driver: bridge
 ```
 
-##### Step 4: Setup Grafana
+Start the services:
 
-1. Login to Grafana with username `admin` and password `admin`
-2. Navigate to [connections/datasources/](http://localhost:3000/connections/datasources/)
-3. Add the Prometheus datasource with the following URL: `http://host.docker.internal:9090`. If you are having trouble with this step, please [read this guide](https://grafana.com/docs/grafana/latest/getting-started/get-started-grafana-prometheus/).
-4. Create a Grafana dashboard
-    * All Vector internal metrics with have the `vector_` prefix
-    * For example, you can visualize `vector_component_errors_total` and `vector_component_discarded_events_total`.
-    * You can take it further and alert with `increase(vector_component_discarded_events_total[5m])`
+```shell
+docker compose up -d
+```
 
-Note that this guide is meant as a starting point. I recommend saving your Grafana datasources and
-dashboards and including them as volumes in your `docker-compose.yaml`.
+1. Open [Grafana](http://localhost:3000) and log in with username `admin` and password `admin`.
+2. Add a Prometheus data source with the URL `http://prometheus:9090`.
+3. Create a dashboard and query `vector_component_errors_total{component_id="sink_0"}` or
+   `vector_component_discarded_events_total{component_id="sink_0"}`.
+4. To see how many events were discarded recently, try `increase(vector_component_discarded_events_total{component_id="sink_0"}[5m])`.
+
+For more detail, see Grafana's [Prometheus setup guide](https://grafana.com/docs/grafana/latest/getting-started/get-started-grafana-prometheus/).
+When you're finished, stop the containers with `docker compose down`.
