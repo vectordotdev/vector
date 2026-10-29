@@ -12,7 +12,7 @@ use crate::utils::git;
 pub(super) struct VersionOptions {
     /// Vector release version; defaults to Cargo.toml's development minor without -dev.
     #[arg(long)]
-    version: Option<Version>,
+    pub(super) version: Option<Version>,
     /// Released VRL version; defaults to the latest stable tag in the VRL repository.
     #[arg(long)]
     pub(super) vrl_version: Option<Version>,
@@ -33,7 +33,10 @@ impl VersionOptions {
     }
 }
 
-fn preparation_version(current: &Version, requested: Option<Version>) -> Result<Version> {
+pub(super) fn preparation_version(
+    current: &Version,
+    requested: Option<Version>,
+) -> Result<Version> {
     let version = requested.unwrap_or_else(|| Version::new(current.major, current.minor, 0));
     ensure_stable(&version, "release version")?;
     let expected_current = development_version(&version)?;
