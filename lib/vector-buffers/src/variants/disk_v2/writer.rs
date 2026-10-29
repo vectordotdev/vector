@@ -376,6 +376,9 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
         if buf.len() >= self.buf.capacity() {
             self.inner.write_all(buf).await?;
+            // Async files may acknowledge a write before their blocking write has completed.
+            // Readers must be able to observe these bytes before progress is published.
+            self.inner.flush().await?;
 
             let flush_result = flush_result.get_or_insert(FlushResult::default());
             flush_result.events_flushed += event_count as u64;
@@ -409,7 +412,11 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         let events_flushed = self.unflushed_events as u64;
         let bytes_flushed = self.buf.len() as u64;
 
-        let result = self.inner.write_all(&self.buf[..]).await;
+        let result = async {
+            self.inner.write_all(&self.buf[..]).await?;
+            self.inner.flush().await
+        }
+        .await;
         self.unflushed_events = 0;
         self.buf.clear();
 
@@ -2002,5 +2009,92 @@ where
 {
     fn drop(&mut self) {
         self.close();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io,
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use tokio::io::AsyncWrite;
+
+    use super::TrackingBufWriter;
+
+    // AsyncWrite may accept bytes before they are visible to another file handle, as Tokio's
+    // File does while its blocking write is pending. Model that boundary deterministically.
+    #[derive(Default)]
+    struct DeferredWriter {
+        staged: Vec<u8>,
+        visible: Vec<u8>,
+        fail_flush: bool,
+    }
+
+    impl AsyncWrite for DeferredWriter {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+            bytes: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            self.staged.extend_from_slice(bytes);
+            Poll::Ready(Ok(bytes.len()))
+        }
+
+        fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+            if self.fail_flush {
+                return Poll::Ready(Err(io::Error::other("injected flush failure")));
+            }
+            let staged = std::mem::take(&mut self.staged);
+            self.visible.extend(staged);
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            self.poll_flush(cx)
+        }
+    }
+
+    #[tokio::test]
+    async fn buffered_progress_waits_for_underlying_flush() {
+        let mut writer = TrackingBufWriter::with_capacity(64, DeferredWriter::default());
+        assert!(writer.write(1, b"record").await.unwrap().is_none());
+        let result = writer.flush().await.unwrap().unwrap();
+        assert_eq!(result.events_flushed, 1);
+        assert_eq!(result.bytes_flushed, 6);
+        assert_eq!(writer.get_ref().visible, b"record");
+    }
+
+    #[tokio::test]
+    async fn direct_progress_waits_for_underlying_flush() {
+        let mut writer = TrackingBufWriter::with_capacity(2, DeferredWriter::default());
+        let result = writer.write(1, b"record").await.unwrap().unwrap();
+        assert_eq!(result.events_flushed, 1);
+        assert_eq!(result.bytes_flushed, 6);
+        assert_eq!(writer.get_ref().visible, b"record");
+    }
+
+    #[tokio::test]
+    async fn underlying_flush_failure_does_not_report_progress() {
+        for capacity in [2, 64] {
+            let mut writer = TrackingBufWriter::with_capacity(
+                capacity,
+                DeferredWriter {
+                    fail_flush: true,
+                    ..DeferredWriter::default()
+                },
+            );
+            let result = writer.write(1, b"record").await;
+            let error = if capacity < 6 {
+                result.unwrap_err()
+            } else {
+                assert!(result.unwrap().is_none());
+                writer.flush().await.unwrap_err()
+            };
+            assert_eq!(error.kind(), io::ErrorKind::Other);
+            assert!(writer.get_ref().visible.is_empty());
+        }
     }
 }
