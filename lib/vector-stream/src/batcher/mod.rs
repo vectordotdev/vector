@@ -58,11 +58,6 @@ where
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             let mut this = self.as_mut().project();
-            // An overflowing item can fill the new batch before the previous batch is returned.
-            if this.state.is_batch_full() {
-                this.timer.set(Maybe::None);
-                return Poll::Ready(Some(this.state.take_batch()));
-            }
             match this.stream.poll_next(cx) {
                 Poll::Ready(None) => {
                     return {
@@ -163,24 +158,6 @@ mod test {
                 vec![1],
             ]
         );
-    }
-
-    #[tokio::test]
-    async fn overflow_filling_next_batch_flushes_without_more_input() {
-        tokio::time::pause();
-
-        let input = stream::iter([1, 2]).chain(stream::pending());
-        let settings = BatcherSettings::new(
-            Duration::from_secs(1),
-            NonZeroUsize::new(2).unwrap(),
-            NonZeroUsize::new(100).unwrap(),
-        );
-        let batcher = Batcher::new(input, settings.as_item_size_config(|size: &usize| *size));
-        tokio::pin!(batcher);
-
-        assert_eq!(batcher.next().await, Some(vec![1]));
-        let mut next = batcher.next();
-        assert_eq!(futures::poll!(&mut next), Poll::Ready(Some(vec![2])));
     }
 
     #[tokio::test]

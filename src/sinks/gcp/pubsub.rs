@@ -468,6 +468,16 @@ where
         input
             .filter_map(move |event| future::ready(encoder.encode_event(event)))
             .batched(PubsubBatcher::new(batch_settings))
+            // Pub/Sub rejects a publish request without messages, so a batch that holds only
+            // dropped oversized messages is rejected without a request.
+            .filter_map(|batch| {
+                future::ready(if batch.messages.is_empty() {
+                    batch.finalizers.update_status(EventStatus::Rejected);
+                    None
+                } else {
+                    Some(batch)
+                })
+            })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| {
                 future::ready(match request {
@@ -777,33 +787,47 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn trailing_dropped_message_sends_empty_envelope() {
-        let mut encoder = message_encoder();
-        let small = encode(&mut encoder, log_event("a", None));
-        let (dropped_batch, mut dropped_receiver) = BatchNotifier::new_with_receiver();
-        let oversized = encode(
-            &mut encoder,
-            log_event(&"x".repeat(100), Some(&dropped_batch)),
-        );
-        drop(dropped_batch);
-        let size_limit = oversized.payload_size();
-        let expected_first = expected_body(&[&small]);
-
-        let mut batches = batch(vec![small, oversized], size_limit, 1000)
+    async fn trailing_dropped_message_is_rejected_without_request() {
+        let (_guard, addr) = next_addr();
+        let config: PubsubConfig = serde_yaml::from_str(&format!(
+            indoc! {r"
+                project: project
+                topic: topic
+                endpoint: http://{}
+                skip_authentication: true
+                encoding:
+                  codec: json
+                batch:
+                  max_bytes: 100
+            "},
+            addr
+        ))
+        .unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, SinkContext::default())
             .await
-            .into_iter();
-        let (_, metadata, payload) = build_request(batches.next().unwrap());
-        assert_eq!(&payload.payload[..], &expected_first[..]);
-        assert_eq!(metadata.event_count(), 1);
+            .unwrap();
 
-        let (finalizers, metadata, payload) = build_request(batches.next().unwrap());
-        assert_eq!(&payload.payload[..], br#"{"messages":[]}"#);
-        assert_eq!(metadata.event_count(), 1);
-        assert!(batches.next().is_none());
+        let (mut rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
 
-        finalizers.update_status(EventStatus::Errored);
-        drop(finalizers);
-        assert_eq!(dropped_receiver.try_recv(), Ok(BatchStatus::Errored));
+        let (small_batch, mut small_receiver) = BatchNotifier::new_with_receiver();
+        let (dropped_batch, mut dropped_receiver) = BatchNotifier::new_with_receiver();
+        let events = vec![
+            log_event("a", Some(&small_batch)),
+            log_event(&"x".repeat(100), Some(&dropped_batch)),
+        ];
+        drop((small_batch, dropped_batch));
+        sink.run_events(events).await.unwrap();
+
+        assert_eq!(small_receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(dropped_receiver.try_recv(), Ok(BatchStatus::Rejected));
+        let (_, body) = rx.next().await.expect("request should be received");
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["messages"].as_array().unwrap().len(), 1);
+        assert!(
+            rx.try_recv().is_err(),
+            "no request should publish the dropped message"
+        );
     }
 }
 
