@@ -322,7 +322,7 @@ Your timestamps, host, and counter values will differ:
 ```
 
 Compare the counters over time. A nonzero error count can reflect an earlier failure. If the count keeps increasing, errors are still
-happening. You can use the optional [monitoring setup](#visualizing-and-querying-internal-metrics) below to graph them.
+happening. You can use the [monitoring setup](#visualizing-and-querying-internal-metrics) below to graph them.
 
 ### Increase log verbosity when needed {#controlling-log-verbosity}
 
@@ -617,7 +617,7 @@ You now have a way to check each stage: inspect events with `tap`, compare compo
 You can also add [Vector configuration unit tests](/docs/reference/configuration/unit-tests/) for your transform's expected output.
 When you're finished, stop Vector and the Python server with Ctrl+C.
 
-## Optional: Visualize and query internal metrics {#visualizing-and-querying-internal-metrics}
+## Visualize and query internal metrics {#visualizing-and-querying-internal-metrics}
 
 The console is enough for the walkthrough. For longer investigations, send the same internal metrics to Datadog or Prometheus/Grafana
 so you can compare changes over time.
