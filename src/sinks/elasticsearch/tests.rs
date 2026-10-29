@@ -1,22 +1,48 @@
-use std::{convert::TryFrom, iter::zip};
+use std::{
+    convert::TryFrom,
+    iter::zip,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 
+use futures::stream;
+use http::{Response, StatusCode};
+use hyper::Body;
+use tower::{ServiceExt, retry::Retry};
 use vector_common::sensitive_string::SensitiveString;
-use vector_lib::lookup::PathPrefix;
+use vector_lib::{lookup::PathPrefix, stream::Driver};
 use vrl::event_path;
 
 use crate::{
     codecs::Transformer,
     config::ProxyConfig,
-    event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
+    event::{
+        BatchNotifier, BatchStatus, LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value,
+    },
+    http::HttpClient,
+    metrics::{self, Controller},
     sinks::{
         elasticsearch::{
             BulkAction, BulkConfig, DataStreamConfig, Distribution, ElasticsearchApiVersion,
             ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
-            VersionType, sink::process_log,
+            VersionType,
+            retry::ElasticsearchRetryLogic,
+            service::{ElasticsearchRequest, ElasticsearchService, HttpRequestBuilder},
+            sink::process_log,
         },
-        util::{HttpEndpoint, auth::Auth, encoding::Encoder},
+        util::{
+            HttpEndpoint, RequestBuilder,
+            auth::Auth,
+            encoding::Encoder,
+            retries::{FibonacciRetryPolicy, JitterMode},
+            test::build_test_server_generic,
+        },
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},
+    test_util::addr::next_addr,
 };
 
 // helper to unwrap template strings for tests only
@@ -27,6 +53,111 @@ fn parse_template(input: &str) -> Template {
 // `bulk.action` / `bulk.version` are unconfined templates.
 fn parse_unconfined(input: &str) -> UnconfinedTemplate {
     UnconfinedTemplate::try_from(input).unwrap()
+}
+
+#[tokio::test]
+async fn partial_retry_terminal_outcome_metrics() {
+    metrics::init_test();
+    let controller = Controller::get().unwrap();
+    for terminal_status in [
+        StatusCode::NOT_IMPLEMENTED,
+        StatusCode::SERVICE_UNAVAILABLE,
+        StatusCode::OK,
+    ] {
+        controller.reset();
+        let (_guard, addr) = next_addr();
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let server_attempts = Arc::clone(&attempts);
+        let (_rx, trigger, server) = build_test_server_generic(addr, move || {
+            if server_attempts.fetch_add(1, Ordering::Relaxed) == 0 {
+                Response::new(Body::from(
+                    r#"{"errors":true,"items":[{"index":{"status":201}},{"index":{"status":429}}]}"#,
+                ))
+            } else {
+                Response::builder()
+                    .status(terminal_status)
+                    .body(Body::from(
+                        r#"{"errors":false,"items":[{"index":{"status":201}}]}"#,
+                    ))
+                    .unwrap()
+            }
+        });
+        let server = tokio::spawn(server);
+        let config = ElasticsearchConfig {
+            endpoints: vec![HttpEndpoint::parse(&format!("http://{addr}")).unwrap()],
+            api_version: ElasticsearchApiVersion::V7,
+            ..Default::default()
+        };
+        let common = ElasticsearchCommon::parse_single(&config).await.unwrap();
+        let client = HttpClient::new(common.tls_settings.clone(), &ProxyConfig::default()).unwrap();
+        let batch_sizes = Arc::new(Mutex::new(Vec::new()));
+        let request_batch_sizes = Arc::clone(&batch_sizes);
+        let service = ElasticsearchService::new(client, HttpRequestBuilder::new(&common, &config))
+            .map_request(move |request: ElasticsearchRequest| {
+                request_batch_sizes.lock().unwrap().push(request.batch_size);
+                request
+            });
+        let retry_policy = FibonacciRetryPolicy::new(
+            1,
+            Duration::from_millis(1),
+            Duration::from_millis(1),
+            ElasticsearchRetryLogic {
+                retry_partial: true,
+            },
+            JitterMode::None,
+        );
+        let service = Retry::new(retry_policy, service);
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let events = ["accepted", "retry"]
+            .into_iter()
+            .map(|message| {
+                let log = LogEvent::from(message).with_batch_notifier(&batch);
+                process_log(log, &common.mode, None, &config.encoding).unwrap()
+            })
+            .collect();
+        drop(batch);
+        let builder = common.request_builder;
+        let (metadata, metadata_builder, events) = builder.split_input(events);
+        let encoded = builder.encode_events(events).unwrap();
+        let request = builder.build_request(metadata, metadata_builder.build(&encoded), encoded);
+
+        let driver = Driver::new(stream::iter([request]), service);
+        driver.run().await.unwrap();
+        drop(trigger);
+        server.await.unwrap().unwrap();
+
+        let delivered = terminal_status.is_success();
+        assert_eq!(
+            receiver.await,
+            if delivered {
+                BatchStatus::Delivered
+            } else {
+                BatchStatus::Errored
+            },
+            "{terminal_status}"
+        );
+        assert_eq!(attempts.load(Ordering::Relaxed), 2, "{terminal_status}");
+        assert_eq!(*batch_sizes.lock().unwrap(), [2, 1], "{terminal_status}");
+
+        let metrics = controller.capture_metrics();
+        for name in ["component_errors_total", "component_discarded_events_total"] {
+            let count: f64 = metrics
+                .iter()
+                .filter(|metric| metric.name() == name)
+                .map(|metric| {
+                    let MetricValue::Counter { value } = metric.value() else {
+                        panic!("{name} must be a counter");
+                    };
+                    *value
+                })
+                .sum();
+            assert_eq!(
+                count,
+                if delivered { 0.0 } else { 1.0 },
+                "{terminal_status}: {name}"
+            );
+        }
+    }
 }
 
 #[tokio::test]

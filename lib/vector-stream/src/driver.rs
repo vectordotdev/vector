@@ -19,6 +19,13 @@ pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> &GroupedCountByteSize;
 
+    /// Number of events discarded by this terminal response, when known.
+    /// Partial retries can reduce this below the original request's event count.
+    /// Defaults to using the original request's count.
+    fn events_dropped(&self) -> Option<usize> {
+        None
+    }
+
     /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
@@ -225,7 +232,11 @@ where
                     EventStatus::Rejected | EventStatus::Errored
                 ) {
                     // The retry service has finished; either outcome abandons these events.
-                    Self::emit_call_error(None, request_id, event_count);
+                    Self::emit_call_error(
+                        None,
+                        request_id,
+                        response.events_dropped().unwrap_or(event_count),
+                    );
                 }
             }
         }
@@ -422,12 +433,14 @@ mod tests {
 
     #[tokio::test]
     async fn driver_terminal_outcome_metrics() {
+        use EventStatus::{Delivered, Errored, Rejected};
+
         use vector_core::{
             event::MetricValue,
             metrics::{self, Controller},
         };
 
-        struct StatusResponse(EventStatus, GroupedCountByteSize);
+        struct StatusResponse(EventStatus, GroupedCountByteSize, Option<usize>);
 
         impl DriverResponse for StatusResponse {
             fn event_status(&self) -> EventStatus {
@@ -437,15 +450,22 @@ mod tests {
             fn events_sent(&self) -> &GroupedCountByteSize {
                 &self.1
             }
+
+            fn events_dropped(&self) -> Option<usize> {
+                self.2
+            }
         }
 
         metrics::init_test();
         let controller = Controller::get().unwrap();
-        for (status, expected_batch_status) in [
-            (Some(EventStatus::Delivered), BatchStatus::Delivered),
-            (Some(EventStatus::Rejected), BatchStatus::Rejected),
-            (Some(EventStatus::Errored), BatchStatus::Errored),
-            (None, BatchStatus::Rejected),
+        for (status, dropped, expected_batch_status, expected_discarded) in [
+            (Some(Delivered), None, BatchStatus::Delivered, 0.0),
+            (Some(Rejected), None, BatchStatus::Rejected, 3.0),
+            (Some(Errored), None, BatchStatus::Errored, 3.0),
+            (Some(Rejected), Some(1), BatchStatus::Rejected, 1.0),
+            (Some(Errored), Some(1), BatchStatus::Errored, 1.0),
+            (Some(Errored), Some(0), BatchStatus::Errored, 0.0),
+            (None, None, BatchStatus::Rejected, 3.0),
         ] {
             controller.reset();
             let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -457,7 +477,15 @@ mod tests {
             );
             let service = tower::service_fn(move |_: DelayRequest| {
                 std::future::ready(match status {
-                    Some(status) => Ok(StatusResponse(status, sizes.clone())),
+                    Some(status) => Ok(StatusResponse(
+                        status,
+                        if status == EventStatus::Delivered {
+                            sizes.clone()
+                        } else {
+                            GroupedCountByteSize::default()
+                        },
+                        dropped,
+                    )),
                     None => Err("request failed"),
                 })
             });
@@ -481,7 +509,7 @@ mod tests {
                     })
                     .sum(),
             };
-            let delivered = status == Some(EventStatus::Delivered);
+            let delivered = status == Some(Delivered);
             assert_eq!(
                 counter("component_sent_events_total"),
                 MetricValue::Counter {
@@ -497,7 +525,7 @@ mod tests {
             assert_eq!(
                 counter("component_discarded_events_total"),
                 MetricValue::Counter {
-                    value: if delivered { 0.0 } else { 3.0 }
+                    value: expected_discarded
                 }
             );
             if !delivered {

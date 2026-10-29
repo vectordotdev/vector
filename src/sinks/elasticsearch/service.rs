@@ -173,6 +173,7 @@ impl HttpRequestBuilder {
 pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
+    pub event_count: usize,
     pub events_byte_size: GroupedCountByteSize,
 }
 
@@ -183,6 +184,10 @@ impl DriverResponse for ElasticsearchResponse {
 
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
+    }
+
+    fn events_dropped(&self) -> Option<usize> {
+        (self.event_status == EventStatus::Errored).then_some(self.event_count)
     }
 }
 
@@ -201,14 +206,16 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
-            let events_byte_size =
-                std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
+            let metadata = std::mem::take(req.metadata_mut());
+            let event_count = metadata.event_count();
+            let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
 
             let event_status = get_event_status(&http_response);
             Ok(ElasticsearchResponse {
                 http_response,
                 event_status,
+                event_count,
                 events_byte_size,
             })
         })
