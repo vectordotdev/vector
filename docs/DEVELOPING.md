@@ -322,8 +322,8 @@ to run. A few rules when setting up integration tests:
       run in a Docker container.
 - [ ] The service must be configured on a unique port that is configured through
       an environment variable.
-- [ ] Add `test.yaml` and `compose.yaml` under `tests/integration/<name>/config`
-      so that `vdev` can discover the integration and start its services.
+- [ ] Add `test.yaml` under `tests/integration/<name>/config`, and `compose.yaml`
+      if the integration needs Compose-managed services.
 - [ ] Add the integration to the service matrices in
       [`.github/workflows/integration.yml`](../.github/workflows/integration.yml) and
       [`.github/workflows/ci-integration-review.yml`](../.github/workflows/ci-integration-review.yml).
