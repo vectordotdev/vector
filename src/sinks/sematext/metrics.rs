@@ -188,7 +188,7 @@ impl ValidatedSink for SematextMetricsConfig {
 }
 
 fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
-    let uri = encode_uri(
+    encode_uri(
         endpoint,
         "write",
         &[
@@ -196,8 +196,7 @@ fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
             ("v", Some(format!("vector-{}", vector_version()))),
             ("precision", Some("ns".into())),
         ],
-    )?;
-    Ok(HttpEndpoint::new(uri)?.into_v1())
+    )
 }
 
 impl SematextMetricsService {
