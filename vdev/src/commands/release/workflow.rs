@@ -5,7 +5,7 @@ use crate::{
     utils::{git, paths},
 };
 use anyhow::{Context, Result, bail, ensure};
-use semver::{Prerelease, Version};
+use semver::Version;
 use serde::Deserialize;
 use std::{
     env, fs,
@@ -19,6 +19,10 @@ use toml_edit::DocumentMut;
 use super::{
     ensure_stable, preparation_branch,
     prepare::{replace_version_references, update_vector_package_version, update_vrl_to_version},
+    versions::{
+        VersionOptions, current_cargo_version, development_version, parse_cargo_version,
+        parse_stable_version, pinned_vrl_version,
+    },
 };
 
 /// Helpers used by the GitHub release workflows.
@@ -86,12 +90,8 @@ struct AutotagCheck {
 
 #[derive(clap::Args, Debug)]
 struct PrepareCheck {
-    /// Stable minor version to prepare; defaults to Cargo.toml without its -dev suffix.
-    #[arg(long)]
-    version: Option<Version>,
-    /// Released VRL version to pin; defaults to crates.io's latest stable release or the retry's pin.
-    #[arg(long)]
-    vrl_version: Option<Version>,
+    #[command(flatten)]
+    versions: VersionOptions,
     #[arg(long)]
     bot_app: String,
     #[arg(long)]
@@ -180,7 +180,11 @@ impl Cli {
 
 impl PrepareCheck {
     fn exec(self) -> Result<()> {
-        let version = preparation_version(&current_cargo_version()?, self.version)?;
+        let version = self.versions.resolve_vector()?;
+        ensure!(
+            version.patch == 0,
+            "automated preparation supports minor releases only"
+        );
         let tag = format!("v{version}");
         ensure!(
             !remote_ref_exists(&format!("refs/tags/{tag}"))?,
@@ -196,10 +200,7 @@ impl PrepareCheck {
             append_github_step_summary(&format!("Existing preparation PR: {url}"))?;
         } else {
             let resume = remote_ref_exists(&format!("refs/heads/{branch}"))?;
-            let vrl_version = if let Some(version) = self.vrl_version {
-                ensure_stable(&version, "VRL version")?;
-                version
-            } else if resume {
+            let existing_pin = if resume && self.versions.vrl_version.is_none() {
                 git::run_and_check_output(&[
                     "fetch",
                     "--no-tags",
@@ -207,62 +208,17 @@ impl PrepareCheck {
                     &format!("refs/heads/{branch}"),
                 ])?;
                 let manifest = git::run_and_check_output(&["show", "FETCH_HEAD:Cargo.toml"])?;
-                pinned_vrl_version(&toml::from_str(&manifest)?)?
+                Some(pinned_vrl_version(&toml::from_str(&manifest)?)?)
             } else {
-                latest_vrl_version()?
+                None
             };
+            let vrl_version = self.versions.resolve_vrl(existing_pin)?;
             set_github_output("vrl_version", &vrl_version.to_string())?;
             set_github_output("resume", if resume { "true" } else { "false" })?;
             set_github_output("skip", "false")?;
         }
         Ok(())
     }
-}
-
-fn preparation_version(current: &Version, requested: Option<Version>) -> Result<Version> {
-    let version = requested.unwrap_or_else(|| Version::new(current.major, current.minor, 0));
-    ensure_stable(&version, "release version")?;
-    ensure!(
-        version.patch == 0,
-        "automated preparation supports minor releases only"
-    );
-    let expected_current = development_version(&version)?;
-    ensure!(
-        *current == expected_current,
-        "expected Cargo.toml version {expected_current}, found {current}"
-    );
-    Ok(version)
-}
-
-fn latest_vrl_version() -> Result<Version> {
-    let response = Command::new("curl")
-        .args([
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--location",
-            "--retry",
-            "3",
-            "--max-time",
-            "30",
-            "--user-agent",
-            "Vector release tooling (https://github.com/vectordotdev/vector)",
-            "https://crates.io/api/v1/crates/vrl",
-        ])
-        .check_output()
-        .context("failed to fetch the latest stable VRL version from crates.io")?;
-    parse_latest_vrl_version(&response)
-}
-
-fn parse_latest_vrl_version(response: &str) -> Result<Version> {
-    let response: serde_json::Value =
-        serde_json::from_str(response).context("invalid VRL response from crates.io")?;
-    let version = response
-        .get("crate")
-        .and_then(|krate| krate.get("max_stable_version"))
-        .and_then(serde_json::Value::as_str)
-        .context("crates.io did not return a stable VRL version")?;
-    parse_stable_version(version, "VRL version")
 }
 
 impl AutotagCheck {
@@ -749,17 +705,6 @@ fn validate_release_manifest(
     Ok(())
 }
 
-fn pinned_vrl_version(manifest: &toml::Value) -> Result<Version> {
-    let version = manifest
-        .get("workspace")
-        .and_then(|value| value.get("dependencies"))
-        .and_then(|value| value.get("vrl"))
-        .and_then(|value| value.get("version"))
-        .and_then(toml::Value::as_str)
-        .context("Cargo.toml must pin VRL to a released registry version")?;
-    parse_stable_version(version, "VRL version")
-}
-
 fn parse_preparation_branch(branch: &str) -> Result<Version> {
     let version = branch
         .strip_prefix("prepare-v-")
@@ -775,38 +720,11 @@ fn parse_preparation_branch(branch: &str) -> Result<Version> {
     parse_stable_version(&version.replace('-', "."), "preparation branch version")
 }
 
-fn parse_stable_version(value: &str, label: &str) -> Result<Version> {
-    let version = Version::parse(value).with_context(|| format!("invalid {label}: {value}"))?;
-    ensure_stable(&version, label)?;
-    Ok(version)
-}
-
-fn development_version(version: &Version) -> Result<Version> {
-    ensure_stable(version, "release version")?;
-    let mut development = version.clone();
-    development.pre = Prerelease::new("dev")?;
-    Ok(development)
-}
-
-fn current_cargo_version() -> Result<Version> {
-    parse_cargo_version(&fs::read_to_string("Cargo.toml").context("failed to read Cargo.toml")?)
-}
-
 fn cargo_version_at(revision: &str) -> Result<Version> {
     parse_cargo_version(&git::run_and_check_output(&[
         "show",
         &format!("{revision}:Cargo.toml"),
     ])?)
-}
-
-fn parse_cargo_version(contents: &str) -> Result<Version> {
-    let doc = contents
-        .parse::<DocumentMut>()
-        .context("failed to parse Cargo.toml")?;
-    let version = doc["package"]["version"]
-        .as_str()
-        .context("Cargo.toml package.version must be a string")?;
-    Version::parse(version).context("Cargo.toml package.version is not a semantic version")
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -999,72 +917,8 @@ fn append_github_step_summary(line: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        locked_vrl_git_revision, parse_cargo_version, parse_latest_vrl_version,
-        parse_preparation_branch, preparation_branch, preparation_version, release_file_allowed,
+        locked_vrl_git_revision, parse_preparation_branch, preparation_branch, release_file_allowed,
     };
-    use indoc::indoc;
-
-    #[test]
-    fn preparation_version_defaults_to_the_development_minor() {
-        for version in ["0.59.0", "0.61.0", "1.2.0"] {
-            let current = format!("{version}-dev").parse().unwrap();
-            assert_eq!(
-                preparation_version(&current, None).unwrap(),
-                version.parse().unwrap()
-            );
-        }
-    }
-
-    #[test]
-    fn preparation_version_validates_explicit_versions() {
-        let current = "0.61.0-dev".parse().unwrap();
-        assert_eq!(
-            preparation_version(&current, Some("0.61.0".parse().unwrap())).unwrap(),
-            "0.61.0".parse().unwrap()
-        );
-        for version in ["0.60.0", "0.62.0", "0.61.1", "0.61.0-rc.1", "0.61.0+build"] {
-            assert!(
-                preparation_version(&current, Some(version.parse().unwrap())).is_err(),
-                "accepted {version}"
-            );
-        }
-    }
-
-    #[test]
-    fn preparation_version_requires_a_minor_development_version() {
-        for version in ["0.61.0", "0.61.1-dev", "0.61.0-rc.1", "0.61.0-dev+build"] {
-            assert!(
-                preparation_version(&version.parse().unwrap(), None).is_err(),
-                "accepted {version}"
-            );
-        }
-    }
-
-    #[test]
-    fn latest_vrl_version_uses_the_registrys_stable_release() {
-        let response = r#"{"crate":{"max_stable_version":"0.28.0","max_version":"0.29.0-rc.1","newest_version":"0.27.1"}}"#;
-        assert_eq!(
-            parse_latest_vrl_version(response).unwrap(),
-            "0.28.0".parse().unwrap()
-        );
-    }
-
-    #[test]
-    fn latest_vrl_version_requires_a_valid_stable_release() {
-        for response in [
-            "invalid JSON",
-            r#"{"crate":{"max_version":"0.28.0"}}"#,
-            r#"{"crate":{"max_stable_version":null}}"#,
-            r#"{"crate":{"max_stable_version":"invalid"}}"#,
-            r#"{"crate":{"max_stable_version":"0.28.0-rc.1"}}"#,
-        ] {
-            assert!(
-                parse_latest_vrl_version(response).is_err(),
-                "accepted {response}"
-            );
-        }
-    }
-
     #[test]
     fn preparation_branch_matches_the_documented_format() {
         let version = "0.59.0".parse().unwrap();
@@ -1095,19 +949,6 @@ mod tests {
                 "accepted {branch}"
             );
         }
-    }
-
-    #[test]
-    fn parses_package_version() {
-        let cargo_toml = indoc! {r#"
-            [package]
-            name = "vector"
-            version = "0.59.0-dev"
-        "#};
-        assert_eq!(
-            parse_cargo_version(cargo_toml).expect("valid Cargo.toml"),
-            "0.59.0-dev".parse().expect("valid version")
-        );
     }
 
     #[test]

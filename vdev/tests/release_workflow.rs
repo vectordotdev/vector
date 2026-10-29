@@ -171,7 +171,7 @@ fn check_with_args(repo: &Path, base: &str, args: &[&str], success: bool) -> Str
 }
 
 fn prepare_check(repo: &Path, args: &[&str], success: bool) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
+    let output = vdev(repo)
         .args([
             "release",
             "workflow",
@@ -182,6 +182,16 @@ fn prepare_check(repo: &Path, args: &[&str], success: bool) -> String {
             "vectordotdev/vector",
         ])
         .args(args)
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert_eq!(output.status.success(), success, "{stderr}");
+    stderr
+}
+
+fn vdev(repo: &Path) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_vdev"));
+    command
         .env("GITHUB_OUTPUT", repo.join(".git/github-output"))
         .env("GITHUB_STEP_SUMMARY", repo.join(".git/github-summary"))
         .env(
@@ -192,12 +202,8 @@ fn prepare_check(repo: &Path, args: &[&str], success: bool) -> String {
             )
             .unwrap(),
         )
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert_eq!(output.status.success(), success, "{stderr}");
-    stderr
+        .current_dir(repo);
+    command
 }
 
 #[test]
@@ -544,6 +550,87 @@ mod prepare {
         let output = fs::read_to_string(repo.join(".git/github-output")).unwrap();
         assert!(!output.contains("vrl_version="));
         assert!(!output.contains("skip=false"));
+    }
+
+    #[test]
+    fn cli_prepare_defaults_and_overrides_generate_release_files() {
+        for explicit in [false, true] {
+            let (temp, _remote) = fixture();
+            let repo = temp.path();
+            git(repo, &["tag", "v0.58.0"]);
+            // Keep Cargo resolution offline while running the full preparation command.
+            let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
+            write(
+                repo,
+                "Cargo.toml",
+                &manifest.replace(
+                    r#"git = "https://github.com/vectordotdev/vrl.git", branch = "main""#,
+                    r#"version = "0.28.0""#,
+                ),
+            );
+            write(
+                repo,
+                "website/content/en/releases/0.58.0.md",
+                "---\nweight: 1\n---\n",
+            );
+            write(
+                repo,
+                ".git/registry-response.json",
+                if explicit {
+                    r#"{"crate":{"max_stable_version":"0.29.0"}}"#
+                } else {
+                    r#"{"crate":{"max_stable_version":"0.28.0"}}"#
+                },
+            );
+            write(
+                repo,
+                ".git/test-bin/gh",
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > .git/changelog-requested\nprintf '## 0.28.0\\n- Release fixture\\n'\n",
+            );
+            // Formatting is independent of version resolution and need not require CUE in CI.
+            write(repo, ".git/test-bin/cue", "#!/bin/sh\nexit 0\n");
+            fs::set_permissions(
+                repo.join(".git/test-bin/cue"),
+                fs::Permissions::from_mode(0o755),
+            )
+            .unwrap();
+
+            let mut command = vdev(repo);
+            command.args(["release", "prepare", "--dry-run"]);
+            if explicit {
+                command.args(["--version", "0.59.0", "--vrl-version", "0.28.0"]);
+            }
+            let output = command.env("CARGO_NET_OFFLINE", "true").output().unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+
+            let manifest: toml::Value =
+                toml::from_str(&fs::read_to_string(repo.join("Cargo.toml")).unwrap()).unwrap();
+            assert_eq!(manifest["package"]["version"].as_str(), Some("0.59.0"));
+            assert_eq!(
+                manifest["workspace"]["dependencies"]["vrl"]["version"].as_str(),
+                Some("0.28.0")
+            );
+            assert_eq!(repo.join(".git/registry-requested").exists(), !explicit);
+            assert!(
+                fs::read_to_string(repo.join(".git/changelog-requested"))
+                    .unwrap()
+                    .contains("CHANGELOG.md?ref=v0.28.0")
+            );
+            assert!(
+                repo.join("website/cue/reference/releases/0.59.0.cue")
+                    .is_file()
+            );
+            assert!(repo.join("website/content/en/releases/0.59.0.md").is_file());
+            assert!(
+                fs::read_to_string(repo.join("distribution/install.sh"))
+                    .unwrap()
+                    .contains("0.59.0")
+            );
+        }
     }
 }
 

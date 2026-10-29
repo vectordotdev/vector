@@ -1,7 +1,7 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::commands::release::{ensure_stable, generate_cue, preparation_branch};
+use crate::commands::release::{generate_cue, preparation_branch, versions::VersionOptions};
 use crate::utils::{command::run_command, git, paths};
 use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
@@ -19,12 +19,8 @@ const INSTALL_SCRIPT: &str = "distribution/install.sh";
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// The new Vector version.
-    #[arg(long)]
-    version: Version,
-    /// The new VRL version.
-    #[arg(long)]
-    vrl_version: Version,
+    #[command(flatten)]
+    versions: VersionOptions,
     /// Dry run. Enabling this will make it so no PRs will be created and no branches will be pushed upstream.
     #[arg(long, default_value_t = false)]
     dry_run: bool,
@@ -42,18 +38,24 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        ensure_stable(&self.version, "release version")?;
-        ensure_stable(&self.vrl_version, "VRL version")?;
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
+        if !self.dry_run {
+            // Resolve defaults from the branch that will be prepared.
+            git::run_and_check_output(&["fetch"])?;
+            git::checkout_main_branch()?;
+        }
+        let version = self.versions.resolve_vector()?;
+        let vrl_version = self.versions.resolve_vrl(None)?;
+
         let prepare = Prepare {
-            new_vector_version: self.version.clone(),
-            vrl_version: self.vrl_version,
+            new_vector_version: version.clone(),
+            vrl_version,
             repo_root,
             latest_vector_version: git::latest_release_version()?,
-            release_branch: format!("v{}.{}", self.version.major, self.version.minor),
-            release_preparation_branch: preparation_branch(&self.version),
+            release_branch: format!("v{}.{}", version.major, version.minor),
+            release_preparation_branch: preparation_branch(&version),
             dry_run: self.dry_run,
         };
         prepare.run()
@@ -90,10 +92,6 @@ impl Prepare {
             );
             return Ok(());
         }
-
-        // Step 1: Sync with remote and start from master.
-        git::run_and_check_output(&["fetch"])?;
-        git::checkout_main_branch()?;
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
         git::push_and_set_upstream(self.release_branch.as_str())?;

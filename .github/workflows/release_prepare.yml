@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable minor Vector version (defaults to master's development version without -dev)
+        description: Vector version override (optional)
         required: false
         type: string
       vrl_version:
-        description: Released VRL version to pin (defaults to the latest stable release on crates.io)
+        description: VRL version override (optional)
         required: false
         type: string
 

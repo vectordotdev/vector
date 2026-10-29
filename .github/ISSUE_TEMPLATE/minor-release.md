@@ -18,6 +18,7 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml)
       workflow from `master`. Both version inputs are optional.
+  - `vdev` resolves omitted versions; the workflow only forwards supplied overrides.
   - Leave `version` empty to prepare the next minor release recorded in `master`'s `Cargo.toml`
     (for example, `0.61.0-dev` becomes `0.61.0`), or specify the stable version explicitly.
     Explicit versions must also match `master`'s development version.
