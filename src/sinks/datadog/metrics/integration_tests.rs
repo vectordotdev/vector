@@ -4,8 +4,7 @@ use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
 use datadog_proto::agentpayload as ddmetric_proto;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use http_0::request::Parts;
-use hyper::StatusCode;
+use http::{StatusCode, request::Parts};
 use indoc::indoc;
 use prost::Message;
 use rand::{RngExt, rng};
@@ -109,7 +108,7 @@ fn generate_counter_gauge_set() -> Vec<Event> {
 /// Testers may set `http_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
-async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http_0::request::Parts, Bytes)>) {
+async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
     // Pinned to v2: the tests built on this helper decode `MetricPayload`, which is the v2
     // wire shape. The default (v3) is a different, columnar format and is covered separately by
     // `default_series_version_uses_the_v3_intake` below.
@@ -122,7 +121,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http_0::reques
 async fn start_test_with_series_version(
     events: Vec<Event>,
     series_api_version: Option<&str>,
-) -> (Vec<Event>, Receiver<(http_0::request::Parts, Bytes)>) {
+) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
     let mut config = indoc! {r#"
         default_api_key = "atoken"
         default_namespace = "foo"

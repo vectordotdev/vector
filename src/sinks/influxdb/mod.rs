@@ -487,24 +487,26 @@ pub mod test_util {
         (measurement, tags, fields.to_string(), ts)
     }
 
-    fn client() -> reqwest::Client {
+    fn client() -> reqwest_13::Client {
         let mut test_ca = Vec::<u8>::new();
         File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+        let test_ca = reqwest_13::Certificate::from_pem(&test_ca).unwrap();
 
-        reqwest::Client::builder()
+        reqwest_13::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .unwrap()
     }
 
-    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest_13::Response {
         client()
-            .get(format!("{endpoint}/query"))
-            .query(&[("q", query)])
+            .get(
+                reqwest_13::Url::parse_with_params(&format!("{endpoint}/query"), &[("q", query)])
+                    .unwrap(),
+            )
             .send()
             .await
             .unwrap()
@@ -515,7 +517,7 @@ pub mod test_util {
         let status = query_v1(endpoint, &format!("create database {database}"))
             .await
             .status();
-        assert_eq!(status, http_0::StatusCode::OK, "UnexpectedStatus: {status}");
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
         // Some times InfluxDB will return OK before it can actually
         // accept writes to the database, leading to test failures. Test
         // this with empty writes and loop if it reports the database
@@ -533,8 +535,8 @@ pub mod test_util {
                     .unwrap()
                     .status()
                 {
-                    http_0::StatusCode::NO_CONTENT => true,
-                    http_0::StatusCode::NOT_FOUND => false,
+                    http::StatusCode::NO_CONTENT => true,
+                    http::StatusCode::NOT_FOUND => false,
                     status => panic!("Unexpected status: {status}"),
                 }
             }
@@ -547,7 +549,7 @@ pub mod test_util {
         let status = query_v1(endpoint, &format!("drop database {database}"))
             .await
             .status();
-        assert_eq!(status, http_0::StatusCode::OK, "UnexpectedStatus: {status}");
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
     }
 
     pub(crate) async fn onboarding_v2(endpoint: &str) {
@@ -558,7 +560,7 @@ pub mod test_util {
         body.insert("bucket", BUCKET);
         body.insert("token", TOKEN);
 
-        let client = reqwest::Client::builder()
+        let client = reqwest_13::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
@@ -574,8 +576,7 @@ pub mod test_util {
         let status = res.status();
 
         assert!(
-            status == http_0::StatusCode::CREATED
-                || status == http_0::StatusCode::UNPROCESSABLE_ENTITY,
+            status == http::StatusCode::CREATED || status == http::StatusCode::UNPROCESSABLE_ENTITY,
             "UnexpectedStatus: {status}"
         );
     }

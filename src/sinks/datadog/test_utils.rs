@@ -1,6 +1,6 @@
 #![cfg(any(feature = "sinks-datadog_logs", feature = "sinks-datadog_metrics"))]
 use bytes::Bytes;
-use http_0::status::StatusCode;
+use http::status::StatusCode;
 
 use crate::sinks::util::test::build_test_server_status;
 
@@ -18,6 +18,7 @@ pub enum ApiStatus {
     BadRequestv2,
 }
 
+/// Starts an HTTP test server that captures http 1 request parts and body bytes.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::needless_pass_by_value,
@@ -27,7 +28,7 @@ pub fn test_server(
     addr: std::net::SocketAddr,
     api_status: ApiStatus,
 ) -> (
-    futures::channel::mpsc::Receiver<(http_0::request::Parts, Bytes)>,
+    futures::channel::mpsc::Receiver<(http::request::Parts, Bytes)>,
     stream_cancel::Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {

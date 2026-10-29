@@ -527,11 +527,13 @@ pub enum HealthCheckError {
 mod tests {
     use std::sync::Mutex;
 
-    use hyper::{
-        Server,
-        body::HttpBody as _,
-        service::{make_service_fn, service_fn},
+    use http_body_util::{BodyExt as _, Full};
+    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper_util::{
+        rt::{TokioExecutor, TokioIo},
+        server::conn::auto,
     };
+    use tokio::net::TcpListener;
     use vector_common::sensitive_string::SensitiveString;
 
     use super::*;
@@ -542,32 +544,42 @@ mod tests {
         let (_guard, addr) = next_addr();
         let received = Arc::new(Mutex::new(Vec::new()));
         let server_received = Arc::clone(&received);
-        let service = make_service_fn(move |_| {
-            let received = Arc::clone(&server_received);
-            async move {
-                Ok::<_, crate::Error>(service_fn(move |request: hyper::Request<hyper::Body>| {
-                    let received = Arc::clone(&received);
-                    async move {
-                        let (parts, body) = request.into_parts();
-                        let body = body.collect().await?.to_bytes();
-                        let response = if parts.uri.path() == "/be/_stream_load" {
-                            hyper::Response::new(hyper::Body::from(r#"{"Status":"Success"}"#))
-                        } else {
-                            hyper::Response::builder()
-                                .status(hyper::StatusCode::TEMPORARY_REDIRECT)
-                                .header(
-                                    hyper::header::LOCATION,
-                                    format!("http://{addr}/be/_stream_load?k=a%2Fb"),
-                                )
-                                .body(hyper::Body::empty())?
-                        };
-                        received.lock().unwrap().push((parts, body));
-                        Ok::<_, crate::Error>(response)
-                    }
-                }))
+        let listener = TcpListener::bind(addr).await.unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let received = Arc::clone(&server_received);
+                tokio::spawn(async move {
+                    let service = service_fn(move |request: Request<Incoming>| {
+                        let received = Arc::clone(&received);
+                        async move {
+                            let (parts, body) = request.into_parts();
+                            let body = body.collect().await.unwrap().to_bytes();
+                            let response = if parts.uri.path() == "/be/_stream_load" {
+                                Response::new(Full::new(Bytes::from_static(
+                                    br#"{"Status":"Success"}"#,
+                                )))
+                            } else {
+                                Response::builder()
+                                    .status(StatusCode::TEMPORARY_REDIRECT)
+                                    .header(
+                                        LOCATION,
+                                        format!("http://{addr}/be/_stream_load?k=a%2Fb"),
+                                    )
+                                    .body(Full::new(Bytes::new()))
+                                    .unwrap()
+                            };
+                            received.lock().unwrap().push((parts, body));
+                            Ok::<_, std::convert::Infallible>(response)
+                        }
+                    });
+                    auto::Builder::new(TokioExecutor::new())
+                        .serve_connection(TokioIo::new(stream), service)
+                        .await
+                        .unwrap();
+                });
             }
         });
-        tokio::spawn(Server::bind(&addr).serve(service));
 
         let http_client = HttpClient::new(
             MaybeTlsSettings::from_config(None, false).unwrap(),
@@ -607,7 +619,7 @@ mod tests {
             ]
         );
         for (parts, body) in received.iter() {
-            assert_eq!(parts.method, hyper::Method::PUT);
+            assert_eq!(parts.method, Method::PUT);
             assert_eq!(body, &payload);
             assert_eq!(parts.headers["authorization"], "Basic dXNlcjpwYXNz");
             assert_eq!(parts.headers["expect"], DORIS_EXPECT_HEADER);

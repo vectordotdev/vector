@@ -277,7 +277,14 @@ async fn splunk_passthrough_token() {
 
     let mut tokens = rx
         .take(3)
-        .map(|r| r.0.headers.get("Authorization").unwrap().clone())
+        .map(|r| {
+            r.0.headers
+                .get("Authorization")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned()
+        })
         .collect::<Vec<_>>()
         .await;
 

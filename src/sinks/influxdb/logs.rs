@@ -636,7 +636,7 @@ mod tests {
 
     use chrono::{Utc, offset::TimeZone};
     use futures::{StreamExt, channel::mpsc, stream};
-    use http_0::{StatusCode, request::Parts};
+    use http::{StatusCode, request::Parts};
     use indoc::indoc;
     use vector_lib::{
         event::{BatchNotifier, BatchStatus, Event, LogEvent},

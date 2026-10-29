@@ -1,18 +1,19 @@
 use std::{
     convert::Infallible,
-    net::SocketAddr,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
 };
 
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{
     future::{ok, ready},
     stream,
 };
-use http_0::StatusCode;
+use http::StatusCode;
+use http_body_util::Full;
 use ordered_float::NotNan;
 use serde::Deserialize;
 use serde_json::Value;
@@ -23,7 +24,6 @@ use vector_lib::{
     lookup::PathPrefix,
 };
 use vrl::event_path;
-use warp::Filter;
 
 use crate::{
     codecs::{TimestampFormat, Transformer},
@@ -34,6 +34,7 @@ use crate::{
     },
     test_util::{
         components::{SINK_TAGS, init_test, run_and_assert_sink_compliance},
+        http::spawn_blackhole_http_server,
         random_table_name, trace_init,
     },
 };
@@ -299,29 +300,29 @@ async fn no_retry_on_incorrect_data() {
 }
 
 #[tokio::test]
-async fn no_retry_on_incorrect_data_warp() {
+async fn no_retry_on_incorrect_data_mock() {
     trace_init();
 
     let visited = Arc::new(AtomicBool::new(false));
-    let routes = warp::any().and_then(move || {
+    let host = spawn_blackhole_http_server(move |_| {
         assert!(!visited.load(Ordering::SeqCst), "Should not retry request.");
         visited.store(true, Ordering::SeqCst);
 
-        ok::<_, Infallible>(warp::reply::with_status(
-            "Code: 117",
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ))
-    });
-    let server = warp::serve(routes).bind("0.0.0.0:8124".parse::<SocketAddr>().unwrap());
-    tokio::spawn(server);
-
-    let host = String::from("http://localhost:8124");
+        ok::<_, Infallible>(
+            http::Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                .body(Full::new(Bytes::from_static(b"Code: 117")))
+                .unwrap(),
+        )
+    })
+    .await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(1);
 
     let config = ClickhouseConfig {
-        endpoint: host.parse().unwrap(),
+        endpoint: host.try_into().unwrap(),
         table: random_table_name().try_into().unwrap(),
         batch,
         ..Default::default()

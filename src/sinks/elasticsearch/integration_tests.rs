@@ -3,7 +3,7 @@ use std::{fs::File, io::Read};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, future::ready, stream};
-use http_0::StatusCode;
+use http::StatusCode;
 use serde_json::{Value, json};
 use vector_http::full_body;
 use vector_lib::{
@@ -761,15 +761,15 @@ async fn run_insert_tests(
     Box::pin(run_insert_tests_with_config(&config, test_type, status)).await;
 }
 
-fn create_http_client() -> reqwest::Client {
+fn create_http_client() -> reqwest_13::Client {
     let mut test_ca = Vec::<u8>::new();
     File::open(tls::TEST_PEM_CA_PATH)
         .unwrap()
         .read_to_end(&mut test_ca)
         .unwrap();
-    let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+    let test_ca = reqwest_13::Certificate::from_pem(&test_ca).unwrap();
 
-    reqwest::Client::builder()
+    reqwest_13::Client::builder()
         .add_root_certificate(test_ca)
         .danger_accept_invalid_certs(true)
         .build()

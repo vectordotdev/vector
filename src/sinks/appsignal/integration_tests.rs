@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use http_0::header::AUTHORIZATION;
-use hyper::StatusCode;
+use http::{StatusCode, header::AUTHORIZATION};
 use indoc::indoc;
 use vector_lib::event::{
     BatchNotifier, BatchStatus, Event, LogEvent, Metric, MetricKind, MetricValue,
@@ -26,7 +25,7 @@ use crate::{
     },
 };
 
-async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http_0::request::Parts, Bytes)>) {
+async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request::Parts, Bytes)>) {
     let config = indoc! {r#"
         push_api_key = "${TEST_APPSIGNAL_PUSH_API_KEY}"
         compression = "none"

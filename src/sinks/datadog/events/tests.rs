@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::{StreamExt, channel::mpsc::Receiver, stream::Stream};
-use hyper::StatusCode;
+use http::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
 use vector_lib::event::{BatchNotifier, BatchStatus};
@@ -41,7 +41,7 @@ fn random_events_with_stream(
 async fn start_test(
     http_status: StatusCode,
     batch_status: BatchStatus,
-) -> (Vec<String>, Receiver<(http_0::request::Parts, Bytes)>) {
+) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
     let config = indoc! {r#"
             default_api_key = "atoken"
         "#};

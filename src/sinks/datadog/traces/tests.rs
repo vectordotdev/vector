@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use hyper::StatusCode;
+use http::StatusCode;
 use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
@@ -30,7 +30,7 @@ async fn start_test(
     batch_status: BatchStatus,
     http_status_code: StatusCode,
     events: Vec<Event>,
-) -> Receiver<(http_0::request::Parts, Bytes)> {
+) -> Receiver<(http::request::Parts, Bytes)> {
     start_test_with_config("", batch_status, http_status_code, events).await
 }
 
@@ -40,7 +40,7 @@ async fn start_test_with_config(
     batch_status: BatchStatus,
     http_status_code: StatusCode,
     events: Vec<Event>,
-) -> Receiver<(http_0::request::Parts, Bytes)> {
+) -> Receiver<(http::request::Parts, Bytes)> {
     assert_sink_compliance(&SINK_TAGS, async {
         let (_guard, addr) = next_addr();
         let config = format!(

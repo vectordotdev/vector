@@ -666,7 +666,7 @@ mod tests {
 
     use futures::{StreamExt, channel::mpsc};
     use futures_util::stream;
-    use http_0::{StatusCode, request::Parts};
+    use http::{StatusCode, request::Parts};
     use serde_json::json;
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, EventStatus, LogEvent};
 
@@ -829,7 +829,7 @@ mod tests {
                     .expect("invalid hostname");
                 let lines = &partitions[p];
 
-                assert_eq!(request.method, http_0::Method::POST);
+                assert_eq!(request.method, http::Method::POST);
                 assert_eq!(request.headers["content-type"], "application/json");
                 assert_eq!(request.headers["authorization"], "Basic bXlsb2d0b2tlbjo=");
                 assert!(query.contains("now="));

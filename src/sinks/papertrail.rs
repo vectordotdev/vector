@@ -247,7 +247,7 @@ mod tests {
         let mut config: PapertrailConfig =
             serde_json::from_value(PapertrailConfig::generate_config())
                 .expect("config should be valid");
-        config.endpoint = mock_endpoint.to_string().try_into().unwrap();
+        config.endpoint = mock_endpoint.try_into().unwrap();
         config.tls = Some(TlsEnableableConfig::default());
 
         let context = SinkContext::default();

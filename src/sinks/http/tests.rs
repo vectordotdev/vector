@@ -7,8 +7,9 @@ use std::{
 
 use bytes::{Buf, Bytes};
 use futures::stream;
-use headers::{Authorization, HeaderMapExt};
-use hyper::{Body, Method, Response, StatusCode};
+use headers_1::{Authorization, HeaderMapExt};
+use http::{Method, Response, StatusCode};
+use http_body_util::Full;
 use serde::{Deserialize, de};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
@@ -462,10 +463,10 @@ async fn retries_on_temporary_error() {
                 // Send a temporary error for the first two responses
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::empty())
+                    .body(Full::new(Bytes::new()))
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Body::empty())
+                Response::new(Full::new(Bytes::new()))
             }
         });
 
@@ -518,10 +519,10 @@ async fn custom_retry_retries_only_configured_status_code() {
             if count < NUM_FAILURES {
                 Response::builder()
                     .status(StatusCode::SERVICE_UNAVAILABLE)
-                    .body(Body::empty())
+                    .body(Full::new(Bytes::new()))
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Body::empty())
+                Response::new(Full::new(Bytes::new()))
             }
         });
 
@@ -572,7 +573,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             in_counter.fetch_add(1, atomic::Ordering::Relaxed);
             Response::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Body::empty())
+                .body(Full::new(Bytes::new()))
                 .unwrap_or_else(|_| unreachable!())
         });
 
@@ -1021,7 +1022,7 @@ where
     }
 }
 
-async fn run_sink(extra_config: &str, assert_parts: impl Fn(http_0::request::Parts)) {
+async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts)) {
     let num_lines = 1000;
 
     let (in_addr, sink) = build_sink(extra_config).await;
@@ -1046,7 +1047,7 @@ async fn run_sink_with_events(
     extra_config: &str,
     event_generator: impl Fn() -> Event + Clone,
     num_events: usize,
-    assert_parts: impl Fn(http_0::request::Parts),
+    assert_parts: impl Fn(http::request::Parts),
 ) {
     let (in_addr, sink) = build_sink(extra_config).await;
     let (rx, trigger, server) = build_test_server(in_addr);
@@ -1128,7 +1129,7 @@ async fn sends_through_authenticated_proxy() {
     assert!(
         observation
             .headers
-            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
 
     // The proxy forwards the request to the origin without the proxy credentials,
@@ -1139,7 +1140,7 @@ async fn sends_through_authenticated_proxy() {
     assert!(
         !parts
             .headers
-            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
     let event: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(event["message"], "simple message");

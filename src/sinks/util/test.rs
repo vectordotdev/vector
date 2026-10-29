@@ -4,22 +4,20 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
+use futures::{FutureExt, SinkExt, channel::mpsc, stream};
 use futures_util::StreamExt;
-use http_0::request::Parts;
-use hyper::{
-    Body, Request, Response, Server, StatusCode,
-    body::HttpBody,
-    service::{make_service_fn, service_fn},
+use http::{Request, Response, StatusCode, request::Parts};
+use http_body_util::{BodyExt, Full};
+use hyper_1::{body::Incoming, service::service_fn};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto,
 };
 use serde::Deserialize;
 use stream_cancel::{Trigger, Tripwire};
 use vector_common::decompression::CappedDecoder;
 
-use crate::{
-    Error,
-    config::{SinkConfig, SinkContext},
-};
+use crate::config::{SinkConfig, SinkContext};
 
 /// Load a sink configuration with a default test context.
 ///
@@ -53,25 +51,25 @@ where
 pub fn build_test_server(
     addr: SocketAddr,
 ) -> (
-    mpsc::Receiver<(http_0::request::Parts, Bytes)>,
+    mpsc::Receiver<(Parts, Bytes)>,
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
-    build_test_server_generic(addr, || Response::new(Body::empty()))
+    build_test_server_generic(addr, || Response::new(Full::new(Bytes::new())))
 }
 
 pub fn build_test_server_status(
     addr: SocketAddr,
     status: StatusCode,
 ) -> (
-    mpsc::Receiver<(http_0::request::Parts, Bytes)>,
+    mpsc::Receiver<(Parts, Bytes)>,
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
     build_test_server_generic(addr, move || {
         Response::builder()
             .status(status)
-            .body(Body::empty())
+            .body(Full::new(Bytes::new()))
             .unwrap_or_else(|_| unreachable!())
     })
 }
@@ -80,51 +78,66 @@ pub fn build_test_server_status(
 ///
 /// # Panics
 ///
-/// Panics if the address cannot be bound. The returned future panics on server
-/// errors; spawned request tasks panic if reading or forwarding a body fails.
+/// Panics if the address cannot be bound or the listener cannot be made nonblocking.
+/// The returned future panics on listener errors; spawned request tasks panic if
+/// reading or forwarding a body fails.
 pub fn build_test_server_generic<B>(
     addr: SocketAddr,
     responder: impl Fn() -> Response<B> + Clone + Send + Sync + 'static,
 ) -> (
-    mpsc::Receiver<(http_0::request::Parts, Bytes)>,
+    mpsc::Receiver<(Parts, Bytes)>,
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 )
 where
-    B: HttpBody + Send + 'static,
-    <B as HttpBody>::Data: Send + Sync,
-    <B as HttpBody>::Error: snafu::Error + Send + Sync,
+    B: http_body::Body<Data = Bytes> + Send + 'static,
+    B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
+    let listener = std::net::TcpListener::bind(addr).expect("Failed to bind test server");
+    listener
+        .set_nonblocking(true)
+        .expect("Failed to make test server listener nonblocking");
     let (tx, rx) = mpsc::channel(100);
-    let service = make_service_fn(move |_| {
-        let responder = responder.clone();
-        let tx = tx.clone();
-        async move {
-            let responder = responder.clone();
-            Ok::<_, Error>(service_fn(move |req: Request<Body>| {
-                let responder = responder.clone();
-                let mut tx = tx.clone();
-                async move {
-                    let (parts, body) = req.into_parts();
-                    let response = responder();
-                    if response.status().is_success() {
-                        tokio::spawn(async move {
-                            let bytes = http_body_0::Body::collect(body).await.unwrap().to_bytes();
-                            tx.send((parts, bytes)).await.unwrap();
-                        });
-                    }
-
-                    Ok::<_, Error>(response)
-                }
-            }))
-        }
-    });
-
     let (trigger, tripwire) = Tripwire::new();
-    let server = Server::bind(&addr)
-        .serve(service)
-        .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
-        .map_err(|error| panic!("Server error: {error}"));
+    let server = async move {
+        let listener = tokio::net::TcpListener::from_std(listener)
+            .expect("Failed to create test server listener");
+        let shutdown = tripwire.then(crate::shutdown::tripwire_handler);
+        tokio::pin!(shutdown);
+
+        loop {
+            let (stream, _) = tokio::select! {
+                () = &mut shutdown => return Ok(()),
+                accepted = listener.accept() => accepted.expect("Failed to accept test connection"),
+            };
+            let responder = responder.clone();
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                let service = service_fn(move |req: Request<Incoming>| {
+                    let responder = responder.clone();
+                    let mut tx = tx.clone();
+                    async move {
+                        let (parts, body) = req.into_parts();
+                        let bytes = body.collect().await.unwrap().to_bytes();
+                        let response = responder();
+                        if response.status().is_success() {
+                            tokio::spawn(async move {
+                                tx.send((parts, bytes)).await.unwrap();
+                            });
+                        }
+
+                        Ok::<_, std::convert::Infallible>(response)
+                    }
+                });
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await
+                {
+                    tracing::debug!(message = "Test server connection closed.", %error);
+                }
+            });
+        }
+    };
 
     (rx, trigger, server)
 }

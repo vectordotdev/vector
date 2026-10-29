@@ -3,8 +3,9 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use bytes::Bytes;
 use futures::{StreamExt, stream};
-use hyper::Body;
+use http_body_util::Full;
 use vector_lib::config::{log_schema, proxy::ProxyConfig};
 use vrl::event_path;
 
@@ -42,9 +43,9 @@ async fn rejects_failed_requests(#[case] status: u16, #[case] expected_requests:
     let server_requests = Arc::clone(&requests);
     let (_rx, _trigger, server) = build_test_server_generic(addr, move || {
         server_requests.fetch_add(1, Ordering::Relaxed);
-        http_0::Response::builder()
+        http::Response::builder()
             .status(status)
-            .body(Body::empty())
+            .body(Full::new(Bytes::new()))
             .unwrap()
     });
     let server = tokio::spawn(server);
@@ -184,7 +185,7 @@ async fn healthcheck_includes_auth() {
 
     let output = rx.take(1).collect::<Vec<_>>().await;
     assert_eq!(
-        Some(&http_0::header::HeaderValue::from_static(
+        Some(&http::header::HeaderValue::from_static(
             "Basic dXNlcm5hbWU6c29tZV9wYXNzd29yZA=="
         )),
         output[0].0.headers.get("authorization")
@@ -244,7 +245,7 @@ async fn healthcheck_uses_configured_uri_with_uri_auth_precedence() {
     assert_ne!(parts.uri.path(), "/ready");
     assert_eq!(
         parts.headers.get("authorization"),
-        Some(&http_0::header::HeaderValue::from_static(
+        Some(&http::header::HeaderValue::from_static(
             "Basic dXNlcjpwYXNz"
         )),
     );
@@ -276,7 +277,7 @@ async fn sink_uses_validated_endpoint_and_auth() {
     let (parts, _) = rx.next().await.expect("server should receive a request");
     assert_eq!(parts.uri.path(), "/custom/loki/push");
     assert_eq!(
-        parts.headers.get(http_0::header::AUTHORIZATION).unwrap(),
+        parts.headers.get(http::header::AUTHORIZATION).unwrap(),
         "Basic dXNlcjpwYXNz"
     );
 }
@@ -303,13 +304,13 @@ async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
     let responder_state = Arc::clone(&first_request);
     let (mut rx, _trigger, server) = build_test_server_generic(addr, move || {
         let status = if responder_state.swap(false, Ordering::Relaxed) {
-            http_0::StatusCode::NOT_FOUND
+            http::StatusCode::NOT_FOUND
         } else {
-            http_0::StatusCode::OK
+            http::StatusCode::OK
         };
-        http_0::Response::builder()
+        http::Response::builder()
             .status(status)
-            .body(Body::empty())
+            .body(Full::new(Bytes::new()))
             .unwrap()
     });
     tokio::spawn(server);

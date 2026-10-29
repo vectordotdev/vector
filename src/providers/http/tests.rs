@@ -1,7 +1,8 @@
 use std::{convert::Infallible, future::ready, time::Duration};
 
-use http_0::Response;
-use hyper::Body;
+use bytes::Bytes;
+use http::Response;
+use http_body_util::Full;
 use indoc::indoc;
 use tokio::time::timeout;
 
@@ -35,7 +36,9 @@ const CONFIG: &str = indoc! {r#"
 #[tokio::test]
 async fn initial_and_polled_configs_retain_ignored_field_warnings() {
     let uri = spawn_blackhole_http_server(|_| {
-        ready(Ok::<_, Infallible>(Response::new(Body::from(CONFIG))))
+        ready(Ok::<_, Infallible>(Response::new(Full::new(Bytes::from(
+            CONFIG,
+        )))))
     })
     .await;
 

@@ -644,7 +644,7 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (parts, body) = rx.next().await.expect("request should be received");
-        assert_eq!(parts.method, http_0::Method::POST);
+        assert_eq!(parts.method, http::Method::POST);
         assert_eq!(
             parts.uri.path(),
             "/v1/projects/project/topics/topic:publish"

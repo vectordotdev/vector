@@ -585,14 +585,14 @@ mod tests {
             .expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
-            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+            endpoint: HttpEndpoint::new(mock_endpoint.clone()).expect("valid mock endpoint"),
             ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
-                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+                HttpEndpoint::new(mock_endpoint).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 &context,
                 &validated,

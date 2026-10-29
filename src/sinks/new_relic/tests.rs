@@ -30,7 +30,7 @@ async fn sink() -> (VectorSink, Event) {
 
     let mut config: NewRelicConfig =
         serde_json::from_value(NewRelicConfig::generate_config()).expect("config should be valid");
-    config.override_uri = Some(HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap());
+    config.override_uri = Some(HttpEndpoint::new(mock_endpoint).unwrap());
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
