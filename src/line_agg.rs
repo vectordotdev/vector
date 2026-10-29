@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! A reusable line aggregation implementation.
 
 #![deny(missing_docs)]

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
@@ -43,8 +41,11 @@ impl<T> UnixOnly<T> {
     /// Pass the closure with `#[cfg(unix)]` so Unix-only APIs in its body are not
     /// compiled on other targets. Context is accepted on every target and is
     /// dropped, together with the configuration, if Unix is unavailable.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// On Unix, returns the error produced by `operation`. On other platforms, always returns
+    /// an unsupported-platform error.
     pub fn on_unix<C, R>(
         self,
         context: C,

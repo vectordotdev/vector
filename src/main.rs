@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![deny(warnings)]
 
 extern crate vector;

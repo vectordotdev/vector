@@ -38,7 +38,7 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	address: {
 		description: "The socket address to listen for connections on."
@@ -126,7 +126,7 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 			Whether or not to store the AWS Firehose Access Key in event secrets.
 
 			If set to `true`, when incoming requests contains an access key sent by AWS Firehose, it is kept in the
-			event secrets as "aws_kinesis_firehose_access_key".
+			event secrets as `aws_kinesis_firehose_access_key`.
 			"""
 		required: true
 		type: bool: {}

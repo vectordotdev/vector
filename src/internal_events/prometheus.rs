@@ -1,5 +1,3 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 #[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
@@ -44,11 +42,13 @@ impl InternalEvent for PrometheusParseError<'_> {
     }
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 impl InternalEvent for PrometheusRemoteWriteParseError {
     fn emit(self) {
         error!(
@@ -63,30 +63,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-    }
-}
-
-#[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusNormalizationError;
-
-impl InternalEvent for PrometheusNormalizationError {
-    fn emit(self) {
-        let normalization_reason = "Prometheus metric normalization failed.";
-        error!(
-            message = normalization_reason,
-            error_type = error_type::CONVERSION_FAILED,
-            stage = error_stage::PROCESSING,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONVERSION_FAILED,
-            "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: normalization_reason
-        });
     }
 }
 

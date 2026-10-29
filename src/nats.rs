@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 //! Shared helper functions for NATS source and sink.
 #![allow(missing_docs)]
 

@@ -2,7 +2,7 @@ large-error-threshold = 256  # in bytes
 allow-unwrap-in-tests = true
 
 # Preserve product and component names in prose.
-doc-valid-idents = ["ClickHouse", "GreptimeCloud", "GreptimeDB", "NameNode", "OpenDAL", "OpenSearch", "PostgreSQL", "SQLx", "WebHDFS", ".."]
+doc-valid-idents = ["ClickHouse", "CloudWatch", "GreptimeCloud", "GreptimeDB", "InfluxDB", "JetStream", "MongoDB", "NameNode", "OpenDAL", "OpenSearch", "PostgreSQL", "QoS", "SQLx", "StatsD", "WebHDFS", ".."]
 
 # for `disallowed_method`:
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method

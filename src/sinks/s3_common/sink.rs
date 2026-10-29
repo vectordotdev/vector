@@ -20,9 +20,9 @@ impl<Svc, RB, P> S3Sink<Svc, RB, P> {
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
-            partitioner,
             service,
             request_builder,
+            partitioner,
             batcher_settings,
         }
     }

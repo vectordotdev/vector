@@ -60,6 +60,7 @@ env:
 
 jobs:
   resolve-inputs:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     runs-on: ubuntu-24.04
     outputs:
       baseline-sha: ${{ steps.set_and_validate_shas.outputs.BASELINE_SHA }}
@@ -228,7 +229,7 @@ jobs:
             vector:${{ needs.resolve-inputs.outputs.baseline-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: baseline-image
           path: "${{ runner.temp }}/baseline-image.tar"
@@ -267,7 +268,7 @@ jobs:
             vector:${{ needs.resolve-inputs.outputs.comparison-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: comparison-image
           path: "${{ runner.temp }}/comparison-image.tar"
@@ -312,7 +313,7 @@ jobs:
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - name: "Download baseline image"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: baseline-image
 
@@ -332,7 +333,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
 
       - name: Docker Login to ECR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -355,7 +356,7 @@ jobs:
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - name: "Download comparison image"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: comparison-image
 
@@ -375,7 +376,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
 
       - name: Docker Login to ECR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -432,7 +433,7 @@ jobs:
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --replicas ${{ env.SMP_REPLICAS }}
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/submission-metadata
@@ -490,7 +491,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.resolve-inputs.outputs.smp-version }}/x86_64-unknown-linux-musl/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -532,7 +533,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.resolve-inputs.outputs.smp-version }}/x86_64-unknown-linux-musl/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -554,7 +555,7 @@ jobs:
           path: ${{ runner.temp }}/outputs/report.md
 
       - name: Upload regression report to artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: capture-artifacts
           path: ${{ runner.temp }}/outputs/*
@@ -563,7 +564,7 @@ jobs:
     name: Set final result
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    if: always()
+    if: always() && github.repository == 'vectordotdev/vector'
     needs:
       - should-run-gate
       - resolve-inputs
@@ -578,7 +579,7 @@ jobs:
     steps:
       - name: Download capture-artifacts
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: capture-artifacts
 

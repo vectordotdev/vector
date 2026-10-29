@@ -22,7 +22,7 @@ use crate::{
         SourceOutput,
     },
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::http_server::{build_param_matcher, remove_duplicates},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -62,7 +62,7 @@ pub struct AwsKinesisFirehoseConfig {
     /// Whether or not to store the AWS Firehose Access Key in event secrets.
     ///
     /// If set to `true`, when incoming requests contains an access key sent by AWS Firehose, it is kept in the
-    /// event secrets as "aws_kinesis_firehose_access_key".
+    /// event secrets as `aws_kinesis_firehose_access_key`.
     store_access_key: bool,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
@@ -87,7 +87,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -165,7 +165,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
 
         if self.access_key.is_some() {
-            warn!("DEPRECATION `access_key`, use `access_keys` instead.")
+            warn!("DEPRECATION `access_key`, use `access_keys` instead.");
         }
 
         // Merge with legacy `access_key`
@@ -219,9 +219,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 .serve(make_svc)
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
@@ -284,12 +282,12 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             access_keys: None,
             store_access_key: false,
             tls: None,
-            record_compression: Default::default(),
+            record_compression: Compression::default(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             common_attributes: vec![],
         })
         .unwrap()
@@ -385,7 +383,7 @@ mod tests {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let (_guard, address) = next_addr();
+        let (port_guard, address) = next_addr();
         let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
@@ -399,23 +397,23 @@ mod tests {
                 decoding: default_decoding(),
                 acknowledgements: true.into(),
                 log_namespace: Some(log_namespace),
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
                 common_attributes,
             }
             .build(cx)
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         // Wait for the component to bind to the port
         wait_for_tcp(address).await;
-        (recv, address, _guard)
+        (recv, address, port_guard)
     }
 
     /// Sends the body to the address with the appropriate Firehose headers
     ///
-    /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
+    /// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
     async fn send(
         address: SocketAddr,
         timestamp: DateTime<Utc>,
@@ -426,7 +424,7 @@ mod tests {
         common_attributes: Option<&str>,
     ) -> reqwest::Result<reqwest::Response> {
         let request = models::FirehoseRequest {
-            access_key: key.map(|s| s.to_string()),
+            access_key: key.map(ToString::to_string),
             request_id: REQUEST_ID.to_string(),
             timestamp,
             records: records
@@ -455,7 +453,7 @@ mod tests {
         }
 
         if let Some(common_attributes) = common_attributes {
-            builder = builder.header("x-amz-firehose-common-attributes", common_attributes)
+            builder = builder.header("x-amz-firehose-common-attributes", common_attributes);
         }
 
         if gzip {
@@ -624,6 +622,10 @@ mod tests {
         }
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_vector_namespace() {
         let gzipped_record = {
@@ -718,7 +720,7 @@ mod tests {
                     let meta = log.metadata();
 
                     // event data, currently assumes default bytes deserializer
-                    assert_eq!(log.value(), &value!(Bytes::from(expected.to_owned())));
+                    assert_eq!(log.value(), &value!(Bytes::from(expected.clone())));
 
                     // vector metadata
                     assert_eq!(
@@ -770,8 +772,16 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr, _guard) =
-                source(None, None, false, Default::default(), true, false, vec![]).await;
+            let (rx, addr, _guard) = source(
+                None,
+                None,
+                false,
+                Compression::default(),
+                true,
+                false,
+                vec![],
+            )
+            .await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -813,7 +823,7 @@ mod tests {
                 None,
                 None,
                 false,
-                Default::default(),
+                Compression::default(),
                 true,
                 false,
                 vec!["*".to_string()],
@@ -861,7 +871,7 @@ mod tests {
                 None,
                 None,
                 false,
-                Default::default(),
+                Compression::default(),
                 true,
                 true,
                 vec!["*".to_string()],
@@ -949,7 +959,7 @@ mod tests {
                 None,
                 None,
                 false,
-                Default::default(),
+                Compression::default(),
                 true,
                 false,
                 vec!["environment".to_string(), "absent_attribute".to_string()],
@@ -1004,7 +1014,7 @@ mod tests {
                 None,
                 None,
                 false,
-                Default::default(),
+                Compression::default(),
                 true,
                 true,
                 vec!["environment".to_string(), "absent_attribute".to_string()],
@@ -1084,8 +1094,16 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_ignores_malformed_common_attributes_if_none_configured() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr, _guard) =
-                source(None, None, false, Default::default(), true, true, vec![]).await;
+            let (rx, addr, _guard) = source(
+                None,
+                None,
+                false,
+                Compression::default(),
+                true,
+                true,
+                vec![],
+            )
+            .await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -1159,7 +1177,7 @@ mod tests {
             Some("an access key".to_string().into()),
             Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
-            Default::default(),
+            Compression::default(),
             true,
             false,
             vec![],
@@ -1189,7 +1207,7 @@ mod tests {
             None,
             Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
-            Default::default(),
+            Compression::default(),
             true,
             false,
             vec![],
@@ -1221,7 +1239,7 @@ mod tests {
             Some(valid_access_key.clone()),
             Some(vec!["valid access key 2".to_string().into()]),
             Default::default(),
-            Default::default(),
+            Compression::default(),
             true,
             false,
             vec![],
@@ -1257,7 +1275,7 @@ mod tests {
                 "valid access key 2".to_string().into(),
             ]),
             Default::default(),
-            Default::default(),
+            Compression::default(),
             true,
             false,
             vec![],
@@ -1327,7 +1345,7 @@ mod tests {
             None,
             Some(vec!["an access key".to_string().into()]),
             true,
-            Default::default(),
+            Compression::default(),
             true,
             true,
             vec![],
@@ -1358,7 +1376,7 @@ mod tests {
     #[tokio::test]
     async fn no_authorization_access_key_passthrough_enabled() {
         let (rx, address, _guard) =
-            source(None, None, true, Default::default(), true, true, vec![]).await;
+            source(None, None, true, Compression::default(), true, true, vec![]).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 

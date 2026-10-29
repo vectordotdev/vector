@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use clap::Parser;
 use serde::Serialize;

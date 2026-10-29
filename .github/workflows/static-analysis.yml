@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   static-analysis:
+    # Requires Datadog OIDC credentials that aren't available on forks.
+    if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -23,6 +25,8 @@ jobs:
         uses: ./.github/actions/dd-token
         with:
           policy: public-vectordotdev-vector-static-analysis
+          # The analyzer cannot run without credentials, so surface dd-sts errors here.
+          fail-on-error: "true"
 
       - name: Datadog Static Analyzer
         uses: DataDog/datadog-static-analyzer-github-action@8340f18875fcefca86844b5f947ce2431387e552 # v3.0.0

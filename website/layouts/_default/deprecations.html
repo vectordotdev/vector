@@ -3,8 +3,9 @@
 {{ end }}
 
 {{ define "main" }}
-{{ $pending := sort site.Data.deprecations.deprecations_pending "deprecated_since" "desc" }}
-{{ $enacted := sort site.Data.deprecations.deprecations_enacted "deprecated_since" "desc" }}
+{{ $entries := partialCached "deprecations/entries.html" . }}
+{{ $pending := $entries.active }}
+{{ $enacted := $entries.enacted }}
 {{ $latest := index site.Data.docs.versions 0 }}
 
 <div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
@@ -34,9 +35,9 @@
             <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Deprecated since {{ .deprecated_since }}
             </div>
-            {{ with .description }}
+            {{ with .content }}
             <div class="mt-2.5 prose dark:prose-invert max-w-none">
-              {{ . | markdownify }}
+              {{ . }}
             </div>
             {{ end }}
           </div>
@@ -61,9 +62,9 @@
             <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
             </div>
-            {{ with .description }}
+            {{ with .content }}
             <div class="mt-2.5 prose dark:prose-invert max-w-none">
-              {{ . | markdownify }}
+              {{ . }}
             </div>
             {{ end }}
           </div>

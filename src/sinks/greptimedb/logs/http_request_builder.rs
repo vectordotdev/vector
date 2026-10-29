@@ -1,22 +1,19 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use http::StatusCode;
 use http_1::{
-    Request,
+    Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
+use vector_http::empty_body;
 use vector_lib::codecs::encoding::Framer;
 
 use crate::{
     Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    http::{
-        Auth,
-        client_v1::{HttpClient, empty_body},
-    },
+    http::{Auth, client_v1::HttpClient},
     sinks::{
         HTTPV1RequestBuilderSnafu, HealthcheckError,
         prelude::*,
@@ -264,11 +261,9 @@ pub(super) async fn http_healthcheck(
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    match status {
+    match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 

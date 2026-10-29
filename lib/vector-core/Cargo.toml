@@ -43,6 +43,7 @@ prost-types.workspace = true
 prost.workspace = true
 quanta = { version = "0.12.6", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
+rustls.workspace = true
 zmij = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
@@ -82,6 +83,7 @@ strum.workspace = true
 chrono-tz.workspace = true
 criterion = { workspace = true, features = ["html_reports"] }
 env-test-util = "1.0.1"
+jsonschema.workspace = true
 quickcheck.workspace = true
 quickcheck_macros = "1"
 proptest.workspace = true

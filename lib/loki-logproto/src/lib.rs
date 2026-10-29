@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 // https://github.com/vectordotdev/vector/issues/23659

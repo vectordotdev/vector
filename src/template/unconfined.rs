@@ -1,6 +1,13 @@
 use super::parsing::{parse_template, render_metric_field, render_timestamp};
-use super::*;
+use super::{
+    Bytes, ConfigurableString, Cow, EventRef, FixedOffset, Part, PathBuf, TemplateParseError,
+    TemplateRenderingError, TemplateTimeZone, TryFrom, UnconfinedTemplate, Value, fmt,
+};
 
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "Keep debug output focused on the source and rendering options."
+)]
 impl fmt::Debug for UnconfinedTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnconfinedTemplate")
@@ -74,12 +81,17 @@ impl ConfigurableString for UnconfinedTemplate {}
 
 impl UnconfinedTemplate {
     /// Set tz offset.
+    #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
         self.time_zone = TemplateTimeZone::from_offset(tz_offset);
         self
     }
 
     /// Renders the given template with data from the event, returning raw bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a referenced field is missing from the event.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -89,6 +101,9 @@ impl UnconfinedTemplate {
 
     /// Renders the given template with data from the event.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if a referenced field is missing from the event.
     pub fn render_string<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
@@ -107,7 +122,7 @@ impl UnconfinedTemplate {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
                 Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.time_zone))
+                    out.push_str(&render_timestamp(items, event, self.time_zone));
                 }
                 Part::Reference(key) => {
                     out.push_str(
@@ -140,6 +155,7 @@ impl UnconfinedTemplate {
     }
 
     /// Returns the names of the fields that are rendered in this template.
+    #[must_use]
     pub fn get_fields(&self) -> Option<Vec<String>> {
         let parts: Vec<_> = self
             .parts
@@ -160,6 +176,7 @@ impl UnconfinedTemplate {
     ///
     /// Sinks use this to derive a confinement boundary from the
     /// operator-authored portion of the template.
+    #[must_use]
     pub fn literal_prefix(&self) -> &str {
         let bytes = self.src.as_bytes();
         let mut i = 0;
@@ -182,16 +199,19 @@ impl UnconfinedTemplate {
     }
 
     /// Returns a reference to the template string.
+    #[must_use]
     pub const fn get_ref(&self) -> &str {
         self.src.as_str()
     }
 
     /// Returns `true` if this template string has a length of zero, and `false` otherwise.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.src.is_empty()
     }
 
     /// A dynamic template string contains sections that depend on the input event or time.
+    #[must_use]
     pub const fn is_dynamic(&self) -> bool {
         !self.is_static
     }

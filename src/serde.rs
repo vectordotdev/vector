@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};

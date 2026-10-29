@@ -1,4 +1,6 @@
+mod bool_or_struct;
 mod compatibility;
+mod ignored_fields;
 mod metric_tags;
 
 // Replace the fixture marker with a name verified absent from the environment.

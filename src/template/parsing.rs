@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    EventRef, Hash, Item, Metric, RE, StrftimeItems, TemplateParseError, TemplateTimeZone, Utc,
+    Value, log_schema, parse_target_path,
+};
 
 /// One part of the template string after parsing.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -42,8 +45,7 @@ impl ParsedStrftime {
 
     fn is_dynamic(&self) -> bool {
         self.0.iter().any(|item| match item {
-            Item::Fixed(_) => true,
-            Item::Numeric(_, _) => true,
+            Item::Fixed(_) | Item::Numeric(_, _) => true,
             Item::Error
             | Item::Space(_)
             | Item::OwnedSpace(_)
@@ -65,8 +67,7 @@ impl ParsedStrftime {
                 Item::Space(space) => space.len(),
                 Item::OwnedSpace(space) => space.len(),
                 Item::Error => 0,
-                Item::Numeric(_, _) => 2,
-                Item::Fixed(_) => 2,
+                Item::Numeric(_, _) | Item::Fixed(_) => 2,
             })
             .sum()
     }
@@ -158,8 +159,8 @@ pub(super) fn render_timestamp(
             .with_timezone(&chrono::Local)
             .format_with_items(items.as_items())
             .to_string(),
-        Some(TemplateTimeZone::Named(timezone)) => timestamp
-            .with_timezone(&timezone)
+        Some(TemplateTimeZone::Named(zone)) => timestamp
+            .with_timezone(&zone)
             .format_with_items(items.as_items())
             .to_string(),
         None => timestamp

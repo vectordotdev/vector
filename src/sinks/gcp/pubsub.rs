@@ -19,7 +19,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
-        gcs_common::config::healthcheck_response,
+        gcs_common::config::healthcheck_status,
         util::{
             BatchConfig, BatchSettings, BoxedRawValue, HttpEndpoint, JsonArrayBuffer,
             SinkBatchSettings, TowerRequestConfig,
@@ -184,7 +184,7 @@ impl ValidatedSink for PubsubConfig {
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch_settings.size),
-            request_settings,
+            &request_settings,
             batch_settings.timeout,
             client,
         )
@@ -267,7 +267,7 @@ async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> cr
     auth.apply(&mut request);
 
     let response = client.send(request).await?;
-    healthcheck_response(&response, HealthcheckError::TopicNotFound.into())
+    healthcheck_status(response.status(), HealthcheckError::TopicNotFound.into())
 }
 
 #[cfg(test)]

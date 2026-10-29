@@ -807,7 +807,7 @@ generated: configuration: {
 						required: false
 					}
 					healthcheck: {
-						type:        _schemaDefinitions["derived::d1a2a37da28b48074a6aa38c"]
+						type:        _schemaDefinitions["derived::7ad58e4d9af48ec29d981195"]
 						description: "Healthcheck configuration."
 						required:    false
 					}
@@ -927,7 +927,7 @@ generated: configuration: {
 			group:       "pipeline_components"
 		}
 		acknowledgements: {
-			type: _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+			type: _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 			description: """
 				Controls how acknowledgements are handled for all sinks by default.
 

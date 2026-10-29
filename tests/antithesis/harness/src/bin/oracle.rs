@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! oracle: the conservation judge. Mints unique ids, records which ids the
 //! pipeline acked, and checks they all come back — an acked id that never
 //! returns is loss.
@@ -244,8 +242,12 @@ async fn main() {
 
     wait_for_vector(&args.metrics_url, time::Duration::from_mins(3)).await;
 
-    let server = axum::Server::bind(&args.addr).serve(app.into_make_service());
+    let listener = tokio::net::TcpListener::bind(args.addr)
+        .await
+        .expect("oracle failed to bind");
     lifecycle::setup_complete(&json!({ "component": args.scenario }));
     assert_reachable!("oracle started");
-    server.await.expect("oracle server failed");
+    axum::serve(listener, app)
+        .await
+        .expect("oracle server failed");
 }

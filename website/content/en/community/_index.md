@@ -76,7 +76,7 @@ Vector has adopted the Rust community model and practices for engaging with peop
 
 [vector_discussions]: https://github.com/vectordotdev/vector/discussions/new?category=q-a
 
-[vector_bug_report]: https://github.com/vectordotdev/vector/issues/new?assignees=&labels=type%3A+bug&projects=&template=bug.yml
+[vector_bug_report]: https://github.com/vectordotdev/vector/issues/new?template=bug.yml
 
 [vrl_bug_report]: https://github.com/vectordotdev/vrl/issues/new?template=bug.yml
 

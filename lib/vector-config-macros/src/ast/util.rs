@@ -296,3 +296,48 @@ pub fn find_delegated_serde_deser_ty(attributes: &[syn::Attribute]) -> Option<sy
             _ => None,
         })
 }
+
+/// Recognizes Vector's boolean-or-struct helper through its supported qualified paths.
+///
+/// Proc macros cannot resolve imports, so bare names and arbitrary aliases are intentionally
+/// excluded. Callers must qualify this helper to receive its boolean-or-object schema.
+pub fn is_bool_or_struct_deserializer(path: &syn::ExprPath) -> bool {
+    path.qself.is_none()
+        && ["crate", "vector_core", "vector_lib"].iter().any(|root| {
+            path.path.segments.len() == 3
+                && path
+                    .path
+                    .segments
+                    .iter()
+                    .zip([*root, "serde", "bool_or_struct"])
+                    .all(|(segment, expected)| {
+                        segment.ident == expected && segment.arguments.is_empty()
+                    })
+        })
+}
+
+#[cfg(test)]
+mod bool_or_struct_tests {
+    use super::is_bool_or_struct_deserializer;
+
+    #[test]
+    fn recognizes_only_supported_qualified_helpers() {
+        for (path, expected) in [
+            ("crate::serde::bool_or_struct", true),
+            ("vector_core::serde::bool_or_struct", true),
+            ("vector_lib::serde::bool_or_struct", true),
+            ("::vector_lib::serde::bool_or_struct", true),
+            ("bool_or_struct", false),
+            ("other::bool_or_struct", false),
+            ("other::serde::bool_or_struct", false),
+            ("crate::other::bool_or_struct", false),
+            ("crate::serde::other_helper", false),
+        ] {
+            assert_eq!(
+                is_bool_or_struct_deserializer(&syn::parse_str(path).unwrap()),
+                expected,
+                "{path}"
+            );
+        }
+    }
+}

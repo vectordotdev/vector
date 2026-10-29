@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
-    path::{OwnedTargetPath, parse_target_path},
+    path::{OwnedSegment, OwnedTargetPath, parse_target_path},
     prelude::KeyString,
 };
 
@@ -60,7 +60,7 @@ impl ReduceState {
         }
     }
 
-    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<OwnedTargetPath, MergeStrategy>) {
+    fn add_event(&mut self, e: &LogEvent, strategies: &IndexMap<OwnedTargetPath, MergeStrategy>) {
         self.metadata.merge(e.metadata().clone());
 
         for (path, strategy) in strategies {
@@ -146,20 +146,20 @@ pub struct Reduce {
     end_every_period: Option<Duration>,
     group_by: Vec<String>,
     merge_strategies: IndexMap<OwnedTargetPath, MergeStrategy>,
-    reduce_merge_states: HashMap<Discriminant, ReduceState>,
+    merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
 }
 
-fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
-    for (path, _) in &strategies {
+fn validate_merge_strategies(strategies: &IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
+    for (path, _) in strategies {
         let contains_index = parse_target_path(path)
             .map_err(|_| format!("Could not parse path: `{path}`"))?
             .path
             .segments
             .iter()
-            .any(|segment| segment.is_index());
+            .any(OwnedSegment::is_index);
         if contains_index {
             return Err(format!(
                 "Merge strategies with indexes are currently not supported. Path: `{path}`"
@@ -172,6 +172,10 @@ fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> 
 }
 
 impl Reduce {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible conditions, invalid merge paths, or a condition that cannot be built.
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
@@ -192,9 +196,9 @@ impl Reduce {
             .map(|c| c.build(enrichment_tables, metrics_storage))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
-        let max_events = config.max_events.map(|max| max.into());
+        let max_events = config.max_events.map(std::convert::Into::into);
 
-        validate_merge_strategies(config.merge_strategies.clone())?;
+        validate_merge_strategies(&config.merge_strategies)?;
 
         Ok(Reduce {
             expire_after: config.expire_after_ms,
@@ -215,7 +219,7 @@ impl Reduce {
                     parsed_path.map(|path| (path, strategy.clone()))
                 })
                 .collect(),
-            reduce_merge_states: HashMap::new(),
+            merge_states: HashMap::new(),
             ends_when,
             starts_when,
             max_events,
@@ -225,7 +229,7 @@ impl Reduce {
     fn flush_into(&mut self, emitter: &mut Emitter<Event>) {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
-        for (k, t) in &self.reduce_merge_states {
+        for (k, t) in &self.merge_states {
             if let Some(period) = self.end_every_period
                 && (now - t.creation) >= period
             {
@@ -237,7 +241,7 @@ impl Reduce {
             }
         }
         for k in &flush_discriminants {
-            if let Some(t) = self.reduce_merge_states.remove(k) {
+            if let Some(t) = self.merge_states.remove(k) {
                 emit!(ReduceStaleEventFlushed);
                 emitter.emit(Event::from(t.flush()));
             }
@@ -245,13 +249,13 @@ impl Reduce {
     }
 
     fn flush_all_into(&mut self, emitter: &mut Emitter<Event>) {
-        self.reduce_merge_states
+        self.merge_states
             .drain()
             .for_each(|(_, s)| emitter.emit(Event::from(s.flush())));
     }
 
-    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
-        match self.reduce_merge_states.entry(discriminant) {
+    fn push_or_new_reduce_state(&mut self, event: &LogEvent, discriminant: Discriminant) {
+        match self.merge_states.entry(discriminant) {
             Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
                 state.add_event(event, &self.merge_strategies);
@@ -260,7 +264,7 @@ impl Reduce {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
             }
-        };
+        }
     }
 
     pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
@@ -280,7 +284,7 @@ impl Reduce {
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
                 ends_here = true;
-            } else if let Some(entry) = self.reduce_merge_states.get(&discriminant) {
+            } else if let Some(entry) = self.merge_states.get(&discriminant) {
                 // The current event will finish this set
                 if entry.events + 1 == max_events {
                     ends_here = true;
@@ -289,25 +293,24 @@ impl Reduce {
         }
 
         if starts_here {
-            if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
+            if let Some(state) = self.merge_states.remove(&discriminant) {
                 emitter.emit(state.flush().into());
             }
 
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state(&event, discriminant);
         } else if ends_here {
-            emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
-                Some(mut state) => {
-                    state.add_event(event, &self.merge_strategies);
+            emitter.emit(
+                if let Some(mut state) = self.merge_states.remove(&discriminant) {
+                    state.add_event(&event, &self.merge_strategies);
                     state.flush().into()
-                }
-                None => {
+                } else {
                     let mut state = ReduceState::new();
-                    state.add_event(event, &self.merge_strategies);
+                    state.add_event(&event, &self.merge_strategies);
                     state.flush().into()
-                }
-            });
+                },
+            );
         } else {
-            self.push_or_new_reduce_state(event, discriminant)
+            self.push_or_new_reduce_state(&event, discriminant);
         }
     }
 }
@@ -355,6 +358,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::config::TransformContext;
     use std::sync::Arc;
 
     use indoc::indoc;
@@ -384,7 +388,7 @@ mod test {
         "})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let input_definition = schema::Definition::default_legacy_namespace()
                 .with_event_field(&owned_value_path!("counter"), Kind::integer(), None)
                 .with_event_field(&owned_value_path!("request_id"), Kind::bytes(), None)
@@ -399,14 +403,17 @@ mod test {
                     None,
                 );
             let schema_definitions = reduce_config
-                .outputs(&Default::default(), &[("test".into(), input_definition)])
+                .outputs(
+                    &TransformContext::default(),
+                    &[("test".into(), input_definition)],
+                )
                 .first()
                 .unwrap()
                 .schema_definitions(true)
                 .clone();
 
             let new_schema_definition = reduce_config.outputs(
-                &Default::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -455,23 +462,23 @@ mod test {
             assert_eq!(output_1["message"], "test message 1".into());
             assert_eq!(output_1["counter"], Value::from(8));
             assert_eq!(output_1.metadata(), &metadata_1);
-            schema_definitions
-                .values()
-                .for_each(|definition| definition.assert_valid_for_event(&output_1.clone().into()));
+            for definition in schema_definitions.values() {
+                definition.assert_valid_for_event(&output_1.clone().into());
+            }
 
             let output_2 = out.recv().await.unwrap().into_log();
             assert_eq!(output_2["message"], "test message 2".into());
             assert_eq!(output_2["extra_field"], "value1".into());
             assert_eq!(output_2["counter"], Value::from(7));
             assert_eq!(output_2.metadata(), &metadata_2);
-            schema_definitions
-                .values()
-                .for_each(|definition| definition.assert_valid_for_event(&output_2.clone().into()));
+            for definition in schema_definitions.values() {
+                definition.assert_valid_for_event(&output_2.clone().into());
+            }
 
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -490,11 +497,11 @@ mod test {
         "})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                &Default::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -543,7 +550,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -558,10 +565,10 @@ mod test {
         "})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let new_schema_definition = reduce_config.outputs(
-                &Default::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -618,7 +625,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -653,7 +660,7 @@ mod test {
             max_events: 1
         "})
         .unwrap();
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
@@ -681,7 +688,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -697,7 +704,7 @@ mod test {
         "})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
@@ -745,8 +752,8 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await
+        }))
+        .await;
     }
 
     #[tokio::test]
@@ -763,11 +770,11 @@ mod test {
         "})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                &Default::default(),
+                &TransformContext::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
             )[0]
             .clone()
@@ -836,7 +843,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -854,7 +861,7 @@ mod test {
         "})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
 
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
@@ -912,7 +919,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -953,7 +960,7 @@ mod test {
         "#})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
 
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -997,8 +1004,8 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await
+        }))
+        .await;
     }
 
     #[tokio::test]
@@ -1010,7 +1017,7 @@ mod test {
         "})
         .unwrap();
 
-        assert_transform_compliance(async move {
+        Box::pin(assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
 
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -1031,7 +1038,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
-        .await
+        }))
+        .await;
     }
 }
