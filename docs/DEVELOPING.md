@@ -92,7 +92,6 @@ make test
 # Validate your tests pass (starting required services in Docker)
 make test-integration SCOPE="sources::example"
 # Validate your tests pass against a live service.
-make test-integration SCOPE="sources::example" autospawn=false
 cargo test --features docker sources::example
 # Validate all tests pass (starting required services in Docker)
 make test-integration
