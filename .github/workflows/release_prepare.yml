@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable minor Vector version to prepare, for example 0.59.0
-        required: true
+        description: Stable minor Vector version (defaults to master's development version without -dev)
+        required: false
         type: string
       vrl_version:
-        description: Released VRL version to pin, for example 0.28.0
-        required: true
+        description: Released VRL version to pin (defaults to the latest stable release on crates.io)
+        required: false
         type: string
 
 permissions:
@@ -34,6 +34,8 @@ jobs:
     outputs:
       base_sha: ${{ steps.base.outputs.sha }}
       branch: ${{ steps.preflight.outputs.branch }}
+      version: ${{ steps.preflight.outputs.version }}
+      vrl_version: ${{ steps.preflight.outputs.vrl_version }}
       skip: ${{ steps.preflight.outputs.skip }}
     steps:
       - name: Checkout master
@@ -73,18 +75,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
-        run: >-
-          "$VDEV" release workflow prepare-check
-          --version "$VERSION"
-          --bot-app vectordotdev-bot
-          --repository "$GITHUB_REPOSITORY"
+          VRL_VERSION: ${{ inputs.vrl_version }}
+        run: |
+          version_args=()
+          if [[ -n "$VERSION" ]]; then
+            version_args=(--version "$VERSION")
+          fi
+          if [[ -n "$VRL_VERSION" ]]; then
+            version_args+=(--vrl-version "$VRL_VERSION")
+          fi
+          "$VDEV" release workflow prepare-check \
+            "${version_args[@]}" \
+            --bot-app vectordotdev-bot \
+            --repository "$GITHUB_REPOSITORY"
 
       - name: Generate release changes
         if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.resume != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
+          VERSION: ${{ steps.preflight.outputs.version }}
+          VRL_VERSION: ${{ steps.preflight.outputs.vrl_version }}
         run: >-
           "$VDEV" release prepare
           --version "$VERSION"
@@ -96,7 +106,7 @@ jobs:
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
           PREP_BRANCH: ${{ steps.preflight.outputs.branch }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
+          VRL_VERSION: ${{ steps.preflight.outputs.vrl_version }}
         run: |
           git fetch --no-tags origin "refs/heads/${PREP_BRANCH}"
           git switch --detach FETCH_HEAD
@@ -152,7 +162,7 @@ jobs:
       - name: Validate and commit prepared changes
         env:
           BASE_SHA: ${{ needs.generate.outputs.base_sha }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.generate.outputs.version }}
         run: |
           set -euo pipefail
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -217,8 +227,8 @@ jobs:
       - name: Open preparation PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ inputs.version }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
+          VERSION: ${{ needs.generate.outputs.version }}
+          VRL_VERSION: ${{ needs.generate.outputs.vrl_version }}
           PREP_BRANCH: ${{ needs.generate.outputs.branch }}
         run: |
           url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master \

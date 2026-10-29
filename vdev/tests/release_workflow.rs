@@ -1,4 +1,4 @@
-use std::{fs, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 use tempfile::{TempDir, tempdir};
 
@@ -63,6 +63,7 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
     git(repo, &["config", "user.name", "Release test"]);
     git(repo, &["config", "user.email", "release@example.invalid"]);
     write(repo, "src/lib.rs", "");
+    write(repo, ".gitignore", "/target/\n");
     // Resolve a tiny registry dependency offline while exercising real Cargo metadata.
     write(
         repo,
@@ -169,19 +170,28 @@ fn check_with_args(repo: &Path, base: &str, args: &[&str], success: bool) -> Str
     stderr
 }
 
-fn prepare_check(repo: &Path, success: bool) -> String {
+fn prepare_check(repo: &Path, args: &[&str], success: bool) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
         .args([
             "release",
             "workflow",
             "prepare-check",
-            "--version",
-            "0.59.0",
             "--bot-app",
             "release-bot",
             "--repository",
             "vectordotdev/vector",
         ])
+        .args(args)
+        .env("GITHUB_OUTPUT", repo.join(".git/github-output"))
+        .env("GITHUB_STEP_SUMMARY", repo.join(".git/github-summary"))
+        .env(
+            "PATH",
+            env::join_paths(
+                std::iter::once(repo.join(".git/test-bin"))
+                    .chain(env::split_paths(&env::var_os("PATH").unwrap())),
+            )
+            .unwrap(),
+        )
         .current_dir(repo)
         .output()
         .unwrap();
@@ -220,7 +230,10 @@ fn release_preparation_retry_requires_the_requested_vrl_pin() {
     let repo = temp.path();
     check_with_args(repo, &base, &["--expected-vrl-version", "0.28.0"], true);
     let error = check_with_args(repo, &base, &["--expected-vrl-version", "0.28.1"], false);
-    assert!(error.contains("existing preparation branch pins VRL to 0.28.0, but requested 0.28.1"));
+    assert!(
+        error.contains("existing preparation branch pins VRL to 0.28.0, but requested 0.28.1"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -417,8 +430,121 @@ fn release_preparation_rejects_a_remote_only_release_tag() {
     git(repo, &["push", "origin", "refs/tags/v0.59.0"]);
     git(repo, &["tag", "--delete", "v0.59.0"]);
 
-    let error = prepare_check(repo, false);
-    assert!(error.contains("tag v0.59.0 already exists"));
+    for args in [&[][..], &["--version", "0.59.0"][..]] {
+        let error = prepare_check(repo, args, false);
+        assert!(error.contains("tag v0.59.0 already exists"));
+    }
+}
+
+#[cfg(unix)]
+mod prepare {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    fn fixture() -> (TempDir, TempDir) {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        git(repo, &["switch", "master"]);
+        let remote = tempdir().unwrap();
+        git(remote.path(), &["init", "--bare"]);
+        git(
+            repo,
+            &["remote", "add", "origin", remote.path().to_str().unwrap()],
+        );
+        write(repo, ".git/test-bin/gh", "#!/bin/sh\nprintf '[]\\n'\n");
+        fs::set_permissions(
+            repo.join(".git/test-bin/gh"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        write(
+            repo,
+            ".git/test-bin/curl",
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > .git/registry-requested\ncat .git/registry-response.json\n",
+        );
+        fs::set_permissions(
+            repo.join(".git/test-bin/curl"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        write(
+            repo,
+            ".git/registry-response.json",
+            r#"{"crate":{"max_stable_version":"0.29.0"}}"#,
+        );
+        (temp, remote)
+    }
+
+    #[test]
+    fn default_and_explicit_versions_produce_the_same_preparation_outputs() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        for args in [
+            &[][..],
+            &["--version", "0.59.0", "--vrl-version", "0.29.0"][..],
+        ] {
+            write(repo, ".git/github-output", "");
+            prepare_check(repo, args, true);
+            assert_eq!(
+                fs::read_to_string(repo.join(".git/github-output")).unwrap(),
+                "version=0.59.0\nbranch=prepare-v-0-59-0-website\nvrl_version=0.29.0\nresume=false\nskip=false\n"
+            );
+        }
+        assert!(
+            fs::read_to_string(repo.join(".git/registry-requested"))
+                .unwrap()
+                .contains("https://crates.io/api/v1/crates/vrl")
+        );
+    }
+
+    #[test]
+    fn explicit_vrl_version_skips_the_registry_lookup() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        fs::remove_file(repo.join(".git/registry-response.json")).unwrap();
+        prepare_check(repo, &["--vrl-version", "0.27.0"], true);
+        assert!(
+            fs::read_to_string(repo.join(".git/github-output"))
+                .unwrap()
+                .contains("vrl_version=0.27.0\n")
+        );
+        assert!(!repo.join(".git/registry-requested").exists());
+
+        let error = prepare_check(repo, &["--vrl-version", "0.29.0-rc.1"], false);
+        assert!(
+            error.contains("VRL version must be a stable semantic version"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn retry_reuses_the_preparation_vrl_pin() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        git(repo, &["push", "origin", "prepare-v-0-59-0-website"]);
+        fs::remove_file(repo.join(".git/registry-response.json")).unwrap();
+        prepare_check(repo, &[], true);
+        assert_eq!(
+            fs::read_to_string(repo.join(".git/github-output")).unwrap(),
+            "version=0.59.0\nbranch=prepare-v-0-59-0-website\nvrl_version=0.28.0\nresume=true\nskip=false\n"
+        );
+        assert!(!repo.join(".git/registry-requested").exists());
+    }
+
+    #[test]
+    fn registry_lookup_failure_stops_preparation() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        write(repo, ".git/test-bin/curl", "#!/bin/sh\nexit 22\n");
+        let error = prepare_check(repo, &[], false);
+        assert!(
+            error.contains("failed to fetch the latest stable VRL version from crates.io"),
+            "{error}"
+        );
+        let output = fs::read_to_string(repo.join(".git/github-output")).unwrap();
+        assert!(!output.contains("vrl_version="));
+        assert!(!output.contains("skip=false"));
+    }
 }
 
 #[test]
