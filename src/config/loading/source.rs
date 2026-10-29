@@ -10,6 +10,7 @@ pub struct SourceLoader {
 }
 
 impl SourceLoader {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: ConfigMap::new(),

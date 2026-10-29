@@ -162,7 +162,7 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
 }
 
 /// Asserts that metrics have the expected names and counts by type
-/// Expected: 100 gauge_metric (50 gRPC + 50 HTTP), 100 sum_metric, 100 histogram_metric, 100 exponential_histogram_metric
+/// Expected: 100 `gauge_metric` (50 gRPC + 50 HTTP), 100 `sum_metric`, 100 `histogram_metric`, 100 `exponential_histogram_metric`
 fn assert_metric_names_and_types(request: &ExportMetricsServiceRequest) {
     use std::collections::HashMap;
 
@@ -302,14 +302,14 @@ fn vector_sink_otel_sink_metrics_match() {
     );
 }
 
-#[test]
-fn vector_component_received_events_total_counts_individual_metrics() {
-    // This test verifies that when use_otlp_decoding is enabled, the
+#[tokio::test]
+async fn vector_component_received_events_total_counts_individual_metrics() {
+    // This test verifies that when OTLP preservation is enabled, the
     // component_received_events_total metric counts individual metrics
     // within OTLP batches, not the number of batch requests.
     // This ensures consistency with other Vector sources and with the same
-    // OpenTelemetry source when use_otlp_decoding is disabled.
+    // OpenTelemetry source when native conversion is enabled.
     use crate::opentelemetry::assert_component_received_events_total;
 
-    assert_component_received_events_total("metrics", EXPECTED_METRIC_COUNT);
+    assert_component_received_events_total(EXPECTED_METRIC_COUNT).await;
 }

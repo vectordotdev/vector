@@ -55,7 +55,7 @@ pipeline_name = "test"
             .expect("Error getting greptimedb response array")
             .len(),
         10
-    )
+    );
 }
 
 #[tokio::test]
@@ -94,7 +94,7 @@ dbname = "public"
             .expect("Error getting greptimedb response array")
             .len(),
         10
-    )
+    );
 }
 
 struct GreptimeClient {

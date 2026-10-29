@@ -49,6 +49,7 @@ impl RequestMetadataBuilder {
         }
     }
 
+    #[must_use]
     pub const fn new(
         event_count: usize,
         events_byte_size: usize,
@@ -61,18 +62,19 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub fn track_event<E>(&mut self, event: E)
+    pub fn track_event<E>(&mut self, event: &E)
     where
         E: ByteSizeOf + GetEventCountTags + EstimatedJsonEncodedSizeOf,
     {
         self.event_count += 1;
         self.events_byte_size += event.size_of();
         let json_size = event.estimated_json_encoded_size_of();
-        self.grouped_events_byte_size.add_event(&event, json_size);
+        self.grouped_events_byte_size.add_event(event, json_size);
     }
 
     /// Builds the [`RequestMetadata`] with the given size.
     /// This is used when there is no encoder in the process to provide an `EncodeResult`
+    #[must_use]
     pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
         let size = size.get();
 

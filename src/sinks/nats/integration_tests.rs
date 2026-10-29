@@ -29,16 +29,16 @@ use crate::{
 
 fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
     NatsSinkConfig {
-        acknowledgements: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         encoding: TextSerializerConfig::default().into(),
-        connection_name: "".to_owned(),
+        connection_name: String::new(),
         subject: Template::try_from(subject).unwrap(),
         url: url.to_string(),
         tls: None,
         auth: None,
-        request: Default::default(),
+        request: TowerRequestConfig::default(),
         jetstream: false.into(),
-        confinement: Default::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     }
 }
 
@@ -89,7 +89,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
 
     let mut output: Vec<String> = Vec::new();
     while let Some(msg) = sub.next().await {
-        output.push(String::from_utf8_lossy(&msg.payload).to_string())
+        output.push(String::from_utf8_lossy(&msg.payload).to_string());
     }
 
     assert_eq!(output.len(), input.len());
@@ -458,7 +458,7 @@ async fn nats_jetstream_message_id_valid() {
         name: stream_name.clone(),
         subjects: vec![subject.clone()],
         storage: StorageType::Memory,
-        duplicate_window: std::time::Duration::from_secs(60),
+        duplicate_window: std::time::Duration::from_mins(1),
         ..Default::default()
     })
     .await

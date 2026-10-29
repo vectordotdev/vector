@@ -1,5 +1,6 @@
 use crate::{
     config::Config,
+    extra_context::ExtraContext,
     test_util::{
         mock::{basic_sink, basic_source, basic_transform, tripwire_source},
         start_topology, trace_init,
@@ -30,7 +31,7 @@ async fn closed_source() {
     topology.sources_finished().await;
 
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -52,7 +53,7 @@ async fn remove_sink() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -75,7 +76,7 @@ async fn remove_transform() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -99,7 +100,7 @@ async fn replace_transform() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }

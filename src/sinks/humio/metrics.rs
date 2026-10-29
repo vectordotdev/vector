@@ -8,7 +8,7 @@ use vector_lib::{
     lookup,
     lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath},
     sensitive_string::SensitiveString,
-    sink::StreamSink,
+    sink::{SinkError, StreamSink},
 };
 
 use super::{
@@ -148,10 +148,10 @@ fn default_endpoint() -> HttpEndpoint {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> serde_json::Value {
-        serde_yaml::from_str(indoc! {r#"
+        serde_yaml::from_str(indoc! {r"
             host_key: hostname
             token: ${HUMIO_TOKEN}
-        "#})
+        "})
         .unwrap()
     }
 }
@@ -230,7 +230,7 @@ impl HumioMetricsConfig {
             batch: self.batch,
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             // hard coded as humio expects this format so no sense in making it configurable
             timestamp_key: OptionalTargetPath::from(
                 vrl::path::PathPrefix::Event,
@@ -247,8 +247,8 @@ pub struct HumioMetricsSink {
 }
 
 #[async_trait]
-impl StreamSink<EventArray> for HumioMetricsSink {
-    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), ()> {
+impl StreamSink<EventArray, SinkError> for HumioMetricsSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), SinkError> {
         let mut transform = self.transform;
         self.inner
             .run(input.map(move |events| {
@@ -307,8 +307,8 @@ mod tests {
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            confinement: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            confinement: crate::template::ConfinementConfig::default(),
         };
 
         let result = config.validate();

@@ -10,7 +10,7 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	api_key: {
 		description: """
@@ -110,7 +110,7 @@ generated: components: sinks: gcp_stackdriver_logs: configuration: {
 	labels_key: {
 		description: """
 			The value of this field is used to retrieve the associated labels from the `jsonPayload`
-			and extract their values to set as LogEntry labels.
+			and extract their values to set as `LogEntry` labels.
 			"""
 		required: false
 		type: string: {

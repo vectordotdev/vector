@@ -16,6 +16,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
 pub(crate) use datadog_proto::agentpayload as ddmetric_proto;
+pub(crate) use datadog_proto::metrics_v3 as ddmetric_v3_proto;
 pub(crate) use datadog_proto::trace as ddtrace_proto;
 use futures::FutureExt;
 use http::StatusCode;
@@ -59,7 +60,7 @@ use crate::{
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{HttpBytesReceived, StreamClosedError},
     schema,
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::{
         self,
         util::{
@@ -75,6 +76,10 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 pub const LLMOBS: &str = "llmobs";
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Restructuring these source configuration fields is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 /// Configuration for the `datadog_agent` source.
 #[configurable_component(source(
     "datadog_agent",
@@ -171,7 +176,7 @@ pub struct DatadogAgentConfig {
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     #[serde(default)]
@@ -234,9 +239,11 @@ impl SourceConfig for DatadogAgentConfig {
 
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let source = DatadogAgentSource::new(
-            self.store_api_key,
-            self.valid_api_keys.clone(),
-            self.drop_on_invalid_api_key,
+            ApiKeyExtractor::new(
+                self.store_api_key,
+                self.valid_api_keys.iter().map(|key| key.inner().to_owned()),
+                self.drop_on_invalid_api_key,
+            ),
             decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
@@ -289,14 +296,16 @@ impl SourceConfig for DatadogAgentConfig {
                 .serve(make_svc)
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
-                .map_err(|err| {
-                    error!("An error occurred: {err:?}.");
-                })?;
+                .inspect_err(|err| error!("An error occurred: {err:?}."))?;
 
             Ok(())
         }))
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let definition = self
             .decoding
@@ -400,25 +409,26 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             if !self.disable_logs {
-                output.push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS))
+                output
+                    .push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS));
             }
             if !self.disable_metrics {
-                output.push(SourceOutput::new_metrics().with_port(METRICS))
+                output.push(SourceOutput::new_metrics().with_port(METRICS));
             }
             if !self.disable_traces {
-                output.push(SourceOutput::new_traces().with_port(TRACES))
+                output.push(SourceOutput::new_traces().with_port(TRACES));
             }
             if !self.disable_llmobs {
                 output.push(
                     SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
                         .with_port(LLMOBS),
-                )
+                );
             }
         } else {
             output.push(SourceOutput::new_maybe_logs(
                 DataType::all_bits(),
                 definition,
-            ))
+            ));
         }
         output
     }
@@ -491,6 +501,20 @@ pub(crate) fn invalid_api_key_error() -> ErrorMessage {
 }
 
 impl ApiKeyExtractor {
+    fn new(
+        store_api_key: bool,
+        valid_api_keys: impl IntoIterator<Item = String>,
+        drop_on_invalid_api_key: bool,
+    ) -> Self {
+        Self {
+            matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
+                .expect("static regex always compiles"),
+            store_api_key,
+            valid_api_keys: Arc::new(valid_api_keys.into_iter().collect()),
+            drop_on_invalid_api_key,
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn for_test(valid_api_keys: Vec<String>, drop_on_invalid_api_key: bool) -> Self {
         Self::for_test_with_store_api_key(valid_api_keys, drop_on_invalid_api_key, true)
@@ -502,15 +526,10 @@ impl ApiKeyExtractor {
         drop_on_invalid_api_key: bool,
         store_api_key: bool,
     ) -> Self {
-        Self {
-            matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
-                .expect("static regex always compiles"),
-            store_api_key,
-            valid_api_keys: Arc::new(valid_api_keys.into_iter().collect()),
-            drop_on_invalid_api_key,
-        }
+        Self::new(store_api_key, valid_api_keys, drop_on_invalid_api_key)
     }
 
+    #[must_use]
     pub fn extract(
         &self,
         path: &str,
@@ -558,9 +577,7 @@ impl ApiKeyExtractor {
 impl DatadogAgentSource {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        store_api_key: bool,
-        valid_api_keys: Vec<SensitiveString>,
-        drop_on_invalid_api_key: bool,
+        api_key_extractor: ApiKeyExtractor,
         decoder: Decoder,
         protocol: &'static str,
         logs_schema_definition: Option<schema::Definition>,
@@ -569,18 +586,7 @@ impl DatadogAgentSource {
         split_metric_namespace: bool,
     ) -> Self {
         Self {
-            api_key_extractor: ApiKeyExtractor {
-                store_api_key,
-                matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
-                    .expect("static regex always compiles"),
-                valid_api_keys: Arc::new(
-                    valid_api_keys
-                        .into_iter()
-                        .map(|key| key.inner().to_owned())
-                        .collect(),
-                ),
-                drop_on_invalid_api_key,
-            },
+            api_key_extractor,
             log_schema_host_key: log_schema()
                 .host_key_target_path()
                 .expect("global log_schema.host_key to be valid path")
@@ -666,6 +672,10 @@ impl DatadogAgentSource {
         }
     }
 
+    #[allow(
+        clippy::ref_option,
+        reason = "Changing this shared optional metadata signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     pub(crate) fn decode(
         &self,
         header: &Option<String>,

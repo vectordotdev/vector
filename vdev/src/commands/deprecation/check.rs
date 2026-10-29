@@ -6,7 +6,7 @@ use semver::Version;
 
 use crate::utils::{deprecation, git, paths};
 
-/// Check deprecation.d fragments are valid and that generated/deprecations.json is up to date
+/// Check that the active (deprecation.d) and enacted deprecation notices are valid
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {}
@@ -14,42 +14,38 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let repo_root = paths::find_repo_root()?;
-        let dir = repo_root.join(deprecation::DEPRECATION_DIR);
-
-        let json_path = repo_root.join(deprecation::DEPRECATIONS_JSON);
-        let entries = if dir.is_dir() {
-            deprecation::read_deprecation_fragments(&dir)?
-        } else if json_path.is_file() {
-            println!(
-                "{} not found; validating generated JSON only.",
-                dir.display()
-            );
-            Vec::new()
-        } else {
+        let active_dir = repo_root.join(deprecation::DEPRECATION_DIR);
+        let enacted_dir = repo_root.join(deprecation::ENACTED_DIR);
+        if !active_dir.is_dir() && !enacted_dir.is_dir() {
             bail!(
                 "Neither {} nor {} found; the deprecation fragment system is not installed in this repo.",
-                dir.display(),
-                json_path.display()
+                active_dir.display(),
+                enacted_dir.display()
             );
-        };
-
-        if entries.is_empty() {
-            println!("No deprecation fragments found.");
-        } else {
-            for entry in &entries {
-                println!("  ok  {}", entry.filename);
-            }
-            println!("{} deprecation fragment(s) are valid.", entries.len());
         }
+
+        let deprecations = deprecation::read_all(&repo_root)?;
+        for entry in &deprecations.active {
+            println!("  ok  {}/{}", deprecation::DEPRECATION_DIR, entry.filename);
+        }
+        for entry in &deprecations.enacted {
+            println!("  ok  {}/{}", deprecation::ENACTED_DIR, entry.filename);
+        }
+        println!(
+            "{} active and {} enacted deprecation notice(s) are valid.",
+            deprecations.active.len(),
+            deprecations.enacted.len()
+        );
 
         // Reject any fragment with a deprecated_since newer than the next
         // minor release. Skipped (with a warning) when the checkout has no
         // release tags so shallow CI/source checkouts can still validate
-        // fragment frontmatter + generated JSON.
+        // fragment frontmatter.
         match git::latest_release_version() {
             Ok(latest) => {
                 let next_minor = Version::new(latest.major, latest.minor + 1, 0);
-                let future: Vec<_> = entries
+                let future: Vec<_> = deprecations
+                    .active
                     .iter()
                     .filter(|e| e.deprecated_since.0 > next_minor)
                     .collect();
@@ -76,21 +72,6 @@ impl Cli {
                 );
             }
         }
-
-        let on_disk = std::fs::read_to_string(&json_path).unwrap_or_default();
-        let expected = deprecation::rendered_json(&repo_root)?;
-        if on_disk != expected {
-            bail!(
-                "{} is out of date. Run `cargo vdev deprecation generate` and commit the result.",
-                json_path.display()
-            );
-        }
-
-        let enacted_count = deprecation::validate_enacted(&repo_root)?;
-        println!(
-            "{} is up to date ({enacted_count} enacted entries valid).",
-            json_path.display()
-        );
 
         Ok(())
     }

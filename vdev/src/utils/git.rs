@@ -129,22 +129,6 @@ pub fn get_files_changed_from_head() -> Result<Vec<String>> {
     Ok(files)
 }
 
-pub fn set_config_value(key: &str, value: &str) -> Result<String> {
-    Command::new("git")
-        .args(["config", key, value])
-        .stdout(std::process::Stdio::null())
-        .check_output()
-}
-
-/// Checks if the current directory's repo is clean
-pub fn check_git_repository_clean() -> Result<bool> {
-    Ok(Command::new("git")
-        .args(["diff-index", "--quiet", "HEAD"])
-        .stdout(std::process::Stdio::null())
-        .status()
-        .map(|status| status.success())?)
-}
-
 pub fn add_files_in_current_dir() -> Result<String> {
     Command::new("git").args(["add", "."]).check_output()
 }
@@ -183,11 +167,6 @@ pub fn push_and_set_upstream(branch_name: &str) -> Result<String> {
     Command::new("git")
         .args(["push", "-u", "origin", branch_name])
         .check_output()
-}
-
-pub fn clone(repo_url: &str) -> Result<String> {
-    // We cannot use capture_output since this will need to run in the CWD
-    Command::new("git").args(["clone", repo_url]).check_output()
 }
 
 /// Walks up from the current working directory until it finds a `.git`

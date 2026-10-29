@@ -2,8 +2,9 @@
 {{ if $version }}
   {{ partial "releases/deprecations.html" (dict "version" $version) }}
 {{ else }}
-  {{- $pending := site.Data.deprecations.deprecations_pending -}}
-  {{- $enacted := site.Data.deprecations.deprecations_enacted -}}
+  {{- $entries := partialCached "deprecations/entries.html" . -}}
+  {{- $pending := $entries.active -}}
+  {{- $enacted := $entries.enacted -}}
 
   {{ if gt (len $pending) 0 }}
   <div class="mt-6 flex flex-col space-y-6">
@@ -15,9 +16,9 @@
       <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         Deprecated since {{ .deprecated_since }}
       </div>
-      {{ with .description }}
+      {{ with .content }}
       <div class="mt-2.5 prose dark:prose-invert max-w-none">
-        {{ . | markdownify }}
+        {{ . }}
       </div>
       {{ end }}
     </div>
@@ -35,9 +36,9 @@
       <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
         Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
       </div>
-      {{ with .description }}
+      {{ with .content }}
       <div class="mt-2.5 prose dark:prose-invert max-w-none">
-        {{ . | markdownify }}
+        {{ . }}
       </div>
       {{ end }}
     </div>

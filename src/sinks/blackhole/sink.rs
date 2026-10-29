@@ -84,8 +84,9 @@ impl StreamSink<EventArray> for BlackholeSink {
 
         while let Some(mut events) = input.next().await {
             if let Some(rate) = self.config.rate {
-                let factor: f32 = 1.0 / rate as f32;
-                let secs: f32 = factor * (events.len() as f32);
+                // https://github.com/vectordotdev/vector/issues/23659
+                #[allow(clippy::cast_precision_loss, reason = "Preserve rate-limit rounding")]
+                let secs = (1.0 / rate as f32) * events.len() as f32;
                 let until = self.last.unwrap_or_else(Instant::now) + Duration::from_secs_f32(secs);
                 sleep_until(until.into()).await;
                 self.last = Some(until);

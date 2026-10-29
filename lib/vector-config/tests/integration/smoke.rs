@@ -290,24 +290,23 @@ impl TryFrom<String> for SocketListenAddr {
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
         // first attempt to parse the string into a SocketAddr directly
-        match input.parse::<SocketAddr>() {
-            Ok(socket_addr) => Ok(socket_addr.into()),
-
+        if let Ok(socket_addr) = input.parse::<SocketAddr>() {
+            Ok(socket_addr.into())
+        } else {
             // then attempt to parse a systemd file descriptor
-            Err(_) => {
-                let fd: usize = match input.as_str() {
-                    "systemd" => Ok(0),
-                    s => s
-                        .strip_prefix("systemd#")
-                        .ok_or_else(|| "unable to parse".to_string())?
-                        .parse::<usize>()
-                        .map_err(|_| "failed to parse usize".to_string())?
-                        .checked_sub(1)
-                        .ok_or_else(|| "systemd indices start at 1".to_string()),
-                }?;
 
-                Ok(fd.into())
-            }
+            let fd: usize = match input.as_str() {
+                "systemd" => Ok(0),
+                s => s
+                    .strip_prefix("systemd#")
+                    .ok_or_else(|| "unable to parse".to_string())?
+                    .parse::<usize>()
+                    .map_err(|_| "failed to parse usize".to_string())?
+                    .checked_sub(1)
+                    .ok_or_else(|| "systemd indices start at 1".to_string()),
+            }?;
+
+            Ok(fd.into())
         }
     }
 }

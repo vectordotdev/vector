@@ -1,10 +1,15 @@
+use crate::config::SourceAcknowledgementsConfig;
+use crate::http::KeepaliveConfig;
 use std::{
     collections::{BTreeMap, HashMap},
-    iter::FromIterator,
     net::SocketAddr,
     sync::Arc,
     time::Duration,
 };
+use vector_lib::codecs::decoding::JsonDeserializerConfig;
+#[cfg(feature = "codecs-syslog")]
+use vector_lib::codecs::decoding::SyslogDeserializerConfig;
+use vector_lib::codecs::decoding::framing::OversizedAction;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -49,7 +54,7 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
         ApiKeyExtractor, ApiKeyValidation, DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg,
-        METRICS, TRACES, ddmetric_proto, ddtrace_proto, logs::decode_log_body,
+        METRICS, TRACES, ddmetric_proto, ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body,
         metrics::DatadogSeriesRequest,
     },
     test_util::{
@@ -77,6 +82,7 @@ const DD_API_LOGS_V1_PATH: &str = "/v1/input/";
 const DD_API_LOGS_V2_PATH: &str = "/api/v2/logs";
 const DD_API_SERIES_V1_PATH: &str = "/api/v1/series";
 const DD_API_SERIES_V2_PATH: &str = "/api/v2/series";
+const DD_API_SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
 const DD_API_SKETCHES_PATH: &str = "/api/beta/sketches";
 const DD_API_TRACES_PATH: &str = "/api/v0.2/traces";
 const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
@@ -87,9 +93,7 @@ fn make_llmobs_source() -> DatadogAgentSource {
         Deserializer::Bytes(BytesDeserializer),
     );
     DatadogAgentSource::new(
-        true,
-        Vec::new(),
-        false,
+        ApiKeyExtractor::for_test(Vec::new(), false),
         decoder,
         "http",
         None,
@@ -113,7 +117,7 @@ impl Arbitrary for LogMsg {
             message: Bytes::from(String::arbitrary(g)),
             status: Bytes::from(String::arbitrary(g)),
             timestamp: Utc
-                .timestamp_millis_opt(u32::arbitrary(g) as i64)
+                .timestamp_millis_opt(i64::from(u32::arbitrary(g)))
                 .single()
                 .expect("invalid timestamp"),
             hostname: Bytes::from(String::arbitrary(g)),
@@ -139,9 +143,7 @@ fn test_decode_log_body() {
         );
 
         let source = DatadogAgentSource::new(
-            true,
-            Vec::new(),
-            false,
+            ApiKeyExtractor::for_test(Vec::new(), false),
             decoder,
             "http",
             Some(test_logs_schema_definition()),
@@ -197,9 +199,7 @@ fn test_decode_log_body_parse_ddtags() {
     );
 
     let source = DatadogAgentSource::new(
-        true,
-        Vec::new(),
-        false,
+        ApiKeyExtractor::for_test(Vec::new(), false),
         decoder,
         "http",
         Some(test_logs_schema_definition()),
@@ -236,9 +236,7 @@ fn test_decode_log_body_empty_object() {
     );
 
     let source = DatadogAgentSource::new(
-        true,
-        Vec::new(),
-        false,
+        ApiKeyExtractor::for_test(Vec::new(), false),
         decoder,
         "http",
         Some(test_logs_schema_definition()),
@@ -256,6 +254,10 @@ fn generate_config() {
     crate::test_util::test_generate_config::<DatadogAgentConfig>();
 }
 
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn source(
     status: EventStatus,
     acknowledgements: bool,
@@ -282,6 +284,10 @@ async fn source(
     (recv, logs_output, metrics_output, address, guard)
 }
 
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn source_with_timeout(
     status: EventStatus,
     acknowledgements: bool,
@@ -310,6 +316,10 @@ async fn source_with_timeout(
     (recv, logs_output, metrics_output, address, guard)
 }
 
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+)]
 async fn source_with_sender(
     mut sender: SourceSender,
     status: EventStatus,
@@ -427,6 +437,35 @@ async fn send_and_collect(
     spawn_collect_n(
         async move {
             assert_eq!(200, send_with_path(address, body, headers, path).await);
+        },
+        rx,
+        expected_count,
+    )
+    .await
+}
+
+async fn send_bytes_and_collect(
+    address: SocketAddr,
+    body: Vec<u8>,
+    headers: HeaderMap,
+    path: &'static str,
+    rx: impl Stream<Item = Event> + Unpin,
+    expected_count: usize,
+) -> Vec<Event> {
+    spawn_collect_n(
+        async move {
+            let response = timeout(
+                HTTP_REQUEST_TIMEOUT,
+                reqwest::Client::new()
+                    .post(format!("http://{address}{path}"))
+                    .headers(headers)
+                    .body(body)
+                    .send(),
+            )
+            .await
+            .expect("send_bytes_and_collect request timed out")
+            .unwrap();
+            assert_eq!(200, response.status().as_u16());
         },
         rx,
         expected_count,
@@ -984,6 +1023,10 @@ async fn ignores_api_key() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_series_endpoint_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -997,57 +1040,62 @@ async fn decode_series_endpoint_v1() {
                     r#type: DatadogMetricType::Gauge,
                     interval: None,
                     points: vec![
-                        DatadogPoint(1542182950, 3.14),
-                        DatadogPoint(1542182951, 3.1415),
+                        DatadogPoint(1_542_182_950, 3.14),
+                        DatadogPoint(1_542_182_951, 3.1415),
                     ],
                     tags: Some(vec!["foo:bar".to_string()]),
                     host: Some("random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_rate".to_string(),
                     r#type: DatadogMetricType::Rate,
                     interval: Some(10),
-                    points: vec![DatadogPoint(1542182950, 3.14)],
+                    points: vec![DatadogPoint(1_542_182_950, 3.14)],
                     tags: Some(vec!["foo:bar:baz".to_string()]),
                     host: Some("another_random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_count".to_string(),
                     r#type: DatadogMetricType::Count,
                     interval: None,
-                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    points: vec![DatadogPoint(1_542_182_955, 16_777_216_f64)],
                     tags: Some(vec!["foobar".to_string()]),
                     host: Some("a_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk.free".to_string(),
                     r#type: DatadogMetricType::Count,
                     interval: None,
-                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    points: vec![DatadogPoint(1_542_182_955, 16_777_216_f64)],
                     tags: None,
                     host: None,
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk".to_string(),
                     r#type: DatadogMetricType::Count,
                     interval: None,
-                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    points: vec![DatadogPoint(1_542_182_955, 16_777_216_f64)],
                     tags: None,
                     host: None,
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
             ],
@@ -1160,7 +1208,7 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(
                 *metric.value(),
                 MetricValue::Counter {
-                    value: 16777216_f64
+                    value: 16_777_216_f64
                 }
             );
             assert_tags(
@@ -1205,7 +1253,7 @@ async fn decode_sketches() {
             host: "a_host".to_string(),
             distributions: Vec::new(),
             dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
-                ts: 1542182950,
+                ts: 1_542_182_950,
                 cnt: 2,
                 min: 16.0,
                 max: 31.0,
@@ -1216,6 +1264,7 @@ async fn decode_sketches() {
             }],
             metadata: Some(ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
+                    metric_type: 0,
                     origin_product: 10,
                     origin_category: 11,
                     origin_service: 9,
@@ -1281,6 +1330,10 @@ async fn decode_sketches() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_traces() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -1299,8 +1352,12 @@ async fn decode_traces() {
             start: 1_431_648_000_000_001i64,
             duration: 1_000_000_000i64,
             error: 404i32,
-            meta: BTreeMap::from_iter([("foo".to_string(), "bar".to_string())].into_iter()),
-            metrics: BTreeMap::from_iter([("a_metrics".to_string(), 0.577f64)].into_iter()),
+            meta: [("foo".to_string(), "bar".to_string())]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
+            metrics: [("a_metrics".to_string(), 0.577f64)]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
             r#type: "a_type".to_string(),
             ..Default::default()
         };
@@ -1312,7 +1369,9 @@ async fn decode_traces() {
             origin: "an_origin".to_string(),
             dropped_trace: false,
             spans: vec![span],
-            tags: BTreeMap::from_iter([("a".to_string(), "tag".to_string())].into_iter()),
+            tags: [("a".to_string(), "tag".to_string())]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
         };
 
         let tracer_payload = ddtrace_proto::TracerPayload {
@@ -1323,7 +1382,9 @@ async fn decode_traces() {
             runtime_id: "123abc".to_string(),
             chunks: vec![chunk],
             env: "env".to_string(),
-            tags: BTreeMap::from_iter([("another".to_string(), "tag".to_string())].into_iter()),
+            tags: [("another".to_string(), "tag".to_string())]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>(),
             hostname: "hostname".to_string(),
             app_version: "v314".to_string(),
             ..Default::default()
@@ -1444,7 +1505,7 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
         &["dd.traces"],
         serde_yaml::from_str::<VectorSinkConfig>(&format!(
             r#"
-                address: "{relay_addr}"
+                address: "http://{relay_addr}"
                 batch:
                   max_events: 1
             "#
@@ -1477,6 +1538,10 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
     topology.stop().await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_traces_span_links_and_events() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -1668,6 +1733,10 @@ async fn decode_traces_idx_only_payload_emits_error() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn split_outputs() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -1707,13 +1776,14 @@ async fn split_outputs() {
                 r#type: DatadogMetricType::Gauge,
                 interval: None,
                 points: vec![
-                    DatadogPoint(1542182950, 3.14),
-                    DatadogPoint(1542182951, 3.1415),
+                    DatadogPoint(1_542_182_950, 3.14),
+                    DatadogPoint(1_542_182_951, 3.1415),
                 ],
                 tags: Some(vec!["foo:bar".to_string()]),
                 host: Some("random_host".to_string()),
                 source_type_name: None,
                 device: None,
+                unit: None,
                 metadata: None,
             }],
         };
@@ -1784,8 +1854,16 @@ async fn split_outputs() {
     .await;
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[test]
 fn test_config_outputs_with_disabled_data_types() {
+    #[allow(
+        clippy::struct_excessive_bools,
+        reason = "Restructuring these fixture options is deferred to preserve the existing API. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     struct TestCase {
         multiple_outputs: bool,
         disable_logs: bool,
@@ -1859,7 +1937,7 @@ fn test_config_outputs_with_disabled_data_types() {
             drop_on_invalid_api_key: false,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
             disable_logs,
             disable_metrics,
@@ -1868,7 +1946,7 @@ fn test_config_outputs_with_disabled_data_types() {
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
         };
 
@@ -2074,7 +2152,7 @@ fn test_config_outputs() {
         (
             "json / single output",
             TestCase {
-                decoding: DeserializerConfig::Json(Default::default()),
+                decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -2099,7 +2177,7 @@ fn test_config_outputs() {
         (
             "json / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Json(Default::default()),
+                decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -2141,7 +2219,7 @@ fn test_config_outputs() {
         (
             "syslog / single output",
             TestCase {
-                decoding: DeserializerConfig::Syslog(Default::default()),
+                decoding: DeserializerConfig::Syslog(SyslogDeserializerConfig::default()),
                 multiple_outputs: false,
                 want: HashMap::from([(
                     None,
@@ -2216,7 +2294,7 @@ fn test_config_outputs() {
         (
             "syslog / multiple output",
             TestCase {
-                decoding: DeserializerConfig::Syslog(Default::default()),
+                decoding: DeserializerConfig::Syslog(SyslogDeserializerConfig::default()),
                 multiple_outputs: true,
                 want: HashMap::from([
                     (
@@ -2309,7 +2387,7 @@ fn test_config_outputs() {
             drop_on_invalid_api_key: false,
             framing: default_framing_message_based(),
             decoding,
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs,
             disable_logs: false,
             disable_metrics: false,
@@ -2318,7 +2396,7 @@ fn test_config_outputs() {
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
         };
 
@@ -2338,6 +2416,10 @@ fn test_config_outputs() {
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting this fixture is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::test]
 async fn decode_series_endpoint_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -2355,15 +2437,15 @@ async fn decode_series_endpoint_v2() {
                 points: vec![
                     ddmetric_proto::metric_payload::MetricPoint {
                         value: 3.14,
-                        timestamp: 1542182950,
+                        timestamp: 1_542_182_950,
                     },
                     ddmetric_proto::metric_payload::MetricPoint {
                         value: 3.1415,
-                        timestamp: 1542182951,
+                        timestamp: 1_542_182_951,
                     },
                 ],
                 r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
-                unit: "".to_string(),
+                unit: String::new(),
                 source_type_name: "a_random_source_type_name".to_string(),
                 interval: 10, // Dogstatsd sets Gauge interval to 10 by default
                 metadata: None,
@@ -2377,10 +2459,10 @@ async fn decode_series_endpoint_v2() {
                 tags: vec!["foo:bar:baz".to_string(), "foo:bizbaz".to_string()],
                 points: vec![ddmetric_proto::metric_payload::MetricPoint {
                     value: 3.14,
-                    timestamp: 1542182950,
+                    timestamp: 1_542_182_950,
                 }],
                 r#type: ddmetric_proto::metric_payload::MetricType::Rate as i32,
-                unit: "".to_string(),
+                unit: String::new(),
                 source_type_name: "another_random_source_type_name".to_string(),
                 interval: 10,
                 metadata: None,
@@ -2393,15 +2475,16 @@ async fn decode_series_endpoint_v2() {
                 metric: "dd_count".to_string(),
                 tags: vec!["foobar".to_string()],
                 points: vec![ddmetric_proto::metric_payload::MetricPoint {
-                    value: 16777216_f64,
-                    timestamp: 1542182955,
+                    value: 16_777_216_f64,
+                    timestamp: 1_542_182_955,
                 }],
                 r#type: ddmetric_proto::metric_payload::MetricType::Count as i32,
-                unit: "".to_string(),
+                unit: String::new(),
                 source_type_name: "a_very_random_source_type_name".to_string(),
                 interval: 0,
                 metadata: Some(ddmetric_proto::Metadata {
                     origin: Some(ddmetric_proto::Origin {
+                        metric_type: 9,
                         origin_product: 10,
                         origin_category: 10,
                         origin_service: 42,
@@ -2536,7 +2619,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(
                 *metric.value(),
                 MetricValue::Counter {
-                    value: 16777216_f64
+                    value: 16_777_216_f64
                 }
             );
             assert_tags(
@@ -2581,7 +2664,602 @@ async fn decode_series_endpoint_v2() {
                     .unwrap(),
                 42
             );
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .metric_type(),
+                Some(9)
+            );
         }
+    })
+    .await;
+}
+
+#[test]
+fn decode_series_v2_rejects_excessive_unit_event_expansion() {
+    let point = ddmetric_proto::metric_payload::MetricPoint {
+        value: 1.0,
+        timestamp: 1_542_182_950,
+    };
+    let payload = ddmetric_proto::MetricPayload {
+        series: vec![ddmetric_proto::metric_payload::MetricSeries {
+            metric: "unit.expansion".to_string(),
+            points: vec![point; 16_385],
+            r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
+            unit: "u".repeat(1024),
+            ..Default::default()
+        }],
+    };
+    let mut body = Vec::new();
+    payload.encode(&mut body).unwrap();
+
+    assert!(super::metrics::decode_ddseries_v2(Bytes::from(body), &None, false).is_err());
+}
+
+#[tokio::test]
+async fn decode_series_v1_rejects_excessive_unit_event_expansion() {
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, true).await;
+    let request = DatadogSeriesRequest {
+        series: vec![DatadogSeriesMetric {
+            metric: "unit.expansion".to_string(),
+            r#type: DatadogMetricType::Gauge,
+            interval: None,
+            points: vec![DatadogPoint(1_542_182_950, 1.0); 16_385],
+            tags: None,
+            host: None,
+            source_type_name: None,
+            device: None,
+            unit: Some("u".repeat(1024)),
+            metadata: None,
+        }],
+    };
+
+    assert_eq!(
+        422,
+        send_with_path(
+            addr,
+            serde_json::to_vec(&request).unwrap(),
+            dd_api_key_headers(),
+            DD_API_SERIES_V1_PATH,
+        )
+        .await
+    );
+    assert!(crate::test_util::collect_ready(rx).is_empty());
+}
+
+#[tokio::test]
+async fn decode_series_v1_skips_unit_materialization_for_zero_point_series() {
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, true).await;
+    let request = DatadogSeriesRequest {
+        series: vec![DatadogSeriesMetric {
+            metric: "empty".to_string(),
+            r#type: DatadogMetricType::Gauge,
+            interval: None,
+            points: Vec::new(),
+            tags: None,
+            host: None,
+            source_type_name: None,
+            device: None,
+            unit: Some("u".repeat(1024 * 1024)),
+            metadata: None,
+        }],
+    };
+
+    assert_eq!(
+        200,
+        send_with_path(
+            addr,
+            serde_json::to_vec(&request).unwrap(),
+            dd_api_key_headers(),
+            DD_API_SERIES_V1_PATH,
+        )
+        .await
+    );
+    assert!(crate::test_util::collect_ready(rx).is_empty());
+}
+
+fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
+    values
+        .iter()
+        .flat_map(|value| {
+            let mut encoded = Vec::new();
+            encode_v3_varint(value.len() as u64, &mut encoded);
+            encoded.extend_from_slice(value.as_bytes());
+            encoded
+        })
+        .collect()
+}
+
+fn encode_v3_varint(mut value: u64, encoded: &mut Vec<u8>) {
+    while value >= 0x80 {
+        encoded.push(u8::try_from(value & 0x7f).unwrap() | 0x80);
+        value >>= 7;
+    }
+    encoded.push(u8::try_from(value).unwrap());
+}
+
+fn encode_v3_length_delimited(field: u8, value: &[u8], encoded: &mut Vec<u8>) {
+    encode_v3_varint((u64::from(field) << 3) | 2, encoded);
+    encode_v3_varint(value.len() as u64, encoded);
+    encoded.extend_from_slice(value);
+}
+
+fn minimal_v3_metric_data() -> ddmetric_v3_proto::MetricData {
+    ddmetric_v3_proto::MetricData {
+        dict_name_str: v3_string_dictionary(&["metric"]),
+        dict_tag_str: Vec::new(),
+        dict_tagsets: Vec::new(),
+        dict_resource_str: Vec::new(),
+        dict_resource_len: Vec::new(),
+        dict_resource_type: Vec::new(),
+        dict_resource_name: Vec::new(),
+        dict_source_type_name: Vec::new(),
+        dict_origin_info: Vec::new(),
+        dict_unit_str: Vec::new(),
+        types: vec![3 | 0x30],
+        name_refs: vec![1],
+        tagset_refs: vec![0],
+        resources_refs: vec![0],
+        intervals: vec![0],
+        num_points: vec![1],
+        source_type_name_refs: vec![0],
+        origin_info_refs: vec![0],
+        unit_refs: Vec::new(),
+        timestamps: vec![1],
+        vals_sint64: Vec::new(),
+        vals_float32: Vec::new(),
+        vals_float64: vec![1.0],
+        sketch_num_bins: Vec::new(),
+        sketch_bin_keys: Vec::new(),
+        sketch_bin_cnts: Vec::new(),
+    }
+}
+
+#[test]
+fn decode_v3_rejects_point_count_larger_than_columns() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = u64::MAX;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_negative_origin_values() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_origin_info = vec![-1, 0, 0];
+    data.origin_info_refs[0] = 1;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_timestamp_outside_chrono_range() {
+    let mut data = minimal_v3_metric_data();
+    data.timestamps[0] = i64::MAX;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_interval_millisecond_overflow() {
+    let mut data = minimal_v3_metric_data();
+    data.intervals[0] = u64::from(u32::MAX / 1000 + 1);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_tagset_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    for previous_tagset in 1..=5 {
+        data.dict_tagsets
+            .extend([2, -i64::from(previous_tagset), 0]);
+    }
+    data.tagset_refs[0] = 6;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_series_tag_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    data.types = vec![3 | 0x30; 17];
+    data.name_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.tagset_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.resources_refs = vec![0; 17];
+    data.intervals = vec![0; 17];
+    data.num_points = vec![0; 17];
+    data.source_type_name_refs = vec![0; 17];
+    data.origin_info_refs = vec![0; 17];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_point_tag_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    data.tagset_refs[0] = 1;
+    data.num_points[0] = 17;
+    data.timestamps = vec![1; 17];
+    data.vals_float64 = vec![1.0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_accounts_for_metric_tag_entry_storage() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: (0..200_000).map(|index| format!("t{index}")).collect(),
+        resources: Vec::new(),
+    };
+
+    assert!(super::metrics::decode_v3_metric_data(&data, Some(&metadata)).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_event_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 1_000_000;
+    data.timestamps = vec![0; 1_000_000];
+    data.vals_float64 = vec![0.0; 1_000_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_source_type_event_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_source_type_name = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.source_type_name_refs[0] = 1;
+    data.num_points[0] = 17;
+    data.timestamps = vec![1; 17];
+    data.vals_float64 = vec![1.0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_unit_clone_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_unit_str = v3_string_dictionary(&[&"x".repeat(7 * 1024 * 1024)]);
+    data.types[0] |= 0x200;
+    data.unit_refs = vec![1];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_dictionary_string_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.types = vec![3 | 0x30; 17];
+    data.name_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.tagset_refs = vec![0; 17];
+    data.resources_refs = vec![0; 17];
+    data.intervals = vec![0; 17];
+    data.num_points = vec![0; 17];
+    data.source_type_name_refs = vec![0; 17];
+    data.origin_info_refs = vec![0; 17];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_empty_string_entries() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = vec![0; 700_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_accumulates_string_dictionary_expansion_across_fields() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = vec![0; 300_000];
+    data.dict_tag_str = vec![0; 300_000];
+    data.dict_unit_str = vec![0; 300_000];
+    data.dict_resource_str = vec![0; 300_000];
+    data.dict_source_type_name = vec![0; 300_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_empty_tagsets() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tagsets = vec![0; 700_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_tagset_bookkeeping_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tagsets = vec![0; 450_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_resource_bookkeeping_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_len = vec![0; 450_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_resource_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_resource_len = vec![1; 17];
+    data.dict_resource_type = vec![1; 17];
+    data.dict_resource_name = vec![0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_deduplicates_metadata_tags() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: vec!["team:core".to_string(); 10_000],
+        resources: Vec::new(),
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].tags, ["team:core"]);
+}
+
+#[test]
+fn decode_v3_accepts_many_distinct_metadata_tags() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: (0..10_000).map(|index| format!("tag:{index}")).collect(),
+        resources: Vec::new(),
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].tags.len(), 10_000);
+}
+
+#[test]
+fn decode_v3_accounts_for_metadata_tag_deduplication() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 0;
+    data.timestamps.clear();
+    data.vals_float64.clear();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: (0..250_000).map(|index| format!("tag:{index}")).collect(),
+        resources: Vec::new(),
+    };
+
+    assert!(super::metrics::decode_v3_metric_data(&data, Some(&metadata)).is_err());
+}
+
+#[test]
+fn decode_v3_shares_budget_across_expansion_categories() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 0;
+    data.timestamps.clear();
+    data.vals_float64.clear();
+    data.dict_tagsets = vec![0; 200_000];
+    data.dict_resource_len = vec![0; 200_000];
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: vec![String::new(); 200_000],
+        resources: Vec::new(),
+    };
+
+    assert!(super::metrics::decode_v3_metric_data(&data, Some(&metadata)).is_err());
+}
+
+#[test]
+fn decode_v3_skips_tag_expansion_for_zero_point_series() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 0;
+    data.timestamps.clear();
+    data.vals_float64.clear();
+    let payload = ddmetric_v3_proto::Payload {
+        metadata: Some(ddmetric_v3_proto::Metadata {
+            tags: (0..100_000).map(|index| format!("tag:{index}")).collect(),
+            resources: Vec::new(),
+        }),
+        metric_data: Some(data),
+    };
+    let mut body = Vec::new();
+    payload.encode(&mut body).unwrap();
+
+    let events = super::metrics::decode_ddseries_v3(Bytes::from(body), &None, false).unwrap();
+
+    assert!(events.is_empty());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_metadata_string_entries_before_decode() {
+    let metadata_entry_count = 16 * 1024 * 1024 / std::mem::size_of::<String>() + 1;
+    let mut metadata = Vec::with_capacity(metadata_entry_count * 2);
+    for _ in 0..metadata_entry_count {
+        metadata.extend([0x0a, 0x00]);
+    }
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_accumulates_metadata_allocations_across_fields() {
+    let metadata_entry_count = 16 * 1024 * 1024 / std::mem::size_of::<String>() / 2 + 1;
+    let mut metadata = Vec::with_capacity(metadata_entry_count * 2);
+    for _ in 0..metadata_entry_count {
+        metadata.extend([0x0a, 0x00]);
+    }
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_numeric_columns_before_decode() {
+    let entry_count = 16 * 1024 * 1024 / std::mem::size_of::<i64>() + 1;
+    let packed_timestamps = vec![0; entry_count];
+    let mut metric_data = Vec::new();
+    encode_v3_length_delimited(16, &packed_timestamps, &mut metric_data);
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(3, &metric_data, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_lossy_tag_expansion_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    let invalid_utf8 = vec![0xff; 6 * 1024 * 1024];
+    encode_v3_varint(invalid_utf8.len() as u64, &mut data.dict_tag_str);
+    data.dict_tag_str.extend(invalid_utf8);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_valid_string_expansion_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    let valid_utf8 = vec![b'x'; 16 * 1024 * 1024];
+    encode_v3_varint(valid_utf8.len() as u64, &mut data.dict_tag_str);
+    data.dict_tag_str.extend(valid_utf8);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_reference_accumulator_overflow() {
+    let mut data = minimal_v3_metric_data();
+    data.types = vec![3 | 0x30; 2];
+    data.name_refs = vec![1, i64::MAX];
+    data.tagset_refs = vec![0; 2];
+    data.resources_refs = vec![0; 2];
+    data.intervals = vec![0; 2];
+    data.num_points = vec![0; 2];
+    data.source_type_name_refs = vec![0; 2];
+    data.origin_info_refs = vec![0; 2];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_does_not_expand_unused_global_resources() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_len = vec![0; 100_000];
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: Vec::new(),
+        resources: vec!["container".to_string(), "x".repeat(1024)],
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].resources.len(), 1);
+}
+
+#[tokio::test]
+async fn decode_series_endpoint_v3() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let payload = ddmetric_v3_proto::Payload {
+            metadata: Some(ddmetric_v3_proto::Metadata {
+                tags: vec!["team:core".to_string()],
+                resources: Vec::new(),
+            }),
+            metric_data: Some(ddmetric_v3_proto::MetricData {
+                dict_name_str: v3_string_dictionary(&["namespace.dd_gauge"]),
+                dict_tag_str: v3_string_dictionary(&["foo:bar"]),
+                dict_tagsets: vec![1, 1],
+                dict_resource_str: v3_string_dictionary(&[
+                    "host",
+                    "random_host",
+                    "container",
+                    "container_id",
+                ]),
+                dict_resource_len: vec![2, 1],
+                dict_resource_type: vec![1, 2, 3],
+                dict_resource_name: vec![2, 2, 4],
+                dict_source_type_name: v3_string_dictionary(&["system"]),
+                dict_origin_info: vec![10, 10, 42],
+                dict_unit_str: v3_string_dictionary(&["byte"]),
+                types: vec![3 | 0x30 | 0x100 | 0x200, 3 | 0x30],
+                name_refs: vec![1, 0],
+                tagset_refs: vec![1, 0],
+                resources_refs: vec![1, 1],
+                intervals: vec![10, 10],
+                num_points: vec![1, 1],
+                source_type_name_refs: vec![1, 0],
+                origin_info_refs: vec![1, 0],
+                unit_refs: vec![1],
+                timestamps: vec![1_542_182_950, 1],
+                vals_sint64: Vec::new(),
+                vals_float32: Vec::new(),
+                vals_float64: vec![3.14, 3.1415],
+                sketch_num_bins: Vec::new(),
+                sketch_bin_keys: Vec::new(),
+                sketch_bin_cnts: Vec::new(),
+            }),
+        };
+        let mut body = Vec::new();
+        payload.encode(&mut body).unwrap();
+        let events = send_bytes_and_collect(
+            addr,
+            body,
+            dd_api_key_headers(),
+            DD_API_SERIES_V3_PATH,
+            rx,
+            2,
+        )
+        .await;
+
+        let metric = events[0].as_metric();
+        assert_eq!(metric.name(), "dd_gauge");
+        assert_eq!(metric.namespace(), Some("namespace"));
+        assert_eq!(metric.kind(), MetricKind::Absolute);
+        assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
+        assert_tags(
+            metric,
+            metric_tags!(
+                "foo" => "bar",
+                "team" => "core",
+                "host" => "random_host",
+                "resource.container" => "container_id",
+                "source_type_name" => "system"
+            ),
+        );
+        let origin = metric.metadata().datadog_origin_metadata().unwrap();
+        assert_eq!(origin.product(), Some(10));
+        assert_eq!(origin.category(), Some(10));
+        assert_eq!(origin.service(), Some(42));
+        assert_eq!(origin.metric_type(), Some(9));
+        assert_eq!(metric.metadata().datadog_metric_unit(), Some("byte"));
     })
     .await;
 }
@@ -2643,7 +3321,7 @@ fn test_output_schema_definition_json_vector_namespace() {
                     None
                 )
         )
-    )
+    );
 }
 
 #[test]
@@ -2704,7 +3382,7 @@ fn test_output_schema_definition_bytes_vector_namespace() {
                 )
                 .with_meaning(OwnedTargetPath::event_root(), "message")
         )
-    )
+    );
 }
 
 #[test]
@@ -2735,7 +3413,7 @@ fn test_output_schema_definition_json_legacy_namespace() {
                 .with_event_field(&owned_value_path!("source_type"), Kind::json(), None)
                 .with_event_field(&owned_value_path!("status"), Kind::json(), None)
         )
-    )
+    );
 }
 
 #[test]
@@ -2786,9 +3464,13 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
                 Some("timestamp")
             )
         )
-    )
+    );
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Expected tags are constructed as owned fixtures at the assertion call sites."
+)]
 fn assert_tags(metric: &Metric, tags: MetricTags) {
     assert_eq!(metric.tags().expect("Missing tags"), &tags);
 }
@@ -2805,11 +3487,12 @@ async fn test_series_v1_split_metric_namespace_impl(
             metric: "system.disk.free".to_string(),
             r#type: DatadogMetricType::Gauge,
             interval: None,
-            points: vec![DatadogPoint(1542182950, 42.0)],
+            points: vec![DatadogPoint(1_542_182_950, 42.0)],
             tags: Some(vec!["foo:bar".to_string()]),
             host: Some("test_host".to_string()),
             source_type_name: None,
             device: None,
+            unit: None,
             metadata: None,
         }],
     };
@@ -2861,11 +3544,11 @@ async fn test_series_v2_split_metric_namespace_impl(
         tags: vec!["foo:bar".to_string()],
         points: vec![ddmetric_proto::metric_payload::MetricPoint {
             value: 42.0,
-            timestamp: 1542182950,
+            timestamp: 1_542_182_950,
         }],
         r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
-        unit: "".to_string(),
-        source_type_name: "".to_string(),
+        unit: String::new(),
+        source_type_name: String::new(),
         interval: 10,
         metadata: None,
     }];
@@ -2937,11 +3620,11 @@ async fn series_v2_resources_preserved_as_tags() {
             ],
             points: vec![ddmetric_proto::metric_payload::MetricPoint {
                 value: 100.0,
-                timestamp: 1542182950,
+                timestamp: 1_542_182_950,
             }],
             r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
-            unit: "".to_string(),
-            source_type_name: "".to_string(),
+            unit: String::new(),
+            source_type_name: String::new(),
             interval: 0,
             metadata: None,
         }];
@@ -3001,7 +3684,7 @@ async fn test_sketches_split_metric_namespace_impl(
         host: "test_host".to_string(),
         distributions: Vec::new(),
         dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
-            ts: 1542182950,
+            ts: 1_542_182_950,
             cnt: 2,
             min: 16.0,
             max: 31.0,
@@ -3055,14 +3738,14 @@ impl ValidatableComponent for DatadogAgentConfig {
             drop_on_invalid_api_key: false,
             framing: CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
-                    delimiter: b',',
+                    delimiter: vector_lib::serde::AsciiChar::new(','),
                     max_length: Some(usize::MAX),
-                    oversized_action: Default::default(),
+                    oversized_action: OversizedAction::default(),
                 },
             }
             .into(),
             decoding: BytesDeserializerConfig::new().into(),
-            acknowledgements: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
             multiple_outputs: false,
             disable_logs: false,
             disable_metrics: false,
@@ -3071,7 +3754,7 @@ impl ValidatableComponent for DatadogAgentConfig {
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
-            keepalive: Default::default(),
+            keepalive: KeepaliveConfig::default(),
             send_timeout_secs: None,
         };
 
@@ -3084,7 +3767,7 @@ impl ValidatableComponent for DatadogAgentConfig {
 
         let decoder = DecodingConfig::new(
             config.framing.clone(),
-            DeserializerConfig::Json(Default::default()),
+            DeserializerConfig::Json(JsonDeserializerConfig::default()),
             false.into(),
         );
 
@@ -3307,6 +3990,7 @@ async fn api_key_validation_rejects_before_reading_body() {
         DD_API_LOGS_V2_PATH,
         DD_API_SERIES_V1_PATH,
         DD_API_SERIES_V2_PATH,
+        DD_API_SERIES_V3_PATH,
         DD_API_SKETCHES_PATH,
         DD_API_TRACES_PATH,
         "/api/v0.2/stats",
@@ -3427,6 +4111,7 @@ async fn api_key_validation_preserves_allowed_request_limits() {
         DD_API_LOGS_V2_PATH,
         DD_API_SERIES_V1_PATH,
         DD_API_SERIES_V2_PATH,
+        DD_API_SERIES_V3_PATH,
         DD_API_SKETCHES_PATH,
         DD_API_TRACES_PATH,
         "/api/v2/llmobs",
@@ -3474,6 +4159,34 @@ async fn api_key_validation_disabled_preserves_stats_passthrough() {
         )
         .await,
     );
+}
+
+#[tokio::test]
+async fn api_key_validation_preserves_v3_metric_metadata() {
+    let body = ddmetric_v3_proto::Payload {
+        metadata: None,
+        metric_data: Some(minimal_v3_metric_data()),
+    }
+    .encode_to_vec();
+    for (store_api_key, drop_invalid, supplied_key, expected_key) in [
+        (true, true, DD_API_KEY, Some(DD_API_KEY)),
+        (false, true, DD_API_KEY, None),
+        (true, false, "invalid", None),
+    ] {
+        let (recv, addr, _guard) =
+            source_with_api_key_options(store_api_key, drop_invalid, false).await;
+        let mut headers = HeaderMap::new();
+        headers.insert("dd-api-key", supplied_key.parse().unwrap());
+        let events =
+            send_bytes_and_collect(addr, body.clone(), headers, DD_API_SERIES_V3_PATH, recv, 1)
+                .await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].as_metric().name(), "metric");
+        assert_eq!(
+            events[0].metadata().datadog_api_key().as_deref(),
+            expected_key
+        );
+    }
 }
 
 #[tokio::test]

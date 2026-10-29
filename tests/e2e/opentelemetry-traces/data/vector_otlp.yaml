@@ -1,3 +1,8 @@
+# The E2E tests read component_received_events_total from the observability API.
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+
 sources:
   source0:
     type: opentelemetry
@@ -8,11 +13,8 @@ sources:
       keepalive:
         max_connection_age_jitter_factor: 0.1
         max_connection_age_secs: 300
-    use_otlp_decoding: true
-
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 1
+    decoding:
+      codec: otlp
 
 sinks:
   otel_sink:
@@ -30,13 +32,5 @@ sinks:
     path: "/output/opentelemetry-traces/vector-file-sink.log"
     inputs:
       - source0.traces
-    encoding:
-      codec: json
-
-  metrics_file_sink:
-    type: file
-    path: "/output/opentelemetry-traces/vector-internal-metrics-sink.log"
-    inputs:
-      - internal_metrics
     encoding:
       codec: json

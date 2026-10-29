@@ -82,6 +82,7 @@ pub enum CounterName {
     StoppedTotal,
     TagCardinalityUntrackedEventsTotal,
     TagValueLimitExceededTotal,
+    TopologyDiskBufferLifecycleEventsTotal,
     ValueLimitReachedTotal,
     WebsocketBytesSentTotal,
     WebsocketMessagesSentTotal,
@@ -109,6 +110,7 @@ pub enum CounterName {
     MemoryEnrichmentTableTtlExpirations,
     MemoryEnrichmentTableTtlExpirationsTotal,
     ComponentCpuUsageNsTotal,
+    DatadogLogsEventsTruncatedTotal,
     DatadogLogsReservedAttributeConflictsTotal,
     // Data-plane counter names emitted by the `host_metrics` source.
     CpuSecondsTotal,
@@ -464,6 +466,9 @@ impl CounterName {
             Self::StoppedTotal => "stopped_total",
             Self::TagCardinalityUntrackedEventsTotal => "tag_cardinality_untracked_events_total",
             Self::TagValueLimitExceededTotal => "tag_value_limit_exceeded_total",
+            Self::TopologyDiskBufferLifecycleEventsTotal => {
+                "topology_disk_buffer_lifecycle_events_total"
+            }
             Self::ValueLimitReachedTotal => "value_limit_reached_total",
             Self::WebsocketBytesSentTotal => "websocket_bytes_sent_total",
             Self::WebsocketMessagesSentTotal => "websocket_messages_sent_total",
@@ -503,6 +508,7 @@ impl CounterName {
                 "memory_enrichment_table_ttl_expirations_total"
             }
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
+            Self::DatadogLogsEventsTruncatedTotal => "datadog_logs_events_truncated_total",
             Self::DatadogLogsReservedAttributeConflictsTotal => {
                 "datadog_logs_reserved_attribute_conflicts_total"
             }

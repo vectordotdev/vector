@@ -10,21 +10,25 @@ pub struct LogfmtSerializerConfig;
 
 impl LogfmtSerializerConfig {
     /// Creates a new `LogfmtSerializerConfig`.
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }
 
     /// Build the `LogfmtSerializer` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> LogfmtSerializer {
         LogfmtSerializer
     }
 
     /// The data type of events that are accepted by `LogfmtSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // logfmt, we don't want to enforce that limitation to users yet.

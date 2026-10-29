@@ -328,11 +328,13 @@ impl ZerobusService {
             message: format!("Failed to create Zerobus SDK: {e}"),
         })?;
 
-        let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
-            ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {e}"),
-            }
+        let tls = TlsSettings::from_options(None).map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to create TLS settings: {e}"),
         })?;
+        let http_client =
+            HttpClient::new(tls, proxy).map_err(|e| ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {e}"),
+            })?;
 
         Ok(Self {
             sdk: Arc::new(sdk),
@@ -499,7 +501,7 @@ impl ZerobusService {
                     return Err(ZerobusSinkError::StreamClosed);
                 };
                 match s.ingest_batch(batch).await {
-                    Ok(offset) => s.wait_for_offset(offset).await.map(|_| ()),
+                    Ok(offset) => s.wait_for_offset(offset).await,
                     Err(e) => Err(e),
                 }
             }
@@ -601,10 +603,14 @@ impl ZerobusService {
                 message: format!("Failed to create Zerobus SDK: {e}"),
             })?;
 
-        let http_client = HttpClient::new(TlsSettings::default(), &ProxyConfig::default())
-            .map_err(|e| ZerobusSinkError::ConfigError {
+        let tls = TlsSettings::from_options(None).map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to create TLS settings: {e}"),
+        })?;
+        let http_client = HttpClient::new(tls, &ProxyConfig::default()).map_err(|e| {
+            ZerobusSinkError::ConfigError {
                 message: format!("Failed to create HTTP client: {e}"),
-            })?;
+            }
+        })?;
 
         Ok(Self {
             sdk: Arc::new(sdk),
@@ -726,9 +732,9 @@ mod tests {
             },
             user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: crate::sinks::util::BatchConfig::default(),
+            request: crate::sinks::util::TowerRequestConfig::default(),
+            acknowledgements: crate::config::AcknowledgementsConfig::default(),
         }
     }
 

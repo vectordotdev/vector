@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(clippy::await_holding_lock)]
 
 use indoc::indoc;
