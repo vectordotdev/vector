@@ -87,6 +87,12 @@ components: sources: datadog_agent: {
 				If [multiple_outputs](#multiple_outputs) is enabled, received LLM Observability events will go to this output stream. Use `<component_id>.llmobs` as an input to downstream transforms and sinks.
 				"""
 		},
+		{
+			name: "apm_stats"
+			description: """
+				If [multiple_outputs](#multiple_outputs) and [forward_apm_stats](#forward_apm_stats) are enabled, APM stats payloads received from the Datadog Agent will go to this output stream. Use `<component_id>.apm_stats` as an input to downstream transforms and sinks.
+				"""
+		},
 
 	]
 

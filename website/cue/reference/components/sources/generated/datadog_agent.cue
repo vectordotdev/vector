@@ -55,6 +55,14 @@ generated: components: sources: datadog_agent: configuration: {
 		required:    false
 		type: bool: default: false
 	}
+	forward_apm_stats: {
+		description: """
+			If this is set to `true`, APM stats sent by the Datadog Agent are emitted unmodified on the
+			`apm_stats` output. Requires `multiple_outputs`.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	framing: {
 		description: """
 			Framing configuration.
@@ -77,7 +85,7 @@ generated: components: sources: datadog_agent: configuration: {
 
 			For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
 			configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
-			`agent.traces`, respectively.
+			`agent.traces`, respectively. With `forward_apm_stats` enabled, APM stats are sent to `agent.apm_stats`.
 			"""
 		required: false
 		type: bool: default: false

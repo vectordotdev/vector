@@ -14,7 +14,7 @@ use vector_lib::{
 use vrl::event_path;
 use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto};
+use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, apm_stats, ddtrace_proto};
 use crate::{
     common::{datadog::encode_u64_id_hex, http::ErrorMessage},
     event::{Event, ObjectMap, TraceEvent, Value},
@@ -25,9 +25,15 @@ use crate::{
 pub(super) fn build_warp_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
+    forward_apm_stats: bool,
 ) -> BoxedFilter<(Response,)> {
+    let stats_filter = if forward_apm_stats {
+        apm_stats::build_warp_filter(handler.clone(), source.clone())
+    } else {
+        build_stats_filter()
+    };
     build_trace_filter(handler, source)
-        .or(build_stats_filter())
+        .or(stats_filter)
         .unify()
         .boxed()
 }
