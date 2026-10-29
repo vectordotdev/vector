@@ -3,7 +3,7 @@ use std::{fs::File, io::Read};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, future::ready, stream};
-use http::StatusCode;
+use http_0::StatusCode;
 use serde_json::{Value, json};
 use vector_http::full_body;
 use vector_lib::{

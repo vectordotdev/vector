@@ -5,7 +5,7 @@ use vector_lib::codecs::decoding::NewlineDelimitedDecoderConfig;
 use vector_lib::codecs::decoding::framing::OversizedAction;
 use vector_lib::config::proxy::NoProxy;
 
-use http::{Method, Uri, header};
+use http_0::{Method, Uri, header};
 use tokio::time::Duration;
 use vector_lib::{
     codecs::{

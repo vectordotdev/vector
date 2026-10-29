@@ -827,7 +827,7 @@ impl EventStreamBuilder {
                         // On any error, restart connection
                         match &error {
                             DockerError::DockerResponseServerError { status_code, .. }
-                                if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
+                                if *status_code == http_0::StatusCode::NOT_IMPLEMENTED =>
                             {
                                 emit!(DockerLogsLoggingDriverUnsupportedError {
                                     error,

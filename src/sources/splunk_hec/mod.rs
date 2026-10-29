@@ -9,7 +9,7 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{DateTime, TimeZone, Utc};
 use futures::FutureExt;
-use http::StatusCode;
+use http_0::StatusCode;
 use hyper::{Server, service::make_service_fn};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{
@@ -795,8 +795,8 @@ impl SplunkSource {
         warp::get()
             .and(path!("health" / "1.0").or(path!("health")))
             .map(move |_| {
-                http::Response::builder()
-                    .header(http::header::CONTENT_TYPE, "application/json")
+                http_0::Response::builder()
+                    .header(http_0::header::CONTENT_TYPE, "application/json")
                     .body(hyper::Body::from(r#"{"text":"HEC is healthy","code":17}"#))
                     .expect("static response")
             })
@@ -2000,7 +2000,11 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
 
 fn response_plain(code: StatusCode, msg: &'static str) -> Response {
     warp::reply::with_status(
-        warp::reply::with_header(msg, http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+        warp::reply::with_header(
+            msg,
+            http_0::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        ),
         code,
     )
     .into_response()
@@ -2082,7 +2086,7 @@ mod tests {
 
     use chrono::{TimeZone, Utc};
     use futures_util::Stream;
-    use http::Uri;
+    use http_0::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
     use vector_lib::{

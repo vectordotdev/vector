@@ -140,16 +140,16 @@ impl TestClient for LegacyHttpClient {
         uri: &str,
         headers: &[(&str, &str)],
     ) -> Result<TestResponse, String> {
-        let mut request = http::Request::get(uri)
+        let mut request = http_0::Request::get(uri)
             .body(hyper::Body::empty())
             .map_err(|error| error.to_string())?;
         for &(name, value) in headers {
             request.headers_mut().insert(
-                http::header::HeaderName::from_bytes(name.as_bytes())
+                http_0::header::HeaderName::from_bytes(name.as_bytes())
                     .map_err(|error| error.to_string())?,
                 value
                     .parse()
-                    .map_err(|error: http::header::InvalidHeaderValue| error.to_string())?,
+                    .map_err(|error: http_0::header::InvalidHeaderValue| error.to_string())?,
             );
         }
         let response = timeout(REQUEST_TIMEOUT, self.send(request))

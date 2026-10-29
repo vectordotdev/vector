@@ -1,6 +1,6 @@
 use std::{convert::Infallible, future::ready, time::Duration};
 
-use http::Response;
+use http_0::Response;
 use hyper::Body;
 use indoc::indoc;
 use tokio::time::timeout;

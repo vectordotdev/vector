@@ -2,7 +2,7 @@ use std::{collections::HashMap, convert::Infallible};
 
 use bytes::{Buf, Bytes};
 use chrono::Utc;
-use http::header::HeaderValue;
+use http_0::header::HeaderValue;
 use snafu::ResultExt;
 use vector_lib::{
     config::LogNamespace,

@@ -12,7 +12,7 @@ use futures::{
     future::{ok, ready},
     stream,
 };
-use http::StatusCode;
+use http_0::StatusCode;
 use ordered_float::NotNan;
 use serde::Deserialize;
 use serde_json::Value;

@@ -1021,7 +1021,7 @@ where
     }
 }
 
-async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts)) {
+async fn run_sink(extra_config: &str, assert_parts: impl Fn(http_0::request::Parts)) {
     let num_lines = 1000;
 
     let (in_addr, sink) = build_sink(extra_config).await;
@@ -1046,7 +1046,7 @@ async fn run_sink_with_events(
     extra_config: &str,
     event_generator: impl Fn() -> Event + Clone,
     num_events: usize,
-    assert_parts: impl Fn(http::request::Parts),
+    assert_parts: impl Fn(http_0::request::Parts),
 ) {
     let (in_addr, sink) = build_sink(extra_config).await;
     let (rx, trigger, server) = build_test_server(in_addr);

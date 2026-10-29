@@ -19,7 +19,7 @@ impl ErrorMessage {
     /// Create a new `ErrorMessage` from HTTP status code and a message
     #[allow(unused)] // triggered by check-component-features
     #[must_use]
-    pub fn new(code: http::StatusCode, message: String) -> Self {
+    pub fn new(code: http_0::StatusCode, message: String) -> Self {
         ErrorMessage {
             code: code.as_u16(),
             message,
@@ -29,8 +29,8 @@ impl ErrorMessage {
     /// Returns the HTTP status code
     #[allow(unused)] // triggered by check-component-features
     #[must_use]
-    pub fn status_code(&self) -> http::StatusCode {
-        http::StatusCode::from_u16(self.code).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR)
+    pub fn status_code(&self) -> http_0::StatusCode {
+        http_0::StatusCode::from_u16(self.code).unwrap_or(http_0::StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 

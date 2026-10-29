@@ -41,7 +41,7 @@ fn random_events_with_stream(
 async fn start_test(
     http_status: StatusCode,
     batch_status: BatchStatus,
-) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+) -> (Vec<String>, Receiver<(http_0::request::Parts, Bytes)>) {
     let config = indoc! {r#"
             default_api_key = "atoken"
         "#};

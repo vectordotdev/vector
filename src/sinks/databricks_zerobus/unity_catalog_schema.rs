@@ -256,7 +256,7 @@ mod tests {
     /// the `lookup` response. Only successful requests are recorded.
     struct MockUnityCatalog {
         endpoint: String,
-        requests: mpsc::Receiver<(http::request::Parts, Bytes)>,
+        requests: mpsc::Receiver<(http_0::request::Parts, Bytes)>,
         _trigger: stream_cancel::Trigger,
         _guard: PortGuard,
     }
@@ -273,7 +273,7 @@ mod tests {
             } else {
                 oauth
             };
-            http::Response::builder()
+            http_0::Response::builder()
                 .status(status)
                 .body(hyper::Body::from(body))
                 .expect("valid mock response")
@@ -315,10 +315,10 @@ mod tests {
             mock.requests.next().await.expect("lookup request"),
         ];
         // Bodies are recorded asynchronously; order by method, not arrival.
-        requests.sort_by_key(|(parts, _)| parts.method != http::Method::POST);
+        requests.sort_by_key(|(parts, _)| parts.method != http_0::Method::POST);
 
         let (oauth, oauth_body) = &requests[0];
-        assert_eq!(oauth.method, http::Method::POST);
+        assert_eq!(oauth.method, http_0::Method::POST);
         assert_eq!(oauth.uri.path(), "/oidc/v1/token");
         assert_eq!(oauth.uri.query(), None);
         assert_eq!(
@@ -332,7 +332,7 @@ mod tests {
         );
 
         let (lookup, lookup_body) = &requests[1];
-        assert_eq!(lookup.method, http::Method::GET);
+        assert_eq!(lookup.method, http_0::Method::GET);
         assert_eq!(
             lookup.uri.path(),
             "/api/2.1/unity-catalog/tables/my%20cat.sch%23ema.t%2Fbl"

@@ -615,8 +615,8 @@ mod tests {
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
                 HttpResourceConfig::from_parts(
-                    http::Uri::from_str(endpoint).expect("should never fail to parse"),
-                    Some(http::Method::POST),
+                    http_0::Uri::from_str(endpoint).expect("should never fail to parse"),
+                    Some(http_0::Method::POST),
                 ),
                 config.encoding.clone(),
             );

@@ -4,7 +4,7 @@ use std::{
     net::SocketAddr,
 };
 
-use http::{HeaderMap, Method, Request, Response, StatusCode, Uri, header, uri::Scheme};
+use http_0::{HeaderMap, Method, Request, Response, StatusCode, Uri, header, uri::Scheme};
 use hyper::{
     Body, Client, Server,
     service::{make_service_fn, service_fn},

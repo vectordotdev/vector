@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use futures::{FutureExt, StreamExt};
-use http::Uri;
-use http_body::Collected;
+use http_0::Uri;
+use http_body_0::Collected;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio_stream::wrappers::IntervalStream;
@@ -114,7 +114,7 @@ fn eventstoredb(
                     }
 
                     Ok(resp) => {
-                        let bytes = match http_body::Body::collect(resp.into_body())
+                        let bytes = match http_body_0::Body::collect(resp.into_body())
                             .await
                             .map(Collected::to_bytes)
                         {

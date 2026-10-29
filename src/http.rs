@@ -10,7 +10,7 @@ use std::{
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
-use http::{
+use http_0::{
     HeaderMap, Request, Response, Version, header::HeaderValue, request::Builder, uri::InvalidUri,
 };
 use http_1::Request as RequestV1;
@@ -61,7 +61,7 @@ pub enum HttpError {
     #[snafu(display("Failed to make HTTP(S) request: {}", source))]
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
-    BuildRequest { source: http::Error },
+    BuildRequest { source: http_0::Error },
 }
 
 impl HttpError {
@@ -76,7 +76,7 @@ impl HttpError {
     }
 }
 
-pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
+pub type HttpClientFuture = <HttpClient as Service<http_0::Request<Body>>>::Future;
 pub type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
 /// An HTTP client generic over the underlying connector `C`.
@@ -175,7 +175,7 @@ where
     pub fn send(
         &self,
         mut request: Request<B>,
-    ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
+    ) -> BoxFuture<'static, Result<http_0::Response<Body>, HttpError>> {
         let span = tracing::info_span!("http");
         let _enter = span.enter();
 
@@ -325,7 +325,7 @@ struct TlsProxyAuthorities {
 }
 
 impl TlsProxyAuthorities {
-    fn matches(&self, uri: &http::Uri) -> bool {
+    fn matches(&self, uri: &http_0::Uri) -> bool {
         if self.http.is_none() && self.https.is_none() {
             return false;
         }
@@ -342,7 +342,7 @@ impl TlsProxyAuthorities {
 /// Extract the authority (host and optional port) of a proxy URL, but only when it is reached over
 /// TLS (an `https://` URL). Returns `None` for plaintext proxies or unparseable URLs.
 fn tls_proxy_authority(url: Option<&str>) -> Option<(String, Option<u16>)> {
-    let uri = url?.parse::<http::Uri>().ok()?;
+    let uri = url?.parse::<http_0::Uri>().ok()?;
     if uri.scheme_str() != Some("https") {
         return None;
     }
@@ -402,7 +402,7 @@ where
     B::Error: Into<crate::Error> + Send,
     C: Connect + Clone + Send + Sync + 'static,
 {
-    type Response = http::Response<Body>;
+    type Response = http_0::Response<Body>;
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -539,7 +539,7 @@ impl Auth {
                 // Expected format: "SSWS token123" or "Bearer token123", etc.
                 match HeaderValue::from_str(value) {
                     Ok(header_val) => {
-                        map.insert(http::header::AUTHORIZATION, header_val);
+                        map.insert(http_0::header::AUTHORIZATION, header_val);
                     }
                     Err(error) => {
                         error!(message = "Invalid custom auth header value.", value = %value, %error);
@@ -958,7 +958,7 @@ mod tests {
             http: None,
             https: tls_proxy_authority(Some("https://proxy.example:3128")),
         };
-        let uri = |s: &str| s.parse::<http::Uri>().unwrap();
+        let uri = |s: &str| s.parse::<http_0::Uri>().unwrap();
 
         // The proxy connection itself matches and skips the override.
         assert!(authorities.matches(&uri("https://proxy.example:3128")));

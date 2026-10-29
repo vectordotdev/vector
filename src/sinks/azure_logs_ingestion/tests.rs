@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use futures::stream;
-use http::Response;
+use http_0::Response;
 use std::time::Duration;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
@@ -269,7 +269,7 @@ async fn correct_request() {
     let (parts, body) = request.into_parts();
     assert_eq!(&parts.method.to_string(), "POST");
 
-    let body_bytes: Bytes = http_body::Body::collect(body)
+    let body_bytes: Bytes = http_body_0::Body::collect(body)
         .await
         .expect("failed to collect body")
         .to_bytes();
@@ -318,10 +318,12 @@ async fn retries_transport_error() {
     let server = Server::bind(&addr).serve(make_service_fn(move |_| {
         let requests = Arc::clone(&server_requests);
         async move {
-            Ok::<_, Infallible>(service_fn(move |request: http::Request<Body>| {
+            Ok::<_, Infallible>(service_fn(move |request: http_0::Request<Body>| {
                 let requests = Arc::clone(&requests);
                 async move {
-                    http_body::Body::collect(request.into_body()).await.unwrap();
+                    http_body_0::Body::collect(request.into_body())
+                        .await
+                        .unwrap();
                     if requests.fetch_add(1, Ordering::Relaxed) == 0 {
                         Err(std::io::Error::other(
                             "close the first connection without a response",

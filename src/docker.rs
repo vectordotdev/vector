@@ -11,7 +11,7 @@ use bollard::{
     },
 };
 use futures::StreamExt;
-use http::uri::Uri;
+use http_0::uri::Uri;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
@@ -58,7 +58,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                 .ok()
                 .and_then(|uri| uri.into_parts().scheme);
 
-            match scheme.as_ref().map(http::uri::Scheme::as_str) {
+            match scheme.as_ref().map(http_0::uri::Scheme::as_str) {
                 Some("http" | "tcp") => {
                     let host = get_authority(&host)?;
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)

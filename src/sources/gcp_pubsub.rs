@@ -1230,7 +1230,7 @@ mod integration_tests {
     use base64::prelude::{BASE64_STANDARD, Engine as _};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
-    use http::method::Method;
+    use http_0::method::Method;
     use hyper::{Request, StatusCode};
     use serde_json::{Value, json};
     use tokio::time::{Duration, Instant};
@@ -1518,7 +1518,7 @@ mod integration_tests {
                 .unwrap();
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
-            let body = http_body::Body::collect(response.into_body())
+            let body = http_body_0::Body::collect(response.into_body())
                 .await
                 .unwrap()
                 .to_bytes();

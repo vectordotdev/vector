@@ -64,7 +64,7 @@ mod test {
 mod tests {
     use bytes::{BufMut, Bytes, BytesMut};
     use futures::{StreamExt, channel::mpsc};
-    use http::request::Parts;
+    use http_0::request::Parts;
     use hyper::{
         Method, Response, Server,
         service::{make_service_fn, service_fn},

@@ -15,7 +15,7 @@ use std::{collections::HashMap, future::ready, time::Duration};
 
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
-use http::{
+use http_0::{
     HeaderMap, Uri,
     header::{HeaderName, HeaderValue},
     response::Parts,
@@ -62,12 +62,12 @@ pub(crate) enum HeaderError {
     #[snafu(display("Invalid HTTP header name {name:?}: {source}"))]
     InvalidName {
         name: String,
-        source: http::header::InvalidHeaderName,
+        source: http_0::header::InvalidHeaderName,
     },
     #[snafu(display("Invalid value for HTTP header {name:?}: {source}"))]
     InvalidValue {
         name: String,
-        source: http::header::InvalidHeaderValue,
+        source: http_0::header::InvalidHeaderValue,
     },
 }
 
@@ -237,8 +237,8 @@ pub(crate) async fn call<
             }
 
             // set ACCEPT header if not user specified
-            if !inputs.headers.contains_key(http::header::ACCEPT.as_str()) {
-                builder = builder.header(http::header::ACCEPT, &inputs.content_type);
+            if !inputs.headers.contains_key(http_0::header::ACCEPT.as_str()) {
+                builder = builder.header(http_0::header::ACCEPT, &inputs.content_type);
             }
 
             // Get the request body from the context (if any)
@@ -247,9 +247,9 @@ pub(crate) async fn call<
                     // Set Content-Type header if not already set
                     if !inputs
                         .headers
-                        .contains_key(http::header::CONTENT_TYPE.as_str())
+                        .contains_key(http_0::header::CONTENT_TYPE.as_str())
                     {
-                        builder = builder.header(http::header::CONTENT_TYPE, "application/json");
+                        builder = builder.header(http_0::header::CONTENT_TYPE, "application/json");
                     }
                     Body::from(body_str)
                 }
@@ -277,7 +277,7 @@ pub(crate) async fn call<
                 })
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
-                    let body = http_body::Body::collect(body).await?.to_bytes();
+                    let body = http_body_0::Body::collect(body).await?.to_bytes();
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",

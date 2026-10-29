@@ -30,7 +30,7 @@ async fn start_test(
     batch_status: BatchStatus,
     http_status_code: StatusCode,
     events: Vec<Event>,
-) -> Receiver<(http::request::Parts, Bytes)> {
+) -> Receiver<(http_0::request::Parts, Bytes)> {
     start_test_with_config("", batch_status, http_status_code, events).await
 }
 
@@ -40,7 +40,7 @@ async fn start_test_with_config(
     batch_status: BatchStatus,
     http_status_code: StatusCode,
     events: Vec<Event>,
-) -> Receiver<(http::request::Parts, Bytes)> {
+) -> Receiver<(http_0::request::Parts, Bytes)> {
     assert_sink_compliance(&SINK_TAGS, async {
         let (_guard, addr) = next_addr();
         let config = format!(

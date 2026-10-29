@@ -48,5 +48,5 @@ macro_rules! impl_status_code {
     };
 }
 
-impl_status_code!(http::StatusCode);
+impl_status_code!(http_0::StatusCode);
 impl_status_code!(http_1::StatusCode);

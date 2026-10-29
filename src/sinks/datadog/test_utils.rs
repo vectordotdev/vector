@@ -1,6 +1,6 @@
 #![cfg(any(feature = "sinks-datadog_logs", feature = "sinks-datadog_metrics"))]
 use bytes::Bytes;
-use http::status::StatusCode;
+use http_0::status::StatusCode;
 
 use crate::sinks::util::test::build_test_server_status;
 
@@ -27,7 +27,7 @@ pub fn test_server(
     addr: std::net::SocketAddr,
     api_status: ApiStatus,
 ) -> (
-    futures::channel::mpsc::Receiver<(http::request::Parts, Bytes)>,
+    futures::channel::mpsc::Receiver<(http_0::request::Parts, Bytes)>,
     stream_cancel::Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {

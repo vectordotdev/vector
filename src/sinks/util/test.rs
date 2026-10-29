@@ -6,7 +6,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
 use futures_util::StreamExt;
-use http::request::Parts;
+use http_0::request::Parts;
 use hyper::{
     Body, Request, Response, Server, StatusCode,
     body::HttpBody,
@@ -53,7 +53,7 @@ where
 pub fn build_test_server(
     addr: SocketAddr,
 ) -> (
-    mpsc::Receiver<(http::request::Parts, Bytes)>,
+    mpsc::Receiver<(http_0::request::Parts, Bytes)>,
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
@@ -64,7 +64,7 @@ pub fn build_test_server_status(
     addr: SocketAddr,
     status: StatusCode,
 ) -> (
-    mpsc::Receiver<(http::request::Parts, Bytes)>,
+    mpsc::Receiver<(http_0::request::Parts, Bytes)>,
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
@@ -86,7 +86,7 @@ pub fn build_test_server_generic<B>(
     addr: SocketAddr,
     responder: impl Fn() -> Response<B> + Clone + Send + Sync + 'static,
 ) -> (
-    mpsc::Receiver<(http::request::Parts, Bytes)>,
+    mpsc::Receiver<(http_0::request::Parts, Bytes)>,
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 )
@@ -109,7 +109,7 @@ where
                     let response = responder();
                     if response.status().is_success() {
                         tokio::spawn(async move {
-                            let bytes = http_body::Body::collect(body).await.unwrap().to_bytes();
+                            let bytes = http_body_0::Body::collect(body).await.unwrap().to_bytes();
                             tx.send((parts, bytes)).await.unwrap();
                         });
                     }

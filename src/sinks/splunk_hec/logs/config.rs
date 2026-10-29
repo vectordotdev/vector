@@ -482,7 +482,7 @@ mod tests {
             };
 
             // The component validation harness still takes an `http` 0.2 `Uri`.
-            let endpoint: http::Uri = endpoint
+            let endpoint: http_0::Uri = endpoint
                 .append_path("services/collector/raw")
                 .unwrap()
                 .to_string()

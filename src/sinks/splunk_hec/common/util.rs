@@ -402,7 +402,7 @@ mod tests {
 mod integration_tests {
     use std::net::SocketAddr;
 
-    use http::StatusCode;
+    use http_0::StatusCode;
     use tokio::time::Duration;
     use vector_lib::config::proxy::ProxyConfig;
     use warp::Filter;

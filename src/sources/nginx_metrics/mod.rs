@@ -6,8 +6,8 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, TryFutureExt, future::join_all};
-use http::{Request, StatusCode};
-use http_body::Collected;
+use http_0::{Request, StatusCode};
+use http_body_0::Collected;
 use hyper::{Body, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -61,7 +61,7 @@ macro_rules! gauge {
 #[derive(Debug, Snafu)]
 enum NginxBuildError {
     #[snafu(display("Failed to parse endpoint: {}", source))]
-    HostInvalidUri { source: http::uri::InvalidUri },
+    HostInvalidUri { source: http_0::uri::InvalidUri },
 }
 
 #[derive(Debug, Snafu)]
@@ -263,7 +263,7 @@ impl NginxMetrics {
         let response = self.http_client.send(request).await?;
         let (parts, body) = response.into_parts();
         match parts.status {
-            StatusCode::OK => http_body::Body::collect(body)
+            StatusCode::OK => http_body_0::Body::collect(body)
                 .err_into()
                 .await
                 .map(Collected::to_bytes),

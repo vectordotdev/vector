@@ -5,7 +5,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, channel::mpsc::Receiver};
-use http::request::Parts;
+use http_0::request::Parts;
 use indoc::indoc;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
@@ -83,7 +83,7 @@ async fn start_test_detail(
     api_status: ApiStatus,
     batch_status: BatchStatus,
     test_type: TestType,
-) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+) -> (Vec<String>, Receiver<(http_0::request::Parts, Bytes)>) {
     if test_type == TestType::Telemetry {
         init_telemetry(
             Telemetry {
@@ -121,21 +121,21 @@ async fn start_test_detail(
 async fn start_test_success(
     api_status: ApiStatus,
     batch_status: BatchStatus,
-) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+) -> (Vec<String>, Receiver<(http_0::request::Parts, Bytes)>) {
     start_test_detail(api_status, batch_status, TestType::Happy).await
 }
 
 async fn start_test_telemetry(
     api_status: ApiStatus,
     batch_status: BatchStatus,
-) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+) -> (Vec<String>, Receiver<(http_0::request::Parts, Bytes)>) {
     start_test_detail(api_status, batch_status, TestType::Telemetry).await
 }
 
 async fn start_test_error(
     api_status: ApiStatus,
     batch_status: BatchStatus,
-) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+) -> (Vec<String>, Receiver<(http_0::request::Parts, Bytes)>) {
     start_test_detail(api_status, batch_status, TestType::Error).await
 }
 
@@ -484,7 +484,7 @@ async fn retries_transport_errors() {
                 Ok::<_, Infallible>(service_fn(move |request: hyper::Request<Body>| {
                     let requests = Arc::clone(&requests);
                     async move {
-                        let body = http_body::Body::collect(request.into_body())
+                        let body = http_body_0::Body::collect(request.into_body())
                             .await
                             .unwrap()
                             .to_bytes();

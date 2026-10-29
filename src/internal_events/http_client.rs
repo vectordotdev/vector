@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use http::{
+use http_0::{
     HeaderMap, Request, Response, Version,
     header::{self, HeaderName, HeaderValue},
 };
@@ -330,7 +330,7 @@ impl std::fmt::Display for FormatBodySizeHint {
 
 #[cfg(test)]
 mod tests {
-    use http::header::{self, HeaderMap, HeaderName, HeaderValue};
+    use http_0::header::{self, HeaderMap, HeaderName, HeaderValue};
 
     use super::remove_sensitive;
 

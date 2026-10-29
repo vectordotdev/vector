@@ -1,4 +1,4 @@
-use http::Method;
+use http_0::Method;
 use vector_lib::configurable::configurable_component;
 
 /// HTTP method.

@@ -1,7 +1,7 @@
 use async_stream::stream;
 use bytes::Buf;
 use futures::Stream;
-use http_body::{Body as _, Collected};
+use http_body_0::{Body as _, Collected};
 use hyper::Body;
 use indexmap::IndexMap;
 use tokio::time;
@@ -86,7 +86,7 @@ async fn http_request(
         HttpClient::<Body>::new(tls_settings, proxy).map_err(|_| "Invalid TLS settings")?;
 
     // Build HTTP request.
-    let mut builder = http::request::Builder::new().uri(url.to_string());
+    let mut builder = http_0::request::Builder::new().uri(url.to_string());
 
     // Augment with headers. These may be required e.g. for authentication to
     // private endpoints.

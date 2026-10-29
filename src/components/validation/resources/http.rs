@@ -14,7 +14,7 @@ use axum::{
     routing::{MethodFilter, MethodRouter},
 };
 use bytes::{BufMut as _, BytesMut};
-use http::{Method, Uri};
+use http_0::{Method, Uri};
 use http_body_util::{BodyExt as _, Collected};
 use hyper::Client;
 use tokio::{
@@ -288,7 +288,7 @@ fn spawn_input_http_client(
                 runner_metrics.sent_bytes_total += 1;
             }
 
-            let mut request_builder = http::Request::builder()
+            let mut request_builder = http_0::Request::builder()
                 .uri(request_uri.clone())
                 .method(request_method.clone());
 

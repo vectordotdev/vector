@@ -27,7 +27,7 @@ snafu.workspace = true
 toml.workspace = true
 tracing.workspace = true
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
-http = { version = "0.2.9", default-features = false }
+http-0 = { package = "http", version = "0.2.9", default-features = false }
 http-1 = { package = "http", version = "1.0", default-features = false, features = ["std"] }
 vrl.workspace = true
 vector-config-common = { path = "../vector-config-common" }

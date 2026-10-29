@@ -5,7 +5,7 @@ use std::{collections::HashMap, time::Duration};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use http::{Uri, response::Parts};
+use http_0::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_util::codec::Decoder as _;
@@ -552,12 +552,12 @@ impl http_client::HttpClientContext for HttpClientContext {
             .scheme(
                 url.scheme()
                     .cloned()
-                    .unwrap_or_else(|| http::uri::Scheme::try_from("http").unwrap()),
+                    .unwrap_or_else(|| http_0::uri::Scheme::try_from("http").unwrap()),
             )
             .authority(
                 url.authority()
                     .cloned()
-                    .unwrap_or_else(|| http::uri::Authority::try_from("localhost").unwrap()),
+                    .unwrap_or_else(|| http_0::uri::Authority::try_from("localhost").unwrap()),
             )
             .path_and_query(url.path().to_string())
             .build()

@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use futures::StreamExt;
-use http::HeaderMap;
+use http_0::HeaderMap;
 use indoc::indoc;
 use prost::Message;
 use vector_lib::{metric_tags, prometheus::parser::proto};

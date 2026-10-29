@@ -293,14 +293,14 @@ mod tests {
             let body = body.clone();
             async move {
                 assert_eq!(request.headers()["accept-encoding"], "zstd,gzip,deflate,br");
-                let request_body = http_body::Body::collect(request.into_body())
+                let request_body = http_body_0::Body::collect(request.into_body())
                     .await
                     .unwrap()
                     .to_bytes();
                 assert_eq!(request_body, "events");
                 Ok::<_, Infallible>(
-                    http::Response::builder()
-                        .status(http::StatusCode::SERVICE_UNAVAILABLE)
+                    http_0::Response::builder()
+                        .status(http_0::StatusCode::SERVICE_UNAVAILABLE)
                         .header("content-encoding", "gzip")
                         .header("content-length", body.len())
                         .body(hyper::Body::from(body))
@@ -320,7 +320,7 @@ mod tests {
         .unwrap()
     }
 
-    fn request_builder(uri: &http::Uri) -> RequestBuilder {
+    fn request_builder(uri: &http_0::Uri) -> RequestBuilder {
         // The legacy mock server yields an `http 0.2` `Uri`.
         RequestBuilder {
             uri: crate::sinks::util::HttpEndpoint::parse(&uri.to_string())
@@ -383,7 +383,7 @@ mod tests {
         use super::*;
 
         fn sig_v4_service(
-            uri: &http::Uri,
+            uri: &http_0::Uri,
             credentials: impl ProvideCredentials + 'static,
         ) -> HttpService<RequestBuilder, ()> {
             HttpService::new_with_sig_v4(
@@ -405,9 +405,9 @@ mod tests {
                 let tx = tx.clone();
                 async move {
                     let (parts, body) = request.into_parts();
-                    let body = http_body::Body::collect(body).await.unwrap().to_bytes();
+                    let body = http_body_0::Body::collect(body).await.unwrap().to_bytes();
                     tx.send((parts.headers, body)).unwrap();
-                    Ok::<_, Infallible>(http::Response::new(hyper::Body::empty()))
+                    Ok::<_, Infallible>(http_0::Response::new(hyper::Body::empty()))
                 }
             })
             .await;
@@ -460,7 +460,7 @@ mod tests {
             let received = Arc::clone(&requests);
             let uri = spawn_blackhole_http_server(move |_| {
                 received.fetch_add(1, Ordering::Relaxed);
-                async { Ok::<_, Infallible>(http::Response::new(hyper::Body::empty())) }
+                async { Ok::<_, Infallible>(http_0::Response::new(hyper::Body::empty())) }
             })
             .await;
             let mut service = sig_v4_service(&uri, MissingCredentials);
