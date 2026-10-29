@@ -94,6 +94,16 @@ generated: components: sinks: datadog_traces: configuration: {
 		required: false
 		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
+	disable_apm_stats: {
+		description: """
+			Do not compute APM stats from the received traces.
+
+			Enable this when APM stats are forwarded separately, for example stats computed by the
+			Datadog Agent, to avoid counting them twice.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	endpoint: {
 		description: """
 			The endpoint to send observability data to.
