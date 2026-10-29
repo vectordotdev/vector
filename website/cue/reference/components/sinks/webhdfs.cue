@@ -31,7 +31,10 @@ components: sinks: webhdfs: {
 					enum: ["json", "text"]
 				}
 			}
-			request: enabled: false
+			request: {
+				enabled: true
+				headers: false
+			}
 			tls: enabled:     false
 		}
 	}
