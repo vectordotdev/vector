@@ -1,0 +1,15 @@
+{{- /* Inline "Deprecated in … · Removed in …" credits for a deprecation notice
+       (see deprecations/entries.html). Rendered as the footer of
+       releases/changelog-card.html. Versions link to their release page when it
+       exists; unreleased versions render as plain text. */ -}}
+{{- $versions := slice (dict "label" "Deprecated in" "version" .deprecated_since) -}}
+{{- with .removed_in }}{{ $versions = $versions | append (dict "label" "Removed in" "version" .) }}{{ end -}}
+{{- range $i, $v := $versions }}
+  {{- if $i }} &middot; {{ end -}}
+  {{ $v.label }}
+  {{ with site.GetPage (printf "/releases/%s" $v.version) -}}
+  <a href="{{ .RelPermalink }}" class="text-primary-dark hover:text-secondary dark:text-primary dark:hover:text-secondary">v{{ $v.version }}</a>
+  {{- else -}}
+  v{{ $v.version }}
+  {{- end }}
+{{- end -}}
