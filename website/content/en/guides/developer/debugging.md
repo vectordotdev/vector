@@ -24,13 +24,30 @@ You'll need [Vector](/docs/setup/installation/), [Python](https://www.python.org
 Run the examples on the same machine, with ports 8000 and 8686
 available. The Python server uses only the standard library, so you don't need to install any Python packages.
 
-Download <a href="/guides/debugging/fake_server.py" download>fake_server.py</a>, the local HTTP server that prints the requests it receives.
-Save the following configuration as `vector.yaml` in the same directory. You can also
-<a href="/guides/debugging/vector.yaml" download>download the configuration</a>.
+<a href="/guides/debugging/vector-debugging-guide.tar.gz" download>Download all guide files</a>.
+Extract the archive and open the folder:
+
+```shell
+tar -xzf vector-debugging-guide.tar.gz
+cd vector-debugging-guide
+```
+
+Use this folder in each terminal throughout the guide. It includes the walkthrough and monitoring files:
+
+| File | Purpose |
+| --- | --- |
+| `http-server.py` | Local HTTP server used to simulate failures. |
+| `vector-start.yaml` | Starting pipeline. Edit this file during the scenarios. |
+| `vector-final.yaml` | Completed pipeline with zlib compression and smaller batches. |
+| `vector-datadog.yaml` | Final pipeline with internal metrics sent to Datadog. |
+| `vector-prometheus.yaml` | Final pipeline with internal metrics exposed for Prometheus. |
+| `prometheus.yaml` | Prometheus scrape configuration. |
+| `compose.yaml` | Prometheus and Grafana services. |
+| `README.md` | Quick start and file reference. |
 
 ### Initial Vector configuration {#initial-vector-config}
 
-The configuration connects two `demo_logs` sources to a `remap` transform and an `http` sink. A separate console sink prints Vector's
+`vector-start.yaml` connects two `demo_logs` sources to a `remap` transform and an `http` sink. A separate console sink prints Vector's
 internal metrics every five seconds.
 
 ```yaml
@@ -97,7 +114,7 @@ sinks:
 In the first terminal, run:
 
 ```shell
-python3 fake_server.py
+python3 http-server.py
 ```
 
 You should see:
@@ -107,14 +124,14 @@ Serving on http://127.0.0.1:8000
 ```
 
 Keep this terminal open. The server accepts JSON at `/logs` and returns HTTP 200 by default. Later, we'll change its responses to
-simulate failures. You can [read the server source](/guides/debugging/fake_server.py) without needing to edit it for this walkthrough.
+simulate failures. You can read `http-server.py` to see how it works. You don't need to edit it for this walkthrough.
 
 ### Start Vector
 
 In a second terminal, from the same directory, run:
 
 ```shell
-vector --watch-config --config vector.yaml
+vector --watch-config --config vector-start.yaml
 ```
 
 The `--watch-config` flag reloads the configuration when you save changes. Keep this process running while you work through the scenarios.
@@ -329,13 +346,13 @@ happening. You can use the [monitoring setup](#visualizing-and-querying-internal
 For more detail, stop Vector with Ctrl+C and restart it with debug logging:
 
 ```shell
-VECTOR_LOG=debug vector --watch-config --config vector.yaml
+VECTOR_LOG=debug vector --watch-config --config vector-start.yaml
 ```
 
 You can also select a specific Rust module. For example, to inspect HTTP sink retries while keeping other logs at `info`:
 
 ```shell
-VECTOR_LOG=info,vector::sinks::util::retries=debug vector --watch-config --config vector.yaml
+VECTOR_LOG=info,vector::sinks::util::retries=debug vector --watch-config --config vector-start.yaml
 ```
 
 See the [EnvFilter syntax](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#usage-notes)
@@ -343,11 +360,11 @@ for more filtering options.
 
 ## Debug three common failures {#scenarios}
 
-Work through these scenarios in order, keeping the same `vector.yaml`. Use the third terminal for the `curl` commands.
+Work through these scenarios in order, keeping the same `vector-start.yaml`. Use the third terminal for the `curl` commands.
 
 ### Scenario 1: Unsupported compression {#scenario-1---unsupported-compression}
 
-**Trigger the failure.** Add `compression: gzip` to `sinks.sink_0` and save `vector.yaml`. Here is the HTTP sink with that change:
+**Trigger the failure.** Add `compression: gzip` to `sinks.sink_0` and save `vector-start.yaml`. Here is the HTTP sink with that change:
 
 ```yaml
 sinks:
@@ -498,7 +515,7 @@ For example:
 **Trigger the failure.** Stop the Python server with Ctrl+C, then restart it with a payload limit:
 
 ```shell
-python3 fake_server.py --max-bytes 256
+python3 http-server.py --max-bytes 256
 ```
 
 This deliberately small limit makes the failure easy to reproduce with our demo events. The server measures the JSON body after
@@ -543,7 +560,7 @@ size for your own data. Review the destination's limit and the HTTP sink's [batc
 
 ### Final configuration {#final-config}
 
-Here is the complete configuration after all three scenarios, including zlib compression and batches of up to four events:
+`vector-final.yaml` contains the complete configuration after all three scenarios, including zlib compression and batches of up to four events:
 
 ```yaml
 api:
@@ -606,8 +623,7 @@ sinks:
       codec: json
 ```
 
-Save it as `vector-final.yaml`, or <a href="/guides/debugging/vector-final.yaml" download>download a copy</a>.
-Stop the running Vector process before trying it:
+This file is already in the downloaded folder. Stop the running Vector process before trying it:
 
 ```shell
 vector --watch-config --config vector-final.yaml
@@ -622,9 +638,12 @@ When you're finished, stop Vector and the Python server with Ctrl+C.
 The console is enough for the walkthrough. For longer investigations, send the same internal metrics to Datadog or Prometheus/Grafana
 so you can compare changes over time.
 
+Both setups use the files you downloaded at the start. Run `python3 http-server.py` again if you stopped the server.
+Stop any running Vector process before switching configurations.
+
 ### Datadog Metrics
 
-Add this sink under the existing `sinks` section, alongside `sink_0` and `sink_1`:
+Use `vector-datadog.yaml`, which extends `vector-final.yaml` with this sink:
 
 ```yaml
   sink_2:
@@ -635,7 +654,11 @@ Add this sink under the existing `sinks` section, alongside `sink_0` and `sink_1
 ```
 
 Set `DATADOG_API_KEY` in Vector's environment before starting the process. If your account uses a different Datadog site, set the sink's
-[`site`](/docs/reference/configuration/sinks/datadog_metrics/#site) option too.
+[`site`](/docs/reference/configuration/sinks/datadog_metrics/#site) option too. Then start Vector:
+
+```shell
+vector --watch-config --config vector-datadog.yaml
+```
 
 Open the [Datadog Metrics Explorer](https://app.datadoghq.com/metric/explorer) and search for Vector metrics. For example:
 
@@ -649,10 +672,10 @@ You can collect related queries in a [notebook](https://app.datadoghq.com/notebo
 
 ### Prometheus and Grafana
 
-For this setup, keep Vector and the Python server running on your host. Run Prometheus and Grafana with Docker Compose.
+For this setup, run Vector and the Python server on your host. Run Prometheus and Grafana with Docker Compose.
 This configuration uses Docker Desktop's `host.docker.internal` hostname. On Linux Docker Engine, `extra_hosts` adds that hostname.
 
-Add this sink under the existing `sinks` section, alongside `sink_0` and `sink_1`. Use this instead of the Datadog `sink_2` above:
+Use `vector-prometheus.yaml`, which extends `vector-final.yaml` with this sink:
 
 ```yaml
   sink_2:
@@ -662,7 +685,7 @@ Add this sink under the existing `sinks` section, alongside `sink_0` and `sink_1
     address: 0.0.0.0:9598
 ```
 
-With that addition, the complete Vector configuration is:
+Here is the complete `vector-prometheus.yaml`:
 
 ```yaml
 api:
@@ -731,7 +754,7 @@ sinks:
     address: 0.0.0.0:9598
 ```
 
-Save the following as `prometheus.yaml` in the same directory:
+`prometheus.yaml` tells Prometheus where to scrape Vector:
 
 ```yaml
 global:
@@ -743,7 +766,7 @@ scrape_configs:
       - targets: ["host.docker.internal:9598"]
 ```
 
-Save this as `docker-compose.yaml` alongside it:
+`compose.yaml` starts Prometheus and Grafana and mounts that scrape configuration:
 
 ```yaml
 services:
@@ -766,7 +789,13 @@ services:
       - prometheus
 ```
 
-Start the services:
+Start Vector in its terminal:
+
+```shell
+vector --watch-config --config vector-prometheus.yaml
+```
+
+In another terminal, start the monitoring services from the same folder:
 
 ```shell
 docker compose up -d

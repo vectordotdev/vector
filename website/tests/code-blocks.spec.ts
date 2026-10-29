@@ -11,7 +11,10 @@ for (const { name, viewport, colorScheme } of [
     await page.emulateMedia({ colorScheme });
     await page.goto(debuggingGuide);
 
-    const config = page.locator("#page-content .highlight").first();
+    const config = page
+      .locator("#page-content .highlight")
+      .filter({ has: page.locator('code[data-lang="yaml"]') })
+      .first();
     const code = config.locator("pre");
     const toggle = config.getByRole("button", { name: "Collapse", exact: true });
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -63,7 +66,10 @@ test("copying a collapsed snippet includes the entire configuration", async ({ c
     });
   });
   await page.goto(debuggingGuide);
-  const config = page.locator("#page-content .highlight").first();
+  const config = page
+    .locator("#page-content .highlight")
+    .filter({ has: page.locator('code[data-lang="yaml"]') })
+    .first();
   const original = (await config.locator("pre").textContent())!.replace(/\n$/, "");
   await config.getByRole("button", { name: "Collapse", exact: true }).click();
   await config.getByRole("button", { name: "Copy code to clipboard" }).click();
@@ -76,7 +82,10 @@ test("long snippets still toggle when the Clipboard API is unavailable", async (
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
   });
   await page.goto(debuggingGuide);
-  const config = page.locator("#page-content .highlight").first();
+  const config = page
+    .locator("#page-content .highlight")
+    .filter({ has: page.locator('code[data-lang="yaml"]') })
+    .first();
   await expect(page.getByRole("button", { name: "Copy code to clipboard" })).toHaveCount(0);
   await config.getByRole("button", { name: "Collapse", exact: true }).click();
   await expect(config.locator("pre")).toBeHidden();
