@@ -270,6 +270,7 @@ mod tests {
                 .into(),
             compression: crate::sinks::util::Compression::None,
             batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
             confinement: ConfinementConfig::default(),
         }
