@@ -37,12 +37,8 @@ export SCOPE ?=
 export CARGO_BENCH_FLAGS ?=
 # override this to put criterion output elsewhere
 export CRITERION_HOME ?= $(mkfile_dir)target/criterion
-# Override to false to disable autospawning services on integration tests.
-export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
-export AUTODESPAWN ?= ${AUTOSPAWN}
-# Override autoinstalling of tools. (Eg `cargo install`)
-export AUTOINSTALL ?= false
+export AUTODESPAWN ?= true
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override the container tool. Tries docker first and then tries podman.
@@ -136,9 +132,6 @@ ifeq ($(shell command -v cargo >/dev/null || echo not-found), not-found)
 endif
 
 ##@ Cross Compiling
-.PHONY: cross-enable
-cross-enable: cargo-install-cross
-
 .PHONY: CARGO_HANDLES_FRESHNESS
 CARGO_HANDLES_FRESHNESS:
 	${EMPTY}
@@ -179,7 +172,7 @@ cross-%: export COMMAND ?=$(word 1,${PAIR})
 cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
 cross-%: export CFLAGS += -g0 -O3
-cross-%: cargo-install-cross
+cross-%:
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
 		$(if $(findstring release,$(PROFILE)),--release,) \
@@ -199,7 +192,7 @@ target/%/vector: CARGO_HANDLES_FRESHNESS
 		--no-default-features \
 		--features target-${TRIPLE}
 else
-target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
+target/%/vector: CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
@@ -547,11 +540,6 @@ generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-doc
 .PHONY: version
 version: ## Get the current Vector version
 	@$(VDEV) version
-
-.PHONY: cargo-install-%
-cargo-install-%: override TOOL = $(@:cargo-install-%=%)
-cargo-install-%:
-	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
 
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.

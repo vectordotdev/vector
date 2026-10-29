@@ -59,7 +59,7 @@ Loosely, you'll need the following:
     - `gssapi-vendored` (or `vendored`, which includes it): builds `libsasl2` and `krb5` from bundled source. No system install needed. Linux only; the bundled path does not currently link on macOS arm64.
 
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
-- **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
+- **To run integration tests:** Have `docker` available. See [Integration tests](#integration-tests) for service lifecycle controls.
 - **To run `make check-component-features`:** Have `remarshal` installed.
 - **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `make generate-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
@@ -71,6 +71,7 @@ bash scripts/environment/prepare.sh
 ```
 
 This is the same script CI uses to provision its toolchain, so what you get locally matches what CI installs.
+For cross-compilation alone, run `bash scripts/environment/prepare.sh --modules=cross` before using the Make targets.
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
@@ -333,6 +334,15 @@ Once complete, you can run your integration tests with:
 make test-integration-<name>
 ```
 
+These Make targets start the test environment as needed and stop it after a
+successful run. To keep the environment running for repeated tests or debugging,
+set `AUTODESPAWN=false`, then stop it explicitly when finished:
+
+```bash
+make test-integration-<name> AUTODESPAWN=false
+make test-integration-<name>-cleanup
+```
+
 ### Blackbox tests
 
 Vector also offers blackbox testing via
@@ -577,7 +587,7 @@ E2E (end-to-end) tests.
 - `docker`
 - `kubectl`
 - `bash`
-- `cross` - `cargo install cross`
+- `cross` - `bash scripts/environment/prepare.sh --modules=cross`
 - [`helm`](https://helm.sh/)
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that
