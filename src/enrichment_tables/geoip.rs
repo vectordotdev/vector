@@ -132,11 +132,12 @@ fn lookup_value<'de, A: Deserialize<'de>>(
 
 impl Geoip {
     /// Creates a new `GeoIP` struct from the provided config.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database file cannot be opened or parsed, its database type is
+    /// not supported by this table, a test lookup against the database fails, or the file's
+    /// modification time cannot be read.
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
         let dbkind =

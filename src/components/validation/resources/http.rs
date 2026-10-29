@@ -87,8 +87,18 @@ impl HttpResourceConfig {
         }
     }
 
+    /// Spawns this resource as the output for a sink.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder for the resource codec cannot be built.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the resource direction is `Pull`, which is not implemented, or if the URI host is
+    /// missing or not an IP address. Panics if the codec uses a serializer that has no matching
+    /// deserializer for validation.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
     #[allow(
         clippy::needless_pass_by_value,
         reason = "Preserve ownership and drop timing"
