@@ -1,27 +1,22 @@
 use std::{
-    collections::BTreeMap,
     sync::Arc,
     task::{Context, Poll},
 };
 
-#[cfg(feature = "aws-core")]
-use aws_credential_types::provider::SharedCredentialsProvider;
-#[cfg(feature = "aws-core")]
-use aws_types::region::Region;
 use bytes::Bytes;
-use http::{HeaderValue, Uri};
+use http_1::{HeaderName, HeaderValue, Method, Request, Response, Uri};
+use http_body_util::BodyExt;
+use snafu::ResultExt;
+use vector_http::full_body;
 
 use super::request_builder::RemoteWriteRequest;
 use crate::{
-    http::HttpClient,
+    http::client_v1::HttpClient,
     internal_events::EndpointBytesSent,
     sinks::{
+        HTTPV1RequestBuilderSnafu,
         prelude::*,
-        util::{
-            HttpEndpoint,
-            auth::Auth,
-            http::{HttpResponse, OrderedHeaderName},
-        },
+        util::{auth::Auth, http_v1::HttpResponse},
     },
 };
 
@@ -36,13 +31,19 @@ mod headers {
     pub(super) const APPLICATION_X_PROTOBUF: &str = "application/x-protobuf";
 }
 
+/// Validated custom request headers, in the sorted order of `validate_headers`.
+///
+/// They are appended after the protocol headers, so a custom header with the same name adds
+/// a second value instead of replacing the protocol one.
+pub(super) type CustomHeaders = Arc<[(HeaderName, HeaderValue)]>;
+
 #[derive(Clone)]
 pub(super) struct RemoteWriteService {
-    pub(super) endpoint: HttpEndpoint,
+    pub(super) endpoint: Uri,
     pub(super) auth: Option<Auth>,
     pub(super) client: HttpClient,
     pub(super) compression: super::Compression,
-    pub(super) headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    pub(super) headers: CustomHeaders,
 }
 
 impl Service<RemoteWriteRequest> for RemoteWriteService {
@@ -57,7 +58,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut request: RemoteWriteRequest) -> Self::Future {
         let client = self.client.clone();
-        let endpoint = self.endpoint.as_uri().clone();
+        let endpoint = self.endpoint.clone();
         let auth = self.auth.clone();
         let compression = self.compression;
         let headers = Arc::clone(&self.headers);
@@ -68,22 +69,22 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
             let raw_byte_size = request.request.len();
 
             let http_request = build_request(
-                http::Method::POST,
+                Method::POST,
                 &endpoint,
                 compression,
                 request.request,
                 request.tenant_id.as_ref(),
-                auth,
-                headers,
+                auth.as_ref(),
+                &headers,
             )
             .await?;
 
-            let response = client.send(http_request).await?;
+            let response = client.send(http_request.map(full_body)).await?;
             let (parts, body) = response.into_parts();
-            let body = http_body::Body::collect(body).await?.to_bytes();
-            let http_response = hyper::Response::from_parts(parts, body);
+            let body = body.collect().await?.to_bytes();
+            let response = Response::from_parts(parts, body);
 
-            if http_response.status().is_success() {
+            if response.status().is_success() {
                 // We can't rely on the framework to emit this because we need to specify the additional `endpoint` tag.
                 emit!(EndpointBytesSent {
                     byte_size: raw_byte_size,
@@ -93,33 +94,28 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
             }
 
             Ok(HttpResponse {
+                response,
                 events_byte_size: json_size,
-                http_response,
                 raw_byte_size,
             })
         })
     }
 }
 
-#[cfg(feature = "aws-core")]
-async fn sign_request(
-    request: &mut http::Request<Bytes>,
-    credentials_provider: &SharedCredentialsProvider,
-    region: Option<&Region>,
-) -> crate::Result<()> {
-    crate::aws::sign_request("aps", request, credentials_provider, region, false).await
-}
-
+/// Builds a remote write request with the protocol, tenant, custom and auth headers.
+///
+/// AWS authentication signs the request, so callers must not change it afterwards except to
+/// convert the body at the client boundary.
 pub(super) async fn build_request(
-    method: http::Method,
+    method: Method,
     endpoint: &Uri,
     compression: Compression,
     body: Bytes,
     tenant_id: Option<&String>,
-    auth: Option<Auth>,
-    custom_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
-) -> crate::Result<http::Request<hyper::Body>> {
-    let mut builder = http::Request::builder()
+    auth: Option<&Auth>,
+    custom_headers: &[(HeaderName, HeaderValue)],
+) -> crate::Result<Request<Bytes>> {
+    let mut builder = Request::builder()
         .method(method)
         .uri(endpoint)
         .header(headers::X_PROMETHEUS_REMOTE_WRITE_VERSION, headers::VERSION)
@@ -133,23 +129,30 @@ pub(super) async fn build_request(
         builder = builder.header(headers::X_SCOPE_ORGID, tenant_id);
     }
 
-    // Apply custom headers
-    for (name, value) in custom_headers.iter() {
-        builder = builder.header(name.inner().clone(), value.clone());
+    for (name, value) in custom_headers {
+        builder = builder.header(name, value);
     }
 
-    let mut request = builder.body(body)?;
+    let mut request = builder.body(body).context(HTTPV1RequestBuilderSnafu)?;
 
-    if let Some(auth) = auth {
-        match auth {
-            Auth::Basic(http_auth) => http_auth.apply(&mut request),
-            #[cfg(feature = "aws-core")]
-            Auth::Aws {
-                credentials_provider: provider,
-                region,
-            } => sign_request(&mut request, &provider, Some(&region)).await?,
+    match auth {
+        Some(Auth::Basic(http_auth)) => http_auth.apply_v1(&mut request),
+        #[cfg(feature = "aws-core")]
+        Some(Auth::Aws {
+            credentials_provider,
+            region,
+        }) => {
+            crate::aws::sign_request_v1(
+                "aps",
+                &mut request,
+                credentials_provider,
+                Some(region),
+                false,
+            )
+            .await?;
         }
+        None => {}
     }
 
-    Ok(request.map(hyper::Body::from))
+    Ok(request)
 }

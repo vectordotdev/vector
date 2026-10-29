@@ -1,11 +1,11 @@
-use http::StatusCode;
+use http_1::StatusCode;
 use serde::Deserialize;
+use vector_http::HttpError;
 use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
 use vrl::prelude::value::simdutf_bytes_utf8_lossy;
 
 use crate::{
     event::Finalizable,
-    http::HttpError,
     sinks::{
         elasticsearch::{
             encoder::ProcessedEvent,
@@ -203,7 +203,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use http::Response;
+    use http_1::Response;
     use similar_asserts::assert_eq;
     use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
 

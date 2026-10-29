@@ -9,16 +9,16 @@ use vector_lib::{
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
     config::ValidatedSink,
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
         prelude::*,
         splunk_hec::common::{
             EndpointTarget, SplunkHecDefaultBatchSettings,
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, create_client,
+            build_healthcheck, build_http_service, create_client,
             service::{HecService, HttpRequestBuilder},
         },
-        util::{HttpEndpoint, http::HttpRetryLogic},
+        util::{HttpEndpoint, http::RetryStrategy, http_v1::http_response_retry_logic},
     },
     template::ConfinementConfig,
 };
@@ -322,8 +322,11 @@ impl HecLogsSinkConfig {
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
-            .settings(request_settings, HttpRetryLogic::default())
-            .service(build_http_batch_service(
+            .settings(
+                request_settings,
+                http_response_retry_logic(RetryStrategy::Default),
+            )
+            .service(build_http_service(
                 client,
                 Arc::clone(&http_request_builder),
                 self.endpoint_target,
