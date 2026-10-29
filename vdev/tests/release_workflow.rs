@@ -463,20 +463,29 @@ mod prepare {
             fs::Permissions::from_mode(0o755),
         )
         .unwrap();
-        write(
+        // Exercise real remote tag discovery without accessing GitHub.
+        let vrl_remote = repo.join(".git/vrl-remote");
+        git(repo, &["init", "--bare", vrl_remote.to_str().unwrap()]);
+        git(
             repo,
-            ".git/test-bin/curl",
-            "#!/bin/sh\nprintf '%s\\n' \"$@\" > .git/registry-requested\ncat .git/registry-response.json\n",
+            &[
+                "push",
+                vrl_remote.to_str().unwrap(),
+                "HEAD:refs/tags/v0.9.0",
+                "HEAD:refs/tags/v0.28.0",
+                "HEAD:refs/tags/v0.29.0",
+                "HEAD:refs/tags/v0.30.0-rc.1",
+                "HEAD:refs/tags/v0.30.0+build",
+                "HEAD:refs/tags/vdev-v99.0.0",
+            ],
         );
-        fs::set_permissions(
-            repo.join(".git/test-bin/curl"),
-            fs::Permissions::from_mode(0o755),
-        )
-        .unwrap();
-        write(
+        git(
             repo,
-            ".git/registry-response.json",
-            r#"{"crate":{"max_stable_version":"0.29.0"}}"#,
+            &[
+                "config",
+                &format!("url.{}.insteadOf", vrl_remote.display()),
+                "https://github.com/vectordotdev/vrl.git",
+            ],
         );
         (temp, remote)
     }
@@ -496,25 +505,19 @@ mod prepare {
                 "version=0.59.0\nbranch=prepare-v-0-59-0-website\nvrl_version=0.29.0\nresume=false\nskip=false\n"
             );
         }
-        assert!(
-            fs::read_to_string(repo.join(".git/registry-requested"))
-                .unwrap()
-                .contains("https://crates.io/api/v1/crates/vrl")
-        );
     }
 
     #[test]
-    fn explicit_vrl_version_skips_the_registry_lookup() {
+    fn explicit_vrl_version_skips_the_tag_lookup() {
         let (temp, _remote) = fixture();
         let repo = temp.path();
-        fs::remove_file(repo.join(".git/registry-response.json")).unwrap();
+        fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
         prepare_check(repo, &["--vrl-version", "0.27.0"], true);
         assert!(
             fs::read_to_string(repo.join(".git/github-output"))
                 .unwrap()
                 .contains("vrl_version=0.27.0\n")
         );
-        assert!(!repo.join(".git/registry-requested").exists());
 
         let error = prepare_check(repo, &["--vrl-version", "0.29.0-rc.1"], false);
         assert!(
@@ -528,23 +531,40 @@ mod prepare {
         let (temp, _remote) = fixture();
         let repo = temp.path();
         git(repo, &["push", "origin", "prepare-v-0-59-0-website"]);
-        fs::remove_file(repo.join(".git/registry-response.json")).unwrap();
+        fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
         prepare_check(repo, &[], true);
         assert_eq!(
             fs::read_to_string(repo.join(".git/github-output")).unwrap(),
             "version=0.59.0\nbranch=prepare-v-0-59-0-website\nvrl_version=0.28.0\nresume=true\nskip=false\n"
         );
-        assert!(!repo.join(".git/registry-requested").exists());
     }
 
     #[test]
-    fn registry_lookup_failure_stops_preparation() {
+    fn tag_lookup_failure_stops_preparation() {
         let (temp, _remote) = fixture();
         let repo = temp.path();
-        write(repo, ".git/test-bin/curl", "#!/bin/sh\nexit 22\n");
+        fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
         let error = prepare_check(repo, &[], false);
         assert!(
-            error.contains("failed to fetch the latest stable VRL version from crates.io"),
+            error.contains("failed to fetch the latest stable VRL tag"),
+            "{error}"
+        );
+        let output = fs::read_to_string(repo.join(".git/github-output")).unwrap();
+        assert!(!output.contains("vrl_version="));
+        assert!(!output.contains("skip=false"));
+    }
+
+    #[test]
+    fn no_stable_vrl_tag_stops_preparation() {
+        let (temp, _remote) = fixture();
+        let repo = temp.path();
+        git(
+            &repo.join(".git/vrl-remote"),
+            &["tag", "--delete", "v0.9.0", "v0.28.0", "v0.29.0"],
+        );
+        let error = prepare_check(repo, &[], false);
+        assert!(
+            error.contains("no tag matched the release pattern"),
             "{error}"
         );
         let output = fs::read_to_string(repo.join(".git/github-output")).unwrap();
@@ -573,15 +593,14 @@ mod prepare {
                 "website/content/en/releases/0.58.0.md",
                 "---\nweight: 1\n---\n",
             );
-            write(
-                repo,
-                ".git/registry-response.json",
-                if explicit {
-                    r#"{"crate":{"max_stable_version":"0.29.0"}}"#
-                } else {
-                    r#"{"crate":{"max_stable_version":"0.28.0"}}"#
-                },
-            );
+            if explicit {
+                fs::remove_dir_all(repo.join(".git/vrl-remote")).unwrap();
+            } else {
+                git(
+                    &repo.join(".git/vrl-remote"),
+                    &["tag", "--delete", "v0.29.0"],
+                );
+            }
             write(
                 repo,
                 ".git/test-bin/gh",
@@ -614,7 +633,6 @@ mod prepare {
                 manifest["workspace"]["dependencies"]["vrl"]["version"].as_str(),
                 Some("0.28.0")
             );
-            assert_eq!(repo.join(".git/registry-requested").exists(), !explicit);
             assert!(
                 fs::read_to_string(repo.join(".git/changelog-requested"))
                     .unwrap()

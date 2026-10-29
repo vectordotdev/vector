@@ -18,7 +18,7 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml)
       workflow from `master`. Leave the version inputs empty for the next Vector minor release and
-      latest stable VRL release on crates.io, or supply overrides.
+      latest stable VRL tag, or supply overrides.
   - The workflow activates the `RELEASE_FREEZE_RULESET_ID` ruleset and grants `vectordotdev-bot` an **Always** bypass
     to some of `master`'s rulesets (`RELEASE_FREEZE_BOT_BYPASS`).
   - If preparation fails after activation, the freeze remains active. Retry, or run

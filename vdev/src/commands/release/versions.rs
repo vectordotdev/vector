@@ -1,11 +1,11 @@
-use std::{fs, process::Command};
+use std::fs;
 
 use anyhow::{Context, Result, ensure};
 use semver::{Prerelease, Version};
 use toml_edit::DocumentMut;
 
 use super::ensure_stable;
-use crate::app::CommandExt as _;
+use crate::utils::git;
 
 /// Version overrides shared by local release preparation and workflow preflight.
 #[derive(clap::Args, Debug)]
@@ -13,7 +13,7 @@ pub(super) struct VersionOptions {
     /// Vector release version; defaults to Cargo.toml's development minor without -dev.
     #[arg(long)]
     version: Option<Version>,
-    /// Released VRL version; defaults to the latest stable release on crates.io.
+    /// Released VRL version; defaults to the latest stable tag in the VRL repository.
     #[arg(long)]
     pub(super) vrl_version: Option<Version>,
 }
@@ -45,34 +45,10 @@ fn preparation_version(current: &Version, requested: Option<Version>) -> Result<
 }
 
 fn latest_vrl_version() -> Result<Version> {
-    let response = Command::new("curl")
-        .args([
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--location",
-            "--retry",
-            "3",
-            "--max-time",
-            "30",
-            "--user-agent",
-            "Vector release tooling (https://github.com/vectordotdev/vector)",
-            "https://crates.io/api/v1/crates/vrl",
-        ])
-        .check_output()
-        .context("failed to fetch the latest stable VRL version from crates.io")?;
-    parse_latest_vrl_version(&response)
-}
-
-fn parse_latest_vrl_version(response: &str) -> Result<Version> {
-    let response: serde_json::Value =
-        serde_json::from_str(response).context("invalid VRL response from crates.io")?;
-    let version = response
-        .get("crate")
-        .and_then(|krate| krate.get("max_stable_version"))
-        .and_then(serde_json::Value::as_str)
-        .context("crates.io did not return a stable VRL version")?;
-    parse_stable_version(version, "VRL version")
+    let pattern = regex::Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+    let tag = git::highest_release_tag("https://github.com/vectordotdev/vrl.git", &pattern)
+        .context("failed to fetch the latest stable VRL tag")?;
+    parse_stable_version(tag.trim_start_matches('v'), "VRL version")
 }
 
 pub(super) fn pinned_vrl_version(manifest: &toml::Value) -> Result<Version> {
@@ -115,9 +91,7 @@ pub(super) fn parse_cargo_version(contents: &str) -> Result<Version> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        VersionOptions, parse_cargo_version, parse_latest_vrl_version, preparation_version,
-    };
+    use super::{VersionOptions, parse_cargo_version, preparation_version};
     use indoc::indoc;
 
     #[test]
@@ -152,31 +126,6 @@ mod tests {
             assert!(
                 preparation_version(&version.parse().unwrap(), None).is_err(),
                 "accepted {version}"
-            );
-        }
-    }
-
-    #[test]
-    fn latest_vrl_version_uses_the_registrys_stable_release() {
-        let response = r#"{"crate":{"max_stable_version":"0.28.0","max_version":"0.29.0-rc.1","newest_version":"0.27.1"}}"#;
-        assert_eq!(
-            parse_latest_vrl_version(response).unwrap(),
-            "0.28.0".parse().unwrap()
-        );
-    }
-
-    #[test]
-    fn latest_vrl_version_requires_a_valid_stable_release() {
-        for response in [
-            "invalid JSON",
-            r#"{"crate":{"max_version":"0.28.0"}}"#,
-            r#"{"crate":{"max_stable_version":null}}"#,
-            r#"{"crate":{"max_stable_version":"invalid"}}"#,
-            r#"{"crate":{"max_stable_version":"0.28.0-rc.1"}}"#,
-        ] {
-            assert!(
-                parse_latest_vrl_version(response).is_err(),
-                "accepted {response}"
             );
         }
     }
