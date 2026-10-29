@@ -1,3 +1,4 @@
+mod batch_sink;
 mod client;
 mod config;
 
