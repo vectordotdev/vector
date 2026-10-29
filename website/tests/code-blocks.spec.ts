@@ -6,10 +6,26 @@ for (const { name, viewport, colorScheme } of [
   { name: "desktop light", viewport: { width: 1280, height: 900 }, colorScheme: "light" as const },
   { name: "mobile dark", viewport: { width: 390, height: 844 }, colorScheme: "dark" as const }
 ]) {
-  test(`long snippets start expanded and toggle with the keyboard on ${name}`, async ({ page }) => {
+  test(`snippets honor their initial state and toggle with the keyboard on ${name}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ colorScheme });
     await page.goto(debuggingGuide);
+
+    const server = page
+      .locator("#page-content .highlight")
+      .filter({ has: page.locator('code[data-lang="python"]') })
+      .first();
+    const serverCode = server.locator("pre");
+    const serverToggle = server.getByRole("button", { name: "Expand", exact: true });
+    await expect(serverCode).toBeHidden();
+    await expect(serverToggle).toHaveAttribute("aria-expanded", "false");
+    await serverToggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(serverCode).toBeVisible();
+    await expect(server.getByRole("button", { name: "Collapse", exact: true })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
 
     const config = page
       .locator("#page-content .highlight")
@@ -46,6 +62,8 @@ for (const { name, viewport, colorScheme } of [
 
     await toggle.click();
     await page.reload();
+    await expect(serverCode).toBeHidden();
+    await expect(serverToggle).toHaveAttribute("aria-expanded", "false");
     await expect(config.getByRole("button", { name: "Collapse", exact: true })).toHaveAttribute(
       "aria-expanded",
       "true"
@@ -54,7 +72,7 @@ for (const { name, viewport, colorScheme } of [
   });
 }
 
-test("copying a collapsed snippet includes the entire configuration", async ({ context, page }) => {
+test("copying collapsed snippets includes their entire contents", async ({ context, page }) => {
   await context.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -66,6 +84,16 @@ test("copying a collapsed snippet includes the entire configuration", async ({ c
     });
   });
   await page.goto(debuggingGuide);
+  const server = page
+    .locator("#page-content .highlight")
+    .filter({ has: page.locator('code[data-lang="python"]') })
+    .first();
+  const serverSource = (await server.locator("pre").textContent())!.replace(/\n$/, "");
+  await expect(server.locator("pre")).toBeHidden();
+  await server.getByRole("button", { name: "Copy code to clipboard" }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-code"))).toBe(serverSource);
+  await expect(server.locator("pre")).toBeHidden();
+
   const config = page
     .locator("#page-content .highlight")
     .filter({ has: page.locator('code[data-lang="yaml"]') })

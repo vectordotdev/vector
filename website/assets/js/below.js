@@ -105,7 +105,8 @@ const addCodeControls = () => {
     if (text === null) return;
 
     const lineCount = text.split("\n").length;
-    const collapsible = lineCount > collapsibleCodeLineCount;
+    const collapsedByDefault = block.parentElement.dataset.codeCollapsed === "true";
+    const collapsible = collapsedByDefault || lineCount > collapsibleCodeLineCount;
     const canCopy = Boolean(navigator.clipboard?.writeText);
     if (!collapsible && !canCopy) return;
 
@@ -127,8 +128,9 @@ const addCodeControls = () => {
       const toggle = document.createElement("button");
       toggle.type = "button";
       toggle.className = "code-toggle-button";
-      toggle.textContent = "Collapse";
-      toggle.setAttribute("aria-expanded", "true");
+      content.hidden = collapsedByDefault;
+      toggle.textContent = content.hidden ? "Expand" : "Collapse";
+      toggle.setAttribute("aria-expanded", String(!content.hidden));
       toggle.setAttribute("aria-controls", content.id);
       toggle.addEventListener("click", () => {
         content.hidden = !content.hidden;

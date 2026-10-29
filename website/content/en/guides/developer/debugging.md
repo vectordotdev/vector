@@ -27,7 +27,7 @@ available. The Python server uses only the standard library, so you don't need t
 [Download all guide files](https://download-directory.github.io/?url=https%3A%2F%2Fgithub.com%2Fvectordotdev%2Fvector%2Ftree%2Fmaster%2Fwebsite%2Fstatic%2Fguides%2Fdebugging%2Fvector-debugging-guide) as a ZIP.
 Extract it and open the folder containing `http-server.py`.
 
-{{< code-file file="static/guides/debugging/vector-debugging-guide/http-server.py" lang="python" >}}
+{{< code-file file="static/guides/debugging/vector-debugging-guide/http-server.py" lang="python" collapsed=true >}}
 
 ### Initial Vector configuration {#initial-vector-config}
 
