@@ -38,6 +38,11 @@ pub struct Container<'a> {
 
 impl<'a> Container<'a> {
     /// Creates a new `Container<'a>` from the raw derive macro input.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "keep the existing schema derivation together; splitting is deferred"
+    )]
     pub fn from_derive_input(input: &'a DeriveInput) -> darling::Result<Container<'a>> {
         // We can't do anything unless `serde` can also handle this container. We specifically only care about
         // deserialization here, because the schema tells us what we can _give_ to Vector.
@@ -437,6 +442,11 @@ struct Attributes {
 }
 
 impl Attributes {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "retain the fallible finalization interface used by the AST parsing pipeline"
+    )]
     fn finalize(mut self, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in

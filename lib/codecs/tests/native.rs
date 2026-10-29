@@ -347,6 +347,6 @@ fn native_json_decodes_events_without_metadata() {
     );
     assert_eq!(
         log.metadata().value(),
-        &vector_core::event::Value::Object(Default::default())
+        &vector_core::event::Value::Object(ObjectMap::default())
     );
 }

@@ -53,8 +53,13 @@ or links to further documentation. It is rendered verbatim in the release notes.
 2. **Planned** – every subsequent release lists the entry under `planned_deprecations`.
 3. **Removed** – when a deprecated feature is finally removed, the PR runs
    `cargo vdev deprecation enact <slug> --version <removed-in-version>`. The command
-   records the removal in `website/data/deprecations.json` and deletes the fragment in
-   one step; deleting the fragment manually would drop it from `past_deprecations`.
+   moves the file to `website/content/en/deprecations/enacted/` and adds `removed_in` to its
+   frontmatter, so the entry moves to the Past Deprecations section of the
+   [deprecations page](https://vector.dev/deprecations/). Deleting the file manually would drop it from that
+   section.
+
+The website reads this directory directly (see the `module.mounts` in `website/config.toml`); there is no
+generated file to update.
 
 ## Validation
 

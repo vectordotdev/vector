@@ -43,13 +43,26 @@ static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     ]
 });
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing floating-point metric average."
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn aggregate_metrics(
     metrics_storage: &MetricsStorage,
     function: &Bytes,
     key: Value,
     tags: BTreeMap<String, String>,
 ) -> Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("argument must be a string");
+    let key_str = key.to_str_lossy().expect("argument must be a string");
     let metrics = metrics_storage.find_metrics(&key_str, tags);
 
     let metric_values = metrics.into_iter().filter_map(|m| match m.value() {
@@ -64,8 +77,8 @@ fn aggregate_metrics(
             let len = metric_values.clone().collect::<Vec<_>>().len();
             (metric_values.sum::<NotNan<f64>>() / len as f64).into()
         }
-        b"max" => metric_values.max().map(Into::into).unwrap_or(Value::Null),
-        b"min" => metric_values.min().map(Into::into).unwrap_or(Value::Null),
+        b"max" => metric_values.max().map_or(Value::Null, Into::into),
+        b"min" => metric_values.min().map_or(Value::Null, Into::into),
         _ => unreachable!(),
     })
 }

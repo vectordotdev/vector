@@ -109,19 +109,36 @@ pub struct MqttConnector {
 }
 
 impl MqttConnector {
-    /// Creates a new MqttConnector
+    /// Creates a new `MqttConnector`
     pub const fn new(options: MqttOptions) -> Self {
         Self { options }
     }
 
     /// Connects the connector and generates a client and eventloop
     pub fn connect(&self) -> (AsyncClient, EventLoop) {
-        let (client, eventloop) = AsyncClient::new(self.options.clone(), 1024);
-        (client, eventloop)
+        AsyncClient::builder(self.options.clone())
+            .capacity(1024)
+            .build()
     }
 
+    /// Checks the health of the MQTT connection. Currently a no-op.
+    ///
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error.
     pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn tls_config_uses_explicit_crypto_provider() {
+        // Exercise MQTT's provider selection, including when VRL enables AWS-LC.
+        rumqttc::TlsConfiguration::try_default_rustls()
+            .expect("MQTT TLS should select Ring without a process-wide default provider");
     }
 }

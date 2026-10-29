@@ -44,11 +44,18 @@ const fn default_enabled() -> bool {
 /// By default, the API binds to 127.0.0.1:8686. This function should remain public;
 /// `vector top`  will use it to determine which to connect to by default, if no URL
 /// override is provided.
+#[must_use]
 pub fn default_address() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8686))
 }
 
 /// Default gRPC API address for `vector top` and other API clients
+///
+/// # Panics
+///
+/// Panics if the default API address cannot be formatted into a valid URL, which does not
+/// happen with the built-in default.
+#[must_use]
 pub fn default_grpc_url() -> Url {
     let addr = default_address().unwrap();
     Url::parse(&format!("http://{addr}"))
@@ -56,6 +63,12 @@ pub fn default_grpc_url() -> Url {
 }
 
 impl Options {
+    /// Merges `other` into these options, enabling the API if either side enables it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if both sides set different addresses and neither is the default
+    /// address.
     pub fn merge(&mut self, other: Self) -> Result<(), String> {
         // Merge options
 

@@ -71,7 +71,7 @@ releases: "0.21.0": {
 		  performance over VRL's current tree-walking interpreter implementation. For its initial release, this is an opt in
 		  feature (see [the highlight for how](/highlights/2022-03-15-vrl-vm-beta)) but will become the default VRL
 		  implementation in the future once it has stabilized. We encourage you to try it out and
-		  [report](https://github.com/vectordotdev/vector/issues/new?assignees=&labels=type%3A+bug&template=bug.yml) any
+		  [report](https://github.com/vectordotdev/vector/issues/new?template=bug.yml) any
 		  issues you find.
 		- A new `redis` source to complement the `redis` sink.
 		- Initial support for ingesting traces from the Datadog Agent (version < 6/7.33) and forwarding them to Datadog.

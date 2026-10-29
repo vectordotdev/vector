@@ -54,7 +54,7 @@ fn encoder(c: &mut Criterion) {
                 bytes.put_u8(b'\n');
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.throughput(Throughput::Bytes(input.size_of() as u64));
@@ -67,7 +67,7 @@ fn encoder(c: &mut Criterion) {
                 bytes.put_u8(b'\n');
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.throughput(Throughput::Bytes(input.size_of() as u64));
@@ -80,7 +80,7 @@ fn encoder(c: &mut Criterion) {
                 bytes.put_u8(b'\n');
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 
     group.throughput(Throughput::Bytes(input.size_of() as u64));
@@ -97,7 +97,7 @@ fn encoder(c: &mut Criterion) {
                 encoder.encode(input.clone(), &mut bytes).unwrap();
             },
             BatchSize::SmallInput,
-        )
+        );
     });
 }
 

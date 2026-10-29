@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::Read};
 use indexmap::IndexMap;
 
 use super::{
-    ComponentHint, Process, deserialize_config_map, loader, prepare_input,
+    ComponentHint, Process, deserialize_config_map, ignored_fields, loader, prepare_input,
     representation::ConfigMap, secret,
 };
 use crate::config::{
@@ -20,24 +20,34 @@ pub struct ConfigBuilderLoader {
 
 impl ConfigBuilderLoader {
     /// Sets whether to interpolate environment variables in the config.
+    #[must_use]
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
         self
     }
 
     /// Sets the secrets map for secret interpolation.
+    #[must_use]
     pub fn secrets(mut self, secrets: HashMap<String, String>) -> Self {
         self.secrets = secrets;
         self
     }
 
     /// Sets whether to allow empty configuration.
+    #[must_use]
     pub const fn allow_empty(mut self, allow_empty: bool) -> Self {
         self.builder.allow_empty = allow_empty;
         self
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if a directory or an opened config file cannot be read, a
+    /// referenced environment variable or secret cannot be interpolated, the content cannot be
+    /// parsed or deserialized, or values cannot be merged into the config builder. Config files
+    /// that cannot be opened are logged and skipped.
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -45,7 +55,13 @@ impl ConfigBuilderLoader {
         super::loader_from_paths(self, config_paths)
     }
 
-    /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
+    /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if `input` cannot be read as UTF-8, a referenced environment
+    /// variable or secret cannot be interpolated, the content cannot be parsed or deserialized,
+    /// or values cannot be merged into the config builder.
     pub fn load_from_input<R: Read>(
         self,
         input: R,
@@ -78,6 +94,7 @@ impl Process for ConfigBuilderLoader {
 
     /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
     fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        let ignored = ignored_fields::find(&map, hint);
         match hint {
             Some(ComponentHint::Source) => {
                 self.builder
@@ -113,8 +130,11 @@ impl Process for ConfigBuilderLoader {
             None => {
                 self.builder.append(deserialize_config_map(map)?)?;
             }
-        };
+        }
 
+        self.builder
+            .loading_warnings
+            .extend(ignored_fields::warnings(&ignored));
         Ok(())
     }
 }

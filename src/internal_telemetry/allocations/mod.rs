@@ -71,17 +71,17 @@ thread_local! {
 }
 
 struct GroupInfo {
-    component_kind: String,
-    component_type: String,
-    component_id: String,
+    kind: String,
+    type_name: String,
+    id: String,
 }
 
 impl GroupInfo {
     const fn new() -> Self {
         Self {
-            component_id: String::new(),
-            component_kind: String::new(),
-            component_type: String::new(),
+            kind: String::new(),
+            type_name: String::new(),
+            id: String::new(),
         }
     }
 }
@@ -96,6 +96,8 @@ pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
 
 pub struct MainTracer;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::inline_always, reason = "Retain hot-path inlining")]
 impl Tracer for MainTracer {
     #[inline(always)]
     fn trace_allocation(&self, object_size: usize, group_id: AllocationGroupId) {
@@ -117,13 +119,17 @@ impl Tracer for MainTracer {
 }
 
 /// Initializes allocation tracing.
+///
+/// # Panics
+///
+/// Panics if an allocation-group metadata lock is poisoned or the reporting thread cannot be spawned.
 pub fn init_allocation_tracing() {
     for group in &GROUP_INFO {
         let mut writer = group.lock().unwrap();
         *writer = GroupInfo {
-            component_id: "root".to_string(),
-            component_kind: "root".to_string(),
-            component_type: "root".to_string(),
+            kind: "root".to_string(),
+            type_name: "root".to_string(),
+            id: "root".to_string(),
         };
     }
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
@@ -143,39 +149,41 @@ pub fn init_allocation_tracing() {
                     if allocations_diff == 0 && deallocations_diff == 0 {
                         continue;
                     }
+                    // https://github.com/vectordotdev/vector/issues/23659
+                    #[allow(clippy::cast_possible_wrap, reason = "Preserve signed byte deltas")]
                     let mem_used_diff = allocations_diff as i64 - deallocations_diff as i64;
                     let group_info = group.lock().unwrap();
                     if allocations_diff > 0 {
                         counter!(
-                            CounterName::ComponentAllocatedBytesTotal, "component_kind" => group_info.component_kind.clone(),
-                            "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone()).increment(allocations_diff);
+                            CounterName::ComponentAllocatedBytesTotal, "component_kind" => group_info.kind.clone(),
+                            "component_type" => group_info.type_name.clone(),
+                            "component_id" => group_info.id.clone()).increment(allocations_diff);
                     }
                     if deallocations_diff > 0 {
                         counter!(
-                            CounterName::ComponentDeallocatedBytesTotal, "component_kind" => group_info.component_kind.clone(),
-                            "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone()).increment(deallocations_diff);
+                            CounterName::ComponentDeallocatedBytesTotal, "component_kind" => group_info.kind.clone(),
+                            "component_type" => group_info.type_name.clone(),
+                            "component_id" => group_info.id.clone()).increment(deallocations_diff);
                     }
                     if mem_used_diff > 0 {
                         gauge!(
-                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone(),
-                            "component_kind" => group_info.component_kind.clone())
+                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.type_name.clone(),
+                            "component_id" => group_info.id.clone(),
+                            "component_kind" => group_info.kind.clone())
                             .increment(mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));
                     }
                     if mem_used_diff < 0 {
                         gauge!(
-                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone(),
-                            "component_kind" => group_info.component_kind.clone())
+                            GaugeName::ComponentAllocatedBytes, "component_type" => group_info.type_name.clone(),
+                            "component_id" => group_info.id.clone(),
+                            "component_kind" => group_info.kind.clone())
                             .decrement(-mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));
                     }
                 }
                 thread::sleep(Duration::from_millis(
                     REPORTING_INTERVAL_MS.load(Ordering::Relaxed),
                 ));
-            })
+            });
         })
         .unwrap();
 }
@@ -187,6 +195,10 @@ pub fn init_allocation_tracing() {
 /// a [`tracing::Span`] to achieve this" we utilize the logical invariants provided by spans --
 /// entering, exiting, and how spans exist as a stack -- in order to handle keeping the "current
 /// allocation group" accurate across all threads.
+///
+/// # Panics
+///
+/// Panics if the allocation-group metadata lock is poisoned.
 pub fn acquire_allocation_group_id(
     component_id: String,
     component_type: String,
@@ -197,9 +209,9 @@ pub fn acquire_allocation_group_id(
     {
         let mut writer = group_lock.lock().unwrap();
         *writer = GroupInfo {
-            component_id,
-            component_kind,
-            component_type,
+            kind: component_kind,
+            type_name: component_type,
+            id: component_id,
         };
 
         return group_id;

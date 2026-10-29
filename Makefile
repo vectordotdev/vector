@@ -326,7 +326,8 @@ test-component-validation: ## Runs component validation tests
 
 .PHONY: coverage-report
 coverage-report: ## Generate lcov report after running tests with COVERAGE=true (outputs lcov.info)
-	cargo llvm-cov report --lcov --output-path lcov.info
+	# Report every workspace package, not only Vector's non-virtual root package.
+	cargo llvm-cov report --package '*' --lcov --output-path lcov.info
 
 ##@ Benching
 
@@ -480,10 +481,6 @@ release-docker: ## Release to Docker Hub
 release-github: ## Release to GitHub
 	@$(VDEV) release github
 
-.PHONY: release-homebrew
-release-homebrew: ## Release to vectordotdev Homebrew tap
-	@$(VDEV) release homebrew --vector-version $(VECTOR_VERSION)
-
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
 	@$(VDEV) release prepare
@@ -514,7 +511,7 @@ clean: ## Clean everything
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from the latest (or CHART_VERSION) Helm chart
-	$(VDEV) build manifests -- $(if $(CHART_VERSION),--chart-version $(CHART_VERSION))
+	$(VDEV) build manifests $(if $(CHART_VERSION),--chart-version "$(CHART_VERSION)")
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
@@ -546,10 +543,6 @@ generate-example-configs: generate-component-docs ## Generate committed componen
 
 .PHONY: generate-docs
 generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs generate-example-configs
-
-.PHONY: signoff
-signoff: ## Signsoff all previous commits since branch creation
-	scripts/signoff.sh
 
 .PHONY: version
 version: ## Get the current Vector version

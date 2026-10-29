@@ -62,6 +62,9 @@ impl RunnerInput {
     /// If the runner input is configured for an external resource, and a controlled edge is given,
     /// or if the runner input is configured for a controlled edge and no controlled edge is given,
     /// this function will panic, as one or the other must be provided.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn into_sender(
         self,
         controlled_edge: Option<mpsc::Sender<TestEvent>>,
@@ -109,6 +112,9 @@ impl RunnerOutput {
     /// If the runner output is configured for an external resource, and a controlled edge is given,
     /// or if the runner output is configured for a controlled edge and no controlled edge is given,
     /// this function will panic, as one or the other must be provided.
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     pub fn into_receiver(
         self,
         controlled_edge: Option<mpsc::Receiver<Vec<Event>>>,
@@ -135,18 +141,22 @@ pub struct RunnerResults {
 }
 
 impl RunnerResults {
+    #[must_use]
     pub fn test_name(&self) -> &str {
         &self.test_name
     }
 
+    #[must_use]
     pub const fn expectation(&self) -> TestCaseExpectation {
         self.expectation
     }
 
+    #[must_use]
     pub fn inputs(&self) -> &[TestEvent] {
         &self.inputs
     }
 
+    #[must_use]
     pub fn outputs(&self) -> &[Event] {
         &self.outputs
     }
@@ -164,6 +174,7 @@ pub struct Runner {
 }
 
 impl Runner {
+    #[must_use]
     pub fn from_configuration(
         configuration: ValidationConfiguration,
         test_case_data_path: PathBuf,
@@ -197,7 +208,23 @@ impl Runner {
         }
     }
 
+    /// Runs every test case for the configured component and collects the validator results.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the test case file cannot be opened or deserialized, if a test case
+    /// names a component configuration that does not exist, or if a sink's external resource
+    /// fails to spawn (for example, because its decoder cannot be built).
+    ///
+    /// # Panics
+    ///
+    /// Panics if a source or sink has no external resource, if the input or output driver task
+    /// panics, or if the generated topology configuration fails to build. Spawning external
+    /// resources and drivers can also panic on unsupported codecs, framings, or resource
+    /// directions, and on invalid resource URIs.
     #[allow(clippy::print_stdout)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::too_many_lines, reason = "Preserve existing control flow")]
     pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.
         initialize_test_environment();
@@ -323,7 +350,7 @@ impl Runner {
                 test_case.events.clone(),
                 input_tx,
                 &runner_metrics,
-                maybe_runner_encoder.as_ref().cloned(),
+                maybe_runner_encoder.clone(),
                 self.configuration.component_type,
                 self.configuration.log_namespace(),
             );
@@ -338,7 +365,7 @@ impl Runner {
             let output_driver = spawn_output_driver(
                 output_rx,
                 &runner_metrics,
-                maybe_runner_encoder.as_ref().cloned(),
+                maybe_runner_encoder.clone(),
                 self.configuration.component_type,
                 expected_output_events,
             );
@@ -457,7 +484,9 @@ fn build_external_resource(
         .as_ref()
         .map(|resource| resource.codec.clone());
 
-    let maybe_encoder = resource_codec.as_ref().map(|codec| codec.into_encoder());
+    let maybe_encoder = resource_codec
+        .as_ref()
+        .map(super::resources::ResourceCodec::into_encoder);
 
     match component_type {
         ComponentType::Source => {
@@ -543,10 +572,10 @@ fn spawn_component_topology(
 
             select! {
                 // We got the signal to shutdown, so stop the topology gracefully.
-                _ = topology_shutdown_handle.wait() => {
+                () = topology_shutdown_handle.wait() => {
                     info!("Shutdown signal received, stopping topology...");
                     topology.stop().await;
-                    info!("Component topology stopped gracefully.")
+                    info!("Component topology stopped gracefully.");
                 },
                 _ = crash_rx.recv() => {
                     error!("Component topology under validation unexpectedly crashed.");
@@ -665,7 +694,7 @@ fn spawn_output_driver(
 
         loop {
             tokio::select! {
-                _ = &mut timeout => {
+                () = &mut timeout => {
                     error!("Output driver timed out waiting for all events.");
                     break
                 },

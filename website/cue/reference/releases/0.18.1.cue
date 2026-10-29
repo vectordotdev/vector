@@ -13,7 +13,7 @@ releases: "0.18.1": {
 		**Note:** Please see the release notes for [`v0.18.0`](/releases/0.18.0/) for additional changes if upgrading from
 		`v0.17.X`. In particular, the upgrade guide for breaking changes.
 
-		## Bug Fixes:
+		## Bug Fixes: {#description-bug-fixes}
 
 		- The new [automatic namespacing](/highlights/2021-11-18-implicit-namespacing/) feature broke usages of
 		  `--config-dir` when directories were present that did not match Vector's config schema. Vector now just

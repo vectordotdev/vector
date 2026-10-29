@@ -66,7 +66,7 @@ impl GenerateConfig for ConsoleSinkConfig {
         serde_json::to_value(Self {
             target: Target::Stdout,
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -102,12 +102,12 @@ impl ValidatedSink for ConsoleSinkConfig {
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink: VectorSink = match self.target {
-            Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
+            Target::Stdout => VectorSink::from_detailed_event_streamsink(WriterSink {
                 output: io::stdout(),
                 transformer,
                 encoder,
             }),
-            Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
+            Target::Stderr => VectorSink::from_detailed_event_streamsink(WriterSink {
                 output: io::stderr(),
                 transformer,
                 encoder,

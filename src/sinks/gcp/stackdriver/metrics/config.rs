@@ -133,7 +133,7 @@ impl ValidatedSink for StackdriverConfig {
 
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
-        let healthcheck = async { healthcheck() }.boxed();
+        let healthcheck = async { Ok(()) }.boxed();
         let started = chrono::Utc::now();
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
@@ -225,8 +225,4 @@ impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
 
         Ok(request)
     }
-}
-
-fn healthcheck() -> crate::Result<()> {
-    Ok(())
 }

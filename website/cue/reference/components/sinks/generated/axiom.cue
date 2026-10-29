@@ -4,7 +4,7 @@ generated: components: sinks: axiom: configuration: {
 	acknowledgements: {
 		description: "Controls how acknowledgements are handled for this sink."
 		required:    false
-		type:        _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:        _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	batch: {
 		description: "The batch settings for the sink."

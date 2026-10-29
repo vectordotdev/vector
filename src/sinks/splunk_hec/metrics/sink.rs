@@ -128,8 +128,7 @@ impl HecMetricsProcessedEventMetadata {
 
     fn extract_metric_value(metric: &Metric) -> Option<f64> {
         match *metric.value() {
-            MetricValue::Counter { value } => Some(value),
-            MetricValue::Gauge { value } => Some(value),
+            MetricValue::Counter { value } | MetricValue::Gauge { value } => Some(value),
             _ => {
                 emit!(SplunkInvalidMetricReceivedError {
                     value: metric.value(),

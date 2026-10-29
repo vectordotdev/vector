@@ -33,12 +33,12 @@ impl SecretBackend for FileBackend {
         let contents = tokio::fs::read_to_string(&self.path).await?;
         let output = serde_json::from_str::<HashMap<String, String>>(&contents)?;
         let mut secrets = HashMap::new();
-        for k in secret_keys.into_iter() {
+        for k in secret_keys {
             if let Some(secret) = output.get(&k) {
                 if secret.is_empty() {
                     return Err(format!("secret for key '{k}' was empty").into());
                 }
-                secrets.insert(k, secret.to_string());
+                secrets.insert(k, secret.clone());
             } else {
                 return Err(format!("secret for key '{k}' was not retrieved").into());
             }

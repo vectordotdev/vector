@@ -30,6 +30,7 @@ permissions:
 
 jobs:
   check-component-features:
+    if: github.repository == 'vectordotdev/vector'
     # use free tier on schedule and 8 core to expedite results on demand invocation
     runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-24.04' || 'ubuntu-24.04-8core' }}
     timeout-minutes: 180 # Usually takes 2h but this prevents it from hanging for an indefinite time

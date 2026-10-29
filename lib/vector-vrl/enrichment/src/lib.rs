@@ -1,5 +1,4 @@
 #![deny(warnings)]
-#![warn(clippy::pedantic)]
 
 pub mod find_enrichment_table_records;
 pub mod get_enrichment_table_record;

@@ -8,7 +8,7 @@ use vector_lib::{
     stream::DriverResponse,
 };
 
-/// Generalized request for sending metrics to a StatsD endpoint.
+/// Generalized request for sending metrics to a `StatsD` endpoint.
 #[derive(Clone, Debug)]
 pub struct StatsdRequest {
     pub payload: Vec<u8>,

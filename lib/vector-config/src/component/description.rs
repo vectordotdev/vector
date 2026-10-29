@@ -41,6 +41,7 @@ where
     ///
     /// The type parameter `C` must be the component's configuration type that implements
     /// `Configurable` and `GenerateConfig`.
+    #[must_use]
     pub const fn new<C: GenerateConfig + Configurable + 'static>(
         component_name: &'static str,
         label: &'static str,
@@ -75,6 +76,7 @@ where
     }
 
     /// Gets a sorted list of all registered components of the given component type.
+    #[must_use]
     pub fn types() -> Vec<&'static str> {
         let mut types = Vec::new();
         for definition in inventory::iter::<ComponentDescription<T>> {
@@ -85,6 +87,10 @@ where
     }
 
     /// Generate a schema object covering all the descriptions of this type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if generating a registered component schema fails.
     pub fn generate_schemas(
         generator: &RefCell<SchemaGenerator>,
     ) -> Result<SchemaObject, GenerateError> {
