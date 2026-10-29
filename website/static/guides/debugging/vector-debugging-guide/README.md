@@ -2,8 +2,6 @@
 
 Follow the [debugging guide](https://vector.dev/guides/developer/debugging/) for the walkthrough and explanations.
 
-## Files
-
 | File | Purpose |
 | --- | --- |
 | `http-server.py` | Local HTTP server used to simulate failures. |
