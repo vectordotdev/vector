@@ -11,8 +11,8 @@ use crate::utils::git;
 #[derive(clap::Args, Debug)]
 pub(super) struct VersionOptions {
     /// Vector release version; defaults to Cargo.toml's development minor without -dev.
-    #[arg(long)]
-    pub(super) version: Option<Version>,
+    #[arg(long = "version")]
+    pub(super) vector_version: Option<Version>,
     /// Released VRL version; defaults to the latest stable tag in the VRL repository.
     #[arg(long)]
     pub(super) vrl_version: Option<Version>,
@@ -20,7 +20,7 @@ pub(super) struct VersionOptions {
 
 impl VersionOptions {
     pub(super) fn resolve_vector(&self) -> Result<Version> {
-        preparation_version(&current_cargo_version()?, self.version.clone())
+        preparation_version(&current_cargo_version()?, self.vector_version.clone())
     }
 
     pub(super) fn resolve_vrl(&self, existing_pin: Option<Version>) -> Result<Version> {
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn vrl_override_takes_precedence_over_an_existing_pin() {
         let options = VersionOptions {
-            version: None,
+            vector_version: None,
             vrl_version: Some("0.28.1".parse().unwrap()),
         };
         assert_eq!(

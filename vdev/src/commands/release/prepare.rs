@@ -45,7 +45,7 @@ impl Cli {
         env::set_current_dir(&repo_root)?;
 
         if !self.dry_run {
-            if self.versions.version.is_none() {
+            if self.versions.vector_version.is_none() {
                 git::ensure_worktree_clean().context(
                     "release preparation without --version requires a clean master checkout; commit or stash your changes and retry",
                 )?;
@@ -70,7 +70,7 @@ impl Cli {
                 git::checkout_main_branch()?;
             }
         }
-        let version = match self.versions.version {
+        let version = match self.versions.vector_version {
             Some(ref version) => {
                 ensure_stable(version, "release version")?;
                 version.clone()
