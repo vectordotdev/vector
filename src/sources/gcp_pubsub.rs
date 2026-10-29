@@ -270,7 +270,7 @@ impl SourceConfig for PubsubConfig {
         let auth = self.auth.build(Scope::PubSub).await?;
 
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
-        auth.apply_uri_v1(&mut uri);
+        auth.apply_uri(&mut uri);
 
         let protocol = uri
             .scheme()

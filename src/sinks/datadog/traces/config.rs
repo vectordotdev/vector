@@ -130,8 +130,8 @@ impl DatadogTracesConfig {
         let stats_endpoint = build_uri(&base_uri, "/api/v0.2/stats")?;
 
         Ok(DatadogTracesEndpointConfiguration {
-            traces_endpoint: traces_endpoint.into_v1(),
-            stats_endpoint: stats_endpoint.into_v1(),
+            traces_endpoint: traces_endpoint.into_uri(),
+            stats_endpoint: stats_endpoint.into_uri(),
         })
     }
 

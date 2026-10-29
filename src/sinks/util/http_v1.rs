@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, Response, Uri};
+use http_1::{Request, Response};
 use http_body_util::BodyExt;
 use tower::{Service, service_fn};
 use tower_http_1::decompression::Decompression;
@@ -23,7 +23,7 @@ use super::http::SigV4Config;
 use crate::{
     http::client_v1::HttpClient,
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
-    sinks::util::{http::HttpRequest, sink},
+    sinks::util::{http::HttpRequest, sink, uri::protocol_endpoint},
 };
 
 /// Builds a native `http 1` request from a buffered HTTP sink request.
@@ -181,7 +181,7 @@ where
             #[cfg(feature = "aws-core")]
             let request = sign_request(request, sig_v4_config.as_deref()).await?;
             let byte_size = request.body().len();
-            let (protocol, endpoint) = protocol_endpoint(request.uri());
+            let (protocol, endpoint) = protocol_endpoint(request.uri().clone());
             let request = request.map(full_body);
             let response = if response_decompression {
                 let mut service = Decompression::new(service_fn(|request| client.send(request)));
@@ -259,14 +259,6 @@ pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     )
 }
 
-pub(crate) fn protocol_endpoint(uri: &Uri) -> (String, String) {
-    let uri = uri
-        .to_string()
-        .parse::<http::Uri>()
-        .expect("a valid HTTP/1 URI is valid as an HTTP URI");
-    super::uri::protocol_endpoint(uri)
-}
-
 #[cfg(test)]
 mod tests {
     use std::{convert::Infallible, io::Write};
@@ -287,7 +279,7 @@ mod tests {
 
     #[derive(Clone)]
     struct RequestBuilder {
-        uri: Uri,
+        uri: http_1::Uri,
     }
 
     impl HttpServiceRequestBuilder<()> for RequestBuilder {
@@ -317,7 +309,7 @@ mod tests {
             }
         })
         .await;
-        HttpService::new(client(), request_builder(uri)).with_response_decompression()
+        HttpService::new(client(), request_builder(&uri)).with_response_decompression()
     }
 
     fn client() -> HttpClient {
@@ -328,11 +320,12 @@ mod tests {
         .unwrap()
     }
 
-    fn request_builder(uri: http::Uri) -> RequestBuilder {
+    fn request_builder(uri: &http::Uri) -> RequestBuilder {
+        // The legacy mock server yields an `http 0.2` `Uri`.
         RequestBuilder {
-            uri: crate::sinks::util::HttpEndpoint::new(uri)
+            uri: crate::sinks::util::HttpEndpoint::parse(&uri.to_string())
                 .unwrap()
-                .into_v1(),
+                .into_uri(),
         }
     }
 
@@ -390,7 +383,7 @@ mod tests {
         use super::*;
 
         fn sig_v4_service(
-            uri: http::Uri,
+            uri: &http::Uri,
             credentials: impl ProvideCredentials + 'static,
         ) -> HttpService<RequestBuilder, ()> {
             HttpService::new_with_sig_v4(
@@ -418,7 +411,7 @@ mod tests {
                 }
             })
             .await;
-            let mut service = sig_v4_service(uri, Credentials::from_keys("AKID", "SECRET", None));
+            let mut service = sig_v4_service(&uri, Credentials::from_keys("AKID", "SECRET", None));
 
             let response = service.call(request()).await.unwrap();
             assert_eq!(response.response.status(), http_1::StatusCode::OK);
@@ -470,7 +463,7 @@ mod tests {
                 async { Ok::<_, Infallible>(http::Response::new(hyper::Body::empty())) }
             })
             .await;
-            let mut service = sig_v4_service(uri, MissingCredentials);
+            let mut service = sig_v4_service(&uri, MissingCredentials);
 
             let error = service.call(request()).await.unwrap_err();
             let retry_logic = http_response_retry_logic::<HttpRequest<()>>(RetryStrategy::Default);

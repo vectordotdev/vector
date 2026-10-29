@@ -183,7 +183,7 @@ impl GenerateConfig for HttpSinkConfig {
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let auth = auth.choose_one(&uri.auth)?;
     let uri = uri.with_default_parts();
-    let mut request = Request::head(uri.uri_v1()?).body(empty_body())?;
+    let mut request = Request::head(uri.uri).body(empty_body())?;
 
     if let Some(auth) = auth {
         auth.apply_v1(&mut request);
@@ -587,7 +587,6 @@ mod tests {
             };
 
             let endpoint = "http://127.0.0.1:9000/endpoint";
-            let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");
 
             let config = HttpSinkConfig {
                 uri: UriTemplate::try_from(endpoint).expect("should never fail to parse"),
@@ -615,7 +614,10 @@ mod tests {
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(uri.uri, Some(http::Method::POST)),
+                HttpResourceConfig::from_parts(
+                    http::Uri::from_str(endpoint).expect("should never fail to parse"),
+                    Some(http::Method::POST),
+                ),
                 config.encoding.clone(),
             );
 

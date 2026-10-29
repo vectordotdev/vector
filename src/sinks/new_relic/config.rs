@@ -219,7 +219,7 @@ impl NewRelicCredentials {
 
     pub fn try_get_uri(&self) -> crate::Result<Uri> {
         if let Some(override_uri) = self.override_uri.as_ref() {
-            return Ok(override_uri.clone().into_v1());
+            return Ok(override_uri.as_uri().clone());
         }
 
         match self.api {

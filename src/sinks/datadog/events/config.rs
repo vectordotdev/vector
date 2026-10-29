@@ -56,7 +56,7 @@ impl DatadogEventsConfig {
         let base = datadog::get_api_base_endpoint(endpoint, site);
         Ok(HttpEndpoint::parse(&base)?
             .append_path("/api/v1/events")?
-            .into_v1())
+            .into_uri())
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {

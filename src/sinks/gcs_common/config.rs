@@ -14,7 +14,6 @@ use crate::{
         gcs_common::service::GcsResponse,
         util::{
             HttpEndpoint,
-            http::IntoStatusCode,
             retries::{RetryAction, RetryLogic},
         },
     },
@@ -125,9 +124,9 @@ pub fn build_healthcheck(
     auth: GcpAuthenticator,
 ) -> Healthcheck {
     let healthcheck = async move {
-        let mut request = http_1::Request::head(base_url.into_v1()).body(empty_body())?;
+        let mut request = http_1::Request::head(base_url.into_uri()).body(empty_body())?;
 
-        auth.apply_v1(&mut request);
+        auth.apply(&mut request);
 
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
@@ -138,19 +137,15 @@ pub fn build_healthcheck(
     healthcheck.boxed()
 }
 
-/// Classifies a GCP healthcheck response by status alone, shared by the legacy and native
-/// HTTP clients.
+/// Classifies a GCP healthcheck response by status alone.
 ///
 /// # Errors
 /// Returns an error for forbidden, missing, or unexpected response statuses.
-pub fn healthcheck_status(
-    status: impl IntoStatusCode,
-    not_found_error: crate::Error,
-) -> crate::Result<()> {
-    match status.into_status_code() {
-        http::StatusCode::OK => Ok(()),
-        http::StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
-        http::StatusCode::NOT_FOUND => Err(not_found_error),
+pub fn healthcheck_status(status: StatusCode, not_found_error: crate::Error) -> crate::Result<()> {
+    match status {
+        StatusCode::OK => Ok(()),
+        StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
+        StatusCode::NOT_FOUND => Err(not_found_error),
         status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }

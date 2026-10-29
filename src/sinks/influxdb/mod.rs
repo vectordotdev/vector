@@ -405,7 +405,7 @@ pub(in crate::sinks) fn encode_uri(
     } else {
         format!("{path}?{query}")
     };
-    Ok(endpoint.append_path(&path_and_query)?.into_v1())
+    Ok(endpoint.append_path(&path_and_query)?.into_uri())
 }
 
 #[cfg(test)]

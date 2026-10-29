@@ -192,7 +192,7 @@ impl DatadogLogsConfig {
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(
                 client,
-                endpoint.into_v1(),
+                endpoint.into_uri(),
                 headers,
                 dd_evp_origin,
             )?);

@@ -11,8 +11,7 @@ use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
 use http::{
-    HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
-    uri::InvalidUri,
+    HeaderMap, Request, Response, Version, header::HeaderValue, request::Builder, uri::InvalidUri,
 };
 use http_1::Request as RequestV1;
 use hyper::{
@@ -585,7 +584,7 @@ impl Auth {
 /// # Panics
 ///
 /// Panics if `uri` has a scheme other than `http` or `https`.
-pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
+pub fn get_http_scheme_from_uri(uri: &http_1::Uri) -> &'static str {
     // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
     // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
     uri.scheme_str().map_or("http", |scheme| match scheme {

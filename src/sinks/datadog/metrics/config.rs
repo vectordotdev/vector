@@ -117,8 +117,8 @@ impl DatadogMetricsEndpointConfiguration {
     /// Creates native HTTP 1 endpoints for the metrics APIs.
     pub fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
         Self {
-            series_endpoint: series_endpoint.into_v1(),
-            sketches_endpoint: sketches_endpoint.into_v1(),
+            series_endpoint: series_endpoint.into_uri(),
+            sketches_endpoint: sketches_endpoint.into_uri(),
         }
     }
 

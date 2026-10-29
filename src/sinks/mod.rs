@@ -135,9 +135,7 @@ pub enum BuildError {
     #[snafu(display("Socket address problem: {}", source))]
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
-    UriParseError { source: ::http::uri::InvalidUri },
-    #[snafu(display("HTTP request build error: {}", source))]
-    HTTPRequestBuilderError { source: ::http::Error },
+    UriParseError { source: ::http_1::uri::InvalidUri },
     #[snafu(display("HTTP request build error: {}", source))]
     HTTPV1RequestBuilderError { source: ::http_1::Error },
 }
@@ -146,16 +144,13 @@ pub enum BuildError {
 #[derive(Debug, Snafu)]
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
-    UnexpectedStatus { status: ::http::StatusCode },
+    UnexpectedStatus { status: ::http_1::StatusCode },
 }
 
 impl HealthcheckError {
-    /// Builds an [`HealthcheckError::UnexpectedStatus`] from a status code of either `http`
-    /// crate version.
+    /// Builds an [`HealthcheckError::UnexpectedStatus`] from a status code.
     #[must_use]
-    pub fn unexpected_status(status: impl util::http::IntoStatusCode) -> Self {
-        Self::UnexpectedStatus {
-            status: status.into_status_code(),
-        }
+    pub const fn unexpected_status(status: ::http_1::StatusCode) -> Self {
+        Self::UnexpectedStatus { status }
     }
 }

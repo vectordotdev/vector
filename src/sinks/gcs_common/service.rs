@@ -129,7 +129,7 @@ impl Service<GcsRequest> for GcsService {
             .base_url
             .append_path(&request.key)
             .expect("partition key must be a valid URI path segment")
-            .into_v1();
+            .into_uri();
 
         let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
@@ -151,7 +151,7 @@ impl Service<GcsRequest> for GcsService {
         }
 
         let mut http_request = builder.body(request.body).unwrap();
-        self.auth.apply_v1(&mut http_request);
+        self.auth.apply(&mut http_request);
 
         let client = self.client.clone();
         Box::pin(async move {

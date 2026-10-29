@@ -2,8 +2,7 @@ use std::{collections::HashMap, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
-use http::StatusCode;
-use http_1::{Request, Uri};
+use http_1::{Request, StatusCode, Uri};
 use indoc::indoc;
 use snafu::ResultExt;
 use tower::Service;
@@ -111,7 +110,7 @@ impl GenerateConfig for SematextMetricsConfig {
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     let uri = HttpEndpoint::parse(&endpoint)?
         .append_path("health")?
-        .into_v1();
+        .into_uri();
 
     let request = Request::get(uri)
         .body(empty_body())
@@ -119,9 +118,7 @@ async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    match status {
+    match response.status() {
         StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }

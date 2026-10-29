@@ -1,6 +1,6 @@
 use std::{fmt, str::FromStr};
 
-use http::uri::{Authority, PathAndQuery, Scheme, Uri};
+use http_1::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
@@ -15,7 +15,7 @@ const USERINFO: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'_')
     .remove(b'~');
 
-/// A wrapper for `http::Uri` that implements `Deserialize` and `Serialize`.
+/// A wrapper for `http_1::Uri` that implements `Deserialize` and `Serialize`.
 ///
 /// Authorization credentials, if they exist, will be removed from the URI and stored separately in `auth`.
 #[configurable_component]
@@ -45,9 +45,9 @@ impl UriSerde {
             parts.authority = Some(Authority::from_static("127.0.0.1"));
         }
         if parts.path_and_query.is_none() {
-            // just an empty `path_and_query`,
-            // but `from_parts` will fail without this.
-            parts.path_and_query = Some(PathAndQuery::from_static(""));
+            // `from_parts` fails without a `path_and_query` once a scheme is set.
+            // An absolute URI renders an empty path as `/`, so this is the same URI.
+            parts.path_and_query = Some(PathAndQuery::from_static("/"));
         }
         let uri = Uri::from_parts(parts).expect("invalid parts");
         Self {
@@ -66,7 +66,7 @@ impl UriSerde {
         let self_path = uri.trim_end_matches('/');
         let other_path = path.trim_start_matches('/');
         let path = format!("{self_path}/{other_path}");
-        let uri = path.parse::<Uri>()?;
+        let uri = parse_ascii::<Uri>(&path)?;
         Ok(Self {
             uri,
             auth: self.auth.clone(),
@@ -77,18 +77,6 @@ impl UriSerde {
     pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
         self.auth = auth;
         self
-    }
-
-    /// Returns the URI as an `http 1` `Uri`.
-    ///
-    /// The two `http` crate versions share no conversion traits, so the bridge is a string
-    /// round-trip, as in [`HttpEndpoint::into_v1`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `http 1` cannot parse the URI.
-    pub fn uri_v1(&self) -> Result<http_1::Uri, http_1::uri::InvalidUri> {
-        self.uri.to_string().parse()
     }
 }
 
@@ -128,7 +116,7 @@ impl FromStr for UriSerde {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let uri: Uri = s.parse()?;
+        let uri: Uri = parse_ascii(s)?;
         uri.try_into()
     }
 }
@@ -139,7 +127,7 @@ impl TryFrom<Uri> for UriSerde {
     /// Fallible construction from a parsed `Uri`, extracting any basic auth
     /// credentials from the authority.
     ///
-    /// This can fail: `http::Uri` accepts authorities that `url::Url` rejects
+    /// This can fail: `Uri` accepts authorities that `url::Url` rejects
     /// (e.g. a non-numeric port), in which case the basic auth cannot be
     /// extracted.
     fn try_from(uri: Uri) -> Result<Self, Self::Error> {
@@ -159,7 +147,7 @@ impl TryFrom<Uri> for UriSerde {
 }
 
 fn get_basic_auth(authority: &Authority) -> crate::Result<(Authority, Option<Auth>)> {
-    // `http::Uri` accepts authorities that `url::Url` rejects (e.g. a
+    // `Uri` accepts authorities that `url::Url` rejects (e.g. a
     // non-numeric port), so this parse can fail; propagate the error instead
     // of panicking.
     let url = url::Url::parse(&format!("http://{authority}"))?;
@@ -235,20 +223,20 @@ pub enum HttpEndpointError {
     #[snafu(display("endpoint `{endpoint}` is not a valid URI: {source}"))]
     InvalidUri {
         endpoint: String,
-        source: http::uri::InvalidUri,
+        source: http_1::uri::InvalidUri,
     },
 
     #[snafu(display("endpoint `{endpoint}` has an invalid path `{path}`: {source}"))]
     InvalidPath {
         endpoint: String,
         path: String,
-        source: http::uri::InvalidUri,
+        source: http_1::uri::InvalidUri,
     },
 
     #[snafu(display("endpoint `{endpoint}` cannot be reassembled from its parts: {source}"))]
     InvalidUriParts {
         endpoint: String,
-        source: http::uri::InvalidUriParts,
+        source: http_1::uri::InvalidUriParts,
     },
 
     #[snafu(display(
@@ -336,7 +324,7 @@ impl HttpEndpoint {
     /// usable port.
     ///
     /// The authority check alone is not enough: `http://:8080` parses as a
-    /// valid `http::Uri` with an authority but an empty host, and
+    /// valid `Uri` with an authority but an empty host, and
     /// `http://localhost:notaport` parses with a nonempty host but a port that
     /// cannot be dialed. Both are checked explicitly.
     ///
@@ -370,17 +358,15 @@ impl HttpEndpoint {
     ///
     /// Returns an error if the endpoint cannot be parsed or fails [`Self::new`].
     pub fn parse(endpoint: &str) -> Result<Self, HttpEndpointError> {
-        // Default a missing scheme to `https`. `http::Uri` cannot
+        // Default a missing scheme to `https`. `Uri` cannot
         // parse `host:port/path` without a scheme (it reads `host` as a
         // scheme), so the scheme is added up front rather than relying on
         // the parser to accept authority-form input.
         let parse = |value: &str| {
-            value
-                .parse::<Uri>()
-                .map_err(|source| HttpEndpointError::InvalidUri {
-                    endpoint: redact_unparsed_endpoint(endpoint),
-                    source,
-                })
+            parse_ascii::<Uri>(value).map_err(|source| HttpEndpointError::InvalidUri {
+                endpoint: redact_unparsed_endpoint(endpoint),
+                source,
+            })
         };
         let uri = if has_scheme(endpoint) {
             parse(endpoint)?
@@ -398,25 +384,6 @@ impl HttpEndpoint {
     /// Consumes the endpoint, returning the underlying `Uri`.
     pub fn into_uri(self) -> Uri {
         self.0
-    }
-
-    /// Consumes the endpoint, returning the underlying `Uri` as an `http 1` `Uri`.
-    ///
-    /// The two `http` crate versions share no conversion traits, so the bridge
-    /// is a string round-trip. `Display` of a validated absolute `http(s)` URL
-    /// is always parseable back by `http 1` (the `http 1` parser descends from
-    /// the `http 0.2` parser and accepts the same absolute forms), so this
-    /// cannot fail — the same invariant `protocol_endpoint` relies on.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the validated URI cannot be parsed by `http 1`, violating the
-    /// parser compatibility invariant above.
-    pub fn into_v1(self) -> http_1::Uri {
-        self.0
-            .to_string()
-            .parse()
-            .expect("a validated HTTP endpoint is a valid `http 1` URI")
     }
 
     /// Extracts basic-auth credentials embedded in the authority, returning a
@@ -474,12 +441,10 @@ impl HttpEndpoint {
         };
         parts.path_and_query =
             Some(
-                joined
-                    .parse::<PathAndQuery>()
-                    .with_context(|_| InvalidPathSnafu {
-                        endpoint: redact_uri(&self.0),
-                        path: joined,
-                    })?,
+                parse_ascii::<PathAndQuery>(&joined).with_context(|_| InvalidPathSnafu {
+                    endpoint: redact_uri(&self.0),
+                    path: joined,
+                })?,
             );
         let uri = Uri::from_parts(parts).with_context(|_| InvalidUriPartsSnafu {
             endpoint: redact_uri(&self.0),
@@ -509,12 +474,10 @@ impl HttpEndpoint {
         let joined = format!("{base_path}{suffix}");
         parts.path_and_query =
             Some(
-                joined
-                    .parse::<PathAndQuery>()
-                    .with_context(|_| InvalidPathSnafu {
-                        endpoint: redact_uri(&self.0),
-                        path: joined,
-                    })?,
+                parse_ascii::<PathAndQuery>(&joined).with_context(|_| InvalidPathSnafu {
+                    endpoint: redact_uri(&self.0),
+                    path: joined,
+                })?,
             );
         let uri = Uri::from_parts(parts).with_context(|_| InvalidUriPartsSnafu {
             endpoint: redact_uri(&self.0),
@@ -529,10 +492,29 @@ impl fmt::Display for HttpEndpoint {
     }
 }
 
+/// Parses a URI or path-and-query, rejecting raw non-ASCII bytes.
+///
+/// `http` 1 accepts UTF-8 in the path and query, while `http` 0.2, which these
+/// types were built on, rejected any non-ASCII byte as an invalid URI character.
+/// Each non-ASCII byte is replaced with a space, which the parser rejects the
+/// same way in every component with that same error (bytes in a fragment,
+/// which is dropped, are ignored by both), so the accepted URIs and the errors
+/// are unchanged.
+pub(crate) fn parse_ascii<T>(s: &str) -> Result<T, http_1::uri::InvalidUri>
+where
+    T: TryFrom<Vec<u8>, Error = http_1::uri::InvalidUri>,
+{
+    T::try_from(
+        s.bytes()
+            .map(|b| if b.is_ascii() { b } else { b' ' })
+            .collect(),
+    )
+}
+
 /// Returns `true` if the URI's authority contains a port that is not a valid
 /// `u16`.
 ///
-/// `http::Uri` accepts non-numeric ports (for example
+/// `Uri` accepts non-numeric ports (for example
 /// `http://localhost:notaport`), which `HttpClient` cannot dial. `Authority::port`
 /// returns `None` for both a missing port and an invalid one, so the raw
 /// authority is inspected instead.
@@ -633,8 +615,45 @@ mod tests {
     }
 
     #[test]
+    fn with_default_parts_fills_missing_parts() {
+        for (input, expected) in [
+            // Authority only: the scheme and an empty path are filled in.
+            ("localhost:8080", "http://localhost:8080/"),
+            // Path only: the scheme and authority are filled in.
+            ("/api/test", "http://127.0.0.1/api/test"),
+            // Absolute URIs are left unchanged.
+            (
+                "https://example.com/path?q=1",
+                "https://example.com/path?q=1",
+            ),
+        ] {
+            let uri: UriSerde = input.parse().unwrap();
+            assert_eq!(
+                uri.with_default_parts().uri.to_string(),
+                expected,
+                "{input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn http_endpoint_rejects_empty_host_accepted_by_parser() {
+        // `Uri` parses an authority with a port but no host; the host check
+        // must reject it as not absolute rather than as a parse error.
+        for endpoint in ["http://:8080", "http://:8080/path", ":8080"] {
+            assert!(
+                matches!(
+                    HttpEndpoint::parse(endpoint),
+                    Err(HttpEndpointError::NotAbsoluteHttp { .. })
+                ),
+                "expected `{endpoint}` to be rejected as not absolute"
+            );
+        }
+    }
+
+    #[test]
     fn parse_rejects_malformed_authority_without_panicking() {
-        // `http::Uri` accepts a non-numeric port in the authority, but
+        // `Uri` accepts a non-numeric port in the authority, but
         // `url::Url` rejects it. This must be a parse error, not a panic.
         let result = "http://user:pass@localhost:notaport/path".parse::<UriSerde>();
         assert!(result.is_err());
@@ -772,7 +791,7 @@ mod tests {
     #[test]
     fn http_endpoint_rejects_non_absolute_http_urls() {
         for endpoint in [
-            // No scheme and no host: `http::Uri` parses these as a path.
+            // No scheme and no host: `Uri` parses these as a path.
             "/services/collector",
             "",
             // Absolute, but not a scheme `HttpClient` can dial.
@@ -780,7 +799,7 @@ mod tests {
             "unix:///var/run/vector.sock",
             // Scheme but no authority.
             "http:///path",
-            // Authority with a port but an empty host: `http::Uri` parses this
+            // Authority with a port but an empty host: `Uri` parses this
             // with `authority() == Some` and `host() == Some("")`.
             "http://:8080",
             "http://:8080/path",
@@ -809,6 +828,41 @@ mod tests {
         let error = HttpEndpoint::parse(endpoint).unwrap_err();
         assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
         assert!(error.to_string().contains(endpoint));
+    }
+
+    #[test]
+    fn non_ascii_uris_are_rejected_as_invalid_uri_characters() {
+        for endpoint in [
+            "https://example.com/caf\u{e9}",
+            "https://example.com/?q=caf\u{e9}",
+            "https://caf\u{e9}.example.com/",
+        ] {
+            let error = HttpEndpoint::parse(endpoint).unwrap_err();
+            assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
+            assert!(
+                error.to_string().ends_with(": invalid uri character"),
+                "{error}"
+            );
+
+            let error = endpoint.parse::<UriSerde>().unwrap_err();
+            assert_eq!(error.to_string(), "invalid uri character");
+        }
+
+        let base = HttpEndpoint::parse("https://example.com").unwrap();
+        for error in [
+            base.append_path("caf\u{e9}").unwrap_err(),
+            base.append_raw_suffix(":caf\u{e9}").unwrap_err(),
+        ] {
+            assert!(matches!(error, HttpEndpointError::InvalidPath { .. }));
+        }
+
+        // A fragment is dropped without being checked.
+        assert_eq!(
+            HttpEndpoint::parse("https://example.com/path#caf\u{e9}")
+                .unwrap()
+                .to_string(),
+            "https://example.com/path"
+        );
     }
 
     #[test]

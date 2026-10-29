@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use http::Uri;
+use http_1::Uri;
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tokio::sync::Semaphore;
 use tonic::Code::{
@@ -192,7 +192,7 @@ struct RoutingConfig {
 
 impl VectorConfig {
     /// Creates a `VectorConfig` with the given address.
-    pub fn from_address(addr: &http_1::Uri) -> Self {
+    pub fn from_address(addr: &Uri) -> Self {
         let addr = addr.to_string();
         default_config(addr.as_str())
     }
@@ -244,7 +244,7 @@ impl ValidatedSink for VectorConfig {
     fn validate(&self) -> crate::Result<ValidatedVector> {
         // Endpoint options and endpoint syntax are validated here, and the
         // parsed endpoints are retained so `build` does not re-parse the
-        // original strings. Re-parsing is unsafe: `http::Uri` reads the host
+        // original strings. Re-parsing is unsafe: `Uri` reads the host
         // of a scheme-less `host:port[/path]` endpoint as a scheme, producing
         // a URI that validation accepted but the sink cannot use.
         let endpoints = self.validate_endpoint_options()?;

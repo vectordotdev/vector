@@ -163,7 +163,7 @@ impl DatadogCommonConfig {
     fn get_api_endpoint(&self, path: &str) -> crate::Result<Uri> {
         let base = datadog::get_api_base_endpoint(self.endpoint.as_deref(), self.site.as_str());
         let endpoint = HttpEndpoint::parse(&base)?.append_path(path)?;
-        Ok(endpoint.into_v1())
+        Ok(endpoint.into_uri())
     }
 }
 

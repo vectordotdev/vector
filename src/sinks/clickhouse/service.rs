@@ -3,9 +3,8 @@
 use std::fmt::Write as _;
 
 use bytes::Bytes;
-use http::Uri;
 use http_1::{
-    Request, StatusCode,
+    Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;

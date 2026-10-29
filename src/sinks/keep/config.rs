@@ -174,7 +174,7 @@ async fn healthcheck(
     client: HttpClient,
 ) -> crate::Result<()> {
     let request =
-        Request::post(endpoint.into_v1()).header(HTTP_HEADER_KEEP_API_KEY, api_key.inner());
+        Request::post(endpoint.into_uri()).header(HTTP_HEADER_KEEP_API_KEY, api_key.inner());
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();

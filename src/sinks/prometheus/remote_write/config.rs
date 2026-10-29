@@ -160,8 +160,7 @@ fn remote_write_headers_examples() -> BTreeMap<String, String> {
     ])
 }
 
-/// Validates the custom headers and converts them to `http 1` types, keeping the sorted order
-/// of the shared `validate_headers`.
+/// Validates the custom headers, keeping the sorted order of the shared `validate_headers`.
 fn validate_headers(
     headers: &BTreeMap<String, String>,
     configures_auth: bool,
@@ -170,15 +169,12 @@ fn validate_headers(
         .into_iter()
         .map(
             |(name, value)| -> crate::Result<(HeaderName, HeaderValue)> {
-                let name = HeaderName::from_bytes(name.inner().as_str().as_bytes())
-                    .map_err(|e| format!("Invalid header name '{}': {e}", name.inner()))?;
+                let name = name.inner().clone();
                 if configures_auth && name == AUTHORIZATION {
                     return Err(
                         "Authorization header can not be used with defined auth options".into(),
                     );
                 }
-                let value = HeaderValue::from_bytes(value.as_bytes())
-                    .map_err(|e| format!("Invalid header value: {e}"))?;
                 Ok((name, value))
             },
         )
@@ -306,9 +302,9 @@ impl ValidatedSink for RemoteWriteConfig {
             None => None,
         };
 
-        let endpoint = self.endpoint.clone().into_v1();
+        let endpoint = self.endpoint.as_uri().clone();
         let healthcheck_endpoint = match cx.healthcheck.uri {
-            Some(uri) => uri.uri_v1()?,
+            Some(uri) => uri.uri,
             None => endpoint.clone(),
         };
 

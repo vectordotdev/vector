@@ -19,7 +19,7 @@ use std::{convert::TryFrom, fmt};
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
-use http::uri::InvalidUri;
+use http_1::uri::InvalidUri;
 use snafu::Snafu;
 use vector_lib::{
     NamedInternalEvent, configurable::configurable_component, internal_event::InternalEvent,

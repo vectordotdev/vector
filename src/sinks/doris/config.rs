@@ -335,7 +335,7 @@ mod tests {
         let config = DorisConfig {
             endpoints: vec![
                 "http://127.0.0.1:8030"
-                    .parse::<http::Uri>()
+                    .parse::<http_1::Uri>()
                     .unwrap()
                     .try_into()
                     .unwrap(),
@@ -355,7 +355,7 @@ mod tests {
         let config = DorisConfig {
             endpoints: vec![
                 "http://user:pass@127.0.0.1:8030"
-                    .parse::<http::Uri>()
+                    .parse::<http_1::Uri>()
                     .unwrap()
                     .try_into()
                     .unwrap(),
@@ -382,7 +382,7 @@ mod tests {
         let config = DorisConfig {
             endpoints: vec![
                 "ftp://doris.example.com:8030"
-                    .parse::<http::Uri>()
+                    .parse::<http_1::Uri>()
                     .unwrap()
                     .try_into()
                     .unwrap(),

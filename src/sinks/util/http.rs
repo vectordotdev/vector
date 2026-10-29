@@ -3,8 +3,7 @@ use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use bytes::Bytes;
-use headers::HeaderName;
-use http::{HeaderValue, StatusCode, header};
+use http_1::{HeaderName, HeaderValue, StatusCode, header};
 
 /// Maximum number of response body bytes to include in a non-retriable error's reason.
 pub(crate) const MAX_ERROR_BODY_BYTES: usize = 1024;
@@ -64,7 +63,7 @@ pub struct SigV4Config {
 
 /// Serializes and deserializes a [`Vec<StatusCode>`]
 mod status_code_vec {
-    use http::StatusCode;
+    use http_1::StatusCode;
     use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 
     /// Deserializes a [`Vec<StatusCode>`]
@@ -143,8 +142,7 @@ impl RetryStrategy {
     ///
     /// For the `All` strategy, all non-success status codes will be retried.
     #[must_use]
-    pub fn retry_action<Req>(&self, status: impl IntoStatusCode) -> RetryAction<Req> {
-        let status = status.into_status_code();
+    pub fn retry_action<Req>(&self, status: StatusCode) -> RetryAction<Req> {
         if status.is_success() {
             return RetryAction::Successful;
         }
@@ -183,30 +181,7 @@ impl RetryStrategy {
     }
 }
 
-/// A response status code from either `http` crate version.
-///
-/// Retry logic and healthcheck errors accept both versions through this trait, so callers never
-/// convert between them. This is the only place that converts.
-// TODO: Use `http_1::StatusCode` natively and remove the `http` 0.2 impl once the HTTP v1
-// migration is complete: https://github.com/vectordotdev/vector/issues/19179
-pub trait IntoStatusCode {
-    fn into_status_code(self) -> StatusCode;
-}
-
-impl IntoStatusCode for StatusCode {
-    fn into_status_code(self) -> StatusCode {
-        self
-    }
-}
-
-impl IntoStatusCode for http_1::StatusCode {
-    fn into_status_code(self) -> StatusCode {
-        StatusCode::from_u16(self.as_u16()).expect("HTTP status codes are valid u16 values")
-    }
-}
-
-/// Retry logic driven by a status code extracted from each response, accepting anything that
-/// can be converted to a status code.
+/// Retry logic driven by a status code extracted from each response.
 #[derive(Debug)]
 pub struct HttpStatusRetryLogic<F, Req, Res> {
     func: F,
@@ -215,10 +190,9 @@ pub struct HttpStatusRetryLogic<F, Req, Res> {
     retry_strategy: RetryStrategy,
 }
 
-impl<F, S, Req, Res> HttpStatusRetryLogic<F, Req, Res>
+impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res>
 where
-    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
-    S: IntoStatusCode,
+    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
@@ -232,10 +206,9 @@ where
     }
 }
 
-impl<F, S, Req, Res> RetryLogic for HttpStatusRetryLogic<F, Req, Res>
+impl<F, Req, Res> RetryLogic for HttpStatusRetryLogic<F, Req, Res>
 where
-    F: Fn(&Res) -> S + Clone + Send + Sync + 'static,
-    S: IntoStatusCode,
+    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
@@ -503,7 +476,7 @@ mod test {
 
     #[test]
     fn retry_strategy_custom_serde_rejects_invalid_status_codes() {
-        // `http::StatusCode::from_u16` only accepts 100–999; 1000 is out of range.
+        // `StatusCode::from_u16` only accepts 100–999; 1000 is out of range.
         let json = r#"{"type":"custom","status_codes":[1000]}"#;
         let result = serde_json::from_str::<RetryStrategy>(json);
         assert!(

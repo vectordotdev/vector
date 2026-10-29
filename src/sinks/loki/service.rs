@@ -116,7 +116,7 @@ impl Service<LokiRequest> for LokiService {
             _ => "application/json",
         };
         let mut req =
-            Request::post(self.endpoint.clone().into_v1()).header("Content-Type", content_type);
+            Request::post(self.endpoint.as_uri().clone()).header("Content-Type", content_type);
 
         let metadata = request.get_metadata().clone();
 

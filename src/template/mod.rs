@@ -14,7 +14,7 @@ use chrono::{
     format::{Item, strftime::StrftimeItems},
 };
 use derive_more::Display;
-use http::Uri;
+use http_1::Uri;
 use regex::Regex;
 
 use snafu::Snafu;

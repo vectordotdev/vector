@@ -252,7 +252,7 @@ async fn correct_request() {
         .build_inner(
             &context,
             &validated,
-            HttpEndpoint::new(mock_endpoint).unwrap(),
+            HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
@@ -438,7 +438,7 @@ async fn mock_healthcheck_with_400_response() {
         .build_inner(
             &context,
             &validated,
-            HttpEndpoint::new(mock_endpoint).unwrap(),
+            HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
@@ -502,7 +502,7 @@ async fn mock_healthcheck_with_403_response() {
         .build_inner(
             &context,
             &validated,
-            HttpEndpoint::new(mock_endpoint).unwrap(),
+            HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),

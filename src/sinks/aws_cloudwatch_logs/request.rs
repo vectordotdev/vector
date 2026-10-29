@@ -18,7 +18,7 @@ use aws_sdk_cloudwatchlogs::{
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::{FutureExt, future::BoxFuture};
-use http::HeaderValue;
+use http_1::HeaderValue;
 use tokio::sync::oneshot;
 
 use crate::sinks::{
