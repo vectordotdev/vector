@@ -11,6 +11,10 @@ inputs:
   test-name:
     description: E2E test name, for example `opentelemetry-traces-multiservice`.
     required: true
+  title:
+    description: Comment heading. Defaults to the test name.
+    required: false
+    default: ""
   state:
     description: "`started` or `finished`."
     required: true
@@ -50,6 +54,7 @@ runs:
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         TEST_NAME: ${{ inputs.test-name }}
+        TITLE: ${{ inputs.title }}
         STATE: ${{ inputs.state }}
         COMMENT_ID: ${{ inputs.comment-id }}
         JOB_STATUS: ${{ inputs.job-status }}

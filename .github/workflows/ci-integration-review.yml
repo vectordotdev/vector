@@ -285,6 +285,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           test-name: opentelemetry-traces-multiservice
+          title: Multiservice OpenTelemetry trace validation
           state: started
 
       - uses: ./.github/actions/dd-token
@@ -341,6 +342,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           test-name: opentelemetry-traces-multiservice
+          title: Multiservice OpenTelemetry trace validation
           state: finished
           comment-id: ${{ steps.report_start.outputs.comment-id }}
           job-status: ${{ job.status }}

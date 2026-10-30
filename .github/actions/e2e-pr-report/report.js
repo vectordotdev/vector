@@ -6,11 +6,11 @@ const path = require("path");
 const MAX_FAILURE_LINES = 5;
 const MAX_LINE_LENGTH = 300;
 
-const HEADLINES = {
-  started: ["⏳", "running"],
-  success: ["✅", "passed"],
-  failure: ["❌", "failed"],
-  cancelled: ["⚪", "was cancelled"]
+const ICONS = {
+  started: "⏳",
+  success: "✅",
+  failure: "❌",
+  cancelled: "⚪"
 };
 
 const STATUSES = {
@@ -96,19 +96,19 @@ module.exports = async ({ github, context, core }) => {
   const env = process.env;
   const testName = env.TEST_NAME;
   const outcome = env.STATE === "started" ? "started" : env.JOB_STATUS || "failure";
-  const [icon, verb] = HEADLINES[outcome] || HEADLINES.failure;
+  const icon = ICONS[outcome] || ICONS.failure;
   const [statusState, statusDescription] = STATUSES[outcome] || STATUSES.failure;
   const { owner, repo } = context.repo;
   const issueNumber = context.payload.pull_request.number;
   const sha = context.payload.review.commit_id;
   const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
 
-  const links = [`Commit \`${sha.slice(0, 10)}\``, `[Run](${runUrl})`];
+  const links = [`${icon} **${statusDescription}**`, `Commit \`${sha.slice(0, 10)}\``, `[Run](${runUrl})`];
   if (env.ARTIFACT_URL) {
     links.push(`[Evidence](${env.ARTIFACT_URL})`);
   }
   const marker = `<!-- e2e-pr-report:${testName} -->`;
-  const lines = [marker, `### ${icon} \`${testName}\` ${verb}`, "", links.join(" · ")];
+  const lines = [marker, `### ${env.TITLE || testName}`, "", links.join(" · ")];
   if (env.STATE !== "started") {
     const expected = env.EXPECTED_RESULTS.split(/\s+/).filter(Boolean);
     const results = readResults(env.RESULTS_DIR, expected);
