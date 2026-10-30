@@ -528,13 +528,16 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
-    use futures_util::{future::ready, stream};
+    use std::time::Duration;
+
+    use futures_util::{StreamExt as _, future::ready, stream};
     use vector_lib::{
         EstimatedJsonEncodedSizeOf,
         codecs::{
             JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
             encoding::FramingConfig,
         },
+        event::{BatchNotifier, BatchStatus},
         partition::Partitioner,
         request_metadata::GroupedCountByteSize,
     };
@@ -543,8 +546,10 @@ mod tests {
     use super::*;
     use crate::{
         event::LogEvent,
+        sinks::util::test::build_test_server,
         template::{ConfinementConfig, Template},
         test_util::{
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
             http::{always_200_response, spawn_blackhole_http_server},
         },
@@ -601,6 +606,47 @@ mod tests {
 
         let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+    }
+
+    #[tokio::test]
+    async fn retries_on_no_connection() {
+        let (_guard, addr) = next_addr();
+
+        let context = SinkContext::default();
+        let client = HttpClient::new(TlsSettings::default().into(), context.proxy())
+            .expect("should not fail to create HTTP client");
+        let endpoint = HttpEndpoint::parse(&format!("http://{addr}")).expect("valid mock endpoint");
+        let config = GcsSinkConfig {
+            endpoint: endpoint.clone(),
+            ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+        };
+        let validated = config.validate().expect("validation should succeed");
+        let sink = config
+            .build_sink(
+                client,
+                endpoint,
+                GcpAuthenticator::None,
+                &context,
+                &validated,
+            )
+            .expect("failed to build sink");
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::Log(LogEvent::from("simple message").with_batch_notifier(&batch));
+        drop(batch);
+        let pump = tokio::spawn(sink.run_events(vec![event]));
+
+        // Start the server only after the sink has failed to connect at least once.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        let (mut rx, trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
+
+        pump.await.unwrap().unwrap();
+        drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        let (parts, _) = rx.next().await.expect("server should receive the request");
+        assert_eq!(parts.method, http::Method::PUT);
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use futures::FutureExt;
 use http_1::StatusCode;
 use snafu::Snafu;
-use vector_http::empty_body;
+use vector_http::{HttpError, empty_body};
 use vector_lib::configurable::configurable_component;
 
 use crate::{
@@ -177,7 +177,7 @@ impl<Request> Clone for GcsRetryLogic<Request> {
 
 // This is a clone of HttpRetryLogic for `GcsResponse`, should get merged
 impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
-    type Error = hyper_1::Error;
+    type Error = HttpError;
     type Request = Request;
     type Response = GcsResponse;
 
