@@ -159,24 +159,12 @@
   margin: 0;
 }
 
-/* VRL release entries end with a paragraph linking both the author and PR. */
-.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
-  @apply mb-0 mt-4 min-w-0 list-none rounded-t-lg border border-b-0 border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm md:px-5;
+/* The opening Markdown bullet is the card body, not an extra visible list. */
+.vrl-changelog-entry > .prose > ul:first-child {
+  @apply m-0 list-none p-0;
 }
-.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])) > li,
-.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) > li {
-  @apply m-0;
-}
-.vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
-  @apply mt-0 rounded-b-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm italic shadow-sm md:px-5;
-}
-.dark .vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.dark .vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]),
-.dark .vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
-.dark .vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
-  @apply border-gray-700 bg-gray-800/40;
+.vrl-changelog-entry > .prose > ul:first-child > li {
+  @apply m-0 p-0;
 }
 
 /* Dark mode prose overrides */
@@ -251,6 +239,39 @@
   --aa-primary-color-rgb: var(--dark-rgb);
   --aa-input-border-color-rgb: var(--dark-rgb);
   --aa-input-border-color-alpha: 0.25;
+}
+
+/* Neutral surfaces make long release notes easier to scan in dark mode.
+   Keep this palette local to release pages, including their navigation. */
+.dark .release-page {
+  --color-dark: var(--color-neutral-900);
+  --color-gray-100: var(--color-neutral-100);
+  --color-gray-200: var(--color-neutral-200);
+  --color-gray-300: var(--color-neutral-300);
+  --color-gray-400: var(--color-neutral-400);
+  --color-gray-500: var(--color-neutral-500);
+  --color-gray-600: var(--color-neutral-600);
+  --color-gray-700: var(--color-neutral-700);
+  --color-gray-800: var(--color-neutral-800);
+  --color-gray-900: var(--color-neutral-900);
+}
+
+.dark .release-page .changelog-card {
+  background-color: var(--color-neutral-800);
+}
+
+.dark .release-page .prose code:not([class^="language-"]) {
+  background-color: color-mix(in oklab, var(--color-neutral-700) 50%, var(--color-neutral-800));
+}
+
+.dark .release-page .prose pre,
+.dark .release-page .prose .chroma,
+.dark .release-page .has-copy-button {
+  background-color: var(--color-neutral-900);
+}
+
+.dark .release-page #toc {
+  border-color: var(--color-neutral-700);
 }
 
 @layer components {
