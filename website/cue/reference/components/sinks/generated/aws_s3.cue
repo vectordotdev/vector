@@ -146,6 +146,27 @@ generated: components: sinks: aws_s3: configuration: {
 					}
 				}
 			}
+			max_row_group_bytes: {
+				description: """
+					The maximum estimated encoded size of a row group.
+
+					A row group is written out once its encoded size reaches this limit, so lower
+					values bound the memory held by an open file at the cost of more, smaller row
+					groups, which are less efficient to query. Unset by default, in which case
+					row groups are limited only by `max_row_group_rows`.
+					"""
+				required: false
+				type: uint: unit: "bytes"
+			}
+			max_row_group_rows: {
+				description: """
+					The maximum number of rows in a row group.
+
+					Defaults to the Parquet writer default of 1048576 rows.
+					"""
+				required: false
+				type: uint: unit: "events"
+			}
 			schema_file: {
 				description: """
 					Path to a native Parquet schema file (`.schema`).
@@ -256,6 +277,46 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: bool: default: false
+	}
+	encoded_batch: {
+		description: """
+			Size and age limits for each Parquet object when `batch_encoding` is set.
+
+			Without this setting, every `batch` becomes one object and the whole batch is
+			held in memory until it is encoded. With it, `batch` only controls how many
+			events are encoded at a time, and these limits decide when the object is uploaded.
+			"""
+		required: false
+		type: object: options: {
+			max_bytes: {
+				description: """
+					The maximum encoded size of an object before it is uploaded.
+
+					This is measured on the compressed Parquet output, so an object can hold
+					many times this amount of raw event data. The limit is checked after each
+					`batch` is appended, so an object can exceed it by the encoded size of one
+					batch.
+					"""
+				required: false
+				type: uint: {
+					default: 134217728
+					unit:    "bytes"
+				}
+			}
+			max_events: {
+				description: "The maximum number of events in an object before it is uploaded."
+				required:    false
+				type: uint: unit: "events"
+			}
+			timeout_secs: {
+				description: "The maximum age of an object, measured from its first batch, before it is uploaded."
+				required:    false
+				type: float: {
+					default: 300.0
+					unit:    "seconds"
+				}
+			}
+		}
 	}
 	encoding: {
 		description: """

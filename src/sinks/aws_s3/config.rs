@@ -3,7 +3,9 @@ use tower::ServiceBuilder;
 #[cfg(feature = "codecs-parquet")]
 use vector_lib::codecs::BatchEncoder;
 #[cfg(feature = "codecs-parquet")]
-use vector_lib::codecs::encoding::{BatchSerializerConfig, format::ParquetSerializerConfig};
+use vector_lib::codecs::encoding::{
+    BatchSerializerConfig, ParquetSerializer, format::ParquetSerializerConfig,
+};
 use vector_lib::{
     TimeZone,
     codecs::{
@@ -15,7 +17,11 @@ use vector_lib::{
     stream::BatcherSettings,
 };
 
+#[cfg(feature = "codecs-parquet")]
+use super::parquet_sink::S3ParquetSink;
 use super::sink::S3RequestOptions;
+#[cfg(feature = "codecs-parquet")]
+use crate::sinks::util::parquet_batcher::ParquetBatcherSettings;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
@@ -54,6 +60,82 @@ pub enum S3BatchEncoding {
     ///
     /// [apache_parquet]: https://parquet.apache.org/
     Parquet(ParquetSerializerConfig),
+}
+
+/// Limits for each Parquet object produced with `batch_encoding`.
+///
+/// When set, the sink encodes Parquet incrementally: each `batch` of events is
+/// appended to an open Parquet object for its partition as soon as it is
+/// collected, and the object is uploaded once one of these limits is reached.
+/// Memory usage then tracks the compressed object plus a single `batch`, instead
+/// of holding every event of the object in memory until it is encoded.
+#[cfg(feature = "codecs-parquet")]
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+pub struct EncodedBatchConfig {
+    /// The maximum encoded size of an object before it is uploaded.
+    ///
+    /// This is measured on the compressed Parquet output, so an object can hold
+    /// many times this amount of raw event data. The limit is checked after each
+    /// `batch` is appended, so an object can exceed it by the encoded size of one
+    /// batch.
+    #[serde(default = "default_encoded_batch_max_bytes")]
+    #[configurable(validation(range(min = 1)))]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_bytes: usize,
+
+    /// The maximum number of events in an object before it is uploaded.
+    #[serde(default)]
+    #[configurable(metadata(docs::type_unit = "events"))]
+    pub max_events: Option<usize>,
+
+    /// The maximum age of an object, measured from its first batch, before it is uploaded.
+    #[serde(default = "default_encoded_batch_timeout_secs")]
+    #[configurable(validation(range(min = 0.0)))]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Timeout"))]
+    pub timeout_secs: f64,
+}
+
+#[cfg(feature = "codecs-parquet")]
+const fn default_encoded_batch_max_bytes() -> usize {
+    128 * 1024 * 1024
+}
+
+#[cfg(feature = "codecs-parquet")]
+const fn default_encoded_batch_timeout_secs() -> f64 {
+    300.0
+}
+
+#[cfg(feature = "codecs-parquet")]
+impl Default for EncodedBatchConfig {
+    fn default() -> Self {
+        Self {
+            max_bytes: default_encoded_batch_max_bytes(),
+            max_events: None,
+            timeout_secs: default_encoded_batch_timeout_secs(),
+        }
+    }
+}
+
+#[cfg(feature = "codecs-parquet")]
+impl EncodedBatchConfig {
+    fn into_settings(self) -> crate::Result<ParquetBatcherSettings> {
+        if self.max_bytes == 0 {
+            return Err("`encoded_batch.max_bytes` must be greater than 0".into());
+        }
+        if self.max_events == Some(0) {
+            return Err("`encoded_batch.max_events` must be greater than 0".into());
+        }
+        if !(self.timeout_secs > 0.0 && self.timeout_secs.is_finite()) {
+            return Err("`encoded_batch.timeout_secs` must be a positive number".into());
+        }
+        Ok(ParquetBatcherSettings {
+            max_bytes: self.max_bytes,
+            max_events: self.max_events.unwrap_or(usize::MAX),
+            timeout: std::time::Duration::from_secs_f64(self.timeout_secs),
+        })
+    }
 }
 
 /// Configuration for the `aws_s3` sink.
@@ -137,6 +219,15 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub batch_encoding: Option<S3BatchEncoding>,
 
+    /// Size and age limits for each Parquet object when `batch_encoding` is set.
+    ///
+    /// Without this setting, every `batch` becomes one object and the whole batch is
+    /// held in memory until it is encoded. With it, `batch` only controls how many
+    /// events are encoded at a time, and these limits decide when the object is uploaded.
+    #[cfg(feature = "codecs-parquet")]
+    #[serde(default)]
+    pub encoded_batch: Option<EncodedBatchConfig>,
+
     /// Compression configuration.
     ///
     /// All compression algorithms use the default compression level unless otherwise specified.
@@ -205,6 +296,8 @@ impl GenerateConfig for S3SinkConfig {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             #[cfg(feature = "codecs-parquet")]
             batch_encoding: None,
+            #[cfg(feature = "codecs-parquet")]
+            encoded_batch: None,
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -245,6 +338,8 @@ impl SinkConfig for S3SinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedAwsS3 {
     batch_settings: BatcherSettings,
+    #[cfg(feature = "codecs-parquet")]
+    encoded_batch: Option<ParquetBatcherSettings>,
     key_prefix: ConfinedTemplate,
     ssekms_key_id: Option<ConfinedTemplate>,
 }
@@ -256,6 +351,15 @@ impl ValidatedSink for S3SinkConfig {
     fn validate(&self) -> crate::Result<ValidatedAwsS3> {
         self.encoding.validate()?;
         let batch_settings = self.batch.into_batcher_settings()?;
+
+        #[cfg(feature = "codecs-parquet")]
+        let encoded_batch = match (&self.batch_encoding, self.encoded_batch) {
+            (None, Some(_)) => {
+                return Err("`encoded_batch` requires `batch_encoding` to be set".into());
+            }
+            (Some(_), Some(encoded_batch)) => Some(encoded_batch.into_settings()?),
+            (_, None) => None,
+        };
 
         let key_prefix = Template::try_from(self.key_prefix.clone())?.confine(
             &self.confinement,
@@ -274,6 +378,8 @@ impl ValidatedSink for S3SinkConfig {
 
         Ok(ValidatedAwsS3 {
             batch_settings,
+            #[cfg(feature = "codecs-parquet")]
+            encoded_batch,
             key_prefix,
             ssekms_key_id,
         })
@@ -368,11 +474,25 @@ impl S3SinkConfig {
                 filename_extension,
                 filename_time_format: self.filename_time_format.clone(),
                 filename_append_uuid: self.filename_append_uuid,
-                encoder: (transformer, encoder),
+                encoder: (transformer.clone(), encoder),
                 // Batch formats handle their own compression internally
                 compression: Compression::None,
                 filename_tz_offset: offset,
             };
+
+            if let Some(parquet_settings) = validated.encoded_batch {
+                let serializer = ParquetSerializer::new(parquet_config.clone())?;
+                let sink = S3ParquetSink::new(
+                    service,
+                    request_options,
+                    partitioner,
+                    batch_settings,
+                    parquet_settings,
+                    serializer,
+                    transformer,
+                );
+                return Ok(VectorSink::from_event_streamsink(sink));
+            }
 
             let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
             return Ok(VectorSink::from_event_streamsink(sink));
@@ -516,6 +636,7 @@ mod tests {
             region: crate::aws::RegionOrEndpoint::with_both("us-east-1", "http://localhost:4566"),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             batch_encoding: Some(super::S3BatchEncoding::Parquet(parquet_config)),
+            encoded_batch: None,
             compression: Compression::None,
             batch: BatchConfig::<BulkSizeBasedDefaultBatchSettings>::default(),
             request: TowerRequestConfig::default(),
@@ -693,5 +814,101 @@ mod tests {
             .as_mut_log()
             .insert(event_path!("tenant"), "../../escape");
         assert!(template.render_string(&event).is_err());
+    }
+
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn encoded_batch_parses_and_validates() {
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: auto_infer
+            encoded_batch:
+              max_bytes: 268435456
+              max_events: 5000000
+              timeout_secs: 600
+            "})
+        .expect("encoded_batch should parse");
+
+        let encoded_batch = config.encoded_batch.expect("encoded_batch should be Some");
+        assert_eq!(encoded_batch.max_bytes, 268_435_456);
+        assert_eq!(encoded_batch.max_events, Some(5_000_000));
+        assert_eq!(encoded_batch.timeout_secs, 600.0);
+
+        let validated = config.validate().expect("validation should succeed");
+        let settings = validated.encoded_batch.expect("settings should be derived");
+        assert_eq!(settings.max_bytes, 268_435_456);
+        assert_eq!(settings.max_events, 5_000_000);
+        assert_eq!(settings.timeout, std::time::Duration::from_mins(10));
+    }
+
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn encoded_batch_defaults() {
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
+            bucket: test-bucket
+            compression: none
+            encoding:
+              codec: text
+            batch_encoding:
+              codec: parquet
+              schema_mode: auto_infer
+            encoded_batch: {}
+            "})
+        .expect("empty encoded_batch should parse");
+
+        let settings = config
+            .validate()
+            .expect("validation should succeed")
+            .encoded_batch
+            .expect("settings should be derived");
+        assert_eq!(settings.max_bytes, 128 * 1024 * 1024);
+        assert_eq!(settings.max_events, usize::MAX);
+        assert_eq!(settings.timeout, std::time::Duration::from_mins(5));
+    }
+
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn encoded_batch_requires_batch_encoding() {
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
+            bucket: test-bucket
+            encoding:
+              codec: json
+            encoded_batch:
+              max_bytes: 1048576
+            "})
+        .expect("config should parse");
+
+        let error = config
+            .validate()
+            .expect_err("encoded_batch without batch_encoding should be rejected");
+        assert!(error.to_string().contains("batch_encoding"), "{error}");
+    }
+
+    #[cfg(feature = "codecs-parquet")]
+    #[test]
+    fn encoded_batch_rejects_zero_limits() {
+        for section in ["max_bytes: 0", "max_events: 0", "timeout_secs: 0"] {
+            let config: S3SinkConfig = serde_yaml::from_str(&format!(
+                indoc::indoc! {r"
+                    bucket: test-bucket
+                    compression: none
+                    encoding:
+                      codec: text
+                    batch_encoding:
+                      codec: parquet
+                      schema_mode: auto_infer
+                    encoded_batch:
+                      {section}
+                    "},
+                section = section
+            ))
+            .expect("config should parse");
+            assert!(config.validate().is_err(), "`{section}` should be rejected");
+        }
     }
 }

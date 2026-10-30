@@ -282,6 +282,54 @@ components: sinks: aws_s3: components._aws & {
 				algorithm = "snappy"
 				```
 
+				#### Incremental encoding and object size
+
+				By default each `batch` becomes one Parquet object, and the whole batch is
+				held in memory until it is encoded. Because `batch.max_bytes` counts the
+				in-memory size of the events, producing large objects this way needs many
+				times the object size in memory.
+
+				Set `encoded_batch` to encode incrementally instead. Each `batch` is then
+				appended to an open Parquet object for its partition as soon as it is
+				collected, and the object is uploaded once its encoded size reaches
+				`encoded_batch.max_bytes`, it holds `encoded_batch.max_events` events, or
+				`encoded_batch.timeout_secs` have passed since its first batch. Memory usage
+				tracks the compressed object plus one `batch`, so use a small `batch` and
+				size the object with `encoded_batch`:
+
+				```yaml
+				sinks:
+				  s3_parquet:
+				    type: aws_s3
+				    inputs:
+				      - my-source
+				    bucket: my-analytics-bucket
+				    key_prefix: "logs/date=%F"
+				    compression: none
+				    encoding:
+				      codec: text
+				    batch_encoding:
+				      codec: parquet
+				      schema_file: /etc/vector/schemas/logs.schema
+				      compression:
+				        algorithm: zstd
+				        level: 3
+				    batch:
+				      max_bytes: 8388608
+				      timeout_secs: 5
+				    encoded_batch:
+				      max_bytes: 268435456
+				      timeout_secs: 300
+				```
+
+				The Parquet writer also buffers the row group it is building until it reaches
+				`batch_encoding.max_row_group_rows` (1048576 by default) or
+				`batch_encoding.max_row_group_bytes`. Set `max_row_group_bytes` to bound that
+				buffer as well, at the cost of more, smaller row groups.
+
+				With `schema_mode: auto_infer`, the schema of an object is inferred from its
+				first batch; later batches with new fields have those fields dropped.
+
 				#### YAML example
 
 				```yaml
