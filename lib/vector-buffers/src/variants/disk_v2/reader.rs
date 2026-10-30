@@ -434,6 +434,7 @@ where
     data_file_record_count: u64,
     data_file_marked_record_count: u64,
     ready_to_read: bool,
+    input_exhausted: bool,
     record_acks: OrderedAcknowledgements<u64, u64>,
     data_file_acks: OrderedAcknowledgements<u64, ()>,
     finalizer: OrderedFinalizer<u64>,
@@ -461,6 +462,7 @@ where
             data_file_record_count: 0,
             data_file_marked_record_count: 0,
             ready_to_read: false,
+            input_exhausted: false,
             record_acks: OrderedAcknowledgements::from_acked(next_expected_record_id),
             data_file_acks: OrderedAcknowledgements::from_acked(0),
             finalizer,
@@ -996,8 +998,10 @@ where
 
     /// Reads a record.
     ///
-    /// If the writer is closed and there is no more data in the buffer, `None` is returned.
+    /// If the writer is closed and all readable records have been returned, `None` is returned.
     /// Otherwise, reads the next record or waits until the next record is available.
+    /// After EOF, call [`Self::finish`] to process outstanding acknowledgements and persist the
+    /// reader checkpoint. EOF alone does not acknowledge records.
     ///
     /// # Errors
     ///
@@ -1008,6 +1012,10 @@ where
     // source lines count even when the feature is off, so the allow is unconditional.
     #[allow(clippy::too_many_lines)]
     pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
+        if self.input_exhausted {
+            return Ok(None);
+        }
+
         let mut force_check_pending_data_files = false;
 
         let token = loop {
@@ -1034,9 +1042,14 @@ where
             // corrupted records, but hadn't yet had a "good" record that we could read, since the
             // "we skipped records due to corruption" logic requires performing valid read to
             // detect, and calculate a valid delta from.
-            if self.ledger.is_writer_done() {
+            // Observe closure before the file IDs and read below. If closure races with the
+            // read, its notification makes us retry, so a final write or rollover cannot be
+            // mistaken for EOF.
+            let writer_done = self.ledger.is_writer_done();
+            if writer_done {
                 let total_buffer_size = self.ledger.get_total_buffer_size();
                 if total_buffer_size == 0 {
+                    self.input_exhausted = self.ready_to_read;
                     return Ok(None);
                 }
             }
@@ -1133,10 +1146,8 @@ where
             // make progress now.  If the wake-up was valid, due to writer progress, then, well...
             // we'd actually be able to read data.
             //
-            // The case of "the writer has closed/dropped/finished/etc" is handled at the top of the
-            // loop, because otherwise we could get stuck waiting for the writer after an empty
-            // `try_read_record` attempt when the writer is done and we're at the end of the file,
-            // etc.
+            // Once the writer is closed, EOF in its final file ends input even if records are
+            // awaiting acknowledgements. Downstream batchers need EOF to flush those records.
             if self.ready_to_read {
                 if reader_file_id != writer_file_id {
                     debug!(
@@ -1147,6 +1158,11 @@ where
                     self.roll_to_next_data_file();
                     force_check_pending_data_files = true;
                     continue;
+                }
+
+                if writer_done {
+                    self.input_exhausted = true;
+                    return Ok(None);
                 }
 
                 self.ledger.wait_for_writer().await;
@@ -1234,6 +1250,32 @@ where
         }
 
         Ok(Some(record))
+    }
+
+    /// Waits for outstanding acknowledgements and persists the reader checkpoint after EOF.
+    ///
+    /// This does not read or acknowledge records. Callers must first drain input with
+    /// [`Self::next`] and allow downstream consumers to finalize the returned records.
+    /// Cancellation leaves uncheckpointed records available for replay.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if input has not reached runtime EOF or checkpoint persistence fails.
+    pub async fn finish(&mut self) -> io::Result<()> {
+        if !self.input_exhausted {
+            return Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "cannot finish a disk buffer before input EOF",
+            ));
+        }
+
+        loop {
+            self.handle_pending_acknowledgements(true)?;
+            if self.ledger.get_total_buffer_size() == 0 {
+                return self.ledger.flush_reader_file_checkpoint();
+            }
+            self.ledger.wait_for_writer().await;
+        }
     }
 }
 

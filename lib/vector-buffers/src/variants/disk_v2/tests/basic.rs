@@ -1,16 +1,15 @@
 use std::{io::Cursor, sync::Arc, time::Duration};
 
 use futures::{StreamExt, stream};
-use tokio::{select, time::sleep};
+use tokio::time::timeout;
 use tokio_test::{assert_pending, task::spawn};
-use tracing::Instrument;
 use vector_common::finalization::Finalizable;
 
 use super::{
     create_default_buffer_v2, create_default_buffer_v2_with_usage, read_next, read_next_some,
 };
 use crate::{
-    EventCount, assert_buffer_is_empty, assert_buffer_records,
+    EventCount, assert_buffer_is_empty,
     buffer_usage_data::BufferUsageHandle,
     test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{BufferWriter, DiskBufferConfigBuilder, Ledger, writer::RecordWriter},
@@ -52,6 +51,7 @@ async fn basic_read_write_loop() {
                     acknowledge(record.take_finalizers()).await;
                     items.push(record);
                 }
+                reader.finish().await.unwrap();
                 items
             });
 
@@ -69,86 +69,149 @@ async fn basic_read_write_loop() {
     .await;
 }
 
-#[ignore = "flaky. See https://github.com/vectordotdev/vector/issues/23456"]
 #[tokio::test]
-async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
-    let assertion_registry = install_tracing_helpers();
+async fn reader_eof_precedes_acknowledgement_completion() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut writer, mut reader, ledger) = create_default_buffer_v2(dir.path()).await;
+    writer.write_record(SizedRecord::new(32)).await.unwrap();
+    writer.flush().await.unwrap();
+    writer.close();
 
-    let fut = with_temp_dir(|dir| {
-        let data_dir = dir.to_path_buf();
+    let record = read_next_some(&mut reader).await;
+    let checkpoint = ledger.state().get_last_reader_record_id();
+    let outstanding_bytes = ledger.get_total_buffer_size();
+    assert!(outstanding_bytes > 0);
+    assert!(
+        timeout(Duration::from_secs(1), read_next(&mut reader))
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(read_next(&mut reader).await.is_none());
+    assert_eq!(ledger.state().get_last_reader_record_id(), checkpoint);
+    assert_eq!(ledger.get_total_buffer_size(), outstanding_bytes);
 
-        async move {
-            // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
-            assert_buffer_is_empty!(ledger);
+    let mut finish = spawn(reader.finish());
+    assert_pending!(finish.poll());
+    acknowledge(record).await;
+    timeout(Duration::from_secs(1), finish)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_buffer_is_empty!(ledger);
+    assert_eq!(ledger.state().get_last_reader_record_id(), checkpoint + 1);
+    reader.finish().await.unwrap();
+}
 
-            // Now write a single value and close the writer.
-            writer
-                .write_record(SizedRecord::new(32))
-                .await
-                .expect("write should not fail");
-            writer.flush().await.expect("writer flush should not fail");
-            writer.close();
-            assert_buffer_records!(ledger, 1);
+#[tokio::test]
+async fn reader_finish_requires_runtime_eof() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut writer, mut reader, _) = create_default_buffer_v2::<_, SizedRecord>(dir.path()).await;
+    assert_eq!(
+        reader.finish().await.unwrap_err().kind(),
+        std::io::ErrorKind::InvalidInput
+    );
+    writer.close();
+    assert!(read_next(&mut reader).await.is_none());
+    reader.finish().await.unwrap();
+}
 
-            // And read that single value.
-            let first_read = read_next_some(&mut reader).await;
-            assert_eq!(first_read, SizedRecord::new(32));
-            assert_buffer_records!(ledger, 1);
-
-            // Now, we haven't acknowledged that read yet, so our next read should see the writer as
-            // done but the total buffer size as >= 0, which means it has to wait for something,
-            // which in this case is going to be the wakeup after we acknowledge the read.
-            //
-            // We have to poll until we hit the `wait_for_writer` call because there might be
-            // wake-ups in between due to the actual file I/O calls we do in the `next` call waking
-            // us up.
-            //
-            // Why do we need to make sure we enter `wait_for_writer` twice?  When the writer
-            // closes, it always sends a wakeup in case there's a reader that's been (correctly)
-            // waiting for new data.  When we do our first read here, there's data to be read, so
-            // the reader never has to actually wait for the writer to make progress because it
-            // doesn't yet think it's out of data.
-            //
-            // When we do the first poll of the second read, we will call `wait_for_writer` which
-            // has a stored wakeup, which will let it proceed with another loop iteration, landing
-            // it at the second call which is the one that causes it to actually block.
-            let waiting_for_writer = assertion_registry
-                .build()
-                .with_name("wait_for_writer")
-                .with_parent_name("reader_exits_cleanly_when_writer_done_and_in_flight_acks")
-                .was_entered_at_least(2)
-                .finalize();
-            let mut blocked_read = spawn(reader.next());
-            while !waiting_for_writer.try_assert() {
-                assert_pending!(blocked_read.poll());
-            }
-
-            // Now acknowledge the first read, which should wake up our blocked read.
-            acknowledge(first_read).await;
-
-            // Our blocked read should be woken up, and when we poll it, it should be also be ready,
-            // albeit with a return value of `None`... because the writer is closed, and we read all
-            // the records, so nothing is left. :)
-            assert!(blocked_read.is_woken());
-
-            let second_read = select! {
-                // if the reader task finishes in time, extract its output
-                res = blocked_read => res,
-                // otherwise panics after 1s
-                () = sleep(Duration::from_secs(1)) => {
-                    panic!("Reader not ready after 1s");
-                }
-            };
-            assert_eq!(second_read.expect("read should not fail"), None);
-
-            // All records should be consumed at this point.
-            assert_buffer_is_empty!(ledger);
+#[tokio::test]
+async fn reader_completion_controls_replay_after_eof() {
+    for complete in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut writer, mut reader, ledger) =
+            super::create_buffer_v2_with_max_data_file_size(dir.path(), 256).await;
+        let mut records = Vec::new();
+        for size in [128, 129, 130] {
+            writer.write_record(SizedRecord::new(size)).await.unwrap();
+            writer.flush().await.unwrap();
+            records.push(read_next_some(&mut reader).await);
         }
-    });
+        writer.close();
+        assert!(read_next(&mut reader).await.is_none());
+        if complete {
+            for record in records {
+                acknowledge(record).await;
+            }
+            reader.finish().await.unwrap();
+            drop(reader);
+        } else {
+            // Cancel completion while acknowledgements are still held downstream.
+            let mut finish = spawn(reader.finish());
+            assert_pending!(finish.poll());
+            drop(finish);
+            drop(reader);
+            drop(records);
+        }
+        drop(writer);
+        // The finalizer task owns the ledger until its queued notifications have drained.
+        timeout(Duration::from_secs(1), async {
+            while Arc::strong_count(&ledger) != 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(ledger);
 
-    let parent = trace_span!("reader_exits_cleanly_when_writer_done_and_in_flight_acks");
-    fut.instrument(parent.or_current()).await;
+        let (mut writer, mut reader, _) =
+            create_default_buffer_v2::<_, SizedRecord>(dir.path()).await;
+        writer.close();
+        let mut replayed = Vec::new();
+        while let Some(mut record) = read_next(&mut reader).await {
+            acknowledge(record.take_finalizers()).await;
+            replayed.push(record);
+        }
+        reader.finish().await.unwrap();
+        let expected = if complete {
+            vec![]
+        } else {
+            vec![
+                SizedRecord::new(128),
+                SizedRecord::new(129),
+                SizedRecord::new(130),
+            ]
+        };
+        assert_eq!(replayed, expected);
+    }
+}
+
+#[tokio::test]
+async fn reader_observes_final_write_and_rollover_before_eof() {
+    for roll in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut writer, mut reader, ledger) =
+            super::create_buffer_v2_with_max_data_file_size(dir.path(), 256).await;
+        writer.write_record(SizedRecord::new(128)).await.unwrap();
+        writer.flush().await.unwrap();
+        let first = read_next_some(&mut reader).await;
+        let file_id = ledger.get_current_writer_file_id();
+
+        let mut pending_read = spawn(read_next_some(&mut reader));
+        assert_pending!(pending_read.poll());
+        let tail_size = if roll { 128 } else { 1 };
+        writer
+            .write_record(SizedRecord::new(tail_size))
+            .await
+            .unwrap();
+        writer.flush().await.unwrap();
+        writer.close();
+        assert_eq!(ledger.get_current_writer_file_id() != file_id, roll);
+
+        let tail = timeout(Duration::from_secs(1), pending_read).await.unwrap();
+        assert_eq!(tail, SizedRecord::new(tail_size));
+        assert!(
+            timeout(Duration::from_secs(1), read_next(&mut reader))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        acknowledge(first).await;
+        acknowledge(tail).await;
+        reader.finish().await.unwrap();
+        assert_buffer_is_empty!(ledger);
+    }
 }
 
 #[tokio::test]

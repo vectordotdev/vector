@@ -1,17 +1,113 @@
 use std::{
+    num::{NonZeroU64, NonZeroUsize},
     sync::Arc,
     time::{Duration, Instant},
 };
 
+use futures::StreamExt as _;
 use tokio::{pin, sync::Barrier, time::sleep};
+use tokio_test::{assert_pending, task::spawn};
+use vector_common::finalization::Finalizable as _;
 
 use crate::{
-    Bufferable, WhenFull,
+    BufferConfig, BufferType, Bufferable, MemoryBufferSize, WhenFull,
+    test::{SizedRecord, acknowledge},
     topology::{
         channel::{BufferReceiver, BufferSender},
         test_util::{assert_current_send_capacity, build_buffer},
     },
 };
+
+#[tokio::test]
+async fn stream_eof_retains_all_disk_stages_until_completion() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = BufferConfig::Chained(vec![
+        BufferType::Memory {
+            size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()),
+            when_full: WhenFull::Overflow,
+        },
+        BufferType::DiskV2 {
+            max_size: NonZeroU64::new(268_435_488).unwrap(),
+            when_full: WhenFull::Block,
+        },
+    ]);
+    let (mut tx, rx) = config
+        .build::<SizedRecord>(
+            Some(dir.path().to_path_buf()),
+            "overflow".into(),
+            tracing::Span::none(),
+        )
+        .await
+        .unwrap();
+    for size in [32, 64, 96] {
+        tx.send(SizedRecord::new(size), None).await.unwrap();
+    }
+    tx.flush().await.unwrap();
+    drop(tx);
+
+    let mut stream = rx.into_stream();
+    let mut finalizers = Vec::new();
+    while let Some(mut record) = stream.next().await {
+        finalizers.push(record.take_finalizers());
+    }
+    assert_eq!(finalizers.len(), 3);
+    assert!(stream.next().await.is_none());
+    let mut finish = spawn(stream.finish());
+    assert_pending!(finish.poll());
+    for finalizer in finalizers {
+        acknowledge(finalizer).await;
+    }
+    tokio::time::timeout(Duration::from_secs(1), finish)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(stream.next().await.is_none());
+    stream.finish().await.unwrap();
+}
+
+#[tokio::test]
+async fn stream_completion_preserves_idle_and_pending_receivers() {
+    for stage in [
+        BufferType::Memory {
+            size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap()),
+            when_full: WhenFull::Block,
+        },
+        BufferType::DiskV2 {
+            max_size: NonZeroU64::new(268_435_488).unwrap(),
+            when_full: WhenFull::Block,
+        },
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut tx, rx) = BufferConfig::Single(stage)
+            .build::<SizedRecord>(
+                Some(dir.path().to_path_buf()),
+                "reuse".into(),
+                tracing::Span::none(),
+            )
+            .await
+            .unwrap();
+        let mut stream = rx.into_stream();
+        tx.send(SizedRecord::new(32), None).await.unwrap();
+        tx.flush().await.unwrap();
+        stream.finish().await.unwrap();
+        let first = stream.next().await.unwrap();
+        assert_eq!(first, SizedRecord::new(32));
+        acknowledge(first).await;
+
+        let mut pending_read = spawn(stream.next());
+        assert_pending!(pending_read.poll());
+        drop(pending_read);
+        stream.finish().await.unwrap();
+        tx.send(SizedRecord::new(64), None).await.unwrap();
+        tx.flush().await.unwrap();
+        let second = stream.next().await.unwrap();
+        assert_eq!(second, SizedRecord::new(64));
+        acknowledge(second).await;
+        drop(tx);
+        assert!(stream.next().await.is_none());
+        stream.finish().await.unwrap();
+    }
+}
 
 async fn assert_send_ok_with_capacities<T>(
     sender: &mut BufferSender<T>,
