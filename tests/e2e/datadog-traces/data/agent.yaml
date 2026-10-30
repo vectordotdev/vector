@@ -1,0 +1,41 @@
+api_key: DEADBEEF
+hostname: datadog-agent
+log_level: warn
+
+# Disable everything except APM.
+inventories_configuration_enabled: false
+enable_metadata_collection: false
+enable_gohai: false
+cloud_provider_metadata: []
+logs_enabled: false
+use_dogstatsd: false
+process_config:
+  container_collection:
+    enabled: false
+  process_discovery:
+    enabled: false
+
+# Required per https://github.com/DataDog/datadog-agent/tree/main/test/fakeintake#docker
+dd_url: http://fakeintake-agent:80
+
+apm_config:
+  enabled: true
+  apm_non_local_traffic: true
+  # The trace writer sends the same payload body to every endpoint: fakeintake-agent
+  # records exactly what Vector received.
+  apm_dd_url: http://fakeintake-agent:80
+  additional_endpoints:
+    "http://vector:8181":
+      - DEADBEEF
+  # Agent 7.84+ converts traces to indexed payloads (`idxTracerPayloads`) by default,
+  # which the `datadog_agent` source does not decode yet.
+  features:
+    - disable-convert-traces
+  # Drop the frontend healthcheck traces so the captures contain only the scenario.
+  ignore_resources:
+    - "GET /health"
+  # Keep every workload trace; the scenario is far below these limits anyway.
+  max_traces_per_second: 100000
+  errors_per_second: 100000
+  trace_writer:
+    flush_period_seconds: 1

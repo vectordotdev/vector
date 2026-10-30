@@ -1,0 +1,17 @@
+sources:
+  agent:
+    type: datadog_agent
+    address: 0.0.0.0:8181
+    multiple_outputs: true
+    disable_logs: true
+    disable_metrics: true
+    store_api_key: false
+
+sinks:
+  fakeintake:
+    inputs: [agent.traces]
+    type: datadog_traces
+    default_api_key: unused
+    endpoint: http://fakeintake-vector:80
+    batch:
+      timeout_secs: 1

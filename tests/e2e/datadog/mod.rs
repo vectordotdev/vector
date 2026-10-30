@@ -1,5 +1,6 @@
 pub mod logs;
 pub mod metrics;
+pub mod traces;
 
 use reqwest::{Client, Method};
 use serde::{Deserialize, de::DeserializeOwned};
@@ -20,8 +21,7 @@ fn fake_intake_agent_address() -> String {
 struct FakeIntakePayload<D> {
     // When string, base64 encoded
     data: D,
-    #[serde(rename = "encoding")]
-    _encoding: String,
+    encoding: String,
     #[serde(rename = "timestamp")]
     _timestamp: String,
 }
