@@ -26,8 +26,9 @@ function cell(text) {
   return line.replace(/\|/g, '\\|');
 }
 
+// Lists expected results first, in the given order, followed by any unexpected ones.
 function readResults(resultsDir, expected) {
-  const results = new Map();
+  const results = new Map(expected.map(entry => [entry, { name: entry, missing: true }]));
   if (resultsDir && fs.existsSync(resultsDir)) {
     for (const entry of fs.readdirSync(resultsDir).sort()) {
       const file = path.join(resultsDir, entry, 'result.json');
@@ -39,11 +40,6 @@ function readResults(resultsDir, expected) {
       } catch (error) {
         results.set(entry, { name: entry, passed: false, failures: [`Unreadable result.json: ${error.message}`] });
       }
-    }
-  }
-  for (const entry of expected) {
-    if (!results.has(entry)) {
-      results.set(entry, { name: entry, missing: true });
     }
   }
   return [...results.values()];
