@@ -1,0 +1,3 @@
+The `http_client` and `prometheus_scrape` sources now support following HTTP redirects through a new `redirects` option. The `prometheus_scrape` source follows redirects by default, which matches the behavior of Prometheus, while the `http_client` source does not, which preserves the behavior of existing configurations. The scrape timeout applies to the entire redirect chain, 301, 302, and 303 responses switch requests other than `HEAD` to `GET` while 307 and 308 responses preserve the method and the body, and the headers that carry credentials are not forwarded when a redirect points to a different origin unless the `redirects.cross_origin.not_forward_headers` option is configured otherwise.
+
+authors: XYenon titilambert
