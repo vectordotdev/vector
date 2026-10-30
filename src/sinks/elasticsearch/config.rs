@@ -25,7 +25,7 @@ use crate::{
             ElasticsearchCommonMode, ElasticsearchMode, ParseError, VersionType,
             health::ElasticsearchHealthLogic,
             retry::ElasticsearchRetryLogic,
-            service::{ElasticsearchService, HttpRequestBuilder},
+            service::{ElasticsearchResponseService, ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
         },
         util::{
@@ -890,6 +890,7 @@ impl ElasticsearchConfig {
             1,
         );
 
+        let service = ElasticsearchResponseService::new(service);
         let sink = ElasticsearchSink::new(&common, self, service, validated.batch_settings);
 
         let stream = VectorSink::from_event_streamsink(sink);

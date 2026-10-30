@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use http_1::StatusCode;
 use serde::Deserialize;
 use vector_http::HttpError;
@@ -41,6 +43,16 @@ impl EsResultResponse {
         })
     }
 
+    fn successful_events(&self, event_count: usize) -> Option<usize> {
+        if self.items.len() != event_count {
+            return None;
+        }
+        self.items.iter().try_fold(0, |count, item| {
+            let status = StatusCode::from_u16(item.result().status?).ok()?;
+            Some(count + usize::from(status.is_success()))
+        })
+    }
+
     /// Selects the first error since logging all errors would be quite verbose and many are duplicates.
     /// If partial retry is enabled and we don't retry, this is because there is no retriable error in the
     /// response, thus all errors are equally interesting so logging the first is sufficient.
@@ -55,6 +67,12 @@ impl EsResultResponse {
             None => format!("error response: {body}"),
         }
     }
+}
+
+pub(super) fn successful_events(body: &[u8], event_count: usize) -> Option<usize> {
+    serde_json::from_slice::<EsResultResponse>(body)
+        .ok()?
+        .successful_events(event_count)
 }
 
 #[derive(Deserialize, Debug)]
@@ -147,6 +165,9 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             || status.is_server_error()
                                     })
                                 {
+                                    let confirmed = resp
+                                        .successful_events(response.event_count)
+                                        .unwrap_or_default();
                                     return RetryAction::RetryPartial(Box::new(
                                         move |req: ElasticsearchRequest| {
                                             let mut failed_events: Vec<ProcessedEvent> = req
@@ -172,6 +193,8 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             let metadata_builder =
                                                 RequestMetadataBuilder::from_events(&failed_events);
                                             let metadata = metadata_builder.build(&encode_result);
+                                            req.confirmed_events
+                                                .fetch_add(confirmed, Ordering::Relaxed);
                                             ElasticsearchRequest {
                                                 payload: encode_result.into_payload(),
                                                 finalizers,
@@ -181,6 +204,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 original_events: failed_events,
                                                 elasticsearch_request_builder: req
                                                     .elasticsearch_request_builder,
+                                                confirmed_events: req.confirmed_events,
                                             }
                                         },
                                     ));
@@ -209,6 +233,21 @@ mod tests {
 
     use super::*;
     use crate::event::EventStatus;
+
+    #[test]
+    fn successful_events_requires_complete_valid_statuses() {
+        let body = br#"{"items":[{"index":{"status":201}},{"create":{"status":400}},{"update":{"status":200}}]}"#;
+        assert_eq!(successful_events(body, 3), Some(2));
+        assert_eq!(successful_events(body, 2), None);
+
+        for body in [
+            "invalid json",
+            r#"{"items":[{"index":{"status":201}},{"index":{}}]}"#,
+            r#"{"items":[{"index":{"status":201}},{"index":{"status":99}}]}"#,
+        ] {
+            assert_eq!(successful_events(body.as_bytes(), 2), None);
+        }
+    }
 
     #[test]
     fn handles_error_response() {

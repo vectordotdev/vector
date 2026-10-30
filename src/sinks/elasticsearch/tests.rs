@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use futures::stream;
+use futures::{future::BoxFuture, stream};
 use http::{Response, StatusCode};
 use hyper::Body;
 use tower::{ServiceExt, retry::Retry};
@@ -29,7 +29,10 @@ use crate::{
             ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
             VersionType,
             retry::ElasticsearchRetryLogic,
-            service::{ElasticsearchRequest, ElasticsearchService, HttpRequestBuilder},
+            service::{
+                ElasticsearchRequest, ElasticsearchResponseService, ElasticsearchService,
+                HttpRequestBuilder,
+            },
             sink::process_log,
         },
         util::{
@@ -54,32 +57,216 @@ fn parse_unconfined(input: &str) -> UnconfinedTemplate {
     UnconfinedTemplate::try_from(input).unwrap()
 }
 
+#[derive(Clone, Copy)]
+enum PartialRetryResponse {
+    Bulk(&'static [u16]),
+    Status(StatusCode),
+    TransportError,
+}
+
+impl PartialRetryResponse {
+    fn response(self) -> Response<Body> {
+        match self {
+            Self::Bulk(statuses) => Response::new(Body::from(
+                serde_json::json!({
+                    "errors": statuses.iter().any(|status| *status >= 300),
+                    "items": statuses.iter().map(|status| serde_json::json!({
+                        "index": {"status": status}
+                    })).collect::<Vec<_>>()
+                })
+                .to_string(),
+            )),
+            Self::Status(status) => Response::builder()
+                .status(status)
+                .body(Body::from(
+                    r#"{"errors":false,"items":[{"index":{"status":201}}]}"#,
+                ))
+                .unwrap(),
+            Self::TransportError => Response::new(Body::wrap_stream(stream::once(async {
+                Err::<bytes::Bytes, _>(std::io::Error::new(
+                    std::io::ErrorKind::ConnectionReset,
+                    "fixture response body failed",
+                ))
+            }))),
+        }
+    }
+}
+
 #[tokio::test]
 async fn partial_retry_terminal_outcome_metrics() {
-    metrics::init_test();
-    let controller = Controller::get().unwrap();
-    for terminal_status in [
+    for status in [
         StatusCode::NOT_IMPLEMENTED,
         StatusCode::SERVICE_UNAVAILABLE,
         StatusCode::OK,
     ] {
+        let delivered = status.is_success();
+        assert_partial_retry_outcomes(
+            &[
+                PartialRetryResponse::Bulk(&[201, 429]),
+                PartialRetryResponse::Status(status),
+            ],
+            &[2, 1],
+            usize::from(!delivered),
+            if delivered {
+                BatchStatus::Delivered
+            } else {
+                BatchStatus::Errored
+            },
+        )
+        .await;
+    }
+}
+
+#[tokio::test]
+async fn partial_retry_retains_permanent_failure_on_501() {
+    assert_partial_retry_outcomes(
+        &[
+            PartialRetryResponse::Bulk(&[400, 429]),
+            PartialRetryResponse::Status(StatusCode::NOT_IMPLEMENTED),
+        ],
+        &[2, 1],
+        2,
+        BatchStatus::Errored,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn partial_retry_retains_permanent_failure_on_503() {
+    assert_partial_retry_outcomes(
+        &[
+            PartialRetryResponse::Bulk(&[400, 429]),
+            PartialRetryResponse::Status(StatusCode::SERVICE_UNAVAILABLE),
+        ],
+        &[2, 1],
+        2,
+        BatchStatus::Errored,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn partial_retry_retains_permanent_failure_on_success() {
+    assert_partial_retry_outcomes(
+        &[
+            PartialRetryResponse::Bulk(&[400, 429]),
+            PartialRetryResponse::Status(StatusCode::OK),
+        ],
+        &[2, 1],
+        1,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn partial_retry_transport_failure_excludes_confirmed_success() {
+    assert_partial_retry_outcomes(
+        &[
+            PartialRetryResponse::Bulk(&[201, 400, 429]),
+            PartialRetryResponse::TransportError,
+        ],
+        &[3, 1],
+        2,
+        BatchStatus::Rejected,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn partial_retry_accumulates_multiple_permanent_failures() {
+    for status in [StatusCode::NOT_IMPLEMENTED, StatusCode::OK] {
+        let delivered = status.is_success();
+        assert_partial_retry_outcomes(
+            &[
+                PartialRetryResponse::Bulk(&[400, 429, 429]),
+                PartialRetryResponse::Bulk(&[400, 429]),
+                PartialRetryResponse::Status(status),
+            ],
+            &[3, 2, 1],
+            if delivered { 2 } else { 3 },
+            if delivered {
+                BatchStatus::Delivered
+            } else {
+                BatchStatus::Errored
+            },
+        )
+        .await;
+    }
+}
+
+#[tokio::test]
+async fn partial_retry_zero_budget_preserves_terminal_count() {
+    assert_partial_retry_outcomes(
+        &[PartialRetryResponse::Bulk(&[400, 429])],
+        &[2],
+        2,
+        BatchStatus::Rejected,
+    )
+    .await;
+    assert_partial_retry_outcomes(
+        &[PartialRetryResponse::Bulk(&[201, 429])],
+        &[2],
+        1,
+        BatchStatus::Rejected,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn partial_retry_terminal_bulk_excludes_confirmed_successes() {
+    assert_partial_retry_outcomes(
+        &[
+            PartialRetryResponse::Bulk(&[201, 400, 429, 429]),
+            PartialRetryResponse::Bulk(&[201, 400]),
+        ],
+        &[4, 2],
+        2,
+        BatchStatus::Rejected,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn partial_retry_accumulates_confirmed_successes() {
+    for status in [StatusCode::NOT_IMPLEMENTED, StatusCode::OK] {
+        let delivered = status.is_success();
+        assert_partial_retry_outcomes(
+            &[
+                PartialRetryResponse::Bulk(&[201, 429, 429]),
+                PartialRetryResponse::Bulk(&[201, 429]),
+                PartialRetryResponse::Status(status),
+            ],
+            &[3, 2, 1],
+            usize::from(!delivered),
+            if delivered {
+                BatchStatus::Delivered
+            } else {
+                BatchStatus::Errored
+            },
+        )
+        .await;
+    }
+}
+
+fn assert_partial_retry_outcomes<'a>(
+    responses: &'a [PartialRetryResponse],
+    expected_batch_sizes: &'a [usize],
+    expected_discarded: usize,
+    expected_status: BatchStatus,
+) -> BoxFuture<'a, ()> {
+    Box::pin(async move {
+        metrics::init_test();
+        let controller = Controller::get().unwrap();
         controller.reset();
         let (_guard, addr) = next_addr();
         let attempts = Arc::new(AtomicUsize::new(0));
         let server_attempts = Arc::clone(&attempts);
+        let responses = responses.to_vec();
+        let max_retries = responses.len() - 1;
         let (_rx, trigger, server) = build_test_server_generic(addr, move || {
-            if server_attempts.fetch_add(1, Ordering::Relaxed) == 0 {
-                Response::new(Body::from(
-                    r#"{"errors":true,"items":[{"index":{"status":201}},{"index":{"status":429}}]}"#,
-                ))
-            } else {
-                Response::builder()
-                    .status(terminal_status)
-                    .body(Body::from(
-                        r#"{"errors":false,"items":[{"index":{"status":201}}]}"#,
-                    ))
-                    .unwrap()
-            }
+            let attempt = server_attempts.fetch_add(1, Ordering::Relaxed);
+            responses[attempt.min(responses.len() - 1)].response()
         });
         let server = tokio::spawn(server);
         let config = ElasticsearchConfig {
@@ -97,7 +284,7 @@ async fn partial_retry_terminal_outcome_metrics() {
                 request
             });
         let retry_policy = FibonacciRetryPolicy::new(
-            1,
+            max_retries,
             Duration::from_millis(1),
             Duration::from_millis(1),
             ElasticsearchRetryLogic {
@@ -105,12 +292,11 @@ async fn partial_retry_terminal_outcome_metrics() {
             },
             JitterMode::None,
         );
-        let service = Retry::new(retry_policy, service);
+        let service = ElasticsearchResponseService::new(Retry::new(retry_policy, service));
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events = ["accepted", "retry"]
-            .into_iter()
-            .map(|message| {
-                let log = LogEvent::from(message).with_batch_notifier(&batch);
+        let events = (0..expected_batch_sizes[0])
+            .map(|id| {
+                let log = LogEvent::from(format!("event-{id}")).with_batch_notifier(&batch);
                 process_log(log, &common.mode, None, &config.encoding).unwrap()
             })
             .collect();
@@ -119,43 +305,59 @@ async fn partial_retry_terminal_outcome_metrics() {
         let (metadata, metadata_builder, events) = builder.split_input(events);
         let encoded = builder.encode_events(events).unwrap();
         let request = builder.build_request(metadata, metadata_builder.build(&encoded), encoded);
-
-        let driver = Driver::new(stream::iter([request]), service);
-        driver.run().await.unwrap();
+        Driver::new(stream::iter([request]), service)
+            .run()
+            .await
+            .unwrap();
         drop(trigger);
         server.await.unwrap().unwrap();
-
-        let delivered = terminal_status.is_success();
-        assert_eq!(
-            receiver.await,
-            if delivered {
-                BatchStatus::Delivered
-            } else {
-                BatchStatus::Errored
-            },
-            "{terminal_status}"
+        assert_eq!(receiver.await, expected_status);
+        assert_eq!(attempts.load(Ordering::Relaxed), expected_batch_sizes.len());
+        assert_eq!(*batch_sizes.lock().unwrap(), expected_batch_sizes);
+        assert_partial_retry_metrics(
+            controller,
+            expected_discarded,
+            expected_status,
+            *expected_batch_sizes.last().unwrap(),
         );
-        assert_eq!(attempts.load(Ordering::Relaxed), 2, "{terminal_status}");
-        assert_eq!(*batch_sizes.lock().unwrap(), [2, 1], "{terminal_status}");
+    })
+}
 
-        let metrics = controller.capture_metrics();
-        for name in ["component_errors_total", "component_discarded_events_total"] {
-            let count: f64 = metrics
-                .iter()
-                .filter(|metric| metric.name() == name)
-                .map(|metric| {
-                    let MetricValue::Counter { value } = metric.value() else {
-                        panic!("{name} must be a counter");
-                    };
-                    *value
-                })
-                .sum();
-            assert_eq!(
-                count,
-                if delivered { 0.0 } else { 1.0 },
-                "{terminal_status}: {name}"
-            );
-        }
+fn assert_partial_retry_metrics(
+    controller: &Controller,
+    discarded: usize,
+    status: BatchStatus,
+    final_batch_size: usize,
+) {
+    let metrics = controller.capture_metrics();
+    let sent = if status == BatchStatus::Delivered {
+        final_batch_size
+    } else {
+        0
+    };
+    let errors = usize::from(status != BatchStatus::Delivered || discarded > 0);
+    for (name, expected) in [
+        ("component_discarded_events_total", discarded),
+        ("component_errors_total", errors),
+        ("component_sent_events_total", sent),
+    ] {
+        let value = metrics
+            .iter()
+            .filter(|metric| metric.name() == name)
+            .map(|metric| {
+                let MetricValue::Counter { value } = metric.value() else {
+                    panic!("{name} must be a counter")
+                };
+                *value
+            })
+            .sum();
+        assert_eq!(
+            MetricValue::Counter { value },
+            MetricValue::Counter {
+                value: f64::from(u32::try_from(expected).unwrap())
+            },
+            "{name}"
+        );
     }
 }
 

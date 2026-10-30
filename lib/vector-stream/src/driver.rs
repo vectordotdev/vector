@@ -21,7 +21,8 @@ pub trait DriverResponse {
 
     /// Number of events discarded by this terminal response, when known.
     /// Partial retries can reduce this below the original request's event count.
-    /// Defaults to using the original request's count.
+    /// A successful response can still report permanent failures from earlier attempts.
+    /// Defaults to using the original request's count for failed responses.
     fn events_dropped(&self) -> Option<usize> {
         None
     }
@@ -256,6 +257,9 @@ where
                     }
 
                     response.events_sent().emit_event(events_sent);
+                    if let Some(count) = response.events_dropped().filter(|count| *count > 0) {
+                        Self::emit_call_error(response.error(), request_id, count);
+                    }
                 } else if matches!(
                     response.event_status(),
                     EventStatus::Rejected | EventStatus::Errored
@@ -498,6 +502,7 @@ mod tests {
         let controller = Controller::get().unwrap();
         for (status, dropped, expected_batch_status, expected_discarded) in [
             (Some(Delivered), None, BatchStatus::Delivered, 0.0),
+            (Some(Delivered), Some(1), BatchStatus::Delivered, 1.0),
             (Some(Rejected), None, BatchStatus::Rejected, 3.0),
             (Some(Errored), None, BatchStatus::Errored, 3.0),
             (Some(Rejected), Some(1), BatchStatus::Rejected, 1.0),
@@ -511,14 +516,15 @@ mod tests {
             let sizes: GroupedCountByteSize = CountByteSize(event_count, JsonSize::new(12)).into();
             let request = DelayRequest(
                 EventFinalizers::new(EventFinalizer::new(batch)),
-                RequestMetadata::new(event_count, 12, 12, 12, sizes.clone()),
+                RequestMetadata::new(event_count, 12, 12, 12, sizes),
             );
             let service = tower::service_fn(move |_: DelayRequest| {
                 std::future::ready(match status {
                     Some(status) => Ok(StatusResponse(
                         status,
                         if status == EventStatus::Delivered {
-                            sizes.clone()
+                            CountByteSize(event_count - dropped.unwrap_or(0), JsonSize::new(12))
+                                .into()
                         } else {
                             GroupedCountByteSize::default()
                         },
@@ -552,13 +558,21 @@ mod tests {
             assert_eq!(
                 counter("component_sent_events_total"),
                 MetricValue::Counter {
-                    value: if delivered { 3.0 } else { 0.0 }
+                    value: if delivered {
+                        3.0 - expected_discarded
+                    } else {
+                        0.0
+                    }
                 }
             );
             assert_eq!(
                 counter("component_errors_total"),
                 MetricValue::Counter {
-                    value: if delivered { 0.0 } else { 1.0 }
+                    value: if delivered && dropped.unwrap_or(0) == 0 {
+                        0.0
+                    } else {
+                        1.0
+                    }
                 }
             );
             assert_eq!(
@@ -567,7 +581,7 @@ mod tests {
                     value: expected_discarded
                 }
             );
-            if !delivered {
+            if !delivered || dropped.unwrap_or(0) > 0 {
                 let discarded = metrics
                     .iter()
                     .find(|metric| metric.name() == "component_discarded_events_total")
