@@ -64,6 +64,33 @@ function resultRow(result) {
   return `| ${cell(result.name)} | ❌ ${shown.join('<br>') || 'Failed'} |`;
 }
 
+// Collapses this test's earlier reports as outdated so only the newest one stays expanded.
+async function hideOlderReports({ github, owner, repo, issueNumber, marker, current }) {
+  const comments = await github.paginate(github.rest.issues.listComments, {
+    owner,
+    repo,
+    issue_number: issueNumber,
+    per_page: 100,
+  });
+  const older = comments.filter(comment =>
+    comment.id !== current.id
+    && comment.user.login === current.user.login
+    && comment.body.startsWith(marker));
+  if (older.length === 0) {
+    return;
+  }
+  const { nodes } = await github.graphql(
+    'query($ids: [ID!]!) { nodes(ids: $ids) { ... on IssueComment { id isMinimized } } }',
+    { ids: older.map(comment => comment.node_id) },
+  );
+  for (const node of nodes.filter(node => node && !node.isMinimized)) {
+    await github.graphql(
+      'mutation($id: ID!) { minimizeComment(input: { subjectId: $id, classifier: OUTDATED }) { clientMutationId } }',
+      { id: node.id },
+    );
+  }
+}
+
 module.exports = async ({ github, context, core }) => {
   if (context.eventName !== 'pull_request_review') {
     core.info(`Skipping PR report for ${context.eventName} event`);
@@ -84,8 +111,9 @@ module.exports = async ({ github, context, core }) => {
   if (env.ARTIFACT_URL) {
     links.push(`[Evidence](${env.ARTIFACT_URL})`);
   }
+  const marker = `<!-- e2e-pr-report:${testName} -->`;
   const lines = [
-    `<!-- e2e-pr-report:${testName} -->`,
+    marker,
     `### ${icon} \`${testName}\` ${verb}`,
     '',
     links.join(' · '),
@@ -111,6 +139,11 @@ module.exports = async ({ github, context, core }) => {
       body,
     });
     commentId = comment.id;
+    try {
+      await hideOlderReports({ github, owner, repo, issueNumber, marker, current: comment });
+    } catch (error) {
+      core.warning(`Could not hide older ${testName} reports: ${error.message}`);
+    }
   } else {
     await github.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
   }
