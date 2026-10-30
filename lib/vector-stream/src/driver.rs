@@ -26,6 +26,11 @@ pub trait DriverResponse {
         None
     }
 
+    /// Underlying error for a terminal response that also carries delivery progress.
+    fn error(&self) -> Option<&dyn fmt::Debug> {
+        None
+    }
+
     /// Return the number of bytes that were sent in the request that returned this response.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
@@ -234,7 +239,7 @@ where
                     request_error_status,
                     EventStatus::Rejected | EventStatus::Errored
                 ) {
-                    Self::emit_call_error(Some(error), request_id, event_count);
+                    Self::emit_call_error(Some(&error), request_id, event_count);
                 } else {
                     error!(message = "Request failed.", ?error, request_id);
                 }
@@ -257,7 +262,7 @@ where
                 ) {
                     // The retry service has finished; either outcome abandons these events.
                     Self::emit_call_error(
-                        None,
+                        response.error(),
                         request_id,
                         response.events_dropped().unwrap_or(event_count),
                     );
@@ -269,7 +274,7 @@ where
 
     /// Emit the `Error` and `EventsDropped` internal events.
     /// This scenario occurs after retries have been attempted.
-    fn emit_call_error(error: Option<Svc::Error>, request_id: usize, count: usize) {
+    fn emit_call_error(error: Option<&dyn fmt::Debug>, request_id: usize, count: usize) {
         emit(CallError {
             error,
             request_id,
@@ -455,6 +460,31 @@ mod tests {
         }
     }
 
+    struct StatusResponse(
+        EventStatus,
+        GroupedCountByteSize,
+        Option<usize>,
+        Option<&'static str>,
+    );
+
+    impl DriverResponse for StatusResponse {
+        fn event_status(&self) -> EventStatus {
+            self.0
+        }
+
+        fn events_sent(&self) -> &GroupedCountByteSize {
+            &self.1
+        }
+
+        fn events_dropped(&self) -> Option<usize> {
+            self.2
+        }
+
+        fn error(&self) -> Option<&dyn std::fmt::Debug> {
+            self.3.as_ref().map(|error| error as &dyn std::fmt::Debug)
+        }
+    }
+
     #[tokio::test]
     async fn driver_terminal_outcome_metrics() {
         use EventStatus::{Delivered, Errored, Rejected};
@@ -463,22 +493,6 @@ mod tests {
             event::MetricValue,
             metrics::{self, Controller},
         };
-
-        struct StatusResponse(EventStatus, GroupedCountByteSize, Option<usize>);
-
-        impl DriverResponse for StatusResponse {
-            fn event_status(&self) -> EventStatus {
-                self.0
-            }
-
-            fn events_sent(&self) -> &GroupedCountByteSize {
-                &self.1
-            }
-
-            fn events_dropped(&self) -> Option<usize> {
-                self.2
-            }
-        }
 
         metrics::init_test();
         let controller = Controller::get().unwrap();
@@ -509,6 +523,7 @@ mod tests {
                             GroupedCountByteSize::default()
                         },
                         dropped,
+                        (status == Rejected).then_some("transport failed"),
                     )),
                     None => Err("request failed"),
                 })

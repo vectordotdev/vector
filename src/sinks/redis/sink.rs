@@ -16,7 +16,7 @@ use super::{
     RedisEvent, RedisRequest, RepairChannelSnafu,
     config::{DataTypeConfig, RedisSinkConfig, RedisTowerRequestConfigDefaults},
     request_builder::request_builder,
-    service::{RedisResponse, RedisService},
+    service::{RedisResponse, RedisResponseService, RedisService},
 };
 use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
@@ -344,13 +344,9 @@ impl RedisSink {
         };
 
         let service = ServiceBuilder::new()
-            .settings(
-                request,
-                RedisRetryLogic {
-                    connection: self.conn.clone(),
-                },
-            )
+            .settings(request, RedisRetryLogic::new(self.conn.clone()))
             .service(service);
+        let service = RedisResponseService::new(service);
 
         let mut encoder = self.encoder.clone();
         let transformer = self.transformer.clone();
@@ -377,6 +373,12 @@ impl StreamSink<Event> for RedisSink {
 #[derive(Clone)]
 pub(super) struct RedisRetryLogic {
     connection: RedisConnection,
+}
+
+impl RedisRetryLogic {
+    pub(super) const fn new(connection: RedisConnection) -> Self {
+        Self { connection }
+    }
 }
 
 impl RetryLogic for RedisRetryLogic {

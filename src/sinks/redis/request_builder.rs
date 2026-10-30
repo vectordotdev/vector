@@ -2,7 +2,7 @@ use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
 
-use super::{RedisEvent, RedisKvEntry, RedisRequest};
+use super::{RedisDelivery, RedisEvent, RedisKvEntry, RedisRequest};
 use crate::sinks::{prelude::*, util::EncodedLength};
 
 pub(super) fn encode_event(
@@ -70,10 +70,13 @@ pub(super) fn request_builder(
     let builder = RequestMetadataBuilder::from_events(&events);
     let payload = encode_events(events, transformer, encoder);
     let metadata = builder.build(&payload);
+    let request = payload.into_payload();
+    let delivery = RedisDelivery::new(request.len());
 
     RedisRequest {
-        request: payload.into_payload(),
+        request,
         finalizers,
         metadata,
+        delivery,
     }
 }

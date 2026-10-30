@@ -1,4 +1,7 @@
-use std::task::{Context, Poll};
+use std::{
+    fmt,
+    task::{Context, Poll},
+};
 
 use super::{
     RedisRequest, RedisSinkError,
@@ -89,11 +92,12 @@ impl Service<RedisRequest> for RedisService {
                         event_status.fill(true);
                     }
                     Ok(RedisResponse {
-                        event_status,
+                        event_status: kvs.delivery.record(&event_status),
                         events_byte_size: kvs
                             .metadata
                             .into_events_estimated_json_encoded_byte_size(),
                         byte_size,
+                        error: None,
                     })
                 }
                 Err(error) => Err(RedisSinkError::SendError {
@@ -105,21 +109,68 @@ impl Service<RedisRequest> for RedisService {
     }
 }
 
+/// Preserves delivery progress when the retry service returns a terminal error.
+pub(super) struct RedisResponseService<S> {
+    inner: S,
+}
+
+impl<S> RedisResponseService<S> {
+    pub(super) const fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<S> Service<RedisRequest> for RedisResponseService<S>
+where
+    S: Service<RedisRequest, Response = RedisResponse, Error = crate::Error>,
+    S::Future: Send + 'static,
+{
+    type Response = RedisResponse;
+    type Error = crate::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, request: RedisRequest) -> Self::Future {
+        let delivery = request.delivery.clone();
+        let byte_size = request.metadata.events_byte_size();
+        let events_byte_size = request
+            .metadata
+            .events_estimated_json_encoded_byte_size()
+            .clone();
+        let future = self.inner.call(request);
+
+        Box::pin(async move {
+            Ok(future.await.unwrap_or_else(|error| RedisResponse {
+                event_status: delivery.snapshot(),
+                events_byte_size,
+                byte_size,
+                error: Some(error),
+            }))
+        })
+    }
+}
+
 pub struct RedisResponse {
     pub event_status: Vec<bool>,
     pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
+    pub error: Option<crate::Error>,
 }
 
 impl RedisResponse {
     pub(super) fn is_successful(&self) -> bool {
-        self.event_status.iter().all(|x| *x)
+        self.error.is_none() && self.event_status.iter().all(|x| *x)
     }
 }
 
 impl DriverResponse for RedisResponse {
     fn event_status(&self) -> EventStatus {
-        if self.is_successful() {
+        if self.error.is_some() {
+            EventStatus::Rejected
+        } else if self.is_successful() {
             EventStatus::Delivered
         } else {
             EventStatus::Errored
@@ -132,6 +183,10 @@ impl DriverResponse for RedisResponse {
 
     fn events_dropped(&self) -> Option<usize> {
         Some(self.event_status.iter().filter(|status| !**status).count())
+    }
+
+    fn error(&self) -> Option<&dyn fmt::Debug> {
+        self.error.as_ref().map(|error| error as &dyn fmt::Debug)
     }
 
     fn bytes_sent(&self) -> Option<usize> {
