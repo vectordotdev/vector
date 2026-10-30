@@ -219,7 +219,7 @@ impl ProviderConfig for HttpConfig {
 impl_generate_config_from_default!(HttpConfig);
 
 #[cfg(all(test, feature = "sources-demo_logs"))]
-mod tests {
+mod parse_first_tests {
     use std::{convert::Infallible, future::ready};
 
     use hyper::{Body, Response};
@@ -263,3 +263,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(all(test, feature = "sources-http_server", feature = "sinks-http"))]
+mod tests;

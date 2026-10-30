@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io::Read};
 
 use super::{
-    ComponentHint, deserialize_component_map, deserialize_config_map,
+    ComponentHint, deserialize_component_map, deserialize_config_map, ignored_fields,
     loader::{ConfigLoader, ConfigScope, LoadMode, ParsedInputs},
     representation::ConfigMap,
 };
@@ -37,8 +37,13 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from the specified paths.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if a directory or an opened config file cannot be read, a
+    /// referenced environment variable or secret cannot be interpolated, the content cannot be
+    /// parsed or deserialized, or values cannot be merged into the config builder. Config files
+    /// that cannot be opened are logged and skipped.
     pub fn load_from_paths(
         self,
         config_paths: &[super::ConfigPath],
@@ -47,8 +52,12 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the `ConfigBuilderLoader` and loads configuration from an input reader.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    ///
+    /// # Errors
+    ///
+    /// Returns error messages if `input` cannot be read as UTF-8, a referenced environment
+    /// variable or secret cannot be interpolated, the content cannot be parsed or deserialized,
+    /// or values cannot be merged into the config builder.
     pub fn load_from_input<R: Read>(
         self,
         input: R,
@@ -77,6 +86,11 @@ impl ConfigLoader for ConfigBuilderLoader {
     const MODE: LoadMode = LoadMode::Configuration;
 
     fn merge(&mut self, map: ConfigMap, scope: ConfigScope) -> Result<(), Vec<String>> {
+        let hint = match scope {
+            ConfigScope::Root => None,
+            ConfigScope::Component(hint) => Some(hint),
+        };
+        let ignored = ignored_fields::find(&map, hint);
         match scope {
             ConfigScope::Component(ComponentHint::Source) => {
                 self.builder.sources.extend(deserialize_component_map(map)?);
@@ -109,6 +123,9 @@ impl ConfigLoader for ConfigBuilderLoader {
             }
         }
 
+        self.builder
+            .loading_warnings
+            .extend(ignored_fields::warnings(&ignored));
         Ok(())
     }
 }

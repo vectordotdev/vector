@@ -1,6 +1,7 @@
 package metadata
 
 versions: [string, ...string] & [
+	"0.61.0",
 	"0.60.0",
 	"0.59.0",
 	"0.58.0",

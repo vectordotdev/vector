@@ -8,10 +8,7 @@ use vrl::value::Kind;
 
 use crate::{
     config::ValidatedSink,
-    http::{
-        client_v1::{HttpClient, HttpError},
-        get_http_scheme_from_uri,
-    },
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
         prelude::*,
@@ -153,7 +150,7 @@ impl AzureLogsIngestionConfig {
         )?;
         let healthcheck = service.healthcheck();
 
-        let retry_logic = HttpStatusRetryLogic::<_, _, _, HttpError>::new_with_error(
+        let retry_logic = HttpStatusRetryLogic::new(
             |res: &AzureLogsIngestionResponse| res.http_status,
             self.retry_strategy.clone(),
         );

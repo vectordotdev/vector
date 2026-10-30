@@ -46,8 +46,8 @@ generated: components: sources: fluent: configuration: {
 		description: "The type of socket to use."
 		required:    true
 		type: string: enum: {
-			tcp:  "Listen on TCP port."
-			unix: "Listen on a Unix stream socket."
+			tcp:  "Listen on TCP port"
+			unix: "Listen on unix stream socket"
 		}
 	}
 	path: {

@@ -18,7 +18,8 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
     };
     let mut client = Client::new(uri);
 
-    if client.connect().await.is_err() || client.health().await.is_err() {
+    // `connect` opens no connection, so the health RPC is what detects an unreachable API.
+    if client.connect().is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"
             Vector API server isn't reachable ({}).
