@@ -5,9 +5,11 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{Response, Uri};
-use hyper::{Body, Request, service::Service};
-use tower::ServiceExt;
+use http_1::{Request, Response, Uri};
+use http_body_util::BodyExt;
+use tower::{Service, service_fn};
+use tower_http_1::decompression::Decompression;
+use vector_http::full_body;
 use vector_lib::{
     ByteSizeOf,
     json_size::JsonSize,
@@ -18,13 +20,12 @@ use vector_lib::{
 use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    http::HttpClient,
+    http::client_v1::HttpClient,
+    internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::{
         elasticsearch::{encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder},
         util::{
-            Compression, ElementCount,
-            auth::Auth,
-            http::{HttpBatchService, RequestConfig},
+            Compression, ElementCount, auth::Auth, http::RequestConfig, http_v1::protocol_endpoint,
         },
     },
 };
@@ -68,30 +69,31 @@ impl MetaDescriptive for ElasticsearchRequest {
     }
 }
 
+/// Sends bulk requests through the shared native HTTP client.
+///
+/// Bulk requests may need asynchronous AWS signing with a service-specific payload hash, so
+/// this service builds requests itself instead of using the generic `http_v1::HttpService`.
+/// Like the legacy HTTP batch service, it requests and decodes compressed responses.
 #[derive(Clone)]
 pub struct ElasticsearchService {
-    // TODO: `HttpBatchService` has been deprecated for direct use in sinks.
-    //       This sink should undergo a refactor to utilize the `HttpService`
-    //       instead, which extracts much of the boilerplate code for `Service`.
-    batch_service: HttpBatchService<
-        BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
-        ElasticsearchRequest,
-    >,
+    client: HttpClient,
+    http_request_builder: Arc<HttpRequestBuilder>,
+    protocol: Arc<str>,
+    endpoint: Arc<str>,
 }
 
 impl ElasticsearchService {
     pub fn new(
-        http_client: HttpClient<Body>,
+        http_client: HttpClient,
         http_request_builder: HttpRequestBuilder,
     ) -> ElasticsearchService {
-        let http_request_builder = Arc::new(http_request_builder);
-        let batch_service = HttpBatchService::new(http_client, move |req| {
-            let request_builder = Arc::clone(&http_request_builder);
-            let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-                Box::pin(async move { request_builder.build_request(req).await });
-            future
-        });
-        ElasticsearchService { batch_service }
+        let (protocol, endpoint) = protocol_endpoint(&http_request_builder.bulk_uri);
+        ElasticsearchService {
+            client: http_client,
+            http_request_builder: Arc::new(http_request_builder),
+            protocol: protocol.into(),
+            endpoint: endpoint.into(),
+        }
     }
 }
 
@@ -121,11 +123,18 @@ impl HttpRequestBuilder {
     ///
     /// # Panics
     /// Panics if the configured URI or headers are invalid for an HTTP request.
+    #[cfg_attr(
+        not(feature = "aws-core"),
+        expect(
+            clippy::unused_async,
+            reason = "AWS request signing requires await when aws-core is enabled."
+        )
+    )]
     pub async fn build_request(
         &self,
         es_req: ElasticsearchRequest,
     ) -> Result<Request<Bytes>, crate::Error> {
-        let mut builder = Request::post(&self.bulk_uri);
+        let mut builder = Request::post(self.bulk_uri.clone());
 
         builder = builder.header("Content-Type", "application/x-ndjson");
 
@@ -148,7 +157,7 @@ impl HttpRequestBuilder {
         if let Some(auth) = &self.auth {
             match auth {
                 Auth::Basic(auth) => {
-                    auth.apply(&mut request);
+                    auth.apply_v1(&mut request);
                 }
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
@@ -198,12 +207,36 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut req: ElasticsearchRequest) -> Self::Future {
-        let mut http_service = self.batch_service.clone();
+        let client = self.client.clone();
+        let http_request_builder = Arc::clone(&self.http_request_builder);
+        let protocol = Arc::clone(&self.protocol);
+        let endpoint = Arc::clone(&self.endpoint);
         Box::pin(async move {
-            http_service.ready().await?;
             let events_byte_size =
                 std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
-            let http_response = http_service.call(req).await?;
+            let request = http_request_builder
+                .build_request(req)
+                .await
+                .inspect_err(|error| {
+                    emit!(SinkRequestBuildError { error });
+                })?;
+            let byte_size = request.body().len();
+
+            // Transport errors are emitted as `GotHttpWarning` by `HttpClient::send`; the driver
+            // counts the component error once retries are exhausted.
+            let mut service = Decompression::new(service_fn(|request| client.send(request)));
+            let response = service.call(request.map(full_body)).await?;
+
+            if response.status().is_success() {
+                emit!(EndpointBytesSent {
+                    byte_size,
+                    protocol: &protocol,
+                    endpoint: &endpoint,
+                });
+            }
+
+            let (parts, body) = response.into_parts();
+            let http_response = Response::from_parts(parts, body.collect().await?.to_bytes());
 
             let event_status = get_event_status(&http_response);
             Ok(ElasticsearchResponse {

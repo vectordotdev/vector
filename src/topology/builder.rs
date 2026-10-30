@@ -177,6 +177,9 @@ impl<'a> Builder<'a> {
 
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
+        // Library callers may build topologies without going through CLI startup.
+        vector_lib::tls::install_default_crypto_provider();
+
         let _enrichment_tables_load_guard = ENRICHMENT_TABLES_LOAD_LOCK.lock().await;
         let enrichment_tables = self.load_enrichment_tables().await;
         let source_tasks = self.build_sources(enrichment_tables).await;

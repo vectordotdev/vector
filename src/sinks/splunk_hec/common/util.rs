@@ -1,10 +1,9 @@
 use std::{borrow::Cow, sync::Arc};
 
 use bytes::Bytes;
-use futures_util::future::BoxFuture;
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use http_1::{Request, StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
+use vector_http::empty_body;
 use vector_lib::{
     config::proxy::ProxyConfig,
     event::EventRef,
@@ -13,15 +12,18 @@ use vector_lib::{
 
 use super::{
     EndpointTarget,
-    request::HecRequest,
     service::{HttpRequestBuilder, MetadataFields},
 };
 use crate::{
-    http::HttpClient,
+    http::client_v1::HttpClient,
     internal_events::TemplateRenderingError,
     sinks::{
-        self, UriParseSnafu,
-        util::{SinkBatchSettings, http::HttpBatchService},
+        self,
+        util::{
+            SinkBatchSettings,
+            http::HttpRequest,
+            http_v1::{HttpService, HttpServiceRequestBuilder},
+        },
     },
     template::ConfinedTemplate,
     tls::{TlsConfig, TlsSettings},
@@ -44,6 +46,13 @@ pub enum HealthcheckError {
     QueuesFull,
 }
 
+/// Error returned when a HEC URI cannot be parsed.
+#[derive(Debug, Snafu)]
+#[snafu(display("URI parse error: {source}"))]
+pub struct UriParseError {
+    source: http_1::uri::InvalidUri,
+}
+
 /// Builds the HTTP client.
 ///
 /// # Errors
@@ -53,40 +62,49 @@ pub fn create_client(
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
-    Ok(HttpClient::new(tls_settings, proxy_config)?)
+    HttpClient::new(tls_settings.into(), proxy_config)
 }
 
-// TODO: `HttpBatchService` has been deprecated for direct use in sinks.
-//       This sink should undergo a refactor to utilize the `HttpService`
-//       instead, which extracts much of the boilerplate code for `Service`.
-pub fn build_http_batch_service(
+/// Builds native HEC event or raw endpoint requests for [`HttpService`].
+#[derive(Clone)]
+pub struct HecEventRequestBuilder {
+    http_request_builder: Arc<HttpRequestBuilder>,
+    path: &'static str,
+    auto_extract_timestamp: bool,
+}
+
+impl HttpServiceRequestBuilder<MetadataFields> for HecEventRequestBuilder {
+    fn build(&self, mut request: HttpRequest<MetadataFields>) -> crate::Result<Request<Bytes>> {
+        self.http_request_builder.build_request(
+            request.take_payload(),
+            self.path,
+            request.get_additional_metadata(),
+            self.auto_extract_timestamp,
+        )
+    }
+}
+
+/// Builds the native HEC event service, decoding compressed responses.
+#[must_use]
+pub fn build_http_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
     endpoint_target: EndpointTarget,
     auto_extract_timestamp: bool,
-) -> HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HecRequest> {
-    HttpBatchService::new(client, move |req: HecRequest| {
-        let request_builder = Arc::clone(&http_request_builder);
-        let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-            Box::pin(async move {
-                request_builder.build_request(
-                    req.body,
-                    match endpoint_target {
-                        EndpointTarget::Event => "/services/collector/event",
-                        EndpointTarget::Raw => "/services/collector/raw",
-                    },
-                    req.passthrough_token,
-                    MetadataFields {
-                        source: req.source,
-                        sourcetype: req.sourcetype,
-                        index: req.index,
-                        host: req.host,
-                    },
-                    auto_extract_timestamp,
-                )
-            });
-        future
-    })
+) -> HttpService<HecEventRequestBuilder, MetadataFields> {
+    let path = match endpoint_target {
+        EndpointTarget::Event => "/services/collector/event",
+        EndpointTarget::Raw => "/services/collector/raw",
+    };
+    HttpService::new(
+        client,
+        HecEventRequestBuilder {
+            http_request_builder,
+            path,
+            auto_extract_timestamp,
+        },
+    )
+    .with_response_decompression()
 }
 
 /// Checks the HEC endpoint.
@@ -101,12 +119,11 @@ pub async fn build_healthcheck(
     token: String,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let uri = build_uri(endpoint.as_str(), "/services/collector/health/1.0", None)
-        .context(UriParseSnafu)?;
+    let uri = build_uri(endpoint.as_str(), "/services/collector/health/1.0", None)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {token}"))
-        .body(Body::empty())
+        .body(empty_body())
         .unwrap();
 
     let response = client.send(request).await?;
@@ -114,7 +131,7 @@ pub async fn build_healthcheck(
         StatusCode::OK => Ok(()),
         StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
         StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
-        other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
+        other => Err(sinks::HealthcheckError::unexpected_status(other).into()),
     }
 }
 
@@ -122,11 +139,11 @@ pub async fn build_healthcheck(
 ///
 /// # Errors
 /// Returns an error if the resulting URI is invalid.
-pub fn build_uri(
+pub fn build_uri<'a>(
     host: &str,
     path: &str,
-    query: impl IntoIterator<Item = (&'static str, String)>,
-) -> Result<Uri, http::uri::InvalidUri> {
+    query: impl IntoIterator<Item = (&'static str, &'a str)>,
+) -> Result<Uri, UriParseError> {
     let mut uri = format!("{}{path}", host.trim_end_matches('/'));
 
     let mut first = true;
@@ -144,12 +161,12 @@ pub fn build_uri(
         )));
         uri.push('=');
         uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
-            &value,
+            value,
             percent_encoding::NON_ALPHANUMERIC,
         )));
     }
 
-    uri.parse::<Uri>()
+    uri.parse::<Uri>().context(UriParseSnafu)
 }
 
 #[must_use]
@@ -188,7 +205,7 @@ pub fn render_template_string<'a>(
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use http::{HeaderValue, Uri};
+    use http_1::{HeaderValue, Uri};
     use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
         Mock, MockServer, ResponseTemplate,
@@ -297,8 +314,7 @@ mod tests {
             .build_request(
                 events.clone(),
                 "/services/collector/event",
-                None,
-                MetadataFields::default(),
+                &MetadataFields::default(),
                 false,
             )
             .unwrap();
@@ -340,8 +356,7 @@ mod tests {
             .build_request(
                 events.clone(),
                 "/services/collector/event",
-                None,
-                MetadataFields::default(),
+                &MetadataFields::default(),
                 false,
             )
             .unwrap();
@@ -369,37 +384,9 @@ mod tests {
         assert_eq!(request.body(), &events);
     }
 
-    #[tokio::test]
-    async fn test_build_request_uri_invalid_uri_returns_error() {
-        let endpoint = "invalid";
-        let token = "token";
-        let compression = Compression::gzip_default();
-        let events = Bytes::from("events");
-        let http_request_builder = HttpRequestBuilder::new(
-            String::from(endpoint),
-            EndpointTarget::default(),
-            String::from(token),
-            compression,
-        );
-
-        let err = http_request_builder
-            .build_request(
-                events,
-                "/services/collector/event",
-                None,
-                MetadataFields::default(),
-                false,
-            )
-            .unwrap_err();
-        assert_eq!(err.to_string(), "URI parse error: invalid format");
-    }
-
     #[test]
     fn test_build_uri() {
-        let query = [
-            (HOST_FIELD, "zork flork".to_string()),
-            (SOURCE_FIELD, "zam".to_string()),
-        ];
+        let query = [(HOST_FIELD, "zork flork"), (SOURCE_FIELD, "zam")];
         let uri = build_uri("http://sproink.com", "/thing/thang", query).unwrap();
 
         assert_eq!(

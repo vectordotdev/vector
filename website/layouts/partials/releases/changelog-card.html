@@ -1,0 +1,30 @@
+{{/* Renders one changelog entry card, as listed on the release pages.
+     Params:
+       title  (optional) Markdown title rendered in bold above the body
+       href   (optional) link for the title
+       body   rendered HTML body
+       footer (optional) rendered HTML shown in the card footer; omitted when blank
+       class  (optional) extra classes for the card */}}
+<li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5{{ with .class }} {{ . }}{{ end }}">
+  {{- with .title }}
+  {{- if $.href }}
+  <a href="{{ $.href }}" class="group block underline decoration-primary/50 underline-offset-4 focus:outline-none focus:ring-2 focus:ring-primary hover:decoration-secondary">
+    <div class="prose dark:prose-invert max-w-none font-semibold [&>p]:m-0 [&>p]:text-primary-dark group-hover:[&>p]:text-secondary dark:[&>p]:text-primary dark:group-hover:[&>p]:text-secondary [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+      {{ . | markdownify }}
+    </div>
+  </a>
+  {{- else }}
+  <div class="prose dark:prose-invert max-w-none font-semibold [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+    {{ . | markdownify }}
+  </div>
+  {{- end }}
+  {{- end }}
+  <div class="{{ with .title }}mt-2 {{ end }}prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+    {{ .body }}
+  </div>
+  {{- with strings.TrimSpace .footer }}
+  <div class="mt-3 overflow-x-auto border-t border-gray-200 pt-3 text-sm italic text-gray-600 dark:border-gray-700 dark:text-gray-300">
+    {{- . | safeHTML -}}
+  </div>
+  {{- end }}
+</li>

@@ -1276,6 +1276,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-lc-rs"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "048006790404103c488e6c5616b3e7e702a71292aadda08e8f7698a9e0d2eb53"
+dependencies = [
+ "aws-lc-sys",
+ "zeroize",
+]
+
+[[package]]
+name = "aws-lc-sys"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bfbe32ac36b3c428696ce315464181bc4029d689fd58e3f2a4e58c252242f52"
+dependencies = [
+ "cc",
+ "cmake",
+ "dunce",
+ "fs_extra",
+ "pkg-config",
+]
+
+[[package]]
 name = "aws-runtime"
 version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4154,6 +4177,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dunce"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4751,6 +4780,12 @@ dependencies = [
  "lazy_static",
  "num",
 ]
+
+[[package]]
+name = "fs_extra"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "fsevent-sys"
@@ -5910,7 +5945,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing 0.1.44",
@@ -9414,9 +9449,9 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.13.4"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9f068eba8e7071c5f9511831b44f32c740d5adf574e990f946ddb53db2f314e"
+checksum = "278e9268c93b9e498a2da46c34d90ba93a3255eb99009646398f34bc73ab36eb"
 dependencies = [
  "bitflags 2.13.2",
  "memchr",
@@ -9577,6 +9612,7 @@ version = "0.11.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f4bfc015262b9df63c8845072ce59068853ff5872180c2ce2f13038b970e560"
 dependencies = [
+ "aws-lc-rs",
  "bytes",
  "getrandom 0.4.2",
  "lru-slab",
@@ -9604,7 +9640,7 @@ dependencies = [
  "once_cell",
  "socket2 0.5.10",
  "tracing 0.1.44",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -10156,7 +10192,6 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
- "h2 0.4.19",
  "http 1.5.0",
  "http-body 1.0.1",
  "http-body-util",
@@ -10203,6 +10238,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-util",
+ "h2 0.4.19",
  "http 1.5.0",
  "http-body 1.0.1",
  "http-body-util",
@@ -10215,6 +10251,7 @@ dependencies = [
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
+ "quinn",
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
@@ -10237,24 +10274,23 @@ dependencies = [
 
 [[package]]
 name = "reqwest-middleware"
-version = "0.4.2"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57f17d28a6e6acfe1733fe24bcd30774d13bffa4b8a22535b4c8c98423088d4e"
+checksum = "07bc3f1384cffa4f274dad2d4ddd73aed32fed8f786d96c6be8aa4e5fd3c3b58"
 dependencies = [
  "anyhow",
  "async-trait",
  "http 1.5.0",
- "reqwest 0.12.28",
- "serde",
- "thiserror 1.0.68",
+ "reqwest 0.13.4",
+ "thiserror 2.0.18",
  "tower-service",
 ]
 
 [[package]]
 name = "reqwest-retry"
-version = "0.8.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "105747e3a037fe5bf17458d794de91149e575b6183fc72c85623a44abb9683f5"
+checksum = "fe2412db2af7d2268e7a5406be0431f37d9eb67ff390f35b395716f5f06c2eaa"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -10262,7 +10298,7 @@ dependencies = [
  "getrandom 0.2.15",
  "http 1.5.0",
  "hyper 1.11.1",
- "reqwest 0.12.28",
+ "reqwest 0.13.4",
  "reqwest-middleware",
  "retry-policies",
  "thiserror 2.0.18",
@@ -10541,6 +10577,7 @@ version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
+ "aws-lc-rs",
  "log",
  "once_cell",
  "ring",
@@ -10623,6 +10660,7 @@ version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
+ "aws-lc-rs",
  "ring",
  "rustls-pki-types",
  "untrusted",
@@ -12034,7 +12072,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -13362,7 +13400,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.61.0-dev"
+version = "0.62.0-dev"
 dependencies = [
  "antithesis-instrumentation",
  "approx",
@@ -13791,6 +13829,7 @@ dependencies = [
  "rand 0.10.2",
  "rand_distr",
  "regex",
+ "rustls",
  "schannel",
  "security-framework",
  "serde",
@@ -14038,7 +14077,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.37.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#bcf249e0cfdbd67b0464994a81a36e7ac80e50bc"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#508e5ec17a4243309515239be027f0eee9ffb50d"
 dependencies = [
  "aes 0.9.1",
  "aes-siv",
@@ -14118,7 +14157,7 @@ dependencies = [
  "rand 0.9.4",
  "regex",
  "relative-path 2.0.1",
- "reqwest 0.12.28",
+ "reqwest 0.13.4",
  "reqwest-middleware",
  "reqwest-retry",
  "roxmltree",
@@ -14150,7 +14189,7 @@ dependencies = [
  "webbrowser",
  "woothee",
  "xxhash-rust",
- "zstd 0.13.2",
+ "zstd 0.14.3",
 ]
 
 [[package]]

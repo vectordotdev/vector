@@ -20,7 +20,6 @@
 #![allow(clippy::match_wildcard_for_single_variants)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)] // many false positives in this package
-#![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
 pub mod config;

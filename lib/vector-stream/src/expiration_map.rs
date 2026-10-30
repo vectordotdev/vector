@@ -9,6 +9,7 @@ pub struct Emitter<T> {
 }
 
 impl<T> Emitter<T> {
+    #[must_use]
     pub fn new() -> Self {
         Self { values: vec![] }
     }
