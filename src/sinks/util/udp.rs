@@ -79,7 +79,7 @@ impl UdpSinkConfig {
     ///
     /// Returns an error if the address is invalid or lacks a host or valid port.
     pub fn parse_address(&self) -> crate::Result<(String, u16)> {
-        let uri: http::Uri = crate::sinks::util::uri::parse_ascii(&self.address)?;
+        let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         Ok((host, port))

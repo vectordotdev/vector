@@ -64,8 +64,7 @@ impl TryFrom<String> for HostAndPort {
     type Error = String;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let uri: http::Uri =
-            crate::sinks::util::uri::parse_ascii(&value).map_err(|e| e.to_string())?;
+        let uri = value.parse::<http::Uri>().map_err(|e| e.to_string())?;
         let host = uri
             .host()
             .ok_or_else(|| "missing host".to_string())?

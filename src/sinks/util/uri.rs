@@ -66,7 +66,7 @@ impl UriSerde {
         let self_path = uri.trim_end_matches('/');
         let other_path = path.trim_start_matches('/');
         let path = format!("{self_path}/{other_path}");
-        let uri = parse_ascii::<Uri>(&path)?;
+        let uri = path.parse::<Uri>()?;
         Ok(Self {
             uri,
             auth: self.auth.clone(),
@@ -116,7 +116,7 @@ impl FromStr for UriSerde {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let uri: Uri = parse_ascii(s)?;
+        let uri: Uri = s.parse()?;
         uri.try_into()
     }
 }
@@ -363,10 +363,12 @@ impl HttpEndpoint {
         // scheme), so the scheme is added up front rather than relying on
         // the parser to accept authority-form input.
         let parse = |value: &str| {
-            parse_ascii::<Uri>(value).map_err(|source| HttpEndpointError::InvalidUri {
-                endpoint: redact_unparsed_endpoint(endpoint),
-                source,
-            })
+            value
+                .parse::<Uri>()
+                .map_err(|source| HttpEndpointError::InvalidUri {
+                    endpoint: redact_unparsed_endpoint(endpoint),
+                    source,
+                })
         };
         let uri = if has_scheme(endpoint) {
             parse(endpoint)?
@@ -441,10 +443,12 @@ impl HttpEndpoint {
         };
         parts.path_and_query =
             Some(
-                parse_ascii::<PathAndQuery>(&joined).with_context(|_| InvalidPathSnafu {
-                    endpoint: redact_uri(&self.0),
-                    path: joined,
-                })?,
+                joined
+                    .parse::<PathAndQuery>()
+                    .with_context(|_| InvalidPathSnafu {
+                        endpoint: redact_uri(&self.0),
+                        path: joined,
+                    })?,
             );
         let uri = Uri::from_parts(parts).with_context(|_| InvalidUriPartsSnafu {
             endpoint: redact_uri(&self.0),
@@ -474,10 +478,12 @@ impl HttpEndpoint {
         let joined = format!("{base_path}{suffix}");
         parts.path_and_query =
             Some(
-                parse_ascii::<PathAndQuery>(&joined).with_context(|_| InvalidPathSnafu {
-                    endpoint: redact_uri(&self.0),
-                    path: joined,
-                })?,
+                joined
+                    .parse::<PathAndQuery>()
+                    .with_context(|_| InvalidPathSnafu {
+                        endpoint: redact_uri(&self.0),
+                        path: joined,
+                    })?,
             );
         let uri = Uri::from_parts(parts).with_context(|_| InvalidUriPartsSnafu {
             endpoint: redact_uri(&self.0),
@@ -490,25 +496,6 @@ impl fmt::Display for HttpEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
-}
-
-/// Parses a URI or path-and-query, rejecting raw non-ASCII bytes.
-///
-/// `http` 1 accepts UTF-8 in the path and query, while `http` 0.2, which these
-/// types were built on, rejected any non-ASCII byte as an invalid URI character.
-/// Each non-ASCII byte is replaced with a space, which the parser rejects the
-/// same way in every component with that same error (bytes in a fragment,
-/// which is dropped, are ignored by both), so the accepted URIs and the errors
-/// are unchanged.
-pub(crate) fn parse_ascii<T>(s: &str) -> Result<T, http::uri::InvalidUri>
-where
-    T: TryFrom<Vec<u8>, Error = http::uri::InvalidUri>,
-{
-    T::try_from(
-        s.bytes()
-            .map(|b| if b.is_ascii() { b } else { b' ' })
-            .collect(),
-    )
 }
 
 /// Returns `true` if the URI's authority contains a port that is not a valid
@@ -828,41 +815,6 @@ mod tests {
         let error = HttpEndpoint::parse(endpoint).unwrap_err();
         assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
         assert!(error.to_string().contains(endpoint));
-    }
-
-    #[test]
-    fn non_ascii_uris_are_rejected_as_invalid_uri_characters() {
-        for endpoint in [
-            "https://example.com/caf\u{e9}",
-            "https://example.com/?q=caf\u{e9}",
-            "https://caf\u{e9}.example.com/",
-        ] {
-            let error = HttpEndpoint::parse(endpoint).unwrap_err();
-            assert!(matches!(error, HttpEndpointError::InvalidUri { .. }));
-            assert!(
-                error.to_string().ends_with(": invalid uri character"),
-                "{error}"
-            );
-
-            let error = endpoint.parse::<UriSerde>().unwrap_err();
-            assert_eq!(error.to_string(), "invalid uri character");
-        }
-
-        let base = HttpEndpoint::parse("https://example.com").unwrap();
-        for error in [
-            base.append_path("caf\u{e9}").unwrap_err(),
-            base.append_raw_suffix(":caf\u{e9}").unwrap_err(),
-        ] {
-            assert!(matches!(error, HttpEndpointError::InvalidPath { .. }));
-        }
-
-        // A fragment is dropped without being checked.
-        assert_eq!(
-            HttpEndpoint::parse("https://example.com/path#caf\u{e9}")
-                .unwrap()
-                .to_string(),
-            "https://example.com/path"
-        );
     }
 
     #[test]

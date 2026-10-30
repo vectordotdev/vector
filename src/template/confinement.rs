@@ -384,8 +384,13 @@ impl UriChecker {
     /// FULLWIDTH FULL STOP or U+FF0F FULLWIDTH SOLIDUS onto `.` and `/`, which
     /// would bypass the dot-dot and separator checks, so non-ASCII stays
     /// rejected like any other unparseable URI.
+    /// The fragment is discarded by the parser and was never validated, so it is not checked either.
     fn parse_ascii_uri(s: &str) -> Option<Uri> {
-        crate::sinks::util::uri::parse_ascii(s).ok()
+        let before_fragment = s.split_once('#').map_or(s, |(before, _)| before);
+        before_fragment
+            .is_ascii()
+            .then(|| s.parse::<Uri>().ok())
+            .flatten()
     }
 
     /// Parse `prefix` as an HTTP(S) URI, validating the scheme and that a
