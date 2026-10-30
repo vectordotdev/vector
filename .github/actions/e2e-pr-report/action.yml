@@ -1,0 +1,64 @@
+name: E2E PR report
+description: >
+  Reports a manually triggered E2E test on its PR: a comment that is posted when the job
+  starts and edited with the result when it finishes, and an `e2e/<test-name>` commit
+  status. Does nothing outside `pull_request_review` events.
+
+inputs:
+  github-token:
+    description: "Token with `pull-requests: write` and `statuses: write`."
+    required: true
+  test-name:
+    description: E2E test name, for example `opentelemetry-traces-multiservice`.
+    required: true
+  state:
+    description: "`started` or `finished`."
+    required: true
+  comment-id:
+    description: Comment ID returned by the `started` step. A new comment is posted when empty.
+    required: false
+    default: ""
+  job-status:
+    description: Overall job status (`job.status`), used for the headline and commit status.
+    required: false
+    default: ""
+  results-dir:
+    description: Directory containing one `<result>/result.json` file per test result.
+    required: false
+    default: ""
+  expected-results:
+    description: >
+      Space-separated `<result>` subdirectories that should exist. Missing ones are reported
+      as not run, for example when an earlier environment failed.
+    required: false
+    default: ""
+  artifact-url:
+    description: URL of the uploaded evidence artifact.
+    required: false
+    default: ""
+
+outputs:
+  comment-id:
+    description: ID of the posted or updated comment.
+    value: ${{ steps.report.outputs.comment-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Report E2E result to PR
+      id: report
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        TEST_NAME: ${{ inputs.test-name }}
+        STATE: ${{ inputs.state }}
+        COMMENT_ID: ${{ inputs.comment-id }}
+        JOB_STATUS: ${{ inputs.job-status }}
+        RESULTS_DIR: ${{ inputs.results-dir }}
+        EXPECTED_RESULTS: ${{ inputs.expected-results }}
+        ARTIFACT_URL: ${{ inputs.artifact-url }}
+        ACTION_PATH: ${{ github.action_path }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const report = require(`${process.env.ACTION_PATH}/report.js`);
+          await report({ github, context, core });

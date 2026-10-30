@@ -92,6 +92,8 @@ jobs:
       checkout_ref: ${{ github.event.review.commit_id }}
 
   integration-tests:
+    # Skip the whole matrix for E2E-only commands instead of starting no-op jobs.
+    if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-all')
     needs:
       - prep-pr
       - build-test-runner
@@ -188,7 +190,10 @@ jobs:
 
   e2e-tests:
     # The dedicated command also starts with the ordinary opentelemetry-traces command.
-    if: github.repository == 'vectordotdev/vector' && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
+    if: |
+      github.repository == 'vectordotdev/vector'
+      && (startsWith(github.event.review.body, '/ci-run-e2e') || startsWith(github.event.review.body, '/ci-run-all'))
+      && !startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces-multiservice')
     needs:
       - prep-pr
       - build-test-runner
@@ -265,11 +270,22 @@ jobs:
       contents: read
       packages: read # Required to pull test runner image from GHCR
       id-token: write
+      pull-requests: write # Required to post the result comment
+      statuses: write # Required to set the per-test commit status
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
+
+      - name: Report start to PR
+        id: report_start
+        continue-on-error: true
+        uses: ./.github/actions/e2e-pr-report
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          test-name: opentelemetry-traces-multiservice
+          state: started
 
       - uses: ./.github/actions/dd-token
 
@@ -310,12 +326,27 @@ jobs:
           fi
 
       - name: Upload multiservice trace evidence
+        id: upload_evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: otel-traces-multiservice-${{ github.event.review.commit_id }}
           path: target/otel-traces-multiservice-evidence/
           retention-days: 14
+
+      - name: Report result to PR
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/e2e-pr-report
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          test-name: opentelemetry-traces-multiservice
+          state: finished
+          comment-id: ${{ steps.report_start.outputs.comment-id }}
+          job-status: ${{ job.status }}
+          results-dir: target/otel-traces-multiservice-evidence
+          expected-results: otlphttp otlp
+          artifact-url: ${{ steps.upload_evidence.outputs.artifact-url }}
 
   update-pr-status:
     name: Signal result to PR
