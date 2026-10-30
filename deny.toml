@@ -48,4 +48,6 @@ ignore = [
   { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7 is vulnerable but unmaintained; upgrading vector-buffers to rkyv 0.8 requires a breaking serialization migration" },
   { id = "RUSTSEC-2026-0258", reason = "h2 0.3 via aws-smithy-http-client, hyper 0.14, and reqwest 0.11 - legacy HTTP / AWS SDK upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
   { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 via elliptic-curve 0.13, p256/p384 0.13, and openidconnect 4 (pulsar auth-oauth2), which only uses openidconnect for provider discovery; unblocked when openidconnect moves to p256/p384 0.14 (https://github.com/ramosbugs/openidconnect-rs/pull/244)" },
+  { id = "RUSTSEC-2026-0391", reason = "zstd 0.13 via tonic, pulsar, arrow-ipc 58/59, parquet 59, vrl, and Vector's own zstd use; none call the affected stream::raw with_context constructors. Fixed only in zstd 0.14; Vector's bump needs vector-common's CappedDecoder to borrow its DecoderDictionary" },
+  { id = "RUSTSEC-2026-0403", reason = "zstd-safe 7 via zstd 0.13 (same dependents as RUSTSEC-2026-0391), which only decompress through stream::read::Decoder, decode_all, and bulk, which the advisory lists as unaffected; async-compression's streaming decoder uses the fixed zstd-safe 8.2. Fixed only in zstd-safe 8" },
 ]

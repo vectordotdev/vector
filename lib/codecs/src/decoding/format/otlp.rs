@@ -126,12 +126,12 @@ impl Default for OtlpDeserializer {
 impl OtlpDeserializer {
     /// Creates a new OTLP deserializer with custom signal support.
     /// During parsing, each signal type is tried in order until one succeeds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the embedded OTLP descriptor set cannot be decoded or does not contain the logs,
+    /// metrics, or traces export request message types.
     #[must_use]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "The codec API panic documentation needs a separate audit."
-    )]
     pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> Self {
         let options = Options {
             use_json_names: true,

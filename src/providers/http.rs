@@ -144,7 +144,7 @@ async fn http_request_to_config_builder(
         .map_err(|e| vec![e.to_owned()])?;
 
     if !interpolate_env {
-        return config::load(config_str.chunk(), *config_format);
+        return config::loading::load_builder(config_str.chunk(), *config_format);
     }
 
     let env_vars = std::env::vars_os()
@@ -161,7 +161,7 @@ async fn http_request_to_config_builder(
         &env_vars,
     )?;
 
-    config::load(config_str.as_bytes().chunk(), *config_format)
+    config::loading::load_builder(config_str.as_bytes().chunk(), *config_format)
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
@@ -233,3 +233,6 @@ impl ProviderConfig for HttpConfig {
 }
 
 impl_generate_config_from_default!(HttpConfig);
+
+#[cfg(all(test, feature = "sources-http_server", feature = "sinks-http"))]
+mod tests;
