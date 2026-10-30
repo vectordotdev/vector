@@ -8,6 +8,7 @@
 //! run without enabling the feature for dependents.
 
 mod attributes;
+mod conversion;
 mod datadog;
 mod enums;
 mod flags;
@@ -17,6 +18,9 @@ mod span;
 mod tests;
 
 pub use attributes::{AttrMap, AttrValue, Attributes};
+pub use conversion::{IdField, TraceConversionIssue, TraceConversionReporter};
+#[cfg(any(test, feature = "test"))]
+pub use conversion::{PanicOnIssue, TraceConversionCounts};
 pub use datadog::{
     DatadogAgentEnvelope, DatadogChunkContext, DatadogEventContext, DatadogSpanContext,
     DatadogTracerContext,
@@ -76,6 +80,48 @@ impl TraceEvent {
     #[must_use]
     pub fn new(trace_id: TraceId) -> Self {
         Self::new_with_metadata(trace_id, EventMetadata::default())
+    }
+
+    /// Creates an event directly from its components.
+    #[must_use]
+    pub const fn from_parts(
+        trace_id: TraceId,
+        resource: Resource,
+        scope: Scope,
+        datadog: DatadogEventContext,
+        spans: Vec<Span>,
+        metadata: EventMetadata,
+    ) -> Self {
+        Self {
+            trace_id,
+            resource,
+            scope,
+            datadog,
+            spans,
+            metadata,
+        }
+    }
+
+    /// Decomposes the event into its components.
+    #[must_use]
+    pub fn into_parts(
+        self,
+    ) -> (
+        TraceId,
+        Resource,
+        Scope,
+        DatadogEventContext,
+        Vec<Span>,
+        EventMetadata,
+    ) {
+        (
+            self.trace_id,
+            self.resource,
+            self.scope,
+            self.datadog,
+            self.spans,
+            self.metadata,
+        )
     }
 
     /// Event-level trace ID. Contained spans have no duplicate of this field.
