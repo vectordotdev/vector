@@ -100,7 +100,7 @@ mod tests {
     #[test]
     fn empty_json_is_decoded_but_absent_or_malformed_json_is_not_empty() {
         for input in [
-            r#"{}"#,
+            "{}",
             r#"{"resourceSpans":[]}"#,
             r#"{"resourceSpans":[{}]}"#,
             r#"{"resourceSpans":[{"scopeSpans":[{}]}]}"#,
