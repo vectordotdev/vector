@@ -1,0 +1,51 @@
+## [0.36.0 (2026-10-01)](https://github.com/vectordotdev/vrl/releases/tag/v0.36.0)
+
+### Breaking Changes & Upgrade Guide
+
+- Several stdlib functions now declare element-kind constraints on array parameters, enabling the compiler to detect element-type mismatches at compile time and automatically infer call-site infallibility.
+
+  **Before:** passing a string-literal array required `!` because the compiler assumed it could fail:
+  ```
+  join!(["sources", "transforms", "sinks"], separator: ", ")
+  ```
+
+  **After:** when the compiler can prove the elements are strings, `!` is unnecessary (and `!` now triggers a warning):
+  ```
+  join(["sources", "transforms", "sinks"], separator: ", ")
+  ```
+
+  Passing the wrong element type (e.g. `join([1, 2, 3])`) is now a hard compile error instead of a runtime failure.
+
+  Affected functions: `join`, `contains_all`, `tally`, `encode_key_value`, `encode_logfmt`, `ip_cidr_contains`, `parse_groks`.
+
+  *Thanks to [pront](https://github.com/pront) for contributing PR [#1861](https://github.com/vectordotdev/vrl/pull/1861)!*
+
+### New Features
+
+- Add `break` statement support for early loop exit within `for_each` closures.
+
+  *Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1931](https://github.com/vectordotdev/vrl/pull/1931)!*
+
+### Enhancements
+
+- Optimize `md5` runtime performance with stack-buffered hex encoding and compile-time constant evaluation for literals.
+
+  *Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1930](https://github.com/vectordotdev/vrl/pull/1930)!*
+- Improve `for_each` performance and reduce memory allocations by iterating over collections directly, binding only the closure parameters that are used, and reusing compiler variable slots across iterations. Benchmarks show a 23–41% throughput improvement for arrays and objects.
+
+  *Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1932](https://github.com/vectordotdev/vrl/pull/1932)!*
+- Optimise `merge` runtime performance and memory usage with zero-clone ownership transfer, single-pass entry traversal, size-adaptive shallow merging, and compile-time constant evaluation for literals, while hardening against deep recursion stack overflows and resolving type definition unsoundness for deep merges. Benchmarks show up to a 120% throughput increase for asymmetric merges and 26% for large flat objects.
+
+  *Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1953](https://github.com/vectordotdev/vrl/pull/1953)!*
+- Bump `convert_case` from 0.7.1 to 0.12.0, improving string casing function performance (`camelcase`, `snakecase`, `pascalcase`, `kebabcase`, `screamingsnakecase`) by approximately 70%.
+
+  *Thanks to [jimmystewpot](https://github.com/jimmystewpot) for contributing PR [#1961](https://github.com/vectordotdev/vrl/pull/1961)!*
+- Optimize `sha1`, `sha2`, and `sha3` runtime performance with stack-buffered hex encoding and compile-time constant evaluation for literals.
+
+  *Thanks to [bruceg](https://github.com/bruceg) for contributing PR [#1951](https://github.com/vectordotdev/vrl/pull/1951)!*
+
+### Fixes
+
+- Fixed `uuid_v7` to preserve the supplied timestamp at millisecond precision.
+
+  *Thanks to [abbit](https://github.com/abbit) for contributing PR [#1956](https://github.com/vectordotdev/vrl/pull/1956)!*

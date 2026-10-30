@@ -11,6 +11,7 @@ use chrono::Utc;
 use semver::Version;
 use serde_json::json;
 
+use super::vrl_changelog;
 use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
 
@@ -36,11 +37,23 @@ pub struct Cli {
     /// The version being released (e.g. `0.58.0`).
     #[arg(long)]
     version: Version,
+    /// Include this VRL release's changelog and migration instructions.
+    #[arg(long)]
+    vrl_version: Option<Version>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        run(&self.version, PullRequestMetadata::Optional)?;
+        let vrl_notes = self
+            .vrl_version
+            .as_ref()
+            .map(vrl_changelog::fetch)
+            .transpose()?;
+        run(
+            &self.version,
+            PullRequestMetadata::Optional,
+            vrl_notes.as_deref(),
+        )?;
         Ok(())
     }
 }
@@ -52,6 +65,7 @@ impl Cli {
 pub(super) fn run(
     new_version: &Version,
     pull_request_metadata: PullRequestMetadata,
+    vrl_notes: Option<&str>,
 ) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
     env::set_current_dir(&repo_root)?;
@@ -103,11 +117,19 @@ pub(super) fn run(
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
     // "file already exists" guard on the next run).
-    let cue_text = render_release_cue(&new_version, &changelog_entries);
-    let breaking: Vec<&BreakingDetails> = changelog_entries
+    let vrl = vrl_notes.map(|notes| vrl_changelog::extract(notes, &new_version));
+    let cue_text = render_release_cue(
+        &new_version,
+        &changelog_entries,
+        vrl.as_ref().map(|vrl| vrl.notes.as_str()),
+    );
+    let mut breaking: Vec<&BreakingDetails> = changelog_entries
         .iter()
         .filter_map(|e| e.breaking_details.as_ref())
         .collect();
+    if let Some(vrl) = &vrl {
+        breaking.extend(&vrl.migrations);
+    }
     let highlights_md = if breaking.is_empty() {
         None
     } else {
@@ -129,6 +151,10 @@ pub(super) fn run(
     };
 
     // Everything valid — commit the writes atomically via .tmp + rename.
+    if highlights_md.is_some() {
+        fs::create_dir_all(repo_root.join(HIGHLIGHTS_DIR))
+            .context("Failed to create the upgrade-guide directory")?;
+    }
     atomic_write(&cue_path, &cue_text)?;
     if let Some(md) = highlights_md {
         if let Err(e) = atomic_write(&highlights_path, &md) {
@@ -252,7 +278,7 @@ pub(super) fn write_release_stub(repo_root: &Path, version: &Version) -> Result<
         .unwrap_or(0);
 
     let content = format!(
-        "---\ntitle: Vector v{version} release notes\nweight: {}\n---\n",
+        "---\ntitle: Vector v{version} release notes\nweight: {}\ninline_upgrade_guide: true\n---\n",
         max_weight + 1
     );
     atomic_write(&stub_path, &content)?;
@@ -308,14 +334,14 @@ struct ChangelogEntry {
 }
 
 #[derive(Debug, Clone)]
-struct BreakingDetails {
-    title: String,
-    anchor: String,
+pub(super) struct BreakingDetails {
+    pub(super) title: String,
+    pub(super) anchor: String,
     /// Content of the fragment's `## Summary` section — reused in the guide so each
     /// breaking change stands on its own without the reader hunting for the release notes.
-    summary: String,
+    pub(super) summary: String,
     /// Content of the fragment's `## Migration` section (headers, code fences, etc.).
-    migration: String,
+    pub(super) migration: String,
 }
 
 fn read_changelog_fragments(
@@ -642,9 +668,16 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
 
 // ---------- CUE rendering ----------
 
-fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String {
+fn render_release_cue(
+    version: &Version,
+    changelog: &[ChangelogEntry],
+    vrl_notes: Option<&str>,
+) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let changelog_block = render_changelog(changelog);
+    let vrl_block = vrl_notes
+        .map(|notes| format!("\n{}\n", vrl_changelog::cue_block(notes)))
+        .unwrap_or_default();
 
     indoc::formatdoc! {"
         package metadata
@@ -655,7 +688,7 @@ fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String
         \tchangelog: [
         {changelog_block}
         \t]
-        }}
+        {vrl_block}}}
     "}
 }
 
@@ -1067,7 +1100,7 @@ mod tests {
                 }),
             },
         ];
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, None);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
@@ -1397,6 +1430,22 @@ mod tests {
     }
 
     #[test]
+    fn vrl_only_migrations_generate_a_guide_and_linked_changelog() {
+        let version = Version::new(0, 61, 0);
+        let vrl = vrl_changelog::extract(include_str!("fixtures/vrl-0.38.0.txt"), &version);
+        let breaking: Vec<_> = vrl.migrations.iter().collect();
+        validate_breaking_anchors(&breaking).unwrap();
+        let guide = render_upgrade_guide("2026-10-30", &version, &breaking);
+        let cue = render_release_cue(&version, &[], Some(&vrl.notes));
+        assert!(guide.contains("{#vrl-pr-2001}"));
+        assert_eq!(guide.matches("```vrl").count(), 3);
+        assert!(cue.contains("/releases/0.61.0/#vrl-pr-2001"));
+        assert!(cue.contains("\tvrl_changelog:"));
+        assert!(!cue.contains("```vrl"));
+        assert!(cue.ends_with("}\n"));
+    }
+
+    #[test]
     fn write_release_stub_picks_max_weight_and_writes_correct_format() {
         let tmp = tempfile::tempdir().unwrap();
         let stubs_dir = tmp.path().join("website/content/en/releases");
@@ -1419,7 +1468,7 @@ mod tests {
         let out = fs::read_to_string(stubs_dir.join("0.58.0.md")).unwrap();
         assert_eq!(
             out,
-            "---\ntitle: Vector v0.58.0 release notes\nweight: 37\n---\n"
+            "---\ntitle: Vector v0.58.0 release notes\nweight: 37\ninline_upgrade_guide: true\n---\n"
         );
     }
 

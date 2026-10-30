@@ -82,8 +82,8 @@ for (const width of [1280, 390]) {
     await expect(vrlEntry.locator("pre")).toHaveCount(0);
     await expect(vrlEntry.getByRole("link", { name: "suryakant-source", exact: true })).toBeVisible();
     await vrlEntry.getByRole("link", { name: "migration instructions" }).click();
-    await expect(page).toHaveURL(/\/releases\/0\.61\.0\/#vrl-to-unix-timestamp-nanoseconds$/);
-    await expect(guide.locator("#vrl-to-unix-timestamp-nanoseconds")).toBeInViewport();
+    await expect(page).toHaveURL(/\/releases\/0\.61\.0\/#vrl-pr-2001$/);
+    await expect(guide.locator("#vrl-pr-2001")).toBeInViewport();
     await expect(guide.locator('pre:has(code[data-lang="vrl"])')).toHaveText([
       'to_unix_timestamp(ts, unit: "nanoseconds")',
       'to_unix_timestamp!(ts, unit: "nanoseconds")',
@@ -111,6 +111,9 @@ test("standalone upgrade-guide anchors remain available and older releases stay 
   await expect(page.locator("#vector-sink-default-https")).toHaveJSProperty("tagName", "H2");
   await expect(page.locator("#vrl-to-unix-timestamp-nanoseconds")).toBeAttached();
   await expect(page.locator('pre:has(code[data-lang="vrl"])')).toHaveCount(3);
+
+  await page.goto("/releases/0.61.0/#vrl-to-unix-timestamp-nanoseconds");
+  await expect(page.locator("#vrl-pr-2001")).toBeInViewport();
 
   await page.goto("/releases/0.60.0/");
   await expect(page.locator(".upgrade-guide")).toHaveCount(0);

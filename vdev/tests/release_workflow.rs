@@ -604,7 +604,7 @@ mod prepare {
             repo,
             "gh",
             r#"printf '%s\n' "$@" >> .git/gh-calls
-printf '## 0.28.0\n- Release fixture\n'"#,
+printf '## [0.28.0 (2026-10-30)](https://github.com/vectordotdev/vrl/releases/tag/v0.28.0)\n### Fixes\n- Release fixture\n'"#,
         );
         stub(repo, "cue", "exit 0");
     }
@@ -850,6 +850,42 @@ printf '## 0.28.0\n- Release fixture\n'"#,
         }
         prepare_cli(repo, &args, None);
         assert_release_files(repo, "0.59.0");
+    }
+
+    #[test]
+    fn cli_preparation_generates_vrl_migrations_without_vector_breaking_fragments() {
+        let (temp, _) = development_checkout(false);
+        let repo = temp.path();
+        git(repo, &["tag", "v0.58.0"]);
+        cli_fixture(repo, "0.58.0");
+        let notes = include_str!("../src/commands/release/fixtures/vrl-0.38.0.txt")
+            .replace("0.38.0", "0.28.0");
+        stub(
+            repo,
+            "gh",
+            &format!(
+                "printf '%s\\n' \"$@\" >> .git/gh-calls\ncat <<'VRL_NOTES'\n{notes}\nVRL_NOTES\n"
+            ),
+        );
+        prepare_cli(repo, &["--dry-run", "--vrl-version", "0.28.0"], None);
+        assert_release_files(repo, "0.59.0");
+        let guides: Vec<_> = fs::read_dir(repo.join("website/content/en/highlights"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect();
+        assert_eq!(guides.len(), 1);
+        let guide = fs::read_to_string(&guides[0]).unwrap();
+        assert!(guide.contains("{#vrl-pr-2001}"));
+        assert_eq!(guide.matches("```vrl").count(), 3);
+        let cue =
+            fs::read_to_string(repo.join("website/cue/reference/releases/0.59.0.cue")).unwrap();
+        assert!(cue.contains("/releases/0.59.0/#vrl-pr-2001"));
+        assert!(!cue.contains("```vrl"));
+        assert!(
+            fs::read_to_string(repo.join("website/content/en/releases/0.59.0.md"))
+                .unwrap()
+                .contains("inline_upgrade_guide: true")
+        );
     }
 
     #[test]

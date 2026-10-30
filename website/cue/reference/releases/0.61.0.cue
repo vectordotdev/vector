@@ -223,35 +223,34 @@ releases: "0.61.0": {
 		
 		- Updated `rustls-webpki` to 0.103.16 to address [RUSTSEC-2026-0382](https://rustsec.org/advisories/RUSTSEC-2026-0382). TLS certificate verification in `http_request` now rejects certificate chains that contain the compromised eMudhra emSign intermediate certificates, even when the system trust store still trusts their root.
 		
-		*Thanks to [thomasqueirozb](https://github.com/thomasqueirozb) for contributing PR [#2008](https://github.com/vectordotdev/vrl/pull/2008)!*
+		  *Thanks to [thomasqueirozb](https://github.com/thomasqueirozb) for contributing PR [#2008](https://github.com/vectordotdev/vrl/pull/2008)!*
 		
 		#### New Features
 		
 		- Added a new `range` function that generates an array of integers from `start` (inclusive) to `end` (exclusive), with an optional `step`.
 		
-		*Thanks to [lchabert](https://github.com/lchabert) for contributing PR [#1994](https://github.com/vectordotdev/vrl/pull/1994)!*
+		  *Thanks to [lchabert](https://github.com/lchabert) for contributing PR [#1994](https://github.com/vectordotdev/vrl/pull/1994)!*
 		
 		#### Enhancements
 		
 		- `http_request` now uses the platform certificate verifier for HTTPS connections.
 		
-		*Thanks to [pront](https://github.com/pront) for contributing PR [#2026](https://github.com/vectordotdev/vrl/pull/2026)!*
+		  *Thanks to [pront](https://github.com/pront) for contributing PR [#2026](https://github.com/vectordotdev/vrl/pull/2026)!*
 		- Accept `critical` keyword in `to_syslog_severity` in addition to `crit`.
 		
-		*Thanks to [slopggobblercobbler81](https://github.com/slopggobblercobbler81) for contributing PR [#2010](https://github.com/vectordotdev/vrl/pull/2010)!*
+		  *Thanks to [slopggobblercobbler81](https://github.com/slopggobblercobbler81) for contributing PR [#2010](https://github.com/vectordotdev/vrl/pull/2010)!*
 		- VRL programs that assign objects or arrays now run faster and allocate less: an assignment whose value
-		isn't used (for example, any statement that isn't the last expression of a block) no longer makes a deep
-		copy of the assigned value.
+		  isn't used (for example, any statement that isn't the last expression of a block) no longer makes a deep
+		  copy of the assigned value.
 		
-		*Thanks to [lukesteensen](https://github.com/lukesteensen) for contributing PR [#2002](https://github.com/vectordotdev/vrl/pull/2002)!*
+		  *Thanks to [lukesteensen](https://github.com/lukesteensen) for contributing PR [#2002](https://github.com/vectordotdev/vrl/pull/2002)!*
 		
 		#### Fixes
 		
-		- `to_unix_timestamp` with `unit: "nanoseconds"` is now correctly marked as fallible by the
-		compiler. Existing calls must handle errors to compile. Other units are unaffected.
-		See the [migration instructions](/releases/0.61.0/#vrl-to-unix-timestamp-nanoseconds).
+		- `to_unix_timestamp` with `unit: "nanoseconds"` is now correctly marked as fallible by the compiler.
 		
-		*Thanks to [suryakant-source](https://github.com/suryakant-source) for contributing PR [#2001](https://github.com/vectordotdev/vrl/pull/2001)!*
+		  See the [migration instructions](/releases/0.61.0/#vrl-pr-2001).
 		
+		  *Thanks to [suryakant-source](https://github.com/suryakant-source) for contributing PR [#2001](https://github.com/vectordotdev/vrl/pull/2001)!*
 		"""#
 }
