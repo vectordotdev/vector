@@ -1,4 +1,4 @@
-//! OTLP JSON is ProtoJSON with hexadecimal trace/span IDs and integer enums.
+//! OTLP JSON is `ProtoJSON` with hexadecimal trace/span IDs and integer enums.
 use std::sync::LazyLock;
 
 use base64::Engine as _;
@@ -71,7 +71,7 @@ fn normalize_message(descriptor: &MessageDescriptor, value: &mut Value) -> Resul
     Ok(())
 }
 
-pub(super) fn request(signal: &str, body: Bytes) -> Result<Bytes, ()> {
+pub(super) fn request(signal: &str, body: &[u8]) -> Result<Bytes, ()> {
     let name = match signal {
         TRACES => TRACES_REQUEST_MESSAGE_TYPE,
         LOGS => LOGS_REQUEST_MESSAGE_TYPE,
@@ -81,7 +81,7 @@ pub(super) fn request(signal: &str, body: Bytes) -> Result<Bytes, ()> {
     let descriptor = DESCRIPTORS
         .get_message_by_name(name)
         .expect("compiled OTLP request");
-    let mut value: Value = serde_json::from_slice(&body).map_err(|_| ())?;
+    let mut value: Value = serde_json::from_slice(body).map_err(|_| ())?;
     if !value.is_object() {
         return Err(());
     }
@@ -105,17 +105,17 @@ mod tests {
             r#"{"resourceSpans":[{}]}"#,
             r#"{"resourceSpans":[{"scopeSpans":[{}]}]}"#,
         ] {
-            let body = request(TRACES, Bytes::copy_from_slice(input.as_bytes())).unwrap();
+            let body = request(TRACES, input.as_bytes()).unwrap();
             assert!(super::super::empty::protobuf(TRACES, body).unwrap());
         }
         for input in ["", " ", "null", "[]", "{", r#"{"resourceSpans":42}"#] {
-            assert!(request(TRACES, Bytes::copy_from_slice(input.as_bytes())).is_err());
+            assert!(request(TRACES, input.as_bytes()).is_err());
         }
     }
 
     #[test]
     fn json_preserves_ids_scope_resource_and_zero_valued_span() {
-        let body = request(TRACES, Bytes::from_static(br#"{
+        let body = request(TRACES, br#"{
           "resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"test-service"}}]},
             "schemaUrl":"https://example.invalid/resource-schema",
             "scopeSpans":[{"scope":{"name":"test-scope","version":"1"},"schemaUrl":"https://example.invalid/scope-schema",
@@ -123,7 +123,7 @@ mod tests {
                 "parentSpanId":"0807060504030201","name":"test","kind":1,
                 "startTimeUnixNano":"0","endTimeUnixNano":"0",
                 "links":[{"traceId":"10100f0e0d0c0b0a0908070605040302","spanId":"0807060504030201"}]}]}]}]
-        }"#)).unwrap();
+        }"#).unwrap();
         let request = ExportTraceServiceRequest::decode(body).unwrap();
         let resource = &request.resource_spans[0];
         assert_eq!(
@@ -156,7 +156,7 @@ mod tests {
         for field in [r#""traceId":"not-hex""#, r#""kind":"SPAN_KIND_INTERNAL""#] {
             let body =
                 format!(r#"{{"resourceSpans":[{{"scopeSpans":[{{"spans":[{{{field}}}]}}]}}]}}"#);
-            assert!(request(TRACES, Bytes::from(body)).is_err());
+            assert!(request(TRACES, body.as_bytes()).is_err());
         }
     }
 }

@@ -349,7 +349,7 @@ fn build_warp_log_filter(
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 let decoded_body = match encoding {
                     Encoding::Protobuf => decoded_body,
-                    Encoding::Json => super::json::request(LOGS, decoded_body)
+                    Encoding::Json => super::json::request(LOGS, &decoded_body)
                         .map_err(|()| emit_decode_error("Invalid OTLP JSON request"))?,
                 };
                 if let Some(d) = deserializer.as_ref() {
@@ -398,7 +398,7 @@ fn build_warp_metrics_filter(
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 let decoded_body = match encoding {
                     Encoding::Protobuf => decoded_body,
-                    Encoding::Json => super::json::request(METRICS, decoded_body)
+                    Encoding::Json => super::json::request(METRICS, &decoded_body)
                         .map_err(|()| emit_decode_error("Invalid OTLP JSON request"))?,
                 };
                 if let Some(d) = deserializer.as_ref() {
@@ -453,7 +453,7 @@ fn build_warp_trace_filter(
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 let decoded_body = match encoding {
                     Encoding::Protobuf => decoded_body,
-                    Encoding::Json => super::json::request(TRACES, decoded_body)
+                    Encoding::Json => super::json::request(TRACES, &decoded_body)
                         .map_err(|()| emit_decode_error("Invalid OTLP JSON request"))?,
                 };
                 if let Some(d) = deserializer.as_ref() {
