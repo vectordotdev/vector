@@ -15,10 +15,7 @@ use vector_common::constants::ZSTD_SMALL_INPUT_THRESHOLD;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{
-        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue,
-        metric::{MetricSketch, TagValue},
-    },
+    event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
     metrics::AgentDDSketch,
     request_metadata::GroupedCountByteSize,
 };
@@ -446,6 +443,7 @@ fn generate_proto_metadata(
             }
             ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
+                    metric_type: origin.metric_type().unwrap_or_default(),
                     origin_product: origin.product().unwrap_or_default(),
                     origin_category: origin.category().unwrap_or_default(),
                     origin_service: origin.service().unwrap_or_default(),
@@ -512,12 +510,19 @@ fn sketch_to_proto_message(
 
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
-    let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-        .unwrap_or_default();
-    let tags = encode_tags(&tags);
+    let metric_tags = metric.tags();
+    let host_key = log_schema.host_key().map(ToString::to_string);
+    let host = host_key
+        .as_deref()
+        .and_then(|key| metric_tags.and_then(|tags| tags.get(key)))
+        .unwrap_or_default()
+        .to_owned();
+    let tags = encode_tag_pairs(
+        metric_tags
+            .into_iter()
+            .flat_map(MetricTags::iter_all)
+            .filter(|(name, _)| host_key.as_deref() != Some(*name)),
+    );
 
     let cnt = i64::from(ddsketch.count());
     let min = ddsketch
@@ -577,48 +582,56 @@ pub(super) struct SeriesTags {
 
 /// Splits a metric's tags into resources, `source_type_name`, and the remaining tags
 pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> SeriesTags {
-    let mut tags = metric.tags().cloned().unwrap_or_default();
-
+    let metric_tags = metric.tags();
+    let host_key = log_schema.host_key().map(ToString::to_string);
     let mut resources = vec![];
 
-    if let Some(host) = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-    {
-        resources.push(("host".to_string(), host));
+    if let Some(host_key) = host_key.as_deref() {
+        resources.push((
+            "host".to_owned(),
+            metric_tags
+                .and_then(|tags| tags.get(host_key))
+                .unwrap_or_default()
+                .to_owned(),
+        ));
     }
 
     // The Agent source preserves `device` as a plain tag for v1/v2 compatibility.
-    if let Some(device) = tags.remove("device") {
-        resources.push(("device".to_string(), device));
+    if host_key.as_deref() != Some("device")
+        && let Some(device) = metric_tags.and_then(|tags| tags.get("device"))
+    {
+        resources.push(("device".to_owned(), device.to_owned()));
     }
 
-    let resource_tags: Vec<_> = tags
-        .keys()
-        .filter_map(|tag| {
-            tag.strip_prefix(DATADOG_METRIC_RESOURCE_TAG_PREFIX)
-                .filter(|resource_type| !resource_type.is_empty())
-                .map(|resource_type| (tag.to_string(), resource_type.to_string()))
-        })
-        .collect();
+    let source_type_name = if host_key.as_deref() == Some("source_type_name") {
+        String::new()
+    } else {
+        metric_tags
+            .and_then(|tags| tags.get("source_type_name"))
+            .unwrap_or_default()
+            .to_owned()
+    };
 
-    for (tag, resource_type) in resource_tags {
-        if let Some(values) = tags.remove_set(&tag) {
-            for value in values {
-                match value {
-                    TagValue::Value(name) if !name.is_empty() => {
-                        resources.push((resource_type.clone(), name));
-                    }
-                    value => tags.insert(tag.clone(), value),
-                }
-            }
+    let mut tags = vec![];
+    for (tag, value) in metric_tags.into_iter().flat_map(MetricTags::iter_all) {
+        if host_key.as_deref() == Some(tag) || matches!(tag, "device" | "source_type_name") {
+            continue;
+        }
+
+        if let Some(resource_type) = tag
+            .strip_prefix(DATADOG_METRIC_RESOURCE_TAG_PREFIX)
+            .filter(|resource_type| !resource_type.is_empty())
+            && let Some(name) = value.filter(|name| !name.is_empty())
+        {
+            resources.push((resource_type.to_owned(), name.to_owned()));
+        } else {
+            tags.push(encode_tag(tag, value));
         }
     }
-
-    let source_type_name = tags.remove("source_type_name").unwrap_or_default();
+    tags.sort_unstable();
 
     SeriesTags {
-        tags: encode_tags(&tags),
+        tags,
         resources,
         source_type_name,
     }
@@ -716,8 +729,10 @@ fn series_to_proto_message(
         tags,
         points,
         r#type: metric_type.into(),
-        // unit is omitted
-        unit: String::new(),
+        unit: event_metadata
+            .datadog_metric_unit()
+            .unwrap_or_default()
+            .to_string(),
         source_type_name,
         interval: i64::from(maybe_interval.unwrap_or(0)),
         metadata,
@@ -756,17 +771,16 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
     )
 }
 
-fn encode_tags(tags: &MetricTags) -> Vec<String> {
-    let mut pairs: Vec<_> = tags
-        .iter_all()
-        .map(|(name, value)| {
-            let mut encoded = String::new();
-            encode_metric_tag(&mut encoded, name, value);
-            encoded
-        })
-        .collect();
+fn encode_tag_pairs<'a>(pairs: impl Iterator<Item = (&'a str, Option<&'a str>)>) -> Vec<String> {
+    let mut pairs: Vec<_> = pairs.map(|(name, value)| encode_tag(name, value)).collect();
     pairs.sort_unstable();
     pairs
+}
+
+fn encode_tag(name: &str, value: Option<&str>) -> String {
+    let mut encoded = String::new();
+    encode_metric_tag(&mut encoded, name, value);
+    encoded
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
@@ -838,11 +852,14 @@ pub(super) fn generate_origin_metadata(
     //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
     //        the new metric.
     if let Some(pass_through) = maybe_pass_through {
-        Some(DatadogMetricOriginMetadata::new(
-            pass_through.product().or(Some(origin_product_value)),
-            pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
-            pass_through.service().or(Some(no_value)),
-        ))
+        Some(
+            DatadogMetricOriginMetadata::new(
+                pass_through.product().or(Some(origin_product_value)),
+                pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
+                pass_through.service().or(Some(no_value)),
+            )
+            .with_metric_type(pass_through.metric_type()),
+        )
 
     // No metadata has been set upstream
     } else {
@@ -901,7 +918,7 @@ mod tests {
 
     use super::{
         DatadogMetricsEncoder, EncoderError, ddmetric_proto, encode_proto_key_and_message,
-        encode_tags, encode_timestamp, get_sketch_payload_sketches_field_number,
+        encode_tag_pairs, encode_timestamp, get_sketch_payload_sketches_field_number,
         max_compressed_size, series_to_proto_message, sketch_to_proto_message,
     };
     use crate::sinks::{
@@ -1067,9 +1084,10 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_tags() {
+    fn test_encode_tag_pairs() {
+        let tags = tags();
         assert_eq!(
-            encode_tags(&tags()),
+            encode_tag_pairs(tags.iter_all()),
             vec![
                 "empty_tag",
                 "multi_value:one",
@@ -1077,6 +1095,31 @@ mod tests {
                 "normal_tag:value",
                 "true_tag:true",
             ]
+        );
+    }
+
+    #[test]
+    fn sketch_tags_exclude_host_and_preserve_all_other_values() {
+        let metric = get_simple_sketch().with_tags(Some(metric_tags! {
+            "host" => "example.com",
+            "bare" => TagValue::Bare,
+            "multi" => "one",
+            "multi" => "two",
+            "normal" => "value",
+        }));
+        let MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(ddsketch),
+        } = metric.value()
+        else {
+            panic!("must be an AgentDDSketch")
+        };
+
+        let sketch = sketch_to_proto_message(&metric, ddsketch, &None, log_schema(), 14).unwrap();
+
+        assert_eq!(sketch.host, "example.com");
+        assert_eq!(
+            sketch.tags,
+            vec!["bare", "multi:one", "multi:two", "normal:value"]
         );
     }
 
@@ -1296,9 +1339,12 @@ mod tests {
         let category = 11;
         let service = 9;
 
-        let event_metadata = EventMetadata::default().with_origin_metadata(
-            DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service)),
-        );
+        let event_metadata = EventMetadata::default()
+            .with_origin_metadata(
+                DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service))
+                    .with_metric_type(Some(9)),
+            )
+            .with_datadog_metric_unit("byte".to_string());
         let counter = get_simple_counter_with_metadata(event_metadata);
 
         // series v2
@@ -1312,9 +1358,11 @@ mod tests {
             .unwrap();
 
             let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.metric_type, 9);
             assert_eq!(generated_origin.origin_product, product);
             assert_eq!(generated_origin.origin_category, category);
             assert_eq!(generated_origin.origin_service, service);
+            assert_eq!(series_proto.unit, "byte");
         }
     }
 

@@ -178,11 +178,12 @@ impl FileConfig {
     }
 
     /// Load the configured file into memory. Required to create a new file enrichment table.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be opened or read, a row is not valid CSV or has a
+    /// different number of fields than the others, a column's configured schema type is invalid
+    /// or a value cannot be converted to it, or the file's modification time cannot be read.
     pub fn load_file(&self, timezone: TimeZone) -> crate::Result<FileData> {
         let Encoding::Csv {
             include_headers,

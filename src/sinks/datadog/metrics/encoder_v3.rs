@@ -27,6 +27,7 @@ use super::{
         generate_origin_metadata, split_series_tags,
     },
 };
+use crate::common::datadog::DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX;
 use crate::sinks::util::{
     Compression, Compressor, encode_namespace, request_builder::EncodeResult,
 };
@@ -234,8 +235,6 @@ fn encode_metric_to_v3(
     // `resource.<type>` tags that the `datadog_agent` source produces from an upstream V2
     // payload's resources back into structured resources.
     //
-    // `unit` is intentionally never set: V2 always sends it empty (`unit: "".to_string()` in
-    // `series_to_proto_message`), so a `dd.internal.unit` tag stays an ordinary tag here too.
     let SeriesTags {
         tags,
         resources,
@@ -270,7 +269,8 @@ fn encode_metric_to_v3(
         let product = origin.product().unwrap_or(origin_product_value);
         let category = origin.category().unwrap_or(ORIGIN_CATEGORY_VALUE);
         let service = origin.service().unwrap_or(0);
-        builder.set_origin(product, category, service, false);
+        let no_index = origin.metric_type() == Some(DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX);
+        builder.set_origin(product, category, service, no_index);
     }
 
     // Interval — matches V2, which always stamps the interval field on the message
@@ -279,8 +279,9 @@ fn encode_metric_to_v3(
         builder.set_interval(interval.into());
     }
 
-    // Note: `unit` is intentionally never set — V2 always sends it empty (see
-    // `series_to_proto_message`'s `unit: "".to_string()`).
+    if let Some(unit) = event_metadata.datadog_metric_unit() {
+        builder.set_unit(unit);
+    }
 
     // ── Data points ─────────────────────────────────────────────────────────
     let timestamp = encode_timestamp(metric.timestamp());
@@ -324,8 +325,13 @@ mod tests {
 
     use super::super::config::SeriesApiVersion;
     use super::*;
+    use datadog_proto::metrics_v3::MetricData;
+    use prost::Message;
     use vector_lib::{
-        event::{MetricKind, MetricValue, metric::MetricSketch},
+        event::{
+            DatadogMetricOriginMetadata, EventMetadata, MetricKind, MetricValue,
+            metric::MetricSketch,
+        },
         metrics::AgentDDSketch,
     };
 
@@ -589,7 +595,7 @@ mod tests {
                     count: 1,
                 }],
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
             },
         );
         assert!(enc.try_encode(histogram).is_err());
@@ -638,6 +644,43 @@ mod tests {
         let origin = generate_origin_metadata(None, Some("host_metrics"), *ORIGIN_PRODUCT_VALUE)
             .expect("host_metrics should get synthesized origin metadata");
         assert_eq!(origin.service(), Some(211));
+    }
+
+    #[test]
+    fn v3_preserves_unit_and_no_index_metadata() {
+        const FLAG_NO_INDEX: u64 = 0x100;
+        const FLAG_HAS_UNIT: u64 = 0x200;
+
+        let metadata = EventMetadata::default()
+            .with_origin_metadata(
+                DatadogMetricOriginMetadata::new(Some(10), Some(11), Some(42))
+                    .with_metric_type(Some(DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX)),
+            )
+            .with_datadog_metric_unit("byte".to_string());
+        let metric = Metric::new_with_metadata(
+            "preserved.metadata",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            metadata,
+        );
+
+        let mut writer = V3Writer::new();
+        encode_metric_to_v3(
+            &mut writer,
+            &metric,
+            &None,
+            log_schema(),
+            *ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+        let encoded = writer.finalize().unwrap();
+        let data = MetricData::decode(encoded.payload.as_slice()).unwrap();
+
+        assert_eq!(data.types.len(), 1);
+        assert_eq!(data.types[0] & FLAG_NO_INDEX, FLAG_NO_INDEX);
+        assert_eq!(data.types[0] & FLAG_HAS_UNIT, FLAG_HAS_UNIT);
+        assert_eq!(data.dict_unit_str, b"\x04byte");
+        assert_eq!(data.unit_refs, vec![1]);
     }
 
     #[test]

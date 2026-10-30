@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
 use http_1::Request;
+use vector_http::empty_body;
 
 use super::NewRelicCredentials;
-use crate::{
-    http::client_v1::{HttpClient, empty_body},
-    sinks::HealthcheckError,
-};
+use crate::{http::client_v1::HttpClient, sinks::HealthcheckError};
 
 pub(crate) async fn healthcheck(
     client: HttpClient,
