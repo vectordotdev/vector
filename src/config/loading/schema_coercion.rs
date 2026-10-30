@@ -2,12 +2,15 @@
 //!
 //! This is a preparation pass, not a general JSON Schema validator. Serde remains
 //! authoritative for final component validation.
-//! The loader does not invoke this pass yet.
+//! The loader invokes this pass after environment-variable and secret substitution.
+
+use std::collections::HashSet;
 
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
-use std::collections::HashSet;
 use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_STRING_ONLY, SERDE_VARIANT_ALIASES};
+
+use super::{ignored_fields, merge::ConfigNode};
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -27,6 +30,9 @@ const PROVIDER: &str = "provider";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
+    #[snafu(display("{message}"))]
+    Merge { message: String },
+
     #[snafu(display("Expected boolean at '{path}', found '{actual}'"))]
     ExpectedBool { path: String, actual: &'static str },
 
@@ -93,6 +99,7 @@ macro_rules! fail_expected {
 /// error paths. The schema is borrowed and may be reused across calls.
 pub struct ValueCoercer<'a> {
     schema: &'a Value,
+    tree: Option<ConfigNode>,
     definitions: Option<&'a Value>,
     component_schemas: Vec<&'a Value>,
     path: Vec<String>,
@@ -104,6 +111,7 @@ impl<'a> ValueCoercer<'a> {
     pub fn new(schema: &'a Value) -> Self {
         let mut coercer = Self {
             schema,
+            tree: None,
             definitions: schema.get("definitions"),
             component_schemas: Vec::new(),
             path: Vec::new(),
@@ -135,6 +143,46 @@ impl<'a> ValueCoercer<'a> {
     pub fn coerce(&mut self, value: &mut Value) -> Result<(), Error> {
         self.path.clear();
         self.coerce_value(value, self.schema)
+    }
+
+    /// Resolves a merge tree in its final configuration coordinates. Histories are
+    /// checked at the corresponding field, using that field's schema only.
+    pub(super) fn coerce_tree(&mut self, tree: &ConfigNode) -> Result<Value, Error> {
+        self.path.clear();
+        self.tree = Some(tree.clone());
+        let mut value = tree.latest();
+        let result = self.coerce_field(&mut value, self.schema);
+        let tree = self
+            .tree
+            .take()
+            .expect("merge tree is retained during coercion");
+        result?;
+        // Fields without a schema still follow the raw merge rules. Typed fields
+        // have already converted their scalar histories in place.
+        tree.check_raw_merges().map_err(|errors| Error::Merge {
+            message: errors.join("\n"),
+        })?;
+        Ok(value)
+    }
+
+    fn coerce_field(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        self.coerce_value(value, schema)?;
+        if let Some(node) = self
+            .tree
+            .as_mut()
+            .and_then(|tree| tree.at_path_mut(&self.path))
+            && matches!(node, ConfigNode::Scalar(values) if values.len() > 1 && values.iter().any(Value::is_string))
+        {
+            let mut scalar_coercer = Self::new(self.schema);
+            scalar_coercer.path.clone_from(&self.path);
+            node.resolve_scalar_history(value, &self.path, |previous| {
+                scalar_coercer
+                    .coerce_value(previous, schema)
+                    .map_err(|error| error.to_string())
+            })
+            .map_err(|message| Error::Merge { message })?;
+        }
+        Ok(())
     }
 
     fn definition(&self, reference: &str) -> Option<&'a Value> {
@@ -199,6 +247,21 @@ impl<'a> ValueCoercer<'a> {
     }
 
     fn coerce_object_schema(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        if let Some(object) = schema.as_object()
+            && let Some(tag) = object
+                .get(METADATA)
+                .and_then(|metadata| metadata.get(ignored_fields::SERDE_OPTIONAL_TAG))
+                .and_then(Value::as_str)
+        {
+            // Use the same accepted-input adjustment as ignored-field diagnostics.
+            let mut object = object.clone();
+            if let Some(metadata) = object.get_mut(METADATA).and_then(Value::as_object_mut) {
+                metadata.remove(ignored_fields::SERDE_OPTIONAL_TAG);
+            }
+            ignored_fields::make_tag_optional(&mut object, tag);
+            return self.coerce_object_schema(value, &Value::Object(object));
+        }
+
         // Some custom string deserializers (for example ASCII characters) reject
         // native numbers. Do not turn those inputs into valid-looking strings.
         if schema
@@ -420,7 +483,7 @@ impl<'a> ValueCoercer<'a> {
             let s_trimmed = s.trim();
 
             // String → Bool
-            if let Ok(b) = s_trimmed.parse::<bool>()
+            if let Some(b) = parse_bool(s_trimmed)
                 && allowed.iter().any(|opt| opt.as_bool() == Some(b))
             {
                 *value = Value::Bool(b);
@@ -436,9 +499,7 @@ impl<'a> ValueCoercer<'a> {
             }
 
             // String → Null
-            if s_trimmed.eq_ignore_ascii_case("null")
-                && allowed.iter().any(serde_json::Value::is_null)
-            {
+            if is_null_literal(s_trimmed) && allowed.iter().any(serde_json::Value::is_null) {
                 *value = Value::Null;
                 return true;
             }
@@ -560,78 +621,34 @@ impl<'a> ValueCoercer<'a> {
             }
         }
 
-        // When unevaluatedProperties:false is set (used by Vector's component outer-wrapper schemas
-        // like SourceOuter, SinkOuter, EnrichmentTableOuter), collect all properties declared
-        // anywhere in the schema — including across allOf/$ref/oneOf — and flag any key not found.
-        // This is the right level to do this check: the outer wrapper sees the full union of all
-        // properties (component-specific fields + shared fields like `inputs`, `proxy`, `graph`).
-        //
-        // Guard: skip the check when the value's `type` discriminant is not recognized by any
-        // compiled variant. In that case the component is simply not compiled in, and checking
-        // would incorrectly flag its fields as unknown.
-        let unevaluated_props_false = schema
-            .get("unevaluatedProperties")
-            .and_then(serde_json::Value::as_bool)
-            == Some(false);
-        let known_for_unevaluated: Option<HashSet<String>> = if unevaluated_props_false {
-            let type_val = obj.get("type").and_then(|t| t.as_str());
-            let type_is_known =
-                type_val.is_some_and(|tv| self.schema_contains_type_discriminant(schema, tv)); // no `type` field → not a component config → skip check
-            if type_is_known {
-                let mut set = HashSet::new();
-                // Filter `oneOf` variants by the value's discriminant so properties
-                // valid in *other* variants (e.g. a Kafka-only field on an HTTP sink)
-                // still trigger the unknown-field check.
-                self.collect_known_properties(schema, type_val, &mut set);
-                Some(set)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
         for (key, field) in obj.iter_mut() {
-            let key_str = key.as_str();
-            let initial_len = self.path.len();
-            self.path.push(key_str.to_string());
-
             let field_schema = properties
                 .and_then(|props| {
-                    props.get(key_str).or_else(|| {
+                    props.get(key).or_else(|| {
                         props
                             .values()
-                            .find(|field| Self::field_aliases(field).any(|alias| alias == key_str))
+                            .find(|field| Self::field_aliases(field).any(|alias| alias == key))
                     })
                 })
                 // `true` allows the property without imposing a schema.
                 .or_else(|| additional_properties.filter(|schema| **schema != Value::Bool(true)));
-
-            if let Some(field_schema) = field_schema {
-                if field_schema == &Value::Bool(false) {
-                    self.path.truncate(initial_len);
-                    return UnexpectedPropertySnafu {
-                        path: self.path.join("."),
-                        key: key_str.to_string(),
-                    }
-                    .fail();
+            let Some(field_schema) = field_schema else {
+                // Ignored-field diagnostics belong to the configuration loader.
+                continue;
+            };
+            if field_schema == &Value::Bool(false) {
+                return UnexpectedPropertySnafu {
+                    path: self.path.join("."),
+                    key: key.to_owned(),
                 }
-
-                let result = self.coerce_value(field, field_schema);
-                self.path.truncate(initial_len);
-                result?;
-            } else {
-                if let Some(ref known) = known_for_unevaluated
-                    && !known.contains(key_str)
-                {
-                    // Serde remains authoritative for unknown fields.
-                    warn!(
-                        message = "Unknown field in config, deferring to serde.",
-                        path = %self.path.join("."),
-                    );
-                }
-                self.path.truncate(initial_len);
+                .fail();
             }
+
+            let initial_len = self.path.len();
+            self.path.push(key.to_owned());
+            let result = self.coerce_field(field, field_schema);
+            self.path.truncate(initial_len);
+            result?;
         }
 
         Ok(())
@@ -671,7 +688,7 @@ impl<'a> ValueCoercer<'a> {
                             .fail();
                         }
 
-                        let result = self.coerce_value(item_val, item_schema);
+                        let result = self.coerce_field(item_val, item_schema);
                         self.path.truncate(initial_len);
                         result?;
                     } else {
@@ -684,7 +701,7 @@ impl<'a> ValueCoercer<'a> {
                 for (idx, item_val) in arr.iter_mut().enumerate() {
                     let initial_len = self.path.len();
                     self.path.push(idx.to_string());
-                    let result = self.coerce_value(item_val, item_schema);
+                    let result = self.coerce_field(item_val, item_schema);
                     self.path.truncate(initial_len);
                     result?;
                 }
@@ -697,15 +714,16 @@ impl<'a> ValueCoercer<'a> {
     /// Prefer shape-preserving variants, leaving final validation to serde.
     fn coerce_one_of(&mut self, value: &mut Value, schemas: &[Value]) -> Result<(), Error> {
         let initial_len = self.path.len();
-        if self.coerce_any_of(value, schemas).is_ok() {
-            return Ok(());
+        match self.coerce_any_of(value, schemas) {
+            Ok(()) => return Ok(()),
+            Err(error @ Error::Merge { .. }) => return Err(error),
+            Err(_) => {}
         }
 
         // No variant succeeded. If the value carries a `type` discriminant that matches a known
         // variant, re-run coercion strictly against that variant so callers get a path-aware
         // coercion error (e.g. "expected integer at sources.my_source.count") rather than a
-        // silent pass-through. Unknown-field detection is handled at the outer wrapper level
-        // (see unevaluatedProperties handling in coerce_object).
+        // silent pass-through. The configuration loader handles ignored-field diagnostics.
         if let Some(type_val) = value
             .as_object()
             .and_then(|o| o.get("type"))
@@ -728,73 +746,6 @@ impl<'a> ValueCoercer<'a> {
             message: "No matching oneOf variant".to_owned(),
         }
         .fail()
-    }
-
-    /// Collect property names declared in `schema`, recursively through `$ref`, `allOf`,
-    /// `anyOf`, and `oneOf`. When `discriminant` is `Some`, `oneOf` traversal is filtered
-    /// to only the variant whose `properties.type.const` matches — so unknown-field
-    /// detection on a tagged-union component doesn't accept fields that are valid only
-    /// in *other* variants.
-    fn collect_known_properties(
-        &self,
-        schema: &Value,
-        discriminant: Option<&str>,
-        out: &mut HashSet<String>,
-    ) {
-        let resolved = if let Some(ref_str) = schema.get("$ref").and_then(|r| r.as_str()) {
-            match self.definition(ref_str) {
-                Some(def) => def,
-                None => return,
-            }
-        } else {
-            schema
-        };
-
-        if let Some(props) = resolved.get("properties").and_then(|p| p.as_object()) {
-            out.extend(props.keys().cloned());
-            out.extend(
-                props
-                    .values()
-                    .flat_map(Self::field_aliases)
-                    .map(str::to_owned),
-            );
-        }
-
-        for kw in ["allOf", "anyOf"] {
-            if let Some(variants) = resolved.get(kw).and_then(|v| v.as_array()) {
-                for sub in variants {
-                    self.collect_known_properties(sub, discriminant, out);
-                }
-            }
-        }
-
-        if let Some(variants) = resolved.get("oneOf").and_then(|v| v.as_array()) {
-            match discriminant {
-                Some(disc) => {
-                    // Only collect properties from the variant whose `type` const matches.
-                    // If no variant matches (e.g. untagged or non-component oneOf), fall back
-                    // to including all variants so callers don't get false positives.
-                    let matched: Vec<&Value> = variants
-                        .iter()
-                        .filter(|v| self.schema_matches_type_discriminant(v, disc))
-                        .collect();
-                    if matched.is_empty() {
-                        for sub in variants {
-                            self.collect_known_properties(sub, discriminant, out);
-                        }
-                    } else {
-                        for sub in matched {
-                            self.collect_known_properties(sub, discriminant, out);
-                        }
-                    }
-                }
-                None => {
-                    for sub in variants {
-                        self.collect_known_properties(sub, discriminant, out);
-                    }
-                }
-            }
-        }
     }
 
     /// Returns true if `schema` (after resolving any `$ref` and walking `allOf`) has a
@@ -833,8 +784,8 @@ impl<'a> ValueCoercer<'a> {
     }
 
     /// Returns true if `schema`, after resolving `$ref`, `allOf`, and unions, contains
-    /// any variant that claims `expected` as its `type` discriminant. Used to skip the
-    /// unevaluatedProperties unknown-field check for components whose type is not compiled in.
+    /// any variant that claims `expected` as its `type` discriminant. Components whose
+    /// type is not compiled in pass through coercion for Serde to diagnose.
     fn schema_contains_type_discriminant(&self, schema: &Value, expected: &str) -> bool {
         let resolved = if let Some(ref_str) = schema.get("$ref").and_then(|r| r.as_str()) {
             match self.definition(ref_str) {
@@ -877,9 +828,18 @@ impl<'a> ValueCoercer<'a> {
 
                 self.path.truncate(initial_len);
                 let mut candidate = value.clone();
-                if self.coerce_value(&mut candidate, schema).is_ok() {
+                // Choose the variant from the final definitions. Historical values
+                // must not cause a different branch to win or disappear in a fallback.
+                let tree = self.tree.take();
+                let result = self.coerce_value(&mut candidate, schema);
+                self.tree = tree;
+                if result.is_ok() {
                     self.path.truncate(initial_len);
-                    *value = candidate;
+                    if self.tree.is_some() {
+                        self.coerce_value(value, schema)?;
+                    } else {
+                        *value = candidate;
+                    }
                     return Ok(());
                 }
             }
@@ -937,8 +897,8 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_bool(&mut self, value: &mut Value) -> Result<(), Error> {
         match value {
             Value::Bool(_) => Ok(()),
-            Value::String(s) => match s.trim().parse::<bool>() {
-                Ok(b) => {
+            Value::String(s) => match parse_bool(s) {
+                Some(b) => {
                     *value = Value::Bool(b);
                     Ok(())
                 }
@@ -1006,7 +966,7 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_null(&mut self, value: &mut Value) -> Result<(), Error> {
         match value {
             Value::Null => Ok(()),
-            Value::String(s) if s.trim().eq_ignore_ascii_case("null") => {
+            Value::String(s) if is_null_literal(s) => {
                 *value = Value::Null;
                 Ok(())
             }
@@ -1041,21 +1001,65 @@ fn value_matches_type(value: &Value, schema_type: &str) -> bool {
     }
 }
 
-fn parse_integer(input: &str) -> Option<Number> {
-    if let Ok(i) = input.trim().parse::<i64>() {
-        Some(Number::from(i))
-    } else if let Ok(u) = input.trim().parse::<u64>() {
-        Some(Number::from(u))
-    } else {
-        None
+fn is_null_literal(input: &str) -> bool {
+    // YAML also represents null with a tilde or an empty scalar.
+    let input = input.trim();
+    matches!(input, "" | "~") || input.eq_ignore_ascii_case("null")
+}
+
+fn parse_bool(input: &str) -> Option<bool> {
+    // Preserve YAML's boolean spellings when substitution happens after parsing.
+    match input.trim() {
+        "true" | "True" | "TRUE" => Some(true),
+        "false" | "False" | "FALSE" => Some(false),
+        _ => None,
     }
+}
+
+fn remove_digit_separators(input: &str, radix: u32) -> Option<String> {
+    // TOML permits underscores only between digits, including exponent digits.
+    let is_digit = |byte: u8| char::from(byte).is_digit(radix);
+    if input.starts_with('_')
+        || input.ends_with('_')
+        || input
+            .as_bytes()
+            .windows(3)
+            .any(|bytes| bytes[1] == b'_' && (!is_digit(bytes[0]) || !is_digit(bytes[2])))
+    {
+        return None;
+    }
+    Some(input.replace('_', ""))
+}
+
+fn parse_integer(input: &str) -> Option<Number> {
+    let input = input.trim();
+    let (sign, digits) = if let Some(digits) = input.strip_prefix('-') {
+        ("-", digits)
+    } else {
+        ("", input.strip_prefix('+').unwrap_or(input))
+    };
+    let (digits, radix) = [("0x", 16), ("0o", 8), ("0b", 2)]
+        .into_iter()
+        .find_map(|(prefix, radix)| digits.strip_prefix(prefix).map(|digits| (digits, radix)))
+        .unwrap_or((digits, 10));
+    if digits.starts_with(['+', '-']) {
+        return None;
+    }
+    // Keep the sign for checked parsing, including i64::MIN, without accepting
+    // arrays, maps, tags, or other configuration syntax from substituted values.
+    let digits = remove_digit_separators(digits, radix)?;
+    let number = format!("{sign}{digits}");
+    i64::from_str_radix(&number, radix)
+        .map(Number::from)
+        .or_else(|_| u64::from_str_radix(&number, radix).map(Number::from))
+        .ok()
 }
 
 fn parse_number(input: &str) -> Option<Number> {
     if let Some(num) = parse_integer(input) {
         return Some(num);
     }
-    if let Ok(f) = input.trim().parse::<f64>() {
+    if let Ok(f) = remove_digit_separators(input.trim(), 10)?.parse::<f64>() {
         return Number::from_f64(f);
     }
     None

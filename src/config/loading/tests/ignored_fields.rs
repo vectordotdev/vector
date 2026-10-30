@@ -9,13 +9,9 @@
 use std::io::{Read as _, Seek as _, SeekFrom};
 
 use indoc::indoc;
-use serde_json::Value;
 use tracing_subscriber::{Layer as _, layer::SubscriberExt as _};
 
-use crate::config::{
-    ConfigBuilder, Format,
-    loading::{ConfigBuilderLoader, ignored_fields},
-};
+use crate::config::{ConfigBuilder, Format, loading::ConfigBuilderLoader};
 
 const CONFIG: &str = indoc! {r#"
     sources:
@@ -78,12 +74,12 @@ fn supported_defaults_aliases_and_maps_do_not_warn() {
               headers:
                 X-Token: "HEADER_SECRET"
     "#};
-    let value: Value = serde_yaml::from_str(CONFIG).unwrap();
-    let _: ConfigBuilder = serde_json::from_value(value.clone()).unwrap();
-    assert_eq!(
-        ignored_fields::find(value.as_object().unwrap(), None),
-        Vec::<String>::new()
-    );
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(false)
+        .load_from_input(CONFIG.as_bytes(), Format::Yaml)
+        .unwrap();
+    let (_, warnings) = builder.build_with_warnings().unwrap();
+    assert!(warnings.is_empty(), "{warnings:?}");
 }
 
 fn with_logs<T>(f: impl FnOnce() -> T) -> (T, String) {
@@ -166,11 +162,12 @@ fn invalid_configurations_keep_their_error_without_deprecation_warnings() {
             .interpolate_env(false)
             .load_from_input(CONFIG.as_bytes(), Format::Yaml)
     });
+    let errors = result.unwrap_err();
     assert!(
-        result
-            .unwrap_err()
-            .join(" ")
-            .contains("missing field `token`")
+        errors
+            .iter()
+            .any(|error| error.contains("sources.http.auth")),
+        "{errors:?}"
     );
     assert!(!logs.contains("DEPRECATED:"), "{logs}");
 }
