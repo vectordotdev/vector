@@ -194,6 +194,7 @@ impl ValidatedSink for AmqpSinkConfig {
             exchange,
             routing_key,
         } = validated.clone();
+        self.connection.warn_unenforceable_protocol_versions();
         let sink = AmqpSink::new(self.clone(), exchange, routing_key)?;
         let hc = healthcheck(sink.channels.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))

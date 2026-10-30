@@ -24,7 +24,7 @@ pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};
 pub use settings::{
     MaybeTlsSettings, PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
     TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
-    TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
+    TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig, TlsVersion,
 };
 
 /// Install Ring as the process-wide Rustls provider if none is already installed.
@@ -38,6 +38,19 @@ pub fn install_default_crypto_provider() {
 }
 
 pub type Result<T> = std::result::Result<T, TlsError>;
+
+/// Warns that `tls_stack` cannot honor the configured TLS protocol version bounds.
+///
+/// `min_tls_version`/`max_tls_version` are applied to the OpenSSL context built by
+/// [`TlsSettings::apply_context_base`]. Components that instead pass the configured certificates
+/// to a third-party TLS implementation never reach that code, so the bounds have no effect there.
+/// Because they are a security control, such components warn rather than ignore them silently.
+pub fn warn_unenforceable_protocol_versions(tls_stack: &str) {
+    warn!(
+        message = "`tls.min_tls_version` and `tls.max_tls_version` are not enforced by this component's TLS implementation and are ignored.",
+        tls_stack
+    );
+}
 
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 
@@ -111,6 +124,27 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting the TLS protocol version: {}", source))]
+    SetTlsVersion { source: ErrorStack },
+    #[snafu(display(
+        "`min_tls_version` ({}) must not be greater than `max_tls_version` ({})",
+        min,
+        max
+    ))]
+    InvalidTlsVersionRange { min: TlsVersion, max: TlsVersion },
+    #[snafu(display(
+        "No TLS protocol version is usable between {} and {}: the host's OpenSSL configuration \
+         sets a conflicting bound or disables every version left by `min_tls_version`/\
+         `max_tls_version`.",
+        min,
+        max
+    ))]
+    EmptyTlsVersionWindow { min: TlsVersion, max: TlsVersion },
+    #[snafu(display(
+        "No TLS protocol version is usable: the host's OpenSSL configuration sets a maximum \
+         below TLS v1.0."
+    ))]
+    HostMaxTlsVersionBelowTls10,
     #[snafu(display("Error setting SNI: {}", source))]
     SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]

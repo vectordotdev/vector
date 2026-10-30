@@ -206,6 +206,10 @@ impl MqttSinkConfig {
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = tls.identity_pem();
+            if tls.has_protocol_version_bounds() {
+                vector_lib::tls::warn_unenforceable_protocol_versions("rumqttc");
+            }
+
             // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
             // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
             let alpn = self
