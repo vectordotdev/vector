@@ -87,13 +87,7 @@ impl BigqueryRequestBuilder {
         protobuf_serializer: ProtobufSerializer,
         write_stream: String,
     ) -> Result<Self, BigqueryRequestBuilderError> {
-        // The codecs library uses prost-reflect (prost 0.13), but the generated BigQuery proto
-        // uses tonic (prost 0.12). We bridge the version gap by encoding to bytes and decoding.
-        let descriptor_bytes = protobuf_serializer.encode_descriptor_proto();
-        let descriptor_proto = prost_types::DescriptorProto::decode(descriptor_bytes.as_slice())
-            .map_err(|e| BigqueryRequestBuilderError::ProtobufEncoding {
-                message: format!("{e}"),
-            })?;
+        let descriptor_proto = protobuf_serializer.descriptor_proto().clone();
         let root_full_name = protobuf_serializer.message_full_name();
 
         // The Storage Write API expects rows with proto2 semantics, especially for default values.
