@@ -16,8 +16,8 @@
 //! and will provide full batching, and request dispatching based on
 //! the settings passed.
 //!
-//! For more advanced use cases like HTTP based sinks, one should use the
-//! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
+//! HTTP based sinks instead use a `StreamSink` that drives the native HTTP 1
+//! `http_v1::HttpService`.
 //!
 //! # Driving to completion
 //!

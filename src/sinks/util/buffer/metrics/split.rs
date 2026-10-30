@@ -248,7 +248,7 @@ mod tests {
                     },
                 ],
                 count: 7,
-                sum: 100.0,
+                sum: Some(100.0),
             },
         );
         let agg_summary = Metric::new(

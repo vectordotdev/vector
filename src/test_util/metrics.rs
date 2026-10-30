@@ -373,7 +373,7 @@ where
         MetricValue::AggregatedHistogram {
             buckets,
             count,
-            sum,
+            sum: Some(sum),
         },
     )
 }
