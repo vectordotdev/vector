@@ -1,6 +1,7 @@
 {{/* Reuse the standalone guide so both URLs share the same migration instructions.
-     Nest its headings under the release page's Upgrade guide heading, keeping IDs. */}}
-{{ $content := .Content }}
+     Each top-level migration becomes a standard changelog card. Nest its headings
+     under the release page's Upgrade guide heading, keeping IDs. */}}
+{{ $content := .Content | replaceRE `<h2(\s|>)` `<!-- upgrade-guide-entry --><h2${1}` }}
 {{ range slice 5 4 3 2 }}
 {{ $content = $content | replaceRE (printf `<(/?)h%d(\s|>)` .) (printf `<${1}h%d${2}` (add . 1)) }}
 {{ end }}
@@ -8,7 +9,11 @@
   <div class="prose dark:prose-invert max-w-none">
     {{ partial "heading.html" (dict "text" "Upgrade guide" "level" 2) }}
   </div>
-  <div class="mt-6 prose dark:prose-invert max-w-none [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
-    {{ $content | safeHTML }}
-  </div>
+  <ul class="mt-6 grid min-w-0 list-none gap-3 p-0">
+    {{ range split $content "<!-- upgrade-guide-entry -->" }}
+    {{ with strings.TrimSpace . }}
+    {{ partial "releases/changelog-card.html" (dict "body" (. | safeHTML) "class" "upgrade-guide-entry") }}
+    {{ end }}
+    {{ end }}
+  </ul>
 </section>

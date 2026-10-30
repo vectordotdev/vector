@@ -69,7 +69,7 @@ for (const width of [1280, 390]) {
     await expect(guide.getByRole("heading", { name: "Upgrade guide", exact: true })).toBeInViewport();
 
     const vectorMigration = guide.locator("#vector-sink-default-https");
-    await page.locator('.changelog-card a[href="#vector-sink-default-https"]').click();
+    await page.locator('.changelog-card > a[href="#vector-sink-default-https"]').click();
     await expect(page).toHaveURL(/\/releases\/0\.61\.0\/#vector-sink-default-https$/);
     await expect(vectorMigration).toBeInViewport();
     await expect(vectorMigration).toHaveJSProperty("tagName", "H3");
