@@ -1,0 +1,30 @@
+{{/* Renders deprecation notices as release-page changelog cards with a
+     newest/oldest first toggle. The notices arrive sorted newest first (see
+     deprecations/entries.html), so the toggle only reverses the rendered list.
+     Params: entries (slice of notices), sort_by (sort key shown to readers, e.g.
+     "removal version"), class (optional extra classes for each card) */}}
+<div x-data="{ newestFirst: true }">
+  <div class="mt-4 flex justify-end">
+    <button type="button"
+      @click="newestFirst = !newestFirst; $refs.list.append(...Array.from($refs.list.children).reverse())"
+      :aria-label="'Sorted by {{ .sort_by }}, ' + (newestFirst ? 'newest' : 'oldest') + ' first. Reverse order.'"
+      aria-label="Sorted by {{ .sort_by }}, newest first. Reverse order."
+      title="Sort by {{ .sort_by }}"
+      class="flex items-center space-x-1.5 rounded-md border border-gray-200 px-2.5 py-1 text-sm text-gray-600 hover:border-secondary hover:text-secondary dark:border-gray-700 dark:text-gray-300 dark:hover:border-primary dark:hover:text-primary">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+      </svg>
+      <span x-text="newestFirst ? 'Newest first' : 'Oldest first'">Newest first</span>
+    </button>
+  </div>
+  <ul x-ref="list" class="mt-3 grid min-w-0 list-none gap-3 p-0">
+    {{ range .entries }}
+    {{ partial "releases/changelog-card.html" (dict
+      "title" .what
+      "body" .content
+      "footer" (partial "deprecations/versions.html" .)
+      "class" $.class
+    ) }}
+    {{ end }}
+  </ul>
+</div>

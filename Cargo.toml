@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.61.0-dev"
+version = "0.62.0-dev"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -220,6 +220,7 @@ rand_distr = { version = "0.6.0", default-features = false }
 rdkafka = { version = "0.39.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json"] }
+rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
 semver = { version = "1.0.28", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.150", default-features = false, features = ["preserve_order", "raw_value", "std"] }
@@ -262,6 +263,7 @@ similar-asserts = "2.0.0"
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
+jsonschema.workspace = true
 cfg-if.workspace = true
 reqwest.workspace = true
 reqwest_13 = { package = "reqwest", version = "0.13", default-features = false, features = ["json", "native-tls", "rustls-no-provider"] }
@@ -482,9 +484,8 @@ rdkafka = { workspace = true, features = ["curl-static", "tokio", "libz", "ssl",
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
-rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-no-provider"], optional = true }
-# Keep MQTT on Ring alongside Vector's other Rustls users, including in minimal builds.
-rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"], optional = true }
+# Select MQTT's provider explicitly because VRL also enables Rustls's AWS-LC provider.
+rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-ring"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -550,13 +551,13 @@ criterion = { workspace = true, features = ["html_reports", "async_tokio"] }
 hyper-1 = { package = "hyper", version = "1", default-features = false, features = ["server"] }
 hyper-util = { version = "0.1", default-features = false, features = ["server-auto"] }
 itertools.workspace = true
-jsonschema.workspace = true
 libc.workspace = true
 mock_instant.workspace = true
 proptest.workspace = true
 quickcheck.workspace = true
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
+rustls.workspace = true
 serial_test.workspace = true
 similar-asserts.workspace = true
 tempfile.workspace = true
@@ -798,7 +799,7 @@ sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
-sources-mqtt = ["dep:rumqttc", "dep:rustls"]
+sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-okta = ["sources-utils-http-client"]
@@ -1007,7 +1008,7 @@ sinks-kafka = ["dep:rdkafka"]
 sinks-keep = []
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
-sinks-mqtt = ["dep:rumqttc", "dep:rustls"]
+sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []

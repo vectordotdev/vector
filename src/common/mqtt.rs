@@ -121,12 +121,13 @@ impl MqttConnector {
             .build()
     }
 
+    /// Checks the health of the MQTT connection. Currently a no-op.
+    ///
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error.
     pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
     }
@@ -135,10 +136,9 @@ impl MqttConnector {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn tls_crypto_provider_is_unambiguous() {
-        // Rustls panics here if no provider, or both Ring and AWS-LC, are enabled.
-        let _config = rustls::ClientConfig::builder()
-            .with_root_certificates(rustls::RootCertStore::empty())
-            .with_no_client_auth();
+    fn tls_config_uses_explicit_crypto_provider() {
+        // Exercise MQTT's provider selection, including when VRL enables AWS-LC.
+        rumqttc::TlsConfiguration::try_default_rustls()
+            .expect("MQTT TLS should select Ring without a process-wide default provider");
     }
 }

@@ -47,11 +47,12 @@ impl Partitioner for ChroniclePartitioner {
                     });
                     Ok(fallback_log_type.clone())
                 } else {
-                    Err(emit!(TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("log_type"),
                         drop_event: true,
-                    }))
+                    });
+                    Err(())
                 }
             })
             .ok()?;

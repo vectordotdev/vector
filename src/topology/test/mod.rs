@@ -40,6 +40,8 @@ mod confinement_gauge;
 mod cpu_metrics;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
+#[cfg(feature = "sinks-greptimedb_metrics")]
+mod crypto_provider;
 mod doesnt_reload;
 #[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
 mod end_to_end;
