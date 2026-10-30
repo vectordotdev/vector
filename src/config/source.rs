@@ -233,3 +233,54 @@ impl SourceContext {
             .into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{SourceSender, config::SourceContext};
+    use vector_common::shutdown::ShutdownSignal;
+    use vector_lib::config::GlobalOptions;
+
+    #[test]
+    fn do_acknowledgments() {
+        // Global acknowledgment, sink acknowledgment, expected acknowledgment result
+        let test_data_set = [
+            (None, false, false),
+            (None, true, true),
+            (None, false, false),
+            (Some(true), false, false),
+            (Some(true), true, true),
+            (Some(true), false, false),
+            (Some(false), false, false),
+            (Some(false), true, true),
+            (Some(false), false, false),
+        ];
+
+        test_data_set.iter().for_each(|test_data| {
+            let global_options = match test_data.0 {
+                None => Default::default(),
+                Some(acknowledgements) => {
+                    let mut global_options = GlobalOptions::default();
+                    global_options.acknowledgements = acknowledgements.into();
+
+                    global_options
+                }
+            };
+
+            let source_context = SourceContext {
+                key: "default".into(),
+                globals: global_options,
+                enrichment_tables: Default::default(),
+                metrics_storage: Default::default(),
+                shutdown: ShutdownSignal::noop(),
+                out: SourceSender::builder().build(),
+                proxy: Default::default(),
+                acknowledgements: test_data.1,
+                schema: Default::default(),
+                schema_definitions: Default::default(),
+                extra_context: Default::default(),
+            };
+
+            assert_eq!(source_context.do_acknowledgements(None.into()), test_data.2);
+        });
+    }
+}
