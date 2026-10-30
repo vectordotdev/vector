@@ -1,0 +1,255 @@
+name: Package Repositories
+
+on:
+  workflow_run:
+    workflows: [Release Suite]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Release Suite run ID for the published tag
+        type: string
+        required: true
+      tag:
+        description: Immutable published tag (v0.x.y or an explicitly selected beta)
+        type: string
+        required: true
+      channel:
+        description: Repository channel
+        type: choice
+        options: [stable, beta]
+        default: stable
+
+permissions: {}
+
+# All channels share the apt pool and one S3 publication control object.
+concurrency:
+  group: package-repositories
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  # Freeze verified release assets and the reviewed tooling checkout.
+  # Jobs install the publisher version and SHA-256 pinned by that checkout.
+  # Trust authorized GitHub release publishers: run/tag and checksum checks do not
+  # prove build provenance. Stronger provenance verification is deferred.
+  # Enable only after historical backfill and the repository/key migration are ready.
+  inputs:
+    if: >-
+      github.repository_id == '146327667' &&
+      github.ref == 'refs/heads/master' &&
+      vars.PACKAGE_REPOSITORIES_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        startsWith(github.event.workflow_run.head_branch, 'v0.') &&
+        !contains(github.event.workflow_run.head_branch, '-')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tooling_commit: ${{ steps.source.outputs.commit }}
+    steps:
+      # workflow_run executes reviewed default-branch code, never release/tag code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/package-repository-tools
+      - name: Freeze and verify release inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.run_id || github.event.workflow_run.id }}
+          SOURCE_TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+          CHANNEL: ${{ inputs.channel || 'stable' }}
+        run: >-
+          "$VDEV" release repositories fetch --run "$SOURCE_RUN" --tag "$SOURCE_TAG" --channel "$CHANNEL"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-repository-inputs
+          path: target/package-repositories/
+          retention-days: 1
+          if-no-files-found: error
+
+  # Read current S3 metadata or restore the exact signed output of a retry.
+  # Uses AWS OIDC without access to the signing key.
+  base:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    environment: package-repositories-publishing
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.inputs.outputs.tooling_commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/package-repository-tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-inputs
+          path: target/package-repositories
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 900
+          allowed-account-ids: "486234852809"
+      - name: Read the active generation or restore a signed retry
+        env:
+          PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+        run: '"$VDEV" release repositories base'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-repository-base
+          path: target/package-repositories/
+          retention-days: 1
+          if-no-files-found: error
+
+  # Sign new packages and repository metadata; retries reuse saved signatures.
+  # The protected signing job has no AWS credentials.
+  sign:
+    needs: [inputs, base]
+    runs-on: ubuntu-24.04
+    environment: package-repositories-signing
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.inputs.outputs.tooling_commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/package-repository-tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-base
+          path: target/package-repositories
+      - id: cached
+        run: |
+          if test -f target/package-repositories/result/manifest.json; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Sign packages and incremental repository metadata
+        if: steps.cached.outputs.ready != 'true'
+        env:
+          PACKAGE_SIGNING_SUBKEY: ${{ secrets.PACKAGE_SIGNING_SUBKEY }}
+          PACKAGE_SIGNING_PASSPHRASE: ${{ secrets.PACKAGE_SIGNING_PASSPHRASE }}
+        run: '"$VDEV" release repositories prepare'
+      # GPG homes use private /dev/shm directories and are removed before this upload.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-repository-signed
+          path: target/package-repositories/
+          retention-days: 1
+          if-no-files-found: error
+
+  # Upload immutable packages/indexes before switching signed repository roots.
+  # Serialize writes with the S3 control lock; this job has no signing key.
+  # If an upload fails with the lock held, follow the recovery procedure above
+  # the maintain job in package-repositories-maintenance.yml before retrying.
+  publish:
+    needs: [inputs, sign]
+    runs-on: ubuntu-24.04
+    environment: package-repositories-publishing
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.inputs.outputs.tooling_commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/package-repository-tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-signed
+          path: target/package-repositories
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 900
+          allowed-account-ids: "486234852809"
+      - name: Publish and verify S3 objects
+        env:
+          PACKAGE_REPOSITORIES_ROLE_ARN: ${{ vars.PACKAGE_REPOSITORIES_ROLE_ARN }}
+        run: '"$VDEV" release repositories publish'
+
+  # Check public HTTPS metadata and package bytes against the signed snapshot.
+  endpoints:
+    needs: [inputs, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.inputs.outputs.tooling_commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/package-repository-tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-signed
+          path: target/package-repositories
+      - name: Verify public HTTPS metadata and new package bytes
+        run: '"$VDEV" release repositories verify'
+
+  # Install the selected version through apt/DNF on amd64 and arm64 using pinned trust.
+  clients:
+    needs: [inputs, endpoints]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        image: ["ubuntu:24.04", "almalinux:9"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.inputs.outputs.tooling_commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-repository-inputs
+          path: target/package-repositories
+      - name: Configure and install through the public repository with pinned trust
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          CHANNEL=$(jq -r .channel target/package-repositories/input.json)
+          TAG=$(jq -r .tag target/package-repositories/input.json)
+          export CHANNEL TAG
+          export APT_URL=https://apt.vector.dev/
+          export YUM_URL=https://yum.vector.dev/
+          docker run --rm --interactive --env CHANNEL --env TAG --env APT_URL --env YUM_URL \
+            --mount "type=bind,source=$PWD/distribution/repositories/setup.sh,target=/setup.sh,readonly" \
+            "$IMAGE" bash -seuo pipefail <<'VERIFY'
+          version=${TAG#v}
+          version=${version/-/\~}
+          VECTOR_DIST_CHANNEL="$CHANNEL" TESTING_APT_URL="$APT_URL" TESTING_YUM_URL="$YUM_URL" bash /setup.sh
+          if command -v apt-get >/dev/null; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get install -y "vector=$version-1"
+            test "$(dpkg-query -W -f='${Version}' vector)" = "$version-1"
+          else
+            version=${version//-/.}
+            dnf install -y "vector-$version-1"
+            test "$(rpm -q --qf '%{VERSION}-%{RELEASE}' vector)" = "$version-1"
+          fi
+          getent passwd vector
+          getent group vector
+          vector --version
+          test -f /usr/share/vector/examples/vector.yaml
+          VERIFY

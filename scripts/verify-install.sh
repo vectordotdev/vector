@@ -13,6 +13,30 @@ if [[ $# -ne 1 || ! -f "$package" ]]; then
   exit 1
 fi
 
+# Validate with the native package tools before executing maintainer scripts.
+# Package filenames must describe their native identity. Symlinks conventionally
+# have mode 0777; other world-writable entries are rejected.
+case "$package" in
+  *.deb)
+    test "$(dpkg-deb -f "$package" Package)" = vector
+    test "$(basename "$package")" = "vector_$(dpkg-deb -f "$package" Version)_$(dpkg-deb -f "$package" Architecture).deb"
+    dpkg-deb --contents "$package" | awk '
+      $1 !~ /^l/ && substr($1, 9, 1) == "w" { print "World-writable package entry: " $0; bad=1 }
+      END { exit bad }'
+    ;;
+  *.rpm)
+    test "$(rpm -qp --qf '%{NAME}' "$package")" = vector
+    test "$(basename "$package")" = "$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}.rpm' "$package")"
+    rpm -qp --qf '[%{FILEMODES:perms} %{FILENAMES}\n]' "$package" | awk '
+      $1 !~ /^l/ && substr($1, 9, 1) == "w" { print "World-writable package entry: " $0; bad=1 }
+      END { exit bad }'
+    ;;
+  *)
+    echo "Expected a Debian or RPM package" >&2
+    exit 1
+    ;;
+esac
+
 install_package () {
   case "$1" in
     *.deb)
@@ -70,5 +94,3 @@ getent group vector || (echo "vector group  missing" && exit 1)
 vector --version || (echo "vector --version failed" && exit 1)
 grep -q "FOO=bar" "/etc/default/vector" || (echo "/etc/default/vector has incorrect contents" && exit 1)
 grep -q "foo: bar" "/etc/vector/vector.yaml" || (echo "user-provided /etc/vector/vector.yaml was not preserved on reinstall" && exit 1)
-
-dd-pkg lint "$package"

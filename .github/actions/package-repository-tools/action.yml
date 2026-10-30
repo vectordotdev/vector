@@ -1,0 +1,26 @@
+name: Install package repository tools
+description: Install native packaging tools and the checksum-pinned opt-in vdev binary.
+runs:
+  using: composite
+  steps:
+    # Install tools before the job acquires signing or AWS credentials.
+    - shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          apt-utils ca-certificates createrepo-c dpkg-dev gnupg rpm libssl3t64
+        # Pin independently of developer vdev; update version and archive SHA-256 together.
+        # Published by https://github.com/vectordotdev/vector/actions/runs/40552518149.
+        version=0.3.37
+        sha256=43ec4b112782a51af7cefec6a28e0248dc8b8b6b8b51cca4e4d0a3c2e05e8990
+        archive="vdev-package-repositories-x86_64-unknown-linux-gnu-v${version}"
+        tools="$RUNNER_TEMP/package-repository-tools"
+        mkdir -p "$tools"
+        curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 3 \
+          "https://install.datadoghq.com/vector/vdev/${version}/${archive}.tgz" \
+          --output "$tools/$archive.tgz"
+        echo "$sha256  $tools/$archive.tgz" | sha256sum --check --strict
+        tar -xzf "$tools/$archive.tgz" -C "$tools" --strip-components=1 "$archive/vdev"
+        test "$("$tools/vdev" --version)" = "vdev $version"
+        "$tools/vdev" release repositories --help >/dev/null
+        echo "VDEV=$tools/vdev" >> "$GITHUB_ENV"
