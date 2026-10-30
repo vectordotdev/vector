@@ -10,6 +10,10 @@
 {{ $breaking := where ($release.changelog | default slice) "breaking" true }}
 {{ $breakingTitled := where $breaking "title" "ne" nil }}
 {{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
+{{ $inlineUpgradeGuide := and .Params.inline_upgrade_guide (gt (len $upgradeGuides) 0) }}
+{{ if $inlineUpgradeGuide }}
+{{ $highlights = $highlights | complement $upgradeGuides }}
+{{ end }}
 {{/* Keep legacy entries in their categories unless they are rendered above. */}}
 {{ $groupedChanges := slice }}
 {{ range $release.changelog }}
@@ -54,6 +58,9 @@
             these can each contain breaking changes while Vector is pre-1.0.
             These breaking changes are noted in their respective upgrade
             guides.
+            {{ if $inlineUpgradeGuide }}
+            <a href="#upgrade-guide" class="underline underline-offset-4">Read the upgrade guide for this release.</a>
+            {{ end }}
           </div>
         </div>
       </div>
@@ -116,9 +123,13 @@
 
           <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
             {{ range $breakingTitled }}
+            {{ $guideLink := printf "%s#%s" (index $upgradeGuides 0).RelPermalink .anchor }}
+            {{ if $inlineUpgradeGuide }}
+            {{ $guideLink = printf "#%s" .anchor }}
+            {{ end }}
             {{ partial "releases/changelog-card.html" (dict
               "title" .title
-              "href" (printf "%s#%s" (index $upgradeGuides 0).RelPermalink .anchor)
+              "href" $guideLink
               "body" (.description | markdownify)
               "footer" (partial "releases/changelog-attribution.html" .)
             ) }}
@@ -202,6 +213,10 @@
         </div>
       </div>
       {{ end }}
+      {{ end }}
+
+      {{ if $inlineUpgradeGuide }}
+      {{ partial "releases/upgrade-guide.html" (index $upgradeGuides 0) }}
       {{ end }}
 
       {{ with $release.whats_next }}

@@ -174,14 +174,8 @@ releases: "0.61.0": {
 			title:    "Scheme-less `vector` sink endpoints default to `https`"
 			anchor:   "vector-sink-default-https"
 			description: #"""
-				`address` and `routing.endpoints` values in the `vector` sink that omit the scheme (for example,
-				`127.0.0.1:6000` instead of `http://127.0.0.1:6000`) now default to `https`. Previously they
-				defaulted to `http` unless TLS was enabled. The `http` default was
-				[deprecated in 0.59.0](https://vector.dev/deprecations/).
-				
-				Endpoints that already specify a scheme, and scheme-less endpoints in configurations that enable
-				TLS, are unaffected. A scheme-less endpoint pointing at a plaintext `vector` source now fails the
-				TLS handshake.
+				Scheme-less endpoints that connect to plaintext sources now fail TLS handshakes.
+				Use explicit `http://` endpoints or enable TLS on the receiving source.
 				"""#
 			pr_numbers: [26699]
 			contributors: ["JinchengCao"]
@@ -254,30 +248,8 @@ releases: "0.61.0": {
 		#### Fixes
 		
 		- `to_unix_timestamp` with `unit: "nanoseconds"` is now correctly marked as fallible by the
-		compiler. The conversion can fail at runtime when the timestamp is out of range for a
-		64-bit nanosecond value, but the compiler previously rejected error handling for this
-		call as unnecessary.
-		
-		Programs that call `to_unix_timestamp` with `unit: "nanoseconds"` are affected: they no
-		longer compile until the error is handled. Other units are unaffected.
-		
-		**Before**
-		
-		```vrl
-		to_unix_timestamp(ts, unit: "nanoseconds")
-		```
-		
-		**After**
-		
-		```vrl
-		to_unix_timestamp!(ts, unit: "nanoseconds")
-		```
-		
-		or with error coalescing:
-		
-		```vrl
-		to_unix_timestamp(ts, unit: "nanoseconds") ?? 0
-		```
+		compiler. Existing calls must handle errors to compile. Other units are unaffected.
+		See the [migration instructions](/releases/0.61.0/#vrl-to-unix-timestamp-nanoseconds).
 		
 		*Thanks to [suryakant-source](https://github.com/suryakant-source) for contributing PR [#2001](https://github.com/vectordotdev/vrl/pull/2001)!*
 		
