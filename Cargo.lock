@@ -5945,7 +5945,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tokio",
  "tower-service",
  "tracing 0.1.44",
@@ -9469,12 +9469,13 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "6.7.2"
+version = "6.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2367cb38f1b65857bc11dd13b2adf13b7a1d991ef1cd43572f1420958c56cc2"
+checksum = "e764221c5f6dfd98f7456ea8c5c341a88ebfb6f15fc9e2da902f74afca370c6d"
 dependencies = [
  "async-channel",
  "async-trait",
+ "base64 0.22.1",
  "bytes",
  "chrono",
  "crc",
