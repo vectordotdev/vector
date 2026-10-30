@@ -50,6 +50,12 @@ pub struct S3Metadata {
     pub finalizers: EventFinalizers,
 }
 
+impl Finalizable for S3Metadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 #[derive(Debug)]
 pub struct S3Response {
     events_byte_size: GroupedCountByteSize,

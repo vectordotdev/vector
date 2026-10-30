@@ -77,6 +77,12 @@ pub(super) struct RemoteWriteMetadata {
     tenant_id: Option<String>,
 }
 
+impl Finalizable for RemoteWriteMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 pub(super) struct RemoteWriteRequestBuilder {
     pub(super) compression: Compression,
     pub(super) encoder: RemoteWriteEncoder,

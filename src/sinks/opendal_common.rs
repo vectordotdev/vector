@@ -155,6 +155,12 @@ pub struct OpenDalMetadata {
     pub finalizers: EventFinalizers,
 }
 
+impl Finalizable for OpenDalMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 /// `OpenDalRequestBuilder` will collect and encode input events to build a
 /// valid [`OpenDalRequest`].
 pub struct OpenDalRequestBuilder {

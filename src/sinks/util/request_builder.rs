@@ -1,7 +1,10 @@
 use std::{io, num::NonZeroUsize};
 
 use bytes::Bytes;
-use vector_lib::request_metadata::{GroupedCountByteSize, RequestMetadata};
+use vector_lib::{
+    event::Finalizable,
+    request_metadata::{GroupedCountByteSize, RequestMetadata},
+};
 
 use super::{Compression, Compressor, encoding::Encoder, metadata::RequestMetadataBuilder};
 
@@ -62,7 +65,7 @@ impl<P> EncodeResult<P> {
 
 /// Generalized interface for defining how a batch of events will be turned into a request.
 pub trait RequestBuilder<Input> {
-    type Metadata;
+    type Metadata: Finalizable;
     type Events;
     type Encoder: Encoder<Self::Events>;
     type Payload: From<Bytes> + AsRef<[u8]>;

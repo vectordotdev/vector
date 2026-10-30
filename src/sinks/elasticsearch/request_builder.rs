@@ -30,6 +30,12 @@ pub struct Metadata {
     original_events: Vec<ProcessedEvent>,
 }
 
+impl Finalizable for Metadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     type Metadata = Metadata;
     type Events = Vec<ProcessedEvent>;

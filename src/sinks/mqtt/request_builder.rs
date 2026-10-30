@@ -11,6 +11,12 @@ pub(super) struct MqttMetadata {
     finalizers: EventFinalizers,
 }
 
+impl Finalizable for MqttMetadata {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
 pub(super) struct MqttEncoder {
     pub(super) encoder: vector_lib::codecs::Encoder<()>,
     pub(super) transformer: vector_lib::codecs::Transformer,

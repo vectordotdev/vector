@@ -123,7 +123,64 @@ fn format_s3_key(s3_key: &str, filename: &str, extension: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
+    use futures::{StreamExt, stream};
+    use vector_lib::{
+        codecs::encoding::{AvroSerializerConfig, Framer, NewlineDelimitedEncoder},
+        event::{BatchNotifier, BatchStatus, EventStatus, LogEvent},
+    };
+    use vrl::event_path;
+
     use super::*;
+    use crate::sinks::util::builder::SinkBuilderExt;
+
+    /// An Avro schema requiring a field the test events never carry, so every
+    /// encode attempt fails at schema resolution.
+    const UNSATISFIABLE_AVRO_SCHEMA: &str = r#"{
+        "type": "record",
+        "name": "Log",
+        "fields": [{ "name": "required_field", "type": "string" }]
+    }"#;
+
+    fn request_options(encoder: (Transformer, EncoderKind)) -> S3RequestOptions {
+        S3RequestOptions {
+            bucket: "test-bucket".to_owned(),
+            filename_time_format: "%s".to_owned(),
+            filename_append_uuid: false,
+            filename_extension: None,
+            api_options: S3Options::default(),
+            encoder,
+            compression: Compression::None,
+            filename_tz_offset: None,
+        }
+    }
+
+    fn failing_encoder() -> (Transformer, EncoderKind) {
+        let serializer = AvroSerializerConfig::new(UNSATISFIABLE_AVRO_SCHEMA.to_owned())
+            .build()
+            .expect("valid Avro schema");
+        let encoder = vector_lib::codecs::Encoder::<Framer>::new(
+            NewlineDelimitedEncoder::default().into(),
+            serializer.into(),
+        );
+
+        (
+            Transformer::default(),
+            EncoderKind::Framed(Box::new(encoder)),
+        )
+    }
+
+    fn working_encoder() -> (Transformer, EncoderKind) {
+        (Transformer::default(), EncoderKind::Framed(Box::default()))
+    }
+
+    fn partition_key() -> S3PartitionKey {
+        S3PartitionKey {
+            key_prefix: "prefix/".to_owned(),
+            ssekms_key_id: None,
+        }
+    }
 
     #[test]
     fn test_format_s3_key() {
@@ -132,5 +189,97 @@ mod tests {
             format_s3_key("s3_key_", "filename", "txt")
         );
         assert_eq!("s3_key_filename", format_s3_key("s3_key_", "filename", ""));
+    }
+
+    /// Encoding failures must reject the batch instead of letting the dropped
+    /// finalizers report a successful delivery upstream.
+    #[tokio::test]
+    async fn encode_failure_rejects_the_batch() {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let events = vec![Event::Log(
+            LogEvent::from("hello world").with_batch_notifier(&batch),
+        )];
+        drop(batch);
+
+        let mut requests = stream::iter(vec![(partition_key(), events)]).request_builder(
+            NonZeroUsize::new(1).expect("nonzero"),
+            request_options(failing_encoder()),
+        );
+
+        let result = requests.next().await.expect("one result");
+        assert!(result.is_err(), "the encoder is expected to fail");
+        drop(requests);
+
+        assert_eq!(receiver.await, BatchStatus::Rejected);
+    }
+
+    /// A successful encode must leave the finalizers attached to the request so
+    /// the driver still owns the delivery outcome.
+    #[tokio::test]
+    async fn encode_success_leaves_the_batch_to_the_driver() {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let events = vec![Event::Log(
+            LogEvent::from("hello world").with_batch_notifier(&batch),
+        )];
+        drop(batch);
+
+        let mut requests = stream::iter(vec![(partition_key(), events)]).request_builder(
+            NonZeroUsize::new(1).expect("nonzero"),
+            request_options(working_encoder()),
+        );
+
+        let mut request = requests.next().await.expect("one result").expect("encoded");
+        drop(requests);
+
+        let finalizers = request.take_finalizers();
+        finalizers.update_status(EventStatus::Delivered);
+        drop(finalizers);
+
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+    }
+
+    #[tokio::test]
+    async fn encode_failure_does_not_affect_another_batch() {
+        let (failed_batch, failed_receiver) = BatchNotifier::new_with_receiver();
+        let failed_events = vec![Event::Log(
+            LogEvent::from("missing required field").with_batch_notifier(&failed_batch),
+        )];
+        drop(failed_batch);
+
+        let (successful_batch, successful_receiver) = BatchNotifier::new_with_receiver();
+        let mut successful_log = LogEvent::from("valid event");
+        successful_log.insert(event_path!("required_field"), "present");
+        let successful_events = vec![Event::Log(
+            successful_log.with_batch_notifier(&successful_batch),
+        )];
+        drop(successful_batch);
+
+        let mut requests = stream::iter(vec![
+            (partition_key(), failed_events),
+            (partition_key(), successful_events),
+        ])
+        .request_builder(
+            NonZeroUsize::new(2).expect("nonzero"),
+            request_options(failing_encoder()),
+        );
+
+        let mut encoded = 0;
+        let mut rejected = 0;
+        while let Some(result) = requests.next().await {
+            match result {
+                Ok(mut request) => {
+                    encoded += 1;
+                    request
+                        .take_finalizers()
+                        .update_status(EventStatus::Delivered);
+                }
+                Err(_) => rejected += 1,
+            }
+        }
+
+        assert_eq!(encoded, 1);
+        assert_eq!(rejected, 1);
+        assert_eq!(failed_receiver.await, BatchStatus::Rejected);
+        assert_eq!(successful_receiver.await, BatchStatus::Delivered);
     }
 }
