@@ -1,0 +1,4 @@
+{{- $code := readFile (.Get "file") -}}
+<div data-code-filename="{{ path.Base (.Get "file") }}" data-code-collapsed="{{ .Get "collapsed" | default false }}">
+  {{- highlight $code (.Get "lang") "" -}}
+</div>
