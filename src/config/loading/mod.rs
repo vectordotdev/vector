@@ -167,7 +167,15 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
 /// interpolated, parsed, merged, or deserialized, or if the resulting configuration fails to
 /// build. Config files that cannot be opened are logged and skipped.
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
+    load_from_paths_with_data_dir(config_paths, None)
+}
+
+pub(crate) fn load_from_paths_with_data_dir(
+    config_paths: &[ConfigPath],
+    data_dir: Option<&Path>,
+) -> Result<Config, Vec<String>> {
     ConfigBuilderLoader::default()
+        .data_dir(data_dir)
         .load_from_paths(config_paths)?
         .build()
 }
@@ -186,9 +194,11 @@ pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
+    data_dir: Option<&Path>,
 ) -> Result<Config, Vec<String>> {
     let mut builder =
-        load_builder_from_paths_with_secrets(config_paths, signal_handler, allow_empty).await?;
+        load_builder_from_paths_with_secrets(config_paths, signal_handler, allow_empty, data_dir)
+            .await?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -197,6 +207,9 @@ pub async fn load_from_paths_with_provider_and_secrets(
     if let Some(mut provider) = builder.provider {
         let bootstrap_warnings = builder.loading_warnings;
         builder = provider.build(signal_handler).await?;
+        if let Some(data_dir) = data_dir {
+            builder.set_data_dir(data_dir);
+        }
         builder.loading_warnings.extend(bootstrap_warnings);
         debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
@@ -210,6 +223,7 @@ pub(crate) async fn load_builder_from_paths_with_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
+    data_dir: Option<&Path>,
 ) -> Result<ConfigBuilder, Vec<String>> {
     let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
     let secrets = secrets_backends_loader
@@ -218,6 +232,7 @@ pub(crate) async fn load_builder_from_paths_with_secrets(
         .map_err(|e| vec![e])?;
 
     ConfigBuilderLoader::default()
+        .data_dir(data_dir)
         .allow_empty(allow_empty)
         .secrets(secrets)
         .load_from_paths(config_paths)
