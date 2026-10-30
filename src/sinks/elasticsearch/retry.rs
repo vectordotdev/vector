@@ -41,6 +41,16 @@ impl EsResultResponse {
         })
     }
 
+    fn successful_events(&self, event_count: usize) -> Option<usize> {
+        if self.items.len() != event_count {
+            return None;
+        }
+        self.items.iter().try_fold(0, |count, item| {
+            let status = StatusCode::from_u16(item.result().status?).ok()?;
+            Some(count + usize::from(status.is_success()))
+        })
+    }
+
     /// Selects the first error since logging all errors would be quite verbose and many are duplicates.
     /// If partial retry is enabled and we don't retry, this is because there is no retriable error in the
     /// response, thus all errors are equally interesting so logging the first is sufficient.
@@ -147,6 +157,9 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             || status.is_server_error()
                                     })
                                 {
+                                    let confirmed = resp
+                                        .successful_events(response.event_count)
+                                        .unwrap_or_default();
                                     return RetryAction::RetryPartial(Box::new(
                                         move |req: ElasticsearchRequest| {
                                             let mut failed_events: Vec<ProcessedEvent> = req
@@ -181,6 +194,9 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 original_events: failed_events,
                                                 elasticsearch_request_builder: req
                                                     .elasticsearch_request_builder,
+                                                unconfirmed_events: req
+                                                    .unconfirmed_events
+                                                    .saturating_sub(confirmed),
                                             }
                                         },
                                     ));
@@ -211,6 +227,27 @@ mod tests {
     use crate::event::EventStatus;
 
     #[test]
+    fn successful_events_requires_complete_valid_statuses() {
+        let body = r#"{"items":[{"index":{"status":201}},{"create":{"status":400}},{"update":{"status":200}}]}"#;
+        let response = EsResultResponse::parse(body).unwrap();
+        assert_eq!(response.successful_events(3), Some(2));
+        assert_eq!(response.successful_events(2), None);
+
+        for body in [
+            "invalid json",
+            r#"{"items":[{"index":{"status":201}},{"index":{}}]}"#,
+            r#"{"items":[{"index":{"status":201}},{"index":{"status":99}}]}"#,
+        ] {
+            assert_eq!(
+                EsResultResponse::parse(body)
+                    .ok()
+                    .and_then(|response| response.successful_events(2)),
+                None
+            );
+        }
+    }
+
+    #[test]
     fn handles_error_response() {
         let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
         let response = Response::builder()
@@ -224,6 +261,8 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Rejected,
+                event_count: 1,
+                unconfirmed_events: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::DontRetry(_)
@@ -244,6 +283,8 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Errored,
+                event_count: 1,
+                unconfirmed_events: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::RetryPartial(_)

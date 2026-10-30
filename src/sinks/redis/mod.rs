@@ -13,6 +13,8 @@ mod tests;
 #[cfg(test)]
 mod integration_tests;
 
+use std::sync::{Arc, Mutex};
+
 use bytes::Bytes;
 use redis::RedisError;
 use snafu::Snafu;
@@ -97,6 +99,25 @@ pub(super) struct RedisRequest {
     request: Vec<RedisKvEntry>,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
+    delivery: RedisDelivery,
+}
+
+/// Confirmed deliveries shared by every retry of one original request.
+#[derive(Clone)]
+pub(super) struct RedisDelivery(Arc<Mutex<Vec<bool>>>);
+
+impl RedisDelivery {
+    fn new(count: usize) -> Self {
+        Self(Arc::new(Mutex::new(vec![false; count])))
+    }
+
+    fn record(&self, statuses: &[bool]) -> usize {
+        let mut delivered = self.0.lock().expect("Redis delivery state lock poisoned");
+        for (confirmed, status) in delivered.iter_mut().zip(statuses) {
+            *confirmed |= status;
+        }
+        delivered.iter().filter(|status| !**status).count()
+    }
 }
 
 impl Finalizable for RedisRequest {

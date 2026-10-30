@@ -1,20 +1,108 @@
 use std::collections::HashMap;
 
+use futures::stream;
 use vector_lib::{
     codecs::{JsonSerializerConfig, TextSerializerConfig},
-    event::{LogEvent, Metric, MetricKind, MetricValue},
+    event::{BatchNotifier, BatchStatus, LogEvent, Metric, MetricKind, MetricValue},
     request_metadata::GroupedCountByteSize,
+    stream::Driver,
 };
 
-use super::{config::RedisSinkConfig, request_builder::encode_event};
+use super::{
+    RedisDelivery, RedisEvent, RedisRequest,
+    config::RedisSinkConfig,
+    request_builder::{encode_event, request_builder},
+    service::RedisResponse,
+};
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
+    metrics::{self, Controller},
 };
 
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<RedisSinkConfig>();
+}
+
+#[test]
+fn redis_retry_clones_share_confirmed_delivery() {
+    let delivery = RedisDelivery::new(2);
+    let retry = delivery.clone();
+    assert_eq!(delivery.record(&[true, false]), 1);
+    assert_eq!(retry.record(&[false, false]), 1);
+    assert_eq!(retry.record(&[false, true]), 0);
+    assert_eq!(delivery.record(&[false, false]), 0);
+    assert_eq!(RedisDelivery::new(2).record(&[false, false]), 2);
+}
+
+#[tokio::test]
+async fn redis_terminal_outcome_metrics() {
+    metrics::init_test();
+    let controller = Controller::get().unwrap();
+    for (event_status, expected_discarded, expected_batch_status) in [
+        ([true, false], 1.0, BatchStatus::Errored),
+        ([false, true], 1.0, BatchStatus::Errored),
+        ([false, false], 2.0, BatchStatus::Errored),
+        ([true, true], 0.0, BatchStatus::Delivered),
+    ] {
+        controller.reset();
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let events = ["first", "second"]
+            .into_iter()
+            .map(|message| RedisEvent {
+                event: LogEvent::from(message).with_batch_notifier(&batch).into(),
+                key: message.to_owned(),
+                score: None,
+            })
+            .collect();
+        drop(batch);
+        let request = request_builder(
+            events,
+            &Transformer::default(),
+            &mut Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+        );
+        let service = tower::service_fn(move |request: RedisRequest| {
+            let byte_size = request.metadata.events_byte_size();
+            std::future::ready(Ok::<_, crate::Error>(RedisResponse {
+                event_status: event_status.to_vec(),
+                events_byte_size: request
+                    .metadata
+                    .into_events_estimated_json_encoded_byte_size(),
+                byte_size,
+                events_dropped: request.delivery.record(&event_status),
+            }))
+        });
+
+        Driver::new(stream::iter([request]), service)
+            .run()
+            .await
+            .unwrap();
+        assert_eq!(receiver.await, expected_batch_status, "{event_status:?}");
+
+        let metrics = controller.capture_metrics();
+        let delivered = expected_batch_status == BatchStatus::Delivered;
+        for (name, expected) in [
+            ("component_discarded_events_total", expected_discarded),
+            ("component_errors_total", if delivered { 0.0 } else { 1.0 }),
+            (
+                "component_sent_events_total",
+                if delivered { 2.0 } else { 0.0 },
+            ),
+        ] {
+            let count: f64 = metrics
+                .iter()
+                .filter(|metric| metric.name() == name)
+                .map(|metric| {
+                    let MetricValue::Counter { value } = metric.value() else {
+                        panic!("{name} must be a counter");
+                    };
+                    *value
+                })
+                .sum();
+            assert_eq!(count, expected, "{event_status:?}: {name}");
+        }
+    }
 }
 
 #[test]

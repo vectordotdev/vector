@@ -39,6 +39,8 @@ pub struct ElasticsearchRequest {
     pub metadata: RequestMetadata,
     pub original_events: Vec<ProcessedEvent>, //store original_events for reconstruct request when retrying
     pub elasticsearch_request_builder: ElasticsearchRequestBuilder,
+    // Includes permanent failures removed from earlier partial retries.
+    pub unconfirmed_events: usize,
 }
 
 impl ByteSizeOf for ElasticsearchRequest {
@@ -182,6 +184,8 @@ impl HttpRequestBuilder {
 pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
+    pub event_count: usize,
+    pub unconfirmed_events: usize,
     pub events_byte_size: GroupedCountByteSize,
 }
 
@@ -192,6 +196,10 @@ impl DriverResponse for ElasticsearchResponse {
 
     fn events_sent(&self) -> &GroupedCountByteSize {
         &self.events_byte_size
+    }
+
+    fn events_dropped(&self) -> Option<usize> {
+        Some(self.unconfirmed_events)
     }
 }
 
@@ -212,8 +220,10 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         let protocol = Arc::clone(&self.protocol);
         let endpoint = Arc::clone(&self.endpoint);
         Box::pin(async move {
-            let events_byte_size =
-                std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
+            let metadata = std::mem::take(req.metadata_mut());
+            let event_count = metadata.event_count();
+            let unconfirmed_events = req.unconfirmed_events;
+            let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let request = http_request_builder
                 .build_request(req)
                 .await
@@ -242,6 +252,8 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
             Ok(ElasticsearchResponse {
                 http_response,
                 event_status,
+                event_count,
+                unconfirmed_events,
                 events_byte_size,
             })
         })

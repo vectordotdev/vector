@@ -598,6 +598,25 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
 }
 
 #[tokio::test]
+async fn accounts_for_unretriable_server_error() {
+    components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
+        let (in_addr, sink) = build_sink("").await;
+        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::NOT_IMPLEMENTED);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_, events) = random_lines_with_stream(100, 3, Some(batch));
+        tokio::spawn(server);
+
+        sink.run(events).await.unwrap();
+        drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+        let output = get_received_gzip(rx, |_| unreachable!("No request should succeed")).await;
+        assert!(output.is_empty());
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn fails_on_permanent_error() {
     components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
         let num_lines = 1000;

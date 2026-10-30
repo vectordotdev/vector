@@ -452,9 +452,8 @@ where
                         events_sent.emit(CountByteSize(count, json_byte_size));
                         // TODO: Emit a BytesSent event here too
                     }
-                    EventStatus::Rejected => {
-                        // Emit the `Error` and `EventsDropped` internal events.
-                        // This scenario occurs after retries have been attempted.
+                    EventStatus::Rejected | EventStatus::Errored => {
+                        // The retry service has finished; either outcome abandons these events.
                         let error = result.err().unwrap_or_else(|| "Response failed.".into());
                         emit!(CallError {
                             error,
@@ -1013,6 +1012,89 @@ mod tests {
 
         let output = sent_requests.lock().unwrap();
         assert_eq!(&*output, &vec![vec![1]]);
+    }
+
+    #[tokio::test]
+    async fn service_sink_terminal_outcome_metrics() {
+        use crate::{
+            event::MetricValue,
+            metrics::{self, Controller},
+        };
+
+        metrics::init_test();
+        let controller = Controller::get().unwrap();
+        for (response, expected_batch_status) in [
+            (
+                Ok(http::Response::builder()
+                    .status(200)
+                    .body(Bytes::new())
+                    .unwrap()),
+                BatchStatus::Delivered,
+            ),
+            (
+                Ok(http::Response::builder()
+                    .status(400)
+                    .body(Bytes::new())
+                    .unwrap()),
+                BatchStatus::Rejected,
+            ),
+            (
+                Ok(http::Response::builder()
+                    .status(501)
+                    .body(Bytes::new())
+                    .unwrap()),
+                BatchStatus::Errored,
+            ),
+            (Err("request failed"), BatchStatus::Errored),
+        ] {
+            controller.reset();
+            let mut response = Some(response);
+            let svc = tower::service_fn(move |()| future::ready(response.take().unwrap()));
+            let mut sink = ServiceSink::new(svc);
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            sink.call(EncodedBatch {
+                items: (),
+                finalizers: EventFinalizers::new(EventFinalizer::new(batch)),
+                count: 3,
+                byte_size: 12,
+                json_byte_size: JsonSize::new(12),
+            })
+            .await;
+            assert_eq!(receiver.await, expected_batch_status);
+
+            let metrics = controller.capture_metrics();
+            let counter = |name| MetricValue::Counter {
+                value: metrics
+                    .iter()
+                    .filter(|metric| metric.name() == name)
+                    .map(|metric| {
+                        let MetricValue::Counter { value } = metric.value() else {
+                            panic!("{name} must be a counter");
+                        };
+                        *value
+                    })
+                    .sum(),
+            };
+            let delivered = expected_batch_status == BatchStatus::Delivered;
+            assert_eq!(
+                counter("component_sent_events_total"),
+                MetricValue::Counter {
+                    value: if delivered { 3.0 } else { 0.0 }
+                }
+            );
+            assert_eq!(
+                counter("component_errors_total"),
+                MetricValue::Counter {
+                    value: if delivered { 0.0 } else { 1.0 }
+                }
+            );
+            assert_eq!(
+                counter("component_discarded_events_total"),
+                MetricValue::Counter {
+                    value: if delivered { 0.0 } else { 3.0 }
+                }
+            );
+        }
     }
 
     #[tokio::test]
