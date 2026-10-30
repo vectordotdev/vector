@@ -1,0 +1,19 @@
+always: []
+
+labels:
+  all:
+    - cases/**
+  logs:
+    - cases/datadog_agent_*
+    - cases/file_*
+    - cases/fluent_*
+    - cases/http_*
+    - cases/otlp_*
+    - cases/scale_*
+    - cases/socket_*
+    - cases/splunk_*
+    - cases/syslog_*
+  metrics:
+    - cases/statsd_*
+    - cases/syslog_log2metric_*
+    - cases/syslog_regex_logs2metric_*
