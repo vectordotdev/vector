@@ -1,18 +1,25 @@
-{{/* Renders the deprecation announcements group of a release page's changelog
-     as changelog cards. Notices that have since been enacted are dimmed and
-     credit the release that removed them.
-     Params: entries (notices from releases/deprecation-announcements.html) */}}
-{{ with .entries }}
-{{ $count := len . }}
-<div>
+{{/* Renders the "Deprecation Announcements" section for a specific release.
+     Each entry whose `deprecated_since` matches the page version is listed:
+     active notices first, then notices that have since been enacted, dimmed
+     and crediting the release that removed them. The release that removes a
+     notice surfaces the removal in its Breaking changes section instead.
+     Params: version (string, e.g. "0.56" or "0.56.0") */}}
+{{- $entries := partialCached "deprecations/entries.html" . -}}
+{{- /* Entries carry X.Y.Z versions (see deprecations/entries.html), so normalize
+       a "0.56" shorthand param the same way and match exactly: "0.56" fragments
+       belong to the 0.56.0 page only, never to 0.56.1. */ -}}
+{{- $version := (partial "deprecations/version.html" .version).version -}}
+
+{{- $announced := (where $entries.active "deprecated_since" $version) | append (where $entries.enacted "deprecated_since" $version) -}}
+
+{{ with $announced }}
+<div class="mt-8">
   <div class="prose dark:prose-invert max-w-none">
-    {{ $heading := printf "%d %s" $count (cond (eq $count 1) "deprecation announcement" "deprecation announcements") }}
-    {{ partial "heading.html" (dict "text" $heading "id" "deprecation announcements" "level" 3 "icon" false) }}
+    {{ partial "heading.html" (dict "text" "Deprecation Announcements" "level" 2) }}
     <p class="text-sm text-gray-500 dark:text-gray-400">
       See the <a href="/deprecations/">deprecations page</a> for all active and historical deprecations.
     </p>
   </div>
-
   <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
     {{ range . }}
     {{ $footer := "" }}

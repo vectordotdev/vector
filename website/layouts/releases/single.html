@@ -10,7 +10,6 @@
 {{ $breaking := where ($release.changelog | default slice) "breaking" true }}
 {{ $breakingTitled := where $breaking "title" "ne" nil }}
 {{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
-{{ $announced := partial "releases/deprecation-announcements.html" (dict "version" $version) }}
 {{/* Keep legacy entries in their categories unless they are rendered above. */}}
 {{ $groupedChanges := slice }}
 {{ range $release.changelog }}
@@ -100,9 +99,7 @@
       </div>
       {{ end }}
 
-      {{/* Deprecation announcements are part of the changelog, so a release that
-           only announces deprecations still renders it with that single group. */}}
-      {{ if or (gt (len $release.changelog) 0) (gt (len $announced) 0) }}
+      {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
@@ -155,8 +152,6 @@
           </div>
           {{ end }}
           {{ end }}
-
-          {{ partial "releases/deprecations.html" (dict "entries" $announced) }}
         </div>
       </div>
       {{ else }}
@@ -245,6 +240,7 @@
         </div>
       </div>
     </div>
+    {{ partial "releases/deprecations.html" (dict "version" $version) }}
   </main>
 
   <div class="hidden lg:block xl:col-span-1">
