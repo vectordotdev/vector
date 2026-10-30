@@ -260,7 +260,9 @@ impl RunningTopology {
 
                 if all_done {
                     info!("Shutdown reporter exiting: all components shut down.");
-                    break true;
+                    // Only the aggregate result can report success: completed components may
+                    // have failed, and metrics/utilization tasks may still be running.
+                    return future::pending::<bool>().await;
                 } else if deadline_passed {
                     error!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded.");
                     break false;
@@ -1596,10 +1598,13 @@ fn enrichment_table_sink_buffer(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, io, time::Duration};
 
+    use tokio::sync::{mpsc, oneshot};
+    use tokio_test::{assert_pending, task::spawn};
     use vector_lib::config::ComponentKey;
 
+    use super::RunningTopology;
     use crate::{
         config::Config,
         extra_context::ExtraContext,
@@ -1607,7 +1612,41 @@ mod tests {
             mock::{basic_sink, basic_source, basic_transform},
             start_topology, trace_init,
         },
+        topology::task::{TaskError, TaskOutput},
     };
+
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_reporter_does_not_hide_task_errors() {
+        let (abort_tx, _) = mpsc::unbounded_channel();
+        let mut config = Config::builder();
+        config.add_source("in", basic_source().1);
+        config.add_sink("sink", &["in"], basic_sink(1).1);
+        let mut topology = RunningTopology::new(config.build().unwrap(), abort_tx);
+        topology.graceful_shutdown_duration = Some(Duration::from_secs(30));
+        let failed_task = tokio::spawn(async {
+            Err(TaskError::wrapped(Box::new(io::Error::other(
+                "checkpoint failed",
+            ))))
+        });
+        while !failed_task.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        topology
+            .tasks
+            .insert(ComponentKey::from("sink"), failed_task);
+        let (release, held) = oneshot::channel();
+        topology.metrics_task = Some(tokio::spawn(async {
+            held.await.unwrap();
+            Ok(TaskOutput::Healthcheck)
+        }));
+
+        let mut shutdown = spawn(topology.stop());
+        assert_pending!(shutdown.poll());
+        tokio::time::advance(Duration::from_secs(6)).await;
+        assert_pending!(shutdown.poll());
+        release.send(()).unwrap();
+        assert!(!shutdown.await);
+    }
 
     #[tokio::test]
     async fn pending_component_reloads_are_consumed_after_reload() {

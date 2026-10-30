@@ -1,5 +1,5 @@
 use std::{
-    mem,
+    io, mem,
     pin::Pin,
     task::{Context, Poll, ready},
 };
@@ -44,6 +44,13 @@ impl<T> ReceiverAdapter<T>
 where
     T: Bufferable,
 {
+    async fn finish(&mut self) -> io::Result<()> {
+        match self {
+            Self::InMemory(_) => Ok(()),
+            Self::DiskV2(reader) => reader.finish().await,
+        }
+    }
+
     pub(crate) async fn next(&mut self) -> Option<T> {
         match self {
             ReceiverAdapter::InMemory(rx) => rx.next().await,
@@ -155,13 +162,30 @@ impl<T: Bufferable> BufferReceiver<T> {
     pub fn into_stream(self) -> BufferReceiverStream<T> {
         BufferReceiverStream::new(self)
     }
+
+    /// Completes acknowledgement processing and checkpointing for every disk stage.
+    ///
+    /// Call this after [`Self::next`] returns `None` and downstream consumers have finished
+    /// processing the records. Memory stages need no additional completion work.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a disk stage has not reached EOF or its checkpoint cannot be persisted.
+    #[async_recursion]
+    pub async fn finish(&mut self) -> io::Result<()> {
+        self.base.finish().await?;
+        if let Some(overflow) = self.overflow.as_mut() {
+            overflow.finish().await?;
+        }
+        Ok(())
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
 enum StreamState<T: Bufferable> {
     Idle(BufferReceiver<T>),
     Polling,
-    Closed,
+    Closed(BufferReceiver<T>),
 }
 
 pub struct BufferReceiverStream<T: Bufferable> {
@@ -176,6 +200,21 @@ impl<T: Bufferable> BufferReceiverStream<T> {
             recv_fut: ReusableBoxFuture::new(make_recv_future(None)),
         }
     }
+
+    /// Completes acknowledgement processing and checkpointing after natural input EOF.
+    ///
+    /// If a consumer stopped before EOF, this leaves the receiver untouched so that it can be
+    /// reused, including when a receive operation is pending during a configuration reload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a disk stage's checkpoint cannot be persisted.
+    pub async fn finish(&mut self) -> io::Result<()> {
+        if let StreamState::Closed(receiver) = &mut self.state {
+            receiver.finish().await?;
+        }
+        Ok(())
+    }
 }
 
 impl<T: Bufferable> Stream for BufferReceiverStream<T> {
@@ -184,7 +223,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             match mem::replace(&mut self.state, StreamState::Polling) {
-                s @ StreamState::Closed => {
+                s @ StreamState::Closed(_) => {
                     self.state = s;
                     return Poll::Ready(None);
                 }
@@ -194,7 +233,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
                 StreamState::Polling => {
                     let (result, receiver) = ready!(self.recv_fut.poll(cx));
                     self.state = if result.is_none() {
-                        StreamState::Closed
+                        StreamState::Closed(receiver)
                     } else {
                         StreamState::Idle(receiver)
                     };

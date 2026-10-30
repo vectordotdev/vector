@@ -757,12 +757,17 @@ impl<'a> Builder<'a> {
                     .take_until_if(tripwire),
             )
             .await
-            .map(|()| {
-                debug!("Sink finished normally.");
-                TaskOutput::Sink(rx)
-            })
             .inspect_err(|error| debug!(%error, "Sink finished with an error."))
-            .map_err(Into::into)
+            .map_err(TaskError::from)?;
+
+            // Natural EOF lets the sink flush partial batches before we wait for their
+            // acknowledgements. A reload-detached stream has not reached EOF and is preserved.
+            rx.get_mut()
+                .finish()
+                .await
+                .map_err(|error| TaskError::wrapped(Box::new(error)))?;
+            debug!("Sink finished normally.");
+            Ok(TaskOutput::Sink(rx))
         };
 
         let task = Task::new(key.clone(), typetag, sink);
