@@ -804,6 +804,8 @@ sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-okta = ["sources-utils-http-client"]
 sources-opentelemetry = [
+  "dep:prost-reflect",
+  "dep:base64",
   "dep:hex",
   "codecs-opentelemetry",
   "vector-lib/opentelemetry",
