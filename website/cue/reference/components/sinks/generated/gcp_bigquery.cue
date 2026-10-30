@@ -119,62 +119,8 @@ generated: components: sinks: gcp_bigquery: configuration: {
 		type: string: examples: ["this-is-a-table"]
 	}
 	tls: {
-		description: """
-			TLS configuration.
-
-			TLS is used whenever `endpoint` uses the `https` scheme, verifying the server against the system's
-			trusted root certificates. These options customize it.
-			"""
-		required: false
-		type: object: options: {
-			ca_file: {
-				description: """
-					Absolute path to an additional CA certificate file, trusted in addition to the system's root certificates.
-
-					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/certificate_authority.crt"]
-			}
-			crt_file: {
-				description: """
-					Absolute path to a certificate file used to identify this client.
-
-					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-					an inline string in PEM format.
-
-					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.crt"]
-			}
-			key_file: {
-				description: """
-					Absolute path to a private key file used to identify this client.
-
-					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.key"]
-			}
-			key_pass: {
-				description: """
-					Passphrase used to unlock the encrypted key file.
-
-					This has no effect unless `key_file` is set.
-					"""
-				required: false
-				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-			}
-			server_name: {
-				description: """
-					Server name to use for Server Name Indication (SNI) and to verify the server's certificate.
-
-					Defaults to the host of `endpoint`.
-					"""
-				required: false
-				type: string: examples: ["bigquerystorage.googleapis.com"]
-			}
-		}
+		description: "TLS configuration."
+		required:    false
+		type:        _schemaDefinitions["core::option::Option<vector_core::tls::settings::TlsConfig>"]
 	}
 }

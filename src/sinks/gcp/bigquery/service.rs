@@ -3,11 +3,9 @@ use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use snafu::Snafu;
 use std::task::{Context, Poll};
 use tonic::metadata::{Ascii, MetadataValue};
-use tonic::service::Interceptor;
-use tonic::service::interceptor::InterceptedService;
-use tonic::transport::Channel;
 use tonic::{Request, Status};
 use tower::Service;
+use vector_http::{GrpcTransport, HttpError};
 use vector_lib::{
     event::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -29,18 +27,18 @@ const REQUEST_PARAMS_ESCAPE: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'~');
 
 #[derive(Clone)]
-pub struct AuthInterceptor {
+pub struct RequestAuth {
     auth: GcpAuthenticator,
     request_params: MetadataValue<Ascii>,
 }
 
-impl AuthInterceptor {
-    /// Interceptor for `AppendRows`, which routes on the `write_stream` field.
+impl RequestAuth {
+    /// Metadata for `AppendRows`, which routes on the `write_stream` field.
     pub fn for_append_rows(auth: GcpAuthenticator, write_stream: &str) -> crate::Result<Self> {
         Self::new(auth, "write_stream", write_stream)
     }
 
-    /// Interceptor for `GetWriteStream`, which routes on the `name` field.
+    /// Metadata for `GetWriteStream`, which routes on the `name` field.
     pub fn for_get_write_stream(auth: GcpAuthenticator, write_stream: &str) -> crate::Result<Self> {
         Self::new(auth, "name", write_stream)
     }
@@ -59,10 +57,10 @@ impl AuthInterceptor {
             request_params,
         })
     }
-}
 
-impl Interceptor for AuthInterceptor {
-    fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
+    /// Wraps `message` in a request carrying the current token and the routing metadata.
+    pub fn request<T>(&self, message: T) -> Result<Request<T>, Status> {
+        let mut request = Request::new(message);
         if let Some(token) = self.auth.make_token() {
             let value: MetadataValue<_> = token
                 .parse()
@@ -195,23 +193,25 @@ impl From<tonic::Status> for BigqueryServiceError {
     }
 }
 
-type BigQueryWriteClient = proto::big_query_write_client::BigQueryWriteClient<
-    InterceptedService<tonic::transport::Channel, AuthInterceptor>,
->;
+pub type Transport = GrpcTransport<tonic::body::BoxBody>;
+
+pub type BigQueryWriteClient = proto::big_query_write_client::BigQueryWriteClient<Transport>;
 
 #[derive(Clone)]
 pub struct BigqueryService {
     service: BigQueryWriteClient,
+    auth: RequestAuth,
 }
 
 /// Whether the status was caused by a connection-level failure rather than an error returned by BigQuery.
 fn is_transport_failure(status: &tonic::Status) -> bool {
     let mut source = std::error::Error::source(status);
     while let Some(error) = source {
-        if error.is::<std::io::Error>()
-            || error.is::<hyper::Error>()
-            || error.is::<tonic::transport::Error>()
-        {
+        if let Some(error) = error.downcast_ref::<HttpError>() {
+            return error.is_retriable();
+        }
+        // Failures reading the response body, such as a connection reset mid-stream.
+        if error.is::<std::io::Error>() || error.is::<hyper_1::Error>() {
             return true;
         }
         source = error.source();
@@ -278,19 +278,20 @@ impl RetryLogic for BigqueryRetryLogic {
 
 impl BigqueryService {
     pub fn new(
-        channel: Channel,
+        transport: Transport,
+        origin: http_1::Uri,
         auth: GcpAuthenticator,
         write_stream: &str,
     ) -> crate::Result<Self> {
-        let service = proto::big_query_write_client::BigQueryWriteClient::with_interceptor(
-            channel,
-            AuthInterceptor::for_append_rows(auth, write_stream)?,
-        )
-        // AppendRowsResponse.row_errors is a repeated field
-        // that can grow with batch size, so remove the cap to avoid decoding failures on large
-        // error responses.
-        .max_decoding_message_size(usize::MAX);
-        Ok(Self { service })
+        let service = BigQueryWriteClient::with_origin(transport, origin)
+            // AppendRowsResponse.row_errors is a repeated field
+            // that can grow with batch size, so remove the cap to avoid decoding failures on large
+            // error responses.
+            .max_decoding_message_size(usize::MAX);
+        Ok(Self {
+            service,
+            auth: RequestAuth::for_append_rows(auth, write_stream)?,
+        })
     }
 }
 
@@ -309,11 +310,12 @@ impl Service<BigqueryRequest> for BigqueryService {
         let request_uncompressed_size = request.uncompressed_size;
 
         let mut client = self.service.clone();
+        let auth = self.auth.clone();
 
         Box::pin(async move {
             // Ideally, we would maintain the gRPC stream, detect when auth expired and re-request with new auth.
             // But issuing a new request every time leads to more comprehensible code with reasonable performance.
-            let stream = tokio_stream::once(request.request);
+            let stream = auth.request(tokio_stream::once(request.request))?;
             let response = client.append_rows(stream).await?;
             match response.into_inner().message().await? {
                 Some(body) => {
@@ -341,7 +343,9 @@ mod test {
     use tower::Service;
     use vector_lib::request_metadata::RequestMetadata;
 
-    use super::{BigqueryRequest, BigqueryService, EventFinalizers, proto};
+    use super::{
+        BigqueryRequest, BigqueryService, EventFinalizers, GrpcTransport, Transport, proto,
+    };
 
     /// A dumb `BigQueryWrite` server that can be used to test the `BigqueryService`.
     struct BigqueryServer {
@@ -423,21 +427,18 @@ mod test {
         }
     }
 
-    /// Create a `TcpListener` on some arbitrary local address and an HTTP Channel that's connected to it
-    async fn create_tcp_listener() -> (tokio::net::TcpListener, tonic::transport::Channel) {
+    /// Create a `TcpListener` on some arbitrary local address and a plaintext transport and origin for it
+    async fn create_tcp_listener() -> (tokio::net::TcpListener, Transport, http_1::Uri) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let uri = tonic::transport::Uri::builder()
-            .scheme("http")
-            .authority(format!("{}:{}", addr.ip(), addr.port()))
-            .path_and_query("/")
-            .build()
-            .unwrap();
-        let channel = tonic::transport::Channel::builder(uri)
-            .connect()
-            .await
-            .unwrap();
-        (listener, channel)
+        let origin = format!("http://{addr}").parse().unwrap();
+        let client = vector_http::Http2Client::new(
+            crate::tls::MaybeTlsSettings::Raw(()),
+            &crate::config::ProxyConfig::default(),
+            hyper_util::client::legacy::Builder::new(hyper_util::rt::TokioExecutor::new()),
+        )
+        .unwrap();
+        (listener, GrpcTransport(client), origin)
     }
 
     /// Run a fake `BigqueryServer`, providing a client, a request handler, and a handle to shut it down.
@@ -455,7 +456,7 @@ mod test {
             error: None,
             append_rows_request_sender: sender,
         };
-        let (listener, channel) = create_tcp_listener().await;
+        let (listener, transport, origin) = create_tcp_listener().await;
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
         let router = tonic::transport::server::Server::builder().add_service(
             proto::big_query_write_server::BigQueryWriteServer::new(bigquery_server),
@@ -469,8 +470,13 @@ mod test {
                 .await
                 .unwrap();
         });
-        let service =
-            BigqueryService::new(channel, crate::gcp::GcpAuthenticator::None, "test").unwrap();
+        let service = BigqueryService::new(
+            transport,
+            origin,
+            crate::gcp::GcpAuthenticator::None,
+            "test",
+        )
+        .unwrap();
         (service, receiver, shutdown_tx, join_handle)
     }
 

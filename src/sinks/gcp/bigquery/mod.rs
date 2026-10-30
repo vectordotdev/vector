@@ -16,6 +16,7 @@ mod sink;
     warnings,
     clippy::pedantic,
     clippy::nursery,
+    clippy::clone_on_ref_ptr,
     clippy::missing_const_for_fn,
     clippy::trivially_copy_pass_by_ref
 )]

@@ -30,15 +30,15 @@ components: sinks: gcp_bigquery: {
 					enum: ["protobuf"]
 				}
 			}
-			proxy: enabled: false
+			proxy: enabled: true
 			request: {
 				enabled: true
 				headers: false
 			}
 			tls: {
 				enabled:                true
-				can_verify_certificate: false
-				can_verify_hostname:    false
+				can_verify_certificate: true
+				can_verify_hostname:    true
 				enabled_default:        true
 				enabled_by_scheme:      true
 			}

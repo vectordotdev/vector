@@ -1,16 +1,18 @@
 use crate::codecs::encoding::ProtobufSerializerConfig;
 use futures::FutureExt;
 use indoc::indoc;
-use std::path::PathBuf;
 
-use http::uri::Scheme;
-use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
+use http_1::uri::Scheme;
+use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
+use vector_http::{GrpcTransport, Http2Client};
 
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use super::request_builder::{BigqueryRequestBuilder, MAX_BATCH_PAYLOAD_SIZE};
-use super::service::{AuthInterceptor, BigqueryRetryLogic, BigqueryService};
+use super::service::{
+    BigQueryWriteClient, BigqueryRetryLogic, BigqueryService, RequestAuth, Transport,
+};
 use super::sink::BigquerySink;
 use crate::config::{
     AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
@@ -91,8 +93,7 @@ pub struct BigqueryConfig {
     /// Only Protobuf is supported, because the Storage Write API ingests rows as serialized Protobuf messages.
     encoding: ProtobufSerializerConfig,
 
-    #[serde(default)]
-    pub tls: Option<BigqueryTlsConfig>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(
         default,
@@ -100,82 +101,6 @@ pub struct BigqueryConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-/// TLS configuration.
-///
-/// TLS is used whenever `endpoint` uses the `https` scheme, verifying the server against the system's
-/// trusted root certificates. These options customize it.
-#[configurable_component]
-#[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields)]
-pub struct BigqueryTlsConfig {
-    /// Absolute path to an additional CA certificate file, trusted in addition to the system's root certificates.
-    ///
-    /// The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-    #[configurable(metadata(docs::examples = "/path/to/certificate_authority.crt"))]
-    #[configurable(metadata(docs::human_name = "CA File Path"))]
-    pub ca_file: Option<PathBuf>,
-
-    /// Absolute path to a certificate file used to identify this client.
-    ///
-    /// The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-    /// an inline string in PEM format.
-    ///
-    /// If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-    #[configurable(metadata(docs::examples = "/path/to/host_certificate.crt"))]
-    #[configurable(metadata(docs::human_name = "Certificate File Path"))]
-    pub crt_file: Option<PathBuf>,
-
-    /// Absolute path to a private key file used to identify this client.
-    ///
-    /// The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-    #[configurable(metadata(docs::examples = "/path/to/host_certificate.key"))]
-    #[configurable(metadata(docs::human_name = "Key File Path"))]
-    pub key_file: Option<PathBuf>,
-
-    /// Passphrase used to unlock the encrypted key file.
-    ///
-    /// This has no effect unless `key_file` is set.
-    #[configurable(metadata(docs::examples = "${KEY_PASS_ENV_VAR}"))]
-    #[configurable(metadata(docs::examples = "PassWord1"))]
-    #[configurable(metadata(docs::human_name = "Key File Password"))]
-    pub key_pass: Option<String>,
-
-    /// Server name to use for Server Name Indication (SNI) and to verify the server's certificate.
-    ///
-    /// Defaults to the host of `endpoint`.
-    #[configurable(metadata(docs::examples = "bigquerystorage.googleapis.com"))]
-    #[configurable(metadata(docs::human_name = "Server Name"))]
-    pub server_name: Option<String>,
-}
-
-impl BigqueryTlsConfig {
-    /// Loads the certificate files and builds the tonic TLS configuration.
-    fn client_tls_config(&self) -> crate::Result<ClientTlsConfig> {
-        let settings = TlsSettings::from_options(Some(&TlsConfig {
-            ca_file: self.ca_file.clone(),
-            crt_file: self.crt_file.clone(),
-            key_file: self.key_file.clone(),
-            key_pass: self.key_pass.clone(),
-            ..TlsConfig::default()
-        }))?;
-
-        let mut config = ClientTlsConfig::new();
-        if let Some(server_name) = &self.server_name {
-            config = config.domain_name(server_name);
-        }
-
-        let authorities: Vec<u8> = settings.authorities_pem().flatten().collect();
-        if !authorities.is_empty() {
-            config = config.ca_certificate(Certificate::from_pem(authorities));
-        }
-
-        if let Some((cert, key)) = settings.identity_pem() {
-            config = config.identity(Identity::from_pem(cert, key));
-        }
-        Ok(config)
-    }
 }
 
 impl BigqueryConfig {
@@ -206,19 +131,19 @@ impl GenerateConfig for BigqueryConfig {
 
 /// Create a future that calls `GetWriteStream` to verify connectivity and auth.
 async fn healthcheck_future(
-    channel: Channel,
+    transport: Transport,
+    origin: http_1::Uri,
     auth: GcpAuthenticator,
     write_stream: String,
 ) -> crate::Result<()> {
-    let mut client = proto::big_query_write_client::BigQueryWriteClient::with_interceptor(
-        channel,
-        AuthInterceptor::for_get_write_stream(auth, &write_stream)?,
-    );
-    client
-        .get_write_stream(proto::GetWriteStreamRequest {
+    let request = RequestAuth::for_get_write_stream(auth, &write_stream)?.request(
+        proto::GetWriteStreamRequest {
             name: write_stream,
             view: proto::WriteStreamView::Basic as i32,
-        })
+        },
+    )?;
+    BigQueryWriteClient::with_origin(transport, origin)
+        .get_write_stream(request)
         .await?;
     Ok(())
 }
@@ -237,7 +162,7 @@ impl SinkConfig for BigqueryConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedBigquery {
-    endpoint: http::Uri,
+    endpoint: http_1::Uri,
     write_stream: String,
     batcher_settings: BatcherSettings,
 }
@@ -247,7 +172,7 @@ impl ValidatedSink for BigqueryConfig {
     type Validated = ValidatedBigquery;
 
     fn validate(&self) -> crate::Result<ValidatedBigquery> {
-        let endpoint: http::Uri = self.endpoint.parse()?;
+        let endpoint: http_1::Uri = self.endpoint.parse()?;
         let scheme = endpoint.scheme();
         if scheme != Some(&Scheme::HTTP) && scheme != Some(&Scheme::HTTPS) {
             return Err(format!(
@@ -280,9 +205,6 @@ impl ValidatedSink for BigqueryConfig {
         validated: &ValidatedBigquery,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        // `cx.proxy` doesn't apply well to tonic gRPC connections,
-        // so we don't use it when building the sink.
-
         // Configure auth and make sure it's constantly up-to-date
         let auth = GcpAuthConfig {
             api_key: None,
@@ -293,21 +215,21 @@ impl ValidatedSink for BigqueryConfig {
         .await?;
         auth.spawn_regenerate_token();
 
-        let mut endpoint = Channel::builder(validated.endpoint.clone())
-            .connect_timeout(std::time::Duration::from_secs(10));
-        if validated.endpoint.scheme() == Some(&Scheme::HTTPS) {
-            let tls = self.tls.clone().unwrap_or_default().client_tls_config()?;
-            endpoint = endpoint.tls_config(tls)?;
-        }
+        let mut tls_config = self.tls.clone().unwrap_or_default();
+        tls_config
+            .alpn_protocols
+            // Google's frontends negotiate gRPC over http2.
+            .get_or_insert_with(|| vec!["h2".to_owned()]);
 
-        // Connect lazily so an unreachable endpoint at startup surfaces as a retriable error on the
-        // first request instead of failing the sink build.
-        let channel = endpoint.connect_lazy();
+        let tls = TlsSettings::from_options(Some(&tls_config))?.with_system_roots();
+        let mut builder = Builder::new(TokioExecutor::new());
+        builder.http2_max_header_list_size(vector_common::constants::GRPC_MAX_HEADER_LIST_SIZE);
+        let transport = GrpcTransport(Http2Client::new(tls.into(), &cx.proxy, builder)?);
 
-        // Kick off the healthcheck
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {
             healthcheck_future(
-                channel.clone(),
+                transport.clone(),
+                validated.endpoint.clone(),
                 auth.clone(),
                 validated.write_stream.clone(),
             )
@@ -320,7 +242,8 @@ impl ValidatedSink for BigqueryConfig {
         let service = ServiceBuilder::new()
             .settings(request_settings, BigqueryRetryLogic)
             .service(BigqueryService::new(
-                channel,
+                transport,
+                validated.endpoint.clone(),
                 auth,
                 &validated.write_stream,
             )?);
