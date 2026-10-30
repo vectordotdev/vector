@@ -7,7 +7,7 @@
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
 use std::collections::HashSet;
-use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_VARIANT_ALIASES};
+use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_STRING_ONLY, SERDE_VARIANT_ALIASES};
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -100,6 +100,7 @@ pub struct ValueCoercer<'a> {
 
 impl<'a> ValueCoercer<'a> {
     /// Creates a coercer for a root schema and its local definitions.
+    #[must_use]
     pub fn new(schema: &'a Value) -> Self {
         let mut coercer = Self {
             schema,
@@ -124,6 +125,13 @@ impl<'a> ValueCoercer<'a> {
     }
 
     /// Coerces a value in place. On error, some fields may already be coerced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if `value` does not match the schema, for example when a value has
+    /// the wrong type, an object has a disallowed property, an array has extra elements, or a
+    /// value is not an allowed enum option or constant. Also returns an error if the schema
+    /// contains a missing or unsupported `$ref`.
     pub fn coerce(&mut self, value: &mut Value) -> Result<(), Error> {
         self.path.clear();
         self.coerce_value(value, self.schema)
@@ -154,6 +162,8 @@ impl<'a> ValueCoercer<'a> {
         })
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     fn coerce_value(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         if self.is_unknown_component(value, schema) {
             return Ok(());
@@ -189,6 +199,18 @@ impl<'a> ValueCoercer<'a> {
     }
 
     fn coerce_object_schema(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        // Some custom string deserializers (for example ASCII characters) reject
+        // native numbers. Do not turn those inputs into valid-looking strings.
+        if schema
+            .get(METADATA)
+            .and_then(|metadata| metadata.get(SERDE_STRING_ONLY))
+            .and_then(Value::as_bool)
+            == Some(true)
+            && !value.is_string()
+        {
+            return fail_expected!(String, value, self.path);
+        }
+
         // Keywords can coexist. Apply every constraint in this order.
         self.apply_reference(value, schema)?;
         self.apply_all_of(value, schema)?;
@@ -414,7 +436,9 @@ impl<'a> ValueCoercer<'a> {
             }
 
             // String → Null
-            if s_trimmed.eq_ignore_ascii_case("null") && allowed.iter().any(|opt| opt.is_null()) {
+            if s_trimmed.eq_ignore_ascii_case("null")
+                && allowed.iter().any(serde_json::Value::is_null)
+            {
                 *value = Value::Null;
                 return true;
             }
@@ -547,13 +571,12 @@ impl<'a> ValueCoercer<'a> {
         // would incorrectly flag its fields as unknown.
         let unevaluated_props_false = schema
             .get("unevaluatedProperties")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             == Some(false);
         let known_for_unevaluated: Option<HashSet<String>> = if unevaluated_props_false {
             let type_val = obj.get("type").and_then(|t| t.as_str());
-            let type_is_known = type_val
-                .map(|tv| self.schema_contains_type_discriminant(schema, tv))
-                .unwrap_or(false); // no `type` field → not a component config → skip check
+            let type_is_known =
+                type_val.is_some_and(|tv| self.schema_contains_type_discriminant(schema, tv)); // no `type` field → not a component config → skip check
             if type_is_known {
                 let mut set = HashSet::new();
                 // Filter `oneOf` variants by the value's discriminant so properties
@@ -693,7 +716,7 @@ impl<'a> ValueCoercer<'a> {
                     let mut candidate = value.clone();
                     let result = self.coerce_value(&mut candidate, schema);
                     self.path.truncate(initial_len);
-                    return result.map(|_| {
+                    return result.map(|()| {
                         *value = candidate;
                     });
                 }
@@ -925,6 +948,16 @@ impl<'a> ValueCoercer<'a> {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Bounds and overflow audit deferred"
+    )]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Numeric precision audit deferred"
+    )]
+    #[allow(clippy::cast_sign_loss, reason = "Input bounds audit deferred")]
     fn coerce_integer(&mut self, value: &mut Value) -> Result<(), Error> {
         if let Value::Number(n) = value {
             if n.is_i64() || n.is_u64() {

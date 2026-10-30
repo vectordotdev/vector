@@ -32,19 +32,19 @@ impl<const N: usize> GroupStack<N> {
     /// Pushes an allocation group on to the stack, marking it as the active allocation group.
     pub fn push(&mut self, group: AllocationGroupId) {
         self.current_top += 1;
-        if self.current_top >= self.slots.len() {
-            panic!(
-                "tried to push new allocation group to the current stack, but hit the limit of {N} entries"
-            );
-        }
+        assert!(
+            self.current_top < self.slots.len(),
+            "tried to push new allocation group to the current stack, but hit the limit of {N} entries"
+        );
         self.slots[self.current_top] = group;
     }
 
     /// Pops the previous allocation group that was on the stack.
     pub fn pop(&mut self) {
-        if self.current_top == 0 {
-            panic!("tried to pop current allocation group from the stack but the stack is empty");
-        }
+        assert!(
+            self.current_top != 0,
+            "tried to pop current allocation group from the stack but the stack is empty"
+        );
         self.current_top -= 1;
     }
 }

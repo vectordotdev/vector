@@ -1,11 +1,11 @@
-use http::StatusCode;
+use http_1::StatusCode;
 use serde::Deserialize;
+use vector_http::HttpError;
 use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
 use vrl::prelude::value::simdutf_bytes_utf8_lossy;
 
 use crate::{
     event::Finalizable,
-    http::HttpError,
     sinks::{
         elasticsearch::{
             encoder::ProcessedEvent,
@@ -70,9 +70,7 @@ enum EsResultItem {
 impl EsResultItem {
     const fn result(&self) -> &EsIndexResult {
         match self {
-            EsResultItem::Index(r) => r,
-            EsResultItem::Create(r) => r,
-            EsResultItem::Update(r) => r,
+            EsResultItem::Index(r) | EsResultItem::Create(r) | EsResultItem::Update(r) => r,
         }
     }
 }
@@ -165,12 +163,11 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 .iter()
                                                 .map(|x| x.log.estimated_json_encoded_size_of())
                                                 .fold(JsonSize::zero(), |a, b| a + b);
-                                            let encode_result = match req
+                                            let Ok(encode_result) = req
                                                 .elasticsearch_request_builder
                                                 .encode_events(failed_events.clone())
-                                            {
-                                                Ok(s) => s,
-                                                Err(_) => return req,
+                                            else {
+                                                return req;
                                             };
                                             let metadata_builder =
                                                 RequestMetadataBuilder::from_events(&failed_events);
@@ -206,7 +203,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use http::Response;
+    use http_1::Response;
     use similar_asserts::assert_eq;
     use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
 

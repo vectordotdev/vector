@@ -56,7 +56,7 @@ jobs:
 
   check-clippy:
     name: Check clippy
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -68,6 +68,27 @@ jobs:
           libsasl2: true
           cargo-cache: true
       - run: make check-clippy
+
+  check-package-repositories:
+    name: Check package repository tooling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    if: ${{ needs.changes.outputs.package_repositories == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Default-off and opt-in CLI checks require neither signing material nor AWS access.
+      - run: |
+          cargo build --locked --package vdev
+          target/debug/vdev release --help
+          if target/debug/vdev release repositories --help; then
+            echo 'Package repository commands must be disabled by default.' >&2
+            exit 1
+          fi
+          cargo build --locked --package vdev --features package-repositories
+          target/debug/vdev release repositories --help
 
   test:
     needs: changes
@@ -96,7 +117,7 @@ jobs:
 
   check-events:
     name: Check events
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -151,7 +172,7 @@ jobs:
 
   check-generated-docs:
     name: Check Generated Docs
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -168,7 +189,7 @@ jobs:
 
   test-vrl:
     name: VRL - Linux
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -183,7 +204,7 @@ jobs:
 
   build-vrl-playground:
     name: Build VRL Playground
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
@@ -198,7 +219,8 @@ jobs:
           wasm-pack build --target web --out-dir public/pkg
 
   test-website:
-    if: ${{ github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'merge_group' && (needs.changes.outputs.website_tests == 'true' || needs.changes.outputs.test-yml == 'true') }}
+    needs: changes
     permissions:
       contents: read
       id-token: write
@@ -213,6 +235,7 @@ jobs:
       - check-fmt
       - check-actionlint
       - check-clippy
+      - check-package-repositories
       - test
       - check-scripts
       - check-events

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;
@@ -137,11 +135,10 @@ pub trait ClientBuilder {
 }
 
 /// Provides the configured AWS region.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+///
+/// # Errors
+///
+/// Returns an error if the TLS settings are invalid or the proxy or TLS connector cannot be built.
 pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
@@ -178,11 +175,11 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+///
+/// # Errors
+///
+/// Returns an error if the client cannot be created. See [`create_client_and_region`] for the
+/// specific errors.
 pub async fn create_client<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -201,11 +198,12 @@ where
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
+///
+/// # Errors
+///
+/// Returns an error if no region is configured and none can be resolved from the environment,
+/// profile files, or IMDS; if the TLS settings are invalid or the proxy or TLS connector cannot
+/// be built; or if the credentials provider for `auth` cannot be created.
 pub async fn create_client_and_region<T>(
     builder: &T,
     auth: &AwsAuthentication,
@@ -288,35 +286,69 @@ enum SigningError {
     NotUTF8Header,
 }
 
-/// Sign the request prior to sending to AWS.
+/// Sign the request prior to sending to AWS, using `http` 1.x request types.
 /// The signature is added to the provided `request`.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(
-    clippy::missing_errors_doc,
-    reason = "Audit and document the existing error contracts separately from lint enforcement."
-)]
-#[allow(
-    clippy::missing_panics_doc,
-    reason = "Audit and document the existing panic conditions separately from lint enforcement."
-)]
-pub async fn sign_request(
+///
+/// # Errors
+///
+/// Returns an error if a header value is not valid UTF-8, the credentials cannot be
+/// provided, or the request cannot be signed.
+///
+/// # Panics
+///
+/// Panics if the access key ID, region, or service name contains characters that are not valid
+/// in an HTTP header value, such as a newline.
+pub async fn sign_request_v1(
     service_name: &str,
-    request: &mut http::Request<Bytes>,
+    request: &mut http_1::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
-    let headers = request
-        .headers()
-        .iter()
+    sign_request_v1_at(
+        service_name,
+        request,
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+        SystemTime::now,
+    )
+    .await
+}
+
+/// Collect a request's headers as `(&str, &str)` pairs for signing, rejecting headers whose
+/// values are not valid UTF-8 with [`SigningError::NotUTF8Header`].
+fn signable_headers<'a>(
+    headers: impl Iterator<Item = (&'a str, &'a [u8])>,
+) -> Result<Vec<(&'a str, &'a str)>, SigningError> {
+    headers
         .map(|(k, v)| {
             Ok((
-                k.as_str(),
-                std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
+                k,
+                std::str::from_utf8(v).map_err(|_| SigningError::NotUTF8Header)?,
             ))
         })
-        .collect::<Result<Vec<_>, SigningError>>()?;
+        .collect()
+}
 
+/// Signs `request` like [`sign_request_v1`], taking the signing time from `signing_time`.
+///
+/// `signing_time` is called after the credentials are provided, so a slow credential lookup
+/// does not make the signature's `x-amz-date` stale.
+async fn sign_request_v1_at(
+    service_name: &str,
+    request: &mut http_1::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+    signing_time: impl FnOnce() -> SystemTime,
+) -> crate::Result<()> {
+    let headers = signable_headers(
+        request
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_bytes())),
+    )?;
     let signable_request = SignableRequest::new(
         request.method().as_str(),
         request.uri().to_string(),
@@ -339,7 +371,7 @@ pub async fn sign_request(
         .identity(&identity)
         .region(region.as_ref().map_or("", std::convert::AsRef::as_ref))
         .name(service_name)
-        .time(SystemTime::now())
+        .time(signing_time())
         .settings(signing_settings);
 
     let signing_params = signing_params_builder
@@ -348,7 +380,7 @@ pub async fn sign_request(
 
     let (signing_instructions, _signature) =
         aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
-    signing_instructions.apply_to_request_http0x(request);
+    signing_instructions.apply_to_request_http1x(request);
 
     Ok(())
 }
@@ -588,5 +620,73 @@ impl Body for MeasuredBody {
         _cx: &mut Context<'_>,
     ) -> Poll<Result<Option<HeaderMap>, Self::Error>> {
         Poll::Ready(Ok(None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aws_credential_types::Credentials;
+
+    /// Signing with a fixed time must produce the exact AWS v4 signature headers for the request,
+    /// credentials, region, and service, and leave the URI unchanged.
+    #[tokio::test]
+    async fn sign_request_v1_signs_with_fixed_time() {
+        const SERVICE_NAME: &str = "example-service";
+        const URI: &str =
+            "https://example.us-east-1.amazonaws.com/path/to/resource?query=param&value=42";
+        const BODY: &[u8] = b"some non-empty request body";
+        let signing_time = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+
+        let credentials_provider =
+            SharedCredentialsProvider::new(Credentials::from_keys("AKID", "SECRET", None));
+        let region = Region::new("us-east-1");
+
+        let mut request = http_1::Request::post(URI)
+            .header("content-type", "application/json")
+            .body(Bytes::from_static(BODY))
+            .expect("valid request");
+
+        sign_request_v1_at(
+            SERVICE_NAME,
+            &mut request,
+            &credentials_provider,
+            Some(&region),
+            true,
+            || signing_time,
+        )
+        .await
+        .expect("signing should succeed");
+
+        let header = |name: &str| {
+            request
+                .headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_else(|| panic!("`{name}` header must be set by signing"))
+        };
+
+        let authorization = header("authorization");
+        assert!(
+            authorization.starts_with("AWS4-HMAC-SHA256 Credential=AKID/"),
+            "`authorization` header must be an AWS v4 signature for the test credentials: {authorization}"
+        );
+        assert_eq!(
+            authorization,
+            "AWS4-HMAC-SHA256 \
+             Credential=AKID/20231114/us-east-1/example-service/aws4_request, \
+             SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date, \
+             Signature=f486a00bdba23adbad2fa7ef1467edd40078469c99f77a83773fa3444fb69144"
+        );
+        assert_eq!(header("x-amz-date"), "20231114T221320Z");
+        assert_eq!(
+            header("x-amz-content-sha256"),
+            "3ec836486ef3ca1ae62a9438c68c7c08659ea6913b487fdfbec70056a8457539"
+        );
+        assert_eq!(
+            request.uri().to_string(),
+            URI,
+            "URI (including signed query) must be unchanged by signing"
+        );
     }
 }

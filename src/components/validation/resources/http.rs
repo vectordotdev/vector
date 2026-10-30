@@ -8,14 +8,17 @@ use std::{
 
 use axum::{
     Router,
+    extract::Request,
+    http::StatusCode,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
 };
 use bytes::{BufMut as _, BytesMut};
-use http::{Method, Request, StatusCode, Uri};
-use http_body::{Body as _, Collected};
-use hyper::{Body, Client, Server};
+use http::{Method, Uri};
+use http_body_util::{BodyExt as _, Collected};
+use hyper::Client;
 use tokio::{
+    net::TcpListener,
     select,
     sync::{Mutex, Notify, mpsc, oneshot},
 };
@@ -53,11 +56,17 @@ impl HttpResourceConfig {
         }
     }
 
+    #[must_use]
     pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
         self.headers = Some(headers);
         self
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     pub fn spawn_as_input(
         self,
         direction: ResourceDirection,
@@ -69,19 +78,38 @@ impl HttpResourceConfig {
         match direction {
             // The source will pull data from us.
             ResourceDirection::Pull => {
-                spawn_input_http_server(self, codec, input_rx, task_coordinator, runner_metrics)
+                spawn_input_http_server(self, codec, input_rx, task_coordinator, runner_metrics);
             }
             // We'll push data to the source.
             ResourceDirection::Push => {
-                spawn_input_http_client(self, codec, input_rx, task_coordinator, runner_metrics)
+                spawn_input_http_client(self, codec, input_rx, task_coordinator, runner_metrics);
             }
         }
     }
 
+    /// Spawns this resource as the output for a sink.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the decoder for the resource codec cannot be built.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the resource direction is `Pull`, which is not implemented, or if the URI host is
+    /// missing or not an IP address. Panics if the codec uses a serializer that has no matching
+    /// deserializer for validation.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     pub fn spawn_as_output(self, ctx: HttpResourceOutputContext) -> vector_lib::Result<()> {
         match ctx.direction {
             // We'll pull data from the sink.
-            ResourceDirection::Pull => Ok(ctx.spawn_output_http_client(self)),
+            ResourceDirection::Pull => {
+                ctx.spawn_output_http_client(self);
+                Ok(())
+            }
             // The sink will push data to us.
             ResourceDirection::Push => ctx.spawn_output_http_server(self),
         }
@@ -89,6 +117,11 @@ impl HttpResourceConfig {
 }
 
 /// Spawns an HTTP server that a source will make requests to in order to get events.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn spawn_input_http_server(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -153,18 +186,15 @@ fn spawn_input_http_server(
                 // When the channel closes, we'll mark the input as being finished so that we know
                 // to close the external resource itself once the HTTP server has consumed/sent all
                 // outstanding events.
-                maybe_event = input_rx.recv(), if !input_finished => match maybe_event {
-                    Some(event) => {
-                        let mut outstanding_events = outstanding_events.lock().await;
-                        outstanding_events.push_back(event);
-                    },
-                    None => {
-                        info!("HTTP server external input resource input is finished.");
-                        input_finished = true;
-                    },
+                maybe_event = input_rx.recv(), if !input_finished => if let Some(event) = maybe_event {
+                    let mut outstanding_events = outstanding_events.lock().await;
+                    outstanding_events.push_back(event);
+                } else {
+                    info!("HTTP server external input resource input is finished.");
+                    input_finished = true;
                 },
 
-                _ = resource_notifier.notified() => {
+                () = resource_notifier.notified() => {
                     // The HTTP server notified us that it made progress with a send, which is
                     // specifically that it serviced a request which returned a non-zero number of
                     // events.
@@ -198,6 +228,11 @@ fn spawn_input_http_server(
 }
 
 /// Spawns an HTTP client that pushes events to a source which is accepting events over HTTP.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Preserve ownership and drop timing"
+)]
 fn spawn_input_http_client(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -218,7 +253,7 @@ fn spawn_input_http_client(
         started.mark_as_done();
         info!("HTTP client external input resource started.");
 
-        let client = Client::builder().build_http::<Body>();
+        let client = Client::builder().build_http::<hyper::Body>();
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
         let headers = config.headers.unwrap_or_default();
@@ -253,7 +288,7 @@ fn spawn_input_http_client(
                 runner_metrics.sent_bytes_total += 1;
             }
 
-            let mut request_builder = Request::builder()
+            let mut request_builder = http::Request::builder()
                 .uri(request_uri.clone())
                 .method(request_method.clone());
 
@@ -297,6 +332,11 @@ pub struct HttpResourceOutputContext<'a> {
 
 impl HttpResourceOutputContext<'_> {
     /// Spawns an HTTP server that accepts events sent by a sink.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Preserve ownership and drop timing"
+    )]
     fn spawn_output_http_server(&self, config: HttpResourceConfig) -> vector_lib::Result<()> {
         // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
         // via an output sender. We accept/collect events until we're told to shutdown.
@@ -332,7 +372,7 @@ impl HttpResourceOutputContext<'_> {
                         .headers()
                         .get("content-encoding")
                         .and_then(|v| v.to_str().ok())
-                        .map(|s| s.to_string());
+                        .map(std::string::ToString::to_string);
 
                     match request.into_body().collect().await.map(Collected::to_bytes) {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -392,9 +432,8 @@ impl HttpResourceOutputContext<'_> {
                                             // This status code is not retried and should result in the component under test
                                             // emitting error events
                                             return StatusCode::BAD_REQUEST.into_response();
-                                        } else {
-                                            return StatusCode::OK.into_response();
                                         }
+                                        return StatusCode::OK.into_response();
                                     }
                                     Err(_) => {
                                         error!(
@@ -452,7 +491,7 @@ fn spawn_http_server<H, F, R>(
     handler: H,
 ) -> (Arc<Notify>, oneshot::Sender<()>)
 where
-    H: Fn(Request<Body>, Arc<Mutex<RunnerMetrics>>) -> F + Clone + Send + 'static,
+    H: Fn(Request, Arc<Mutex<RunnerMetrics>>) -> F + Clone + Send + 'static,
     F: Future<Output = R> + Send,
     R: IntoResponse,
 {
@@ -463,8 +502,7 @@ where
     let request_path = config
         .uri
         .path_and_query()
-        .map(|pq| pq.as_str().to_string())
-        .unwrap_or_else(|| "/".to_string());
+        .map_or_else(|| "/".to_string(), |pq| pq.as_str().to_string());
     let request_method = config.method.clone().unwrap_or(Method::POST);
 
     // Create our synchronization primitives that are shared between the HTTP server and the
@@ -482,8 +520,9 @@ where
     tokio::spawn(async move {
         // Create our HTTP server by binding as early as possible to return an error if we can't
         // actually bind.
-        let server_builder =
-            Server::try_bind(&listen_addr).expect("Failed to bind to listen address.");
+        let listener = TcpListener::bind(listen_addr)
+            .await
+            .expect("Failed to bind to listen address.");
 
         // Create our router, which is a bit boilerplate-y because we take the HTTP method
         // parametrically. We generate a handler that calls the given `handler` and then triggers
@@ -492,10 +531,13 @@ where
         // Every time a request is processed, we notify the core logic loop so it can continue
         // checking to see if it's time to fully close once all input events have been consumed and
         // the input receiver is closed.
-        let method_filter = MethodFilter::try_from(request_method)
-            .expect("should not fail to convert method to method filter");
+        let method_filter = MethodFilter::try_from(
+            axum::http::Method::from_bytes(request_method.as_str().as_bytes())
+                .expect("configured HTTP method should be a valid method token"),
+        )
+        .expect("should not fail to convert method to method filter");
         let method_router = MethodRouter::new()
-            .fallback(|req: Request<Body>| async move {
+            .fallback(|req: Request| async move {
                 error!(
                     path = req.uri().path(),
                     method = req.method().as_str(),
@@ -504,7 +546,7 @@ where
 
                 StatusCode::METHOD_NOT_ALLOWED
             })
-            .on(method_filter, move |request: Request<Body>| {
+            .on(method_filter, move |request: Request| {
                 let request_handler = handler(request, output_runner_metrics);
                 let notifier = Arc::clone(&server_notifier);
 
@@ -515,21 +557,20 @@ where
                 }
             });
 
-        let router = Router::new().route(&request_path, method_router).fallback(
-            |req: Request<Body>| async move {
-                error!(?req, "Component sent request the server could not route.");
-                StatusCode::NOT_FOUND
-            },
-        );
+        let router =
+            Router::new()
+                .route(&request_path, method_router)
+                .fallback(|req: Request| async move {
+                    error!(?req, "Component sent request the server could not route.");
+                    StatusCode::NOT_FOUND
+                });
 
         // Now actually run/drive the HTTP server and process requests until we're told to shutdown.
         http_server_started.mark_as_done();
 
-        let server = server_builder
-            .serve(router.into_make_service())
-            .with_graceful_shutdown(async {
-                http_server_shutdown_rx.await.ok();
-            });
+        let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+            http_server_shutdown_rx.await.ok();
+        });
 
         if let Err(e) = server.await {
             error!(error = ?e, "HTTP server encountered an error.");

@@ -14,14 +14,15 @@ Both options are optional and unset by default, so existing configurations negot
 same versions as before.
 
 These options take effect for every component whose `tls` settings are applied to an OpenSSL
-context, which includes the HTTP-based sources and sinks and the AWS SDK-based sinks.
+context, which includes the HTTP-based sources and sinks, the AWS SDK-based sinks, and the
+`gcp_pubsub` source.
 
 Some components pass the configured certificates to a third-party TLS implementation instead, which
 does not expose protocol version selection. Those components cannot enforce the bounds, so they now
 log a warning when either option is set rather than ignoring it silently: the `kafka` source and
 sink (librdkafka), the `nats` source and sink (async-nats), the `amqp` source and sink (lapin), the
-`mqtt` source and sink (rumqttc), the `gcp_pubsub` source (tonic), and the `databend` sink, whose
-deprecated `tls` block is not read. The `greptimedb_metrics` sink lists them in its existing
+`mqtt` source and sink (rumqttc), and the `databend` sink, whose deprecated `tls` block is not
+read. The `greptimedb_metrics` sink lists them in its existing
 unsupported-options warning.
 
 A configured bound only narrows one already set by the host's OpenSSL configuration

@@ -1,13 +1,12 @@
 use serde::Deserialize;
 use tracing::{debug, error};
 
-use crate::{
-    http::HttpError,
-    sinks::{
-        doris::{service::DorisResponse, sink::DorisPartitionKey},
-        prelude::*,
-        util::{http::HttpRequest, retries::RetryAction},
-    },
+use vector_http::HttpError;
+
+use crate::sinks::{
+    doris::{service::DorisResponse, sink::DorisPartitionKey},
+    prelude::*,
+    util::{http::HttpRequest, retries::RetryAction},
 };
 
 /// Internal struct for parsing Doris Stream Load API responses
@@ -56,16 +55,15 @@ impl RetryLogic for DorisRetryLogic {
                 return RetryAction::Retry(
                     format!("Doris error: {} - {message}", doris_resp.status).into(),
                 );
-            } else {
-                // HTTP success but failed to parse response
-                // Don't retry to avoid data duplication, but log the response for debugging
-                error!(
-                    message = "Failed to parse Doris response, not retrying to avoid data duplication.",
-                    status_code = %status,
-                    body = %body_str
-                );
-                return RetryAction::DontRetry("Failed to parse Doris response".into());
             }
+            // HTTP success but failed to parse response
+            // Don't retry to avoid data duplication, but log the response for debugging
+            error!(
+                message = "Failed to parse Doris response, not retrying to avoid data duplication.",
+                status_code = %status,
+                body = %body_str
+            );
+            return RetryAction::DontRetry("Failed to parse Doris response".into());
         }
 
         // Retry only for server errors (5xx)

@@ -10,7 +10,7 @@ generated: components: sinks: clickhouse: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	auth: {
 		description: """
@@ -154,10 +154,10 @@ generated: components: sinks: clickhouse: configuration: {
 		type: string: {
 			default: "json_each_row"
 			enum: {
-				arrow_stream:   "ArrowStream (beta)."
-				json_as_object: "JSONAsObject."
-				json_as_string: "JSONAsString."
-				json_each_row:  "JSONEachRow."
+				arrow_stream:   "`ArrowStream` (beta)."
+				json_as_object: "`JSONAsObject`."
+				json_as_string: "`JSONAsString`."
+				json_each_row:  "`JSONEachRow`."
 			}
 		}
 	}
@@ -220,7 +220,7 @@ generated: components: sinks: clickhouse: configuration: {
 				}
 				wait_for_processing_timeout: {
 					description: """
-						Sets 'wait_for_processing_timeout`, to control the timeout for waiting for processing asynchronous insertion.
+						Sets `wait_for_processing_timeout`, to control the timeout for waiting for processing asynchronous insertion.
 
 						If left unspecified, use the default provided by the `ClickHouse` server.
 						"""

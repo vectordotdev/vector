@@ -195,7 +195,7 @@ pub(super) fn default_filename_time_format() -> String {
 impl GenerateConfig for S3SinkConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
-            bucket: "".to_owned(),
+            bucket: String::new(),
             key_prefix: default_key_prefix(),
             filename_time_format: default_filename_time_format(),
             filename_append_uuid: true,
@@ -210,10 +210,10 @@ impl GenerateConfig for S3SinkConfig {
             request: TowerRequestConfig::default(),
             tls: Some(TlsConfig::default()),
             auth: AwsAuthentication::default(),
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            force_path_style: Default::default(),
-            retry_strategy: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: None,
+            force_path_style: false,
+            retry_strategy: RetryStrategy::default(),
             confinement: ConfinementConfig::default(),
         })
         .unwrap()
@@ -266,9 +266,8 @@ impl ValidatedSink for S3SinkConfig {
         let ssekms_key_id = self
             .options
             .ssekms_key_id
-            .as_ref()
-            .cloned()
-            .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
+            .as_deref()
+            .map(Template::try_from)
             .transpose()?
             .map(|t| t.confine(&self.confinement, Self::NAME, "ssekms_key_id"))
             .transpose()?;
@@ -286,17 +285,21 @@ impl ValidatedSink for S3SinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let service = self.create_service(&cx.proxy).await?;
-        let healthcheck = self.build_healthcheck(service.client())?;
-        let sink = self.build_processor(service, cx, validated)?;
+        let healthcheck = self.build_healthcheck(service.client());
+        let sink = self.build_processor(service, &cx, validated)?;
         Ok((sink, healthcheck))
     }
 }
 
 impl S3SinkConfig {
+    /// Builds the S3 event processor.
+    ///
+    /// # Errors
+    /// Returns an error if the configured framing or serializer cannot be built.
     pub fn build_processor(
         &self,
         service: S3Service,
-        cx: SinkContext,
+        cx: &SinkContext,
         validated: &ValidatedAwsS3,
     ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
@@ -341,7 +344,7 @@ impl S3SinkConfig {
             // override via `options.content_type`; we only set it when unset.
             let mut api_options = self.options.clone();
             if api_options.content_type.is_none() {
-                api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
+                api_options.content_type = batch_encoder.content_type().map(str::to_string);
             }
 
             let encoder = EncoderKind::Batch(batch_encoder);
@@ -356,7 +359,7 @@ impl S3SinkConfig {
             });
 
             if self.compression != Compression::None {
-                warn!("Top level compression setting ignored when batch_encoding set to parquet.")
+                warn!("Top level compression setting ignored when batch_encoding set to parquet.");
             }
 
             let request_options = S3RequestOptions {
@@ -394,10 +397,16 @@ impl S3SinkConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
+    /// Builds the future that checks access to the configured bucket.
+    #[must_use]
+    pub fn build_healthcheck(&self, client: S3Client) -> Healthcheck {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
+    /// Creates the S3 service.
+    ///
+    /// # Errors
+    /// Returns an error if region resolution, authentication, or HTTP client configuration fails.
     pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
         s3_common::config::create_service(
             &self.region,
@@ -412,18 +421,43 @@ impl S3SinkConfig {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "codecs-parquet")]
+    use vector_lib::codecs::{
+        TextSerializerConfig,
+        encoding::{
+            BatchSerializerConfig, FramingConfig,
+            format::{ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig},
+        },
+    };
+    use vector_lib::event::LogEvent;
+    use vrl::event_path;
+
     use super::S3SinkConfig;
-    use crate::config::ValidatedSink;
-    use crate::template::{ConfinementConfig, Template};
+    #[cfg(feature = "codecs-parquet")]
+    use crate::{
+        aws::AwsAuthentication,
+        config::AcknowledgementsConfig,
+        sinks::{
+            s3_common::config::{RetryStrategy, S3Options},
+            util::{
+                BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, TowerRequestConfig,
+            },
+        },
+    };
+    use crate::{
+        config::ValidatedSink,
+        event::Event,
+        template::{ConfinementConfig, Template},
+    };
 
     #[test]
     fn prepares_valid_config() {
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
               codec: text
-        "#})
+        "})
         .unwrap();
 
         let validated = config.validate().expect("preparation should succeed");
@@ -440,7 +474,7 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_batch_encoding_correct_toml_shape() {
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
@@ -450,14 +484,13 @@ mod tests {
               codec: parquet
               compression:
                 algorithm: snappy
-            "#})
+            "})
         .expect("correct batch_encoding shape should parse");
 
         let batch_enc = config
             .batch_encoding
             .expect("batch_encoding should be Some");
         let super::S3BatchEncoding::Parquet(ref p) = batch_enc;
-        use vector_lib::codecs::encoding::format::{ParquetCompression, ParquetSchemaMode};
         assert_eq!(p.schema_mode, ParquetSchemaMode::AutoInfer);
         assert_eq!(p.compression, ParquetCompression::Snappy);
     }
@@ -467,15 +500,6 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_content_type_auto_detected() {
-        use vector_lib::codecs::encoding::format::{
-            ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
-        };
-
-        use crate::sinks::s3_common::config::S3Options;
-        use crate::sinks::util::{BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression};
-        use vector_lib::codecs::TextSerializerConfig;
-        use vector_lib::codecs::encoding::{BatchSerializerConfig, FramingConfig};
-
         let parquet_config = ParquetSerializerConfig {
             schema_mode: ParquetSchemaMode::AutoInfer,
             compression: ParquetCompression::Snappy,
@@ -494,13 +518,13 @@ mod tests {
             batch_encoding: Some(super::S3BatchEncoding::Parquet(parquet_config)),
             compression: Compression::None,
             batch: BatchConfig::<BulkSizeBasedDefaultBatchSettings>::default(),
-            request: Default::default(),
-            tls: Default::default(),
-            auth: Default::default(),
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
+            request: TowerRequestConfig::default(),
+            tls: None,
+            auth: AwsAuthentication::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            timezone: None,
             force_path_style: true,
-            retry_strategy: Default::default(),
+            retry_strategy: RetryStrategy::default(),
             confinement: ConfinementConfig::default(),
         };
 
@@ -511,7 +535,7 @@ mod tests {
 
         let mut api_options = config.options.clone();
         if api_options.content_type.is_none() {
-            api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
+            api_options.content_type = batch_encoder.content_type().map(str::to_string);
         }
 
         assert_eq!(
@@ -547,7 +571,7 @@ mod tests {
 
         let mut api_options = config.options.clone();
         if api_options.content_type.is_none() {
-            api_options.content_type = batch_encoder.content_type().map(|s| s.to_string());
+            api_options.content_type = batch_encoder.content_type().map(str::to_string);
         }
 
         assert_eq!(
@@ -563,14 +587,14 @@ mod tests {
     #[test]
     fn parquet_batch_encoding_rejects_unsupported_codec() {
         let err = serde_yaml::from_str::<S3SinkConfig>(
-            r#"
+            r"
             bucket: test-bucket
             compression: none
             encoding:
               codec: text
             batch_encoding:
               codec: arrow_stream
-            "#,
+            ",
         )
         .unwrap_err();
 
@@ -580,11 +604,11 @@ mod tests {
         );
     }
 
-    /// Explicit filename_extension overrides the `.parquet` default.
+    /// Explicit `filename_extension` overrides the `.parquet` default.
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_filename_extension_user_override() {
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             filename_extension: pq
@@ -593,7 +617,7 @@ mod tests {
             batch_encoding:
               codec: parquet
               schema_mode: auto_infer
-            "#})
+            "})
         .unwrap();
 
         assert_eq!(config.filename_extension.as_deref(), Some("pq"));
@@ -603,16 +627,14 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_schema_mode_defaults_to_relaxed() {
-        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
-
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
               codec: text
             batch_encoding:
               codec: parquet
-            "#})
+            "})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
@@ -623,9 +645,7 @@ mod tests {
     #[cfg(feature = "codecs-parquet")]
     #[test]
     fn parquet_schema_mode_strict_parsed() {
-        use vector_lib::codecs::encoding::format::ParquetSchemaMode;
-
-        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: S3SinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             bucket: test-bucket
             compression: none
             encoding:
@@ -634,7 +654,7 @@ mod tests {
               codec: parquet
               schema_mode: strict
               schema_file: tmp/something.schema
-            "#})
+            "})
         .unwrap();
 
         let super::S3BatchEncoding::Parquet(p) = config.batch_encoding.unwrap();
@@ -664,10 +684,6 @@ mod tests {
 
     #[test]
     fn confinement_blocks_dotdot_escape_at_render() {
-        use crate::event::Event;
-        use vector_lib::event::LogEvent;
-        use vrl::event_path;
-
         let template: Template = "safe/{{ tenant }}/".try_into().unwrap();
         let template = template
             .confine(&ConfinementConfig::default(), "aws_s3", "key_prefix")

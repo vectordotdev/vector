@@ -115,7 +115,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
     sub(&mut vector);
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Time shutdown.
     let now = Instant::now();
@@ -246,8 +246,8 @@ fn log_schema_multiple_config_files() {
 
     overwrite_file(
         input_file.clone(),
-        r#"42
-    "#,
+        r"42
+    ",
     );
 
     cmd.arg("--quiet")
@@ -263,7 +263,7 @@ fn log_schema_multiple_config_files() {
     sleep(STARTUP_TIME);
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Wait for shutdown
     let output = vector.wait_with_output().unwrap();
@@ -319,7 +319,7 @@ fn configuration_path_recomputed() {
     overwrite_file(dir.join("conf1.toml"), "");
 
     // Signal reload
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGHUP).unwrap();
 
     // Message to assert, sent to console source and picked up from
     // console sink, both added in the second configuration file.
@@ -692,7 +692,7 @@ async fn health_503_during_shutdown() {
     assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early.");
 
     // Signal shutdown
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGTERM).unwrap();
 
     // Give vector time to begin shutting down.
     sleep(Duration::from_secs(1));
@@ -701,5 +701,5 @@ async fn health_503_during_shutdown() {
 
     assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
 
-    kill(Pid::from_raw(vector.id() as i32), Signal::SIGKILL).unwrap();
+    kill(Pid::from_raw(vector.id().cast_signed()), Signal::SIGKILL).unwrap();
 }

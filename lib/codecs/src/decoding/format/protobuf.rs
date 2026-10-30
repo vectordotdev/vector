@@ -32,11 +32,11 @@ pub struct ProtobufDeserializerConfig {
 
 impl ProtobufDeserializerConfig {
     /// Build the `ProtobufDeserializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the descriptor set file cannot be read or decoded, or if it does not
+    /// contain the message type.
     pub fn build(&self) -> vector_common::Result<ProtobufDeserializer> {
         ProtobufDeserializer::try_from(self)
     }
@@ -123,11 +123,11 @@ impl ProtobufDeserializer {
     }
 
     /// Creates a new deserializer instance using the descriptor bytes directly.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the descriptor bytes cannot be decoded, or if they do not contain the
+    /// message type.
     pub fn new_from_bytes(
         desc_bytes: &[u8],
         message_type: &str,
@@ -255,7 +255,7 @@ mod tests {
             assert_eq!(log["name"], "someone".into());
             assert_eq!(
                 log["phones"].as_array().unwrap()[0].as_object().unwrap()["number"]
-                    .as_str()
+                    .to_str_lossy()
                     .unwrap(),
                 "123456"
             );
@@ -278,7 +278,7 @@ mod tests {
             assert_eq!(log["name"], "someone".into());
             assert_eq!(
                 log["phones"].as_array().unwrap()[0].as_object().unwrap()["number"]
-                    .as_str()
+                    .to_str_lossy()
                     .unwrap(),
                 "1234"
             );

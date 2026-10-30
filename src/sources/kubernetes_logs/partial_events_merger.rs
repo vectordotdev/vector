@@ -237,7 +237,7 @@ fn merge_partial_events_with_custom_expiration(
 
     map_with_expiration(
         state,
-        stream.map(|e| e.into_log()),
+        stream.map(Event::into_log),
         Duration::from_secs(1),
         move |state: &mut PartialEventMergeState,
               event: LogEvent,
@@ -245,12 +245,12 @@ fn merge_partial_events_with_custom_expiration(
             // called for each event
             let is_partial = event
                 .get(&partial_flag_path)
-                .and_then(|x| x.as_boolean())
+                .and_then(Value::as_boolean)
                 .unwrap_or(false);
 
             let file = event
                 .get(&file_path)
-                .and_then(|x| x.as_str())
+                .and_then(Value::to_str_lossy)
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 
@@ -261,7 +261,7 @@ fn merge_partial_events_with_custom_expiration(
         },
         |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
             // check for expired events
-            state.emit_expired_events(emitter)
+            state.emit_expired_events(emitter);
         },
         |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
             // the source is ending, flush all pending events
@@ -269,7 +269,7 @@ fn merge_partial_events_with_custom_expiration(
         },
     )
     // LogEvent -> Event
-    .map(|e| e.into())
+    .map(Into::into)
 }
 
 #[cfg(test)]

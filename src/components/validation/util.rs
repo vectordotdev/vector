@@ -1,6 +1,6 @@
 use std::{fmt, net::SocketAddr};
 
-use http::Uri;
+use http_1::Uri;
 
 /// A gRPC address.
 ///
@@ -17,6 +17,7 @@ impl GrpcAddress {
     ///
     /// This is typically used when actually binding a socket to use for listening for connections
     /// as a gRPC server.
+    #[must_use]
     pub const fn as_socket_addr(&self) -> SocketAddr {
         self.addr
     }
@@ -24,6 +25,12 @@ impl GrpcAddress {
     /// Gets the fully-qualified endpoint address.
     ///
     /// This is a URI in the form of `http://<socket address>/`. The scheme and path are hard-coded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the socket address does not form a valid URI authority, which should not happen
+    /// for any `SocketAddr`.
+    #[must_use]
     pub fn as_uri(&self) -> Uri {
         let addr_str = self.addr.to_string();
         Uri::builder()

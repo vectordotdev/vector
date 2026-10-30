@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable minor Vector version to prepare, for example 0.59.0
-        required: true
+        description: Vector version override (optional)
+        required: false
         type: string
       vrl_version:
-        description: Released VRL version to pin, for example 0.28.0
-        required: true
+        description: VRL version override (optional)
+        required: false
         type: string
 
 permissions:
@@ -34,6 +34,8 @@ jobs:
     outputs:
       base_sha: ${{ steps.base.outputs.sha }}
       branch: ${{ steps.preflight.outputs.branch }}
+      version: ${{ steps.preflight.outputs.version }}
+      vrl_version: ${{ steps.preflight.outputs.vrl_version }}
       skip: ${{ steps.preflight.outputs.skip }}
     steps:
       - name: Checkout master
@@ -73,18 +75,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
-        run: >-
-          "$VDEV" release workflow prepare-check
-          --version "$VERSION"
-          --bot-app vectordotdev-bot
-          --repository "$GITHUB_REPOSITORY"
+          VRL_VERSION: ${{ inputs.vrl_version }}
+        run: |
+          version_args=()
+          if [[ -n "$VERSION" ]]; then
+            version_args=(--version "$VERSION")
+          fi
+          if [[ -n "$VRL_VERSION" ]]; then
+            version_args+=(--vrl-version "$VRL_VERSION")
+          fi
+          "$VDEV" release workflow prepare-check \
+            "${version_args[@]}" \
+            --bot-app vectordotdev-bot \
+            --repository "$GITHUB_REPOSITORY"
 
       - name: Generate release changes
         if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.resume != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
+          VERSION: ${{ steps.preflight.outputs.version }}
+          VRL_VERSION: ${{ steps.preflight.outputs.vrl_version }}
         run: >-
           "$VDEV" release prepare
           --version "$VERSION"
@@ -96,7 +106,7 @@ jobs:
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
           PREP_BRANCH: ${{ steps.preflight.outputs.branch }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
+          VRL_VERSION: ${{ steps.preflight.outputs.vrl_version }}
         run: |
           git fetch --no-tags origin "refs/heads/${PREP_BRANCH}"
           git switch --detach FETCH_HEAD
@@ -122,7 +132,7 @@ jobs:
 
       - name: Upload prepared changes
         if: steps.preflight.outputs.skip != 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-preparation
           path: ${{ runner.temp }}/release-preparation.patch
@@ -144,7 +154,7 @@ jobs:
           persist-credentials: false
 
       - name: Download prepared changes
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-preparation
           path: ${{ runner.temp }}/release-preparation
@@ -152,7 +162,7 @@ jobs:
       - name: Validate and commit prepared changes
         env:
           BASE_SHA: ${{ needs.generate.outputs.base_sha }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.generate.outputs.version }}
         run: |
           set -euo pipefail
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -198,7 +208,7 @@ jobs:
 
       - name: Create Vector bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
@@ -217,8 +227,8 @@ jobs:
       - name: Open preparation PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ inputs.version }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
+          VERSION: ${{ needs.generate.outputs.version }}
+          VRL_VERSION: ${{ needs.generate.outputs.vrl_version }}
           PREP_BRANCH: ${{ needs.generate.outputs.branch }}
         run: |
           url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master \

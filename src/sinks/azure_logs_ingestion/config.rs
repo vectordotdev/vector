@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
-
-use http::uri::PathAndQuery;
+use http_1::uri::PathAndQuery;
 
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
     config::ValidatedSink,
-    http::{HttpClient, get_http_scheme_from_uri},
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
         prelude::*,
@@ -111,17 +110,17 @@ impl Default for AzureLogsIngestionConfig {
     fn default() -> Self {
         Self {
             endpoint: HttpEndpoint::parse("http://localhost:8080").unwrap(),
-            dcr_immutable_id: Default::default(),
-            stream_name: Default::default(),
-            auth: Default::default(),
+            dcr_immutable_id: String::new(),
+            stream_name: String::new(),
+            auth: AzureAuthentication::default(),
             token_scope: default_scope(),
             timestamp_field: default_timestamp_field(),
-            encoding: Default::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            encoding: Transformer::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
-            retry_strategy: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
+            retry_strategy: RetryStrategy::default(),
         }
     }
 }
@@ -130,22 +129,21 @@ impl AzureLogsIngestionConfig {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn build_inner(
         &self,
-        cx: SinkContext,
+        cx: &SinkContext,
         validated: &ValidatedAzureLogsIngestion,
         endpoint: HttpEndpoint,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
         timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = endpoint.into_uri();
-        let protocol = get_http_scheme_from_uri(&endpoint).to_string();
+        let protocol = get_http_scheme_from_uri(&endpoint.clone().into_uri()).to_string();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let service = AzureLogsIngestionService::new(
             client,
-            endpoint,
+            endpoint.into_v1(),
             validated.path_and_query.clone(),
             credential,
             token_scope,
@@ -223,7 +221,7 @@ impl ValidatedSink for AzureLogsIngestionConfig {
         let credential: Arc<dyn TokenCredential> = self.auth.credential()?;
 
         self.build_inner(
-            cx,
+            &cx,
             validated,
             self.endpoint.clone(),
             credential,

@@ -135,7 +135,7 @@ impl FileConfig {
 
         Ok(match self.schema.get(column) {
             Some(format) => {
-                let mut split = format.splitn(2, '|').map(|segment| segment.trim());
+                let mut split = format.splitn(2, '|').map(str::trim);
 
                 match (split.next(), split.next()) {
                     (Some("date"), None) => Value::Timestamp(
@@ -178,6 +178,12 @@ impl FileConfig {
     }
 
     /// Load the configured file into memory. Required to create a new file enrichment table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be opened or read, a row is not valid CSV or has a
+    /// different number of fields than the others, a column's configured schema type is invalid
+    /// or a value cannot be converted to it, or the file's modification time cannot be read.
     pub fn load_file(&self, timezone: TimeZone) -> crate::Result<FileData> {
         let Encoding::Csv {
             include_headers,
@@ -194,7 +200,7 @@ impl FileConfig {
             reader
                 .headers()?
                 .iter()
-                .map(|col| col.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<_>>()
         } else {
             // If there are no headers in the datafile we make headers as the numerical index of
@@ -257,7 +263,7 @@ pub struct FileData {
     pub modified: SystemTime,
 }
 
-/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a CSV file.
+/// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
@@ -273,6 +279,7 @@ pub struct File {
 
 impl File {
     /// Creates a new [File] based on the provided config.
+    #[must_use]
     pub fn new(config: FileConfig, data: FileData) -> Self {
         Self {
             config,
@@ -357,12 +364,7 @@ impl File {
         self.headers
             .iter()
             .zip(row)
-            .filter(|(header, _)| {
-                select
-                    .map(|select| select.contains(header))
-                    // If no select is passed, we assume all columns are included
-                    .unwrap_or(true)
-            })
+            .filter(|(header, _)| select.is_none_or(|select| select.contains(header)))
             .map(|(header, col)| (header.as_str().into(), col.clone()))
             .collect()
     }
@@ -383,7 +385,9 @@ impl File {
             })
             .collect::<Vec<_>>();
 
-        if normalized.len() != index.len() {
+        if normalized.len() == index.len() {
+            Ok(normalized)
+        } else {
             let fields = index
                 .iter()
                 .filter_map(|col| {
@@ -395,8 +399,6 @@ impl File {
                 })
                 .collect();
             Err(Error::MissingDatasetFields { fields })
-        } else {
-            Ok(normalized)
         }
     }
 
@@ -465,7 +467,7 @@ impl File {
         // being passed in the condition.
         let mut hash = seahash::SeaHasher::default();
 
-        for header in self.headers.iter() {
+        for header in &self.headers {
             if let Some(Condition::Equals { value, .. }) = condition.iter().find(
                 |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
             ) {
@@ -492,7 +494,7 @@ impl File {
 
         // If lookup fails and a wildcard is provided, compute hash for the wildcard
         let mut wildcard_hash = seahash::SeaHasher::default();
-        for header in self.headers.iter() {
+        for header in &self.headers {
             if condition.iter().any(
                 |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
             ) {
@@ -624,21 +626,18 @@ impl Table for File {
 
     fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         let normalized = self.normalize_index_fields(fields)?;
-        match self
+        if let Some(pos) = self
             .indexes
             .iter()
             .position(|index| index.0 == case && index.1 == normalized)
         {
-            Some(pos) => {
-                // This index already exists
-                Ok(IndexHandle(pos))
-            }
-            None => {
-                let index = self.index_data(&normalized, case)?;
-                self.indexes.push((case, normalized, index));
-                // The returned index handle is the position of the index in our list of indexes.
-                Ok(IndexHandle(self.indexes.len() - 1))
-            }
+            // This index already exists
+            Ok(IndexHandle(pos))
+        } else {
+            let index = self.index_data(&normalized, case)?;
+            self.indexes.push((case, normalized, index));
+            // The returned index handle is the position of the index in our list of indexes.
+            Ok(IndexHandle(self.indexes.len() - 1))
         }
     }
 
@@ -685,6 +684,11 @@ mod tests {
     use super::*;
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn parse_file_with_headers() {
         let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
         let path = dir.path().join("table.csv");
@@ -714,6 +718,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn parse_file_no_headers() {
         let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
         let path = dir.path().join("table.csv");
@@ -743,6 +752,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+    )]
     fn parse_column() {
         let mut schema = HashMap::new();
         schema.insert("col1".to_string(), " string ".to_string());
@@ -753,7 +767,7 @@ mod tests {
         schema.insert("col4-spaces".to_string(), "timestamp | %+".to_string());
         schema.insert("col5".to_string(), "int".to_string());
         let config = FileConfig {
-            file: Default::default(),
+            file: FileSettings::default(),
             schema,
         };
 
@@ -849,7 +863,7 @@ mod tests {
     #[test]
     fn finds_row() {
         let file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -877,7 +891,7 @@ mod tests {
     #[test]
     fn finds_row_with_wildcard() {
         let file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -907,7 +921,7 @@ mod tests {
     #[test]
     fn duplicate_indexes() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: Vec::new(),
@@ -929,7 +943,7 @@ mod tests {
     #[test]
     fn errors_on_missing_columns() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: Vec::new(),
@@ -947,13 +961,13 @@ mod tests {
                 fields: vec!["apples".into(), "bananas".into()],
             }),
             error
-        )
+        );
     }
 
     #[test]
     fn finds_row_with_index() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -983,7 +997,7 @@ mod tests {
     #[test]
     fn finds_row_with_index_case_sensitive_and_wildcard() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1020,7 +1034,7 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1075,7 +1089,7 @@ mod tests {
     #[test]
     fn selects_columns() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1123,7 +1137,7 @@ mod tests {
     fn case_insensitive_lookup_accepts_strings_and_bytes() {
         for value in [Value::from("ZiP"), Value::Bytes("ZiP".into())] {
             let mut file = File::new(
-                Default::default(),
+                FileConfig::default(),
                 FileData {
                     modified: SystemTime::now(),
                     data: vec![vec![value]],
@@ -1164,7 +1178,7 @@ mod tests {
             Value::Null,
         ];
         let file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: values.iter().cloned().map(|value| vec![value]).collect(),
@@ -1192,7 +1206,7 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1256,7 +1270,7 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_insensitive_and_wildcard() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1320,7 +1334,7 @@ mod tests {
     #[test]
     fn finds_row_between_dates() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1387,7 +1401,7 @@ mod tests {
     #[test]
     fn finds_row_from_date() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1450,7 +1464,7 @@ mod tests {
     #[test]
     fn finds_row_to_date() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1513,7 +1527,7 @@ mod tests {
     #[test]
     fn doesnt_find_row() {
         let file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1538,7 +1552,7 @@ mod tests {
     #[test]
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![
@@ -1565,7 +1579,7 @@ mod tests {
     #[test]
     fn doesnt_find_row_with_index_and_wildcard() {
         let mut file = File::new(
-            Default::default(),
+            FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
                 data: vec![

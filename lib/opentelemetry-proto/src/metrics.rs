@@ -339,7 +339,7 @@ impl HistogramMetric {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: self.point.count,
-                sum: self.point.sum.unwrap_or(0.0),
+                sum: self.point.sum,
             },
         )
         .with_timestamp(timestamp)
@@ -412,7 +412,7 @@ impl ExpHistogramMetric {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: self.point.count,
-                sum: self.point.sum.unwrap_or(0.0),
+                sum: self.point.sum,
             },
         )
         .with_timestamp(timestamp)
@@ -687,7 +687,7 @@ impl OTLPDataConverter {
         self,
         mut buckets: Vec<Bucket>,
         count: u64,
-        sum: f64,
+        sum: Option<f64>,
     ) -> Result<Data, vector_common::Error> {
         if let Some(bucket) = buckets.iter().find(|bucket| bucket.upper_limit.is_nan()) {
             return Err(format!(
@@ -704,7 +704,12 @@ impl OTLPDataConverter {
             "histogram bucket upper_limit",
         )?;
 
-        let sum = reject_invalid_sum(count, sum, "histogram")?;
+        // A histogram that reported no sum has nothing to validate and nothing to encode: OTLP's
+        // `sum` is optional for exactly this case, so the absence carries straight through.
+        let sum = sum
+            .map(|sum| reject_invalid_sum(count, sum, "histogram"))
+            .transpose()?
+            .flatten();
 
         // A bucket with a negative upper bound and a nonzero count proves at least one
         // negative event was recorded, even if the aggregate sum is non-negative. OTLP
@@ -1072,7 +1077,7 @@ mod tests {
                     },
                 ],
                 count: 4,
-                sum: 10.0,
+                sum: Some(10.0),
             },
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
@@ -1105,7 +1110,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: 4,
-                sum: 10.0,
+                sum: Some(10.0),
             },
         );
 
@@ -1144,7 +1149,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: 4,
-                sum: 10.0,
+                sum: Some(10.0),
             },
         );
 
@@ -1181,7 +1186,7 @@ mod tests {
                     },
                 ],
                 count: 3,
-                sum: f64::NAN,
+                sum: Some(f64::NAN),
             },
         )
         .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
@@ -1350,7 +1355,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: 6,
-                sum: 10.0,
+                sum: Some(10.0),
             },
         );
 
@@ -1389,7 +1394,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: 6,
-                sum: 10.0,
+                sum: Some(10.0),
             },
         );
 

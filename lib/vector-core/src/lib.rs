@@ -10,7 +10,6 @@
 
 #![deny(warnings)]
 #![deny(clippy::all)]
-#![deny(clippy::pedantic)]
 #![deny(unreachable_pub)]
 #![deny(unused_allocation)]
 #![deny(unused_extern_crates)]
@@ -21,7 +20,6 @@
 #![allow(clippy::match_wildcard_for_single_variants)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)] // many false positives in this package
-#![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
 pub mod config;
@@ -63,6 +61,16 @@ pub(crate) use vector_common::{Error, Result};
 
 pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {
     (l_value.is_nan() && r_value.is_nan()) || l_value.eq_ulps(&r_value, &1)
+}
+
+/// Compares two optional floats, treating a reported value and an unreported one as different even
+/// when the reported value is zero.
+pub(crate) fn opt_float_eq(l_value: Option<f64>, r_value: Option<f64>) -> bool {
+    match (l_value, r_value) {
+        (Some(l_value), Some(r_value)) => float_eq(l_value, r_value),
+        (None, None) => true,
+        _ => false,
+    }
 }
 
 // These macros aren't actually usable in lib crates without some `vector_lib` shenanigans.

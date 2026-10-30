@@ -455,7 +455,7 @@ generated: configuration: {
 								type: bool: default: false
 								description: """
 																		If set to true, all data will be removed from cache after exporting.
-																		Only valid if used as a source and export_interval > 0
+																		Only valid if used as a source and `export_interval` is greater than 0.
 
 																		By default, export will not remove data from cache
 																		"""
@@ -495,7 +495,7 @@ generated: configuration: {
 						description: """
 														The locale to use when querying the database.
 
-														MaxMind includes localized versions of some of the fields within their database, such as
+														`MaxMind` includes localized versions of some of the fields within their database, such as
 														country name. This setting can control which of those localized versions are returned by the
 														transform.
 
@@ -807,7 +807,7 @@ generated: configuration: {
 						required: false
 					}
 					healthcheck: {
-						type:        _schemaDefinitions["derived::d1a2a37da28b48074a6aa38c"]
+						type:        _schemaDefinitions["derived::7ad58e4d9af48ec29d981195"]
 						description: "Healthcheck configuration."
 						required:    false
 					}
@@ -927,7 +927,7 @@ generated: configuration: {
 			group:       "pipeline_components"
 		}
 		acknowledgements: {
-			type: _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+			type: _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 			description: """
 				Controls how acknowledgements are handled for all sinks by default.
 

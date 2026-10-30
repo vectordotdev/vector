@@ -10,7 +10,7 @@ generated: components: sinks: datadog_traces: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -93,6 +93,16 @@ generated: components: sinks: datadog_traces: configuration: {
 			"""
 		required: false
 		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+	}
+	disable_apm_stats: {
+		description: """
+			Do not compute APM stats from the received traces.
+
+			Enable this when APM stats are forwarded separately, for example stats computed by the
+			Datadog Agent, to avoid counting them twice.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	endpoint: {
 		description: """

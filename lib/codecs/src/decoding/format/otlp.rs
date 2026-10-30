@@ -107,7 +107,7 @@ impl OtlpDeserializerConfig {
 /// However, these events can be forwarded directly to a downstream OTEL collector.
 ///
 /// This is the inverse of what the OTLP encoder does, ensuring round-trip compatibility
-/// with the `opentelemetry` source when `use_otlp_decoding` is enabled.
+/// with the `opentelemetry` source when `decoding.codec` is `otlp` for the corresponding signal.
 #[derive(Debug, Clone)]
 pub struct OtlpDeserializer {
     logs_deserializer: ProtobufDeserializer,
@@ -126,12 +126,12 @@ impl Default for OtlpDeserializer {
 impl OtlpDeserializer {
     /// Creates a new OTLP deserializer with custom signal support.
     /// During parsing, each signal type is tried in order until one succeeds.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the embedded OTLP descriptor set cannot be decoded or does not contain the logs,
+    /// metrics, or traces export request message types.
     #[must_use]
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_panics_doc,
-        reason = "The codec API panic documentation needs a separate audit."
-    )]
     pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> Self {
         let options = Options {
             use_json_names: true,
@@ -266,6 +266,7 @@ mod tests {
                         trace_id: vec![],
                         span_id: vec![],
                         observed_time_unix_nano: 0,
+                        event_name: String::new(),
                     }],
                     schema_url: String::new(),
                 }],

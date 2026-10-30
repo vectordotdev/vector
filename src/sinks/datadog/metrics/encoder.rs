@@ -15,10 +15,7 @@ use vector_common::constants::ZSTD_SMALL_INPUT_THRESHOLD;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{
-        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue,
-        metric::{MetricSketch, TagValue},
-    },
+    event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
     metrics::AgentDDSketch,
     request_metadata::GroupedCountByteSize,
 };
@@ -444,6 +441,7 @@ fn generate_proto_metadata(
             }
             ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
+                    metric_type: origin.metric_type().unwrap_or_default(),
                     origin_product: origin.product().unwrap_or_default(),
                     origin_category: origin.category().unwrap_or_default(),
                     origin_service: origin.service().unwrap_or_default(),
@@ -492,6 +490,11 @@ fn get_series_payload_series_field_number() -> u32 {
     })
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn sketch_to_proto_message(
     metric: &Metric,
     ddsketch: &AgentDDSketch,
@@ -505,14 +508,21 @@ fn sketch_to_proto_message(
 
     let name = get_namespaced_name(metric, default_namespace);
     let ts = encode_timestamp(metric.timestamp());
-    let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-        .unwrap_or_default();
-    let tags = encode_tags(&tags);
+    let metric_tags = metric.tags();
+    let host_key = log_schema.host_key().map(ToString::to_string);
+    let host = host_key
+        .as_deref()
+        .and_then(|key| metric_tags.and_then(|tags| tags.get(key)))
+        .unwrap_or_default()
+        .to_owned();
+    let tags = encode_tag_pairs(
+        metric_tags
+            .into_iter()
+            .flat_map(MetricTags::iter_all)
+            .filter(|(name, _)| host_key.as_deref() != Some(*name)),
+    );
 
-    let cnt = ddsketch.count() as i64;
+    let cnt = i64::from(ddsketch.count());
     let min = ddsketch
         .min()
         .expect("min should be present for non-empty sketch");
@@ -570,53 +580,70 @@ pub(super) struct SeriesTags {
 
 /// Splits a metric's tags into resources, `source_type_name`, and the remaining tags
 pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> SeriesTags {
-    let mut tags = metric.tags().cloned().unwrap_or_default();
-
+    let metric_tags = metric.tags();
+    let host_key = log_schema.host_key().map(ToString::to_string);
     let mut resources = vec![];
 
-    if let Some(host) = log_schema
-        .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-    {
-        resources.push(("host".to_string(), host));
+    if let Some(host_key) = host_key.as_deref() {
+        resources.push((
+            "host".to_owned(),
+            metric_tags
+                .and_then(|tags| tags.get(host_key))
+                .unwrap_or_default()
+                .to_owned(),
+        ));
     }
 
     // The Agent source preserves `device` as a plain tag for v1/v2 compatibility.
-    if let Some(device) = tags.remove("device") {
-        resources.push(("device".to_string(), device));
+    if host_key.as_deref() != Some("device")
+        && let Some(device) = metric_tags.and_then(|tags| tags.get("device"))
+    {
+        resources.push(("device".to_owned(), device.to_owned()));
     }
 
-    let resource_tags: Vec<_> = tags
-        .keys()
-        .filter_map(|tag| {
-            tag.strip_prefix(DATADOG_METRIC_RESOURCE_TAG_PREFIX)
-                .filter(|resource_type| !resource_type.is_empty())
-                .map(|resource_type| (tag.to_string(), resource_type.to_string()))
-        })
-        .collect();
+    let source_type_name = if host_key.as_deref() == Some("source_type_name") {
+        String::new()
+    } else {
+        metric_tags
+            .and_then(|tags| tags.get("source_type_name"))
+            .unwrap_or_default()
+            .to_owned()
+    };
 
-    for (tag, resource_type) in resource_tags {
-        if let Some(values) = tags.remove_set(&tag) {
-            for value in values {
-                match value {
-                    TagValue::Value(name) if !name.is_empty() => {
-                        resources.push((resource_type.clone(), name));
-                    }
-                    value => tags.insert(tag.clone(), value),
-                }
-            }
+    let mut tags = vec![];
+    for (tag, value) in metric_tags.into_iter().flat_map(MetricTags::iter_all) {
+        if host_key.as_deref() == Some(tag) || matches!(tag, "device" | "source_type_name") {
+            continue;
+        }
+
+        if let Some(resource_type) = tag
+            .strip_prefix(DATADOG_METRIC_RESOURCE_TAG_PREFIX)
+            .filter(|resource_type| !resource_type.is_empty())
+            && let Some(name) = value.filter(|name| !name.is_empty())
+        {
+            resources.push((resource_type.to_owned(), name.to_owned()));
+        } else {
+            tags.push(encode_tag(tag, value));
         }
     }
-
-    let source_type_name = tags.remove("source_type_name").unwrap_or_default();
+    tags.sort();
 
     SeriesTags {
-        tags: encode_tags(&tags),
+        tags,
         resources,
         source_type_name,
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+)]
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn series_to_proto_message(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
@@ -655,7 +682,7 @@ fn series_to_proto_message(
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                let value = *value / (interval as f64);
+                let value = *value / f64::from(interval);
                 (
                     vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }],
                     ddmetric_proto::metric_payload::MetricType::Rate,
@@ -700,15 +727,22 @@ fn series_to_proto_message(
         tags,
         points,
         r#type: metric_type.into(),
-        // unit is omitted
-        unit: "".to_string(),
+        unit: event_metadata
+            .datadog_metric_unit()
+            .unwrap_or_default()
+            .to_string(),
         source_type_name,
-        interval: maybe_interval.unwrap_or(0) as i64,
+        interval: i64::from(maybe_interval.unwrap_or(0)),
         metadata,
     })
 }
 
 // Manually write the field tag and then encode the Message payload directly as a length-delimited message.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep ownership and drop timing unchanged during the lint rollout."
+)]
 fn encode_proto_key_and_message<T, B>(msg: T, tag: u32, buf: &mut B) -> Result<(), EncoderError>
 where
     T: prost::Message,
@@ -720,26 +754,32 @@ where
         .map_err(|_| EncoderError::ProtoEncodingFailed)
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+)]
 fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
     encode_namespace(
         metric
             .namespace()
-            .or_else(|| default_namespace.as_ref().map(|s| s.as_ref())),
+            .or_else(|| default_namespace.as_ref().map(std::convert::AsRef::as_ref)),
         '.',
         metric.name(),
     )
 }
 
-fn encode_tags(tags: &MetricTags) -> Vec<String> {
-    let mut pairs: Vec<_> = tags
-        .iter_all()
-        .map(|(name, value)| match value {
-            Some(value) => format!("{name}:{value}"),
-            None => name.into(),
-        })
-        .collect();
+fn encode_tag_pairs<'a>(pairs: impl Iterator<Item = (&'a str, Option<&'a str>)>) -> Vec<String> {
+    let mut pairs: Vec<_> = pairs.map(|(name, value)| encode_tag(name, value)).collect();
     pairs.sort();
     pairs
+}
+
+fn encode_tag(name: &str, value: Option<&str>) -> String {
+    match value {
+        Some(value) => format!("{name}:{value}"),
+        None => name.into(),
+    }
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
@@ -811,11 +851,14 @@ pub(super) fn generate_origin_metadata(
     //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
     //        the new metric.
     if let Some(pass_through) = maybe_pass_through {
-        Some(DatadogMetricOriginMetadata::new(
-            pass_through.product().or(Some(origin_product_value)),
-            pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
-            pass_through.service().or(Some(no_value)),
-        ))
+        Some(
+            DatadogMetricOriginMetadata::new(
+                pass_through.product().or(Some(origin_product_value)),
+                pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
+                pass_through.service().or(Some(no_value)),
+            )
+            .with_metric_type(pass_through.metric_type()),
+        )
 
     // No metadata has been set upstream
     } else {
@@ -874,7 +917,7 @@ mod tests {
 
     use super::{
         DatadogMetricsEncoder, EncoderError, ddmetric_proto, encode_proto_key_and_message,
-        encode_tags, encode_timestamp, get_sketch_payload_sketches_field_number,
+        encode_tag_pairs, encode_timestamp, get_sketch_payload_sketches_field_number,
         max_compressed_size, series_to_proto_message, sketch_to_proto_message,
     };
     use crate::sinks::{
@@ -926,10 +969,15 @@ mod tests {
 
     /// Compresses `n` bytes of high-entropy (worst-case for compression) data and returns the
     /// total output size after `finish()`.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+    )]
     fn total_compressed_len(n: usize) -> usize {
         // Xorshift64 — period 2^64-1, passes BigCrush, produces statistically random bytes
         // that zstd cannot compress significantly.
-        let mut state = 0xdeadbeef_cafebabe_u64;
+        let mut state = 0xdead_beef_cafe_babe_u64;
         let data: Vec<u8> = (0..n)
             .map(|_| {
                 state ^= state << 13;
@@ -996,6 +1044,11 @@ mod tests {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ref_option,
+        reason = "Preserve the current parameter type and caller contracts during the lint rollout."
+    )]
     fn encode_sketches_normal<B>(
         metrics: &[Metric],
         default_namespace: &Option<Arc<str>>,
@@ -1026,13 +1079,14 @@ mod tests {
         };
 
         // Now try encoding this sketch payload, and then try to compress it.
-        sketch_payload.encode(buf).unwrap()
+        sketch_payload.encode(buf).unwrap();
     }
 
     #[test]
-    fn test_encode_tags() {
+    fn test_encode_tag_pairs() {
+        let tags = tags();
         assert_eq!(
-            encode_tags(&tags()),
+            encode_tag_pairs(tags.iter_all()),
             vec![
                 "empty_tag",
                 "multi_value:one",
@@ -1044,9 +1098,34 @@ mod tests {
     }
 
     #[test]
+    fn sketch_tags_exclude_host_and_preserve_all_other_values() {
+        let metric = get_simple_sketch().with_tags(Some(metric_tags! {
+            "host" => "example.com",
+            "bare" => TagValue::Bare,
+            "multi" => "one",
+            "multi" => "two",
+            "normal" => "value",
+        }));
+        let MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(ddsketch),
+        } = metric.value()
+        else {
+            panic!("must be an AgentDDSketch")
+        };
+
+        let sketch = sketch_to_proto_message(&metric, ddsketch, &None, log_schema(), 14).unwrap();
+
+        assert_eq!(sketch.host, "example.com");
+        assert_eq!(
+            sketch.tags,
+            vec!["bare", "multi:one", "multi:two", "normal:value"]
+        );
+    }
+
+    #[test]
     fn test_encode_timestamp() {
         assert_eq!(encode_timestamp(None), Utc::now().timestamp());
-        assert_eq!(encode_timestamp(Some(ts())), 1542182950);
+        assert_eq!(encode_timestamp(Some(ts())), 1_542_182_950);
     }
 
     #[test]
@@ -1178,6 +1257,11 @@ mod tests {
         ));
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "The encoder must preserve this deterministic rate value exactly."
+    )]
     #[test]
     fn encode_counter_with_interval_as_rate() {
         // When a counter explicitly has an interval, we need to encode it as a rate. This means
@@ -1188,7 +1272,7 @@ mod tests {
         let value = 423.1331;
         let interval_ms = 10000;
         let rate_counter = get_simple_rate_counter(value, interval_ms);
-        let expected_value = value / (interval_ms / 1000) as f64;
+        let expected_value = value / f64::from(interval_ms / 1000);
         let expected_interval = interval_ms / 1000;
 
         // series v2
@@ -1201,12 +1285,17 @@ mod tests {
             )
             .unwrap();
             assert_eq!(series_proto.r#type, 2);
-            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.interval, i64::from(expected_interval));
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[expect(
+        clippy::float_cmp,
+        reason = "The encoder must preserve this gauge value exactly."
+    )]
     #[test]
     fn encode_non_rate_metric_with_interval() {
         // It is possible that the Agent sends Gauges with an interval set. This
@@ -1237,7 +1326,7 @@ mod tests {
             )
             .unwrap();
             assert_eq!(series_proto.r#type, 3);
-            assert_eq!(series_proto.interval, expected_interval as i64);
+            assert_eq!(series_proto.interval, i64::from(expected_interval));
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
         }
@@ -1249,9 +1338,12 @@ mod tests {
         let category = 11;
         let service = 9;
 
-        let event_metadata = EventMetadata::default().with_origin_metadata(
-            DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service)),
-        );
+        let event_metadata = EventMetadata::default()
+            .with_origin_metadata(
+                DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service))
+                    .with_metric_type(Some(9)),
+            )
+            .with_datadog_metric_unit("byte".to_string());
         let counter = get_simple_counter_with_metadata(event_metadata);
 
         // series v2
@@ -1265,9 +1357,11 @@ mod tests {
             .unwrap();
 
             let generated_origin = series_proto.metadata.unwrap().origin.unwrap();
+            assert_eq!(generated_origin.metric_type, 9);
             assert_eq!(generated_origin.origin_product, product);
             assert_eq!(generated_origin.origin_category, category);
             assert_eq!(generated_origin.origin_service, service);
+            assert_eq!(series_proto.unit, "byte");
         }
     }
 
@@ -1615,6 +1709,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn zstd_v2_payload_never_exceeds_512kb_with_incompressible_data() {
         // End-to-end regression test using the real 512 KB compressed limit.
         //
@@ -1640,7 +1739,7 @@ mod tests {
         const PRINTABLE_START: u8 = 0x21;
         const PRINTABLE_END: u8 = 0x7E;
         const PRINTABLE_LEN: u64 = (PRINTABLE_END - PRINTABLE_START + 1) as u64; // 93
-        let mut xor_state = 0xdeadbeef_cafebabe_u64;
+        let mut xor_state = 0xdead_beef_cafe_babe_u64;
         let mut next_name = || -> String {
             std::iter::once('m')
                 .chain((0..4999).map(|_| {
@@ -1733,7 +1832,7 @@ mod tests {
                 format!("counter_{i:0>20}"),
                 MetricKind::Incremental,
                 MetricValue::Counter {
-                    value: (i + 1) as f64,
+                    value: f64::from(i + 1),
                 },
             )
             .with_timestamp(Some(ts()));
@@ -1764,6 +1863,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve the existing numeric conversion and precision until its bounds are audited."
+    )]
     fn zstd_buffered_bound_resets_to_last_metric_size_after_block_flush() {
         // White-box test: directly verifies that buffered_bound resets to exactly n (the last
         // metric's encoded size) when a zstd block flush occurs, not to 0 or some other value.
@@ -1894,7 +1998,7 @@ mod tests {
 
                 // V2 uses zstd.
                 let result = CappedDecoder::zstd(&payload[..])
-                    .and_then(|decoder| decoder.decompress())
+                    .and_then(vector_common::decompression::CappedDecoder::decompress)
                     .map(Bytes::from);
                 prop_assert!(result.is_ok());
 

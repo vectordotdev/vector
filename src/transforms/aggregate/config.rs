@@ -71,7 +71,11 @@ pub struct EventTimeConfig {
     ///
     /// Set to 0 to allow events at any future time.
     #[serde(default = "default_max_future_ms")]
-    #[configurable(metadata(docs::examples = 0, docs::examples = 60000, docs::examples = 300000))]
+    #[configurable(metadata(
+        docs::examples = 0,
+        docs::examples = 60000,
+        docs::examples = 300_000
+    ))]
     pub max_future_ms: u64,
 }
 
@@ -156,6 +160,7 @@ impl Default for AggregateConfig {
 
 impl AggregateConfig {
     /// Returns `true` when event-time aggregation is enabled.
+    #[must_use]
     pub const fn is_event_time(&self) -> bool {
         self.event_time.is_some()
     }
