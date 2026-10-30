@@ -12,37 +12,19 @@ use super::active_projects::find_active_environment_for_integration;
 
 /// RAII guard that triggers test environment cleanup.
 ///
-/// Cleanup is skipped if disabled via `AUTODESPAWN` or `AUTOSPAWN` environment
-/// variables, or if the environment was already running prior to the test execution
+/// Cleanup is skipped if the environment was already running prior to the test execution
 /// (preserving caller-owned environments and fast repeated runs).
 struct DespawnGuard<'a> {
     local_config: ComposeTestLocalConfig,
-    test_name: &'a str,
+    integration: &'a str,
     should_despawn: bool,
 }
 
-impl<'a> DespawnGuard<'a> {
-    pub fn new(
-        local_config: ComposeTestLocalConfig,
-        test_name: &'a str,
-        was_running: bool,
-    ) -> Self {
-        let auto_despawn = std::env::var("AUTODESPAWN")
-            .or_else(|_| std::env::var("AUTOSPAWN"))
-            .map_or(true, |v| v.eq_ignore_ascii_case("true"));
-
-        let should_despawn = auto_despawn && !was_running;
-        Self {
-            local_config,
-            test_name,
-            should_despawn,
-        }
-    }
-
+impl DespawnGuard<'_> {
     pub fn disarm_and_stop(mut self) -> Result<()> {
         if self.should_despawn {
             self.should_despawn = false;
-            super::stop::exec(self.local_config, self.test_name)?;
+            super::stop::exec(self.local_config, self.integration)?;
         }
         Ok(())
     }
@@ -51,7 +33,7 @@ impl<'a> DespawnGuard<'a> {
 impl Drop for DespawnGuard<'_> {
     fn drop(&mut self) {
         if self.should_despawn
-            && let Err(e) = super::stop::exec(self.local_config, self.test_name)
+            && let Err(e) = super::stop::exec(self.local_config, self.integration)
         {
             warn!("Failed to stop environment (cleanup): {e}");
         }
@@ -89,7 +71,11 @@ pub fn exec(
     let mut ran_environments = Vec::new();
     let is_running = active.is_some();
     for environment in environments {
-        let despawn_guard = DespawnGuard::new(local_config, integration, is_running);
+        let despawn_guard = DespawnGuard {
+            local_config,
+            integration,
+            should_despawn: !is_running,
+        };
 
         run_environment(
             local_config,
