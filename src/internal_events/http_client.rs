@@ -1,12 +1,10 @@
 use std::time::Duration;
 
-use http::{Request as RequestV1, Response as ResponseV1};
-use http_0::{
+use http::{
     HeaderMap, Request, Response, Version,
     header::{self, HeaderName, HeaderValue},
 };
-use http_body::Body as HttpBodyV1;
-use hyper::body::HttpBody;
+use http_body::Body;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
     internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
@@ -75,9 +73,9 @@ pub trait HttpResponseTelemetry {
     }
 }
 
-// ── Implementations for the hyper HTTP types (full data) ──────────────────────
+// ── Implementations for the legacy http 0.2 / hyper 0.14 types (full data) ────
 
-impl<T: HttpBody> HttpRequestTelemetry for Request<T> {
+impl<T: hyper::body::HttpBody> HttpRequestTelemetry for http_0::Request<T> {
     fn method(&self) -> &str {
         self.method().as_str()
     }
@@ -87,7 +85,7 @@ impl<T: HttpBody> HttpRequestTelemetry for Request<T> {
     }
 
     fn headers(&self) -> HeaderMap<HeaderValue> {
-        self.headers().clone()
+        convert_legacy_headers(self.headers())
     }
 
     fn body_size_hint(&self) -> (u64, Option<u64>) {
@@ -96,17 +94,17 @@ impl<T: HttpBody> HttpRequestTelemetry for Request<T> {
     }
 
     fn version(&self) -> Option<Version> {
-        Some(self.version())
+        convert_legacy_version(self.version())
     }
 }
 
-impl<T: HttpBody> HttpResponseTelemetry for Response<T> {
+impl<T: hyper::body::HttpBody> HttpResponseTelemetry for http_0::Response<T> {
     fn status_u16(&self) -> u16 {
         self.status().as_u16()
     }
 
     fn headers(&self) -> HeaderMap<HeaderValue> {
-        self.headers().clone()
+        convert_legacy_headers(self.headers())
     }
 
     fn body_size_hint(&self) -> (u64, Option<u64>) {
@@ -115,7 +113,7 @@ impl<T: HttpBody> HttpResponseTelemetry for Response<T> {
     }
 
     fn version(&self) -> Option<Version> {
-        Some(self.version())
+        convert_legacy_version(self.version())
     }
 }
 
@@ -192,17 +190,17 @@ impl InternalEvent for GotHttpWarning<'_> {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Adapts Hyper 1 request metadata to the shared HTTP telemetry contract.
-pub(crate) struct HttpRequestV1Telemetry<'a, T: HttpBodyV1> {
-    request: &'a RequestV1<T>,
+pub(crate) struct HttpRequestV1Telemetry<'a, T: Body> {
+    request: &'a Request<T>,
 }
 
-impl<'a, T: HttpBodyV1> HttpRequestV1Telemetry<'a, T> {
-    pub(crate) const fn new(request: &'a RequestV1<T>) -> Self {
+impl<'a, T: Body> HttpRequestV1Telemetry<'a, T> {
+    pub(crate) const fn new(request: &'a Request<T>) -> Self {
         Self { request }
     }
 }
 
-impl<T: HttpBodyV1> HttpRequestTelemetry for HttpRequestV1Telemetry<'_, T> {
+impl<T: Body> HttpRequestTelemetry for HttpRequestV1Telemetry<'_, T> {
     fn method(&self) -> &str {
         self.request.method().as_str()
     }
@@ -212,7 +210,7 @@ impl<T: HttpBodyV1> HttpRequestTelemetry for HttpRequestV1Telemetry<'_, T> {
     }
 
     fn headers(&self) -> HeaderMap<HeaderValue> {
-        convert_headers(self.request.headers())
+        self.request.headers().clone()
     }
 
     fn body_size_hint(&self) -> (u64, Option<u64>) {
@@ -221,28 +219,28 @@ impl<T: HttpBodyV1> HttpRequestTelemetry for HttpRequestV1Telemetry<'_, T> {
     }
 
     fn version(&self) -> Option<Version> {
-        convert_version(self.request.version())
+        Some(self.request.version())
     }
 }
 
 /// Adapts Hyper 1 response metadata to the shared HTTP telemetry contract.
-pub(crate) struct HttpResponseV1Telemetry<'a, T: HttpBodyV1> {
-    response: &'a ResponseV1<T>,
+pub(crate) struct HttpResponseV1Telemetry<'a, T: Body> {
+    response: &'a Response<T>,
 }
 
-impl<'a, T: HttpBodyV1> HttpResponseV1Telemetry<'a, T> {
-    pub(crate) const fn new(response: &'a ResponseV1<T>) -> Self {
+impl<'a, T: Body> HttpResponseV1Telemetry<'a, T> {
+    pub(crate) const fn new(response: &'a Response<T>) -> Self {
         Self { response }
     }
 }
 
-impl<T: HttpBodyV1> HttpResponseTelemetry for HttpResponseV1Telemetry<'_, T> {
+impl<T: Body> HttpResponseTelemetry for HttpResponseV1Telemetry<'_, T> {
     fn status_u16(&self) -> u16 {
         self.response.status().as_u16()
     }
 
     fn headers(&self) -> HeaderMap<HeaderValue> {
-        convert_headers(self.response.headers())
+        self.response.headers().clone()
     }
 
     fn body_size_hint(&self) -> (u64, Option<u64>) {
@@ -251,30 +249,32 @@ impl<T: HttpBodyV1> HttpResponseTelemetry for HttpResponseV1Telemetry<'_, T> {
     }
 
     fn version(&self) -> Option<Version> {
-        convert_version(self.response.version())
+        Some(self.response.version())
     }
 }
 
-fn convert_headers(headers: &http::HeaderMap) -> HeaderMap<HeaderValue> {
-    headers
-        .iter()
-        .fold(HeaderMap::new(), |mut converted, (name, value)| {
+/// Converts legacy http 0.2 headers to http 1 headers, keeping repeated headers.
+fn convert_legacy_headers(headers: &http_0::HeaderMap) -> HeaderMap<HeaderValue> {
+    headers.iter().fold(
+        HeaderMap::with_capacity(headers.len()),
+        |mut converted, (name, value)| {
             let name = HeaderName::from_bytes(name.as_str().as_bytes())
-                .expect("HTTP/1 header names are valid HTTP header names");
+                .expect("http 0.2 header names are valid http 1 header names");
             let value = HeaderValue::from_bytes(value.as_bytes())
-                .expect("HTTP/1 header values are valid HTTP header values");
+                .expect("http 0.2 header values are valid http 1 header values");
             converted.append(name, value);
             converted
-        })
+        },
+    )
 }
 
-const fn convert_version(version: http::Version) -> Option<Version> {
+const fn convert_legacy_version(version: http_0::Version) -> Option<Version> {
     match version {
-        http::Version::HTTP_09 => Some(Version::HTTP_09),
-        http::Version::HTTP_10 => Some(Version::HTTP_10),
-        http::Version::HTTP_11 => Some(Version::HTTP_11),
-        http::Version::HTTP_2 => Some(Version::HTTP_2),
-        http::Version::HTTP_3 => Some(Version::HTTP_3),
+        http_0::Version::HTTP_09 => Some(Version::HTTP_09),
+        http_0::Version::HTTP_10 => Some(Version::HTTP_10),
+        http_0::Version::HTTP_11 => Some(Version::HTTP_11),
+        http_0::Version::HTTP_2 => Some(Version::HTTP_2),
+        http_0::Version::HTTP_3 => Some(Version::HTTP_3),
         _ => None,
     }
 }
@@ -330,9 +330,12 @@ impl std::fmt::Display for FormatBodySizeHint {
 
 #[cfg(test)]
 mod tests {
-    use http_0::header::{self, HeaderMap, HeaderName, HeaderValue};
+    use http::{
+        Version,
+        header::{self, HeaderMap, HeaderName, HeaderValue},
+    };
 
-    use super::remove_sensitive;
+    use super::{HttpRequestTelemetry, HttpResponseTelemetry, remove_sensitive};
 
     fn is_sensitive(map: &HeaderMap, name: &HeaderName) -> Vec<bool> {
         map.get_all(name)
@@ -409,6 +412,48 @@ mod tests {
             is_sensitive(&result, &header::CONTENT_TYPE)
                 .iter()
                 .all(|&s| !s)
+        );
+    }
+
+    #[test]
+    fn legacy_request_converts_headers_and_version() {
+        let request = http_0::Request::builder()
+            .version(http_0::Version::HTTP_11)
+            .header("x-api-key", "key-one")
+            .header("x-api-key", "key-two")
+            .header(http_0::header::CONTENT_TYPE, "application/json")
+            .body(hyper::Body::empty())
+            .unwrap();
+
+        let headers = HttpRequestTelemetry::sanitized_headers(&request);
+        let x_api_key = HeaderName::from_static("x-api-key");
+        let values: Vec<_> = headers.get_all(&x_api_key).iter().collect();
+        assert_eq!(values, ["key-one", "key-two"]);
+        assert_eq!(is_sensitive(&headers, &x_api_key), [true, true]);
+        assert_eq!(headers[header::CONTENT_TYPE], "application/json");
+        assert_eq!(is_sensitive(&headers, &header::CONTENT_TYPE), [false]);
+        assert_eq!(
+            HttpRequestTelemetry::version(&request),
+            Some(Version::HTTP_11)
+        );
+    }
+
+    #[test]
+    fn legacy_response_converts_headers_and_version() {
+        let response = http_0::Response::builder()
+            .version(http_0::Version::HTTP_2)
+            .header(http_0::header::SET_COOKIE, "a=1")
+            .header(http_0::header::SET_COOKIE, "b=2")
+            .body(hyper::Body::empty())
+            .unwrap();
+
+        let headers = HttpResponseTelemetry::sanitized_headers(&response);
+        let values: Vec<_> = headers.get_all(header::SET_COOKIE).iter().collect();
+        assert_eq!(values, ["a=1", "b=2"]);
+        assert_eq!(is_sensitive(&headers, &header::SET_COOKIE), [true, true]);
+        assert_eq!(
+            HttpResponseTelemetry::version(&response),
+            Some(Version::HTTP_2)
         );
     }
 }

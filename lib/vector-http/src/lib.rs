@@ -108,6 +108,7 @@ type PooledClient = Client<HttpProxyConnector, RequestBody>;
 pub struct ConnectionOptions {
     max_connection_age: Option<Duration>,
     max_connection_age_jitter_factor: f64,
+    connect_timeout: Option<Duration>,
 }
 
 impl ConnectionOptions {
@@ -126,6 +127,17 @@ impl ConnectionOptions {
     #[must_use]
     pub const fn max_connection_age_jitter_factor(mut self, jitter_factor: f64) -> Self {
         self.max_connection_age_jitter_factor = jitter_factor;
+        self
+    }
+
+    /// Limits connection setup, that is the TCP connect, the TLS handshake and a proxy
+    /// `CONNECT` tunnel, to this duration. A connection that is not ready in time fails with an
+    /// [`std::io::Error`] of kind [`std::io::ErrorKind::TimedOut`] in the error's source chain.
+    ///
+    /// `None`, the default, disables the limit.
+    #[must_use]
+    pub const fn connect_timeout(mut self, connect_timeout: Option<Duration>) -> Self {
+        self.connect_timeout = connect_timeout;
         self
     }
 }

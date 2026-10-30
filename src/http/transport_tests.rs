@@ -27,6 +27,8 @@ use tokio::{
 use vector_http::{ConnectionOptions, RequestBody, empty_body};
 
 use super::{HttpClient as LegacyHttpClient, client_v1::HttpClient};
+#[cfg(feature = "aws-core")]
+use crate::aws::http_client::{SdkHttpClient, test_runtime_components};
 use crate::{
     config::ProxyConfig,
     tls::{
@@ -35,6 +37,13 @@ use crate::{
         TlsEnableableConfig, TlsSettings,
     },
 };
+#[cfg(feature = "aws-core")]
+use aws_smithy_runtime_api::client::{
+    http::{HttpClient as _, HttpConnector as _, HttpConnectorSettings},
+    orchestrator::HttpRequest,
+};
+#[cfg(feature = "aws-core")]
+use aws_smithy_types::body::SdkBody;
 
 mod http2;
 
@@ -110,6 +119,8 @@ trait TestClient: Send + Sync {
 enum ClientVersion {
     Legacy,
     V1,
+    #[cfg(feature = "aws-core")]
+    Aws,
 }
 
 impl ClientVersion {
@@ -125,6 +136,10 @@ impl ClientVersion {
             Self::V1 => Ok(Box::new(
                 HttpClient::new(tls, proxy).map_err(|error| error.to_string())?,
             )),
+            #[cfg(feature = "aws-core")]
+            Self::Aws => Ok(Box::new(AwsHttpClient(
+                SdkHttpClient::new(tls, proxy).map_err(|error| error.to_string())?,
+            ))),
         }
     }
 }
@@ -184,6 +199,49 @@ impl TestClient for HttpClient {
     }
 }
 
+/// Sends requests through the AWS SDK HTTP transport, as an SDK client does.
+#[cfg(feature = "aws-core")]
+struct AwsHttpClient(SdkHttpClient);
+
+#[cfg(feature = "aws-core")]
+#[async_trait]
+impl TestClient for AwsHttpClient {
+    async fn get(&self, uri: &str) -> Result<TestResponse, String> {
+        self.get_with_headers(uri, &[]).await
+    }
+
+    async fn get_with_headers(
+        &self,
+        uri: &str,
+        headers: &[(&str, &str)],
+    ) -> Result<TestResponse, String> {
+        let request = get_request(uri, headers, SdkBody::empty())?;
+        let request = HttpRequest::try_from(request).map_err(|error| error.to_string())?;
+        let connector = self.0.http_connector(
+            &HttpConnectorSettings::default(),
+            &test_runtime_components(),
+        );
+        let response = timeout(REQUEST_TIMEOUT, connector.call(request))
+            .await
+            .map_err(|_| "request timed out".to_owned())?
+            .map_err(|error| error.to_string())?;
+        let status = response.status().as_u16();
+        // `SdkBody` may also implement `http_body` 0.4, whose `Body::collect` is in scope too.
+        let body = timeout(
+            REQUEST_TIMEOUT,
+            http_body_util::BodyExt::collect(response.into_body()),
+        )
+        .await
+        .map_err(|_| "response body timed out".to_owned())?
+        .map_err(|error| error.to_string())?
+        .to_bytes();
+        Ok(TestResponse {
+            status,
+            body: body.to_vec(),
+        })
+    }
+}
+
 /// Sends a `GET` request with `headers` through a native HTTP 1 client and collects the response.
 async fn native_get<F, E>(
     uri: &str,
@@ -194,17 +252,7 @@ where
     F: Future<Output = Result<Response<Incoming>, E>>,
     E: Display,
 {
-    let mut request = Request::get(uri)
-        .body(empty_body())
-        .map_err(|error| error.to_string())?;
-    for &(name, value) in headers {
-        request.headers_mut().insert(
-            header::HeaderName::from_bytes(name.as_bytes()).map_err(|error| error.to_string())?,
-            value
-                .parse()
-                .map_err(|error: header::InvalidHeaderValue| error.to_string())?,
-        );
-    }
+    let request = get_request(uri, headers, empty_body())?;
     let response = timeout(REQUEST_TIMEOUT, send(request))
         .await
         .map_err(|_| "request timed out".to_owned())?
@@ -219,6 +267,22 @@ where
         status,
         body: body.to_vec(),
     })
+}
+
+/// Builds a `GET` request for `uri` with `headers` and `body`.
+fn get_request<B>(uri: &str, headers: &[(&str, &str)], body: B) -> Result<Request<B>, String> {
+    let mut request = Request::get(uri)
+        .body(body)
+        .map_err(|error| error.to_string())?;
+    for &(name, value) in headers {
+        request.headers_mut().insert(
+            header::HeaderName::from_bytes(name.as_bytes()).map_err(|error| error.to_string())?,
+            value
+                .parse()
+                .map_err(|error: header::InvalidHeaderValue| error.to_string())?,
+        );
+    }
+    Ok(request)
 }
 
 fn no_tls() -> MaybeTlsSettings {
@@ -482,6 +546,7 @@ fn assert_success(response: TestResponse) {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn direct_http(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
@@ -496,6 +561,7 @@ async fn direct_http(#[case] client_version: ClientVersion) {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn direct_https_with_trusted_ca(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
@@ -509,6 +575,7 @@ async fn direct_https_with_trusted_ca(#[case] client_version: ClientVersion) {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn direct_https_rejects_untrusted_ca(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
@@ -531,6 +598,7 @@ async fn direct_https_rejects_untrusted_ca(#[case] client_version: ClientVersion
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn direct_https_honors_server_name(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
@@ -558,6 +626,7 @@ async fn direct_https_honors_server_name(#[case] client_version: ClientVersion) 
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn direct_https_supports_mtls(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(true)).await;
@@ -711,6 +780,7 @@ async fn v1_max_connection_age_fails_truncated_close_delimited_body() {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn http_via_authenticated_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
@@ -747,6 +817,7 @@ async fn http_via_authenticated_proxy(#[case] client_version: ClientVersion) {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn http_proxy_credentials_do_not_reach_origin(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
@@ -774,6 +845,7 @@ async fn http_proxy_credentials_do_not_reach_origin(#[case] client_version: Clie
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn https_via_authenticated_connect_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
@@ -848,6 +920,7 @@ async fn v1_tls_proxy_uses_http1_alpn() {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn no_proxy_bypasses_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
@@ -863,6 +936,7 @@ async fn no_proxy_bypasses_proxy(#[case] client_version: ClientVersion) {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn disabled_proxy_is_bypassed(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
@@ -878,6 +952,7 @@ async fn disabled_proxy_is_bypassed(#[case] client_version: ClientVersion) {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn http_via_tls_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(no_tls()).await;
@@ -893,6 +968,7 @@ async fn http_via_tls_proxy(#[case] client_version: ClientVersion) {
 #[rstest]
 #[case::legacy(ClientVersion::Legacy)]
 #[case::v1(ClientVersion::V1)]
+#[cfg_attr(feature = "aws-core", case::aws(ClientVersion::Aws))]
 #[tokio::test]
 async fn https_via_tls_connect_proxy(#[case] client_version: ClientVersion) {
     let origin = spawn_origin(server_tls(false)).await;
