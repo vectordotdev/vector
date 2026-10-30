@@ -123,12 +123,12 @@ impl BigqueryResponse {
             );
         }
         match &self.body.response {
-            Some(proto::append_rows_response::Response::Error(status)) => {
-                match super::proto::google::rpc::Code::try_from(status.code) {
-                    Ok(code) => format!("{}: {}", code.as_str_name(), status.message),
-                    Err(_) => format!("code {}: {}", status.code, status.message),
-                }
-            }
+            Some(proto::append_rows_response::Response::Error(status)) => format!(
+                "{:?} (code {}): {}",
+                tonic::Code::from_i32(status.code),
+                status.code,
+                status.message
+            ),
             Some(proto::append_rows_response::Response::AppendResult(_)) | None => {
                 "no error details in response".to_owned()
             }
@@ -148,20 +148,19 @@ impl DriverResponse for BigqueryResponse {
         match &self.body.response {
             Some(proto::append_rows_response::Response::AppendResult(_)) => EventStatus::Delivered,
             Some(proto::append_rows_response::Response::Error(status)) => {
-                match super::proto::google::rpc::Code::try_from(status.code) {
+                // `google.rpc.Code` values are the gRPC status codes.
+                match tonic::Code::from_i32(status.code) {
                     // We really shouldn't be able to get here, but just in case
-                    Ok(super::proto::google::rpc::Code::Ok) => EventStatus::Delivered,
+                    tonic::Code::Ok => EventStatus::Delivered,
                     // Permanent errors - retrying won't help
-                    Ok(
-                        super::proto::google::rpc::Code::InvalidArgument
-                        | super::proto::google::rpc::Code::NotFound
-                        | super::proto::google::rpc::Code::AlreadyExists
-                        // PermissionDenied requires human action (IAM changes) to resolve, so fail fast.
-                        | super::proto::google::rpc::Code::PermissionDenied
-                        | super::proto::google::rpc::Code::FailedPrecondition
-                        | super::proto::google::rpc::Code::OutOfRange
-                        | super::proto::google::rpc::Code::Unimplemented,
-                    ) => EventStatus::Rejected,
+                    tonic::Code::InvalidArgument
+                    | tonic::Code::NotFound
+                    | tonic::Code::AlreadyExists
+                    // PermissionDenied requires human action (IAM changes) to resolve, so fail fast.
+                    | tonic::Code::PermissionDenied
+                    | tonic::Code::FailedPrecondition
+                    | tonic::Code::OutOfRange
+                    | tonic::Code::Unimplemented => EventStatus::Rejected,
                     // Everything else (including Unauthenticated, since a bearer token may have
                     // just expired and a retry will pick up the refreshed token) is transient.
                     _ => EventStatus::Errored,
