@@ -6,6 +6,10 @@ use tokio;
 use super::transform::Throttle;
 use crate::cpu_time::spawn_timed;
 
+/// A keyed rate limiter with a `DashMap` state store and no middleware.
+type KeyedRateLimiter<K, C> =
+    RateLimiter<K, DashMapStateStore<K>, C, NoOpMiddleware<<C as clock::Clock>::Instant>>;
+
 /// Re-usable wrapper around the structs/type from the governor crate.
 /// Spawns a background task that periodically flushes keys that haven't been accessed recently.
 pub struct RateLimiterRunner<K, C>
@@ -13,7 +17,7 @@ where
     K: Hash + Eq + Clone,
     C: clock::Clock,
 {
-    pub rate_limiter: Arc<RateLimiter<K, DashMapStateStore<K>, C, NoOpMiddleware<C::Instant>>>,
+    pub rate_limiter: Arc<KeyedRateLimiter<K, C>>,
     flush_handle: tokio::task::JoinHandle<()>,
 }
 

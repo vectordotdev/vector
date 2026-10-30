@@ -297,13 +297,16 @@ impl StreamSink<Event> for UnitTestSink {
     }
 }
 
+/// The sink that receives the processed events in a `unit_test_stream` sink.
+type UnitTestStreamSink = Box<dyn Sink<Event, Error = ()> + Send + Unpin>;
+
 /// Configuration for the `unit_test_stream` sink.
 #[configurable_component(sink("unit_test_stream", "Unit test stream."))]
 #[derive(Clone, Default)]
 pub struct UnitTestStreamSinkConfig {
     /// Sink that receives the processed events.
     #[serde(skip)]
-    sink: Arc<Mutex<Option<Box<dyn Sink<Event, Error = ()> + Send + Unpin>>>>,
+    sink: Arc<Mutex<Option<UnitTestStreamSink>>>,
 }
 
 impl_generate_config_from_default!(UnitTestStreamSinkConfig);

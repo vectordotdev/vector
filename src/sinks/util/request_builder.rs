@@ -118,6 +118,10 @@ pub trait RequestBuilder<Input> {
     ) -> Self::Request;
 }
 
+/// The payloads returned by [`IncrementalRequestBuilder::encode_events_incremental`], each with
+/// its metadata.
+type IncrementalPayloads<Metadata, Payload, Error> = Vec<Result<(Metadata, Payload), Error>>;
+
 /// Generalized interface for defining how a batch of events will incrementally be turned into requests.
 ///
 /// As opposed to `RequestBuilder`, this trait provides the means to incrementally build requests
@@ -138,7 +142,7 @@ pub trait IncrementalRequestBuilder<Input> {
     fn encode_events_incremental(
         &mut self,
         input: Input,
-    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>>;
+    ) -> IncrementalPayloads<Self::Metadata, Self::Payload, Self::Error>;
 
     /// Builds a request for the given metadata and payload.
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;

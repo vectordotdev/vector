@@ -180,6 +180,12 @@ pub async fn build_unit_tests(
     }
 }
 
+/// The receivers for the test sinks, and the test sinks keyed by component.
+type HydratedSinks = (
+    Vec<Receiver<UnitTestSinkResult>>,
+    IndexMap<ComponentKey, SinkOuter<String>>,
+);
+
 pub struct UnitTestBuildMetadata {
     // A set of all valid insert_at targets, used to validate test inputs.
     available_insert_targets: HashSet<ComponentKey>,
@@ -327,13 +333,7 @@ impl UnitTestBuildMetadata {
         test_name: &str,
         outputs: &[TestOutput],
         no_outputs_from: &[OutputId],
-    ) -> Result<
-        (
-            Vec<Receiver<UnitTestSinkResult>>,
-            IndexMap<ComponentKey, SinkOuter<String>>,
-        ),
-        Vec<String>,
-    > {
+    ) -> Result<HydratedSinks, Vec<String>> {
         if outputs.is_empty() && no_outputs_from.is_empty() {
             return Err(vec![
                 "unit test must contain at least one of `outputs` or `no_outputs_from`."

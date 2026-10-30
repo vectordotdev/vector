@@ -775,7 +775,7 @@ impl IngestorProcess {
                     lines.map(|line| ((), line, ())),
                     line_agg::Logic::new(config.clone()),
                 )
-                .map(|(_src, line, _context, _lastline_context)| line),
+                .map(|aggregated| aggregated.line),
             ),
             None => lines,
         };
