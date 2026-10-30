@@ -1,4 +1,4 @@
-//! OTLP JSON is `ProtoJSON` with hexadecimal trace/span IDs and integer enums.
+//! OTLP JSON uses lowerCamelCase fields, hexadecimal trace/span IDs and integer enums.
 use std::sync::LazyLock;
 
 use base64::Engine as _;
@@ -39,33 +39,30 @@ fn normalize_message(descriptor: &MessageDescriptor, value: &mut Value) -> Resul
         // The typed deserializer reports wrong message shapes after normalization.
         return Ok(());
     };
+    // OTLP does not admit the original protobuf name as an alias. Unknown names
+    // are ignored before the more permissive general ProtoJSON deserializer.
+    object.retain(|name, _| descriptor.fields().any(|field| field.json_name() == name));
     for field in descriptor.fields() {
-        let names = [field.json_name(), field.name()];
-        for (index, name) in names.into_iter().enumerate() {
-            if index == 1 && name == field.json_name() {
-                continue;
-            }
-            let Some(value) = object.get_mut(name) else {
-                continue;
-            };
-            let is_id = matches!(field.name(), "trace_id" | "span_id" | "parent_span_id");
-            let kind = field.kind();
-            if field.is_list() {
-                if let Some(values) = value.as_array_mut() {
-                    for value in values {
-                        normalize_value(kind.clone(), is_id, value)?;
-                    }
+        let Some(value) = object.get_mut(field.json_name()) else {
+            continue;
+        };
+        let is_id = matches!(field.name(), "trace_id" | "span_id" | "parent_span_id");
+        let kind = field.kind();
+        if field.is_list() {
+            if let Some(values) = value.as_array_mut() {
+                for value in values {
+                    normalize_value(kind.clone(), is_id, value)?;
                 }
-            } else if field.is_map() {
-                if let (Kind::Message(entry), Some(values)) = (kind, value.as_object_mut()) {
-                    let kind = entry.get_field(2).expect("map value descriptor").kind();
-                    for value in values.values_mut() {
-                        normalize_value(kind.clone(), false, value)?;
-                    }
-                }
-            } else {
-                normalize_value(kind, is_id, value)?;
             }
+        } else if field.is_map() {
+            if let (Kind::Message(entry), Some(values)) = (kind, value.as_object_mut()) {
+                let kind = entry.get_field(2).expect("map value descriptor").kind();
+                for value in values.values_mut() {
+                    normalize_value(kind.clone(), false, value)?;
+                }
+            }
+        } else {
+            normalize_value(kind, is_id, value)?;
         }
     }
     Ok(())
