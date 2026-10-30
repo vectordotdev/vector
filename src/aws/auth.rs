@@ -276,11 +276,12 @@ impl AwsAuthentication {
     }
 
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "Audit and document the existing error contracts separately from lint enforcement."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP client used by the credentials provider (for assume role,
+    /// profile files, or the default credentials chain) cannot be built because the TLS
+    /// settings are invalid or the proxy or TLS connector cannot be created.
     pub async fn credentials_provider(
         &self,
         service_region: Region,

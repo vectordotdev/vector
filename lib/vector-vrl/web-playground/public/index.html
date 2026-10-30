@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1" name="viewport" />
     <title>VRL playground</title>
+    <link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/editor/editor.main.js">
     <link rel="icon" type="image/x-icon" href="https://vector.dev/favicon.ico">
     <link
       rel="stylesheet"
@@ -47,27 +48,28 @@
           </table>
         </div>
         <div class="headers-grid-item theme-section">
-          <button id="theme-toggle-btn" type="button" title="Theme" aria-label="Toggle theme"></button>
+          <button id="theme-toggle-btn" data-startup-control disabled type="button" title="Theme" aria-label="Toggle theme"></button>
         </div>
       </div>
     </div>
     <div id="App">
       <div id="toolbar-section">
         <div class="toolbar-group">
-          <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()" title="Run program (Shift+Enter)">
+          <button id="run-code-btn" data-startup-control disabled class="btn btn-primary" onClick="vrlPlayground.handleRunCode()" title="Run program (Shift+Enter)">
             <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 4.3a1 1 0 011.55-.832l8 5.7a1 1 0 010 1.664l-8 5.7A1 1 0 016.3 15.7V4.3z"/></svg>
             <span>Run program</span>
           </button>
-          <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">
+          <button id="share-code-btn" data-startup-control disabled class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
             <span>Share program</span>
           </button>
         </div>
+        <span id="startup-status" role="status">Loading playground…</span>
         <div id="toolbar-controls">
           <div class="toolbar-group">
             <input
               type="text"
-              id="timezone-input"
+              id="timezone-input" data-startup-control disabled
               name="timezone"
               list="timezone-list"
               placeholder="Timezone"
@@ -88,13 +90,13 @@
             </datalist>
           </div>
           <div class="toolbar-group">
-            <select id="examples-select" title="Load an example program and input" aria-label="Examples">
+            <select id="examples-select" data-startup-control disabled title="Load an example program and input" aria-label="Examples">
               <option value="" disabled selected>Examples</option>
             </select>
-            <select id="history-select" title="Run history (stored locally in your browser)">
+            <select id="history-select" data-startup-control disabled title="Run history (stored locally in your browser)">
               <option value="" disabled selected>History</option>
             </select>
-            <button id="clear-history-btn" type="button" title="Clear run history" onClick="vrlPlayground.handleClearHistory()" aria-label="Clear run history">
+            <button id="clear-history-btn" data-startup-control disabled type="button" title="Clear run history" onClick="vrlPlayground.handleClearHistory()" aria-label="Clear run history">
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.7 6l-.5 9.4a2 2 0 01-2 1.9H7.8a2 2 0 01-2-1.9L5.3 6m10.7 0h-2.7m-6 0H5.3m2.7 0V4.5A1.5 1.5 0 019.5 3h1a1.5 1.5 0 011.5 1.5V6m-4 0h4"/></svg>
             </button>
           </div>

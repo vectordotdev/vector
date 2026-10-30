@@ -7,10 +7,10 @@ use std::{
 
 use anyhow::{Context as _, Result, bail};
 use regex::Regex;
-use semver::Version;
 use tempfile::TempDir;
 
 use crate::app::{self, CommandExt as _};
+use crate::utils::git::highest_release_tag;
 
 pub(super) struct VendorSpec {
     pub(super) repo_url: &'static str,
@@ -73,47 +73,6 @@ fn ensure_tag(checkout: &Path, tag: &str) -> Result<()> {
     } else {
         bail!("{tag} is not a tag")
     }
-}
-
-fn highest_release_tag(repo: &str, pattern: &Regex) -> Result<String> {
-    let output = Command::new("git")
-        .args(["ls-remote", "--tags", "--refs", repo])
-        .check_output()
-        .with_context(|| format!("Could not list tags in {repo}"))?;
-    let tags = tags_from_ls_remote(&output);
-    select_highest_tag(tags, pattern)
-        .with_context(|| format!("Could not select a release from {repo}"))
-}
-
-fn tags_from_ls_remote(output: &str) -> impl Iterator<Item = &str> {
-    output.lines().filter_map(|line| {
-        let (_object, reference) = line.split_once('\t')?;
-        reference.strip_prefix("refs/tags/")
-    })
-}
-
-fn select_highest_tag<'a>(
-    tags: impl IntoIterator<Item = &'a str>,
-    pattern: &Regex,
-) -> Result<String> {
-    let mut highest: Option<(Version, &str)> = None;
-    for tag in tags.into_iter().filter(|tag| pattern.is_match(tag)) {
-        let version = version_of(tag)?;
-        if highest
-            .as_ref()
-            .is_none_or(|(current, _)| version > *current)
-        {
-            highest = Some((version, tag));
-        }
-    }
-    highest
-        .map(|(_, tag)| tag.to_string())
-        .with_context(|| format!("no tag matched the release pattern {}", pattern.as_str()))
-}
-
-fn version_of(tag: &str) -> Result<Version> {
-    let bare = tag.strip_prefix('v').unwrap_or(tag);
-    Version::parse(bare).with_context(|| format!("release tag {tag} is not a semantic version"))
 }
 
 // `{:?}` quotes and escapes paths. Clippy prefers `Path::display`, which does neither.
@@ -251,32 +210,6 @@ fn readme(spec: &VendorSpec, tag: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn selects_highest_stable_tag() {
-        let pattern = Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
-        let tag = select_highest_tag(
-            ["v1.9.0", "v1.10.0", "v1.2.0", "v1.10.0-rc.1", "main"],
-            &pattern,
-        )
-        .unwrap();
-        assert_eq!(tag, "v1.10.0");
-    }
-
-    #[test]
-    fn selects_highest_numeric_tag() {
-        let pattern = Regex::new(r"^[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
-        let tag =
-            select_highest_tag(["7.9.0", "7.10.0", "7.83.3", "7.83.3-rc.1"], &pattern).unwrap();
-        assert_eq!(tag, "7.83.3");
-    }
-
-    #[test]
-    fn parses_ls_remote_tags() {
-        let output = "abc\trefs/tags/v1.1.0\ndef\trefs/tags/v1.1.0^{}\n";
-        let tags: Vec<_> = tags_from_ls_remote(output).collect();
-        assert_eq!(tags, ["v1.1.0", "v1.1.0^{}"]);
-    }
 
     #[test]
     fn adds_a_missing_trailing_newline() {

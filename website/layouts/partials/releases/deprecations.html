@@ -3,23 +3,14 @@
      Enactments (removals) are not duplicated here — they are surfaced via
      the changelog's Breaking changes section and on /deprecations/.
      Params: version (string, e.g. "0.56" or "0.56.0") */}}
-{{- $pending := site.Data.deprecations.deprecations_pending -}}
+{{- $pending := (partialCached "deprecations/entries.html" .).active -}}
+{{- /* Entries carry X.Y.Z versions (see deprecations/entries.html), so normalize
+       a "0.56" shorthand param the same way and match exactly: "0.56" fragments
+       belong to the 0.56.0 page only, never to 0.56.1. */ -}}
 {{- $version := .version -}}
+{{- if eq (len (split $version ".")) 2 }}{{ $version = printf "%s.0" $version }}{{ end -}}
 
-{{- $parts := split $version "." -}}
-{{- /* `deprecated_since` can be the shorthand "0.56" (normalized at write
-       time) or the full "0.56.0". Match exactly on either; never a loose
-       major.minor prefix that would put `0.56.1` fragments on the 0.56.0
-       page. */ -}}
-{{- $exact := printf "%s.%s" (index $parts 0) (index $parts 1) -}}
-
-{{- $announced := slice -}}
-{{- range $pending -}}
-  {{- if or (eq .deprecated_since $version) (eq .deprecated_since $exact) -}}
-    {{- $announced = $announced | append . -}}
-  {{- end -}}
-{{- end -}}
-{{- $announced = sort $announced "deprecated_since" "desc" -}}
+{{- $announced := where $pending "deprecated_since" $version -}}
 
 {{ if gt (len $announced) 0 }}
 <div class="mt-8">
@@ -29,19 +20,13 @@
       See the <a href="/deprecations/">deprecations page</a> for all active and historical deprecations.
     </p>
   </div>
-  <div class="mt-6 flex flex-col space-y-6">
+  <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
     {{ range $announced }}
-    <div>
-      <span class="text-xl font-semibold text-dark dark:text-gray-300">
-        {{ .what | markdownify }}
-      </span>
-      {{ with .description }}
-      <div class="mt-2.5 prose dark:prose-invert max-w-none">
-        {{ . | markdownify }}
-      </div>
-      {{ end }}
-    </div>
+    {{ partial "releases/changelog-card.html" (dict
+      "title" .what
+      "body" .content
+    ) }}
     {{ end }}
-  </div>
+  </ul>
 </div>
 {{ end }}

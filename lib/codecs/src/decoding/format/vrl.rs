@@ -54,11 +54,10 @@ pub struct VrlDeserializerOptions {
 
 impl VrlDeserializerConfig {
     /// Build the `VrlDeserializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the VRL program fails to compile.
     pub fn build(&self) -> vector_common::Result<VrlDeserializer> {
         let state = TypeState {
             local: LocalEnv::default(),

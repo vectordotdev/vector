@@ -68,11 +68,15 @@ impl BatchEncoder {
     }
 
     /// Encode a batch of events into a `BatchOutput`.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the serializer is Parquet, which only supports the
+    /// `tokio_util::codec::Encoder` interface. For Arrow, returns
+    /// `Error::SchemaConstraintViolation` if a non-nullable top-level schema field is missing or
+    /// null in a log event, and `Error::SerializingError` if `events` contains no log events, a log
+    /// event cannot be serialized to JSON, or the values cannot be decoded into the schema
+    /// (including null values in non-nullable nested fields).
     pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
         match &self.serializer {
             BatchSerializer::Arrow(serializer) => {
@@ -167,11 +171,10 @@ where
     Framer: Clone,
 {
     /// Serialize the event without applying framing.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::SerializingError` if the serializer fails to encode the event.
     pub fn serialize(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
         let len = buffer.len();
         let mut payload = buffer.split_off(len);

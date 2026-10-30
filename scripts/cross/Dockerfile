@@ -1,7 +1,22 @@
 ARG TARGET=x86_64-unknown-linux-musl
 ARG CROSS_DIGEST
 
+FROM docker.io/ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c AS trust-store
+
+# Use Ubuntu's maintained CA set without upgrading the cross toolchain or target libc.
+# Keep the CA package current, as in the runtime Dockerfiles.
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 FROM ghcr.io/cross-rs/${TARGET}@${CROSS_DIGEST}
+
+# Replace both the source certificates and generated links before any downloads.
+RUN rm -rf /usr/share/ca-certificates /etc/ssl/certs && mkdir -p /etc/ssl/certs
+COPY --from=trust-store /usr/share/ca-certificates/ /usr/share/ca-certificates/
+COPY --from=trust-store /etc/ca-certificates.conf /etc/ca-certificates.conf
+RUN update-ca-certificates --fresh
 
 # Common steps for all targets
 COPY scripts/cross/bootstrap-ubuntu.sh /

@@ -15,7 +15,8 @@ use super::{
 use crate::{
     config::{OutputId, TransformConfig, TransformContext},
     event::{
-        BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventStatus, Metric,
+        BatchNotifier, BatchStatus, BatchStatusReceiver, DatadogMetricOriginMetadata, Event,
+        EventMetadata, EventStatus, Metric,
         metric::{MetricKind, MetricValue},
     },
     schema::Definition,
@@ -1531,6 +1532,37 @@ fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
         ));
         let out = flush_final(&mut agg);
         assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
+        assert_gauge(&out[0], 2.0);
+    }
+
+    // The selected sample's absent Datadog attribution must not be filled from a discarded one.
+    {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        let attributed_metadata = EventMetadata::default()
+            .with_origin_metadata(DatadogMetricOriginMetadata::new(Some(1), Some(2), Some(3)))
+            .with_datadog_metric_unit("byte");
+        let attributed = Event::Metric(
+            Metric::new_with_metadata(
+                "latest_attribution",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+                attributed_metadata,
+            )
+            .with_timestamp(Some(later)),
+        );
+        let selected = make_metric_with_timestamp(
+            "latest_attribution",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+            latest_ts,
+        );
+
+        agg.record(attributed);
+        agg.record(selected);
+        let out = flush_final(&mut agg);
+        assert!(out[0].metadata().datadog_origin_metadata().is_none());
+        assert_eq!(out[0].metadata().datadog_metric_unit(), None);
         assert_gauge(&out[0], 2.0);
     }
 

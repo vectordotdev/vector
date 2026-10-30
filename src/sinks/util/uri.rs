@@ -78,6 +78,18 @@ impl UriSerde {
         self.auth = auth;
         self
     }
+
+    /// Returns the URI as an `http 1` `Uri`.
+    ///
+    /// The two `http` crate versions share no conversion traits, so the bridge is a string
+    /// round-trip, as in [`HttpEndpoint::into_v1`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `http 1` cannot parse the URI.
+    pub fn uri_v1(&self) -> Result<http_1::Uri, http_1::uri::InvalidUri> {
+        self.uri.to_string().parse()
+    }
 }
 
 impl TryFrom<String> for UriSerde {

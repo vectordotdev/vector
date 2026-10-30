@@ -5,7 +5,7 @@ use vector_lib::{
 
 #[derive(NamedInternalEvent)]
 pub struct GcpPubsubConnectError {
-    pub error: tonic::transport::Error,
+    pub error: tonic::Status,
 }
 
 impl InternalEvent for GcpPubsubConnectError {

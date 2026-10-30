@@ -62,6 +62,8 @@ use crate::{
 };
 use vrl::value::Value;
 
+use super::{NotificationBatch, NotificationParser, S3ObjectReference};
+
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
 
@@ -226,6 +228,13 @@ pub enum ProcessingError {
         source: serde_json::Error,
         message_id: String,
     },
+    #[snafu(display("Could not parse SQS message with id {message_id}: {source}"))]
+    MessageParseError {
+        source: Box<dyn std::error::Error + Send + Sync>,
+        message_id: String,
+    },
+    #[snafu(display("Age-based deferral requires a notification publication timestamp"))]
+    MissingPublicationTimestamp,
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
         source: SdkError<GetObjectError, HttpResponse>,
@@ -281,6 +290,10 @@ pub enum ProcessingError {
     },
 }
 
+// Box the large AWS errors so each iterator result stays small.
+type ProcessingBatches =
+    Box<dyn Iterator<Item = Result<NotificationBatch, Box<ProcessingError>>> + Send>;
+
 pub struct State {
     region: Region,
 
@@ -300,10 +313,12 @@ pub struct State {
     decoder: Decoder,
 
     deferred: Option<DeferredConfig>,
+    notification_parser: Option<Arc<dyn NotificationParser>>,
+    source_type: &'static str,
 }
 
 pub(super) struct Ingestor {
-    state: Arc<State>,
+    state: State,
 }
 
 impl Ingestor {
@@ -325,7 +340,7 @@ impl Ingestor {
                 messages: config.max_number_of_messages,
             });
         }
-        let state = Arc::new(State {
+        let state = State {
             region,
 
             s3_client,
@@ -346,9 +361,21 @@ impl Ingestor {
             decoder,
 
             deferred: config.deferred,
-        });
+            notification_parser: None,
+            source_type: AwsS3Config::NAME,
+        };
 
         Ok(Ingestor { state })
+    }
+
+    pub(super) fn with_notification_parser(
+        mut self,
+        parser: Arc<dyn NotificationParser>,
+        source_type: &'static str,
+    ) -> Self {
+        self.state.notification_parser = Some(parser);
+        self.state.source_type = source_type;
+        self
     }
 
     pub(super) async fn run(
@@ -358,10 +385,11 @@ impl Ingestor {
         log_namespace: LogNamespace,
     ) -> Result<(), ()> {
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
+        let state = Arc::new(self.state);
         let mut handles = Vec::new();
-        for _ in 0..self.state.client_concurrency {
+        for _ in 0..state.client_concurrency {
             let process = IngestorProcess::new(
-                Arc::clone(&self.state),
+                Arc::clone(&state),
                 cx.out.clone(),
                 cx.shutdown.clone(),
                 log_namespace,
@@ -609,31 +637,52 @@ impl IngestorProcess {
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
-        let sqs_body = message.body.unwrap_or_default();
-        let sqs_body = serde_json::from_str::<SnsNotification>(sqs_body.as_ref())
-            .map(|notification| notification.message)
-            .unwrap_or(sqs_body);
-        let s3_event: SqsEvent =
-            serde_json::from_str(sqs_body.as_ref()).context(InvalidSqsMessageSnafu {
-                message_id: message
-                    .message_id
-                    .clone()
-                    .unwrap_or_else(|| "<empty>".to_owned()),
-            })?;
-
-        match s3_event {
-            SqsEvent::TestEvent(_s3_test_event) => {
-                debug!(?message.message_id, message = "Found S3 Test Event.");
-                Ok(())
+        let batches: ProcessingBatches = match &self.state.notification_parser {
+            Some(parser) => {
+                let message_id = message.message_id.unwrap_or_else(|| "<empty>".to_owned());
+                Box::new(
+                    parser
+                        .parse(message.body.as_deref().unwrap_or_default())
+                        .into_iter()
+                        .map(move |result| {
+                            result.map_err(|source| {
+                                Box::new(ProcessingError::MessageParseError {
+                                    source,
+                                    message_id: message_id.clone(),
+                                })
+                            })
+                        }),
+                )
             }
-            SqsEvent::Event(s3_event) => self.handle_s3_event(s3_event).await,
+            None => parse_s3_notification(message).map_err(|error| *error)?,
+        };
+
+        for batch in batches {
+            self.handle_notification_batch(batch.map_err(|error| *error)?)
+                .await?;
         }
+        Ok(())
     }
 
-    async fn handle_s3_event(&mut self, s3_event: S3Event) -> Result<(), ProcessingError> {
-        for record in s3_event.records {
-            self.handle_s3_event_record(record, self.log_namespace)
-                .await?;
+    async fn handle_notification_batch(
+        &mut self,
+        batch: NotificationBatch,
+    ) -> Result<(), ProcessingError> {
+        for object in &batch.objects {
+            if self.state.region.as_ref() != object.region {
+                return Err(ProcessingError::WrongRegion {
+                    bucket: object.bucket.clone(),
+                    key: object.key.clone(),
+                    region: object.region.clone(),
+                });
+            }
+        }
+
+        if let Some(deferred) = &self.state.deferred {
+            check_notification_age(&batch, deferred, Utc::now()).map_err(|error| *error)?;
+        }
+        for object in batch.objects {
+            self.handle_s3_object(object, self.log_namespace).await?;
         }
         Ok(())
     }
@@ -642,75 +691,34 @@ impl IngestorProcess {
         clippy::too_many_lines,
         reason = "Splitting this source routine is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
     )]
-    #[allow(
-        clippy::cast_possible_wrap,
-        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
-    )]
-    async fn handle_s3_event_record(
+    async fn handle_s3_object(
         &mut self,
-        s3_event: S3EventRecord,
+        reference: S3ObjectReference,
         log_namespace: LogNamespace,
     ) -> Result<(), ProcessingError> {
-        let event_version: semver::Version = s3_event.event_version.clone().into();
-        if !SUPPORTED_S3_EVENT_VERSION.matches(&event_version) {
-            return Err(ProcessingError::UnsupportedS3EventVersion {
-                version: event_version.clone(),
-            });
-        }
-
-        if s3_event.event_name.kind != "ObjectCreated" {
-            emit!(SqsS3EventRecordInvalidEventIgnored {
-                bucket: &s3_event.s3.bucket.name,
-                key: &s3_event.s3.object.key,
-                kind: &s3_event.event_name.kind,
-                name: &s3_event.event_name.name,
-            });
-            return Ok(());
-        }
-
-        // S3 has to send notifications to a queue in the same region so I don't think this will
-        // actually ever be hit unless messages are being forwarded from one queue to another
-        if self.state.region.as_ref() != s3_event.aws_region.as_str() {
-            return Err(ProcessingError::WrongRegion {
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
-                region: s3_event.aws_region,
-            });
-        }
-
-        if let Some(deferred) = &self.state.deferred {
-            let delta = Utc::now() - s3_event.event_time;
-            if delta.num_seconds() > deferred.max_age_secs as i64 {
-                return Err(ProcessingError::FileTooOld {
-                    bucket: s3_event.s3.bucket.name.clone(),
-                    key: s3_event.s3.object.key.clone(),
-                    deferred_queue: deferred.queue_url.clone(),
-                });
-            }
-        }
-
         let download_start = Instant::now();
+        let source_type = self.state.source_type;
 
         let object_result = self
             .state
             .s3_client
             .get_object()
-            .bucket(s3_event.s3.bucket.name.clone())
-            .key(s3_event.s3.object.key.clone())
+            .bucket(reference.bucket.clone())
+            .key(reference.key.clone())
             .set_request_payer(self.state.s3_options.request_payer.map(Into::into))
             .send()
             .await
             .context(GetObjectSnafu {
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
+                bucket: reference.bucket.clone(),
+                key: reference.key.clone(),
             });
 
         let object = object_result?;
 
         debug!(
             message = "Got S3 object from SQS notification.",
-            bucket = s3_event.s3.bucket.name,
-            key = s3_event.s3.object.key,
+            bucket = reference.bucket,
+            key = reference.key,
         );
 
         let metadata = object.metadata;
@@ -724,7 +732,7 @@ impl IngestorProcess {
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
             self.state.s3_options.compression,
-            &s3_event.s3.object.key,
+            &reference.key,
             object.content_encoding.as_deref(),
             object.content_type.as_deref(),
             object.body,
@@ -790,7 +798,8 @@ impl IngestorProcess {
                         handle_single_log(
                             log_event,
                             log_namespace,
-                            &s3_event,
+                            source_type,
+                            &reference,
                             metadata.as_ref(),
                             timestamp,
                         );
@@ -816,7 +825,7 @@ impl IngestorProcess {
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
 
-        let bucket = &s3_event.s3.bucket.name;
+        let bucket = &reference.bucket;
         let duration = download_start.elapsed();
 
         if read_error.is_some() {
@@ -832,14 +841,14 @@ impl IngestorProcess {
         if let Some(error) = read_error {
             Err(ProcessingError::ReadObject {
                 source: error,
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
+                bucket: reference.bucket.clone(),
+                key: reference.key.clone(),
             })
         } else if let Some(error) = send_error {
             Err(ProcessingError::PipelineSend {
                 source: error,
-                bucket: s3_event.s3.bucket.name.clone(),
-                key: s3_event.s3.object.key.clone(),
+                bucket: reference.bucket.clone(),
+                key: reference.key.clone(),
             })
         } else {
             match receiver {
@@ -850,30 +859,30 @@ impl IngestorProcess {
                         BatchStatus::Delivered => {
                             debug!(
                                 message = "S3 object from SQS delivered.",
-                                bucket = s3_event.s3.bucket.name,
-                                key = s3_event.s3.object.key,
+                                bucket = reference.bucket,
+                                key = reference.key,
                             );
                             Ok(())
                         }
                         BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement {
-                            bucket: s3_event.s3.bucket.name,
-                            key: s3_event.s3.object.key,
-                            region: s3_event.aws_region,
+                            bucket: reference.bucket,
+                            key: reference.key,
+                            region: reference.region,
                         }),
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
                                 warn!(
                                     message =
                                         "S3 object from SQS was rejected. Deleting failed message.",
-                                    bucket = s3_event.s3.bucket.name,
-                                    key = s3_event.s3.object.key,
+                                    bucket = reference.bucket,
+                                    key = reference.key,
                                 );
                                 Ok(())
                             } else {
                                 Err(ProcessingError::ErrorAcknowledgement {
-                                    bucket: s3_event.s3.bucket.name,
-                                    key: s3_event.s3.object.key,
-                                    region: s3_event.aws_region,
+                                    bucket: reference.bucket,
+                                    key: reference.key,
+                                    region: reference.region,
                                 })
                             }
                         }
@@ -926,10 +935,86 @@ impl IngestorProcess {
     }
 }
 
+#[allow(
+    clippy::cast_possible_wrap,
+    reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+)]
+pub(super) fn check_notification_age(
+    batch: &NotificationBatch,
+    deferred: &DeferredConfig,
+    now: DateTime<Utc>,
+) -> Result<(), Box<ProcessingError>> {
+    if let Some(object) = batch.objects.first() {
+        let published_at = batch
+            .published_at
+            .ok_or(ProcessingError::MissingPublicationTimestamp)?;
+        if (now - published_at).num_seconds() > deferred.max_age_secs as i64 {
+            return Err(Box::new(ProcessingError::FileTooOld {
+                bucket: object.bucket.clone(),
+                key: object.key.clone(),
+                deferred_queue: deferred.queue_url.clone(),
+            }));
+        }
+    }
+    Ok(())
+}
+
+// Parse the whole message before any downloads, but validate records as we reach
+// them. This preserves delivery of earlier records if a later version is unsupported.
+fn parse_s3_notification(message: Message) -> Result<ProcessingBatches, Box<ProcessingError>> {
+    let sqs_body = message.body.unwrap_or_default();
+    let sqs_body = serde_json::from_str::<SnsNotification>(&sqs_body)
+        .map(|notification| notification.message)
+        .unwrap_or(sqs_body);
+    let s3_event: SqsEvent = serde_json::from_str(&sqs_body).context(InvalidSqsMessageSnafu {
+        message_id: message
+            .message_id
+            .clone()
+            .unwrap_or_else(|| "<empty>".to_owned()),
+    })?;
+    let records = match s3_event {
+        SqsEvent::TestEvent(_s3_test_event) => {
+            debug!(?message.message_id, message = "Found S3 Test Event.");
+            Vec::new()
+        }
+        SqsEvent::Event(s3_event) => s3_event.records,
+    };
+    Ok(Box::new(records.into_iter().filter_map(s3_record_batch)))
+}
+
+fn s3_record_batch(
+    record: S3EventRecord,
+) -> Option<Result<NotificationBatch, Box<ProcessingError>>> {
+    let event_version: semver::Version = record.event_version.into();
+    if !SUPPORTED_S3_EVENT_VERSION.matches(&event_version) {
+        return Some(Err(Box::new(ProcessingError::UnsupportedS3EventVersion {
+            version: event_version,
+        })));
+    }
+    if record.event_name.kind != "ObjectCreated" {
+        emit!(SqsS3EventRecordInvalidEventIgnored {
+            bucket: &record.s3.bucket.name,
+            key: &record.s3.object.key,
+            kind: &record.event_name.kind,
+            name: &record.event_name.name,
+        });
+        return None;
+    }
+    Some(Ok(NotificationBatch::new(
+        vec![S3ObjectReference::new(
+            record.s3.bucket.name,
+            record.s3.object.key,
+            record.aws_region,
+        )],
+        Some(record.event_time),
+    )))
+}
+
 fn handle_single_log(
     log: &mut LogEvent,
     log_namespace: LogNamespace,
-    s3_event: &S3EventRecord,
+    source_type: &'static str,
+    reference: &S3ObjectReference,
     metadata: Option<&HashMap<String, String>>,
     timestamp: Option<DateTime<Utc>>,
 ) {
@@ -938,7 +1023,7 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!(BUCKET))),
         path!(BUCKET),
-        Value::from(s3_event.s3.bucket.name.clone()),
+        Value::from(reference.bucket.clone()),
     );
 
     log_namespace.insert_source_metadata(
@@ -946,14 +1031,14 @@ fn handle_single_log(
         log,
         Some(LegacyKey::Overwrite(path!(OBJECT))),
         path!(OBJECT),
-        Value::from(s3_event.s3.object.key.clone()),
+        Value::from(reference.key.clone()),
     );
     log_namespace.insert_source_metadata(
         AwsS3Config::NAME,
         log,
         Some(LegacyKey::Overwrite(path!(REGION))),
         path!(REGION),
-        Value::from(s3_event.aws_region.clone()),
+        Value::from(reference.region.clone()),
     );
 
     if let Some(metadata) = metadata {
@@ -972,7 +1057,7 @@ fn handle_single_log(
         log,
         log_schema().source_type_key(),
         path!(SOURCE_TYPE),
-        Value::from_static_str(AwsS3Config::NAME),
+        Value::from_static_str(source_type),
     );
 
     // This handles the transition from the original timestamp logic. Originally the

@@ -272,10 +272,11 @@ impl SourceConfig for DockerLogsConfig {
         let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
-            Ok(tokio::select! {
+            tokio::select! {
                 () = fut => {}
                 _ = shutdown => {}
-            })
+            }
+            Ok(())
         }))
     }
 

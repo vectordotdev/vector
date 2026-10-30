@@ -148,3 +148,14 @@ pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
 }
+
+impl HealthcheckError {
+    /// Builds an [`HealthcheckError::UnexpectedStatus`] from a status code of either `http`
+    /// crate version.
+    #[must_use]
+    pub fn unexpected_status(status: impl util::http::IntoStatusCode) -> Self {
+        Self::UnexpectedStatus {
+            status: status.into_status_code(),
+        }
+    }
+}

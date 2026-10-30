@@ -2,7 +2,7 @@
 name: Vector minor release
 about: Use this template for a new minor release.
 title: "Vector [version] release"
-labels: "domain: releasing"
+labels: "domain:releasing"
 ---
 
 # Prepare the release
@@ -17,7 +17,8 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
 - [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed.
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml)
-      workflow from `master` with `version` set to the stable Vector version and `vrl_version` to the exact released VRL version.
+      workflow from `master`. Leave the version inputs empty for the next Vector minor release and
+      latest stable VRL tag, or supply overrides.
   - The workflow activates the `RELEASE_FREEZE_RULESET_ID` ruleset and grants `vectordotdev-bot` an **Always** bypass
     to some of `master`'s rulesets (`RELEASE_FREEZE_BOT_BYPASS`).
   - If preparation fails after activation, the freeze remains active. Retry, or run

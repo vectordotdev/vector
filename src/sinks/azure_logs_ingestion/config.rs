@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
-
-use http::uri::PathAndQuery;
+use http_1::uri::PathAndQuery;
 
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
     config::ValidatedSink,
-    http::{HttpClient, get_http_scheme_from_uri},
+    http::{client_v1::HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
         prelude::*,
@@ -137,15 +136,14 @@ impl AzureLogsIngestionConfig {
         token_scope: String,
         timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = endpoint.into_uri();
-        let protocol = get_http_scheme_from_uri(&endpoint).to_string();
+        let protocol = get_http_scheme_from_uri(&endpoint.clone().into_uri()).to_string();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let service = AzureLogsIngestionService::new(
             client,
-            endpoint,
+            endpoint.into_v1(),
             validated.path_and_query.clone(),
             credential,
             token_scope,
