@@ -5,7 +5,7 @@ use std::{
     fs,
     hash::Hash,
     net::SocketAddr,
-    path::PathBuf,
+    path::{self, PathBuf},
     time::Duration,
 };
 
@@ -95,13 +95,13 @@ impl ComponentConfig {
         component_key: ComponentKey,
         component_type: ComponentKind,
     ) -> Self {
-        let canonicalized_paths = config_paths
+        let absolute_paths = config_paths
             .into_iter()
-            .filter_map(|p| fs::canonicalize(p).ok())
+            .filter_map(|p| path::absolute(p).ok())
             .collect();
 
         Self {
-            config_paths: canonicalized_paths,
+            config_paths: absolute_paths,
             component_key,
             component_type,
         }
@@ -112,7 +112,18 @@ impl ComponentConfig {
         &self,
         config_paths: &HashSet<PathBuf>,
     ) -> Option<(ComponentKey, ComponentKind)> {
-        if config_paths.iter().any(|p| self.config_paths.contains(p)) {
+        let changed_files: HashSet<PathBuf> = config_paths
+            .iter()
+            .filter_map(|p| fs::canonicalize(p).ok())
+            .collect();
+
+        if config_paths.iter().any(|p| self.config_paths.contains(p))
+            || self
+                .config_paths
+                .iter()
+                .filter_map(|p| fs::canonicalize(p).ok())
+                .any(|p| changed_files.contains(&p))
+        {
             return Some((self.component_key.clone(), self.component_type));
         }
         None
