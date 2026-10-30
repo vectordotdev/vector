@@ -2,7 +2,7 @@ use vector_lib::{
     NamedInternalEvent,
     configurable::configurable_component,
     gauge,
-    internal_event::{GaugeName, InternalEvent},
+    internal_event::{GaugeName, InternalEvent, ToF64Lossy},
 };
 
 #[cfg(feature = "sources-file")]
@@ -31,10 +31,8 @@ pub struct FileOpen {
 }
 
 impl InternalEvent for FileOpen {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        gauge!(GaugeName::OpenFiles).set(self.count as f64);
+        gauge!(GaugeName::OpenFiles).set(self.count.to_f64_lossy());
     }
 }
 
@@ -522,16 +520,11 @@ mod source {
     }
 
     impl InternalEvent for FileCheckpointed {
-        // https://github.com/vectordotdev/vector/issues/23659
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "Bounds and overflow audit deferred"
-        )]
         fn emit(self) {
             debug!(
                 message = "Files checkpointed.",
                 count = %self.count,
-                duration_ms = self.duration.as_millis() as u64,
+                duration_ms = u64::try_from(self.duration.as_millis()).unwrap_or(u64::MAX),
             );
             counter!(CounterName::CheckpointsTotal).increment(self.count as u64);
         }
