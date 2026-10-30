@@ -260,8 +260,8 @@ impl SourceConfig for AwsS3Config {
 impl AwsS3Config {
     /// Build the S3 source with a custom notification parser.
     ///
-    /// Only notification parsing changes. Downloads, SQS handling, output schemas,
-    /// and `aws_s3` metadata stay the same.
+    /// Only notification parsing and the `source_type` stamped on events change.
+    /// Downloads, SQS handling, output schemas, and other `aws_s3` metadata stay the same.
     ///
     /// # Errors
     /// Returns an error if configuration is invalid or AWS client setup fails.
@@ -269,14 +269,15 @@ impl AwsS3Config {
         &self,
         cx: SourceContext,
         parser: Arc<dyn NotificationParser>,
+        source_type: &'static str,
     ) -> crate::Result<super::Source> {
-        Box::pin(self.build_source(cx, Some(parser))).await
+        Box::pin(self.build_source(cx, Some((parser, source_type)))).await
     }
 
     async fn build_source(
         &self,
         cx: SourceContext,
-        parser: Option<Arc<dyn NotificationParser>>,
+        parser: Option<(Arc<dyn NotificationParser>, &'static str)>,
     ) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
         let multiline_config = self.multiline.as_ref().map(TryInto::try_into).transpose()?;
@@ -286,7 +287,9 @@ impl AwsS3Config {
                     .create_sqs_ingestor(multiline_config, &cx.proxy, log_namespace)
                     .await?;
                 let ingestor = match parser {
-                    Some(parser) => ingestor.with_notification_parser(parser),
+                    Some((parser, source_type)) => {
+                        ingestor.with_notification_parser(parser, source_type)
+                    }
                     None => ingestor,
                 };
                 Ok(crate::sources::opaque_source(ingestor.run(

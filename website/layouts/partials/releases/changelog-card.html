@@ -5,7 +5,7 @@
        body   rendered HTML body
        footer (optional) rendered HTML shown in the card footer; omitted when blank
        class  (optional) extra classes for the card */}}
-<li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5{{ with .class }} {{ . }}{{ end }}">
+<li class="changelog-card m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5{{ with .class }} {{ . }}{{ end }}">
   {{- with .title }}
   {{- if $.href }}
   <a href="{{ $.href }}" class="group block underline decoration-primary/50 underline-offset-4 focus:outline-none focus:ring-2 focus:ring-primary hover:decoration-secondary">

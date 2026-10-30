@@ -20,19 +20,13 @@
       See the <a href="/deprecations/">deprecations page</a> for all active and historical deprecations.
     </p>
   </div>
-  <div class="mt-6 flex flex-col space-y-6">
+  <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
     {{ range $announced }}
-    <div>
-      <span class="text-xl font-semibold text-dark dark:text-gray-300">
-        {{ .what | markdownify }}
-      </span>
-      {{ with .content }}
-      <div class="mt-2.5 prose dark:prose-invert max-w-none">
-        {{ . }}
-      </div>
-      {{ end }}
-    </div>
+    {{ partial "releases/changelog-card.html" (dict
+      "title" .what
+      "body" .content
+    ) }}
     {{ end }}
-  </div>
+  </ul>
 </div>
 {{ end }}
