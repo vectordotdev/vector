@@ -1,9 +1,5 @@
 use std::{
-    fmt,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -21,7 +17,7 @@ use vector_lib::{
     stream::DriverResponse,
 };
 
-use super::{ElasticsearchCommon, ElasticsearchConfig, retry::successful_events};
+use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::client_v1::HttpClient,
@@ -43,8 +39,8 @@ pub struct ElasticsearchRequest {
     pub metadata: RequestMetadata,
     pub original_events: Vec<ProcessedEvent>, //store original_events for reconstruct request when retrying
     pub elasticsearch_request_builder: ElasticsearchRequestBuilder,
-    // Shared by retry clones, counting successful events removed by partial retries.
-    pub confirmed_events: Arc<AtomicUsize>,
+    // Includes permanent failures removed from earlier partial retries.
+    pub unconfirmed_events: usize,
 }
 
 impl ByteSizeOf for ElasticsearchRequest {
@@ -189,17 +185,11 @@ pub struct ElasticsearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
     pub event_count: usize,
+    pub unconfirmed_events: usize,
     pub events_byte_size: GroupedCountByteSize,
 }
 
-pub struct ElasticsearchDriverResponse {
-    event_status: EventStatus,
-    events_byte_size: GroupedCountByteSize,
-    events_dropped: usize,
-    error: Option<crate::Error>,
-}
-
-impl DriverResponse for ElasticsearchDriverResponse {
+impl DriverResponse for ElasticsearchResponse {
     fn event_status(&self) -> EventStatus {
         self.event_status
     }
@@ -209,70 +199,7 @@ impl DriverResponse for ElasticsearchDriverResponse {
     }
 
     fn events_dropped(&self) -> Option<usize> {
-        Some(self.events_dropped)
-    }
-
-    fn error(&self) -> Option<&dyn fmt::Debug> {
-        self.error.as_ref().map(|error| error as &dyn fmt::Debug)
-    }
-}
-
-/// Accounts for delivery across the entire retry stack, including terminal service errors.
-pub struct ElasticsearchResponseService<S> {
-    inner: S,
-}
-
-impl<S> ElasticsearchResponseService<S> {
-    pub const fn new(inner: S) -> Self {
-        Self { inner }
-    }
-}
-
-impl<S> Service<ElasticsearchRequest> for ElasticsearchResponseService<S>
-where
-    S: Service<ElasticsearchRequest, Response = ElasticsearchResponse, Error = crate::Error>,
-    S::Future: Send + 'static,
-{
-    type Response = ElasticsearchDriverResponse;
-    type Error = crate::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: ElasticsearchRequest) -> Self::Future {
-        let event_count = req.metadata.event_count();
-        let confirmed_events = Arc::clone(&req.confirmed_events);
-        let future = self.inner.call(req);
-        Box::pin(async move {
-            let result = future.await;
-            let remaining = event_count.saturating_sub(confirmed_events.load(Ordering::Relaxed));
-            Ok(match result {
-                Ok(response) => {
-                    let confirmed = if response.event_status == EventStatus::Delivered {
-                        response.event_count
-                    } else if response.http_response.status().is_success() {
-                        successful_events(response.http_response.body(), response.event_count)
-                            .unwrap_or_default()
-                    } else {
-                        0
-                    };
-                    ElasticsearchDriverResponse {
-                        event_status: response.event_status,
-                        events_byte_size: response.events_byte_size,
-                        events_dropped: remaining.saturating_sub(confirmed),
-                        error: None,
-                    }
-                }
-                Err(error) => ElasticsearchDriverResponse {
-                    event_status: EventStatus::Rejected,
-                    events_byte_size: GroupedCountByteSize::default(),
-                    events_dropped: remaining,
-                    error: Some(error),
-                },
-            })
-        })
+        Some(self.unconfirmed_events)
     }
 }
 
@@ -295,6 +222,7 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         Box::pin(async move {
             let metadata = std::mem::take(req.metadata_mut());
             let event_count = metadata.event_count();
+            let unconfirmed_events = req.unconfirmed_events;
             let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let request = http_request_builder
                 .build_request(req)
@@ -325,6 +253,7 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
                 http_response,
                 event_status,
                 event_count,
+                unconfirmed_events,
                 events_byte_size,
             })
         })

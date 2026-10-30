@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use http_1::StatusCode;
 use serde::Deserialize;
 use vector_http::HttpError;
@@ -67,12 +65,6 @@ impl EsResultResponse {
             None => format!("error response: {body}"),
         }
     }
-}
-
-pub(super) fn successful_events(body: &[u8], event_count: usize) -> Option<usize> {
-    serde_json::from_slice::<EsResultResponse>(body)
-        .ok()?
-        .successful_events(event_count)
 }
 
 #[derive(Deserialize, Debug)]
@@ -193,8 +185,6 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             let metadata_builder =
                                                 RequestMetadataBuilder::from_events(&failed_events);
                                             let metadata = metadata_builder.build(&encode_result);
-                                            req.confirmed_events
-                                                .fetch_add(confirmed, Ordering::Relaxed);
                                             ElasticsearchRequest {
                                                 payload: encode_result.into_payload(),
                                                 finalizers,
@@ -204,7 +194,9 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 original_events: failed_events,
                                                 elasticsearch_request_builder: req
                                                     .elasticsearch_request_builder,
-                                                confirmed_events: req.confirmed_events,
+                                                unconfirmed_events: req
+                                                    .unconfirmed_events
+                                                    .saturating_sub(confirmed),
                                             }
                                         },
                                     ));
@@ -236,16 +228,22 @@ mod tests {
 
     #[test]
     fn successful_events_requires_complete_valid_statuses() {
-        let body = br#"{"items":[{"index":{"status":201}},{"create":{"status":400}},{"update":{"status":200}}]}"#;
-        assert_eq!(successful_events(body, 3), Some(2));
-        assert_eq!(successful_events(body, 2), None);
+        let body = r#"{"items":[{"index":{"status":201}},{"create":{"status":400}},{"update":{"status":200}}]}"#;
+        let response = EsResultResponse::parse(body).unwrap();
+        assert_eq!(response.successful_events(3), Some(2));
+        assert_eq!(response.successful_events(2), None);
 
         for body in [
             "invalid json",
             r#"{"items":[{"index":{"status":201}},{"index":{}}]}"#,
             r#"{"items":[{"index":{"status":201}},{"index":{"status":99}}]}"#,
         ] {
-            assert_eq!(successful_events(body.as_bytes(), 2), None);
+            assert_eq!(
+                EsResultResponse::parse(body)
+                    .ok()
+                    .and_then(|response| response.successful_events(2)),
+                None
+            );
         }
     }
 
@@ -264,6 +262,7 @@ mod tests {
                 http_response: response,
                 event_status: EventStatus::Rejected,
                 event_count: 1,
+                unconfirmed_events: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::DontRetry(_)
@@ -285,6 +284,7 @@ mod tests {
                 http_response: response,
                 event_status: EventStatus::Errored,
                 event_count: 1,
+                unconfirmed_events: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::RetryPartial(_)

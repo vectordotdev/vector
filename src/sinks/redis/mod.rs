@@ -111,19 +111,12 @@ impl RedisDelivery {
         Self(Arc::new(Mutex::new(vec![false; count])))
     }
 
-    fn record(&self, statuses: &[bool]) -> Vec<bool> {
+    fn record(&self, statuses: &[bool]) -> usize {
         let mut delivered = self.0.lock().expect("Redis delivery state lock poisoned");
         for (confirmed, status) in delivered.iter_mut().zip(statuses) {
             *confirmed |= status;
         }
-        delivered.clone()
-    }
-
-    fn snapshot(&self) -> Vec<bool> {
-        self.0
-            .lock()
-            .expect("Redis delivery state lock poisoned")
-            .clone()
+        delivered.iter().filter(|status| !**status).count()
     }
 }
 

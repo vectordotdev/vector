@@ -1,5 +1,3 @@
-use std::sync::{Arc, atomic::AtomicUsize};
-
 use bytes::Bytes;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, json_size::JsonSize, request_metadata::RequestMetadata,
@@ -83,7 +81,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             metadata,
             original_events: es_metadata.original_events,
             elasticsearch_request_builder: self.clone(),
-            confirmed_events: Arc::new(AtomicUsize::new(0)),
+            unconfirmed_events: es_metadata.batch_size,
         }
     }
 }

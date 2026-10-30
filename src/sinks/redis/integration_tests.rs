@@ -1,6 +1,6 @@
 use std::{
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
@@ -9,7 +9,6 @@ use std::{
 use futures::stream;
 use rand::RngExt;
 use redis::AsyncCommands;
-use tower::ServiceExt;
 use vector_lib::{
     codecs::{JsonSerializerConfig, TextSerializerConfig},
     config::{Tags, Telemetry, init_telemetry},
@@ -24,7 +23,7 @@ use super::{
         SortedSetMethod, SortedSetOption,
     },
     request_builder::request_builder,
-    service::{RedisResponse, RedisResponseService, RedisService},
+    service::{RedisResponse, RedisService},
     sink::{RedisConnection, RedisRetryLogic},
 };
 use crate::{
@@ -54,14 +53,13 @@ fn redis_sentinel_server() -> Vec<String> {
 enum SubscriptionChange {
     SubscribeOther,
     Unsubscribe,
-    DenyExecute,
 }
 
 #[tokio::test]
-async fn redis_channel_retry_delivers_across_attempts() {
+async fn redis_channel_delivery_accounting_preserves_retries() {
     assert_channel_retry(
         SubscriptionChange::SubscribeOther,
-        BatchStatus::Delivered,
+        BatchStatus::Errored,
         0.0,
     )
     .await;
@@ -70,36 +68,6 @@ async fn redis_channel_retry_delivers_across_attempts() {
 #[tokio::test]
 async fn redis_channel_retry_preserves_delivery_after_unsubscribe() {
     assert_channel_retry(SubscriptionChange::Unsubscribe, BatchStatus::Errored, 1.0).await;
-}
-
-#[tokio::test]
-async fn redis_channel_retry_preserves_delivery_after_error() {
-    assert_channel_retry(SubscriptionChange::DenyExecute, BatchStatus::Rejected, 1.0).await;
-}
-
-async fn redis_retry_user(
-    client: &redis::Client,
-) -> (String, RedisConnection, redis::aio::ConnectionManager) {
-    let mut control = client.get_connection_manager().await.unwrap();
-    let username = format!("vector-retry-{}", random_string(10));
-    let password = random_string(24);
-    let _: () = redis::cmd("ACL")
-        .arg(&["SETUSER", &username, "on", "+@all", "~*", "&*"])
-        .arg(format!(">{password}"))
-        .query_async(&mut control)
-        .await
-        .unwrap();
-    let mut connection_info = client.get_connection_info().clone();
-    connection_info.redis.username = Some(username.clone());
-    connection_info.redis.password = Some(password);
-    let connection = RedisConnection::new_direct(
-        redis::Client::open(connection_info)
-            .unwrap()
-            .get_connection_manager()
-            .await
-            .unwrap(),
-    );
-    (username, connection, control)
 }
 
 async fn assert_channel_retry(
@@ -111,20 +79,20 @@ async fn assert_channel_retry(
     let controller = Controller::get().unwrap();
     controller.reset();
     let client = redis::Client::open(redis_server()).unwrap();
-    let (username, connection, mut control) = redis_retry_user(&client).await;
+    let channel_prefix = format!("vector-retry-{}", random_string(10));
+    let connection = RedisConnection::new_direct(client.get_connection_manager().await.unwrap());
     let service = RedisService {
         conn: connection.clone(),
         data_type: super::DataType::Channel,
     };
-    let first_channel = format!("{username}-first");
-    let second_channel = format!("{username}-second");
+    let first_channel = format!("{channel_prefix}-first");
+    let second_channel = format!("{channel_prefix}-second");
     let mut subscriber = client.get_async_pubsub().await.unwrap();
     subscriber.subscribe(&first_channel).await.unwrap();
     let subscriber = Arc::new(tokio::sync::Mutex::new(subscriber));
     let attempts = Arc::new(AtomicUsize::new(0));
-    let original_error = Arc::new(Mutex::new(None));
     let mut settings = TowerRequestConfig::<RedisTowerRequestConfigDefaults> {
-        retry_attempts: 1,
+        retry_attempts: 2,
         timeout_secs: 2,
         retry_jitter_mode: JitterMode::None,
         ..Default::default()
@@ -139,20 +107,8 @@ async fn assert_channel_retry(
             change,
             Arc::clone(&subscriber),
             Arc::clone(&attempts),
-            control.clone(),
-            username.clone(),
-            Arc::clone(&original_error),
+            channel_prefix.clone(),
         ));
-    let service = RedisResponseService::new(service);
-    let terminal_error = Arc::new(Mutex::new(None));
-    let captured_error = Arc::clone(&terminal_error);
-    let service = service.map_result(move |result: Result<RedisResponse, crate::Error>| {
-        *captured_error.lock().unwrap() = match &result {
-            Ok(response) => response.error().map(|error| format!("{error:?}")),
-            Err(error) => Some(format!("{error:?}")),
-        };
-        result
-    });
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let events = [("first", first_channel), ("second", second_channel)]
         .into_iter()
@@ -177,21 +133,7 @@ async fn assert_channel_retry(
         let message = subscriber.on_message().next().await.unwrap();
         assert_eq!(message.get_payload::<String>().unwrap(), "second");
     }
-    let _: usize = redis::cmd("ACL")
-        .arg(&["DELUSER", &username])
-        .query_async(&mut control)
-        .await
-        .unwrap();
-    assert_eq!(attempts.load(Ordering::Relaxed), 2);
-    if matches!(change, SubscriptionChange::DenyExecute) {
-        assert!(original_error.lock().unwrap().is_some());
-        assert_eq!(
-            *terminal_error.lock().unwrap(),
-            *original_error.lock().unwrap()
-        );
-    } else {
-        assert!(terminal_error.lock().unwrap().is_none());
-    }
+    assert_eq!(attempts.load(Ordering::Relaxed), 3);
     let delivered = expected_status == BatchStatus::Delivered;
     assert_redis_metrics(
         &format!("{change:?}"),
@@ -207,47 +149,33 @@ fn channel_retry_service(
     change: SubscriptionChange,
     subscriber: Arc<tokio::sync::Mutex<redis::aio::PubSub>>,
     attempts: Arc<AtomicUsize>,
-    control: redis::aio::ConnectionManager,
-    username: String,
-    original_error: Arc<Mutex<Option<String>>>,
+    channel_prefix: String,
 ) -> impl Service<RedisRequest, Response = RedisResponse, Error = super::RedisSinkError, Future: Send>
 + Clone {
     tower::service_fn(move |request| {
         let attempt = attempts.fetch_add(1, Ordering::Relaxed);
         let mut service = service.clone();
         let subscriber = Arc::clone(&subscriber);
-        let mut control = control.clone();
-        let username = username.clone();
-        let original_error = Arc::clone(&original_error);
+        let channel_prefix = channel_prefix.clone();
         async move {
             let result = service.call(request).await;
-            if let Err(error) = &result {
-                *original_error.lock().unwrap() = Some(format!("{error:?}"));
-            }
             if attempt == 0 {
                 assert_eq!(result.as_ref().unwrap().event_status, [true, false]);
                 let mut subscriber = subscriber.lock().await;
                 let message = subscriber.on_message().next().await.unwrap();
                 assert_eq!(message.get_payload::<String>().unwrap(), "first");
                 subscriber
-                    .unsubscribe(format!("{username}-first"))
+                    .unsubscribe(format!("{channel_prefix}-first"))
                     .await
                     .unwrap();
                 match change {
                     SubscriptionChange::SubscribeOther => {
                         subscriber
-                            .subscribe(format!("{username}-second"))
+                            .subscribe(format!("{channel_prefix}-second"))
                             .await
                             .unwrap();
                     }
                     SubscriptionChange::Unsubscribe => {}
-                    SubscriptionChange::DenyExecute => {
-                        let _: () = redis::cmd("ACL")
-                            .arg(&["SETUSER", &username, "-exec"])
-                            .query_async(&mut control)
-                            .await
-                            .unwrap();
-                    }
                 }
             }
             result

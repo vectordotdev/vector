@@ -29,10 +29,7 @@ use crate::{
             ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
             VersionType,
             retry::ElasticsearchRetryLogic,
-            service::{
-                ElasticsearchRequest, ElasticsearchResponseService, ElasticsearchService,
-                HttpRequestBuilder,
-            },
+            service::{ElasticsearchRequest, ElasticsearchService, HttpRequestBuilder},
             sink::process_log,
         },
         util::{
@@ -146,28 +143,28 @@ async fn partial_retry_retains_permanent_failure_on_503() {
 }
 
 #[tokio::test]
-async fn partial_retry_retains_permanent_failure_on_success() {
+async fn partial_retry_success_accounting_is_unchanged() {
     assert_partial_retry_outcomes(
         &[
             PartialRetryResponse::Bulk(&[400, 429]),
             PartialRetryResponse::Status(StatusCode::OK),
         ],
         &[2, 1],
-        1,
+        0,
         BatchStatus::Delivered,
     )
     .await;
 }
 
 #[tokio::test]
-async fn partial_retry_transport_failure_excludes_confirmed_success() {
+async fn partial_retry_transport_error_accounting_is_unchanged() {
     assert_partial_retry_outcomes(
         &[
             PartialRetryResponse::Bulk(&[201, 400, 429]),
             PartialRetryResponse::TransportError,
         ],
         &[3, 1],
-        2,
+        3,
         BatchStatus::Rejected,
     )
     .await;
@@ -184,7 +181,7 @@ async fn partial_retry_accumulates_multiple_permanent_failures() {
                 PartialRetryResponse::Status(status),
             ],
             &[3, 2, 1],
-            if delivered { 2 } else { 3 },
+            if delivered { 0 } else { 3 },
             if delivered {
                 BatchStatus::Delivered
             } else {
@@ -207,21 +204,21 @@ async fn partial_retry_zero_budget_preserves_terminal_count() {
     assert_partial_retry_outcomes(
         &[PartialRetryResponse::Bulk(&[201, 429])],
         &[2],
-        1,
+        2,
         BatchStatus::Rejected,
     )
     .await;
 }
 
 #[tokio::test]
-async fn partial_retry_terminal_bulk_excludes_confirmed_successes() {
+async fn partial_retry_rejected_accounting_is_unchanged() {
     assert_partial_retry_outcomes(
         &[
             PartialRetryResponse::Bulk(&[201, 400, 429, 429]),
             PartialRetryResponse::Bulk(&[201, 400]),
         ],
         &[4, 2],
-        2,
+        4,
         BatchStatus::Rejected,
     )
     .await;
@@ -292,7 +289,7 @@ fn assert_partial_retry_outcomes<'a>(
             },
             JitterMode::None,
         );
-        let service = ElasticsearchResponseService::new(Retry::new(retry_policy, service));
+        let service = Retry::new(retry_policy, service);
         let (batch, receiver) = BatchNotifier::new_with_receiver();
         let events = (0..expected_batch_sizes[0])
             .map(|id| {
@@ -335,7 +332,7 @@ fn assert_partial_retry_metrics(
     } else {
         0
     };
-    let errors = usize::from(status != BatchStatus::Delivered || discarded > 0);
+    let errors = usize::from(status != BatchStatus::Delivered);
     for (name, expected) in [
         ("component_discarded_events_total", discarded),
         ("component_errors_total", errors),

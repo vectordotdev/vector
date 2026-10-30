@@ -19,16 +19,10 @@ pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> &GroupedCountByteSize;
 
-    /// Number of events discarded by this terminal response, when known.
-    /// Partial retries can reduce this below the original request's event count.
-    /// A successful response can still report permanent failures from earlier attempts.
-    /// Defaults to using the original request's count for failed responses.
+    /// Number of events discarded by a terminal `Errored` response, when known.
+    /// Excludes confirmed deliveries from earlier attempts of the same request.
+    /// Defaults to the original request's count; other statuses do not use this override.
     fn events_dropped(&self) -> Option<usize> {
-        None
-    }
-
-    /// Underlying error for a terminal response that also carries delivery progress.
-    fn error(&self) -> Option<&dyn fmt::Debug> {
         None
     }
 
@@ -240,7 +234,7 @@ where
                     request_error_status,
                     EventStatus::Rejected | EventStatus::Errored
                 ) {
-                    Self::emit_call_error(Some(&error), request_id, event_count);
+                    Self::emit_call_error(Some(error), request_id, event_count);
                 } else {
                     error!(message = "Request failed.", ?error, request_id);
                 }
@@ -257,19 +251,17 @@ where
                     }
 
                     response.events_sent().emit_event(events_sent);
-                    if let Some(count) = response.events_dropped().filter(|count| *count > 0) {
-                        Self::emit_call_error(response.error(), request_id, count);
-                    }
                 } else if matches!(
                     response.event_status(),
                     EventStatus::Rejected | EventStatus::Errored
                 ) {
                     // The retry service has finished; either outcome abandons these events.
-                    Self::emit_call_error(
-                        response.error(),
-                        request_id,
-                        response.events_dropped().unwrap_or(event_count),
-                    );
+                    let count = if response.event_status() == EventStatus::Errored {
+                        response.events_dropped().unwrap_or(event_count)
+                    } else {
+                        event_count
+                    };
+                    Self::emit_call_error(None, request_id, count);
                 }
             }
         }
@@ -278,7 +270,7 @@ where
 
     /// Emit the `Error` and `EventsDropped` internal events.
     /// This scenario occurs after retries have been attempted.
-    fn emit_call_error(error: Option<&dyn fmt::Debug>, request_id: usize, count: usize) {
+    fn emit_call_error(error: Option<Svc::Error>, request_id: usize, count: usize) {
         emit(CallError {
             error,
             request_id,
@@ -464,12 +456,7 @@ mod tests {
         }
     }
 
-    struct StatusResponse(
-        EventStatus,
-        GroupedCountByteSize,
-        Option<usize>,
-        Option<&'static str>,
-    );
+    struct StatusResponse(EventStatus, GroupedCountByteSize, Option<usize>);
 
     impl DriverResponse for StatusResponse {
         fn event_status(&self) -> EventStatus {
@@ -482,10 +469,6 @@ mod tests {
 
         fn events_dropped(&self) -> Option<usize> {
             self.2
-        }
-
-        fn error(&self) -> Option<&dyn std::fmt::Debug> {
-            self.3.as_ref().map(|error| error as &dyn std::fmt::Debug)
         }
     }
 
@@ -502,10 +485,10 @@ mod tests {
         let controller = Controller::get().unwrap();
         for (status, dropped, expected_batch_status, expected_discarded) in [
             (Some(Delivered), None, BatchStatus::Delivered, 0.0),
-            (Some(Delivered), Some(1), BatchStatus::Delivered, 1.0),
+            (Some(Delivered), Some(1), BatchStatus::Delivered, 0.0),
             (Some(Rejected), None, BatchStatus::Rejected, 3.0),
             (Some(Errored), None, BatchStatus::Errored, 3.0),
-            (Some(Rejected), Some(1), BatchStatus::Rejected, 1.0),
+            (Some(Rejected), Some(1), BatchStatus::Rejected, 3.0),
             (Some(Errored), Some(1), BatchStatus::Errored, 1.0),
             (Some(Errored), Some(0), BatchStatus::Errored, 0.0),
             (None, None, BatchStatus::Rejected, 3.0),
@@ -523,13 +506,11 @@ mod tests {
                     Some(status) => Ok(StatusResponse(
                         status,
                         if status == EventStatus::Delivered {
-                            CountByteSize(event_count - dropped.unwrap_or(0), JsonSize::new(12))
-                                .into()
+                            CountByteSize(event_count, JsonSize::new(12)).into()
                         } else {
                             GroupedCountByteSize::default()
                         },
                         dropped,
-                        (status == Rejected).then_some("transport failed"),
                     )),
                     None => Err("request failed"),
                 })
@@ -558,21 +539,13 @@ mod tests {
             assert_eq!(
                 counter("component_sent_events_total"),
                 MetricValue::Counter {
-                    value: if delivered {
-                        3.0 - expected_discarded
-                    } else {
-                        0.0
-                    }
+                    value: if delivered { 3.0 } else { 0.0 }
                 }
             );
             assert_eq!(
                 counter("component_errors_total"),
                 MetricValue::Counter {
-                    value: if delivered && dropped.unwrap_or(0) == 0 {
-                        0.0
-                    } else {
-                        1.0
-                    }
+                    value: if delivered { 0.0 } else { 1.0 }
                 }
             );
             assert_eq!(
@@ -581,7 +554,7 @@ mod tests {
                     value: expected_discarded
                 }
             );
-            if !delivered || dropped.unwrap_or(0) > 0 {
+            if !delivered {
                 let discarded = metrics
                     .iter()
                     .find(|metric| metric.name() == "component_discarded_events_total")
