@@ -52,9 +52,31 @@ const SUBNET_ID_KEY: &str = "subnet-id";
 const VPC_ID_KEY: &str = "vpc-id";
 const ROLE_NAME_KEY: &str = "role-name";
 const TAGS_KEY: &str = "tags";
+const PARTITION_KEY: &str = "partition";
+const DOMAIN_KEY: &str = "domain";
+const AVAILABILITY_ZONE_ID_KEY: &str = "availability-zone-id";
+const PLACEMENT_GROUP_NAME_KEY: &str = "placement-group-name";
+const PLACEMENT_PARTITION_NUMBER_KEY: &str = "placement-partition-number";
+const HOST_ID_KEY: &str = "host-id";
+const AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY: &str = "autoscaling-target-lifecycle-state";
 
 static AVAILABILITY_ZONE: LazyLock<PathAndQuery> =
     LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
+static AVAILABILITY_ZONE_ID: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone-id"));
+static PARTITION: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/services/partition"));
+static DOMAIN: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/services/domain"));
+static PLACEMENT_GROUP_NAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/group-name"));
+static PLACEMENT_PARTITION_NUMBER: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/partition-number"));
+static HOST_ID: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/host-id"));
+static AUTOSCALING_TARGET_LIFECYCLE_STATE: LazyLock<PathAndQuery> = LazyLock::new(|| {
+    PathAndQuery::from_static("/latest/meta-data/autoscaling/target-lifecycle-state")
+});
 static LOCAL_HOSTNAME: LazyLock<PathAndQuery> =
     LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
 static LOCAL_IPV4: LazyLock<PathAndQuery> =
@@ -185,6 +207,7 @@ struct Keys {
     account_id: MetadataKey,
     ami_id: MetadataKey,
     availability_zone: MetadataKey,
+    availability_zone_id: MetadataKey,
     instance_id: MetadataKey,
     instance_type: MetadataKey,
     local_hostname: MetadataKey,
@@ -192,6 +215,12 @@ struct Keys {
     public_hostname: MetadataKey,
     public_ipv4: MetadataKey,
     region: MetadataKey,
+    partition: MetadataKey,
+    domain: MetadataKey,
+    placement_group_name: MetadataKey,
+    placement_partition_number: MetadataKey,
+    host_id: MetadataKey,
+    autoscaling_target_lifecycle_state: MetadataKey,
     subnet_id: MetadataKey,
     vpc_id: MetadataKey,
     role_name: MetadataKey,
@@ -267,6 +296,7 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.account_id.log_path,
             &added_keys.ami_id.log_path,
             &added_keys.availability_zone.log_path,
+            &added_keys.availability_zone_id.log_path,
             &added_keys.instance_id.log_path,
             &added_keys.instance_type.log_path,
             &added_keys.local_hostname.log_path,
@@ -274,6 +304,12 @@ impl TransformConfig for Ec2Metadata {
             &added_keys.public_hostname.log_path,
             &added_keys.public_ipv4.log_path,
             &added_keys.region.log_path,
+            &added_keys.partition.log_path,
+            &added_keys.domain.log_path,
+            &added_keys.placement_group_name.log_path,
+            &added_keys.placement_partition_number.log_path,
+            &added_keys.host_id.log_path,
+            &added_keys.autoscaling_target_lifecycle_state.log_path,
             &added_keys.subnet_id.log_path,
             &added_keys.vpc_id.log_path,
             &added_keys.role_name.log_path,
@@ -492,6 +528,57 @@ impl MetadataClient {
                 new_state.push((self.keys.availability_zone.clone(), availability_zone));
             }
 
+            if self.fields.contains(AVAILABILITY_ZONE_ID_KEY)
+                && let Some(availability_zone_id) = self.get_metadata(&AVAILABILITY_ZONE_ID).await?
+            {
+                new_state.push((self.keys.availability_zone_id.clone(), availability_zone_id));
+            }
+
+            if self.fields.contains(PARTITION_KEY)
+                && let Some(partition) = self.get_metadata(&PARTITION).await?
+            {
+                new_state.push((self.keys.partition.clone(), partition));
+            }
+
+            if self.fields.contains(DOMAIN_KEY)
+                && let Some(domain) = self.get_metadata(&DOMAIN).await?
+            {
+                new_state.push((self.keys.domain.clone(), domain));
+            }
+
+            if self.fields.contains(PLACEMENT_GROUP_NAME_KEY)
+                && let Some(placement_group_name) = self.get_metadata(&PLACEMENT_GROUP_NAME).await?
+            {
+                new_state.push((self.keys.placement_group_name.clone(), placement_group_name));
+            }
+
+            if self.fields.contains(PLACEMENT_PARTITION_NUMBER_KEY)
+                && let Some(placement_partition_number) =
+                    self.get_metadata(&PLACEMENT_PARTITION_NUMBER).await?
+            {
+                new_state.push((
+                    self.keys.placement_partition_number.clone(),
+                    placement_partition_number,
+                ));
+            }
+
+            if self.fields.contains(HOST_ID_KEY)
+                && let Some(host_id) = self.get_metadata(&HOST_ID).await?
+            {
+                new_state.push((self.keys.host_id.clone(), host_id));
+            }
+
+            if self.fields.contains(AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY)
+                && let Some(autoscaling_target_lifecycle_state) = self
+                    .get_metadata(&AUTOSCALING_TARGET_LIFECYCLE_STATE)
+                    .await?
+            {
+                new_state.push((
+                    self.keys.autoscaling_target_lifecycle_state.clone(),
+                    autoscaling_target_lifecycle_state,
+                ));
+            }
+
             if self.fields.contains(LOCAL_HOSTNAME_KEY)
                 && let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await?
             {
@@ -674,6 +761,7 @@ impl Keys {
             account_id: create_key(namespace.as_ref(), ACCOUNT_ID_KEY),
             ami_id: create_key(namespace.as_ref(), AMI_ID_KEY),
             availability_zone: create_key(namespace.as_ref(), AVAILABILITY_ZONE_KEY),
+            availability_zone_id: create_key(namespace.as_ref(), AVAILABILITY_ZONE_ID_KEY),
             instance_id: create_key(namespace.as_ref(), INSTANCE_ID_KEY),
             instance_type: create_key(namespace.as_ref(), INSTANCE_TYPE_KEY),
             local_hostname: create_key(namespace.as_ref(), LOCAL_HOSTNAME_KEY),
@@ -681,6 +769,18 @@ impl Keys {
             public_hostname: create_key(namespace.as_ref(), PUBLIC_HOSTNAME_KEY),
             public_ipv4: create_key(namespace.as_ref(), PUBLIC_IPV4_KEY),
             region: create_key(namespace.as_ref(), REGION_KEY),
+            partition: create_key(namespace.as_ref(), PARTITION_KEY),
+            domain: create_key(namespace.as_ref(), DOMAIN_KEY),
+            placement_group_name: create_key(namespace.as_ref(), PLACEMENT_GROUP_NAME_KEY),
+            placement_partition_number: create_key(
+                namespace.as_ref(),
+                PLACEMENT_PARTITION_NUMBER_KEY,
+            ),
+            host_id: create_key(namespace.as_ref(), HOST_ID_KEY),
+            autoscaling_target_lifecycle_state: create_key(
+                namespace.as_ref(),
+                AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY,
+            ),
             subnet_id: create_key(namespace.as_ref(), SUBNET_ID_KEY),
             vpc_id: create_key(namespace.as_ref(), VPC_ID_KEY),
             role_name: create_key(namespace.as_ref(), ROLE_NAME_KEY),
@@ -717,13 +817,137 @@ enum Ec2MetadataError {
 
 #[cfg(test)]
 mod test {
+    use std::sync::{Arc, Mutex};
+
     use vector_lib::lookup::OwnedTargetPath;
     use vrl::{owned_value_path, value::Kind};
 
+    use super::*;
     use crate::{
         config::{LogNamespace, OutputId, TransformConfig, TransformContext, schema::Definition},
+        event::{LogEvent, Metric, MetricKind, metric::MetricValue},
+        test_util::http::spawn_blackhole_http_server,
         transforms::aws_ec2_metadata::Ec2Metadata,
     };
+
+    const ADDITIONAL_CATEGORIES: [(&str, &str, &str); 7] = [
+        (
+            AVAILABILITY_ZONE_ID_KEY,
+            "/latest/meta-data/placement/availability-zone-id",
+            "use1-az1",
+        ),
+        (PARTITION_KEY, "/latest/meta-data/services/partition", "aws"),
+        (
+            DOMAIN_KEY,
+            "/latest/meta-data/services/domain",
+            "amazonaws.com",
+        ),
+        (
+            PLACEMENT_GROUP_NAME_KEY,
+            "/latest/meta-data/placement/group-name",
+            "test-group",
+        ),
+        (
+            PLACEMENT_PARTITION_NUMBER_KEY,
+            "/latest/meta-data/placement/partition-number",
+            "2",
+        ),
+        (HOST_ID_KEY, "/latest/meta-data/placement/host-id", "h-test"),
+        (
+            AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY,
+            "/latest/meta-data/autoscaling/target-lifecycle-state",
+            "InService",
+        ),
+    ];
+
+    #[tokio::test]
+    async fn additional_categories_are_selected_and_enrich_logs_and_metrics() {
+        let all: Vec<_> = ADDITIONAL_CATEGORIES
+            .iter()
+            .map(|(field, _, _)| *field)
+            .collect();
+        for (selected, missing) in [
+            (all.clone(), None),
+            (vec![PARTITION_KEY], None),
+            (all, Some(HOST_ID_KEY)),
+        ] {
+            let requests = Arc::new(Mutex::new(Vec::new()));
+            let endpoint = spawn_blackhole_http_server({
+                let requests = Arc::clone(&requests);
+                move |request: http::Request<Body>| {
+                    let path = request.uri().path();
+                    requests.lock().unwrap().push(path.to_owned());
+                    let (status, body) = if path == "/latest/api/token" {
+                        assert_eq!(request.method(), http::Method::PUT);
+                        (StatusCode::OK, "test-token")
+                    } else {
+                        assert_eq!(request.headers()["x-aws-ec2-metadata-token"], "test-token");
+                        if path == "/latest/dynamic/instance-identity/document" {
+                            (StatusCode::OK, r#"{"accountId":"test-account","architecture":"x86_64","imageId":"ami-test","instanceId":"i-test","instanceType":"t3.micro","privateIp":"192.0.2.1","region":"us-east-1","version":"2017-09-30"}"#)
+                        } else {
+                            ADDITIONAL_CATEGORIES.iter()
+                                .find(|(field, uri, _)| *uri == path && Some(*field) != missing)
+                                .map_or((StatusCode::NOT_FOUND, ""), |(_, _, value)| (StatusCode::OK, *value))
+                        }
+                    };
+                    std::future::ready(Ok::<_, std::convert::Infallible>(
+                        http::Response::builder().status(status).body(Body::from(body)).unwrap(),
+                    ))
+                }
+            }).await;
+            let state = Arc::new(ArcSwap::from_pointee(Vec::new()));
+            let mut client = MetadataClient::new(
+                HttpClient::new(None, &ProxyConfig::default()).unwrap(),
+                endpoint,
+                Keys::new(Some(
+                    OwnedTargetPath::event(owned_value_path!("ec2")).into(),
+                )),
+                Arc::clone(&state),
+                Duration::from_mins(1),
+                Duration::from_secs(5),
+                selected.iter().map(|field| (*field).to_owned()).collect(),
+                Vec::new(),
+            );
+            client.refresh_metadata().await.unwrap();
+            let mut transform = Ec2MetadataTransform {
+                state: Arc::clone(&state),
+            };
+            let log = transform.transform_one(Event::Log(LogEvent::default()));
+            let metric = transform.transform_one(Event::Metric(Metric::new(
+                "test",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )));
+            let metadata = state.load();
+            assert_eq!(
+                metadata.len(),
+                selected
+                    .iter()
+                    .filter(|field| Some(**field) != missing)
+                    .count()
+            );
+            for (field, uri, value) in ADDITIONAL_CATEGORIES {
+                assert_eq!(
+                    requests.lock().unwrap().iter().any(|path| path == uri),
+                    selected.contains(&field)
+                );
+                if selected.contains(&field) && Some(field) != missing {
+                    let key = metadata
+                        .iter()
+                        .find(|(key, _)| key.metric_tag == format!("ec2.{field}"))
+                        .unwrap();
+                    assert_eq!(
+                        log.as_log().get(&key.0.log_path),
+                        Some(&vrl::value::Value::from(value))
+                    );
+                    assert_eq!(
+                        metric.as_metric().tags().unwrap().get(&key.0.metric_tag),
+                        Some(value)
+                    );
+                }
+            }
+        }
+    }
 
     #[tokio::test]
     async fn schema_def_with_string_input() {

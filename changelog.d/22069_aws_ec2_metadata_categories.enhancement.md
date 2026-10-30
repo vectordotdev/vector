@@ -1,0 +1,3 @@
+The `aws_ec2_metadata` transform now supports additional IMDS instance metadata categories. The following fields can now be requested via the `fields` option: `availability-zone-id`, `partition`, `domain`, `placement-group-name`, `placement-partition-number`, `host-id`, and `autoscaling-target-lifecycle-state`.
+
+These are useful for locating impacted instances (for example, by availability zone ID, which is consistent across accounts, or by Dedicated Host ID) and for correlating EC2 Auto Scaling lifecycle events with on-instance events. As with the existing optional fields, these are only fetched when explicitly listed in `fields`.
