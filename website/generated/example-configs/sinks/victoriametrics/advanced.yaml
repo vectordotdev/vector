@@ -1,0 +1,11 @@
+sinks:
+  my_sink_id:
+    type: victoriametrics
+    inputs:
+      - my-source-or-transform-id
+    compression_level: 3
+    dangerously_allow_unconfined_template_resolution: false
+    default_namespace: service
+    endpoint: http://localhost:8428
+    expire_metrics_secs: 300.0
+    send_metadata: true
