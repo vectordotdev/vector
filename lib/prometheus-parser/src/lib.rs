@@ -1003,11 +1003,6 @@ mod test {
         });
     }
 
-    /// `OpenMetrics` only recommends the `_sum` series for histograms, and forbids it once negative
-    /// bucket thresholds are used, so an exposition can legitimately omit it. Both the
-    /// OpenTelemetry Collector's remote-write exporter and the Prometheus server's own OTLP
-    /// receiver drop it when an OTLP histogram carries no sum. That has to stay distinguishable
-    /// from a reported sum of zero.
     #[test]
     fn parse_request_histogram_without_sum() {
         let parsed = parse_request(

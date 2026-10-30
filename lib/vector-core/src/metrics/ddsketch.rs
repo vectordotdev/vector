@@ -801,35 +801,10 @@ impl AgentDDSketch {
                 let true_count = *count;
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
-                // Some sources hand us fewer buckets than the histogram's true
-                // total count -- notably Prometheus, which always drops its
-                // cumulative "+Inf" bucket once converted to deltas, so any
-                // observations beyond the last finite bound go missing from the
-                // buckets we actually receive. In that case, `sketch.count()`
-                // (built purely from those buckets) won't match the histogram's
-                // own exact `count`. We can't just use `true_count` as the divisor
-                // for `avg` while leaving `sketch.count()` as-is: the encoder
-                // reports `sketch.count()` as the sketch's `cnt`, so a mismatched
-                // pair would ship e.g. `cnt=4` alongside `sum`/`avg` that reflect
-                // all 10 true observations, corrupting the `sum`/`avg`/`cnt`
-                // invariant for downstream consumers. So only apply the exact
-                // override when the counts agree; otherwise, fall back to the
-                // bucket-derived `sum`/`avg`, which stay self-consistent with
-                // `sketch.count()` since both are derived from the same
-                // (possibly incomplete) buckets.
-                //
-                // The histogram also has to have reported a sum in the first place.
-                // OTLP leaves it unset for histograms recording negative values,
-                // and OpenMetrics allows an exposition to omit the `_sum` series
-                // entirely, so there is often nothing exact to substitute. Those
-                // histograms keep the bucket-derived estimate, which is the best
-                // available answer rather than a confident zero.
-                //
-                // When present, the exact `sum` still has to actually be a number.
-                // Vector's Prometheus parser accepts `NaN`/`+Inf`/`-Inf` as metric
-                // values (see `parse_value` in `lib/prometheus-parser/src/line.rs`),
-                // so a scraped `_sum` can be non-finite, and OTLP's `sum` is an
-                // unvalidated `double`.
+                // Prefer the histogram's exact sum over the bucket estimate, but only when it is
+                // reported, finite, and matches the buckets' count. Prometheus drops its `+Inf`
+                // bucket, so buckets can undercount; mixing an exact `sum`/`avg` with the buckets'
+                // `cnt` would then break `avg == sum / cnt` downstream.
                 if let Some(true_sum) = true_sum
                     && true_count > 0
                     && true_count == u64::from(sketch.count())
@@ -841,12 +816,7 @@ impl AgentDDSketch {
                     )]
                     let true_count_f64 = true_count as f64;
                     sketch.avg = true_sum / true_count_f64;
-                    // Interpolation places `min`/`max` at a bucket edge, which can
-                    // fall outside this exact `avg` -- most notably for the
-                    // unbounded first/last bucket, where interpolation collapses
-                    // to a single point mass. Extend them just enough to keep the
-                    // reported summary stats internally consistent
-                    // (`min <= avg <= max`).
+                    // Interpolation puts `min`/`max` on bucket edges, which can exclude the exact `avg`.
                     sketch.min = sketch.min.min(sketch.avg);
                     sketch.max = sketch.max.max(sketch.avg);
                     sketch.sum = true_sum;
