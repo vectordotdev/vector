@@ -3718,7 +3718,7 @@ impl ValidatableComponent for DatadogAgentConfig {
         // TODO set up separate test cases for metrics and traces endpoints
 
         let logs_addr = format!("http://{}/api/v2/logs", config.address);
-        let uri = http_0::Uri::try_from(&logs_addr).expect("should not fail to parse URI");
+        let uri = http::Uri::try_from(&logs_addr).expect("should not fail to parse URI");
 
         let decoder = DecodingConfig::new(
             config.framing.clone(),

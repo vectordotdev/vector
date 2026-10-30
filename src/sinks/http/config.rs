@@ -587,6 +587,7 @@ mod tests {
             };
 
             let endpoint = "http://127.0.0.1:9000/endpoint";
+            let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");
 
             let config = HttpSinkConfig {
                 uri: UriTemplate::try_from(endpoint).expect("should never fail to parse"),
@@ -614,10 +615,7 @@ mod tests {
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(
-                    http_0::Uri::from_str(endpoint).expect("should never fail to parse"),
-                    Some(http_0::Method::POST),
-                ),
+                HttpResourceConfig::from_parts(uri.uri, Some(http::Method::POST)),
                 config.encoding.clone(),
             );
 

@@ -481,13 +481,10 @@ mod tests {
                 confinement: ConfinementConfig::default(),
             };
 
-            // The component validation harness still takes an `http` 0.2 `Uri`.
-            let endpoint: http_0::Uri = endpoint
+            let endpoint = endpoint
                 .append_path("services/collector/raw")
                 .unwrap()
-                .to_string()
-                .parse()
-                .unwrap();
+                .into_uri();
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,

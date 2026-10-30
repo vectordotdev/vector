@@ -650,7 +650,7 @@ mod test {
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
                 HttpResourceConfig::from_parts(
-                    http_0::Uri::try_from(&logs_endpoint).expect("should not fail to parse URI"),
+                    http::Uri::try_from(&logs_endpoint).expect("should not fail to parse URI"),
                     None,
                 ),
                 encoding,

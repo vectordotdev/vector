@@ -2086,7 +2086,7 @@ mod tests {
 
     use chrono::{TimeZone, Utc};
     use futures_util::Stream;
-    use http_0::Uri;
+    use http::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
     use vector_lib::{
