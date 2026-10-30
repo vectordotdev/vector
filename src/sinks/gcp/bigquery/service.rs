@@ -156,11 +156,12 @@ impl DriverResponse for BigqueryResponse {
                     tonic::Code::InvalidArgument
                     | tonic::Code::NotFound
                     | tonic::Code::AlreadyExists
-                    // PermissionDenied requires human action (IAM changes) to resolve, so fail fast.
+                    // PermissionDenied requires human action (IAM changes) to resolve.
                     | tonic::Code::PermissionDenied
                     | tonic::Code::FailedPrecondition
                     | tonic::Code::OutOfRange
-                    | tonic::Code::Unimplemented => EventStatus::Rejected,
+                    | tonic::Code::Unimplemented
+                    | tonic::Code::DataLoss => EventStatus::Rejected,
                     // Everything else (including Unauthenticated, since a bearer token may have
                     // just expired and a retry will pick up the refreshed token) is transient.
                     _ => EventStatus::Errored,
