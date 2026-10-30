@@ -1,11 +1,13 @@
 features:
   - gcp-integration-tests
+  - gcp-bigquery-integration-tests
   - gcp-pubsub-integration-tests
 
 test_filter: "::gcp"
 
 env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681
+  BIGQUERY_EMULATOR_ADDRESS: http://bigquery-emulator:9060
 
 matrix:
   version: [latest]
