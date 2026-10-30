@@ -175,7 +175,7 @@ impl<Request> Clone for GcsRetryLogic<Request> {
     }
 }
 
-// This is a clone of HttpRetryLogic for `GcsResponse`, should get merged
+// Mirrors `RetryStrategy::Default` for `GcsResponse`, but also retries 401 Unauthorized
 impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
     type Error = hyper_1::Error;
     type Request = Request;
