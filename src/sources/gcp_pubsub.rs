@@ -1083,7 +1083,7 @@ mod tests {
         let component = crate::config::ComponentKey::from("pubsub");
         let (out, _events) = SourceSender::new_test();
         let (mut context, mut shutdown) = SourceContext::new_shutdown(&component, out);
-        context.acknowledgements = acknowledgements;
+        context.acknowledgements = Some(acknowledgements);
         let source = tokio::spawn(config.build(context).await.unwrap());
         timeout(Duration::from_secs(10), ready).await.unwrap();
 
@@ -1198,7 +1198,7 @@ mod tests {
         // `send_batch` on the third batch.
         let (out, mut batches) = SourceSender::new_test_sender_with_options(1, None);
         let (mut context, mut shutdown) = SourceContext::new_shutdown(&component, out);
-        context.acknowledgements = true;
+        context.acknowledgements = Some(true);
         let source = tokio::spawn(test_config(endpoint).build(context).await.unwrap());
 
         let first = timeout(Duration::from_secs(10), batches.next())

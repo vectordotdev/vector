@@ -272,7 +272,7 @@ impl Config {
             let component = &input.component;
             if let Some(source) = self.sources.get_mut(component) {
                 if source.inner.can_acknowledge() {
-                    source.sink_acknowledgements = true;
+                    source.sink_acknowledgements = Some(true);
                 } else {
                     warn!(
                         message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
@@ -1257,8 +1257,8 @@ mod acknowledgements_tests {
         .unwrap();
 
         for source in config.sources.values() {
-            assert!(
-                !source.sink_acknowledgements,
+            assert_eq!(
+                source.sink_acknowledgements, None,
                 "Source `sink_acknowledgements` should be `false` before propagation"
             );
         }
@@ -1266,9 +1266,9 @@ mod acknowledgements_tests {
         let config = config.build().unwrap();
 
         let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
-        assert!(!get("in1").sink_acknowledgements);
-        assert!(get("in2").sink_acknowledgements);
-        assert!(get("in3").sink_acknowledgements);
+        assert_eq!(get("in1").sink_acknowledgements, None);
+        assert_eq!(get("in2").sink_acknowledgements, Some(true));
+        assert_eq!(get("in3").sink_acknowledgements, Some(true));
     }
 }
 

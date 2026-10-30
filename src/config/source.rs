@@ -59,7 +59,7 @@ pub struct SourceOuter {
     pub graph: GraphConfig,
 
     #[serde(default, skip)]
-    pub sink_acknowledgements: bool,
+    pub sink_acknowledgements: Option<bool>,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
@@ -71,7 +71,7 @@ impl SourceOuter {
         Self {
             proxy: ProxyConfig::default(),
             graph: GraphConfig::default(),
-            sink_acknowledgements: false,
+            sink_acknowledgements: None,
             inner: inner.into(),
         }
     }
@@ -136,7 +136,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
-    pub acknowledgements: bool,
+    pub acknowledgements: Option<bool>,
     pub schema: schema::Options,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
@@ -173,7 +173,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 proxy: ProxyConfig::default(),
-                acknowledgements: false,
+                acknowledgements: Some(false),
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
                 extra_context: ExtraContext::default(),
@@ -201,7 +201,7 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: ProxyConfig::default(),
-            acknowledgements: false,
+            acknowledgements: Some(false),
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
             extra_context: ExtraContext::default(),
@@ -218,8 +218,8 @@ impl SourceContext {
         }
 
         config
-            .merge_default(&self.globals.acknowledgements)
             .merge_default(&self.acknowledgements.into())
+            .merge_default(&self.globals.acknowledgements)
             .enabled()
     }
 
@@ -244,15 +244,15 @@ mod tests {
     fn do_acknowledgments() {
         // Global acknowledgment, sink acknowledgment, expected acknowledgment result
         let test_data_set = [
-            (None, false, false),
-            (None, true, true),
-            (None, false, false),
-            (Some(true), false, false),
-            (Some(true), true, true),
-            (Some(true), false, false),
-            (Some(false), false, false),
-            (Some(false), true, true),
-            (Some(false), false, false),
+            (None, None, false),
+            (None, Some(true), true),
+            (None, Some(false), false),
+            (Some(true), None, true),
+            (Some(true), Some(true), true),
+            (Some(true), Some(false), false),
+            (Some(false), None, false),
+            (Some(false), Some(true), true),
+            (Some(false), Some(false), false),
         ];
 
         test_data_set.iter().for_each(|test_data| {
