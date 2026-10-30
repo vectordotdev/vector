@@ -25,6 +25,7 @@ use crate::{
 struct VisibilityGate {
     hide_reads: Arc<AtomicBool>,
     eof_reads: Arc<AtomicUsize>,
+    read_calls: Arc<AtomicUsize>,
 }
 
 #[derive(Debug)]
@@ -39,6 +40,7 @@ impl AsyncRead for VisibilityFile {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
+        self.gate.read_calls.fetch_add(1, Ordering::Relaxed);
         if self.gate.hide_reads.load(Ordering::Acquire) {
             self.gate.eof_reads.fetch_add(1, Ordering::Relaxed);
             return Poll::Ready(Ok(()));
@@ -203,6 +205,85 @@ async fn caught_up_reader_does_not_poll_while_waiting_for_new_progress() {
                     .is_pending()
             );
             assert_eq!(gate.eof_reads.load(Ordering::Relaxed), initial);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn dropped_tail_does_not_retry_eof_for_earlier_unacknowledged_data() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+        async move {
+            let gate = VisibilityGate::default();
+            let config = DiskBufferConfigBuilder::from_path(data_dir)
+                .filesystem(gate.clone())
+                .build()
+                .unwrap();
+            let (mut writer, mut reader, ledger) =
+                Buffer::from_config_inner(config, BufferUsageHandle::noop())
+                    .await
+                    .unwrap();
+            let first_bytes = writer.write_record(SizedRecord::new(128)).await.unwrap();
+            let bad_bytes = writer.write_record(SizedRecord::new(129)).await.unwrap();
+            writer.flush().await.unwrap();
+            let path = ledger.get_current_writer_data_file_path();
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while tokio::fs::metadata(&path).await.unwrap().len()
+                    < (first_bytes + bad_bytes) as u64
+                {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+            super::known_errors::corrupt_record_checksum(
+                &path,
+                first_bytes,
+                first_bytes + bad_bytes,
+            )
+            .await;
+
+            // Keep the first delivery unacknowledged while the corrupt final frame is consumed.
+            let first = reader.next().await.unwrap().unwrap();
+            assert_eq!(first, SizedRecord::new(128));
+            assert!(reader.next().await.unwrap_err().is_bad_read());
+            assert_eq!(ledger.get_total_buffer_size(), first_bytes as u64);
+            let mut waiting = Box::pin(reader.next());
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut waiting)
+                    .await
+                    .is_err()
+            );
+            let initial = gate.read_calls.load(Ordering::Relaxed);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(250), &mut waiting)
+                    .await
+                    .is_err()
+            );
+            assert_eq!(
+                gate.read_calls.load(Ordering::Relaxed),
+                initial,
+                "consumed corrupt bytes must not keep EOF retries alive"
+            );
+            drop(waiting);
+
+            // New published bytes must still retry visibility after the corrupt frame.
+            gate.hide_reads.store(true, Ordering::Release);
+            writer.write_record(SizedRecord::new(130)).await.unwrap();
+            writer.flush().await.unwrap();
+            let release = gate.clone();
+            let release_task = tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                release.hide_reads.store(false, Ordering::Release);
+            });
+            let next = tokio::time::timeout(Duration::from_secs(1), reader.next())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(next, Some(SizedRecord::new(130)));
+            release_task.await.unwrap();
+            drop(first);
         }
     })
     .await;

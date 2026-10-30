@@ -430,6 +430,7 @@ where
     reader: Option<RecordReader<FS::File, T>>,
     pending_read_token: Option<ReadToken>,
     bytes_read: u64,
+    unacknowledged_read_bytes: u64,
     last_reader_record_id: u64,
     data_file_start_record_id: Option<u64>,
     data_file_record_count: u64,
@@ -457,6 +458,7 @@ where
             reader: None,
             pending_read_token: None,
             bytes_read: 0,
+            unacknowledged_read_bytes: 0,
             last_reader_record_id: 0,
             data_file_start_record_id: None,
             data_file_record_count: 0,
@@ -517,6 +519,10 @@ where
         // We've done a "real" record read, so we need to track it for acknowledgement.  Check our
         // acknowledge state first to see if this is the next record ID we expected.
         self.data_file_record_count += 1;
+        self.unacknowledged_read_bytes = self
+            .unacknowledged_read_bytes
+            .checked_add(record_bytes)
+            .expect("unacknowledged read bytes should not overflow");
         if let Err(me) =
             self.record_acks
                 .add_marker(record_id, Some(event_count.get()), Some(record_bytes))
@@ -671,6 +677,10 @@ where
             if had_eligible_records {
                 self.ledger
                     .track_reads(events_acknowledged, bytes_acknowledged);
+                self.unacknowledged_read_bytes = self
+                    .unacknowledged_read_bytes
+                    .checked_sub(bytes_acknowledged)
+                    .expect("cannot acknowledge more bytes than were read");
 
                 // We need to account for skipped events, too, so that our "last reader record ID"
                 // value stays correct as we process these gap markers.
@@ -1153,8 +1163,11 @@ where
 
                 let writer_next_record_id = self.ledger.state().get_next_writer_record_id();
                 if self.last_reader_record_id.saturating_add(1) < writer_next_record_id
-                    && self.ledger.get_total_buffer_size() != 0
+                    && self.ledger.get_total_buffer_size() > self.unacknowledged_read_bytes
                 {
+                    // Occupancy includes delivered records awaiting acknowledgement. Only
+                    // bytes beyond those already consumed can still be becoming visible;
+                    // dropped corrupt frames have already been removed from occupancy.
                     // Tokio files can accept a write before its blocking I/O is visible here.
                     // Published progress says data is already on its way: waiting only for a new
                     // writer notification can miss it forever if this was the final write.

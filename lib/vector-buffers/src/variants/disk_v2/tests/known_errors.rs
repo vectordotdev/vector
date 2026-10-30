@@ -42,7 +42,11 @@ impl AsMetadata for u32 {
     }
 }
 
-async fn corrupt_record_checksum(data_file_path: &PathBuf, record_start: usize, record_end: usize) {
+pub(super) async fn corrupt_record_checksum(
+    data_file_path: &PathBuf,
+    record_start: usize,
+    record_end: usize,
+) {
     let data_file = OpenOptions::new()
         .read(true)
         .write(true)
