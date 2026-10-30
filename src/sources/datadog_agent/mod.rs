@@ -3,6 +3,7 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
+pub mod apm_stats;
 pub mod llmobs;
 pub mod logs;
 pub mod metrics;
@@ -26,7 +27,10 @@ use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        BytesDeserializerConfig,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     event::{BatchNotifier, BatchStatus},
@@ -69,6 +73,7 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 pub const LLMOBS: &str = "llmobs";
+pub const APM_STATS: &str = "apm_stats";
 
 #[allow(
     clippy::struct_excessive_bools,
@@ -111,12 +116,18 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     disable_llmobs: bool,
 
+    /// If this is set to `true`, APM stats sent by the Datadog Agent are emitted unmodified on the
+    /// `apm_stats` output. Requires `multiple_outputs`.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_false")]
+    forward_apm_stats: bool,
+
     /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
     ///
     ///
     /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
-    /// `agent.traces`, respectively.
+    /// `agent.traces`, respectively. With `forward_apm_stats` enabled, APM stats are sent to `agent.apm_stats`.
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
@@ -177,6 +188,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_metrics: false,
             disable_traces: false,
             disable_llmobs: false,
+            forward_apm_stats: false,
             multiple_outputs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
@@ -192,6 +204,10 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        if self.forward_apm_stats && !self.multiple_outputs {
+            return Err("`forward_apm_stats` requires `multiple_outputs` to be enabled.".into());
+        }
+
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let logs_schema_definition = cx
@@ -368,6 +384,26 @@ impl SourceConfig for DatadogAgentConfig {
         )
         .with_standard_vector_source_metadata();
 
+        let apm_stats_definition = BytesDeserializerConfig::new()
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    "content_encoding"
+                ))),
+                &owned_value_path!("content_encoding"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("content_type"))),
+                &owned_value_path!("content_type"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_standard_vector_source_metadata();
+
         let mut output = Vec::with_capacity(1);
 
         if self.multiple_outputs {
@@ -385,6 +421,12 @@ impl SourceConfig for DatadogAgentConfig {
                 output.push(
                     SourceOutput::new_maybe_logs(DataType::Log, llmobs_definition)
                         .with_port(LLMOBS),
+                );
+            }
+            if self.forward_apm_stats && !self.disable_traces {
+                output.push(
+                    SourceOutput::new_maybe_logs(DataType::Log, apm_stats_definition)
+                        .with_port(APM_STATS),
                 );
             }
         } else {
@@ -507,7 +549,8 @@ impl DatadogAgentSource {
             (!config.disable_logs).then(|| logs::build_warp_filter(handler.clone(), self.clone()));
 
         if !config.disable_traces {
-            let trace_filter = traces::build_warp_filter(handler.clone(), self.clone());
+            let trace_filter =
+                traces::build_warp_filter(handler.clone(), self.clone(), config.forward_apm_stats);
             filters = filters
                 .map(|f| f.or(trace_filter.clone()).unify().boxed())
                 .or(Some(trace_filter));
