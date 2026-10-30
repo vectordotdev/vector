@@ -1,6 +1,6 @@
 use super::{
-    EventRef, FixedOffset, Hash, Item, Metric, RE, StrftimeItems, TemplateParseError, Utc, Value,
-    log_schema, parse_target_path,
+    EventRef, Hash, Item, Metric, RE, StrftimeItems, TemplateParseError, TemplateTimeZone, Utc,
+    Value, log_schema, parse_target_path,
 };
 
 /// One part of the template string after parsing.
@@ -132,7 +132,7 @@ pub(super) fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&
 pub(super) fn render_timestamp(
     items: &ParsedStrftime,
     event: EventRef<'_>,
-    tz_offset: Option<FixedOffset>,
+    time_zone: Option<TemplateTimeZone>,
 ) -> String {
     let timestamp = match event {
         EventRef::Log(log) => log.get_timestamp().and_then(Value::as_timestamp).copied(),
@@ -150,9 +150,17 @@ pub(super) fn render_timestamp(
     }
     .unwrap_or_else(Utc::now);
 
-    match tz_offset {
-        Some(offset) => timestamp
+    match time_zone {
+        Some(TemplateTimeZone::Offset(offset)) => timestamp
             .with_timezone(&offset)
+            .format_with_items(items.as_items())
+            .to_string(),
+        Some(TemplateTimeZone::Local) => timestamp
+            .with_timezone(&chrono::Local)
+            .format_with_items(items.as_items())
+            .to_string(),
+        Some(TemplateTimeZone::Named(zone)) => timestamp
+            .with_timezone(&zone)
             .format_with_items(items.as_items())
             .to_string(),
         None => timestamp
