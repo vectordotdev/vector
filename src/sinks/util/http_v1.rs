@@ -410,7 +410,7 @@ mod tests {
                         .unwrap()
                         .to_bytes();
                     tx.send((parts.headers, body)).unwrap();
-                    Ok::<_, Infallible>(http::Response::new(Full::new(Bytes::new())))
+                    Ok::<_, Infallible>(http::Response::new(Full::default()))
                 }
             })
             .await;
@@ -463,7 +463,7 @@ mod tests {
             let received = Arc::clone(&requests);
             let uri = spawn_blackhole_http_server(move |_| {
                 received.fetch_add(1, Ordering::Relaxed);
-                async { Ok::<_, Infallible>(http::Response::new(Full::new(Bytes::new()))) }
+                async { Ok::<_, Infallible>(http::Response::new(Full::default())) }
             })
             .await;
             let mut service = sig_v4_service(&uri, MissingCredentials);

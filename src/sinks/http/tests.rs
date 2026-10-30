@@ -463,10 +463,10 @@ async fn retries_on_temporary_error() {
                 // Send a temporary error for the first two responses
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Full::new(Bytes::new()))
+                    .body(Full::default())
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Full::new(Bytes::new()))
+                Response::new(Full::default())
             }
         });
 
@@ -519,10 +519,10 @@ async fn custom_retry_retries_only_configured_status_code() {
             if count < NUM_FAILURES {
                 Response::builder()
                     .status(StatusCode::SERVICE_UNAVAILABLE)
-                    .body(Full::new(Bytes::new()))
+                    .body(Full::default())
                     .unwrap_or_else(|_| unreachable!())
             } else {
-                Response::new(Full::new(Bytes::new()))
+                Response::new(Full::default())
             }
         });
 
@@ -573,7 +573,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             in_counter.fetch_add(1, atomic::Ordering::Relaxed);
             Response::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::new()))
+                .body(Full::default())
                 .unwrap_or_else(|_| unreachable!())
         });
 

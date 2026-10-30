@@ -55,7 +55,7 @@ pub fn build_test_server(
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
-    build_test_server_generic(addr, || Response::new(Full::new(Bytes::new())))
+    build_test_server_generic(addr, || Response::new(Full::default()))
 }
 
 pub fn build_test_server_status(
@@ -69,7 +69,7 @@ pub fn build_test_server_status(
     build_test_server_generic(addr, move || {
         Response::builder()
             .status(status)
-            .body(Full::new(Bytes::new()))
+            .body(Full::default())
             .unwrap_or_else(|_| unreachable!())
     })
 }

@@ -566,7 +566,7 @@ mod tests {
                                         LOCATION,
                                         format!("http://{addr}/be/_stream_load?k=a%2Fb"),
                                     )
-                                    .body(Full::new(Bytes::new()))
+                                    .body(Full::default())
                                     .unwrap()
                             };
                             received.lock().unwrap().push((parts, body));

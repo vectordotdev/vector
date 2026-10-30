@@ -467,7 +467,7 @@ mod tests {
                 Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(Full::new(Bytes::new()))
+                    .body(Full::default())
                     .unwrap()
             } else {
                 Response::builder()
@@ -547,7 +547,7 @@ mod tests {
             Response::builder()
                 .header("grpc-status", "14") // unavailable
                 .header("content-type", "application/grpc")
-                .body(Full::new(Bytes::new()))
+                .body(Full::default())
                 .unwrap()
         });
 
@@ -564,7 +564,7 @@ mod tests {
                 Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(Full::new(Bytes::new()))
+                    .body(Full::default())
                     .unwrap()
             }
         });
@@ -627,7 +627,7 @@ mod tests {
                 Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(Full::new(Bytes::new()))
+                    .body(Full::default())
                     .unwrap()
             } else {
                 Response::builder()
@@ -651,7 +651,7 @@ mod tests {
                 Response::builder()
                     .header("grpc-status", "14") // unavailable
                     .header("content-type", "application/grpc")
-                    .body(Full::new(Bytes::new()))
+                    .body(Full::default())
                     .unwrap()
             }
         });
@@ -708,7 +708,7 @@ mod tests {
             Response::builder()
                 .header("grpc-status", "15") // data loss
                 .header("content-type", "application/grpc")
-                .body(Full::new(Bytes::new()))
+                .body(Full::default())
                 .unwrap()
         });
         let (rx2, trigger2, server2) = build_test_server_generic(addr2, move || {
@@ -928,7 +928,7 @@ mod tests {
             Response::builder()
                 .header("grpc-status", "7") // permission denied
                 .header("content-type", "application/grpc")
-                .body(Full::new(Bytes::new()))
+                .body(Full::default())
                 .unwrap()
         });
 

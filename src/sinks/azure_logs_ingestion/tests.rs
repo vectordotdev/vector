@@ -240,7 +240,7 @@ async fn correct_request() {
             endpoint_tx.send(request).await.unwrap();
             Ok(Response::builder()
                 .status(204)
-                .body(Full::new(Bytes::new()))
+                .body(Full::default())
                 .unwrap())
         }
     })

@@ -3,7 +3,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use bytes::Bytes;
 use futures::{StreamExt, stream};
 use http_body_util::Full;
 use vector_lib::config::{log_schema, proxy::ProxyConfig};
@@ -45,7 +44,7 @@ async fn rejects_failed_requests(#[case] status: u16, #[case] expected_requests:
         server_requests.fetch_add(1, Ordering::Relaxed);
         http::Response::builder()
             .status(status)
-            .body(Full::new(Bytes::new()))
+            .body(Full::default())
             .unwrap()
     });
     let server = tokio::spawn(server);
@@ -310,7 +309,7 @@ async fn healthcheck_fallback_requests_base_path_with_trailing_slash() {
         };
         http::Response::builder()
             .status(status)
-            .body(Full::new(Bytes::new()))
+            .body(Full::default())
             .unwrap()
     });
     tokio::spawn(server);
