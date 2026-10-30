@@ -1,0 +1,13 @@
+{{- /* Returns the titled breaking changes of the release an upgrade guide
+       belongs to: a highlight tied to a release whose title ends in "Upgrade
+       Guide", matching how releases/single.html finds upgrade guides. Only
+       guides generated from breaking changelog fragments have these titles and
+       use one `##` section per change; the result is empty for any other page,
+       including older, hand-written guides. */ -}}
+{{- $breakingTitled := slice -}}
+{{- if and (eq .Section "highlights") (isset .Params "release") (findRE "Upgrade Guide$" .Title) -}}
+  {{- with index site.Data.docs.releases (string .Params.release) -}}
+    {{- $breakingTitled = where (where (.changelog | default slice) "breaking" true) "title" "ne" nil -}}
+  {{- end -}}
+{{- end -}}
+{{- return $breakingTitled -}}

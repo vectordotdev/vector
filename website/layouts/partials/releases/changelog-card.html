@@ -2,7 +2,7 @@
      Params:
        title  (optional) Markdown title rendered in bold above the body
        href   (optional) link for the title
-       body   rendered HTML body
+       body   (optional) rendered HTML body
        footer (optional) rendered HTML shown in the card footer; omitted when blank
        class  (optional) extra classes for the card */}}
 <li class="changelog-card m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5{{ with .class }} {{ . }}{{ end }}">
@@ -19,9 +19,11 @@
   </div>
   {{- end }}
   {{- end }}
-  <div class="{{ with .title }}mt-2 {{ end }}prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
-    {{ .body }}
+  {{- with .body }}
+  <div class="{{ with $.title }}mt-2 {{ end }}prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+    {{ . }}
   </div>
+  {{- end }}
   {{- with strings.TrimSpace .footer }}
   <div class="mt-3 overflow-x-auto border-t border-gray-200 pt-3 text-sm italic text-gray-600 dark:border-gray-700 dark:text-gray-300">
     {{- . | safeHTML -}}

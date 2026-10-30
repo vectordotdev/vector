@@ -1,12 +1,14 @@
 import tocbot from "tocbot";
 
-// Table of contents for documentation pages
+// Table of contents for documentation pages. Pages can limit the listed
+// headings with a `data-heading-selector` attribute on the TOC element.
 const tableOfContents = () => {
-  if (document.getElementById("toc")) {
+  const toc = document.getElementById("toc");
+  if (toc) {
     tocbot.init({
       tocSelector: "#toc",
       contentSelector: "#page-content",
-      headingSelector: "h2,h3,h4,h5",
+      headingSelector: toc.dataset.headingSelector || "h2,h3,h4,h5",
       scrollSmoothDuration: 400,
       headingsOffset: 80,
       scrollSmoothOffset: -80,

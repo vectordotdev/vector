@@ -8,7 +8,9 @@
     On this page
   </p>
 
-  {{/* This div is auto-populated by Tocbot */}}
-  <div id="toc"></div>
+  {{/* This div is auto-populated by Tocbot. Generated upgrade guides list
+       only their changes and each change's sections, not the examples nested
+       below. */}}
+  <div id="toc"{{ if partial "highlights/upgrade-guide-breaking.html" . }} data-heading-selector="h2,h3"{{ end }}></div>
 </div>
 {{ end }}

@@ -1,0 +1,24 @@
+{{/* Lists an upgrade guide's breaking changes as changelog cards that link to
+     their sections, with the same titles and credits as the release page.
+     The cards omit the description, which repeats each section's summary.
+     Renders nothing for pages without titled breaking changes (see
+     highlights/upgrade-guide-breaking.html). */}}
+{{ with partial "highlights/upgrade-guide-breaking.html" . }}
+{{ $count := len . }}
+<div class="mt-12">
+  <div class="prose dark:prose-invert max-w-none">
+    {{ $heading := printf "%d %s" $count (cond (eq $count 1) "breaking change" "breaking changes") }}
+    {{ partial "heading.html" (dict "text" $heading "id" "breaking changes" "level" 2 "toc_hide" true) }}
+  </div>
+
+  <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
+    {{ range . }}
+    {{ partial "releases/changelog-card.html" (dict
+      "title" .title
+      "href" (printf "#%s" .anchor)
+      "footer" (partial "releases/changelog-attribution.html" .)
+    ) }}
+    {{ end }}
+  </ul>
+</div>
+{{ end }}
