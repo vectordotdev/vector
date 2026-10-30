@@ -162,10 +162,6 @@ where
     T: Stream<Item = (K, Bytes, C)> + Unpin,
     K: Hash + Eq + Clone,
 {
-    /// `K` - file name, or other line source,
-    /// `Bytes` - the line data,
-    /// `C` - the initial context related to the first line of data.
-    /// `Option<C>` - context related to the last-seen line data.
     type Item = AggregatedLine<K, C>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -212,10 +208,7 @@ where
                         this.logic
                             .buffers
                             .drain()
-                            .map(|(src, (_, aggregate))| {
-                                let (line, initial_context, last_context) = aggregate.merge();
-                                (src, line, initial_context, last_context)
-                            })
+                            .map(|(src, (_, aggregate))| aggregate.merge().with_source(src))
                             .collect(),
                     );
                 }
@@ -226,8 +219,7 @@ where
                     {
                         let key = expired_key.into_inner();
                         if let Some((_, aggregate)) = this.logic.buffers.remove(&key) {
-                            let (line, initial_context, last_context) = aggregate.merge();
-                            return Poll::Ready(Some((key, line, initial_context, last_context)));
+                            return Poll::Ready(Some(aggregate.merge().with_source(key)));
                         }
                     }
 
@@ -260,22 +252,14 @@ where
         let val = match val {
             // If we have to emit just one line - that's easy,
             // we just return it.
-            (src, Emit::One((line, initial_context, last_context))) => {
-                (src, line, initial_context, last_context)
-            }
+            (src, Emit::One(merged)) => merged.with_source(src),
             // If we have to emit two lines - take the second
             // one and stash it, then return the first one.
             // This way, the stashed line will be returned
             // on the next stream poll.
-            (
-                src,
-                Emit::Two(
-                    (line, initial_context, last_context),
-                    (line_to_stash, context_to_stash, _),
-                ),
-            ) => {
-                *this.stashed = Some((src.clone(), line_to_stash, context_to_stash));
-                (src, line, initial_context, last_context)
+            (src, Emit::Two(merged, to_stash)) => {
+                *this.stashed = Some((src.clone(), to_stash.line, to_stash.initial_context));
+                merged.with_source(src)
             }
         };
         Some(val)
@@ -283,10 +267,38 @@ where
 }
 
 /// A merged line with the context of its first line and, if more lines were merged, of its last line.
-type MergedLine<C> = (Bytes, C, Option<C>);
+pub struct MergedLine<C> {
+    /// The line data.
+    pub line: Bytes,
+    /// The context related to the first line of data.
+    pub initial_context: C,
+    /// The context related to the last-seen line data, if more than one line was merged.
+    pub last_context: Option<C>,
+}
+
+impl<C> MergedLine<C> {
+    fn with_source<K>(self, source: K) -> AggregatedLine<K, C> {
+        AggregatedLine {
+            source,
+            line: self.line,
+            initial_context: self.initial_context,
+            last_context: self.last_context,
+        }
+    }
+}
 
 /// A merged line together with the key of its source.
-type AggregatedLine<K, C> = (K, Bytes, C, Option<C>);
+#[derive(Debug, PartialEq, Eq)]
+pub struct AggregatedLine<K, C> {
+    /// The file name, or other line source.
+    pub source: K,
+    /// The line data.
+    pub line: Bytes,
+    /// The context related to the first line of data.
+    pub initial_context: C,
+    /// The context related to the last-seen line data, if more than one line was merged.
+    pub last_context: Option<C>,
+}
 
 /// Specifies the amount of lines to emit in response to a single input line.
 /// We have to emit either one or two lines.
@@ -356,7 +368,12 @@ where
                     Decision::EndExclude => {
                         let (src, (key, buffered)) = entry.remove_entry();
                         self.timeouts.remove(&key);
-                        Some((src, Emit::Two(buffered.merge(), (line, context, None))))
+                        let line = MergedLine {
+                            line,
+                            initial_context: context,
+                            last_context: None,
+                        };
+                        Some((src, Emit::Two(buffered.merge(), line)))
                     }
                 }
             }
@@ -372,7 +389,12 @@ where
                     None
                 } else {
                     // It's just a regular line we don't really care about.
-                    Some((entry.into_key(), Emit::One((line, context, None))))
+                    let line = MergedLine {
+                        line,
+                        initial_context: context,
+                        last_context: None,
+                    };
+                    Some((entry.into_key(), Emit::One(line)))
                 }
             }
         }
@@ -411,7 +433,11 @@ impl<C> Aggregate<C> {
             }
             bytes_mut.extend_from_slice(&line);
         }
-        (bytes_mut.freeze(), self.initial_context, self.last_context)
+        MergedLine {
+            line: bytes_mut.freeze(),
+            initial_context: self.initial_context,
+            last_context: self.last_context,
+        }
     }
 }
 
@@ -819,18 +845,16 @@ mod tests {
 
     /// Compare actual output to expected; expected is a list of the expected strings and context
     fn assert_results(
-        actual: &[(Filename, Bytes, usize, Option<usize>)],
+        actual: &[AggregatedLine<Filename, usize>],
         expected: &[(&str, usize, Option<usize>)],
     ) {
-        let expected_mapped: Vec<(Filename, Bytes, usize, Option<usize>)> = expected
+        let expected_mapped: Vec<AggregatedLine<Filename, usize>> = expected
             .iter()
-            .map(|(line, context, last_context)| {
-                (
-                    "test.log".to_owned(),
-                    Bytes::copy_from_slice(line.as_bytes()),
-                    *context,
-                    *last_context,
-                )
+            .map(|(line, context, last_context)| AggregatedLine {
+                source: "test.log".to_owned(),
+                line: Bytes::copy_from_slice(line.as_bytes()),
+                initial_context: *context,
+                last_context: *last_context,
             })
             .collect();
 
