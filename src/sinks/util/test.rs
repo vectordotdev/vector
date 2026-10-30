@@ -11,7 +11,7 @@ use http_body_util::{BodyExt, Full};
 use hyper_1::{body::Incoming, service::service_fn};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
-    server::conn::auto,
+    server::{conn::auto, graceful::GracefulShutdown},
 };
 use serde::Deserialize;
 use stream_cancel::{Trigger, Tripwire};
@@ -76,6 +76,9 @@ pub fn build_test_server_status(
 
 /// Build a test server with a custom response factory.
 ///
+/// Triggering the returned [`Trigger`] stops accepting connections, closes idle keep-alive
+/// connections, and waits for requests in progress before the server future completes.
+///
 /// # Panics
 ///
 /// Panics if the address cannot be bound or the listener cannot be made nonblocking.
@@ -104,14 +107,16 @@ where
             .expect("Failed to create test server listener");
         let shutdown = tripwire.then(crate::shutdown::tripwire_handler);
         tokio::pin!(shutdown);
+        let graceful = GracefulShutdown::new();
 
         loop {
             let (stream, _) = tokio::select! {
-                () = &mut shutdown => return Ok(()),
+                () = &mut shutdown => break,
                 accepted = listener.accept() => accepted.expect("Failed to accept test connection"),
             };
             let responder = responder.clone();
             let tx = tx.clone();
+            let watcher = graceful.watcher();
             tokio::spawn(async move {
                 let service = service_fn(move |req: Request<Incoming>| {
                     let responder = responder.clone();
@@ -129,14 +134,17 @@ where
                         Ok::<_, std::convert::Infallible>(response)
                     }
                 });
-                if let Err(error) = auto::Builder::new(TokioExecutor::new())
-                    .serve_connection(TokioIo::new(stream), service)
-                    .await
-                {
+                let builder = auto::Builder::new(TokioExecutor::new());
+                let connection = builder.serve_connection(TokioIo::new(stream), service);
+                if let Err(error) = watcher.watch(connection).await {
                     tracing::debug!(message = "Test server connection closed.", %error);
                 }
             });
         }
+
+        drop(listener);
+        graceful.shutdown().await;
+        Ok(())
     };
 
     (rx, trigger, server)
@@ -173,4 +181,57 @@ where
     })
     .collect::<Vec<_>>()
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use hyper_1::client::conn::http1;
+    use tokio::{net::TcpStream, time::timeout};
+
+    use super::*;
+    use crate::test_util::addr::next_addr;
+
+    fn request() -> Request<Full<Bytes>> {
+        Request::post("/")
+            .header("host", "localhost")
+            .body(Full::new(Bytes::from_static(b"event")))
+            .unwrap()
+    }
+
+    /// Shutting down the test server must close keep-alive connections and the capture
+    /// channel, not just stop accepting new connections.
+    #[tokio::test]
+    async fn shutdown_closes_keep_alive_connections() {
+        let (_guard, addr) = next_addr();
+        let (mut rx, trigger, server) = build_test_server(addr);
+        let server = tokio::spawn(server);
+
+        let stream = TcpStream::connect(addr).await.unwrap();
+        let (mut sender, connection) = http1::handshake(TokioIo::new(stream)).await.unwrap();
+        tokio::spawn(connection);
+
+        let response = sender.send_request(request()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(rx.next().await.unwrap().1, "event");
+
+        drop(trigger);
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("server should finish after shutdown")
+            .unwrap()
+            .unwrap();
+
+        assert!(
+            sender.send_request(request()).await.is_err(),
+            "the keep-alive connection should be closed after shutdown"
+        );
+        assert!(
+            timeout(Duration::from_secs(5), rx.next())
+                .await
+                .expect("the capture channel should close after shutdown")
+                .is_none()
+        );
+    }
 }
