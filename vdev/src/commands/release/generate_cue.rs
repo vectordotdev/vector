@@ -11,6 +11,7 @@ use chrono::Utc;
 use semver::Version;
 use serde_json::json;
 
+use super::vrl_changelog;
 use crate::commands::changelog::FRAGMENT_TYPES;
 use crate::utils::{git, paths};
 
@@ -36,11 +37,23 @@ pub struct Cli {
     /// The version being released (e.g. `0.58.0`).
     #[arg(long)]
     version: Version,
+    /// Include this VRL release's changelog and migration instructions.
+    #[arg(long)]
+    vrl_version: Option<Version>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        run(&self.version, PullRequestMetadata::Optional)?;
+        let vrl_notes = self
+            .vrl_version
+            .as_ref()
+            .map(vrl_changelog::fetch)
+            .transpose()?;
+        run(
+            &self.version,
+            PullRequestMetadata::Optional,
+            vrl_notes.as_deref(),
+        )?;
         Ok(())
     }
 }
@@ -52,6 +65,7 @@ impl Cli {
 pub(super) fn run(
     new_version: &Version,
     pull_request_metadata: PullRequestMetadata,
+    vrl_notes: Option<&str>,
 ) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
     env::set_current_dir(&repo_root)?;
@@ -63,17 +77,9 @@ pub(super) fn run(
     validate_single_bump(&last_version, new_version)?;
     let new_version = new_version.clone();
 
-    // Capture today's date ONCE so the highlights filename and its frontmatter can never
-    // disagree if the run crosses UTC midnight.
-    let today = Utc::now().format("%Y-%m-%d").to_string();
-
     let cue_path = repo_root
         .join(RELEASES_DIR)
         .join(format!("{new_version}.cue"));
-    let highlights_path = repo_root
-        .join(HIGHLIGHTS_DIR)
-        .join(upgrade_guide_filename(&today, &new_version));
-
     if cue_path.exists() {
         bail!(
             "{} already exists. Delete it (or move it aside) and re-run.",
@@ -92,10 +98,6 @@ pub(super) fn run(
             stub_path.display()
         );
     }
-    // Note: the highlights collision is checked later, only if we're actually going to
-    // write it — so a manually-authored upgrade guide doesn't block a release with no
-    // breaking fragments.
-
     let changelog_dir = repo_root.join(CHANGELOG_DIR);
     let changelog_entries =
         read_changelog_fragments(&repo_root, &changelog_dir, pull_request_metadata)?;
@@ -103,19 +105,23 @@ pub(super) fn run(
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
     // "file already exists" guard on the next run).
-    let cue_text = render_release_cue(&new_version, &changelog_entries);
-    let breaking: Vec<&BreakingDetails> = changelog_entries
+    let vrl = vrl_notes.map(|notes| vrl_changelog::extract(notes, &new_version));
+    let cue_text = render_release_cue(
+        &new_version,
+        &changelog_entries,
+        vrl.as_ref().map(|vrl| vrl.notes.as_str()),
+    );
+    let mut breaking: Vec<&BreakingDetails> = changelog_entries
         .iter()
         .filter_map(|e| e.breaking_details.as_ref())
         .collect();
-    let highlights_md = if breaking.is_empty() {
-        None
+    if let Some(vrl) = &vrl {
+        breaking.extend(&vrl.migrations);
+    }
+    let upgrade_guide = if breaking.is_empty() {
+        String::new()
     } else {
-        // Guard against clobbering an existing upgrade guide for this release. We match on
-        // the version-suffix rather than the exact `today`-prefixed filename so a partial
-        // run from a previous UTC day (or a maintainer-authored guide dated earlier) is
-        // still detected. The single-page release layout would otherwise render two
-        // "upgrade guide" cards for the same release.
+        // Refuse a second source for a release that already has a standalone guide.
         if let Some(existing) =
             find_existing_upgrade_guide(&repo_root.join(HIGHLIGHTS_DIR), &new_version)?
         {
@@ -125,19 +131,14 @@ pub(super) fn run(
             );
         }
         validate_breaking_anchors(&breaking)?;
-        Some(render_upgrade_guide(&today, &new_version, &breaking))
+        render_upgrade_guide(&breaking)
     };
 
-    // Everything valid — commit the writes atomically via .tmp + rename.
+    // Everything valid — write the release data and its inline migration content.
     atomic_write(&cue_path, &cue_text)?;
-    if let Some(md) = highlights_md {
-        if let Err(e) = atomic_write(&highlights_path, &md) {
-            // Highlights write failed after CUE succeeded — roll the CUE back so the next
-            // attempt doesn't hit the "file already exists" guard.
-            drop(fs::remove_file(&cue_path));
-            return Err(e);
-        }
-        success!("Wrote {}", highlights_path.display());
+    if let Err(error) = write_release_stub(&repo_root, &new_version, &upgrade_guide) {
+        drop(fs::remove_file(&cue_path));
+        return Err(error);
     }
 
     // Format with `cue fmt` (best-effort: warn but do not fail if cue is missing).
@@ -146,7 +147,6 @@ pub(super) fn run(
     }
 
     refresh_versions_cue(&repo_root)?;
-    write_release_stub(&repo_root, &new_version)?;
 
     success!("Wrote {}", cue_path.display());
     Ok(cue_path)
@@ -213,7 +213,11 @@ pub(super) fn render_versions_cue(
 /// Write `website/content/en/releases/<version>.md` — the Hugo stub Hugo needs to route
 /// `/releases/<version>/`. Weight is derived from the highest weight found among existing
 /// stubs so the new release naturally sorts last (newest).
-pub(super) fn write_release_stub(repo_root: &Path, version: &Version) -> Result<()> {
+pub(super) fn write_release_stub(
+    repo_root: &Path,
+    version: &Version,
+    upgrade_guide: &str,
+) -> Result<()> {
     let releases_dir = repo_root
         .join("website")
         .join("content")
@@ -251,10 +255,18 @@ pub(super) fn write_release_stub(repo_root: &Path, version: &Version) -> Result<
         .max()
         .unwrap_or(0);
 
-    let content = format!(
-        "---\ntitle: Vector v{version} release notes\nweight: {}\n---\n",
+    let inline = if upgrade_guide.is_empty() {
+        ""
+    } else {
+        "inline_upgrade_guide: true\n"
+    };
+    let mut content = format!(
+        "---\ntitle: Vector v{version} release notes\nweight: {}\n{inline}---\n",
         max_weight + 1
     );
+    if !upgrade_guide.is_empty() {
+        write!(content, "\n{upgrade_guide}").unwrap();
+    }
     atomic_write(&stub_path, &content)?;
     Ok(())
 }
@@ -308,14 +320,14 @@ struct ChangelogEntry {
 }
 
 #[derive(Debug, Clone)]
-struct BreakingDetails {
-    title: String,
-    anchor: String,
+pub(super) struct BreakingDetails {
+    pub(super) title: String,
+    pub(super) anchor: String,
     /// Content of the fragment's `## Summary` section — reused in the guide so each
     /// breaking change stands on its own without the reader hunting for the release notes.
-    summary: String,
+    pub(super) summary: String,
     /// Content of the fragment's `## Migration` section (headers, code fences, etc.).
-    migration: String,
+    pub(super) migration: String,
 }
 
 fn read_changelog_fragments(
@@ -642,9 +654,16 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
 
 // ---------- CUE rendering ----------
 
-fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String {
+fn render_release_cue(
+    version: &Version,
+    changelog: &[ChangelogEntry],
+    vrl_notes: Option<&str>,
+) -> String {
     let date = Utc::now().format("%Y-%m-%d").to_string();
     let changelog_block = render_changelog(changelog);
+    let vrl_block = vrl_notes
+        .map(|notes| format!("\n{}\n", vrl_changelog::cue_block(notes)))
+        .unwrap_or_default();
 
     indoc::formatdoc! {"
         package metadata
@@ -655,7 +674,7 @@ fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String
         \tchangelog: [
         {changelog_block}
         \t]
-        }}
+        {vrl_block}}}
     "}
 }
 
@@ -701,7 +720,7 @@ fn run_cue_fmt(path: &Path) -> Result<()> {
     Ok(())
 }
 
-// ---------- Upgrade-guide (highlights) rendering ----------
+// ---------- Upgrade-guide rendering and legacy highlights ----------
 
 /// Return the first file in `highlights_dir` whose name ends in the version-suffix used
 /// by upgrade guides (e.g. `-0-58-0-upgrade-guide.md`), regardless of the date prefix.
@@ -729,9 +748,21 @@ pub(super) fn find_existing_upgrade_guide(
     Ok(None)
 }
 
-fn upgrade_guide_filename(date: &str, version: &Version) -> String {
-    let version_slug = format!("{}-{}-{}", version.major, version.minor, version.patch);
-    format!("{date}-{version_slug}-upgrade-guide.md")
+/// Whether a release page owns a nonempty inline upgrade guide.
+pub(super) fn has_inline_upgrade_guide(repo_root: &Path, version: &Version) -> Result<bool> {
+    let path = repo_root.join(format!("website/content/en/releases/{version}.md"));
+    if !path.is_file() {
+        return Ok(false);
+    }
+    let page = fs::read_to_string(&path)?.replace("\r\n", "\n");
+    let Some((frontmatter, body)) = page
+        .strip_prefix("---\n")
+        .and_then(|page| page.split_once("\n---\n"))
+    else {
+        return Ok(false);
+    };
+    let metadata: serde_yaml::Value = serde_yaml::from_str(frontmatter)?;
+    Ok(metadata["inline_upgrade_guide"].as_bool() == Some(true) && !body.trim().is_empty())
 }
 
 /// Fail the release if any breaking fragment produced an invalid, empty, or duplicate
@@ -771,30 +802,15 @@ fn atomic_write(path: &Path, content: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_upgrade_guide(date: &str, version: &Version, breaking: &[&BreakingDetails]) -> String {
-    let title = format!("{}.{} Upgrade Guide", version.major, version.minor);
-    let description = format!("An upgrade guide that addresses breaking changes in {version}");
-
-    // No `authors:` in the frontmatter — this file is auto-generated; a "byline" would
-    // misattribute a multi-author guide to a single contributor.
+fn render_upgrade_guide(breaking: &[&BreakingDetails]) -> String {
     let mut out = String::new();
-    out.push_str("---\n");
-    writeln!(out, "date: \"{date}\"").unwrap();
-    writeln!(out, "title: \"{title}\"").unwrap();
-    writeln!(out, "description: \"{description}\"").unwrap();
-    writeln!(out, "release: \"{version}\"").unwrap();
-    out.push_str("hide_on_release_notes: false\n");
-    out.push_str("badges:\n  type: breaking change\n");
-    out.push_str("---\n\n");
 
     // Each fragment becomes an H2 (`## Title`), with Summary/Migration under it at H3.
     // Fragment authors write sub-headings at H4+ (`#### Old` / `#### New`) per the
     // scaffolder's template so nothing needs to be bumped here — Migration content
     // passes through verbatim.
     //
-    // Heading levels matter for the highlights page's Tocbot config
-    // (`website/assets/js/below.js`, which indexes h2-h5): fragment titles at H2 show up
-    // in the TOC as the top-level entries for the guide.
+    // The release-page partial nests these headings under its Upgrade guide section.
     for b in breaking {
         writeln!(out, "## {} {{#{}}}\n", b.title, b.anchor).unwrap();
         writeln!(out, "### Summary\n\n{}\n", b.summary).unwrap();
@@ -1067,7 +1083,7 @@ mod tests {
                 }),
             },
         ];
-        let out = render_release_cue(&Version::new(0, 99, 0), &entries);
+        let out = render_release_cue(&Version::new(0, 99, 0), &entries, None);
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
@@ -1178,12 +1194,6 @@ mod tests {
     }
 
     #[test]
-    fn upgrade_guide_filename_uses_version() {
-        let name = upgrade_guide_filename("2026-07-17", &Version::parse("0.58.0").unwrap());
-        assert!(name.ends_with("-0-58-0-upgrade-guide.md"), "{name}");
-    }
-
-    #[test]
     fn find_existing_upgrade_guide_matches_any_date() {
         let tmp = tempfile::tempdir().unwrap();
         // A guide dated on some past day (simulating a failed run yesterday, or a
@@ -1258,7 +1268,6 @@ mod tests {
 
     #[test]
     fn render_upgrade_guide_shape() {
-        let version = Version::parse("0.58.0").unwrap();
         // First fragment models the scaffolder's default template: prose plus
         // `### Old` / `### New` fenced code examples. These sub-headings must pass
         // through into the guide verbatim (no bumping, no rewriting). Uses generic
@@ -1292,18 +1301,8 @@ mod tests {
             "A deprecated label is gone.",
             "N/A",
         );
-        let md = render_upgrade_guide("2026-07-17", &version, &[&d1, &d2]);
-        let expected = indoc::indoc! {r#"
-            ---
-            date: "2026-07-17"
-            title: "0.58 Upgrade Guide"
-            description: "An upgrade guide that addresses breaking changes in 0.58.0"
-            release: "0.58.0"
-            hide_on_release_notes: false
-            badges:
-              type: breaking change
-            ---
-
+        let md = render_upgrade_guide(&[&d1, &d2]);
+        let expected = indoc::indoc! {r"
             ## First breaking change {#first}
 
             ### Summary
@@ -1336,26 +1335,15 @@ mod tests {
 
             N/A
 
-        "#};
+        "};
         assert_eq!(md, expected);
     }
 
     #[test]
     fn render_upgrade_guide_empty_migration() {
-        let version = Version::parse("0.58.0").unwrap();
         let d = bd("A change", "a-change", "Something changed.", "");
-        let md = render_upgrade_guide("2026-07-17", &version, &[&d]);
-        let expected = indoc::indoc! {r#"
-            ---
-            date: "2026-07-17"
-            title: "0.58 Upgrade Guide"
-            description: "An upgrade guide that addresses breaking changes in 0.58.0"
-            release: "0.58.0"
-            hide_on_release_notes: false
-            badges:
-              type: breaking change
-            ---
-
+        let md = render_upgrade_guide(&[&d]);
+        let expected = indoc::indoc! {r"
             ## A change {#a-change}
 
             ### Summary
@@ -1364,7 +1352,7 @@ mod tests {
 
             ### Migration
 
-        "#};
+        "};
         assert_eq!(md, expected);
     }
 
@@ -1414,7 +1402,7 @@ mod tests {
         .unwrap();
 
         let version = Version::parse("0.58.0").unwrap();
-        write_release_stub(tmp.path(), &version).unwrap();
+        write_release_stub(tmp.path(), &version, "").unwrap();
 
         let out = fs::read_to_string(stubs_dir.join("0.58.0.md")).unwrap();
         assert_eq!(
@@ -1435,7 +1423,7 @@ mod tests {
         .unwrap();
 
         let version = Version::parse("0.58.0").unwrap();
-        let err = write_release_stub(tmp.path(), &version).unwrap_err();
+        let err = write_release_stub(tmp.path(), &version, "").unwrap_err();
         assert!(err.to_string().contains("already exists"), "{err}");
     }
 

@@ -71,7 +71,11 @@ const MIGRATION_MARKER: &str = "\n## Migration\n";
 
 /// Anchors that would collide with fixed headings emitted by the upgrade-guide renderer.
 /// Fragments may not choose these as their `{#anchor}` override, or produce them via slugify.
-pub(crate) const RESERVED_ANCHORS: &[&str] = &["vector-breaking-changes", "vector-upgrade-guide"];
+pub(crate) const RESERVED_ANCHORS: &[&str] = &[
+    "vector-breaking-changes",
+    "vector-upgrade-guide",
+    "upgrade-guide",
+];
 
 /// Slug rule shared by the CI checker and the release generator: lowercase ASCII alnum
 /// with `-` separators, non-empty, no leading/trailing hyphen, not a reserved name.

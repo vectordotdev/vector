@@ -604,7 +604,7 @@ mod prepare {
             repo,
             "gh",
             r#"printf '%s\n' "$@" >> .git/gh-calls
-printf '## 0.28.0\n- Release fixture\n'"#,
+printf '## [0.28.0 (2026-10-30)](https://github.com/vectordotdev/vrl/releases/tag/v0.28.0)\n### Fixes\n- Release fixture\n'"#,
         );
         stub(repo, "cue", "exit 0");
     }

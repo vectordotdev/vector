@@ -10,10 +10,12 @@
 {{ $breaking := where ($release.changelog | default slice) "breaking" true }}
 {{ $breakingTitled := where $breaking "title" "ne" nil }}
 {{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
+{{ $inlineUpgradeGuide := and .Params.inline_upgrade_guide (ne (strings.TrimSpace .Content) "") }}
+{{ $hasUpgradeGuide := or $inlineUpgradeGuide (gt (len $upgradeGuides) 0) }}
 {{/* Keep legacy entries in their categories unless they are rendered above. */}}
 {{ $groupedChanges := slice }}
 {{ range $release.changelog }}
-{{ if not (and .breaking (ne .title nil) (gt (len $upgradeGuides) 0)) }}
+{{ if not (and .breaking (ne .title nil) $hasUpgradeGuide) }}
 {{ $groupedChanges = $groupedChanges | append . }}
 {{ end }}
 {{ end }}
@@ -54,6 +56,9 @@
             these can each contain breaking changes while Vector is pre-1.0.
             These breaking changes are noted in their respective upgrade
             guides.
+            {{ if $inlineUpgradeGuide }}
+            <a href="#upgrade-guide" class="underline underline-offset-4">Read the upgrade guide for this release.</a>
+            {{ end }}
           </div>
         </div>
       </div>
@@ -105,7 +110,7 @@
           {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
         </div>
 
-        {{ if and (gt (len $breakingTitled) 0) (gt (len $upgradeGuides) 0) }}
+        {{ if and (gt (len $breakingTitled) 0) $hasUpgradeGuide }}
         <div class="mt-6">
           <div class="prose dark:prose-invert max-w-none">
             {{ $numBreaking := len $breakingTitled }}
@@ -116,9 +121,13 @@
 
           <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
             {{ range $breakingTitled }}
+            {{ $guideLink := printf "#%s" .anchor }}
+            {{ if not $inlineUpgradeGuide }}
+            {{ $guideLink = printf "%s#%s" (index $upgradeGuides 0).RelPermalink .anchor }}
+            {{ end }}
             {{ partial "releases/changelog-card.html" (dict
               "title" .title
-              "href" (printf "%s#%s" (index $upgradeGuides 0).RelPermalink .anchor)
+              "href" $guideLink
               "body" (.description | markdownify)
               "footer" (partial "releases/changelog-attribution.html" .)
             ) }}
@@ -202,6 +211,10 @@
         </div>
       </div>
       {{ end }}
+      {{ end }}
+
+      {{ if $inlineUpgradeGuide }}
+      {{ partial "releases/upgrade-guide.html" . }}
       {{ end }}
 
       {{ with $release.whats_next }}
