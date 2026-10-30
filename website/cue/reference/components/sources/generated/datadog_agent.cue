@@ -55,6 +55,20 @@ generated: components: sources: datadog_agent: configuration: {
 		required:    false
 		type: bool: default: false
 	}
+	drop_on_invalid_api_key: {
+		description: """
+			Controls what happens when a request carries an API key that is not present in
+			`valid_api_keys`.
+
+			When set to `true`, requests with a missing or unrecognized API key are rejected with a
+			`403 Forbidden` response. When set to `false` (the default), the unrecognized key is
+			simply not stored in the event metadata, but the events are still accepted.
+
+			This option has no effect when `valid_api_keys` is empty.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	framing: {
 		description: """
 			Framing configuration.
@@ -127,5 +141,23 @@ generated: components: sources: datadog_agent: configuration: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
 		type:        _schemaDefinitions["core::option::Option<vector_core::tls::settings::TlsEnableableConfig>"]
+	}
+	valid_api_keys: {
+		description: """
+			A list of API keys that are permitted to send events to this source.
+
+			When this list is non-empty, the API key carried by an incoming request (in the URL,
+			the `dd-api-key` header, or the `dd-api-key` query parameter) is checked against it.
+			When the list is empty (the default), all API keys are accepted and no validation is
+			performed.
+
+			The behavior when a request carries an API key that is not in this list is controlled by
+			`drop_on_invalid_api_key`.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: {}
+		}
 	}
 }

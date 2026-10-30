@@ -14,7 +14,7 @@ use vector_lib::{
 use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
 use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
-use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
+use super::{DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
         datadog::{DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogSeriesMetric},
@@ -67,27 +67,20 @@ fn sketches_service(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "beta" / "sketches" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
                         decode_datadog_sketches(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             source.split_metric_namespace,
                             &source.events_received,
                         )
@@ -104,27 +97,20 @@ fn series_v1_service(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v1" / "series" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
                         decode_datadog_series_v1(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             // Currently metrics do not have schemas defined, so for now we just pass a
                             // default one.
                             &Arc::new(schema::Definition::default_legacy_namespace()),
@@ -144,27 +130,20 @@ fn series_v2_service(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v2" / "series" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
                         decode_datadog_series_v2(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             source.split_metric_namespace,
                             &source.events_received,
                         )
@@ -180,27 +159,21 @@ fn series_v3_service(
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
-        .and(path!("api" / "intake" / "metrics" / "v3" / "series" / ..).and(warp::path::full()))
+        .and(path!("api" / "intake" / "metrics" / "v3" / "series" / ..))
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
                         decode_datadog_series_v3(
                             body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
+                            api_key,
                             source.split_metric_namespace,
                             &source.events_received,
                         )
