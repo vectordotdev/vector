@@ -27,6 +27,15 @@ generated: components: sources: websocket: configuration: {
 		required:    false
 		type:        _schemaDefinitions["derived::codecs::decoding::FramingConfig::2a4f9b813a8f495175f80ccf"]
 	}
+	headers: {
+		description: """
+			Headers to apply to the connection request.
+
+			One or more values for the same header can be provided.
+			"""
+		required: false
+		type:     _schemaDefinitions["derived::46bb095c824810f857f5c4c8"]
+	}
 	initial_message: {
 		description: "An optional message to send to the server upon connection."
 		required:    false
@@ -113,6 +122,77 @@ generated: components: sources: websocket: configuration: {
 				}
 			}
 			string: {}
+		}
+	}
+	replay: {
+		description: """
+			Configuration for message replay which allows replaying missed messages from servers that
+			support message buffering.
+			"""
+		required: false
+		type: object: options: {
+			ack: {
+				description: """
+					Configuration for ACK support for message replay.
+
+					Enabling ACK support removes the need for client to keep track of latest received message.
+					It moves the burden of tracking latest received messages from this component to the server.
+					This will only work if the server has it enabled. This will make the client respond to received
+					messages with an ACK.
+					"""
+				required: false
+				type: object: options: {
+					encoding: {
+						description: """
+																Encoding configuration.
+																Configures how events are encoded into raw bytes.
+																The selected encoding also determines which input types (logs, metrics, traces) are supported.
+																"""
+						required: true
+						type:     _schemaDefinitions["codecs::encoding::config::EncodingConfig"]
+					}
+					message_id_path: {
+						description: """
+																Name of the field that should contain the ACKed message ID.
+
+																Use "." if message ID is the root of the message.
+																"""
+						required: true
+						type: string: {}
+					}
+				}
+			}
+			data_dir: {
+				description: """
+					The directory used to persist latest received message ID.
+
+					By default, the [global `data_dir` option][global_data_dir] is used.
+					Make sure the running user has write permissions to this directory.
+
+					If this directory is specified, then Vector will attempt to create it.
+
+					This is only in effect if [`Self::stateful`] is enabled.
+
+					[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
+					"""
+				required: false
+				type: string: examples: ["/var/local/lib/vector/"]
+			}
+			message_id_path: {
+				description: """
+					Message ID path.
+
+					This has to be defined to read message ID from messages. Using that ID,
+					replay can be requested at reconnection and ACK messages can be sent.
+					"""
+				required: true
+				type: string: {}
+			}
+			stateful: {
+				description: "Whether the latest received message ID should be kept across Vector restarts."
+				required:    false
+				type: bool: default: false
+			}
 		}
 	}
 	tls: {

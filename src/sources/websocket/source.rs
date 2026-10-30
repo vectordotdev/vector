@@ -1,19 +1,23 @@
-use std::pin::Pin;
+use std::{borrow::Cow, fs, path::PathBuf, pin::Pin};
 
+use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
-use tokio::time;
+use tempfile::NamedTempFile;
+use tokio::{sync::mpsc::Sender, time};
 use tokio_tungstenite::tungstenite::{
     Message, error::Error as TungsteniteError, protocol::CloseFrame,
 };
+use tokio_util::codec::Encoder;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::DecoderFramedRead,
+    codecs::{DecoderFramedRead, encoding::Serializer},
     config::LogNamespace,
-    event::{Event, LogEvent},
+    event::{Event, EventMetadata, LogEvent},
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
 };
+use vrl::{core::Value, prelude::VrlValueConvert};
 
 use crate::{
     SourceSender,
@@ -41,15 +45,21 @@ macro_rules! fail_with_event {
 type WebSocketSink = Pin<Box<dyn Sink<Message, Error = TungsteniteError> + Send>>;
 type WebSocketStream = Pin<Box<dyn Stream<Item = Result<Message, TungsteniteError>> + Send>>;
 
+const LAST_RECEIVED_MESSAGE_ID_FILE_NAME: &str = "last_received_message_id";
+const LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME: &str = "last_received";
+
 pub(crate) struct WebSocketSourceParams {
     pub connector: WebSocketConnector,
     pub decoder: Decoder,
     pub log_namespace: LogNamespace,
+    pub data_dir: Option<PathBuf>,
 }
 
 pub(crate) struct WebSocketSource {
     config: WebSocketConfig,
     params: WebSocketSourceParams,
+    last_received_message_id: Option<String>,
+    ack_serializer: Option<Serializer>,
 }
 
 #[derive(Debug, Snafu)]
@@ -79,38 +89,92 @@ pub enum WebSocketSourceError {
 }
 
 impl WebSocketSource {
-    pub const fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> Self {
-        Self { config, params }
+    pub fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> crate::Result<Self> {
+        let last_received_message_id = 'restore: {
+            if let Some(path) = params
+                .data_dir
+                .as_ref()
+                .map(|p| p.join(LAST_RECEIVED_MESSAGE_ID_FILE_NAME))
+            {
+                let message_id = match fs::read_to_string(&path) {
+                    Ok(contents) => contents,
+                    Err(err) => match err.kind() {
+                        std::io::ErrorKind::NotFound => {
+                            if let Some(parent) = path.parent()
+                                && parent != ""
+                                && !fs::metadata(parent).is_ok_and(|m| m.is_dir())
+                            {
+                                return Err(format!(
+                                    "Message replay persistence path directory ({}) doesn't exist. This will prevent persisting last received message. Fix the `persistence_path` to ensure export works.",
+                                    parent.to_str().unwrap_or(""),
+                                )
+                                .into());
+                            }
+                            break 'restore None;
+                        }
+                        _ => {
+                            return Err(format!(
+                                "Couldn't open \"{}\" to read latest message received. {}",
+                                path.to_str().unwrap_or(""),
+                                err
+                            )
+                            .into());
+                        }
+                    },
+                };
+                Some(message_id)
+            } else {
+                None
+            }
+        };
+        let mut ack_serializer = None;
+        if let Some(replay_config) = &config.replay
+            && let Some(replay_ack_config) = &replay_config.ack
+        {
+            ack_serializer = Some(replay_ack_config.encoding.build()?);
+        }
+        Ok(Self {
+            config,
+            params,
+            last_received_message_id,
+            ack_serializer,
+        })
     }
 
-    pub async fn run(self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
+    pub async fn run(mut self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
         let mut ping_manager = PingManager::new(&self.config);
 
         let mut out = cx.out;
 
-        let (ws_sink, ws_source) = self.connect(&mut out).await?;
+        let (ack_tx, mut ack_rx) = tokio::sync::mpsc::channel(10);
+        let (ws_sink, ws_source) = self.connect(ack_tx.clone(), &mut out).await?;
 
         pin_mut!(ws_sink, ws_source);
 
+        let stateful = self.config.replay.as_ref().is_some_and(|r| r.stateful);
+
         loop {
             let result = tokio::select! {
+                biased;
+
                 _ = cx.shutdown.clone() => {
                     info!("Received shutdown signal.");
                     break;
                 },
 
-                res = ping_manager.tick(&mut ws_sink) => res,
-
-                Some(msg_result) = ws_source.next() => {
-                    match msg_result {
-                        Ok(msg) => self.handle_message(msg, &mut ping_manager, &mut out).await,
-                        Err(error) => {
-                            emit!(WebSocketReceiveError { error: &error });
-                            Err(WebSocketSourceError::Tungstenite { source: error })
-                        }
-                    }
+                Some(ack) = ack_rx.recv() => {
+                    Ok(self.handle_ack(&mut ws_sink, ack, stateful).await)
                 }
+
+                // Split "fairly" between pings and incoming messages
+                res = self.handle_messages_and_pings(
+                    &mut ws_source,
+                    &mut ws_sink,
+                    &mut ping_manager,
+                    ack_tx.clone(),
+                    &mut out
+                ) => res
             };
 
             if let Err(error) = result {
@@ -154,8 +218,9 @@ impl WebSocketSource {
                         );
                     }
                 }
+
                 if self
-                    .reconnect(&mut out, &mut ws_sink, &mut ws_source)
+                    .reconnect(ack_tx.clone(), &mut out, &mut ws_sink, &mut ws_source)
                     .await
                     .is_err()
                 {
@@ -163,13 +228,75 @@ impl WebSocketSource {
                 }
             }
         }
+
+        drop(ack_tx);
+        while let Some(ack) = ack_rx.recv().await {
+            self.handle_ack(&mut ws_sink, ack, stateful).await;
+        }
+
         Ok(())
+    }
+
+    async fn handle_messages_and_pings(
+        &mut self,
+        ws_source: &mut WebSocketStream,
+        ws_sink: &mut WebSocketSink,
+        ping_manager: &mut PingManager,
+        ack_tx: Sender<String>,
+        out: &mut SourceSender,
+    ) -> Result<(), WebSocketSourceError> {
+        tokio::select! {
+            Some(msg_result) = ws_source.next() => {
+                match msg_result {
+                    Ok(msg) => self.handle_message(msg, ping_manager, ack_tx, out).await,
+                    Err(error) => {
+                        emit!(WebSocketReceiveError { error: &error });
+                        Err(WebSocketSourceError::Tungstenite { source: error })
+                    }
+                }
+            }
+
+            res = ping_manager.tick(ws_sink) => res,
+        }
+    }
+
+    async fn store_last_message_id(&self) {
+        if let Some(path) = self
+            .params
+            .data_dir
+            .as_ref()
+            .map(|p| p.join(LAST_RECEIVED_MESSAGE_ID_FILE_NAME))
+            && let Some(last_message_id) = &self.last_received_message_id
+        {
+            let mut parent = path.clone();
+
+            if parent.pop() {
+                if parent == *"" {
+                    parent = ".".into();
+                }
+
+                match NamedTempFile::new_in(parent) {
+                    Ok(temp) => {
+                        if let Err(err) = tokio::fs::write(temp.path(), last_message_id).await {
+                            error!(message = "Persisting last received message id failed.", %err);
+                        }
+                        if let Err(err) = temp.persist(path) {
+                            error!(message = "Persisting last received message id failed.", %err);
+                        }
+                    }
+                    Err(err) => warn!(
+                        message = "Persisting last received message id failed. Couldn't open temporary file.", %err
+                    ),
+                }
+            }
+        }
     }
 
     async fn handle_message(
         &self,
         msg: Message,
         ping_manager: &mut PingManager,
+        ack_tx: Sender<String>,
         out: &mut SourceSender,
     ) -> Result<(), WebSocketSourceError> {
         match msg {
@@ -182,13 +309,13 @@ impl WebSocketSource {
                     ping_manager.record_pong();
                     debug!("Received custom pong response.");
                 } else {
-                    self.process_message(&msg_txt, WebSocketKind::Text, out)
+                    self.process_message(&msg_txt, WebSocketKind::Text, ack_tx, out)
                         .await;
                 }
                 Ok(())
             }
             Message::Binary(msg_bytes) => {
-                self.process_message(&msg_bytes, WebSocketKind::Binary, out)
+                self.process_message(&msg_bytes, WebSocketKind::Binary, ack_tx, out)
                     .await;
                 Ok(())
             }
@@ -201,8 +328,13 @@ impl WebSocketSource {
         }
     }
 
-    async fn process_message<T>(&self, payload: &T, kind: WebSocketKind, out: &mut SourceSender)
-    where
+    async fn process_message<T>(
+        &self,
+        payload: &T,
+        kind: WebSocketKind,
+        ack_tx: Sender<String>,
+        out: &mut SourceSender,
+    ) where
         T: AsRef<[u8]> + ?Sized,
     {
         let payload_bytes = payload.as_ref();
@@ -235,6 +367,10 @@ impl WebSocketSource {
                     });
 
                     let now = Utc::now();
+
+                    // Extract message IDs to remember the last one and to send ACKs if needed
+                    let message_ids = self.extract_message_ids(events.iter());
+
                     let events_with_meta = events.into_iter().map(|mut event| {
                         if let Event::Log(event) = &mut event {
                             self.add_metadata(event, now);
@@ -244,6 +380,12 @@ impl WebSocketSource {
 
                     if let Err(error) = out.send_batch(events_with_meta).await {
                         error!(message = "Error sending events.", %error);
+                    } else {
+                        // Only ACK on successful send
+                        // We only care about the latest message ID, because it is used to replay
+                        if let Some(last_message_id) = message_ids.last() {
+                            _ = ack_tx.send(last_message_id.clone()).await;
+                        }
                     }
                 }
                 Err(error) => {
@@ -255,6 +397,46 @@ impl WebSocketSource {
         }
     }
 
+    fn extract_message_ids<'a>(&self, events: impl Iterator<Item = &'a Event>) -> Vec<String> {
+        let mut message_ids = Vec::new();
+        if let Some(replay_config) = &self.config.replay {
+            message_ids.extend(events
+                .filter_map(|event| {
+                    if let Event::Log(event) = event {
+                        event
+                            .value()
+                            .get(&replay_config.message_id_path)
+                            .filter(|value| matches!(value, Value::Bytes(_)))
+                            .or_else(|| {
+                                event
+                                    .get_message()
+                                    .and_then(|message| message.get(&replay_config.message_id_path))
+                            })
+                            .and_then(|v| {
+                                v.try_bytes_utf8_lossy()
+                                    .inspect_err(|err| debug!(message = "Message ID is not a valid string.", %err))
+                                    .ok()
+                            })
+                            .map(Cow::into_owned)
+                    } else {
+                        None
+                    }
+                }));
+        }
+        message_ids
+    }
+
+    async fn handle_ack(&mut self, ws_sink: &mut WebSocketSink, ack: String, stateful: bool) {
+        self.last_received_message_id = Some(ack.clone());
+
+        if stateful {
+            self.store_last_message_id().await;
+        }
+
+        // Ignore failed acks
+        self.send_ack(ws_sink, ack).await;
+    }
+
     fn add_metadata(&self, event: &mut LogEvent, now: DateTime<Utc>) {
         self.params
             .log_namespace
@@ -263,13 +445,14 @@ impl WebSocketSource {
 
     async fn reconnect(
         &self,
+        ack_tx: Sender<String>,
         out: &mut SourceSender,
         ws_sink: &mut WebSocketSink,
         ws_source: &mut WebSocketStream,
     ) -> Result<(), WebSocketSourceError> {
         info!("Reconnecting to WebSocket...");
 
-        let (new_sink, new_source) = self.connect(out).await?;
+        let (new_sink, new_source) = self.connect(ack_tx, out).await?;
 
         *ws_sink = new_sink;
         *ws_source = new_source;
@@ -281,12 +464,13 @@ impl WebSocketSource {
 
     async fn connect(
         &self,
+        ack_tx: Sender<String>,
         out: &mut SourceSender,
     ) -> Result<(WebSocketSink, WebSocketStream), WebSocketSourceError> {
         let (mut ws_sink, mut ws_source) = self.try_create_sink_and_stream().await?;
 
         if self.config.initial_message.is_some() {
-            self.send_initial_message(&mut ws_sink, &mut ws_source, out)
+            self.send_initial_message(&mut ws_sink, &mut ws_source, ack_tx, out)
                 .await?;
         }
 
@@ -296,9 +480,41 @@ impl WebSocketSource {
     async fn try_create_sink_and_stream(
         &self,
     ) -> Result<(WebSocketSink, WebSocketStream), WebSocketSourceError> {
-        let ws_stream = self
-            .params
-            .connector
+        // Create a new connector with `last_received` query param in the URL
+        // If needed
+        let last_received_message_connector =
+            self.last_received_message_id
+                .as_ref()
+                .and_then(|last_received_message_id| {
+                    let mut new_uri = url::Url::parse(&self.config.common.uri).ok()?;
+                    let query_pairs: Vec<_> = new_uri
+                        .query_pairs()
+                        .filter(|(name, _)| name != LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME)
+                        .map(|(name, value)| (name.into_owned(), value.into_owned()))
+                        .collect();
+                    new_uri
+                        .query_pairs_mut()
+                        .clear()
+                        .extend_pairs(query_pairs)
+                        .append_pair(
+                            LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME,
+                            last_received_message_id,
+                        );
+                    let new_uri = WebSocketConnector::parse_uri(new_uri.as_str())
+                        .inspect_err(|err| {
+                            warn!(message = "Sending last_received message ID to the server failed.", %err);
+                        })
+                        .ok()?;
+                    Some(self.params.connector.clone().with_new_uri(new_uri))
+                });
+        let connector = if self.config.replay.is_some() {
+            last_received_message_connector
+                .as_ref()
+                .unwrap_or(&self.params.connector)
+        } else {
+            &self.params.connector
+        };
+        let ws_stream = connector
             .connect_backoff_with_timeout(self.config.connect_timeout_secs)
             .await;
 
@@ -311,6 +527,7 @@ impl WebSocketSource {
         &self,
         ws_sink: &mut WebSocketSink,
         ws_source: &mut WebSocketStream,
+        ack_tx: Sender<String>,
         out: &mut SourceSender,
     ) -> Result<(), WebSocketSourceError> {
         let initial_message = self.config.initial_message.as_ref().unwrap();
@@ -338,11 +555,13 @@ impl WebSocketSource {
 
         match message {
             Message::Text(txt) => {
-                self.process_message(&txt, WebSocketKind::Text, out).await;
+                self.process_message(&txt, WebSocketKind::Text, ack_tx, out)
+                    .await;
                 Ok(())
             }
             Message::Binary(bin) => {
-                self.process_message(&bin, WebSocketKind::Binary, out).await;
+                self.process_message(&bin, WebSocketKind::Binary, ack_tx, out)
+                    .await;
                 Ok(())
             }
             Message::Close(frame) => Self::handle_close_frame(frame),
@@ -375,6 +594,46 @@ impl WebSocketSource {
         emit!(WebSocketReceiveError { error: &error });
 
         Err(specific_error)
+    }
+
+    async fn send_ack(&mut self, ws_sink: &mut WebSocketSink, message_id: impl Into<Value>) {
+        if let Some(replay_config) = &self.config.replay
+            && let Some(replay_ack_config) = &replay_config.ack
+            && let Some(ack_serializer) = &mut self.ack_serializer
+        {
+            let mut value = Value::Null;
+            value.insert(&replay_ack_config.message_id_path, message_id);
+
+            let mut message_bytes = BytesMut::new();
+            if let Err(err) = ack_serializer.encode(
+                match (&*ack_serializer, value) {
+                    (Serializer::Text(_) | Serializer::RawMessage(_), Value::Bytes(bytes)) => {
+                        LogEvent::from_bytes_legacy(&bytes).into()
+                    }
+                    (_, value) => LogEvent::from_parts(value, EventMetadata::default()).into(),
+                },
+                &mut message_bytes,
+            ) {
+                debug!(message = "Encoding ACK message failed.", %err);
+                return;
+            }
+            let message = if ack_serializer.is_binary() {
+                Message::binary(message_bytes)
+            } else {
+                Message::text(String::from_utf8_lossy(&message_bytes))
+            };
+
+            _ = ws_sink
+                .send(message)
+                .await
+                .map_err(|error| {
+                    emit!(WebSocketSendError { error: &error });
+                    WebSocketSourceError::Tungstenite { source: error }
+                })
+                .inspect_err(
+                    |err| warn!(message = "WebSocket error occurred while sending ACK.", %err),
+                );
+        }
     }
 
     fn is_custom_pong(&self, msg_txt: &str) -> bool {
@@ -433,20 +692,27 @@ mod tests {
     use vector_lib::codecs::decoding::JsonDeserializerConfig;
 
     use futures::{StreamExt, sink::SinkExt};
+    use tempfile::TempDir;
     use tokio::{net::TcpListener, time::Duration};
     use tokio_tungstenite::{
-        accept_async,
+        accept_async, accept_hdr_async,
         tungstenite::{
             Message,
+            handshake::server::{ErrorResponse, Request, Response},
             protocol::frame::{CloseFrame, coding::CloseCode},
         },
     };
     use url::Url;
-    use vector_lib::codecs::decoding::DeserializerConfig;
+    use vector_lib::codecs::{
+        TextSerializerConfig, decoding::DeserializerConfig, encoding::SerializerConfig,
+    };
 
     use crate::{
         common::websocket::WebSocketCommonConfig,
-        sources::websocket::config::{PongMessage, WebSocketConfig},
+        sources::websocket::{
+            config::{MessageReplayConfig, PongMessage, ReplayAckConfig, WebSocketConfig},
+            source::LAST_RECEIVED_MESSAGE_ID_FILE_NAME,
+        },
         test_util::{
             addr::next_addr,
             components::{
@@ -717,5 +983,149 @@ mod tests {
         config.connect_timeout_secs = Duration::from_secs(1);
 
         run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
+    }
+
+    async fn start_ack_supported_server() -> String {
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            // First connection
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+            websocket
+                .send(Message::Text("message1".to_string()))
+                .await
+                .unwrap();
+            // Wait for ack
+            let Some(Ok(Message::Text(ack))) = websocket.next().await else {
+                panic!("Didn't receive ack!");
+            };
+            assert_eq!(ack, "message1");
+            websocket
+                .send(Message::Text("message2".to_string()))
+                .await
+                .unwrap();
+            // Wait for ack
+            let Some(Ok(Message::Text(ack))) = websocket.next().await else {
+                panic!("Didn't receive ack!");
+            };
+            assert_eq!(ack, "message2");
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_can_send_acks() {
+        let server_addr = start_ack_supported_server().await;
+        let mut config = make_config(&server_addr);
+        config.replay = Some(MessageReplayConfig {
+            message_id_path: ".".into(),
+            ack: Some(ReplayAckConfig {
+                encoding: SerializerConfig::Text(TextSerializerConfig::default()).into(),
+                message_id_path: ".".into(),
+            }),
+            data_dir: None,
+            stateful: false,
+        });
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty(), "No events received from source");
+    }
+
+    async fn start_reconnect_server_with_last_received() -> String {
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            // First connection
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+            websocket
+                .send(Message::Text("message1".to_string()))
+                .await
+                .unwrap();
+            // Close the connection to force a reconnect from the client
+            websocket.close(None).await.unwrap();
+
+            // Second connection
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_hdr_async(stream, move |req: &Request, res: Response| {
+                let Some(query_params) = req.uri().query() else {
+                    return Err(ErrorResponse::new(Some(
+                        "missing last_received".to_string(),
+                    )));
+                };
+                if !query_params.contains("last_received=message1") {
+                    return Err(ErrorResponse::new(Some(
+                        "missing last_received".to_string(),
+                    )));
+                }
+                Ok(res)
+            })
+            .await
+            .expect("Failed to accept");
+            websocket
+                .send(Message::Text("message2".to_string()))
+                .await
+                .unwrap();
+            let _ = websocket.next().await;
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_can_send_last_received_message_on_reconnect() {
+        let server_addr = start_reconnect_server_with_last_received().await;
+        let mut config = make_config(&server_addr);
+        config.replay = Some(MessageReplayConfig {
+            message_id_path: ".".into(),
+            ack: None,
+            data_dir: None,
+            stateful: false,
+        });
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty(), "No events received from source");
+        assert_eq!(2, events.len());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_can_persist_last_received_message_in_a_file() {
+        let server_addr = start_reconnect_server_with_last_received().await;
+        let mut config = make_config(&server_addr);
+        let temp_dir = TempDir::new().unwrap();
+        config.replay = Some(MessageReplayConfig {
+            message_id_path: ".".into(),
+            ack: None,
+            data_dir: temp_dir.path().to_owned().into(),
+            stateful: true,
+        });
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty(), "No events received from source");
+        assert_eq!(events.len(), 2);
+
+        // Check stored last_message_id
+        assert_eq!(
+            std::fs::read_to_string(
+                temp_dir
+                    .path()
+                    .join("default")
+                    .join(LAST_RECEIVED_MESSAGE_ID_FILE_NAME)
+            )
+            .unwrap(),
+            "message2"
+        );
     }
 }
