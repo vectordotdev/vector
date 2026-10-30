@@ -48,14 +48,6 @@ releases: "0.61.0": {
 			contributors: ["pront"]
 		},
 		{
-			type: "feat"
-			description: #"""
-				VRL now includes a `range` function that creates an array of integers from a start value to an exclusive end value, with an optional step.
-				"""#
-			pr_numbers: [26876]
-			contributors: ["pront"]
-		},
-		{
 			type: "enhancement"
 			description: #"""
 				The `character_delimited` and `newline_delimited` decoding framers now report frames dropped for

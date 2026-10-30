@@ -75,7 +75,7 @@ impl DriverResponse for HttpResponse {
     }
 }
 
-/// Native `http 1` equivalent of the legacy `HttpService`.
+/// Generic `Service` implementation for HTTP stream sinks.
 #[derive(Clone)]
 pub struct HttpService<B, T: Send> {
     client: HttpClient,
@@ -105,9 +105,8 @@ where
     /// Creates a service that signs every built request with AWS `SigV4` before sending it.
     ///
     /// The signature covers the method, URI, headers and body produced by `request_builder`,
-    /// without adding an `x-amz-content-sha256` header, matching the legacy
-    /// `HttpService::new_with_sig_v4`. A request that cannot be signed fails with a
-    /// non-retriable [`HttpError`].
+    /// without adding an `x-amz-content-sha256` header. A request that cannot be signed fails
+    /// with a non-retriable [`HttpError`].
     #[cfg(feature = "aws-core")]
     pub fn new_with_sig_v4(
         client: HttpClient,
@@ -237,9 +236,8 @@ pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     impl Fn(&HttpResponse) -> http_1::StatusCode + Clone + Send + Sync + 'static,
     Request,
     HttpResponse,
-    HttpError,
 > {
-    super::http::HttpStatusRetryLogic::new_with_error(
+    super::http::HttpStatusRetryLogic::new(
         |response: &HttpResponse| {
             let status = response.response.status();
             if !status.is_success() {
