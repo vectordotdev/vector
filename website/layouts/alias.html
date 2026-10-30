@@ -1,0 +1,4 @@
+{{ $hash := cond (.Page.Params.inline_upgrade_guide | default false) "#upgrade-guide" "" }}<!doctype html><html><head><meta charset="utf-8">
+<title>{{ .Permalink }}</title><link rel="canonical" href="{{ .Permalink }}">
+<meta http-equiv="refresh" content="0; url={{ .Permalink }}{{ $hash }}">
+<script>location.replace({{ .Permalink }} + (location.hash || {{ $hash }}))</script></head></html>

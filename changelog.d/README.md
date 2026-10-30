@@ -120,7 +120,8 @@ Finally, a good fragment is concise and avoids implementation details.
 Breaking fragments (`*.breaking.md`) carry extra structured fields (title, optional anchor, and
 `## Summary` / `## Migration` sections) so the release process can auto-generate the upgrade
 guide from them. See [Examples](#examples) below for the exact shape — or just run the
-scaffolder from [Quick start](#quick-start).
+scaffolder from [Quick start](#quick-start). The generated guide lives in the release
+page's Markdown and is rendered below the VRL changelog.
 
 Release preparation also imports the selected VRL release's changelog. Entries in its
 **Breaking Changes** section, or entries with explicit **Migration** / **Upgrade Guide**

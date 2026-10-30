@@ -1,6 +1,5 @@
-{{/* Reuse the standalone guide so both URLs share the same migration instructions.
-     Each top-level migration becomes a standard changelog card. Nest its headings
-     under the release page's Upgrade guide heading, keeping IDs. */}}
+{{/* Render the release page's migration content as changelog cards.
+     Nest its headings under Upgrade guide, preserving migration IDs. */}}
 {{ $content := .Content | replaceRE `<h2(\s|>)` `<!-- upgrade-guide-entry --><h2${1}` }}
 {{ range slice 5 4 3 2 }}
 {{ $content = $content | replaceRE (printf `<(/?)h%d(\s|>)` .) (printf `<${1}h%d${2}` (add . 1)) }}
