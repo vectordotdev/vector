@@ -655,6 +655,7 @@ printf '## 0.28.0\n- Release fixture\n'"#,
         assert_eq!(git(repo, &["branch", "--show-current"]), branch);
         assert_eq!(git(repo, &["rev-parse", "HEAD^"]), base);
         assert_eq!(git(remote, &["rev-parse", "refs/heads/master"]), master);
+        assert_eq!(git(remote, &["rev-parse", "refs/heads/v0.59"]), base);
         assert_eq!(
             git(remote, &["rev-parse", &format!("refs/heads/{branch}")]),
             git(repo, &["rev-parse", "HEAD"])
@@ -673,7 +674,7 @@ printf '## 0.28.0\n- Release fixture\n'"#,
             &["status", "--porcelain"][..],
         ];
         let before = checks.map(|args| git(repo, args));
-        prepare_cli(repo, &[], Some(message));
+        prepare_cli(repo, &["--vrl-version", "0.28.0"], Some(message));
         assert_eq!(checks.map(|args| git(repo, args)), before);
     }
 
@@ -727,7 +728,38 @@ printf '## 0.28.0\n- Release fixture\n'"#,
     }
 
     #[test]
-    fn cli_default_preparation_accepts_current_master() {
+    fn cli_default_preparation_rejects_stale_branches() {
+        let (temp, _) = development_checkout(false);
+        let repo = temp.path();
+        let remote = add_origin(repo);
+        git(repo, &["tag", "v0.58.0"]);
+        cli_fixture(repo, "0.58.0");
+        let base = commit(repo);
+        let branches = ["v0.59", "prepare-v-0-59-0-website"];
+        for branch in branches {
+            git(repo, &["branch", branch, &base]);
+        }
+        // Both branches still have the expected version, but omit this commit.
+        write(repo, "master-only.txt", "latest master change\n");
+        let master = commit(repo);
+        git(repo, &["push", "origin", "master"]);
+        let remote_refs = git(remote.path(), &["for-each-ref", "refs/heads"]);
+        for branch in branches {
+            reject_default(
+                repo,
+                &format!(
+                    "requires existing branch {branch} to match master; rename the existing branch and retry"
+                ),
+            );
+            assert_eq!(
+                git(remote.path(), &["for-each-ref", "refs/heads"]),
+                remote_refs
+            );
+            git(repo, &["branch", "-f", branch, &master]);
+        }
+    }
+
+    fn cli_default_preparation(reuse_branches: bool) {
         let (temp, _) = development_checkout(false);
         let repo = temp.path();
         let remote = add_origin(repo);
@@ -735,8 +767,23 @@ printf '## 0.28.0\n- Release fixture\n'"#,
         cli_fixture(repo, "0.58.0");
         let master = commit(repo);
         git(repo, &["push", "-u", "origin", "master"]);
+        if reuse_branches {
+            for branch in ["v0.59", "prepare-v-0-59-0-website"] {
+                git(repo, &["branch", branch, &master]);
+            }
+        }
         prepare_cli(repo, &["--vrl-version", "0.28.0"], None);
         assert_published(repo, remote.path(), "0.59.0", &master, &master);
+    }
+
+    #[test]
+    fn cli_default_preparation_accepts_current_master() {
+        cli_default_preparation(false);
+    }
+
+    #[test]
+    fn cli_default_preparation_accepts_matching_branches() {
+        cli_default_preparation(true);
     }
 
     fn patch_fixture() -> (TempDir, TempDir, String, String) {

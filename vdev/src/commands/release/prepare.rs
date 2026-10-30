@@ -77,15 +77,30 @@ impl Cli {
             }
             None => self.versions.resolve_vector()?,
         };
+        let release_branch = format!("v{}.{}", version.major, version.minor);
+        let release_preparation_branch = preparation_branch(&version);
+        if !self.dry_run && self.versions.vector_version.is_none() {
+            let master = git::run_and_check_output(&["rev-parse", "HEAD"])?;
+            for branch in [&release_branch, &release_preparation_branch] {
+                ensure!(
+                    !git::branch_exists(branch)?
+                        || git::run_and_check_output(&[
+                            "rev-parse",
+                            &format!("refs/heads/{branch}"),
+                        ])? == master,
+                    "release preparation without --version requires existing branch {branch} to match master; rename the existing branch and retry"
+                );
+            }
+        }
         let vrl_version = self.versions.resolve_vrl(None)?;
 
         let prepare = Prepare {
-            new_vector_version: version.clone(),
+            new_vector_version: version,
             vrl_version,
             repo_root,
             latest_vector_version: git::latest_release_version()?,
-            release_branch: format!("v{}.{}", version.major, version.minor),
-            release_preparation_branch: preparation_branch(&version),
+            release_branch,
+            release_preparation_branch,
             dry_run: self.dry_run,
         };
         prepare.run()
