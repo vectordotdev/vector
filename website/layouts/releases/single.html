@@ -109,17 +109,12 @@
 
           <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
             {{ range $breakingTitled }}
-            <li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5">
-              <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="group block underline decoration-primary/50 underline-offset-4 focus:outline-none focus:ring-2 focus:ring-primary hover:decoration-secondary">
-                <div class="prose dark:prose-invert max-w-none font-semibold [&>p]:m-0 [&>p]:text-primary-dark group-hover:[&>p]:text-secondary dark:[&>p]:text-primary dark:group-hover:[&>p]:text-secondary [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
-                  {{ .title | markdownify }}
-                </div>
-              </a>
-              <div class="mt-2 prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
-                {{ .description | markdownify }}
-              </div>
-              {{ partial "releases/changelog-attribution.html" . }}
-            </li>
+            {{ partial "releases/changelog-card.html" (dict
+              "title" .title
+              "href" (printf "%s#%s" (index $upgradeGuides 0).RelPermalink .anchor)
+              "body" (.description | markdownify)
+              "footer" (partial "releases/changelog-attribution.html" .)
+            ) }}
             {{ end }}
           </ul>
         </div>
@@ -140,12 +135,10 @@
 
             <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
               {{ range $changes }}
-              <li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5">
-                <div class="prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
-                  {{ .description | markdownify }}
-                </div>
-                {{ partial "releases/changelog-attribution.html" . }}
-              </li>
+              {{ partial "releases/changelog-card.html" (dict
+                "body" (.description | markdownify)
+                "footer" (partial "releases/changelog-attribution.html" .)
+              ) }}
               {{ end }}
             </ul>
           </div>

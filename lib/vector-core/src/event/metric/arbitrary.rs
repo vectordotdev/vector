@@ -37,7 +37,7 @@ impl Arbitrary for MetricValue {
                 MetricValue::AggregatedHistogram {
                     buckets,
                     count,
-                    sum,
+                    sum: Some(sum),
                 }
             }),
             any::<AgentDDSketch>().prop_map(|sketch| {

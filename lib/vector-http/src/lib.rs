@@ -10,8 +10,6 @@
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![allow(clippy::module_name_repetitions)]
-#![allow(clippy::must_use_candidate)]
 
 mod connector;
 

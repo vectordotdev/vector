@@ -44,6 +44,7 @@ pub struct Driver<St, Svc> {
     input: St,
     service: Svc,
     protocol: Option<SharedString>,
+    request_error_status: EventStatus,
 }
 
 impl<St, Svc> Driver<St, Svc> {
@@ -52,6 +53,7 @@ impl<St, Svc> Driver<St, Svc> {
             input,
             service,
             protocol: None,
+            request_error_status: EventStatus::Rejected,
         }
     }
 
@@ -62,6 +64,17 @@ impl<St, Svc> Driver<St, Svc> {
     #[must_use]
     pub fn protocol(mut self, protocol: impl Into<SharedString>) -> Self {
         self.protocol = Some(protocol.into());
+        self
+    }
+
+    /// Sets the finalization status for requests that fail with a service error.
+    ///
+    /// The default is `Rejected`. Use `Errored` when the source must be able to retry failed
+    /// delivery. Only rejected failures emit dropped-event telemetry; other failures are logged.
+    /// This does not change how successful service calls interpret response status codes.
+    #[must_use]
+    pub const fn with_request_error_status(mut self, status: EventStatus) -> Self {
+        self.request_error_status = status;
         self
     }
 }
@@ -92,6 +105,7 @@ where
             input,
             mut service,
             protocol,
+            request_error_status,
         } = self;
 
         let batched_input = input.ready_chunks(1024);
@@ -177,6 +191,7 @@ where
                                 event_count,
                                 bytes_sent.as_ref(),
                                 &events_sent,
+                                request_error_status,
                             ))
                             .instrument(info_span!("request", request_id).or_current());
 
@@ -203,11 +218,16 @@ where
         event_count: usize,
         bytes_sent: Option<&Registered<BytesSent>>,
         events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
+        request_error_status: EventStatus,
     ) {
         match result {
             Err(error) => {
-                Self::emit_call_error(Some(error), request_id, event_count);
-                finalizers.update_status(EventStatus::Rejected);
+                if request_error_status == EventStatus::Rejected {
+                    Self::emit_call_error(Some(error), request_id, event_count);
+                } else {
+                    error!(message = "Request failed.", ?error, request_id);
+                }
+                finalizers.update_status(request_error_status);
             }
             Ok(response) => {
                 trace!(message = "Service call succeeded.", request_id);
@@ -265,7 +285,9 @@ mod tests {
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
     use vector_common::{
-        finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        finalization::{
+            BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+        },
         internal_event::CountByteSize,
         json_size::JsonSize,
         request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -414,6 +436,30 @@ mod tests {
 
                 Ok(DelayResponse::new())
             })
+        }
+    }
+
+    #[tokio::test]
+    async fn request_errors_use_configured_finalization() {
+        for (status, expected) in [
+            (None, BatchStatus::Rejected),
+            (Some(EventStatus::Errored), BatchStatus::Errored),
+        ] {
+            let (notifier, receiver) = BatchNotifier::new_with_receiver();
+            let request = DelayRequest(
+                EventFinalizers::new(EventFinalizer::new(notifier)),
+                RequestMetadata::default(),
+            );
+            let service = tower::service_fn(|_: DelayRequest| {
+                futures::future::ready(Err::<DelayResponse, _>("connection failed"))
+            });
+            let mut driver = Driver::new(stream::iter([request]), service);
+            if let Some(status) = status {
+                driver = driver.with_request_error_status(status);
+            }
+
+            driver.run().await.unwrap();
+            assert_eq!(receiver.await, expected);
         }
     }
 
