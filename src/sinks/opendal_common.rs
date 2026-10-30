@@ -283,3 +283,37 @@ impl From<opendal::Error> for OpenDalError {
         Self::OpenDal { source }
     }
 }
+
+/// Retry logic for OpenDAL operations.
+#[derive(Debug, Clone, Default)]
+pub struct OpenDalRetryLogic;
+
+impl RetryLogic for OpenDalRetryLogic {
+    type Error = opendal::Error;
+    type Request = OpenDalRequest;
+    type Response = OpenDalResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_temporary()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_opendal_retry_logic_temporary_error() {
+        let logic = OpenDalRetryLogic;
+        let err = opendal::Error::new(opendal::ErrorKind::Unexpected, "network dropped connection")
+            .set_temporary();
+        assert!(logic.is_retriable_error(&err));
+    }
+
+    #[test]
+    fn test_opendal_retry_logic_permanent_error() {
+        let logic = OpenDalRetryLogic;
+        let err = opendal::Error::new(opendal::ErrorKind::PermissionDenied, "access denied");
+        assert!(!logic.is_retriable_error(&err));
+    }
+}
