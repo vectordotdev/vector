@@ -103,7 +103,7 @@ mod tests {
                     count,
                 }],
                 count,
-                sum,
+                sum: Some(sum),
             },
         )
     }
@@ -174,7 +174,7 @@ mod tests {
                     count: 3
                 }],
                 count: 3,
-                sum: 19.0,
+                sum: Some(19.0),
             }
         );
     }

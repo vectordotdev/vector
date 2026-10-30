@@ -909,7 +909,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets: vec![vector_lib::event::metric::Bucket { upper_limit, count }],
                 count,
-                sum: 0.0,
+                sum: Some(0.0),
             },
         )
     }
