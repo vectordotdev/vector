@@ -16,6 +16,25 @@ fi
 # Basis of script copied from:
 # https://github.com/paxosglobal/asdf-protoc/blob/46c2f9349b8420144b197cfd064a9677d21cfb0c/bin/install
 
+# Pinned protoc release. Archives are verified against the SHA-256 digests in
+# get_archive_sha256 before extraction. The archive names embed the version, so
+# a version bump without new pins fails closed. Compute each digest from the
+# official GitHub release assets, e.g.:
+#   gh release download "v${PROTOC_VERSION}" -R protocolbuffers/protobuf \
+#     -p "protoc-${PROTOC_VERSION}-*.zip" && shasum -a 256 protoc-*.zip
+readonly PROTOC_VERSION="21.12"
+
+get_archive_sha256() {
+  case "$1" in
+    protoc-21.12-linux-aarch_64.zip) echo "2dd17f75d66a682640b136e31848da9fb2eefe68d55303baf8b32617374f6711" ;;
+    protoc-21.12-linux-x86_64.zip) echo "3a4c1e5f2516c639d3079b1586e703fc7bcfa2136d58bda24d1d54f949c315e8" ;;
+    protoc-21.12-osx-aarch_64.zip) echo "96839af0caed64352442fc8236f4bdf7c1cd6efcfaa98fa5db37307a73fc7c70" ;;
+    protoc-21.12-osx-x86_64.zip) echo "9448ff40278504a7ae5139bb70c962acc78c32d8fc54b4890a55c14c68b9d10a" ;;
+    protoc-21.12-win64.zip) echo "71852a30cf62975358edfcbbff93086e8857a079c8e4d6904881aa968d65c7f9" ;;
+    *) >&2 echo "unsupported platform: no pinned SHA-256 for ${1}" && return 1 ;;
+  esac
+}
+
 # shellcheck disable=SC2155
 readonly TMP_DIR="$(mktemp -d -t "protoc_XXXX")"
 trap 'rm -rf "${TMP_DIR?}"' EXIT
@@ -54,19 +73,47 @@ get_bin_name() {
   fi
 }
 
-install_protoc() {
-  local version=$1
-  local install_path=$2
-
-  local base_url="https://github.com/protocolbuffers/protobuf/releases/download"
-  local url
-  if [[ "$(get_platform)" == "win64" ]]; then
+get_archive_name() {
+  local platform=$1
+  local arch=$2
+  if [[ "${platform}" == "win64" ]]; then
     # Windows release assets are named without an explicit arch suffix.
-    url="${base_url}/v${version}/protoc-${version}-win64.zip"
+    echo "protoc-${PROTOC_VERSION}-win64.zip"
   else
-    url="${base_url}/v${version}/protoc-${version}-$(get_platform)-$(get_arch).zip"
+    echo "protoc-${PROTOC_VERSION}-${platform}-${arch}.zip"
   fi
-  local download_path="${TMP_DIR}/protoc.zip"
+}
+
+# Prints the SHA-256 of a file using sha256sum (Linux, Git Bash) or shasum
+# (macOS). Only executables on PATH are considered, never shell functions.
+sha256_of() {
+  local file=$1
+  local output
+  if type -P sha256sum >/dev/null; then
+    output="$(command sha256sum "${file}")" || return 1
+  elif type -P shasum >/dev/null; then
+    output="$(command shasum -a 256 "${file}")" || return 1
+  else
+    >&2 echo "neither sha256sum nor shasum is available to verify ${file}"
+    return 1
+  fi
+  echo "${output%% *}"
+}
+
+install_protoc() {
+  local install_path=$1
+
+  local platform
+  local arch
+  local archive
+  local expected_sha256
+  platform="$(get_platform)"
+  arch="$(get_arch)"
+  archive="$(get_archive_name "${platform}" "${arch}")"
+  expected_sha256="$(get_archive_sha256 "${archive}")"
+
+  local url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${archive}"
+  local download_path="${TMP_DIR}/${archive}"
 
   echo "Downloading ${url}"
   # Stay compatible with the curl shipped by Ubuntu 20.04 focal (7.68.x) used
@@ -74,8 +121,15 @@ install_protoc() {
   # in curl 7.71.0, so rely on the transport-level retry that --retry covers.
   curl --retry 5 --retry-delay 10 -fsSL "${url}" -o "${download_path}"
 
+  local actual_sha256
+  actual_sha256="$(sha256_of "${download_path}")"
+  if [[ "${actual_sha256}" != "${expected_sha256}" ]]; then
+    >&2 echo "SHA-256 mismatch for ${archive}: expected ${expected_sha256}, got ${actual_sha256:-<none>}"
+    exit 1
+  fi
+
   unzip -qq "${download_path}" -d "${TMP_DIR}"
   mv -f -v "${TMP_DIR}/bin/$(get_bin_name)" "${install_path}"
 }
 
-install_protoc "21.12" "${INSTALL_PATH}/$(get_bin_name)"
+install_protoc "${INSTALL_PATH}/$(get_bin_name)"

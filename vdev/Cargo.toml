@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.3.35"
+version = "0.3.37"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
@@ -19,7 +19,32 @@ include = [
 [lints]
 workspace = true
 
+[features]
+default = []
+# Opt in to the entire package-repository command and its publisher dependencies.
+# Ordinary developer binaries omit it; the separate Linux publisher binary enables it.
+package-repositories = [
+  "dep:aws-config", "dep:aws-sdk-s3", "dep:aws-sdk-sts", "dep:aws-sdk-iam",
+  "dep:aws-smithy-http-client", "dep:aws-smithy-runtime-api", "dep:aws-smithy-types", "dep:base64", "dep:flate2", "dep:reqwest", "dep:roxmltree", "dep:tar",
+  "dep:tokio", "dep:uuid",
+]
+
 [dependencies]
+aws-config = { version = "=1.12.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-s3 = { version = "=1.146.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sts = { version = "=1.114.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-iam = { version = "1.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+# Match Vector's Ring provider when both packages are built together.
+aws-smithy-http-client = { version = "1.4", default-features = false, features = ["rustls-ring"], optional = true }
+aws-smithy-runtime-api = { version = "1.16", features = ["client"], optional = true }
+aws-smithy-types = { version = "1", optional = true }
+base64 = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+reqwest = { workspace = true, features = ["blocking"], optional = true }
+roxmltree = { version = "0.21", optional = true }
+tar = { version = "0.4", optional = true }
+tokio = { workspace = true, features = ["rt-multi-thread"], optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true

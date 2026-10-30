@@ -11,9 +11,10 @@ use http_1::{
 use http_body_util::BodyExt;
 use snafu::ResultExt;
 use tracing::Instrument;
+use vector_http::full_body;
 
 use crate::{
-    http::client_v1::{HttpClient, full_body},
+    http::client_v1::HttpClient,
     sinks::{HTTPV1RequestBuilderSnafu, prelude::*},
 };
 

@@ -1,5 +1,3 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
 use vector_lib::counter;
@@ -236,6 +234,48 @@ mod s3 {
             .increment(1);
         }
     }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct SqsMessageReceiveSucceeded {
+        pub count: usize,
+    }
+
+    impl InternalEvent for SqsMessageReceiveSucceeded {
+        fn emit(self) {
+            trace!(message = "Received SQS messages.", count = %self.count);
+            counter!(CounterName::SqsMessageReceiveSucceededTotal).increment(1);
+            counter!(CounterName::SqsMessageReceivedMessagesTotal).increment(self.count as u64);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct SqsMessageProcessingSucceeded<'a> {
+        pub message_id: &'a str,
+    }
+
+    impl InternalEvent for SqsMessageProcessingSucceeded<'_> {
+        fn emit(self) {
+            trace!(message = "Processed SQS message successfully.", message_id = %self.message_id);
+            counter!(CounterName::SqsMessageProcessingSucceededTotal).increment(1);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
+        pub bucket: &'a str,
+        pub key: &'a str,
+        pub kind: &'a str,
+        pub name: &'a str,
+    }
+
+    impl InternalEvent for SqsS3EventRecordInvalidEventIgnored<'_> {
+        fn emit(self) {
+            warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
+                bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
+            counter!(CounterName::SqsS3EventRecordIgnoredTotal, "ignore_type" => "invalid_event_kind")
+                .increment(1);
+        }
+    }
 }
 
 #[derive(Debug, NamedInternalEvent)]
@@ -262,31 +302,6 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct SqsMessageReceiveSucceeded {
-    pub count: usize,
-}
-
-impl InternalEvent for SqsMessageReceiveSucceeded {
-    fn emit(self) {
-        trace!(message = "Received SQS messages.", count = %self.count);
-        counter!(CounterName::SqsMessageReceiveSucceededTotal).increment(1);
-        counter!(CounterName::SqsMessageReceivedMessagesTotal).increment(self.count as u64);
-    }
-}
-
-#[derive(Debug, NamedInternalEvent)]
-pub struct SqsMessageProcessingSucceeded<'a> {
-    pub message_id: &'a str,
-}
-
-impl InternalEvent for SqsMessageProcessingSucceeded<'_> {
-    fn emit(self) {
-        trace!(message = "Processed SQS message successfully.", message_id = %self.message_id);
-        counter!(CounterName::SqsMessageProcessingSucceededTotal).increment(1);
-    }
-}
-
 // AWS SQS source
 
 #[cfg(feature = "sources-aws_sqs")]
@@ -310,24 +325,5 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'_, E> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-    }
-}
-
-// AWS s3 source
-
-#[derive(Debug, NamedInternalEvent)]
-pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
-    pub bucket: &'a str,
-    pub key: &'a str,
-    pub kind: &'a str,
-    pub name: &'a str,
-}
-
-impl InternalEvent for SqsS3EventRecordInvalidEventIgnored<'_> {
-    fn emit(self) {
-        warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
-            bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
-        counter!(CounterName::SqsS3EventRecordIgnoredTotal, "ignore_type" => "invalid_event_kind")
-            .increment(1);
     }
 }

@@ -21,11 +21,11 @@ pub struct OtlpSerializerConfig {
 
 impl OtlpSerializerConfig {
     /// Build the `OtlpSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundled OTLP descriptor set cannot be decoded or does not contain
+    /// the logs, metrics, or traces export request message types.
     pub fn build(&self) -> Result<OtlpSerializer, crate::encoding::BuildError> {
         OtlpSerializer::new()
     }
@@ -70,11 +70,11 @@ pub struct OtlpSerializer {
 
 impl OtlpSerializer {
     /// Creates a new OTLP serializer with the appropriate message descriptors.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bundled OTLP descriptor set cannot be decoded or does not contain
+    /// the logs, metrics, or traces export request message types.
     pub fn new() -> vector_common::Result<Self> {
         let options = Options {
             use_json_names: true,

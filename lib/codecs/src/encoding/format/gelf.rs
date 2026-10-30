@@ -127,11 +127,17 @@ impl GelfSerializer {
     }
 
     /// Encode event and represent it as JSON value.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event is not valid GELF and cannot be coerced into it: the `host`
+    /// field is missing, both `short_message` and the log schema message field are missing, a field
+    /// name contains characters other than word characters, `.`, `-`, or `@`, or a field value has
+    /// a type that GELF does not allow for that field.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the event is not a log event.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         // input_type() restricts the event type to LogEvents
         let log = to_gelf_event(event.into_log())?;

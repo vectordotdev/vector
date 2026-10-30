@@ -1,16 +1,12 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+use serde::{Deserialize, Deserializer, de::Error as _};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
 use super::{samples_to_buckets, write_list, write_word};
 use crate::{float_eq, metrics::AgentDDSketch, opt_float_eq};
-
-const INFINITY: &str = "inf";
-const NEG_INFINITY: &str = "-inf";
-const NAN: &str = "NaN";
 
 /// Metric value.
 #[configurable_component]
@@ -629,78 +625,100 @@ impl ByteSizeOf for Sample {
     }
 }
 
-/// Custom serialization function which converts special `f64` values to strings.
-/// Non-special values are serialized as numbers.
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn serialize_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    if value.is_infinite() {
-        serializer.serialize_str(if *value > 0.0 { INFINITY } else { NEG_INFINITY })
-    } else if value.is_nan() {
-        serializer.serialize_str(NAN)
-    } else {
-        serializer.serialize_f64(*value)
-    }
-}
-
-/// Custom deserialization function for handling special f64 values.
-fn deserialize_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct UpperLimitVisitor;
-
-    impl de::Visitor<'_> for UpperLimitVisitor {
-        type Value = f64;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a number or a special string value")
-        }
-
-        fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
-            Ok(value)
-        }
-
-        // f64 represents integers exactly up to 2^53 (~9 quadrillion), which covers any realistic
-        // histogram bucket boundary. The precision loss only affects values beyond that threshold.
-        #[allow(clippy::cast_precision_loss)]
-        fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
-            Ok(value as f64)
-        }
-
-        #[allow(clippy::cast_precision_loss)]
-        fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
-            Ok(value as f64)
-        }
-
-        fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
-            match value {
-                NAN => Ok(f64::NAN),
-                INFINITY => Ok(f64::INFINITY),
-                NEG_INFINITY => Ok(f64::NEG_INFINITY),
-                _ => Err(E::custom("unsupported string value")),
-            }
-        }
-    }
-
-    deserializer.deserialize_any(UpperLimitVisitor)
-}
-
 /// A histogram bucket.
 ///
 /// Histogram buckets represent the `count` of observations where the value of the observations does
 /// not exceed the specified `upper_limit`.
-#[configurable_component(no_deser, no_ser)]
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+#[serde(from = "BucketRepr", into = "BucketRepr")]
 pub struct Bucket {
     /// The upper limit of values in the bucket.
-    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
     pub upper_limit: f64,
 
     /// The number of values tracked in this bucket.
     pub count: u64,
+}
+
+/// Histogram bucket representation, including special floating-point bounds.
+#[configurable_component]
+struct BucketRepr {
+    /// The upper limit of values in the bucket.
+    upper_limit: BucketBound,
+    /// The number of values tracked in this bucket.
+    count: u64,
+}
+
+/// A finite bucket boundary or a special floating-point value.
+#[configurable_component]
+#[serde(untagged)]
+enum BucketBound {
+    /// A finite numeric boundary.
+    Number(f64),
+    /// An infinite or NaN boundary, represented as a string.
+    Special(SpecialBucketBound),
+}
+
+/// String representations of non-finite bucket boundaries.
+#[configurable_component(no_deser)]
+enum SpecialBucketBound {
+    /// Positive infinity.
+    #[serde(rename = "inf")]
+    Infinity,
+    /// Negative infinity.
+    #[serde(rename = "-inf")]
+    NegativeInfinity,
+    /// Not a number.
+    #[serde(rename = "NaN")]
+    Nan,
+}
+
+// Unit enums also accept single-key objects by default, but bucket bounds only accept strings.
+impl<'de> Deserialize<'de> for SpecialBucketBound {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match String::deserialize(deserializer)?.as_str() {
+            "inf" => Ok(Self::Infinity),
+            "-inf" => Ok(Self::NegativeInfinity),
+            "NaN" => Ok(Self::Nan),
+            value => Err(D::Error::unknown_variant(value, &["inf", "-inf", "NaN"])),
+        }
+    }
+}
+
+impl From<BucketRepr> for Bucket {
+    fn from(input: BucketRepr) -> Self {
+        let upper_limit = match input.upper_limit {
+            BucketBound::Number(value) => value,
+            BucketBound::Special(SpecialBucketBound::Infinity) => f64::INFINITY,
+            BucketBound::Special(SpecialBucketBound::NegativeInfinity) => f64::NEG_INFINITY,
+            BucketBound::Special(SpecialBucketBound::Nan) => f64::NAN,
+        };
+        Self {
+            upper_limit,
+            count: input.count,
+        }
+    }
+}
+
+impl From<Bucket> for BucketRepr {
+    fn from(bucket: Bucket) -> Self {
+        let upper_limit = if bucket.upper_limit.is_nan() {
+            BucketBound::Special(SpecialBucketBound::Nan)
+        } else if bucket.upper_limit == f64::INFINITY {
+            BucketBound::Special(SpecialBucketBound::Infinity)
+        } else if bucket.upper_limit == f64::NEG_INFINITY {
+            BucketBound::Special(SpecialBucketBound::NegativeInfinity)
+        } else {
+            BucketBound::Number(bucket.upper_limit)
+        };
+        Self {
+            upper_limit,
+            count: bucket.count,
+        }
+    }
 }
 
 impl PartialEq for Bucket {
@@ -786,7 +804,49 @@ impl ByteSizeOf for Quantile {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+    use vector_config::schema::generate_root_schema;
+
     use super::*;
+
+    #[test]
+    fn bucket_schema_matches_supported_bounds() {
+        let schema = serde_json::to_value(generate_root_schema::<Bucket>().unwrap()).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        for bound in [
+            json!(1),
+            json!(-1),
+            json!(1.5),
+            json!("inf"),
+            json!("-inf"),
+            json!("NaN"),
+        ] {
+            let input = json!({"upper_limit": bound, "count": 5});
+            validator.validate(&input).unwrap();
+            let bucket: Bucket = serde_json::from_value(input).unwrap();
+            let encoded = serde_json::to_value(bucket).unwrap();
+            validator.validate(&encoded).unwrap();
+            let decoded: Bucket = serde_json::from_value(encoded).unwrap();
+            assert_eq!(bucket, decoded);
+        }
+        for bound in [
+            json!("Infinity"),
+            json!("nan"),
+            json!("1.5"),
+            json!(true),
+            json!(null),
+            json!({"inf": null}),
+            json!({"-inf": null}),
+            json!({"NaN": null}),
+        ] {
+            let input = json!({"upper_limit": bound, "count": 5});
+            assert!(!validator.is_valid(&input), "schema accepted {input}");
+            assert!(
+                serde_json::from_value::<Bucket>(input.clone()).is_err(),
+                "deserializer accepted {input}"
+            );
+        }
+    }
 
     #[test]
     fn bucket_upper_limit_deserializes_integer() {

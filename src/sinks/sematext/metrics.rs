@@ -7,6 +7,7 @@ use http_1::{Request, Uri};
 use indoc::indoc;
 use snafu::ResultExt;
 use tower::Service;
+use vector_http::{HttpError, empty_body};
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
     internal_event::CountByteSize, request_metadata::RequestMetadata,
@@ -23,7 +24,7 @@ use crate::{
         Event, KeyString,
         metric::{Metric, MetricValue},
     },
-    http::client_v1::{HttpClient, HttpError, empty_body},
+    http::client_v1::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
         HTTPV1RequestBuilderSnafu, Healthcheck, HealthcheckError, VectorSink,
@@ -187,7 +188,7 @@ impl ValidatedSink for SematextMetricsConfig {
 }
 
 fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
-    let uri = encode_uri(
+    encode_uri(
         endpoint,
         "write",
         &[
@@ -195,8 +196,7 @@ fn write_uri(endpoint: &HttpEndpoint) -> Result<Uri> {
             ("v", Some(format!("vector-{}", vector_version()))),
             ("precision", Some("ns".into())),
         ],
-    )?;
-    Ok(HttpEndpoint::new(uri)?.into_v1())
+    )
 }
 
 impl SematextMetricsService {

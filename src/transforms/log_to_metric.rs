@@ -380,7 +380,7 @@ fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric,
         .or_else(|| Some(Utc::now()));
 
     // Assign the OriginService for the new metric
-    let metadata = event
+    let mut metadata = event
         .metadata()
         .clone()
         .with_schema_definition(&Arc::new(Definition::any()))
@@ -389,6 +389,9 @@ fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric,
             None,
             Some(ORIGIN_SERVICE_VALUE),
         ));
+    // Configured metrics derive new meaning from arbitrary log fields, so an upstream metric unit
+    // no longer describes them. The `all_metrics` reconstruction path keeps the original metadata.
+    metadata.clear_datadog_metric_unit();
 
     let field = parse_target_path(config.field()).map_err(|_e| PathNotFound {
         path: config.field().to_string(),
@@ -1105,6 +1108,30 @@ mod tests {
             )
             .with_timestamp(Some(ts()))
         );
+    }
+
+    #[test]
+    fn configured_metric_clears_inherited_datadog_unit() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "status"
+            "#,
+        );
+        let mut event = create_event("status", "42");
+        event.metadata_mut().set_datadog_metric_unit("millisecond");
+        let metric_config = config
+            .metrics
+            .as_ref()
+            .and_then(|metrics| metrics.first())
+            .expect("test config should contain one metric");
+
+        let Ok(metric) = to_metric_with_config(metric_config, &event) else {
+            panic!("configured metric should be created");
+        };
+
+        assert_eq!(metric.metadata().datadog_metric_unit(), None);
     }
 
     #[tokio::test]

@@ -5,7 +5,7 @@ use super::sink::DorisSink;
 use crate::{
     codecs::EncodingConfigWithFraming,
     config::ValidatedSink,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, MaybeAuth, client_v1::HttpClient},
     sinks::{
         doris::{
             client::DorisSinkClient, common::DorisCommon, health::DorisHealthLogic,
@@ -234,7 +234,7 @@ impl ValidatedSink for DorisConfig {
         let commons = DorisCommon::parse_many(self)?;
         let common = &commons[0];
 
-        let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
+        let client = HttpClient::new(common.tls_settings.clone().into(), &cx.proxy)?;
 
         let services_futures = commons
             .iter()

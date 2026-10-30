@@ -1,4 +1,5 @@
 mod config_builder;
+mod ignored_fields;
 pub(crate) mod interpolation;
 mod loader;
 mod representation;
@@ -37,8 +38,10 @@ static ALLOW_ENV_VAR_INTERPOLATION: OnceLock<bool> = OnceLock::new();
 
 /// Sets whether environment variable interpolation is enabled for the process.
 /// Must be called exactly once at startup before any config loading.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+///
+/// # Panics
+///
+/// Panics if called more than once.
 pub fn set_env_var_interpolation(allow: bool) {
     ALLOW_ENV_VAR_INTERPOLATION
         .set(allow)
@@ -96,8 +99,14 @@ pub fn merge_path_lists(
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
+///
+/// Returns `None` if a path is not a valid glob pattern, and exits the process with
+/// `exitcode::CONFIG` if a path matches no files.
+///
+/// # Panics
+///
+/// Panics if a config path is not valid UTF-8, or, on Windows, if `config_paths` is empty and
+/// the `ProgramFiles` environment variable is not set.
 pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     let starting_paths = if config_paths.is_empty() {
         default_config_paths()
@@ -150,24 +159,29 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     Some(paths)
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Loads and builds a `Config` from the given config paths, logging any build warnings.
+///
+/// # Errors
+///
+/// Returns error messages if a directory cannot be read, an opened config file cannot be read,
+/// interpolated, parsed, merged, or deserialized, or if the resulting configuration fails to
+/// build. Config files that cannot be opened are logged and skipped.
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
-    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
-    let (config, build_warnings) = builder.build_with_warnings()?;
-
-    for warning in build_warnings {
-        warn!("{warning}");
-    }
-
-    Ok(config)
+    ConfigBuilderLoader::default()
+        .load_from_paths(config_paths)?
+        .build()
 }
 
 /// Loads a configuration from paths. Handle secret replacement and if a provider is present
 /// in the builder, the config is used as bootstrapping for a remote source. Otherwise,
 /// provider instantiation is skipped.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+///
+/// # Errors
+///
+/// Returns error messages if the config paths cannot be loaded, a referenced secret backend is
+/// missing or fails to retrieve secrets, a secret placeholder cannot be resolved, a provider is
+/// configured alongside sources, transforms, or sinks, the provider fails to build a config,
+/// the resulting configuration fails to build, or disk buffer preconditions are not met.
 pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
@@ -181,7 +195,9 @@ pub async fn load_from_paths_with_provider_and_secrets(
 
     // If there's a provider, overwrite the existing config builder with the remote variant.
     if let Some(mut provider) = builder.provider {
+        let bootstrap_warnings = builder.loading_warnings;
         builder = provider.build(signal_handler).await?;
+        builder.loading_warnings.extend(bootstrap_warnings);
         debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
 
@@ -207,8 +223,15 @@ pub(crate) async fn load_builder_from_paths_with_secrets(
         .load_from_paths(config_paths)
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Loads a `Config` from a string in the given format, resolving `SECRET[...]` placeholders from
+/// the configured backends first.
+///
+/// # Errors
+///
+/// Returns error messages if the input cannot be read, interpolated, parsed, merged, or
+/// deserialized, a referenced secret backend is missing or fails to retrieve secrets, a secret
+/// placeholder cannot be resolved, the resulting configuration fails to build, or disk buffer
+/// preconditions are not met.
 pub async fn load_from_str_with_secrets(
     input: &str,
     format: Format,
@@ -236,9 +259,7 @@ async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> 
 
     validation::check_buffer_preconditions(&new_config).await?;
 
-    for warning in build_warnings {
-        warn!("{warning}");
-    }
+    log_warnings(&build_warnings);
 
     Ok(new_config)
 }
@@ -295,25 +316,48 @@ where
 }
 
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a JSON object.
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+///
+/// # Errors
+///
+/// Returns error messages if a directory cannot be read, an opened config file cannot be read or
+/// parsed, or values from different files have incompatible types and cannot be merged. Config
+/// files that cannot be opened are logged and skipped.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Loads and builds a `Config` from a string in the given format, logging any build warnings.
+///
+/// Environment variables are not interpolated.
+///
+/// # Errors
+///
+/// Returns error messages if the input cannot be parsed or deserialized, cannot be appended to
+/// the config builder, or if the resulting configuration fails to build.
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
-    let builder = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
-    let (config, build_warnings) = builder.build_with_warnings()?;
+    load_from_inputs(std::iter::once((input.as_bytes(), format)))?.build()
+}
 
-    for warning in build_warnings {
-        warn!("{warning}");
+pub(super) fn log_warnings(warnings: &[String]) {
+    static LAST_WARNINGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    let mut warnings = warnings.to_vec();
+    warnings.sort_unstable();
+    warnings.dedup();
+
+    let mut previous = LAST_WARNINGS.lock().expect("warning lock poisoned");
+    if *previous == warnings {
+        return;
     }
+    previous.clone_from(&warnings);
+    drop(previous);
 
-    Ok(config)
+    if !warnings.is_empty() {
+        // Suppress identical reloads, but never hide a changed warning set behind log throttling.
+        warn!(warnings = ?warnings, internal_log_rate_limit = false, "Configuration warnings.");
+    }
 }
 
 fn load_from_inputs(
@@ -323,7 +367,7 @@ fn load_from_inputs(
     let mut errors = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|n| config.append(n)) {
+        if let Err(errs) = load_builder(input, format).and_then(|n| config.append(n)) {
             // TODO: add back paths
             errors.extend(errs.iter().cloned());
         }
@@ -336,8 +380,13 @@ fn load_from_inputs(
     }
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Reads `input` into a string, optionally interpolating environment variables.
+///
+/// # Errors
+///
+/// Returns error messages if `input` cannot be read as UTF-8, or, when `interpolate_env` is
+/// set, if a referenced environment variable contains LF or CR, is unset without a default, or
+/// is empty when referenced with `:?`.
 pub fn prepare_input<R: std::io::Read>(
     mut input: R,
     interpolate_env: bool,
@@ -366,8 +415,29 @@ pub fn prepare_input<R: std::io::Read>(
     }
 }
 
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+/// Loads a complete configuration, retaining diagnostics before deserialization discards fields.
+pub(crate) fn load_builder(
+    input: impl std::io::Read,
+    format: Format,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let content = prepare_input(input, false)?;
+    let value = representation::parse_config_value(&content, format)?;
+    let ignored = value
+        .as_object()
+        .map(|map| ignored_fields::find(map, None))
+        .unwrap_or_default();
+    let mut builder: ConfigBuilder = representation::deserialize_config_value(value)?;
+    builder.loading_warnings = ignored_fields::warnings(&ignored);
+    Ok(builder)
+}
+
+/// Reads `input` and deserializes it as `T` in the given format, without interpolating
+/// environment variables.
+///
+/// # Errors
+///
+/// Returns error messages if `input` cannot be read as UTF-8, cannot be parsed in `format`, or
+/// cannot be deserialized into `T`.
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,

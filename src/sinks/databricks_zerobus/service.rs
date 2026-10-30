@@ -2,7 +2,7 @@
 
 use crate::config::ProxyConfig;
 use crate::event::Event;
-use crate::http::HttpClient;
+use crate::http::client_v1::HttpClient;
 use crate::sinks::util::retries::RetryLogic;
 use crate::tls::TlsSettings;
 use databricks_zerobus_ingest_sdk::{
@@ -328,11 +328,13 @@ impl ZerobusService {
             message: format!("Failed to create Zerobus SDK: {e}"),
         })?;
 
-        let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
-            ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {e}"),
-            }
+        let tls = TlsSettings::from_options(None).map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to create TLS settings: {e}"),
         })?;
+        let http_client =
+            HttpClient::new(tls.into(), proxy).map_err(|e| ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {e}"),
+            })?;
 
         Ok(Self {
             sdk: Arc::new(sdk),
@@ -601,10 +603,14 @@ impl ZerobusService {
                 message: format!("Failed to create Zerobus SDK: {e}"),
             })?;
 
-        let http_client = HttpClient::new(TlsSettings::default(), &ProxyConfig::default())
-            .map_err(|e| ZerobusSinkError::ConfigError {
+        let tls = TlsSettings::from_options(None).map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to create TLS settings: {e}"),
+        })?;
+        let http_client = HttpClient::new(tls.into(), &ProxyConfig::default()).map_err(|e| {
+            ZerobusSinkError::ConfigError {
                 message: format!("Failed to create HTTP client: {e}"),
-            })?;
+            }
+        })?;
 
         Ok(Self {
             sdk: Arc::new(sdk),

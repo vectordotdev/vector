@@ -6,8 +6,8 @@ use std::{collections::BTreeMap, path::PathBuf};
 use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
-use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
-use hyper::Body;
+use http_1::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
+use vector_http::empty_body;
 use vector_lib::codecs::{
     CharacterDelimitedEncoderConfig, LengthDelimitedEncoderConfig,
     encoding::{Framer, FramingConfig, SerializerConfig},
@@ -27,15 +27,13 @@ use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     config::ValidatedSink,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, MaybeAuth, client_v1::HttpClient},
     sinks::{
         prelude::*,
         util::{
             RealtimeSizeBasedDefaultBatchSettings, TowerRequestSettings, UriSerde,
-            http::{
-                HttpService, OrderedHeaderName, RequestConfig, RetryStrategy,
-                http_response_retry_logic,
-            },
+            http::{RequestConfig, RetryStrategy},
+            http_v1::{HttpService, http_response_retry_logic},
         },
     },
     template::{ConfinementConfig, UriTemplate},
@@ -161,7 +159,7 @@ impl From<HttpMethod> for Method {
 impl HttpSinkConfig {
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        Ok(HttpClient::new(tls, cx.proxy())?)
+        HttpClient::new(tls.into(), cx.proxy())
     }
 
     #[cfg(test)]
@@ -185,33 +183,33 @@ impl GenerateConfig for HttpSinkConfig {
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let auth = auth.choose_one(&uri.auth)?;
     let uri = uri.with_default_parts();
-    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
+    let mut request = Request::head(uri.uri_v1()?).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply(&mut request);
+        auth.apply_v1(&mut request);
     }
 
     let response = client.send(request).await?;
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 
 pub(super) fn validate_headers(
     headers: &BTreeMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
+) -> crate::Result<()> {
     let headers = crate::sinks::util::http::validate_headers(headers)?;
 
     for name in headers.keys() {
-        if configures_auth && name.inner() == AUTHORIZATION {
+        if configures_auth && name.inner().as_str() == AUTHORIZATION.as_str() {
             return Err("Authorization header can not be used with defined auth options".into());
         }
     }
 
-    Ok(headers)
+    Ok(())
 }
 
 /// Returns the effective framing configuration for the `http` sink (which is
@@ -308,7 +306,8 @@ pub struct ValidatedHttp {
     payload_suffix: String,
     content_type: Option<String>,
     content_encoding: Option<String>,
-    converted_static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
+    /// Static request headers, sorted by name; later entries replace earlier ones of the same name.
+    converted_static_headers: Vec<(HeaderName, HeaderValue)>,
     request_limits: TowerRequestSettings,
 }
 
@@ -406,15 +405,17 @@ impl ValidatedSink for HttpSinkConfig {
                 .to_string()
         });
 
-        let converted_static_headers = static_headers
+        let mut converted_static_headers = static_headers
             .into_iter()
             .map(|(name, value)| -> crate::Result<_> {
-                let header_name =
-                    HeaderName::from_bytes(name.as_bytes()).map(OrderedHeaderName::from)?;
+                let header_name = HeaderName::from_bytes(name.as_bytes())?;
                 let header_value = HeaderValue::try_from(value)?;
                 Ok((header_name, header_value))
             })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
+            .collect::<crate::Result<Vec<_>>>()?;
+        // Keep the header order of the former name-ordered map. The sort is stable, so for names
+        // that only differ in case the last configured value is inserted last and wins.
+        converted_static_headers.sort_by(|(a, _), (b, _)| a.as_str().cmp(b.as_str()));
 
         let request_limits = self.request.tower.into_settings();
 
@@ -445,6 +446,13 @@ impl HttpSinkConfig {
     /// templated headers happens here (not in `validate`) because the
     /// `component_name` threaded from the `opentelemetry`/`axiom` delegations
     /// must appear in per-template security warnings.
+    #[cfg_attr(
+        not(feature = "aws-core"),
+        expect(
+            clippy::unused_async,
+            reason = "AWS credential resolution requires await when aws-core is enabled."
+        )
+    )]
     pub(crate) async fn build_from_validated(
         &self,
         validated: &ValidatedHttp,
@@ -521,7 +529,8 @@ impl HttpSinkConfig {
                 )
             }
             _ => HttpService::new(client, http_sink_request_builder),
-        };
+        }
+        .with_response_decompression();
 
         let service = ServiceBuilder::new()
             .settings(
@@ -606,7 +615,7 @@ mod tests {
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(uri.uri, Some(config.method.into())),
+                HttpResourceConfig::from_parts(uri.uri, Some(http::Method::POST)),
                 config.encoding.clone(),
             );
 
