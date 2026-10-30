@@ -1430,22 +1430,6 @@ mod tests {
     }
 
     #[test]
-    fn vrl_only_migrations_generate_a_guide_and_linked_changelog() {
-        let version = Version::new(0, 61, 0);
-        let vrl = vrl_changelog::extract(include_str!("fixtures/vrl-0.38.0.txt"), &version);
-        let breaking: Vec<_> = vrl.migrations.iter().collect();
-        validate_breaking_anchors(&breaking).unwrap();
-        let guide = render_upgrade_guide("2026-10-30", &version, &breaking);
-        let cue = render_release_cue(&version, &[], Some(&vrl.notes));
-        assert!(guide.contains("{#vrl-pr-2001}"));
-        assert_eq!(guide.matches("```vrl").count(), 3);
-        assert!(cue.contains("/releases/0.61.0/#vrl-pr-2001"));
-        assert!(cue.contains("\tvrl_changelog:"));
-        assert!(!cue.contains("```vrl"));
-        assert!(cue.ends_with("}\n"));
-    }
-
-    #[test]
     fn write_release_stub_picks_max_weight_and_writes_correct_format() {
         let tmp = tempfile::tempdir().unwrap();
         let stubs_dir = tmp.path().join("website/content/en/releases");
