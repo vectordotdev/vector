@@ -237,6 +237,7 @@ fn watcher_for_timing() -> FileWatcher {
         max_line_bytes: 1024,
         line_delimiter: Bytes::from_static(b"\n"),
         buf: BytesMut::new(),
+        generation: 0,
     }
 }
 
@@ -307,7 +308,7 @@ async fn updating_path_resets_eof_backoff() {
         } else {
             std::fs::rename(&old_path, &new_path).unwrap();
         }
-        let old_info = watcher.update_path(new_path).await.unwrap();
+        let old_info = watcher.update_path(new_path).await.unwrap().unwatch_info;
         assert_eq!(old_info.is_some(), replace_file);
         if let Some(old_info) = old_info {
             assert!(old_info.reached_eof);

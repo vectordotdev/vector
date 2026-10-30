@@ -177,7 +177,12 @@ async fn test_bytes_unread_gzip_is_unknown_even_at_eof() {
     // replacement plain reader can report the bytes beyond its inherited offset.
     let replacement = dir.path().join("replacement.log");
     fs::write(&replacement, b"line1\nline2\nline3\n").unwrap();
-    let old_info = fw.update_path(replacement).await.unwrap().unwrap();
+    let old_info = fw
+        .update_path(replacement)
+        .await
+        .unwrap()
+        .unwatch_info
+        .unwrap();
     assert_eq!(old_info.path, path);
     assert_eq!(old_info.bytes_unread, None);
     assert!(old_info.reached_eof);
