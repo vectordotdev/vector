@@ -30,6 +30,7 @@ const REQUIRED_SERVICES: &[&str] = &[
     "load-generator",
     "accounting",
     "fraud-detection",
+    "intentionally-missing-service",
 ];
 
 // Attribute lists are maps; arrays, events and links keep their meaningful order.
