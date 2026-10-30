@@ -130,6 +130,11 @@ pub enum TlsError {
         max
     ))]
     EmptyTlsVersionWindow { min: TlsVersion, max: TlsVersion },
+    #[snafu(display(
+        "No TLS protocol version is usable: the host's OpenSSL configuration sets a maximum \
+         below TLS v1.0."
+    ))]
+    HostMaxTlsVersionBelowTls10,
     #[snafu(display("Error setting SNI: {}", source))]
     SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]

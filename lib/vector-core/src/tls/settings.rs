@@ -8,10 +8,11 @@ use std::{
 };
 
 use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetTlsVersionSnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, CreateAcceptorSnafu,
+    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
+    NewStoreBuilderSnafu, ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
+    SetCertificateSnafu, SetPrivateKeySnafu, SetTlsVersionSnafu, SetVerifyCertSnafu, TlsError,
+    X509ParseSnafu,
 };
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
@@ -19,8 +20,8 @@ use openssl::{
     pkcs12::Pkcs12,
     pkey::{PKey, Private},
     ssl::{
-        AlpnError, ConnectConfiguration, SslContextBuilder, SslOptions, SslVerifyMode, SslVersion,
-        select_next_proto,
+        AlpnError, ConnectConfiguration, SslContextBuilder, SslMethod, SslOptions, SslVerifyMode,
+        SslVersion, select_next_proto,
     },
     stack::Stack,
     x509::{X509, store::X509StoreBuilder, verify::X509CheckFlags},
@@ -451,7 +452,7 @@ impl TlsSettings {
         }
 
         // `mozilla_intermediate` sets this veto on acceptors; on connectors it can only be host policy.
-        if for_server && self.window_contains(TlsVersion::Tls13) {
+        if for_server && self.window_contains(TlsVersion::Tls13) && !host_disables_tls13()? {
             context.clear_options(SslOptions::NO_TLSV1_3);
         }
 
@@ -459,10 +460,13 @@ impl TlsSettings {
             .min_proto_version()
             .and_then(TlsVersion::from_ssl_version)
             .unwrap_or(TlsVersion::Tls10);
-        let max = context
+        // The only maximum `TlsVersion` cannot model is SSLv3, which is below every usable version.
+        let Some(max) = context
             .max_proto_version()
-            .and_then(TlsVersion::from_ssl_version)
-            .unwrap_or(TlsVersion::Tls13);
+            .map_or(Some(TlsVersion::Tls13), TlsVersion::from_ssl_version)
+        else {
+            return Err(TlsError::HostMaxTlsVersionBelowTls10);
+        };
         let options = context.options();
         // OpenSSL accepts a context with no usable version and only fails at handshake time.
         if !TlsVersion::ALL.into_iter().any(|version| {
@@ -607,6 +611,12 @@ impl TlsSettings {
         }
         Ok(())
     }
+}
+
+/// Whether the host's OpenSSL configuration disables TLS v1.3 for newly created contexts.
+fn host_disables_tls13() -> Result<bool> {
+    let context = SslContextBuilder::new(SslMethod::tls()).context(CreateAcceptorSnafu)?;
+    Ok(context.options().contains(SslOptions::NO_TLSV1_3))
 }
 
 /// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
@@ -927,7 +937,7 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 
 #[cfg(test)]
 mod test {
-    use openssl::ssl::{SslAcceptor, SslConnector, SslMethod};
+    use openssl::ssl::{SslAcceptor, SslConnector};
 
     use super::*;
 
