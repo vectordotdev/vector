@@ -53,7 +53,7 @@ components: sinks: gcp_bigquery: {
 						}
 						direction: "outgoing"
 						protocols: ["http"]
-						ssl: "required"
+						ssl: "optional"
 					}
 				}
 			}

@@ -34,7 +34,7 @@ impl BigquerySink {
                 }
             })
             .into_driver(self.service)
-            .protocol("gRPC")
+            .protocol("grpc")
             .run()
             .await
     }
