@@ -10,7 +10,7 @@ use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
-use tower::{Layer, ServiceBuilder};
+use tower::{Layer, ServiceBuilder, ServiceExt};
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -74,6 +74,40 @@ pub(crate) fn middleware_error_response(error: MiddlewareError) -> Response {
     warp::reply::with_status(response, status).into_response()
 }
 
+#[derive(Clone, Copy)]
+enum Encoding {
+    Protobuf,
+    Json,
+}
+
+fn encoding(content_type: Option<&str>) -> Option<Encoding> {
+    match content_type?.split(';').next()?.trim() {
+        value if value.eq_ignore_ascii_case("application/x-protobuf") => Some(Encoding::Protobuf),
+        value if value.eq_ignore_ascii_case("application/json") => Some(Encoding::Json),
+        _ => None,
+    }
+}
+
+fn json_response(response: Response) -> Response {
+    let (mut parts, _) = response.into_parts();
+    let value = if parts.status.is_success() {
+        serde_json::json!({})
+    } else {
+        // Preserve classification without echoing untrusted decoder/provider text.
+        serde_json::json!({"code": 2, "message": parts.status.canonical_reason().unwrap_or("OTLP request failed")})
+    };
+    parts.headers.remove(http::header::CONTENT_LENGTH);
+    parts.headers.remove(http::header::TRANSFER_ENCODING);
+    parts.headers.insert(
+        http::header::CONTENT_TYPE,
+        http::HeaderValue::from_static("application/json"),
+    );
+    Response::from_parts(
+        parts,
+        hyper::Body::from(serde_json::to_vec(&value).expect("fixed OTLP response")),
+    )
+}
+
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -98,6 +132,28 @@ pub(crate) async fn run_http_server(
     // Admission wraps the Warp service, so rejected requests cannot reach `capped_body`.
     let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+        let admitted = admitted.clone();
+        let negotiated = hyper::service::service_fn(move |request: http::Request<hyper::Body>| {
+            let json = matches!(
+                encoding(
+                    request
+                        .headers()
+                        .get(http::header::CONTENT_TYPE)
+                        .and_then(|v| v.to_str().ok())
+                ),
+                Some(Encoding::Json)
+            );
+            let admitted = admitted.clone();
+            async move {
+                // The original request-control layer still owns admission, limits and acknowledgement waits.
+                let response = admitted.oneshot(request).await?;
+                Ok::<_, Infallible>(if json {
+                    json_response(response)
+                } else {
+                    response
+                })
+            }
+        });
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
             .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -107,7 +163,7 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
-            .service(admitted.clone());
+            .service(negotiated);
         futures_util::future::ok::<_, Infallible>(svc)
     });
 
@@ -190,15 +246,20 @@ fn emit_decode_error(error: impl std::fmt::Display) -> ErrorMessage {
 }
 
 fn parse_with_deserializer(
+    signal: &str,
     deserializer: &OtlpDeserializer,
     body: Bytes,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let events = deserializer
-        .parse(body, log_namespace)
-        .map(SmallVec::into_vec)
-        .map_err(emit_decode_error)?;
+    let events = if super::empty::protobuf(signal, body.clone()).map_err(emit_decode_error)? {
+        Vec::new()
+    } else {
+        deserializer
+            .parse(body, log_namespace)
+            .map(SmallVec::into_vec)
+            .map_err(emit_decode_error)?
+    };
 
     // Count individual items within OTLP batches for consistency with other sources
     let count = super::count_otlp_items(&events);
@@ -222,7 +283,7 @@ where
         + Send
         + Sync
         + 'static
-        + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
+        + Fn(Encoding, Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
 {
     let body_filter = capped_body();
 
@@ -230,16 +291,25 @@ where
         .and(warp::path("v1"))
         .and(warp::path(telemetry_type))
         .and(warp::path::end())
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
+        .and(warp::header::optional::<String>("content-type").and_then(
+            |value: Option<String>| async move {
+                encoding(value.as_deref()).ok_or_else(|| {
+                    warp::reject::custom(ErrorMessage::new(
+                        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                        "Unsupported OTLP content type".to_owned(),
+                    ))
+                })
+            },
         ))
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
         .and(body_filter)
         .and_then(
-            move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
-                let events = make_events(encoding_header, headers, body);
+            move |encoding: Encoding,
+                  encoding_header: Option<String>,
+                  headers: HeaderMap,
+                  body: Bytes| {
+                let events = make_events(encoding, encoding_header, headers, body);
                 handle_request(
                     events,
                     acknowledgements,
@@ -261,7 +331,10 @@ fn build_warp_log_filter(
     headers_cfg: Vec<HttpConfigParamKind>,
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+    let make_events = move |encoding: Encoding,
+                            encoding_header: Option<String>,
+                            headers: HeaderMap,
+                            body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
@@ -274,8 +347,13 @@ fn build_warp_log_filter(
             })
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
+                let decoded_body = match encoding {
+                    Encoding::Protobuf => decoded_body,
+                    Encoding::Json => super::json::request(LOGS, decoded_body)
+                        .map_err(|()| emit_decode_error("Invalid OTLP JSON request"))?,
+                };
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(d, decoded_body, log_namespace, &events_received)
+                    parse_with_deserializer(LOGS, d, decoded_body, log_namespace, &events_received)
                 } else {
                     decode_log_body(decoded_body, log_namespace, &events_received)
                 }
@@ -302,7 +380,10 @@ fn build_warp_metrics_filter(
     headers_cfg: Vec<HttpConfigParamKind>,
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+    let make_events = move |encoding: Encoding,
+                            encoding_header: Option<String>,
+                            headers: HeaderMap,
+                            body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
@@ -315,8 +396,19 @@ fn build_warp_metrics_filter(
             })
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
+                let decoded_body = match encoding {
+                    Encoding::Protobuf => decoded_body,
+                    Encoding::Json => super::json::request(METRICS, decoded_body)
+                        .map_err(|()| emit_decode_error("Invalid OTLP JSON request"))?,
+                };
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(d, decoded_body, log_namespace, &events_received)
+                    parse_with_deserializer(
+                        METRICS,
+                        d,
+                        decoded_body,
+                        log_namespace,
+                        &events_received,
+                    )
                 } else {
                     decode_metrics_body(decoded_body, &events_received)
                 }
@@ -343,7 +435,10 @@ fn build_warp_trace_filter(
     headers_cfg: Vec<HttpConfigParamKind>,
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+    let make_events = move |encoding: Encoding,
+                            encoding_header: Option<String>,
+                            headers: HeaderMap,
+                            body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
@@ -356,8 +451,14 @@ fn build_warp_trace_filter(
             })
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
+                let decoded_body = match encoding {
+                    Encoding::Protobuf => decoded_body,
+                    Encoding::Json => super::json::request(TRACES, decoded_body)
+                        .map_err(|()| emit_decode_error("Invalid OTLP JSON request"))?,
+                };
                 if let Some(d) = deserializer.as_ref() {
                     parse_with_deserializer(
+                        TRACES,
                         d,
                         decoded_body,
                         LogNamespace::default(),
@@ -451,6 +552,10 @@ async fn handle_request(
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
+            // A valid no-record export needs no queue admission or downstream acknowledgement.
+            if events.is_empty() {
+                return Ok(protobuf(resp).into_response());
+            }
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
 
