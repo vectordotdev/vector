@@ -125,8 +125,9 @@ scaffolder from [Quick start](#quick-start).
 Release preparation also imports the selected VRL release's changelog. Entries in its
 **Breaking Changes** section, or entries with explicit **Migration** / **Upgrade Guide**
 notes or paired **Before/After** / **Old/New** examples, are included in the same upgrade
-guide. The VRL changelog keeps each entry's summary, contributor credit, and a link to its
-migration instructions. Ordinary entries stay in the VRL changelog.
+guide. The VRL changelog keeps each entry's full opening paragraph (up to the first blank
+line), contributor credit, and a link to its migration instructions. Ordinary entries stay
+in the VRL changelog.
 
 To preview both Vector and VRL release notes without preparing a release, run
 `cargo vdev release generate-cue --version <vector-version> --vrl-version <vrl-version>`.

@@ -247,7 +247,7 @@ releases: "0.61.0": {
 		
 		#### Fixes
 		
-		- `to_unix_timestamp` with `unit: "nanoseconds"` is now correctly marked as fallible by the compiler.
+		- `to_unix_timestamp` with `unit: "nanoseconds"` is now correctly marked as fallible by the compiler. The conversion can fail at runtime when the timestamp is out of range for a 64-bit nanosecond value, but the compiler previously rejected error handling for this call as unnecessary.
 		
 		  See the [migration instructions](/releases/0.61.0/#vrl-pr-2001).
 		

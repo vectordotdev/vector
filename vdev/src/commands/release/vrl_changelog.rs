@@ -107,7 +107,11 @@ pub(super) fn extract(notes: &str, vector_version: &Version) -> Changelog {
                     .iter()
                     .map(|line| (*line).to_owned()),
             );
-            let summary = first_sentence(&migration.summary);
+            let summary = migration
+                .summary
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
             output.push(format!("- {summary}\n"));
             output.push(format!(
                 "  See the [migration instructions](/releases/{vector_version}/#{}).\n",
@@ -322,7 +326,13 @@ mod tests {
         assert!(migration.migration.contains("#### Before"));
         assert!(migration.migration.contains("#### After"));
         assert!(!result.notes.contains("```vrl"));
-        assert!(!result.notes.contains("The conversion can fail at runtime"));
+        assert!(result.notes.contains(concat!(
+            r#"`to_unix_timestamp` with `unit: "nanoseconds"` is now correctly marked as fallible by the compiler. "#,
+            "The conversion can fail at runtime when the timestamp is out of range for a ",
+            "64-bit nanosecond value, but the compiler previously rejected error handling for this ",
+            "call as unnecessary."
+        )));
+        assert!(!result.notes.contains("Programs that call"));
         assert!(result.notes.contains("/releases/0.61.0/#vrl-pr-2001"));
         assert_eq!(result.notes.matches("*Thanks to ").count(), 6);
         assert!(result.notes.contains("### New Features"));

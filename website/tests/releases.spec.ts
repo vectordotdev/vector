@@ -80,6 +80,10 @@ for (const width of [1280, 390]) {
     });
     await expect(page.locator(".vrl-changelog-entry")).toHaveCount(6);
     await expect(vrlEntry.locator("pre")).toHaveCount(0);
+    await expect(vrlEntry).toContainText(
+      "The conversion can fail at runtime when the timestamp is out of range for a 64-bit nanosecond value, but the compiler previously rejected error handling for this call as unnecessary."
+    );
+    await expect(vrlEntry).not.toContainText("Programs that call");
     await expect(vrlEntry.getByRole("link", { name: "suryakant-source", exact: true })).toBeVisible();
     await vrlEntry.getByRole("link", { name: "migration instructions" }).click();
     await expect(page).toHaveURL(/\/releases\/0\.61\.0\/#vrl-pr-2001$/);
@@ -89,7 +93,7 @@ for (const width of [1280, 390]) {
       'to_unix_timestamp!(ts, unit: "nanoseconds")',
       'to_unix_timestamp(ts, unit: "nanoseconds") ?? 0'
     ]);
-    await expect(page.getByText(/The conversion can fail at runtime when the timestamp is out of range/)).toHaveCount(
+    await expect(guide.getByText(/The conversion can fail at runtime when the timestamp is out of range/)).toHaveCount(
       1
     );
 
