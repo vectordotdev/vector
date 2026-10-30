@@ -159,4 +159,64 @@ mod tests {
             assert!(request(TRACES, body.as_bytes()).is_err());
         }
     }
+    #[test]
+    fn json_ignores_unknown_fields_without_accepting_proto_field_aliases() {
+        for input in [
+            r#"{"resource_spans":[{"scopeSpans":[{"spans":[{}]}]}]}"#,
+            r#"{"resourceSpans":[{"scope_spans":[{"spans":[{}]}]}]}"#,
+            r#"{"futureEnvelope":{"kind":"IGNORED","traceId":"not-hex"}}"#,
+        ] {
+            let body = request(TRACES, input.as_bytes()).unwrap();
+            assert!(super::super::empty::protobuf(TRACES, body).unwrap());
+        }
+
+        let body = request(
+            TRACES,
+            br#"{
+          "resource_spans":[{"scopeSpans":[{"spans":[{}]}]}],
+          "resourceSpans":[{
+            "resource":{"droppedAttributesCount":7,"dropped_attributes_count":"ignored"},
+            "scopeSpans":[{"scope":{"name":"test-scope"},"spans":[{
+              "traceId":"0102030405060708090a0b0c0d0e0f10","spanId":"0102030405060708",
+              "trace_id":"not-hex","span_id":"not-hex","kind":1,"futureKind":"IGNORED",
+              "startTimeUnixNano":"0","endTimeUnixNano":"0"
+            }]}]
+          }]
+        }"#,
+        )
+        .unwrap();
+        let decoded = ExportTraceServiceRequest::decode(body).unwrap();
+        assert_eq!(decoded.resource_spans.len(), 1);
+        let resource = &decoded.resource_spans[0];
+        assert_eq!(
+            resource.resource.as_ref().unwrap().dropped_attributes_count,
+            7
+        );
+        let scope = &resource.scope_spans[0];
+        assert_eq!(scope.scope.as_ref().unwrap().name, "test-scope");
+        assert_eq!(scope.spans.len(), 1);
+        let span = &scope.spans[0];
+        assert_eq!(
+            span.trace_id,
+            hex::decode("0102030405060708090a0b0c0d0e0f10").unwrap()
+        );
+        assert_eq!(span.span_id, hex::decode("0102030405060708").unwrap());
+        assert_eq!(span.kind, 1);
+        assert!(!super::super::empty::traces(&decoded));
+
+        // A known repeated field still creates a record even when its inner keys are unknown.
+        let body = request(
+            TRACES,
+            br#"{"resourceSpans":[{"scopeSpans":[{"spans":[{"trace_id":"not-hex"}]}]}]}"#,
+        )
+        .unwrap();
+        let decoded = ExportTraceServiceRequest::decode(body).unwrap();
+        assert_eq!(decoded.resource_spans[0].scope_spans[0].spans.len(), 1);
+        assert!(
+            decoded.resource_spans[0].scope_spans[0].spans[0]
+                .trace_id
+                .is_empty()
+        );
+        assert!(!super::super::empty::traces(&decoded));
+    }
 }
