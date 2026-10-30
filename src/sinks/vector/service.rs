@@ -90,17 +90,17 @@ impl VectorService {
 }
 
 /// Returns the `scheme://authority/` origin that tonic prefixes to each gRPC method path.
-fn grpc_origin(uri: &Uri) -> crate::Result<http_1::Uri> {
-    let (Some(scheme), Some(authority)) = (uri.scheme_str(), uri.authority()) else {
+fn grpc_origin(uri: &Uri) -> crate::Result<Uri> {
+    let (Some(scheme), Some(authority)) = (uri.scheme(), uri.authority()) else {
         return Err(VectorSinkError::NotAbsoluteUri {
             uri: uri.to_string(),
         }
         .into());
     };
 
-    Ok(http_1::Uri::builder()
-        .scheme(scheme)
-        .authority(authority.as_str())
+    Ok(Uri::builder()
+        .scheme(scheme.clone())
+        .authority(authority.clone())
         .path_and_query("/")
         .build()?)
 }

@@ -1,7 +1,7 @@
 use std::{env, time::Duration};
 
 use futures::StreamExt;
-use http_body::Collected;
+use http_body_0::Collected;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio::time;
@@ -198,7 +198,7 @@ async fn aws_ecs_metrics(
 
         match http_client.send(request).await {
             Ok(response) if response.status() == hyper::StatusCode::OK => {
-                match http_body::Body::collect(response.into_body())
+                match http_body_0::Body::collect(response.into_body())
                     .await
                     .map(Collected::to_bytes)
                 {

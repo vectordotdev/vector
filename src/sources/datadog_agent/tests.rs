@@ -14,7 +14,7 @@ use vector_lib::codecs::decoding::framing::OversizedAction;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{Stream, StreamExt};
-use http::HeaderMap;
+use http_0::HeaderMap;
 use indoc::indoc;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};

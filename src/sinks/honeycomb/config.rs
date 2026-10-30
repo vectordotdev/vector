@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use futures::FutureExt;
-use http_1::{HeaderValue, Request, StatusCode};
+use http::{HeaderValue, Request, StatusCode};
 use http_body_util::BodyExt;
 use vector_http::full_body;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -198,7 +198,7 @@ async fn healthcheck(
     api_key: HeaderValue,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::post(uri.clone().into_v1()).header(HTTP_HEADER_HONEYCOMB, api_key);
+    let request = Request::post(uri.into_uri()).header(HTTP_HEADER_HONEYCOMB, api_key);
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();

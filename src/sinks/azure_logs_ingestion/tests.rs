@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use futures::stream;
 use http::Response;
+use http_body_util::{BodyExt, Full};
 use std::time::Duration;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
@@ -239,7 +240,7 @@ async fn correct_request() {
             endpoint_tx.send(request).await.unwrap();
             Ok(Response::builder()
                 .status(204)
-                .body(hyper::Body::empty())
+                .body(Full::default())
                 .unwrap())
         }
     })
@@ -269,7 +270,7 @@ async fn correct_request() {
     let (parts, body) = request.into_parts();
     assert_eq!(&parts.method.to_string(), "POST");
 
-    let body_bytes: Bytes = http_body::Body::collect(body)
+    let body_bytes: Bytes = BodyExt::collect(body)
         .await
         .expect("failed to collect body")
         .to_bytes();
@@ -300,40 +301,52 @@ async fn correct_request() {
 
 #[tokio::test]
 async fn retries_transport_error() {
-    use hyper::{
-        Body, Server,
-        service::{make_service_fn, service_fn},
+    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper_util::{
+        rt::{TokioExecutor, TokioIo},
+        server::conn::auto,
     };
-    use std::{
-        convert::Infallible,
-        sync::{
-            Arc,
-            atomic::{AtomicUsize, Ordering},
-        },
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
     };
 
     let (_guard, addr) = crate::test_util::addr::next_addr();
     let requests = Arc::new(AtomicUsize::new(0));
     let server_requests = Arc::clone(&requests);
-    let server = Server::bind(&addr).serve(make_service_fn(move |_| {
-        let requests = Arc::clone(&server_requests);
-        async move {
-            Ok::<_, Infallible>(service_fn(move |request: http::Request<Body>| {
-                let requests = Arc::clone(&requests);
-                async move {
-                    http_body::Body::collect(request.into_body()).await.unwrap();
-                    if requests.fetch_add(1, Ordering::Relaxed) == 0 {
-                        Err(std::io::Error::other(
-                            "close the first connection without a response",
-                        ))
-                    } else {
-                        Ok(Response::builder().status(204).body(Body::empty()).unwrap())
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let server = tokio::spawn(async move {
+        let mut connections = tokio::task::JoinSet::new();
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            while connections.try_join_next().is_some() {}
+            let requests = Arc::clone(&server_requests);
+            connections.spawn(async move {
+                let service = service_fn(move |request: http::Request<Incoming>| {
+                    let requests = Arc::clone(&requests);
+                    async move {
+                        BodyExt::collect(request.into_body()).await.unwrap();
+                        if requests.fetch_add(1, Ordering::Relaxed) == 0 {
+                            Err(std::io::Error::other(
+                                "close the first connection without a response",
+                            ))
+                        } else {
+                            Ok(Response::builder()
+                                .status(204)
+                                .body(Full::new(Bytes::new()))
+                                .unwrap())
+                        }
                     }
+                });
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await
+                {
+                    tracing::debug!(message = "Test server connection closed.", %error);
                 }
-            }))
+            });
         }
-    }));
-    let server = tokio::spawn(server);
+    });
     let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
         endpoint: "http://localhost:9001"
         dcr_immutable_id: dcr-00000000000000000000000000000000
@@ -424,7 +437,7 @@ async fn mock_healthcheck_with_400_response() {
             Ok(Response::builder()
                 .status(400)
                 .header("Content-Type", "application/json")
-                .body(body.into())
+                .body(Full::new(Bytes::from(body)))
                 .unwrap())
         }
     })
@@ -488,7 +501,7 @@ async fn mock_healthcheck_with_403_response() {
             Ok(Response::builder()
                 .status(403)
                 .header("Content-Type", "application/json")
-                .body(body.into())
+                .body(Full::new(Bytes::from(body)))
                 .unwrap())
         }
     })

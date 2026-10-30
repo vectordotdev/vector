@@ -11,8 +11,8 @@ use std::{
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use flate2::write::GzDecoder;
 use futures_util::FutureExt;
-use http_1::{HeaderValue, Request, Response};
-use http_body_1::Body;
+use http::{HeaderValue, Request, Response};
+use http_body::Body;
 use http_body_util::{
     BodyExt,
     channel::{Channel, Sender},
@@ -718,8 +718,8 @@ mod tests {
 
     use flate2::{Compression, read::GzEncoder};
     use futures::{Stream, StreamExt as _, stream};
-    use http_1::HeaderMap;
-    use http_body_1::Frame;
+    use http::HeaderMap;
+    use http_body::Frame;
     use http_body_util::{Full, StreamBody};
     use tokio_test::{assert_pending, assert_ready, task};
     use tonic::Code;

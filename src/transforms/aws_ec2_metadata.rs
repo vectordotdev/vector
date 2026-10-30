@@ -9,7 +9,7 @@ use std::{
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
-use http::{Request, StatusCode, Uri, uri::PathAndQuery};
+use http_0::{Request, StatusCode, Uri, uri::PathAndQuery};
 use hyper::Body;
 use serde::Deserialize;
 use serde_with::serde_as;
@@ -435,7 +435,9 @@ impl MetadataClient {
                 .into()),
             })?;
 
-        let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
+        let token = http_body_0::Body::collect(res.into_body())
+            .await?
+            .to_bytes();
 
         let next_refresh = Instant::now() + Duration::from_hours(6);
         self.token = Some((token.clone(), next_refresh));
@@ -622,7 +624,9 @@ impl MetadataClient {
                 .into()),
             })? {
             Some(res) => {
-                let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
+                let body = http_body_0::Body::collect(res.into_body())
+                    .await?
+                    .to_bytes();
                 Ok(Some(body))
             }
             None => Ok(None),
@@ -691,7 +695,7 @@ impl Keys {
 
 #[derive(Debug)]
 struct UnexpectedHttpStatusError {
-    status: http::StatusCode,
+    status: http_0::StatusCode,
 }
 
 impl fmt::Display for UnexpectedHttpStatusError {
@@ -711,7 +715,7 @@ enum Ec2MetadataError {
     #[snafu(display("Unable to parse metadata path {}, {}.", value, source))]
     ParsePath {
         value: String,
-        source: http::uri::InvalidUri,
+        source: http_0::uri::InvalidUri,
     },
 }
 

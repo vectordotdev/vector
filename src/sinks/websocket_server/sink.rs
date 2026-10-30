@@ -33,7 +33,7 @@ use futures::{
     future, pin_mut,
     stream::BoxStream,
 };
-use http::StatusCode;
+use http_0::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
     Message,

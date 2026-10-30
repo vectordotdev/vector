@@ -810,7 +810,7 @@ async fn api_version_uses_selected_distribution() {
         atomic::{AtomicUsize, Ordering},
     };
 
-    use hyper::Body;
+    use http_body_util::Full;
 
     use crate::{sinks::util::test::build_test_server_generic, test_util::addr::next_addr};
 
@@ -870,7 +870,7 @@ async fn api_version_uses_selected_distribution() {
         let server_probes = Arc::clone(&probes);
         let (_rx, _trigger, server) = build_test_server_generic(addr, move || {
             server_probes.fetch_add(1, Ordering::Relaxed);
-            http::Response::new(Body::from(body.clone()))
+            http::Response::new(Full::new(bytes::Bytes::from(body.clone())))
         });
         let server = tokio::spawn(server);
         let endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
@@ -913,7 +913,7 @@ async fn bulk_request_shape_and_compressed_error_response() {
 
     use flate2::write::GzEncoder;
     use futures::StreamExt;
-    use hyper::Body;
+    use http_body_util::Full;
     use vector_lib::event::{BatchNotifier, BatchStatus, Event};
 
     use crate::{
@@ -933,7 +933,7 @@ async fn bulk_request_shape_and_compressed_error_response() {
     let (mut rx, _trigger, server) = build_test_server_generic(addr, move || {
         http::Response::builder()
             .header("Content-Encoding", "gzip")
-            .body(Body::from(response_body.clone()))
+            .body(Full::new(response_body.clone()))
             .unwrap()
     });
     tokio::spawn(server);

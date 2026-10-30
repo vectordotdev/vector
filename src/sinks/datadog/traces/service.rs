@@ -5,7 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use http_body_util::BodyExt;
 use snafu::ResultExt;
 use tower::Service;
@@ -74,7 +74,7 @@ impl TraceApiRequest {
     /// # Errors
     ///
     /// Returns an error if a header name or value is invalid.
-    pub fn into_http_request(self) -> http_1::Result<Request<Bytes>> {
+    pub fn into_http_request(self) -> http::Result<Request<Bytes>> {
         let mut request = Request::post(self.uri);
         for (k, v) in &self.headers {
             request = request.header(k, v);

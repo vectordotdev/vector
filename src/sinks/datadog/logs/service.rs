@@ -6,9 +6,9 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{
-    HeaderValue, Request, Uri,
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderMap, HeaderName},
+use http::{
+    Request, Uri,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderMap},
 };
 use tower::Service;
 use tracing::Instrument;
@@ -136,7 +136,7 @@ impl LogApiService {
     }
 }
 
-/// Validates header names and values and converts them to a native `http 1` header map.
+/// Validates header names and values and collects them into a header map.
 ///
 /// Entries are inserted in the sorted order of `validate_headers`, so the
 /// resulting map preserves the same header order as the legacy implementation.
@@ -148,11 +148,7 @@ fn validated_header_map(headers: &BTreeMap<String, String>) -> crate::Result<Hea
     let validated = validate_headers(headers)?;
     let mut map = HeaderMap::with_capacity(validated.len());
     for (name, value) in validated {
-        let name = HeaderName::from_bytes(name.inner().as_str().as_bytes())
-            .map_err(|e| format!("Invalid header name '{}': {e}", name.inner()))?;
-        let value = HeaderValue::from_bytes(value.as_bytes())
-            .map_err(|e| format!("Invalid header value: {e}"))?;
-        map.insert(name, value);
+        map.insert(name.inner().clone(), value);
     }
     Ok(map)
 }

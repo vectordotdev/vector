@@ -13733,6 +13733,7 @@ dependencies = [
  "chrono-tz",
  "encoding_rs",
  "http 0.2.12",
+ "http 1.5.0",
  "indexmap 2.14.2",
  "inventory",
  "jsonschema",

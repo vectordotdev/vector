@@ -16,7 +16,7 @@ pub(crate) use datadog_proto::agentpayload as ddmetric_proto;
 pub(crate) use datadog_proto::metrics_v3 as ddmetric_v3_proto;
 pub(crate) use datadog_proto::trace as ddtrace_proto;
 use futures::FutureExt;
-use http::StatusCode;
+use http_0::StatusCode;
 use hyper::{Server, service::make_service_fn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};

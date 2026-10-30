@@ -17,10 +17,10 @@ use vector_lib::{
 };
 
 /// Request served by the legacy Warp HTTP listener.
-pub(crate) type HttpRequest = http::Request<hyper::Body>;
+pub(crate) type HttpRequest = http_0::Request<hyper::Body>;
 
 /// Request served by the native Tonic gRPC listener.
-pub(crate) type GrpcRequest = http_1::Request<tonic::body::BoxBody>;
+pub(crate) type GrpcRequest = http::Request<tonic::body::BoxBody>;
 
 /// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
@@ -169,13 +169,13 @@ pub(crate) trait AcknowledgementResponse: Sized {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>>;
 }
 
-impl<B: 'static> AcknowledgementResponse for http::Response<B> {
+impl<B: 'static> AcknowledgementResponse for http_0::Response<B> {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
         self.extensions_mut().remove()
     }
 }
 
-impl<B: 'static> AcknowledgementResponse for http_1::Response<B> {
+impl<B: 'static> AcknowledgementResponse for http::Response<B> {
     fn take_pending_acknowledgement(&mut self) -> Option<PendingAcknowledgement<Self>> {
         self.extensions_mut()
             .remove::<SharedPendingAcknowledgement<Self>>()?
@@ -304,7 +304,7 @@ mod tests {
         task::{Context, Poll},
     };
 
-    use http::StatusCode;
+    use http_0::StatusCode;
     use hyper::{Body, body::HttpBody};
     use prost::Message;
     use tonic::body::{BoxBody, empty_body};
@@ -316,19 +316,19 @@ mod tests {
         http::middleware_error_response as http_error_response, status::Status,
     };
 
-    type HttpResponse = http::Response<Body>;
-    type GrpcResponse = http_1::Response<BoxBody>;
+    type HttpResponse = http_0::Response<Body>;
+    type GrpcResponse = http::Response<BoxBody>;
 
     fn http_request() -> HttpRequest {
-        http::Request::new(Body::empty())
+        http_0::Request::new(Body::empty())
     }
 
     fn grpc_request() -> GrpcRequest {
-        http_1::Request::new(empty_body())
+        http::Request::new(empty_body())
     }
 
     fn http_ok() -> HttpResponse {
-        http::Response::new(Body::empty())
+        http_0::Response::new(Body::empty())
     }
 
     fn grpc_ok() -> GrpcResponse {

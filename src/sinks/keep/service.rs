@@ -1,7 +1,7 @@
 //! Service implementation for the `keep` sink.
 
 use bytes::Bytes;
-use http_1::Request;
+use http::Request;
 use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -19,7 +19,7 @@ pub(super) struct KeepSvcRequestBuilder {
 
 impl HttpServiceRequestBuilder<()> for KeepSvcRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let builder = Request::post(self.endpoint.clone().into_v1())
+        let builder = Request::post(self.endpoint.as_uri().clone())
             .header(HTTP_HEADER_KEEP_API_KEY, self.api_key.inner());
 
         let builder = builder.header("Content-Type".to_string(), "application/json".to_string());

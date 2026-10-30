@@ -5,7 +5,7 @@ use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
-use http::StatusCode;
+use http_0::StatusCode;
 use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;

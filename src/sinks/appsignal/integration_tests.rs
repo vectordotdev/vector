@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use http::header::AUTHORIZATION;
-use hyper::StatusCode;
+use http::{StatusCode, header::AUTHORIZATION};
 use indoc::indoc;
 use vector_lib::event::{
     BatchNotifier, BatchStatus, Event, LogEvent, Metric, MetricKind, MetricValue,

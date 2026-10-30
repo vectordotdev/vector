@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     HeaderName, HeaderValue, Method, Request,
     header::{CONTENT_ENCODING, CONTENT_TYPE},
 };
@@ -56,12 +56,11 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
     ) -> Result<Request<Bytes>, crate::Error> {
         let metadata = request.get_additional_metadata();
         let uri_serde = UriSerde::from_str(&metadata.uri)?;
-        let uri = uri_serde.uri_v1()?;
 
         let auth = self.auth.choose_one(&uri_serde.auth)?;
 
         let method: Method = self.method.into();
-        let mut builder = Request::builder().method(method).uri(uri);
+        let mut builder = Request::builder().method(method).uri(uri_serde.uri);
 
         if let Some(content_type) = &self.content_type {
             builder = builder.header(CONTENT_TYPE, content_type);

@@ -5,7 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http_1::{
+use http::{
     Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue},
 };
@@ -56,7 +56,7 @@ impl DatadogMetricsRequest {
     ///
     /// If any of the header names or values are invalid, or if the URI is invalid, an error variant
     /// will be returned.
-    pub fn into_http_request(self, api_key: HeaderValue) -> http_1::Result<Request<Bytes>> {
+    pub fn into_http_request(self, api_key: HeaderValue) -> http::Result<Request<Bytes>> {
         // use the API key from the incoming event if it is provided
         let api_key = self.api_key.map_or_else(
             || api_key,

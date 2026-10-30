@@ -376,13 +376,29 @@ pub(crate) struct UriChecker {
 }
 
 impl UriChecker {
+    /// Parse `s` with `http::Uri`, rejecting raw non-ASCII bytes outside the
+    /// fragment.
+    ///
+    /// `http::Uri` accepts raw UTF-8 in the path and query (the `http` 0.2
+    /// parser did not). Some servers map Unicode look-alikes such as U+FF0E
+    /// FULLWIDTH FULL STOP or U+FF0F FULLWIDTH SOLIDUS onto `.` and `/`, which
+    /// would bypass the dot-dot and separator checks, so non-ASCII stays
+    /// rejected like any other unparseable URI.
+    /// The fragment is discarded by the parser and was never validated, so it is not checked either.
+    fn parse_ascii_uri(s: &str) -> Option<Uri> {
+        let before_fragment = s.split_once('#').map_or(s, |(before, _)| before);
+        before_fragment
+            .is_ascii()
+            .then(|| s.parse::<Uri>().ok())
+            .flatten()
+    }
+
     /// Parse `prefix` as an HTTP(S) URI, validating the scheme and that a
     /// non-empty authority (host) is present. Returns the parsed `Uri` plus the
     /// lowercased scheme and authority.
     fn parse_http_uri(prefix: &str) -> Result<(Uri, String, String), BuildError> {
-        let uri = prefix
-            .parse::<Uri>()
-            .map_err(|_| BuildError::NoStaticUriAuthority {
+        let uri =
+            Self::parse_ascii_uri(prefix).ok_or_else(|| BuildError::NoStaticUriAuthority {
                 prefix: prefix.to_string(),
             })?;
 
@@ -473,11 +489,9 @@ impl UriChecker {
 
         // Parse with http::Uri so all structural checks use the same tokeniser
         // that built the baseline — no raw-string heuristics.
-        let uri = rendered
-            .parse::<Uri>()
-            .map_err(|_| ConfineError::UriParseFailed {
-                rendered: rendered.to_string(),
-            })?;
+        let uri = Self::parse_ascii_uri(rendered).ok_or_else(|| ConfineError::UriParseFailed {
+            rendered: rendered.to_string(),
+        })?;
 
         // 2. Authority check: scheme + host must exactly match the base.
         //    Catches @-userinfo injection and host-extension attacks.

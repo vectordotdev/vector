@@ -2,7 +2,7 @@ use std::{io, mem, time::Duration};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
-use http_1::{Request, Uri, header::CONTENT_TYPE};
+use http::{Request, Uri, header::CONTENT_TYPE};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
@@ -173,13 +173,13 @@ impl ValidatedSink for PubsubConfig {
         let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let healthcheck =
-            healthcheck(client.clone(), uri_base.clone().into_v1(), auth.clone()).boxed();
+            healthcheck(client.clone(), uri_base.as_uri().clone(), auth.clone()).boxed();
         auth.spawn_regenerate_token();
 
         // The suffix is a Google API method that attaches directly to the topic path without a
         // separator.
         let service_request_builder = PubsubServiceRequestBuilder {
-            uri: uri_base.append_raw_suffix(":publish")?.into_v1(),
+            uri: uri_base.append_raw_suffix(":publish")?.into_uri(),
             auth,
         };
         let service =
@@ -435,7 +435,7 @@ impl HttpServiceRequestBuilder<()> for PubsubServiceRequestBuilder {
             .header(CONTENT_TYPE, "application/json")
             .body(request.take_payload())
             .context(HTTPV1RequestBuilderSnafu)?;
-        self.auth.apply_v1(&mut request);
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -498,7 +498,7 @@ where
 
 async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
     let mut request = Request::get(uri).body(empty_body())?;
-    auth.apply_v1(&mut request);
+    auth.apply(&mut request);
 
     let response = client.send(request).await?;
     healthcheck_status(response.status(), HealthcheckError::TopicNotFound.into())

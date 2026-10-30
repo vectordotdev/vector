@@ -4,7 +4,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use http_1::{
+use http::{
     Request,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };

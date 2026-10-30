@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use http::{
+use http::{Request as RequestV1, Response as ResponseV1};
+use http_0::{
     HeaderMap, Request, Response, Version,
     header::{self, HeaderName, HeaderValue},
 };
-use http_1::{Request as RequestV1, Response as ResponseV1};
-use http_body_1::Body as HttpBodyV1;
+use http_body::Body as HttpBodyV1;
 use hyper::body::HttpBody;
 use vector_lib::{
     NamedInternalEvent, counter, histogram,
@@ -255,7 +255,7 @@ impl<T: HttpBodyV1> HttpResponseTelemetry for HttpResponseV1Telemetry<'_, T> {
     }
 }
 
-fn convert_headers(headers: &http_1::HeaderMap) -> HeaderMap<HeaderValue> {
+fn convert_headers(headers: &http::HeaderMap) -> HeaderMap<HeaderValue> {
     headers
         .iter()
         .fold(HeaderMap::new(), |mut converted, (name, value)| {
@@ -268,13 +268,13 @@ fn convert_headers(headers: &http_1::HeaderMap) -> HeaderMap<HeaderValue> {
         })
 }
 
-const fn convert_version(version: http_1::Version) -> Option<Version> {
+const fn convert_version(version: http::Version) -> Option<Version> {
     match version {
-        http_1::Version::HTTP_09 => Some(Version::HTTP_09),
-        http_1::Version::HTTP_10 => Some(Version::HTTP_10),
-        http_1::Version::HTTP_11 => Some(Version::HTTP_11),
-        http_1::Version::HTTP_2 => Some(Version::HTTP_2),
-        http_1::Version::HTTP_3 => Some(Version::HTTP_3),
+        http::Version::HTTP_09 => Some(Version::HTTP_09),
+        http::Version::HTTP_10 => Some(Version::HTTP_10),
+        http::Version::HTTP_11 => Some(Version::HTTP_11),
+        http::Version::HTTP_2 => Some(Version::HTTP_2),
+        http::Version::HTTP_3 => Some(Version::HTTP_3),
         _ => None,
     }
 }
@@ -330,7 +330,7 @@ impl std::fmt::Display for FormatBodySizeHint {
 
 #[cfg(test)]
 mod tests {
-    use http::header::{self, HeaderMap, HeaderName, HeaderValue};
+    use http_0::header::{self, HeaderMap, HeaderName, HeaderValue};
 
     use super::remove_sensitive;
 

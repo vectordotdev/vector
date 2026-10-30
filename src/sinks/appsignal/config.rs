@@ -1,6 +1,5 @@
 use futures::FutureExt;
-use http::StatusCode;
-use http_1::{HeaderValue, Request, header::AUTHORIZATION};
+use http::{HeaderValue, Request, header::AUTHORIZATION};
 use tower::ServiceBuilder;
 use vector_http::empty_body;
 use vector_lib::{
@@ -201,13 +200,10 @@ async fn healthcheck(
     authorization: HeaderValue,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::get(uri.into_v1()).header(AUTHORIZATION, authorization);
+    let request = Request::get(uri.into_uri()).header(AUTHORIZATION, authorization);
     let response = client.send(request.body(empty_body())?).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-
-    match status {
+    match response.status() {
         status if status.is_success() => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }

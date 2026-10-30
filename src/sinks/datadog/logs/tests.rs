@@ -454,14 +454,16 @@ async fn error_is_retriable() {
 #[tokio::test]
 async fn retries_transport_errors() {
     use std::{
-        convert::Infallible,
         sync::{Arc, Mutex},
         time::Duration,
     };
 
-    use hyper::{
-        Body, Response, Server,
-        service::{make_service_fn, service_fn},
+    use http::{Response, StatusCode};
+    use http_body_util::{BodyExt as _, Full};
+    use hyper_1::{body::Incoming, service::service_fn};
+    use hyper_util::{
+        rt::{TokioExecutor, TokioIo},
+        server::conn::auto,
     };
 
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
@@ -476,18 +478,23 @@ async fn retries_transport_errors() {
     config.local_dd_common.endpoint = Some(format!("http://{addr}"));
 
     let requests = Arc::new(Mutex::new(Vec::new()));
-    let make_service = make_service_fn({
-        let requests = Arc::clone(&requests);
-        move |_| {
-            let requests = Arc::clone(&requests);
-            async move {
-                Ok::<_, Infallible>(service_fn(move |request: hyper::Request<Body>| {
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let (shutdown, mut stopped) = tokio::sync::oneshot::channel();
+    let server_requests = Arc::clone(&requests);
+    let server = tokio::spawn(async move {
+        let mut connections = tokio::task::JoinSet::new();
+        loop {
+            let (stream, _) = tokio::select! {
+                accepted = listener.accept() => accepted?,
+                _ = &mut stopped => break,
+            };
+            while connections.try_join_next().is_some() {}
+            let requests = Arc::clone(&server_requests);
+            connections.spawn(async move {
+                let service = service_fn(move |request: http::Request<Incoming>| {
                     let requests = Arc::clone(&requests);
                     async move {
-                        let body = http_body::Body::collect(request.into_body())
-                            .await
-                            .unwrap()
-                            .to_bytes();
+                        let body = request.into_body().collect().await.unwrap().to_bytes();
                         let attempt = {
                             let mut requests = requests.lock().unwrap();
                             requests.push(body);
@@ -500,22 +507,22 @@ async fn retries_transport_errors() {
                             ))
                         } else {
                             Ok(Response::builder()
-                                .status(hyper::StatusCode::ACCEPTED)
-                                .body(Body::empty())
+                                .status(StatusCode::ACCEPTED)
+                                .body(Full::new(Bytes::new()))
                                 .unwrap())
                         }
                     }
-                }))
-            }
+                });
+                if let Err(error) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await
+                {
+                    tracing::debug!(message = "Test server connection closed.", %error);
+                }
+            });
         }
+        Ok::<_, std::io::Error>(())
     });
-    let (shutdown, stopped) = tokio::sync::oneshot::channel();
-    let server = Server::bind(&addr)
-        .serve(make_service)
-        .with_graceful_shutdown(async move {
-            _ = stopped.await;
-        });
-    let server = tokio::spawn(server);
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, status) = BatchNotifier::new_with_receiver();
     let event =

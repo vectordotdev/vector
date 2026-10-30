@@ -1,7 +1,7 @@
 //! Service implementation for the `gcp_stackdriver_logs` sink.
 
 use bytes::Bytes;
-use http_1::{Request, header::CONTENT_TYPE};
+use http::{Request, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
 use crate::{
@@ -21,14 +21,14 @@ pub(super) struct StackdriverLogsServiceRequestBuilder {
 impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
         let builder =
-            Request::post(self.endpoint.clone().into_v1()).header(CONTENT_TYPE, "application/json");
+            Request::post(self.endpoint.as_uri().clone()).header(CONTENT_TYPE, "application/json");
 
         let mut request = builder
             .body(request.take_payload())
             .context(HTTPV1RequestBuilderSnafu)
             .map_err(crate::Error::from)?;
 
-        self.auth.apply_v1(&mut request);
+        self.auth.apply(&mut request);
 
         Ok(request)
     }

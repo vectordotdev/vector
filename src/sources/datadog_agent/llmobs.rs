@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use http::StatusCode;
+use http_0::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
 use vector_lib::{

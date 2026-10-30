@@ -37,8 +37,8 @@ use aws_smithy_runtime_api::client::{
 use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
-use http::{HeaderMap, HeaderName, header::HeaderValue};
-use http_body::{Body, combinators::BoxBody};
+use http_0::{HeaderMap, HeaderName, header::HeaderValue};
+use http_body_0::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -300,7 +300,7 @@ enum SigningError {
 /// in an HTTP header value, such as a newline.
 pub async fn sign_request_v1(
     service_name: &str,
-    request: &mut http_1::Request<Bytes>,
+    request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
@@ -337,7 +337,7 @@ fn signable_headers<'a>(
 /// does not make the signature's `x-amz-date` stale.
 async fn sign_request_v1_at(
     service_name: &str,
-    request: &mut http_1::Request<Bytes>,
+    request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
@@ -490,7 +490,7 @@ fn smithy_headers_to_map(
 ) -> HeaderMap<HeaderValue> {
     let mut map = HeaderMap::with_capacity(headers.len());
     for (name, value) in headers {
-        let Ok(header_name) = http::HeaderName::from_bytes(name.as_bytes()) else {
+        let Ok(header_name) = http_0::HeaderName::from_bytes(name.as_bytes()) else {
             continue;
         };
         let Ok(header_value) = HeaderValue::from_str(value) else {
@@ -642,7 +642,7 @@ mod tests {
             SharedCredentialsProvider::new(Credentials::from_keys("AKID", "SECRET", None));
         let region = Region::new("us-east-1");
 
-        let mut request = http_1::Request::post(URI)
+        let mut request = http::Request::post(URI)
             .header("content-type", "application/json")
             .body(Bytes::from_static(BODY))
             .expect("valid request");
