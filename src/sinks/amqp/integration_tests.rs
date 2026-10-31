@@ -1,4 +1,11 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 
 use config::AmqpPropertiesConfig;
 use futures::StreamExt;
@@ -19,6 +26,160 @@ use crate::{
         random_lines_with_stream, random_string,
     },
 };
+
+#[tokio::test]
+async fn amqp_backpressure_one_channel() {
+    amqp_backpressure(1).await;
+}
+
+#[tokio::test]
+async fn amqp_backpressure_four_channels() {
+    amqp_backpressure(4).await;
+}
+
+async fn amqp_backpressure(max_channels: u32) {
+    use vector_lib::sink::StreamSink;
+
+    let mut config = make_config();
+    config.max_channels = max_channels;
+    // The default exchange routes directly to this test's exclusive queue.
+    config.exchange = Template::try_from("").unwrap();
+    let (_connection, channel) = config.connection.connect().await.unwrap();
+    let queue = channel
+        .queue_declare(
+            "".into(),
+            lapin::options::QueueDeclareOptions {
+                exclusive: true,
+                ..Default::default()
+            },
+            lapin::types::FieldTable::default(),
+        )
+        .await
+        .unwrap();
+    config.routing_key = Some(Template::try_from(queue.name().as_str()).unwrap());
+    let confine = |template: Template, field| {
+        template
+            .confine(&config.confinement, "amqp", field)
+            .unwrap()
+    };
+    let sink = sink::AmqpSink::new(
+        config.clone(),
+        confine(config.exchange.clone(), "exchange"),
+        Some(confine(config.routing_key.clone().unwrap(), "routing_key")),
+    )
+    .unwrap();
+    let channels = sink.channels.clone();
+    // Hold every channel so requests wait for pool capacity, without relying on
+    // broker timing or changing the broker's settings.
+    let mut held_channels = Vec::new();
+    for _ in 0..max_channels {
+        held_channels.push(channels.get().await.unwrap());
+    }
+
+    let blocked_input: Vec<_> = (0..4096).map(|i| format!("blocked-event-{i}")).collect();
+    let events = futures::stream::iter(blocked_input.clone())
+        .map(|line| vector_lib::event::Event::from(LogEvent::from_str_legacy(&line)));
+    let consumed = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&consumed);
+    let events = events.inspect(move |_| {
+        counter.fetch_add(1, Ordering::Relaxed);
+    });
+    let mut blocked = Box::pin(Box::new(sink).run(events.boxed()));
+    tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::select! {
+            result = &mut blocked => panic!("blocked sink completed: {result:?}"),
+            () = async {
+                while channels.status().waiting == 0 {
+                    tokio::task::yield_now().await;
+                }
+            } => {}
+        }
+    })
+    .await
+    .unwrap();
+    // Allow the request builder and driver to run while all channels are held.
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), &mut blocked)
+            .await
+            .is_err()
+    );
+    let waiting = channels.status().waiting;
+    assert!(
+        waiting <= max_channels as usize,
+        "unbounded pending requests: {waiting}"
+    );
+    assert!(
+        consumed.load(Ordering::Relaxed) < blocked_input.len(),
+        "the sink drained its entire input while blocked"
+    );
+
+    // A separate sink must still publish while the first sink has no capacity.
+    let (healthy, _) = config.build(SinkContext::default()).await.unwrap();
+    let (healthy_input, healthy_events) = random_lines_with_stream(100, 128, None);
+    tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::select! {
+            result = &mut blocked => panic!("blocked sink completed: {result:?}"),
+            result = healthy.run(healthy_events) => result.unwrap(),
+        }
+    })
+    .await
+    .unwrap();
+    let queued = channel
+        .queue_declare(
+            queue.name().clone(),
+            lapin::options::QueueDeclareOptions {
+                passive: true,
+                ..Default::default()
+            },
+            lapin::types::FieldTable::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(queued.message_count() as usize, healthy_input.len());
+
+    // Restoring capacity must wake the driver and deliver every pending event.
+    drop(held_channels);
+    tokio::time::timeout(Duration::from_secs(30), &mut blocked)
+        .await
+        .unwrap()
+        .unwrap();
+    let expected: HashSet<_> = blocked_input.into_iter().chain(healthy_input).collect();
+    assert_queue_contents(&channel, queue.name(), expected).await;
+}
+
+async fn assert_queue_contents(
+    channel: &lapin::Channel,
+    queue: &ShortString,
+    expected: HashSet<String>,
+) {
+    let mut received = HashSet::new();
+    for _ in 0..expected.len() {
+        let message = channel
+            .basic_get(
+                queue.clone(),
+                lapin::options::BasicGetOptions { no_ack: true },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            received.insert(String::from_utf8(message.delivery.data).unwrap()),
+            "duplicate event"
+        );
+    }
+    assert_eq!(received, expected);
+    assert!(
+        channel
+            .basic_get(
+                queue.clone(),
+                lapin::options::BasicGetOptions { no_ack: true }
+            )
+            .await
+            .unwrap()
+            .is_none(),
+        "unexpected extra event"
+    );
+}
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {
