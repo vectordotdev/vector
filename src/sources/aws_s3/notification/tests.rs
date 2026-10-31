@@ -184,7 +184,7 @@ impl Fixture {
         let (stop, shutdown, _done) = ShutdownSignal::new_wired();
         let mut cx = SourceContext::new_test(out, None);
         cx.shutdown = shutdown;
-        cx.acknowledgements = Some(true);
+        cx.acknowledgements = Some(true).into();
         let source = match parser {
             Some(parser) => {
                 config
@@ -247,7 +247,7 @@ async fn custom_parser_uses_shared_reader_and_ack_gated_deletion() {
     let (stop, shutdown, _done) = ShutdownSignal::new_wired();
     let mut cx = SourceContext::new_test(out, None);
     cx.shutdown = shutdown;
-    cx.acknowledgements = Some(true);
+    cx.acknowledgements = Some(true).into();
     let source = config
         .build_with_notification_parser(cx, Arc::new(TestParser), TEST_SOURCE_TYPE)
         .await

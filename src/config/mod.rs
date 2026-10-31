@@ -251,28 +251,29 @@ impl Config {
         let inputs: Vec<_> = self
             .sinks
             .iter()
-            .filter(|(_, sink)| {
-                sink.inner
-                    .acknowledgements()
-                    .merge_default(&self.global.acknowledgements)
-                    .enabled()
-            })
             .flat_map(|(name, sink)| {
-                sink.inputs
-                    .iter()
-                    .map(|input| (name.clone(), input.clone()))
+                sink.inputs.iter().map(|input| {
+                    (
+                        name.clone(),
+                        input.clone(),
+                        sink.inner.acknowledgements().clone(),
+                    )
+                })
             })
             .collect();
         self.propagate_acks_rec(inputs);
         Ok(())
     }
 
-    fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
-        for (sink, input) in sink_inputs {
+    fn propagate_acks_rec(
+        &mut self,
+        sink_inputs: Vec<(ComponentKey, OutputId, AcknowledgementsConfig)>,
+    ) {
+        for (sink, input, acknowledgements_config) in sink_inputs {
             let component = &input.component;
             if let Some(source) = self.sources.get_mut(component) {
                 if source.inner.can_acknowledge() {
-                    source.sink_acknowledgements = Some(true);
+                    source.sink_acknowledgements = acknowledgements_config;
                 } else {
                     warn!(
                         message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
@@ -284,7 +285,7 @@ impl Config {
                 let inputs = transform
                     .inputs
                     .iter()
-                    .map(|input| (sink.clone(), input.clone()))
+                    .map(|input| (sink.clone(), input.clone(), acknowledgements_config))
                     .collect();
                 self.propagate_acks_rec(inputs);
             }
@@ -1258,17 +1259,18 @@ mod acknowledgements_tests {
 
         for source in config.sources.values() {
             assert_eq!(
-                source.sink_acknowledgements, None,
-                "Source `sink_acknowledgements` should be `false` before propagation"
+                source.sink_acknowledgements,
+                None.into(),
+                "Source `sink_acknowledgements` should be `None` before propagation"
             );
         }
 
         let config = config.build().unwrap();
 
         let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
-        assert_eq!(get("in1").sink_acknowledgements, None);
-        assert_eq!(get("in2").sink_acknowledgements, Some(true));
-        assert_eq!(get("in3").sink_acknowledgements, Some(true));
+        assert_eq!(get("in1").sink_acknowledgements, None.into());
+        assert_eq!(get("in2").sink_acknowledgements, Some(true).into());
+        assert_eq!(get("in3").sink_acknowledgements, Some(true).into());
     }
 }
 
