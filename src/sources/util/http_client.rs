@@ -541,6 +541,7 @@ pub(crate) async fn call<
         .flatten()
         .map(move |base_url| {
             let client = client.clone();
+            let endpoint = base_url.to_string();
             let inputs = inputs.clone();
 
             let context_builder = context_builder.clone();
@@ -548,7 +549,6 @@ pub(crate) async fn call<
 
             // Check if we need to process the URL dynamically (for updating VRL expressions)
             let request_url = context.process_url(&base_url).unwrap_or(base_url);
-            let request_url_string = request_url.to_string();
 
             // Get the request body from the context (if any)
             let body = context.get_request_body().map(Bytes::from);
@@ -558,7 +558,7 @@ pub(crate) async fn call<
                 send_request_with_redirects(client, &inputs, http_method, body, redirect_url).await
             }
             .and_then(move |response| {
-                let endpoint = request_url_string.clone();
+                let endpoint = endpoint.clone();
                 async move {
                     let (header, body) = response.into_parts();
                     let body = http_body::Body::collect(body).await?.to_bytes();
