@@ -10,6 +10,7 @@ use std::{
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use http::Uri;
+use http_1::HeaderValue;
 use hyper_util::{client::legacy::Builder, rt::TokioExecutor};
 use tokio::sync::Semaphore;
 use tonic::Code::{
@@ -33,6 +34,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
         SinkHealthcheckOptions, ValidatedSink,
     },
+    http::VectorAuthConfig,
     proto::vector as proto,
     sinks::{
         Healthcheck, VectorSink as VectorSinkType,
@@ -110,6 +112,12 @@ pub struct VectorConfig {
     /// before it is reused, ensuring retries always go to a live connection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     keepalive: Option<VectorKeepaliveConfig>,
+
+    /// Authentication sent with every request to the downstream Vector instance.
+    ///
+    /// Use TLS to keep the credentials from being sent in plaintext.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auth: Option<VectorAuthConfig>,
 
     #[serde(
         default,
@@ -214,6 +222,7 @@ fn default_config(address: &str) -> VectorConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         keepalive: None,
+        auth: None,
         acknowledgements: AcknowledgementsConfig::default(),
     }
 }
@@ -278,15 +287,23 @@ impl ValidatedSink for VectorConfig {
             .as_ref()
             .map_or_else(EndpointStrategy::default, |routing| routing.strategy);
 
+        let auth_header = self.auth_header(&uris)?;
+
         let client = new_client(&tls, cx.proxy(), self.keepalive)?;
 
-        let healthcheck = healthchecks(client.clone(), &uris, &cx.healthcheck, endpoint_strategy);
+        let healthcheck = healthchecks(
+            client.clone(),
+            &uris,
+            &cx.healthcheck,
+            endpoint_strategy,
+            auth_header.clone(),
+        );
 
         let services = uris
             .into_iter()
             .map(|uri| {
                 let endpoint = uri.to_string();
-                VectorService::new(client.clone(), uri, self.compression)
+                VectorService::new(client.clone(), uri, self.compression, auth_header.clone())
                     .map(|service| (endpoint, service))
             })
             .collect::<crate::Result<Vec<_>>>()?;
@@ -726,6 +743,19 @@ impl VectorConfig {
                 .collect(),
         }
     }
+
+    fn auth_header(&self, uris: &[Uri]) -> crate::Result<Option<HeaderValue>> {
+        let Some(auth) = self.auth.as_ref() else {
+            return Ok(None);
+        };
+        let header = auth.authorization_header()?;
+        if uris.iter().any(|uri| uri.scheme_str() != Some("https")) {
+            warn!(
+                "Authentication is enabled but an endpoint does not use TLS, so credentials will be sent to it in plaintext."
+            );
+        }
+        Ok(Some(header))
+    }
 }
 
 /// Check to see if the remote service accepts new events.
@@ -759,6 +789,7 @@ fn healthchecks(
     uris: &[Uri],
     options: &SinkHealthcheckOptions,
     endpoint_strategy: EndpointStrategy,
+    auth: Option<HeaderValue>,
 ) -> Healthcheck {
     if !options.enabled {
         return Box::pin(futures::future::ok(()));
@@ -769,8 +800,9 @@ fn healthchecks(
     let timeout = options.timeout;
     let healthchecks = healthcheck_uris.into_iter().map(move |uri| {
         let client = client.clone();
+        let auth = auth.clone();
         async move {
-            let service = VectorService::new(client, uri, VectorCompression::None)?;
+            let service = VectorService::new(client, uri, VectorCompression::None, auth)?;
             healthcheck(
                 service,
                 SinkHealthcheckOptions {
