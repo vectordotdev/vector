@@ -11,7 +11,7 @@
 // Okta source only imports defaults but doesn't use the rest of the client
 #![cfg_attr(feature = "sources-okta", allow(dead_code))]
 
-use std::{collections::HashMap, future::ready, io, time::Duration};
+use std::{collections::HashMap, future::ready, io, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
@@ -41,7 +41,6 @@ use crate::{
 };
 
 /// Contains the inputs generic to any http client.
-#[derive(Clone)]
 pub(crate) struct GenericHttpClientInputs {
     /// Array of URLs to call.
     pub urls: Vec<Uri>,
@@ -534,6 +533,7 @@ pub(crate) async fn call<
     let urls = inputs.urls.clone();
     let interval = inputs.interval;
     let shutdown = inputs.shutdown.clone();
+    let inputs = Arc::new(inputs);
 
     let mut stream = IntervalStream::new(tokio::time::interval(interval))
         .take_until(shutdown)
