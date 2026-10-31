@@ -2,7 +2,7 @@
 #![cfg(test)]
 
 use crate::config::ProxyConfig;
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, num::NonZeroUsize, time::Duration};
 
 use aws_sdk_sqs::operation::create_queue::CreateQueueOutput;
 use aws_types::region::Region;
@@ -82,6 +82,65 @@ pub(crate) async fn test() {
             region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
             auth: AwsAuthentication::test_auth(),
             queue_url: queue_url.clone(),
+            ..Default::default()
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        tokio::spawn(async move {
+            config
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap()
+                .await
+                .unwrap();
+        });
+
+        let mut expected_messages = HashSet::new();
+        for i in 0..num_events {
+            expected_messages.insert(calculate_message(i));
+        }
+
+        let events: Vec<Event> = timeout(
+            Duration::from_secs(10),
+            rx.take(num_events as usize).collect(),
+        )
+        .await
+        .unwrap();
+
+        for event in events {
+            let message = event
+                .as_log()
+                .get(log_schema().message_key_target_path().unwrap())
+                .unwrap()
+                .to_string_lossy();
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
+        }
+        assert!(expected_messages.is_empty());
+    }))
+    .await;
+}
+
+#[tokio::test]
+pub(crate) async fn test_max_concurrency_delivers_multiple_batches() {
+    Box::pin(assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
+        let sqs_client = get_sqs_client().await;
+        let queue_name = gen_queue_name();
+        let queue_url = ensure_queue(&queue_name, &sqs_client)
+            .await
+            .queue_url
+            .expect("Create queue should return the url");
+
+        let num_events = 25;
+        send_test_events(num_events, &queue_url, &sqs_client).await;
+
+        let config = AwsSqsConfig {
+            region: RegionOrEndpoint::with_both("us-east-1", sqs_address().as_str()),
+            auth: AwsAuthentication::test_auth(),
+            queue_url: queue_url.clone(),
+            max_concurrency: Some(NonZeroUsize::new(4).unwrap()),
             ..Default::default()
         };
 

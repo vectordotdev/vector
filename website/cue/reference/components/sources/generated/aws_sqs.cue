@@ -24,6 +24,8 @@ generated: components: sources: aws_sqs: configuration: {
 		type:        _schemaDefinitions["vector::aws::auth::AwsAuthentication"]
 	}
 	client_concurrency: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `max_concurrency` instead."
 		description: """
 			Number of concurrent tasks to create for polling the queue for messages.
 
@@ -70,6 +72,18 @@ generated: components: sources: aws_sqs: configuration: {
 			"""
 		required: false
 		type:     _schemaDefinitions["derived::codecs::decoding::FramingConfig::2a4f9b813a8f495175f80ccf"]
+	}
+	max_concurrency: {
+		description: """
+			Maximum number of concurrent tasks to create for polling the queue for messages.
+
+			Defaults to the number of available CPUs on the system.
+
+			Vector starts with one polling task and dynamically scales up to `max_concurrency` tasks
+			as message volume increases, scaling back down when the queue is idle.
+			"""
+		required: false
+		type: uint: {}
 	}
 	poll_secs: {
 		description: """
