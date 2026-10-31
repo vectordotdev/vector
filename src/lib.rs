@@ -42,7 +42,6 @@ static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator
         tikv_jemallocator::Jemalloc,
     );
 
-#[allow(unreachable_pub)]
 pub mod internal_telemetry;
 
 #[macro_use]
@@ -64,7 +63,6 @@ pub mod internal_events;
 #[cfg(feature = "lapin")]
 pub mod amqp;
 #[cfg(feature = "api")]
-#[allow(unreachable_pub)]
 pub mod api;
 pub mod app;
 pub mod async_read;
@@ -112,7 +110,6 @@ pub mod template;
 pub mod test_util;
 #[cfg(feature = "top")]
 pub mod top;
-#[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
