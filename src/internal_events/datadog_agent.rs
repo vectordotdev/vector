@@ -47,3 +47,27 @@ impl InternalEvent for DatadogAgentUnsupportedTracePayloadError {
         .increment(1);
     }
 }
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct DatadogAgentInvalidIdxStringRefError {
+    pub index: u32,
+}
+
+impl InternalEvent for DatadogAgentInvalidIdxStringRefError {
+    fn emit(self) {
+        error!(
+            message = "Datadog Agent idx trace payload has an invalid string table ref.",
+            error_code = "idx_invalid_string_ref",
+            index = self.index,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "error_code" => "idx_invalid_string_ref",
+        )
+        .increment(1);
+    }
+}

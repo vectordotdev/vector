@@ -21,12 +21,19 @@ pub mod metrics_v3 {
 /// Generated types for `datadog.trace` (AgentPayload / TracerPayload / TraceChunk / Span).
 #[allow(warnings, clippy::all, clippy::nursery)]
 pub mod trace {
-    /// Generated types for `datadog.trace.idx`.
+    /// Generated types for `datadog.trace.idx`, plus wire helpers.
     pub mod idx {
         include!(concat!(env!("OUT_DIR"), "/datadog.trace.idx.rs"));
+
+        pub use crate::idx::{
+            InvalidStringRef, StringTable, format_sampling_mechanism, join_trace_id,
+            parse_sampling_mechanism, span_kind_from_name, span_kind_name, split_trace_id,
+        };
     }
 
     include!(concat!(env!("OUT_DIR"), "/datadog.trace.rs"));
 }
+
+mod idx;
 
 include!(concat!(env!("OUT_DIR"), "/datadog-proto.rs"));
