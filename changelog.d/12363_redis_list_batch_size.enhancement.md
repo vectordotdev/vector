@@ -1,0 +1,3 @@
+The `redis` source now supports a `list.batch_size` option for the `list` data type. When set above `1`, the source still blocks until an entry is available, then reads up to `batch_size - 1` more entries with one more command, preserving list order. Each batch therefore costs two Redis commands instead of one command per entry, which greatly increases throughput and reduces the number of Redis commands when entries are queued. Values above `1` use the `count` argument of `LPOP`/`RPOP`, which requires Redis 6.2 or newer; older servers reject it, and the source logs a warning and reads one entry at a time. The default of `1` keeps the previous behavior.
+
+authors: dsavov
