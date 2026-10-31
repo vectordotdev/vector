@@ -230,6 +230,7 @@ fn watcher_for_timing() -> FileWatcher {
         inode: 0,
         is_dead: false,
         reached_eof: false,
+        skipped_unread: false,
         last_read_attempt: now,
         last_read_success: now,
         read_retry_delay: EOF_READ_BACKOFF_MIN,
