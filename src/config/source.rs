@@ -59,7 +59,7 @@ pub struct SourceOuter {
     pub graph: GraphConfig,
 
     #[serde(default, skip)]
-    pub sink_acknowledgements: bool,
+    pub sink_acknowledgements: AcknowledgementsConfig,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
@@ -71,7 +71,7 @@ impl SourceOuter {
         Self {
             proxy: ProxyConfig::default(),
             graph: GraphConfig::default(),
-            sink_acknowledgements: false,
+            sink_acknowledgements: None.into(),
             inner: inner.into(),
         }
     }
@@ -136,7 +136,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
-    pub acknowledgements: bool,
+    pub acknowledgements: AcknowledgementsConfig,
     pub schema: schema::Options,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
@@ -173,7 +173,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 proxy: ProxyConfig::default(),
-                acknowledgements: false,
+                acknowledgements: Some(false).into(),
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
                 extra_context: ExtraContext::default(),
@@ -201,7 +201,7 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: ProxyConfig::default(),
-            acknowledgements: false,
+            acknowledgements: Some(false).into(),
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
             extra_context: ExtraContext::default(),
@@ -218,8 +218,8 @@ impl SourceContext {
         }
 
         config
-            .merge_default(&self.globals.acknowledgements)
             .merge_default(&self.acknowledgements.into())
+            .merge_default(&self.globals.acknowledgements)
             .enabled()
     }
 
@@ -231,5 +231,56 @@ impl SourceContext {
             .or(self.schema.log_namespace)
             .unwrap_or(false)
             .into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{SourceSender, config::SourceContext};
+    use vector_common::shutdown::ShutdownSignal;
+    use vector_lib::config::GlobalOptions;
+
+    #[test]
+    fn do_acknowledgments() {
+        // Global acknowledgment, sink acknowledgment, expected acknowledgment result
+        let test_data_set = [
+            (None, None, false),
+            (None, Some(true), true),
+            (None, Some(false), false),
+            (Some(true), None, true),
+            (Some(true), Some(true), true),
+            (Some(true), Some(false), false),
+            (Some(false), None, false),
+            (Some(false), Some(true), true),
+            (Some(false), Some(false), false),
+        ];
+
+        test_data_set.iter().for_each(|test_data| {
+            let global_options = match test_data.0 {
+                None => Default::default(),
+                Some(acknowledgements) => {
+                    let mut global_options = GlobalOptions::default();
+                    global_options.acknowledgements = acknowledgements.into();
+
+                    global_options
+                }
+            };
+
+            let source_context = SourceContext {
+                key: "default".into(),
+                globals: global_options,
+                enrichment_tables: Default::default(),
+                metrics_storage: Default::default(),
+                shutdown: ShutdownSignal::noop(),
+                out: SourceSender::builder().build(),
+                proxy: Default::default(),
+                acknowledgements: test_data.1.into(),
+                schema: Default::default(),
+                schema_definitions: Default::default(),
+                extra_context: Default::default(),
+            };
+
+            assert_eq!(source_context.do_acknowledgements(None.into()), test_data.2);
+        });
     }
 }
