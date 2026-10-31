@@ -8,7 +8,7 @@ use tower::{
     buffer::{Buffer, BufferLayer},
     discover::Change,
     layer::{Layer, util::Stack},
-    limit::RateLimit,
+    limit::{ConcurrencyLimit, RateLimit},
     retry::Retry,
     timeout::Timeout,
 };
@@ -37,8 +37,13 @@ mod health;
 mod map;
 pub mod net;
 
-pub type Svc<S, L> =
-    RateLimit<AdaptiveConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, Timeout<S>>, L>>;
+pub type Svc<S, L> = RateLimit<
+    ConcurrencyLimit<Retry<FibonacciRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>,
+>;
+
+/// Multiplier applied to the per-attempt concurrency limit to bound the number of logical requests
+/// that may be in flight at once, including those sleeping between retry attempts.
+const RETRY_HEADROOM: usize = 2;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
@@ -385,17 +390,33 @@ where
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
+        // Retry sits outside the adaptive concurrency limit so that a permit is not held while a
+        // request sleeps between attempts. Since that means the adaptive limit no longer bounds the
+        // requests waiting to be retried, bound whole retry sequences separately.
+        //
+        // A concurrency of 1 is how sinks request strict ordering (e.g. Loki's ordered modes, Azure
+        // append blobs, `concurrency: none`), so there the whole retry sequence stays serialized.
+        let max_logical_requests = match self.settings.concurrency {
+            Some(1) => 1,
+            Some(limit) => limit.saturating_mul(RETRY_HEADROOM),
+            None => self
+                .settings
+                .adaptive_concurrency
+                .max_concurrency_limit
+                .saturating_mul(RETRY_HEADROOM),
+        };
         ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
+            .concurrency_limit(max_logical_requests)
+            .retry(policy)
             .layer(AdaptiveConcurrencyLimitLayer::new(
                 self.settings.concurrency,
                 self.settings.adaptive_concurrency,
                 self.retry_logic.clone(),
             ))
-            .retry(policy)
             .timeout(self.settings.timeout)
             .service(inner)
     }
@@ -403,13 +424,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering::AcqRel},
+    use std::{
+        collections::HashSet,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, AtomicUsize, Ordering, Ordering::AcqRel},
+        },
     };
 
     use futures::{FutureExt, SinkExt, StreamExt, future, stream};
     use tokio::time::Duration;
+    use tower::ServiceExt as _;
     use vector_lib::json_size::JsonSize;
 
     use super::*;
@@ -571,6 +596,133 @@ mod tests {
             &*output,
             &vec![(0..10).collect::<Vec<_>>(), (10..20).collect::<Vec<_>>(),]
         );
+    }
+
+    fn retry_test_settings(concurrency: usize) -> TowerRequestSettings {
+        let cfg: TowerRequestConfig<GlobalTowerRequestConfigDefaults> = TowerRequestConfig {
+            concurrency: Concurrency::Fixed(concurrency),
+            retry_initial_backoff_secs: NonZeroU64::new(60).unwrap(),
+            retry_max_duration_secs: NonZeroU64::new(60).unwrap(),
+            retry_jitter_mode: JitterMode::None,
+            ..TowerRequestConfig::default()
+        };
+        cfg.into_settings()
+    }
+
+    fn buffered<S>(
+        settings: TowerRequestSettings,
+        inner: S,
+    ) -> impl Service<usize, Response = usize, Error = tower::BoxError, Future: Send> + Clone
+    where
+        S: Service<usize, Response = usize> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Future: Send + 'static,
+    {
+        tower::buffer::Buffer::new(
+            ServiceBuilder::new()
+                .settings(settings, RetryUsize)
+                .service(inner),
+            10,
+        )
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retry_backoff_does_not_hold_concurrency_permit() {
+        // The first attempt of requests 0 and 1 fails and they sleep in backoff, which would
+        // occupy both concurrency permits if retries were nested inside the limiter.
+        let seen = Arc::new(Mutex::new(HashSet::new()));
+        let inner = tower::service_fn(move |req: usize| {
+            if req < 2 && seen.lock().unwrap().insert(req) {
+                future::err::<usize, _>(std::io::Error::other("")).boxed()
+            } else {
+                future::ok::<_, std::io::Error>(req).boxed()
+            }
+        });
+        let svc = buffered(retry_test_settings(2), inner);
+
+        let first = tokio::spawn(svc.clone().oneshot(0));
+        let second = tokio::spawn(svc.clone().oneshot(1));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        // A third request must not be blocked by the other two's retry backoff.
+        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(2))
+            .await
+            .expect("request was blocked by other requests' retry backoff")
+            .unwrap();
+
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retrying_requests_are_bounded() {
+        let fifth_calls = Arc::new(AtomicUsize::new(0));
+        let inner = {
+            let fifth_calls = Arc::clone(&fifth_calls);
+            tower::service_fn(move |req: usize| {
+                if req == 4 {
+                    fifth_calls.fetch_add(1, Ordering::AcqRel);
+                }
+                future::err::<usize, _>(std::io::Error::other("")).boxed()
+            })
+        };
+        let svc = buffered(retry_test_settings(2), inner);
+
+        // With a concurrency of 2, four logical requests may be in flight. All keep failing.
+        for req in 0..4 {
+            tokio::spawn(svc.clone().oneshot(req));
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        // A fifth one must wait instead of piling up behind them.
+        tokio::time::timeout(Duration::from_secs(10), svc.clone().oneshot(4))
+            .await
+            .expect_err("request should be held back by the retry bound");
+        assert_eq!(fifth_calls.load(Ordering::Acquire), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn concurrency_of_one_keeps_retries_ordered() {
+        // Request 0 fails once. Request 1 must not overtake it while it is backing off.
+        let failed_once = Arc::new(AtomicBool::new(false));
+        let completed = Arc::new(Mutex::new(Vec::new()));
+        let inner = {
+            let completed = Arc::clone(&completed);
+            tower::service_fn(move |req: usize| {
+                if req == 0 && !failed_once.swap(true, AcqRel) {
+                    future::err::<usize, _>(std::io::Error::other("")).boxed()
+                } else {
+                    completed.lock().unwrap().push(req);
+                    future::ok::<_, std::io::Error>(req).boxed()
+                }
+            })
+        };
+        let svc = buffered(retry_test_settings(1), inner);
+
+        let first = tokio::spawn(svc.clone().oneshot(0));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let second = tokio::spawn(svc.clone().oneshot(1));
+
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
+        assert_eq!(*completed.lock().unwrap(), vec![0, 1]);
+    }
+
+    #[derive(Clone, Debug, Copy)]
+    struct RetryUsize;
+
+    impl RetryLogic for RetryUsize {
+        type Error = std::io::Error;
+        type Request = usize;
+        type Response = usize;
+
+        fn is_retriable_error(&self, _: &Self::Error) -> bool {
+            true
+        }
+
+        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction<Self::Request> {
+            RetryAction::Successful
+        }
     }
 
     #[derive(Clone, Debug, Copy)]
