@@ -42,7 +42,6 @@ use crate::{
 };
 
 /// Contains the inputs generic to any http client.
-#[derive(Clone)]
 pub(crate) struct GenericHttpClientInputs {
     /// Array of URLs to call.
     pub urls: Vec<Uri>,
