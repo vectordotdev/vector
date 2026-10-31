@@ -68,15 +68,10 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 		}
 	}
 	api_key: {
+		deprecated:         true
+		deprecated_message: "API keys are not supported by Google Cloud Storage, use `credentials_path` or default GCE credentials instead."
 		description: """
 			An [API key][gcp_api_key].
-
-			Either an API key or a path to a service account credentials JSON file can be specified.
-
-			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
-			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
-			running on. If this is not on a GCE instance, then you must define it with an API key or service account
-			credentials JSON file.
 
 			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
@@ -165,12 +160,9 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 		description: """
 			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
 
-			Either an API key or a path to a service account credentials JSON file can be specified.
-
-			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
-			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
-			running on. If this is not on a GCE instance, then you must define it with an API key or service account
-			credentials JSON file.
+			If unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked. If that
+			is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
+			service if running on a GCE instance.
 
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
 			"""
