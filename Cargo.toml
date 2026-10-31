@@ -487,6 +487,7 @@ roaring = { version = "0.11.2", default-features = false, features = ["std"], op
 # Select MQTT's provider explicitly because VRL also enables Rustls's AWS-LC provider.
 rumqttc = { package = "rumqttc-v4-next", version = "0.34.0", default-features = false, features = ["use-rustls-ring"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
+sha2 = { version = "0.10.9", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2.workspace = true
@@ -737,6 +738,7 @@ sources-logs = [
   "sources-internal_logs",
   "sources-journald",
   "sources-kafka",
+  "sources-kubernetes_events",
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-mqtt",
@@ -796,6 +798,7 @@ sources-internal_metrics = []
 sources-static_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
+sources-kubernetes_events = ["kubernetes"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
