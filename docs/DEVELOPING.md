@@ -59,7 +59,7 @@ Loosely, you'll need the following:
     - `gssapi-vendored` (or `vendored`, which includes it): builds `libsasl2` and `krb5` from bundled source. No system install needed. Linux only; the bundled path does not currently link on macOS arm64.
 
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
-- **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
+- **To run integration tests:** Have `docker` available. See [Integration tests](#integration-tests) for service lifecycle controls.
 - **To run `make check-component-features`:** Have `remarshal` installed.
 - **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `make generate-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
@@ -71,6 +71,7 @@ bash scripts/environment/prepare.sh
 ```
 
 This is the same script CI uses to provision its toolchain, so what you get locally matches what CI installs.
+For cross-compilation alone, run `bash scripts/environment/prepare.sh --modules=cross` before using the Make targets.
 
 We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
@@ -88,13 +89,12 @@ make test SCOPE="sources::example"
 # Validate tests (that do not require other services) pass
 cargo test
 make test
-# Validate your tests pass (starting required services in Docker)
-make test-integration SCOPE="sources::example"
+# Run an integration suite (starting and stopping required services in Docker)
+cargo vdev integration run amqp
 # Validate your tests pass against a live service.
-make test-integration SCOPE="sources::example" autospawn=false
 cargo test --features docker sources::example
-# Validate all tests pass (starting required services in Docker)
-make test-integration
+# List available integration suites
+cargo vdev integration show
 # Run your benchmarks
 make bench SCOPE="transforms::example"
 cargo bench transforms::example
@@ -322,15 +322,28 @@ to run. A few rules when setting up integration tests:
       run in a Docker container.
 - [ ] The service must be configured on a unique port that is configured through
       an environment variable.
-- [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
-      ensure that it starts the service before running the integration test.
-- [ ] Add the name of your integration to the include matrix of the `test-integration` job to Vector's
-      [`.github/workflows/integration-test.yml`](../.github/workflows/integration-test.yml) workflow.
+- [ ] Add `test.yaml` under `tests/integration/<name>/config`, and `compose.yaml`
+      if the integration needs Compose-managed services.
+- [ ] Add the integration to the service matrices in
+      [`.github/workflows/integration.yml`](../.github/workflows/integration.yml) and
+      [`.github/workflows/ci-integration-review.yml`](../.github/workflows/ci-integration-review.yml).
 
 Once complete, you can run your integration tests with:
 
 ```bash
-make test-integration-<name>
+cargo vdev integration run <name>
+```
+
+This command starts each configured environment, runs its tests, and stops it
+even when tests fail.
+
+For repeated tests or debugging, manage the environment explicitly:
+
+```bash
+cargo vdev integration start <name>
+cargo vdev integration test <name>
+# Repeat the test command while iterating, then stop the environment.
+cargo vdev integration stop <name>
 ```
 
 ### Blackbox tests
@@ -577,7 +590,7 @@ E2E (end-to-end) tests.
 - `docker`
 - `kubectl`
 - `bash`
-- `cross` - `cargo install cross`
+- `cross` - `bash scripts/environment/prepare.sh --modules=cross`
 - [`helm`](https://helm.sh/)
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that

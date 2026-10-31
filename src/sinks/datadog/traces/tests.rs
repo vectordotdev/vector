@@ -31,6 +31,16 @@ async fn start_test(
     http_status_code: StatusCode,
     events: Vec<Event>,
 ) -> Receiver<(http::request::Parts, Bytes)> {
+    start_test_with_config("", batch_status, http_status_code, events).await
+}
+
+/// Submit traces to a dummy http server, with `extra_config` appended to the sink configuration.
+async fn start_test_with_config(
+    extra_config: &str,
+    batch_status: BatchStatus,
+    http_status_code: StatusCode,
+    events: Vec<Event>,
+) -> Receiver<(http::request::Parts, Bytes)> {
     assert_sink_compliance(&SINK_TAGS, async {
         let (_guard, addr) = next_addr();
         let config = format!(
@@ -38,8 +48,9 @@ async fn start_test(
             default_api_key = "atoken"
             compression = "none"
             endpoint = "http://{}"
+            {}
         "#},
-            addr
+            addr, extra_config
         );
         let (config, cx) = load_sink::<DatadogTracesConfig>(&config).unwrap();
         let (sink, _) = config.build(cx).await.unwrap();
@@ -400,4 +411,25 @@ async fn override_global_options() {
         keys.iter()
             .all(|value| value.to_str().unwrap() == "local-key")
     );
+}
+
+#[tokio::test]
+async fn disable_apm_stats_sends_no_stats_payload() {
+    let mut t = simple_trace_event("a_resource".to_string());
+    t.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
+    let events = vec![Event::Trace(t)];
+    let rx = start_test_with_config(
+        "disable_apm_stats = true",
+        BatchStatus::Delivered,
+        StatusCode::OK,
+        events,
+    )
+    .await;
+
+    // The test server is shut down once the sink has run, so the stream ends after the
+    // requests it received.
+    let output = rx.collect::<Vec<_>>().await;
+    assert_eq!(output.len(), 1);
+    let (trace_parts, _) = &output[0];
+    assert_eq!(trace_parts.uri.path(), "/api/v0.2/traces");
 }

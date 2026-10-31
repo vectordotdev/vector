@@ -106,7 +106,10 @@ impl HttpResourceConfig {
     pub fn spawn_as_output(self, ctx: HttpResourceOutputContext) -> vector_lib::Result<()> {
         match ctx.direction {
             // We'll pull data from the sink.
-            ResourceDirection::Pull => Ok(ctx.spawn_output_http_client(self)),
+            ResourceDirection::Pull => {
+                ctx.spawn_output_http_client(self);
+                Ok(())
+            }
             // The sink will push data to us.
             ResourceDirection::Push => ctx.spawn_output_http_server(self),
         }

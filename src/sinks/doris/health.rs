@@ -1,8 +1,6 @@
-use crate::{
-    http::HttpError,
-    sinks::{doris::service::DorisResponse, util::service::HealthLogic},
-};
+use crate::sinks::{doris::service::DorisResponse, util::service::HealthLogic};
 use tracing::{debug, error};
+use vector_http::HttpError;
 
 #[derive(Clone)]
 pub struct DorisHealthLogic;

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use azure_core::credentials::TokenCredential;
 use http_1::uri::PathAndQuery;
 
-use vector_http::HttpError;
 use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
@@ -151,7 +150,7 @@ impl AzureLogsIngestionConfig {
         )?;
         let healthcheck = service.healthcheck();
 
-        let retry_logic = HttpStatusRetryLogic::<_, _, _, HttpError>::new_with_error(
+        let retry_logic = HttpStatusRetryLogic::new(
             |res: &AzureLogsIngestionResponse| res.http_status,
             self.retry_strategy.clone(),
         );

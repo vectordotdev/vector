@@ -1,11 +1,11 @@
 use std::{fs::File, io::Read};
 
-use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, future::ready, stream};
-use http::{Request, StatusCode};
+use http::StatusCode;
 use serde_json::{Value, json};
+use vector_http::full_body;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry, log_schema},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
@@ -15,8 +15,8 @@ use vrl::event_path;
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
-    config::{ProxyConfig, SinkConfig, SinkContext},
-    http::{HttpClient, ParameterValue, QueryParameterValue},
+    config::{SinkConfig, SinkContext},
+    http::{ParameterValue, QueryParameterValue, client_v1::HttpClient},
     sinks::{
         HealthcheckError,
         util::{BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, auth::Auth},
@@ -83,11 +83,8 @@ fn https_server() -> HttpEndpoint {
 }
 
 impl ElasticsearchCommon {
-    async fn flush_request(&self) -> crate::Result<()> {
-        let url = format!("{}/_flush", self.base_url)
-            .parse::<hyper::Uri>()
-            .unwrap();
-        let mut builder = Request::post(&url);
+    async fn flush_request(&self, client: &HttpClient) -> crate::Result<()> {
+        let mut builder = http_1::Request::post(format!("{}/_flush", self.base_url));
 
         if let Some(ce) = self.request_builder.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
@@ -100,7 +97,7 @@ impl ElasticsearchCommon {
         let mut request = builder.body(Bytes::new())?;
         if let Some(auth) = &self.auth {
             match auth {
-                Auth::Basic(http_auth) => http_auth.apply(&mut request),
+                Auth::Basic(http_auth) => http_auth.apply_v1(&mut request),
                 #[cfg(feature = "aws-core")]
                 Auth::Aws {
                     credentials_provider: provider,
@@ -117,22 +114,19 @@ impl ElasticsearchCommon {
             }
         }
 
-        let proxy = ProxyConfig::default();
-        let client = HttpClient::new(self.tls_settings.clone(), &proxy)
-            .expect("Could not build client to flush");
-        let response = client.send(request.map(SdkBody::from)).await?;
+        let response = client.send(request.map(full_body)).await?;
 
         match response.status() {
-            StatusCode::OK => Ok(()),
-            status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+            http_1::StatusCode::OK => Ok(()),
+            status => Err(HealthcheckError::unexpected_status(status).into()),
         }
     }
 }
 
-async fn flush(common: ElasticsearchCommon) -> crate::Result<()> {
+async fn flush(common: ElasticsearchCommon, client: &HttpClient) -> crate::Result<()> {
     use tokio::time::{Duration, sleep};
     sleep(Duration::from_secs(2)).await;
-    common.flush_request().await?;
+    common.flush_request(client).await?;
     sleep(Duration::from_secs(2)).await;
 
     Ok(())
@@ -267,7 +261,8 @@ async fn structures_events_correctly() {
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     // make sure writes are all visible
-    flush(common).await.unwrap();
+    let client = ElasticsearchCommon::build_client(&config, cx.proxy()).expect("Client error");
+    flush(common, &client).await.unwrap();
 
     let response = reqwest::Client::new()
         .get(format!("{base_url}/{index}/_search"))
@@ -843,7 +838,10 @@ async fn run_insert_tests_with_config(
     assert_eq!(receiver.try_recv(), Ok(batch_status));
 
     // make sure writes are all visible
-    flush(common).await.expect("Flushing writes failed");
+    let client = ElasticsearchCommon::build_client(config, cx.proxy()).expect("Client error");
+    flush(common, &client)
+        .await
+        .expect("Flushing writes failed");
 
     let index = match config.mode {
         ElasticsearchMode::DataStream => config
@@ -906,9 +904,15 @@ async fn run_insert_tests_with_config(
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
     let cx = SinkContext::default();
-    let commons = ElasticsearchCommon::parse_many(config, Distribution::Elasticsearch, cx.proxy())
-        .await
-        .expect("Config error");
+    let es_client = ElasticsearchCommon::build_client(config, cx.proxy()).expect("Client error");
+    let commons = ElasticsearchCommon::parse_many(
+        config,
+        Distribution::Elasticsearch,
+        cx.proxy(),
+        &es_client,
+    )
+    .await
+    .expect("Config error");
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(
@@ -938,7 +942,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
 
     // make sure writes are all visible
     for common in commons {
-        _ = flush(common).await;
+        _ = flush(common, &es_client).await;
     }
 
     let client = create_http_client();

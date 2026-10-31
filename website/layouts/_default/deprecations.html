@@ -26,23 +26,7 @@
           <p>The current Vector release is <strong>v{{ $latest }}</strong>. Deprecated configuration and features are retained for at least one minor release before they are eligible for removal.</p>
         </div>
 
-        <div class="mt-6 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
-          {{ range $pending }}
-          <div class="py-6 first:pt-0">
-            <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .what | markdownify }}
-            </span>
-            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Deprecated since {{ .deprecated_since }}
-            </div>
-            {{ with .content }}
-            <div class="mt-2.5 prose dark:prose-invert max-w-none">
-              {{ . }}
-            </div>
-            {{ end }}
-          </div>
-          {{ end }}
-        </div>
+        {{ partial "deprecations/list.html" (dict "entries" $pending "sort_by" "deprecation version") }}
       </div>
       {{ end }}
 
@@ -50,26 +34,10 @@
       <div class="mt-12">
         <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Past Deprecations" "level" 2) }}
-          <p>These features have been removed from Vector since version 0.57.0, when the new deprecation system was introduced.</p>
+          <p>These features have been removed from Vector as of version <strong>v{{ $latest }}</strong>.</p>
         </div>
 
-        <div class="mt-6 flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
-          {{ range $enacted }}
-          <div class="py-6 first:pt-0 opacity-75">
-            <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .what | markdownify }}
-            </span>
-            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
-            </div>
-            {{ with .content }}
-            <div class="mt-2.5 prose dark:prose-invert max-w-none">
-              {{ . }}
-            </div>
-            {{ end }}
-          </div>
-          {{ end }}
-        </div>
+        {{ partial "deprecations/list.html" (dict "entries" $enacted "sort_by" "removal version" "class" "opacity-75") }}
       </div>
       {{ end }}
 
