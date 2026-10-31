@@ -321,6 +321,10 @@ fn build_request_for_url(
 
     // add user specified headers
     for (header, value) in &inputs.headers {
+        // An explicit Host override belongs to the configured origin, not to the redirect target.
+        if cross_origin && header == http::header::HOST {
+            continue;
+        }
         // A 301, 302 or 303 can discard the original request body. Its framing headers must
         // not be carried over to the empty GET, even if they were explicitly configured.
         if body_dropped
@@ -744,6 +748,10 @@ mod tests {
             )
     }
 
+    fn echo_host() -> impl Filter<Extract = (String,), Error = warp::Rejection> + Clone {
+        warp::header::<String>("host")
+    }
+
     async fn send(
         url: &str,
         method: HttpMethod,
@@ -1099,6 +1107,77 @@ mod tests {
 
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, "GET|||session=1");
+    }
+
+    #[tokio::test]
+    async fn preserves_configured_host_within_the_same_origin() {
+        let routes = warp::path("start")
+            .and(redirect_to(StatusCode::FOUND, "/target"))
+            .or(warp::path("target").and(echo_host()));
+        let (_guard, addr) = next_addr();
+        tokio::spawn(warp::serve(routes).run(addr));
+        wait_for_tcp(addr).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(http::header::HOST, HeaderValue::from_static("original.example"));
+        let inputs = test_inputs(
+            Redirects {
+                follow: Some(true),
+                ..Default::default()
+            },
+            headers,
+            None,
+        );
+
+        let (status, host) = send(
+            &format!("http://{addr}/start"),
+            HttpMethod::Get,
+            None,
+            &inputs,
+        )
+        .await
+        .expect("redirected request should succeed");
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(host, "original.example");
+    }
+
+    #[tokio::test]
+    async fn uses_destination_host_on_cross_origin_redirect() {
+        let (_target_guard, target_addr) = next_addr();
+        tokio::spawn(warp::serve(warp::path("target").and(echo_host())).run(target_addr));
+        wait_for_tcp(target_addr).await;
+
+        let routes = warp::path("start").and(redirect_to(
+            StatusCode::FOUND,
+            &format!("http://{target_addr}/target"),
+        ));
+        let (_guard, addr) = next_addr();
+        tokio::spawn(warp::serve(routes).run(addr));
+        wait_for_tcp(addr).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(http::header::HOST, HeaderValue::from_static("original.example"));
+        let inputs = test_inputs(
+            Redirects {
+                follow: Some(true),
+                ..Default::default()
+            },
+            headers,
+            None,
+        );
+
+        let (status, host) = send(
+            &format!("http://{addr}/start"),
+            HttpMethod::Get,
+            None,
+            &inputs,
+        )
+        .await
+        .expect("redirected request should succeed");
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(host, target_addr.to_string());
     }
 
     #[tokio::test]
