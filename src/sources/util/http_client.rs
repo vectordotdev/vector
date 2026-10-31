@@ -307,6 +307,7 @@ fn build_request_for_url(
     inputs: &GenericHttpClientInputs,
     body: Option<&Bytes>,
     cross_origin: bool,
+    body_dropped: bool,
 ) -> Result<Request<Body>, http::Error> {
     let mut builder = match http_method {
         HttpMethod::Head => Request::head(url),
@@ -320,6 +321,13 @@ fn build_request_for_url(
 
     // add user specified headers
     for (header, value) in &inputs.headers {
+        // A 301, 302 or 303 can discard the original request body. Its framing headers must
+        // not be carried over to the empty GET, even if they were explicitly configured.
+        if body_dropped
+            && (header == http::header::CONTENT_LENGTH || header == http::header::TRANSFER_ENCODING)
+        {
+            continue;
+        }
         builder = builder.header(header, value);
     }
 
@@ -397,8 +405,9 @@ async fn send_http_request(
     body: Option<&Bytes>,
     url: &Uri,
     cross_origin: bool,
+    body_dropped: bool,
 ) -> Result<http::Response<Body>, Error> {
-    let request = build_request_for_url(url, http_method, inputs, body, cross_origin)?;
+    let request = build_request_for_url(url, http_method, inputs, body, cross_origin, body_dropped)?;
     client.send(request).await.map_err(Error::from)
 }
 
@@ -424,6 +433,7 @@ async fn send_request_with_redirects(
                 body.as_ref(),
                 &initial_url,
                 false,
+                false,
             ),
         )
         .await
@@ -440,6 +450,7 @@ async fn send_request_with_redirects(
     let mut http_method = http_method;
     let mut body = body;
     let mut redirects = 0;
+    let mut body_dropped = false;
 
     loop {
         let remaining_timeout = deadline.saturating_duration_since(Instant::now());
@@ -459,6 +470,7 @@ async fn send_request_with_redirects(
                 body.as_ref(),
                 &request_uri,
                 cross_origin,
+                body_dropped,
             ),
         )
         .await
@@ -495,6 +507,7 @@ async fn send_request_with_redirects(
         if matches!(status.as_u16(), 301 | 302 | 303) && http_method != HttpMethod::Head {
             http_method = HttpMethod::Get;
             body = None;
+            body_dropped = true;
         }
 
         debug!(
@@ -771,6 +784,74 @@ mod tests {
             status,
         )
         .into_response()
+    }
+
+    #[test]
+    fn body_framing_headers_are_only_dropped_after_method_rewrite() {
+        let mut headers = HeaderMap::new();
+        headers.insert(http::header::CONTENT_LENGTH, HeaderValue::from_static("7"));
+        headers.insert(http::header::TRANSFER_ENCODING, HeaderValue::from_static("chunked"));
+        headers.insert(http::header::CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+        let inputs = test_inputs(Redirects::default(), headers, None);
+        let url = "http://example.com/target".parse::<Uri>().unwrap();
+        let body = Bytes::from_static(b"payload");
+
+        let initial = build_request_for_url(
+            &url,
+            HttpMethod::Post,
+            &inputs,
+            Some(&body),
+            false,
+            false,
+        )
+        .unwrap();
+        assert_eq!(initial.headers()[http::header::CONTENT_LENGTH], "7");
+        assert_eq!(initial.headers()[http::header::TRANSFER_ENCODING], "chunked");
+
+        let redirected = build_request_for_url(&url, HttpMethod::Get, &inputs, None, false, true)
+            .unwrap();
+        assert!(!redirected.headers().contains_key(http::header::CONTENT_LENGTH));
+        assert!(!redirected.headers().contains_key(http::header::TRANSFER_ENCODING));
+        assert_eq!(redirected.headers()[http::header::CONTENT_TYPE], "text/plain");
+    }
+
+    #[tokio::test]
+    async fn redirected_get_does_not_send_the_original_content_length() {
+        let target = warp::path("target")
+            .and(warp::method())
+            .and(warp::header::optional::<String>("content-length"))
+            .map(|method: http::Method, content_length: Option<String>| {
+                format!("{}|{}", method.as_str(), content_length.unwrap_or_default())
+            });
+        let routes = warp::path("start")
+            .and(redirect_to(StatusCode::FOUND, "/target"))
+            .or(target);
+        let (_guard, addr) = next_addr();
+        tokio::spawn(warp::serve(routes).run(addr));
+        wait_for_tcp(addr).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(http::header::CONTENT_LENGTH, HeaderValue::from_static("7"));
+        let inputs = test_inputs(
+            Redirects {
+                follow: Some(true),
+                ..Default::default()
+            },
+            headers,
+            None,
+        );
+
+        let (status, body) = send(
+            &format!("http://{addr}/start"),
+            HttpMethod::Post,
+            Some("payload"),
+            &inputs,
+        )
+        .await
+        .expect("redirected request should succeed");
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(body == "GET|" || body == "GET|0", "unexpected request: {body}");
     }
 
     #[tokio::test]
