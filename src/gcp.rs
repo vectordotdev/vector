@@ -88,15 +88,16 @@ pub struct GcpCredentialsConfig {
 impl GcpCredentialsConfig {
     /// # Errors
     /// Returns an error if credentials are invalid or token retrieval fails.
-    pub async fn build(&self, scope: Scope) -> crate::Result<GcpAuthenticator> {
+    pub async fn build(&self, scope: Scope, api_key: Option<&SensitiveString>) -> crate::Result<GcpAuthenticator> {
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
         } else {
             let gap = std::env::var(GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR).ok();
             let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
-            match creds_path {
-                Some(path) => GcpAuthenticator::from_file(path, scope).await?,
-                None => GcpAuthenticator::new_implicit().await?,
+            match (creds_path, api_key) {
+                (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
+                (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
+                (None, None) => GcpAuthenticator::new_implicit().await?,
             }
         })
     }

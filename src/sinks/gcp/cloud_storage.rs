@@ -308,7 +308,7 @@ impl ValidatedSink for GcsSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedGcsSink { base_url, .. } = validated;
 
-        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+        let auth = self.auth.build(Scope::DevStorageReadWrite, self.api_key.as_ref()).await?;
 
         if self.api_key.is_some() {
             warn!(
