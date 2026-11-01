@@ -275,9 +275,12 @@ impl Config {
                 if source.inner.can_acknowledge() {
                     source.sink_acknowledgements.push(acknowledgements_config);
                 } else {
-                    if acknowledgements_config.enabled() {
+                    if acknowledgements_config
+                        .merge_default(&self.global.acknowledgements)
+                        .enabled()
+                    {
                         warn!(
-                            message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
+                            message = "Source has acknowledgements enabled by a sink or effectively by the global config, but acknowledgements are not supported by this source. Silent data loss could occur.",
                             source = component.id(),
                             sink = sink.id(),
                         );
@@ -1262,8 +1265,8 @@ mod acknowledgements_tests {
         for source in config.sources.values() {
             assert_eq!(
                 source.sink_acknowledgements,
-                vec![None.into()],
-                "Source `sink_acknowledgements` should be `vec![None]` before propagation"
+                vec![],
+                "Source `sink_acknowledgements` should be `[]` before propagation"
             );
         }
 
