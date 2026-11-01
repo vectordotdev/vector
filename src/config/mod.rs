@@ -273,7 +273,9 @@ impl Config {
             let component = &input.component;
             if let Some(source) = self.sources.get_mut(component) {
                 if source.inner.can_acknowledge() {
-                    source.sink_acknowledgements.push(acknowledgements_config);
+                    source
+                        .sink_acknowledgements
+                        .insert(sink.id().to_string(), acknowledgements_config);
                 } else {
                     if acknowledgements_config
                         .merge_default(&self.global.acknowledgements)
@@ -1265,17 +1267,26 @@ mod acknowledgements_tests {
         for source in config.sources.values() {
             assert_eq!(
                 source.sink_acknowledgements,
-                vec![],
-                "Source `sink_acknowledgements` should be `[]` before propagation"
+                HashMap::new(),
+                "Source `sink_acknowledgements` should be empty before propagation"
             );
         }
 
         let config = config.build().unwrap();
 
         let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
-        assert_eq!(get("in1").sink_acknowledgements, vec![None.into()]);
-        assert_eq!(get("in2").sink_acknowledgements, vec![Some(true).into()]);
-        assert_eq!(get("in3").sink_acknowledgements, vec![Some(true).into()]);
+        assert_eq!(
+            get("in1").sink_acknowledgements,
+            HashMap::from([("out1".to_string(), None.into())])
+        );
+        assert_eq!(
+            get("in2").sink_acknowledgements,
+            HashMap::from([("out2".to_string(), Some(true).into())])
+        );
+        assert_eq!(
+            get("in3").sink_acknowledgements,
+            HashMap::from([("out3".to_string(), Some(true).into())])
+        );
     }
 }
 
