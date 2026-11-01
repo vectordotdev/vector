@@ -314,7 +314,10 @@ impl ValidatedSink for GcsSinkConfig {
 
         let ValidatedGcsSink { base_url, .. } = validated;
 
-        let auth = self.auth.build(Scope::DevStorageReadWrite, self.api_key.as_ref()).await?;
+        let auth = self
+            .auth
+            .build(Scope::DevStorageReadWrite, self.api_key.as_ref())
+            .await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls.into(), cx.proxy())?;

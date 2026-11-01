@@ -88,7 +88,11 @@ pub struct GcpCredentialsConfig {
 impl GcpCredentialsConfig {
     /// # Errors
     /// Returns an error if credentials are invalid or token retrieval fails.
-    pub async fn build(&self, scope: Scope, api_key: Option<&SensitiveString>) -> crate::Result<GcpAuthenticator> {
+    pub async fn build(
+        &self,
+        scope: Scope,
+        api_key: Option<&SensitiveString>,
+    ) -> crate::Result<GcpAuthenticator> {
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
         } else {
