@@ -14,10 +14,10 @@ use vector_lib::{
     },
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::{Kind, Value};
+use vrl::value::Kind;
 
 use crate::{
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -25,6 +25,8 @@ use crate::{
 
 mod channel;
 mod list;
+
+const KEY: &str = "key";
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -201,7 +203,7 @@ impl SourceConfig for RedisSourceConfig {
             .with_source_metadata(
                 Self::NAME,
                 redis_key_path,
-                &owned_value_path!("key"),
+                &owned_value_path!(KEY),
                 Kind::bytes(),
                 None,
             )
@@ -245,16 +247,9 @@ impl InputHandler {
 
                     let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
-                            self.log_namespace.insert_vector_metadata(
+                            self.log_namespace.insert_standard_vector_source_metadata(
                                 log,
-                                log_schema().source_type_key(),
-                                path!("source_type"),
-                                Value::from_static_str(RedisSourceConfig::NAME),
-                            );
-                            self.log_namespace.insert_vector_metadata(
-                                log,
-                                log_schema().timestamp_key(),
-                                path!("ingest_timestamp"),
+                                RedisSourceConfig::NAME,
                                 now,
                             );
 
@@ -262,7 +257,7 @@ impl InputHandler {
                                 RedisSourceConfig::NAME,
                                 log,
                                 self.redis_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                path!("key"),
+                                path!(KEY),
                                 self.key.as_str(),
                             );
                         }
