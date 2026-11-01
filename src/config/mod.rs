@@ -273,13 +273,15 @@ impl Config {
             let component = &input.component;
             if let Some(source) = self.sources.get_mut(component) {
                 if source.inner.can_acknowledge() {
-                    source.sink_acknowledgements = acknowledgements_config;
+                    source.sink_acknowledgements.push(acknowledgements_config);
                 } else {
-                    warn!(
-                        message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
-                        source = component.id(),
-                        sink = sink.id(),
-                    );
+                    if acknowledgements_config.enabled() {
+                        warn!(
+                            message = "Source has acknowledgements enabled by a sink, but acknowledgements are not supported by this source. Silent data loss could occur.",
+                            source = component.id(),
+                            sink = sink.id(),
+                        );
+                    }
                 }
             } else if let Some(transform) = self.transforms.get(component) {
                 let inputs = transform
@@ -1260,17 +1262,17 @@ mod acknowledgements_tests {
         for source in config.sources.values() {
             assert_eq!(
                 source.sink_acknowledgements,
-                None.into(),
-                "Source `sink_acknowledgements` should be `None` before propagation"
+                vec![None.into()],
+                "Source `sink_acknowledgements` should be `vec![None]` before propagation"
             );
         }
 
         let config = config.build().unwrap();
 
         let get = |key: &str| config.sources.get(&ComponentKey::from(key)).unwrap();
-        assert_eq!(get("in1").sink_acknowledgements, None.into());
-        assert_eq!(get("in2").sink_acknowledgements, Some(true).into());
-        assert_eq!(get("in3").sink_acknowledgements, Some(true).into());
+        assert_eq!(get("in1").sink_acknowledgements, vec![None.into()]);
+        assert_eq!(get("in2").sink_acknowledgements, vec![Some(true).into()]);
+        assert_eq!(get("in3").sink_acknowledgements, vec![Some(true).into()]);
     }
 }
 

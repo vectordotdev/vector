@@ -59,7 +59,7 @@ pub struct SourceOuter {
     pub graph: GraphConfig,
 
     #[serde(default, skip)]
-    pub sink_acknowledgements: AcknowledgementsConfig,
+    pub sink_acknowledgements: Vec<AcknowledgementsConfig>,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
@@ -71,7 +71,7 @@ impl SourceOuter {
         Self {
             proxy: ProxyConfig::default(),
             graph: GraphConfig::default(),
-            sink_acknowledgements: None.into(),
+            sink_acknowledgements: Default::default(),
             inner: inner.into(),
         }
     }
@@ -136,7 +136,7 @@ pub struct SourceContext {
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
-    pub acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: Vec<AcknowledgementsConfig>,
     pub schema: schema::Options,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
@@ -173,7 +173,7 @@ impl SourceContext {
                 shutdown: shutdown_signal,
                 out,
                 proxy: ProxyConfig::default(),
-                acknowledgements: Some(false).into(),
+                acknowledgements: vec![Some(false).into()],
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
                 extra_context: ExtraContext::default(),
@@ -201,7 +201,7 @@ impl SourceContext {
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: ProxyConfig::default(),
-            acknowledgements: Some(false).into(),
+            acknowledgements: vec![Some(false).into()],
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
             extra_context: ExtraContext::default(),
@@ -218,7 +218,7 @@ impl SourceContext {
         }
 
         config
-            .merge_default(&self.acknowledgements.into())
+            .merge_defaults(&self.acknowledgements)
             .merge_default(&self.globals.acknowledgements)
             .enabled()
     }
@@ -274,7 +274,7 @@ mod tests {
                 shutdown: ShutdownSignal::noop(),
                 out: SourceSender::builder().build(),
                 proxy: Default::default(),
-                acknowledgements: test_data.1.into(),
+                acknowledgements: vec![test_data.1.into()],
                 schema: Default::default(),
                 schema_definitions: Default::default(),
                 extra_context: Default::default(),

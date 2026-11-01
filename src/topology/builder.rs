@@ -425,7 +425,7 @@ impl<'a> Builder<'a> {
             shutdown: shutdown_signal,
             out: builder.build(),
             proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
-            acknowledgements: source.sink_acknowledgements,
+            acknowledgements: source.sink_acknowledgements.clone(),
             schema_definitions,
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
