@@ -306,15 +306,16 @@ impl ValidatedSink for GcsSinkConfig {
         validated: &ValidatedGcsSink,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ValidatedGcsSink { base_url, .. } = validated;
-
-        let auth = self.auth.build(Scope::DevStorageReadWrite, self.api_key.as_ref()).await?;
-
         if self.api_key.is_some() {
             warn!(
                 "DEPRECATED: The `api_key` option is deprecated and not supported by Google Cloud Storage. See https://vector.dev/deprecations/#gcp_cloud_storage_api_key for migration instructions."
             );
         }
+
+        let ValidatedGcsSink { base_url, .. } = validated;
+
+        let auth = self.auth.build(Scope::DevStorageReadWrite, self.api_key.as_ref()).await?;
+
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls.into(), cx.proxy())?;
         let healthcheck = build_healthcheck(
