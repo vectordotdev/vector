@@ -271,7 +271,9 @@ fn is_credit(line: &str) -> bool {
     let line = line.trim();
     ((line.starts_with("*Thanks to ") || line.starts_with("Thanks to "))
         && line.contains("](https://github.com/"))
-        || ((line.starts_with("[PR #") || line.starts_with("~~[PR #"))
+        || ((line.starts_with("authors: ")
+            || line.starts_with("[PR #")
+            || line.starts_with("~~[PR #"))
             && PULL_REQUEST.is_match(line))
 }
 
@@ -354,6 +356,20 @@ pub(super) fn cue_block(notes: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preserves_legacy_authors_credits() {
+        let credit = "authors: alice bob (https://github.com/vectordotdev/vrl/pull/1557)";
+        let notes = format!(
+            "## [0.29.0 (2025-12-11)]\n\n### Breaking Changes & Upgrade Guide\n\n\
+             - Required metadata was added.\n\n  {credit}\n"
+        );
+        let imported = extract(&notes, &Version::new(0, 62, 0));
+        assert_eq!(imported.migrations.len(), 1);
+        assert!(imported.migrations[0].migration.is_empty());
+        assert_eq!(imported.migrations[0].anchor, "vrl-pr-1557");
+        assert!(imported.notes.contains(credit));
+    }
 
     #[test]
     fn imports_declared_fields_and_keeps_legacy_migrations() {
