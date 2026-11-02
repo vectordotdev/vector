@@ -247,7 +247,7 @@
             {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
           </div>
 
-          <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+          <div class="changelog-card mt-2 border bg-gray-50/50 px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
             {{ partial "download/download-matrix.html" (dict "version" $version) }}
           </div>
         </div>
