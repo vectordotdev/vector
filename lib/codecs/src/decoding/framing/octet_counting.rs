@@ -1,11 +1,14 @@
 use std::io;
 
 use bytes::{Buf, Bytes, BytesMut};
-use tokio_util::codec::LinesCodecError;
+use memchr::memchr;
+use tokio_util::codec::{Decoder, LinesCodecError};
 use tracing::trace;
+use vector_common::internal_event::emit;
 use vector_config::configurable_component;
 
 use super::{BoxedFramingError, CharacterDelimitedDecoder};
+use crate::internal_events::DecoderFrameTooLongError;
 
 /// Config used to build a `OctetCountingDecoder`.
 #[configurable_component]
@@ -43,6 +46,9 @@ pub struct OctetCountingDecoderOptions {
 pub struct OctetCountingDecoder {
     other: CharacterDelimitedDecoder,
     octet_decoding: Option<State>,
+    /// Whether the newline-delimited fallback is currently discarding the
+    /// remainder of an oversized, non-terminated frame.
+    newline_discarding: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +65,7 @@ impl OctetCountingDecoder {
         Self {
             other: CharacterDelimitedDecoder::new(b'\n'),
             octet_decoding: None,
+            newline_discarding: false,
         }
     }
 
@@ -68,6 +75,7 @@ impl OctetCountingDecoder {
         Self {
             other: CharacterDelimitedDecoder::new_with_max_length(b'\n', max_length),
             octet_decoding: None,
+            newline_discarding: false,
         }
     }
 
@@ -233,6 +241,41 @@ impl OctetCountingDecoder {
         self.octet_decoding
             .map(|state| self.octet_decode(state, src))
     }
+
+    /// Newline-delimited fallback decoding on raw bytes.
+    ///
+    /// `CharacterDelimitedDecoder` only enforces `max_length` once a
+    /// delimiter (or EOF) is seen, so a sender streaming a frame that never
+    /// terminates would grow the read buffer without bound. This wrapper
+    /// restores the incremental enforcement of the previous `LinesCodec`-
+    /// based fallback: as soon as the buffered bytes exceed `max_length`
+    /// with no newline in sight, they are discarded and the decoder keeps
+    /// discarding up to the next newline before resuming, keeping memory
+    /// bounded regardless of the sender's behavior.
+    fn newline_decode(&mut self, src: &mut BytesMut) -> Result<Option<Bytes>, BoxedFramingError> {
+        if self.newline_discarding {
+            // Discard the remainder of the oversized frame up to its newline.
+            match memchr(b'\n', src) {
+                Some(pos) => {
+                    src.advance(pos + 1);
+                    self.newline_discarding = false;
+                }
+                None => src.advance(src.len()),
+            }
+        } else if src.len() > self.other.max_length() && memchr(b'\n', src).is_none() {
+            // Over the limit and no delimiter in sight: drop what has been
+            // buffered so far and discard the rest of this frame as it
+            // arrives.
+            emit(DecoderFrameTooLongError {
+                length: src.len(),
+                max_length: self.other.max_length(),
+            });
+            src.advance(src.len());
+            self.newline_discarding = true;
+            return Ok(None);
+        }
+        self.other.decode(src)
+    }
 }
 
 impl Default for OctetCountingDecoder {
@@ -254,8 +297,7 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
             // handling is left to the deserializer. A trailing `\r` is
             // stripped to preserve the behavior of the previous
             // `LinesCodec`-based fallback.
-            self.other
-                .decode(src)
+            self.newline_decode(src)
                 .map(|line| line.map(strip_trailing_carriage_return))
         }
     }
@@ -265,9 +307,13 @@ impl tokio_util::codec::Decoder for OctetCountingDecoder {
             ret.map_err(Into::into)
         } else {
             // Octet counting isn't used so fallback to newline codec.
-            self.other
-                .decode_eof(buf)
-                .map(|line| line.map(strip_trailing_carriage_return))
+            match self.newline_decode(buf)? {
+                Some(bytes) => Ok(Some(strip_trailing_carriage_return(bytes))),
+                None => self
+                    .other
+                    .decode_eof(buf)
+                    .map(|line| line.map(strip_trailing_carriage_return)),
+            }
         }
     }
 }
@@ -386,6 +432,50 @@ mod tests {
             Ok(Some("<57>Mar 25 21:47:46 host app: msg".into())),
             result.map_err(|_| false)
         );
+    }
+
+    #[test]
+    fn non_octet_decode_bounds_buffer_without_newline() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(64);
+        let mut buffer = BytesMut::with_capacity(128);
+
+        // A sender streaming a never-terminating newline-delimited frame:
+        // once the buffered bytes exceed `max_length` with no newline in
+        // sight, the decoder must consume them instead of buffering
+        // indefinitely (restores the incremental enforcement of the old
+        // `LinesCodec` fallback).
+        buffer.put(&b"<57>Mar 25 21:47:46 host app: "[..]);
+        buffer.put(&vec![b'x'; 128][..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+        assert!(
+            buffer.is_empty(),
+            "oversized unterminated frame must be consumed"
+        );
+        assert!(decoder.newline_discarding);
+
+        // The rest of the oversized frame is discarded up to its newline...
+        buffer.put(&b"tail of the oversized frame\n"[..]);
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
+
+        // ...and framing resumes with the next well-formed line.
+        buffer.put(&b"<57>next\n"[..]);
+        assert_eq!(
+            Ok(Some("<57>next".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
+    }
+
+    #[test]
+    fn non_octet_decode_drops_oversized_terminated_line() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
+        let mut buffer = BytesMut::with_capacity(64);
+
+        buffer.put(&b"<57>this line is way over sixteen bytes\n<57>ok\n"[..]);
+        assert_eq!(
+            Ok(Some("<57>ok".into())),
+            decoder.decode(&mut buffer).map_err(|_| false)
+        );
+        assert_eq!(Ok(None), decoder.decode(&mut buffer).map_err(|_| false));
     }
 
     #[test]
