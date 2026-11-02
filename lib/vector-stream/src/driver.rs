@@ -9,7 +9,7 @@ use vector_common::{
         ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
         RegisteredEventCache, SharedString, TaggedEventsSent, emit, register,
     },
-    request_metadata::{GroupedCountByteSize, MetaDescriptive},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestDelivery},
 };
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
@@ -25,6 +25,11 @@ pub trait DriverResponse {
     fn bytes_sent(&self) -> Option<usize> {
         None
     }
+}
+
+struct RequestAccounting {
+    event_count: usize,
+    delivery: Option<RequestDelivery>,
 }
 
 /// Drives the interaction between a stream of items and a service which processes them
@@ -181,7 +186,10 @@ where
                         let finalizers = req.take_finalizers();
                         let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
-                        let event_count = req.get_metadata().event_count();
+                        let accounting = RequestAccounting {
+                            event_count: req.get_metadata().event_count(),
+                            delivery: req.delivery(),
+                        };
 
                         let fut = svc.call(req)
                             .err_into()
@@ -189,7 +197,7 @@ where
                                 result,
                                 request_id,
                                 finalizers,
-                                event_count,
+                                accounting,
                                 bytes_sent.as_ref(),
                                 &events_sent,
                                 request_error_status,
@@ -216,11 +224,21 @@ where
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
-        event_count: usize,
+        accounting: RequestAccounting,
         bytes_sent: Option<&Registered<BytesSent>>,
         events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
         request_error_status: EventStatus,
     ) {
+        let partial_delivery = accounting.delivery.is_some();
+        let event_count = if let Some(delivery) = accounting.delivery {
+            let (sent, remaining) = delivery.snapshot();
+            if let Some(sent) = sent {
+                sent.emit_event(events_sent);
+            }
+            remaining
+        } else {
+            accounting.event_count
+        };
         match result {
             Err(error) => {
                 if matches!(
@@ -243,7 +261,12 @@ where
                         bytes_sent.emit(ByteSize(byte_size));
                     }
 
-                    response.events_sent().emit_event(events_sent);
+                    if !partial_delivery {
+                        response.events_sent().emit_event(events_sent);
+                    } else if event_count > 0 {
+                        // Earlier attempts may have removed permanently failed events.
+                        Self::emit_call_error(None, request_id, event_count);
+                    }
                 } else if matches!(
                     response.event_status(),
                     EventStatus::Rejected | EventStatus::Errored

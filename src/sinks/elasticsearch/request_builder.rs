@@ -1,6 +1,8 @@
 use bytes::Bytes;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, json_size::JsonSize, request_metadata::RequestMetadata,
+    EstimatedJsonEncodedSizeOf,
+    json_size::JsonSize,
+    request_metadata::{RequestDelivery, RequestMetadata},
 };
 
 use crate::{
@@ -74,6 +76,8 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         ElasticsearchRequest {
+            delivery: RequestDelivery::new(es_metadata.batch_size),
+            event_indices: (0..es_metadata.batch_size).collect(),
             payload: payload.into_payload(),
             finalizers: es_metadata.finalizers,
             batch_size: es_metadata.batch_size,

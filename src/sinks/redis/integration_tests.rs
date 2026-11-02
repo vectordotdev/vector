@@ -1,19 +1,36 @@
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
+
 use futures::stream;
 use rand::RngExt;
 use redis::AsyncCommands;
 use vector_lib::{
-    codecs::JsonSerializerConfig,
+    codecs::{JsonSerializerConfig, TextSerializerConfig},
     config::{Tags, Telemetry, init_telemetry},
     event::LogEvent,
+    stream::Driver,
 };
 
-use super::config::{
-    DataTypeConfig, ListMethod, ListOption, RedisSinkConfig, SortedSetMethod, SortedSetOption,
+use super::{
+    RedisEvent, RedisRequest,
+    config::{
+        DataTypeConfig, ListMethod, ListOption, RedisSinkConfig, RedisTowerRequestConfigDefaults,
+        SortedSetMethod, SortedSetOption,
+    },
+    request_builder::request_builder,
+    service::{RedisResponse, RedisService},
+    sink::{RedisConnection, RedisRetryLogic},
 };
 use crate::{
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent},
+    metrics::{self, Controller},
     serde::OneOrMany,
-    sinks::prelude::*,
+    sinks::{prelude::*, util::retries::JitterMode},
     template::Template,
     test_util::{
         components::{
@@ -30,6 +47,178 @@ fn redis_server() -> String {
 
 fn redis_sentinel_server() -> Vec<String> {
     vec![std::env::var("SENTINEL_URL").unwrap_or_else(|_| "redis://127.0.0.1:26379/".to_owned())]
+}
+
+#[derive(Clone, Copy, Debug)]
+enum SubscriptionChange {
+    SubscribeOther,
+    Unsubscribe,
+    FailRetry,
+}
+
+#[tokio::test]
+async fn redis_channel_delivery_accounting_preserves_retries() {
+    assert_channel_retry(
+        SubscriptionChange::SubscribeOther,
+        BatchStatus::Errored,
+        0.0,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn redis_channel_retry_preserves_delivery_after_unsubscribe() {
+    assert_channel_retry(SubscriptionChange::Unsubscribe, BatchStatus::Errored, 1.0).await;
+}
+
+#[tokio::test]
+async fn redis_channel_transport_failure_preserves_delivery() {
+    assert_channel_retry(SubscriptionChange::FailRetry, BatchStatus::Rejected, 1.0).await;
+}
+
+async fn assert_channel_retry(
+    change: SubscriptionChange,
+    expected_status: BatchStatus,
+    expected_discarded: f64,
+) {
+    metrics::init_test();
+    let controller = Controller::get().unwrap();
+    controller.reset();
+    let client = redis::Client::open(redis_server()).unwrap();
+    let channel_prefix = format!("vector-retry-{}", random_string(10));
+    let connection = RedisConnection::new_direct(client.get_connection_manager().await.unwrap());
+    let service = RedisService {
+        conn: connection.clone(),
+        data_type: super::DataType::Channel,
+    };
+    let first_channel = format!("{channel_prefix}-first");
+    let second_channel = format!("{channel_prefix}-second");
+    let mut subscriber = client.get_async_pubsub().await.unwrap();
+    subscriber.subscribe(&first_channel).await.unwrap();
+    let subscriber = Arc::new(tokio::sync::Mutex::new(subscriber));
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let mut settings = TowerRequestConfig::<RedisTowerRequestConfigDefaults> {
+        retry_attempts: 2,
+        timeout_secs: 2,
+        retry_jitter_mode: JitterMode::None,
+        ..Default::default()
+    }
+    .into_settings();
+    settings.retry_initial_backoff = Duration::from_millis(1);
+    settings.retry_max_duration = Duration::from_millis(1);
+    let service = ServiceBuilder::new()
+        .settings(settings, RedisRetryLogic::new(connection))
+        .service(channel_retry_service(
+            service,
+            change,
+            Arc::clone(&subscriber),
+            Arc::clone(&attempts),
+            channel_prefix.clone(),
+        ));
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let events = [("first", first_channel), ("second", second_channel)]
+        .into_iter()
+        .map(|(message, key)| RedisEvent {
+            event: LogEvent::from(message).with_batch_notifier(&batch).into(),
+            key,
+            score: None,
+        })
+        .collect();
+    drop(batch);
+    let request = request_builder(
+        events,
+        &Transformer::default(),
+        &mut Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+    );
+    Driver::new(stream::iter([request]), service)
+        .run()
+        .await
+        .unwrap();
+    if matches!(change, SubscriptionChange::SubscribeOther) {
+        let mut subscriber = subscriber.lock().await;
+        let message = subscriber.on_message().next().await.unwrap();
+        assert_eq!(message.get_payload::<String>().unwrap(), "second");
+    }
+    assert_eq!(attempts.load(Ordering::Relaxed), 3);
+    let delivered = expected_status == BatchStatus::Delivered;
+    assert_redis_metrics(
+        &format!("{change:?}"),
+        expected_discarded,
+        if delivered { 0.0 } else { 1.0 },
+        2.0 - expected_discarded,
+    );
+    assert_eq!(receiver.await, expected_status, "{change:?}");
+}
+
+fn channel_retry_service(
+    service: RedisService,
+    change: SubscriptionChange,
+    subscriber: Arc<tokio::sync::Mutex<redis::aio::PubSub>>,
+    attempts: Arc<AtomicUsize>,
+    channel_prefix: String,
+) -> impl Service<RedisRequest, Response = RedisResponse, Error = super::RedisSinkError, Future: Send>
++ Clone {
+    tower::service_fn(move |request| {
+        let attempt = attempts.fetch_add(1, Ordering::Relaxed);
+        let mut service = service.clone();
+        let subscriber = Arc::clone(&subscriber);
+        let channel_prefix = channel_prefix.clone();
+        async move {
+            if attempt > 0 && matches!(change, SubscriptionChange::FailRetry) {
+                return Err(super::RedisSinkError::SendError {
+                    source: redis::RedisError::from((
+                        redis::ErrorKind::IoError,
+                        "fixture transport failure",
+                    )),
+                    generation: None,
+                });
+            }
+            let result = service.call(request).await;
+            if attempt == 0 {
+                assert_eq!(result.as_ref().unwrap().event_status, [true, false]);
+                let mut subscriber = subscriber.lock().await;
+                let message = subscriber.on_message().next().await.unwrap();
+                assert_eq!(message.get_payload::<String>().unwrap(), "first");
+                subscriber
+                    .unsubscribe(format!("{channel_prefix}-first"))
+                    .await
+                    .unwrap();
+                match change {
+                    SubscriptionChange::SubscribeOther => {
+                        subscriber
+                            .subscribe(format!("{channel_prefix}-second"))
+                            .await
+                            .unwrap();
+                    }
+                    SubscriptionChange::Unsubscribe | SubscriptionChange::FailRetry => {}
+                }
+            }
+            result
+        }
+    })
+}
+
+fn assert_redis_metrics(name: &str, discarded: f64, errors: f64, sent: f64) {
+    let metrics = Controller::get().unwrap().capture_metrics();
+    for (metric_name, expected) in [
+        ("component_discarded_events_total", discarded),
+        ("component_errors_total", errors),
+        ("component_sent_events_total", sent),
+    ] {
+        let count: f64 = metrics
+            .iter()
+            .filter(|metric| metric.name() == metric_name)
+            .map(|metric| match metric.value() {
+                MetricValue::Counter { value } => *value,
+                _ => panic!("{metric_name} must be a counter"),
+            })
+            .sum();
+        assert_eq!(
+            MetricValue::Counter { value: count },
+            MetricValue::Counter { value: expected },
+            "{name}: {metric_name}"
+        );
+    }
 }
 
 #[tokio::test]

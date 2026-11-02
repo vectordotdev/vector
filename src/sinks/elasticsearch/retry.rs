@@ -57,6 +57,23 @@ impl EsResultResponse {
     }
 }
 
+/// Accept only complete item results so successes remain aligned with request events.
+pub(super) fn successful_items(body: &[u8], event_count: usize) -> Option<Vec<bool>> {
+    let response: EsResultResponse = serde_json::from_slice(body).ok()?;
+    if response.items.len() != event_count {
+        return None;
+    }
+    response
+        .items
+        .iter()
+        .map(|item| {
+            StatusCode::from_u16(item.result().status?)
+                .ok()
+                .map(|status| status.is_success())
+        })
+        .collect()
+}
+
 #[derive(Deserialize, Debug)]
 enum EsResultItem {
     #[serde(rename = "index")]
@@ -173,6 +190,15 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 RequestMetadataBuilder::from_events(&failed_events);
                                             let metadata = metadata_builder.build(&encode_result);
                                             ElasticsearchRequest {
+                                                delivery: req.delivery,
+                                                event_indices: req
+                                                    .event_indices
+                                                    .into_iter()
+                                                    .zip(&status_codes)
+                                                    .filter_map(|(index, retry)| {
+                                                        retry.then_some(index)
+                                                    })
+                                                    .collect(),
                                                 payload: encode_result.into_payload(),
                                                 finalizers,
                                                 batch_size,
@@ -209,6 +235,25 @@ mod tests {
 
     use super::*;
     use crate::event::EventStatus;
+
+    #[test]
+    fn successful_items_requires_complete_valid_statuses() {
+        assert_eq!(
+            successful_items(
+                br#"{"items":[{"index":{"status":201}},{"create":{"status":400}}]}"#,
+                2
+            ),
+            Some(vec![true, false])
+        );
+        for body in [
+            b"invalid json".as_slice(),
+            br#"{"items":[{"index":{"status":201}}]}"#,
+            br#"{"items":[{"index":{"status":201}},{"index":{}}]}"#,
+            br#"{"items":[{"index":{"status":201}},{"index":{"status":99}}]}"#,
+        ] {
+            assert_eq!(successful_items(body, 2), None);
+        }
+    }
 
     #[test]
     fn handles_error_response() {

@@ -2,6 +2,8 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::request_metadata::RequestDelivery;
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
@@ -37,6 +39,8 @@ pub struct ElasticsearchRequest {
     pub batch_size: usize,
     pub events_byte_size: JsonSize,
     pub metadata: RequestMetadata,
+    pub delivery: RequestDelivery,
+    pub event_indices: Vec<usize>,
     pub original_events: Vec<ProcessedEvent>, //store original_events for reconstruct request when retrying
     pub elasticsearch_request_builder: ElasticsearchRequestBuilder,
 }
@@ -60,6 +64,10 @@ impl Finalizable for ElasticsearchRequest {
 }
 
 impl MetaDescriptive for ElasticsearchRequest {
+    fn delivery(&self) -> Option<RequestDelivery> {
+        Some(self.delivery.clone())
+    }
+
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
     }
@@ -212,6 +220,14 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         let protocol = Arc::clone(&self.protocol);
         let endpoint = Arc::clone(&self.endpoint);
         Box::pin(async move {
+            let delivery = req.delivery.clone();
+            let event_indices = std::mem::take(&mut req.event_indices);
+            let original_events = std::mem::take(&mut req.original_events);
+            let transformer = req
+                .elasticsearch_request_builder
+                .encoder
+                .transformer
+                .clone();
             let events_byte_size =
                 std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
             let request = http_request_builder
@@ -239,6 +255,29 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
             let http_response = Response::from_parts(parts, body.collect().await?.to_bytes());
 
             let event_status = get_event_status(&http_response);
+            let delivered = if event_status == EventStatus::Delivered {
+                Some(vec![true; original_events.len()])
+            } else if http_response.status().is_success() {
+                super::retry::successful_items(http_response.body(), original_events.len())
+            } else {
+                None
+            };
+            if let Some(delivered) = delivered {
+                for ((index, event), confirmed) in event_indices
+                    .into_iter()
+                    .zip(original_events)
+                    .zip(delivered)
+                {
+                    if confirmed {
+                        let mut event = crate::event::Event::from(event.log);
+                        transformer.transform(&mut event);
+                        let mut size =
+                            vector_lib::config::telemetry().create_request_count_byte_size();
+                        size.add_event(&event, event.estimated_json_encoded_size_of());
+                        delivery.record(index, size);
+                    }
+                }
+            }
             Ok(ElasticsearchResponse {
                 http_response,
                 event_status,

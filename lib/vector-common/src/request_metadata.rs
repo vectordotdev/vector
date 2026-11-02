@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     ops::{Add, AddAssign},
+    sync::{Arc, Mutex},
 };
 
 use crate::{
@@ -343,8 +344,62 @@ impl<'a> Add<&'a RequestMetadata> for RequestMetadata {
     }
 }
 
+/// Delivery progress shared by all attempts of one logical request.
+/// Each original event is counted at most once, even when a retry sends it again.
+#[derive(Clone, Debug)]
+pub struct RequestDelivery(Arc<Mutex<DeliveryProgress>>);
+
+#[derive(Debug)]
+struct DeliveryProgress {
+    delivered: Vec<bool>,
+    events_sent: Option<GroupedCountByteSize>,
+    remaining: usize,
+}
+
+impl RequestDelivery {
+    #[must_use]
+    pub fn new(event_count: usize) -> Self {
+        Self(Arc::new(Mutex::new(DeliveryProgress {
+            delivered: vec![false; event_count],
+            events_sent: None,
+            remaining: event_count,
+        })))
+    }
+
+    /// Records a confirmed delivery using its index in the original request.
+    ///
+    /// # Panics
+    /// Panics if the index is outside the original request or the lock is poisoned.
+    pub fn record(&self, index: usize, size: GroupedCountByteSize) {
+        let mut progress = self.0.lock().expect("Request delivery lock poisoned");
+        if !progress.delivered[index] {
+            progress.delivered[index] = true;
+            match &mut progress.events_sent {
+                Some(sent) => *sent += size,
+                None => progress.events_sent = Some(size),
+            }
+            progress.remaining -= 1;
+        }
+    }
+
+    /// Returns confirmed deliveries, if any, and the number of events still unconfirmed.
+    ///
+    /// # Panics
+    /// Panics if the lock is poisoned.
+    #[must_use]
+    pub fn snapshot(&self) -> (Option<GroupedCountByteSize>, usize) {
+        let progress = self.0.lock().expect("Request delivery lock poisoned");
+        (progress.events_sent.clone(), progress.remaining)
+    }
+}
+
 /// Objects implementing this trait have metadata that describes the request.
 pub trait MetaDescriptive {
+    /// Optional per-event accounting, independent of retry and finalizer decisions.
+    fn delivery(&self) -> Option<RequestDelivery> {
+        None
+    }
+
     /// Returns the `RequestMetadata` associated with this object.
     fn get_metadata(&self) -> &RequestMetadata;
 
@@ -371,6 +426,40 @@ mod tests {
                 service: self.service.clone(),
             }
         }
+    }
+
+    #[test]
+    fn delivery_progress_counts_each_event_once_across_attempts() {
+        let delivery = RequestDelivery::new(3);
+        let retry = delivery.clone();
+        delivery.record(0, CountByteSize(1, JsonSize::new(10)).into());
+        retry.record(0, CountByteSize(1, JsonSize::new(10)).into());
+        retry.record(2, CountByteSize(1, JsonSize::new(30)).into());
+        let (sent, remaining) = delivery.snapshot();
+        assert_eq!(remaining, 1);
+        assert_eq!(
+            sent.unwrap().size(),
+            Some(CountByteSize(2, JsonSize::new(40)))
+        );
+    }
+
+    #[test]
+    fn delivery_progress_preserves_event_tags() {
+        let delivery = RequestDelivery::new(2);
+        let mut expected = HashMap::new();
+        for (index, service) in ["first", "second"].into_iter().enumerate() {
+            let event = DummyEvent {
+                source: None.into(),
+                service: Some(service.to_owned()).into(),
+            };
+            let mut size = GroupedCountByteSize::new_tagged();
+            size.add_event(&event, JsonSize::new(12));
+            expected.insert(event.get_tags(), CountByteSize(1, JsonSize::new(12)));
+            delivery.record(index, size);
+        }
+        let (sent, remaining) = delivery.snapshot();
+        assert_eq!(remaining, 0);
+        assert_eq!(sent.unwrap().sizes(), Some(&expected));
     }
 
     #[test]

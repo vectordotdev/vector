@@ -30,21 +30,21 @@ impl Service<RedisRequest> for RedisService {
         let mut redis_conn = self.conn.clone();
         let mut pipe = redis::pipe();
 
-        for kv in kvs.request {
+        for kv in &kvs.request {
             match self.data_type {
                 super::DataType::List(method) => match method {
                     ListMethod::LPush => {
                         if count > 1 {
-                            pipe.atomic().lpush(kv.key, kv.value.as_ref());
+                            pipe.atomic().lpush(&kv.key, kv.value.as_ref());
                         } else {
-                            pipe.lpush(kv.key, kv.value.as_ref());
+                            pipe.lpush(&kv.key, kv.value.as_ref());
                         }
                     }
                     ListMethod::RPush => {
                         if count > 1 {
-                            pipe.atomic().rpush(kv.key, kv.value.as_ref());
+                            pipe.atomic().rpush(&kv.key, kv.value.as_ref());
                         } else {
-                            pipe.rpush(kv.key, kv.value.as_ref());
+                            pipe.rpush(&kv.key, kv.value.as_ref());
                         }
                     }
                 },
@@ -57,17 +57,17 @@ impl Service<RedisRequest> for RedisService {
                         )]
                         let score = kv.score.unwrap_or(0) as f64;
                         if count > 1 {
-                            pipe.atomic().zadd(kv.key, kv.value.as_ref(), score);
+                            pipe.atomic().zadd(&kv.key, kv.value.as_ref(), score);
                         } else {
-                            pipe.zadd(kv.key, kv.value.as_ref(), score);
+                            pipe.zadd(&kv.key, kv.value.as_ref(), score);
                         }
                     }
                 },
                 super::DataType::Channel => {
                     if count > 1 {
-                        pipe.atomic().publish(kv.key, kv.value.as_ref());
+                        pipe.atomic().publish(&kv.key, kv.value.as_ref());
                     } else {
-                        pipe.publish(kv.key, kv.value.as_ref());
+                        pipe.publish(&kv.key, kv.value.as_ref());
                     }
                 }
             }
@@ -81,12 +81,23 @@ impl Service<RedisRequest> for RedisService {
                 generation,
             } = redis_conn.get_connection_manager().await?;
 
-            match pipe.query_async(&mut conn).await {
-                Ok(event_status) => Ok(RedisResponse {
-                    event_status,
-                    events_byte_size: kvs.metadata.into_events_estimated_json_encoded_byte_size(),
-                    byte_size,
-                }),
+            match pipe.query_async::<Vec<bool>>(&mut conn).await {
+                Ok(event_status) => {
+                    for (index, (confirmed, entry)) in
+                        event_status.iter().zip(&kvs.request).enumerate()
+                    {
+                        if *confirmed {
+                            kvs.delivery.record(index, entry.events_byte_size.clone());
+                        }
+                    }
+                    Ok(RedisResponse {
+                        event_status,
+                        events_byte_size: kvs
+                            .metadata
+                            .into_events_estimated_json_encoded_byte_size(),
+                        byte_size,
+                    })
+                }
                 Err(error) => Err(RedisSinkError::SendError {
                     source: error,
                     generation,

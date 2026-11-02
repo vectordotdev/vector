@@ -344,12 +344,7 @@ impl RedisSink {
         };
 
         let service = ServiceBuilder::new()
-            .settings(
-                request,
-                RedisRetryLogic {
-                    connection: self.conn.clone(),
-                },
-            )
+            .settings(request, RedisRetryLogic::new(self.conn.clone()))
             .service(service);
 
         let mut encoder = self.encoder.clone();
@@ -377,6 +372,12 @@ impl StreamSink<Event> for RedisSink {
 #[derive(Clone)]
 pub(super) struct RedisRetryLogic {
     connection: RedisConnection,
+}
+
+impl RedisRetryLogic {
+    pub(super) const fn new(connection: RedisConnection) -> Self {
+        Self { connection }
+    }
 }
 
 impl RetryLogic for RedisRetryLogic {

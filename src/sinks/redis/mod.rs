@@ -17,6 +17,7 @@ use bytes::Bytes;
 use redis::RedisError;
 use snafu::Snafu;
 use tokio::sync::watch::error::RecvError;
+use vector_lib::request_metadata::RequestDelivery;
 
 use self::{
     config::{ListMethod, SortedSetMethod},
@@ -94,6 +95,7 @@ impl EstimatedJsonEncodedSizeOf for RedisEvent {
 
 #[derive(Clone)]
 pub(super) struct RedisRequest {
+    delivery: RequestDelivery,
     request: Vec<RedisKvEntry>,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
@@ -106,6 +108,10 @@ impl Finalizable for RedisRequest {
 }
 
 impl MetaDescriptive for RedisRequest {
+    fn delivery(&self) -> Option<RequestDelivery> {
+        Some(self.delivery.clone())
+    }
+
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
     }
@@ -117,6 +123,7 @@ impl MetaDescriptive for RedisRequest {
 
 #[derive(Debug, Clone)]
 pub(super) struct RedisKvEntry {
+    events_byte_size: GroupedCountByteSize,
     key: String,
     value: Bytes,
     score: Option<u64>,

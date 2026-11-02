@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
-use vector_lib::config::telemetry;
+use vector_lib::{config::telemetry, request_metadata::RequestDelivery};
 
 use super::{RedisEvent, RedisKvEntry, RedisRequest};
 use crate::sinks::{prelude::*, util::EncodedLength};
@@ -14,7 +14,9 @@ pub(super) fn encode_event(
     byte_size: &mut GroupedCountByteSize,
 ) -> Option<RedisKvEntry> {
     transformer.transform(&mut event);
-    byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+    let mut events_byte_size = telemetry().create_request_count_byte_size();
+    events_byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+    *byte_size += events_byte_size.clone();
 
     let mut bytes = BytesMut::new();
 
@@ -23,7 +25,12 @@ pub(super) fn encode_event(
 
     let value = bytes.freeze();
 
-    let event = RedisKvEntry { key, value, score };
+    let event = RedisKvEntry {
+        events_byte_size,
+        key,
+        value,
+        score,
+    };
     Some(event)
 }
 
@@ -71,8 +78,10 @@ pub(super) fn request_builder(
     let payload = encode_events(events, transformer, encoder);
     let metadata = builder.build(&payload);
 
+    let request = payload.into_payload();
     RedisRequest {
-        request: payload.into_payload(),
+        delivery: RequestDelivery::new(request.len()),
+        request,
         finalizers,
         metadata,
     }
